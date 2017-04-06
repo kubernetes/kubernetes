@@ -12878,8 +12878,22 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.LeaderElectionConfiguration"),
 							},
 						},
+						"lockObjectNamespace": {
+							SchemaProps: spec.SchemaProps{
+								Description: "LockObjectNamespace defines the namespace of the lock object",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"lockObjectName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "LockObjectName defines the lock object name",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
 					},
-					Required: []string{"port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection"},
+					Required: []string{"port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection", "lockObjectNamespace", "lockObjectName"},
 				},
 			},
 			Dependencies: []string{
