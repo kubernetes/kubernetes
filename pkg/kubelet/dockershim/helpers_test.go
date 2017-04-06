@@ -43,10 +43,10 @@ func TestLabelsAndAnnotationsRoundTrip(t *testing.T) {
 	assert.Equal(t, expectedAnnotations, actualAnnotations)
 }
 
-// TestGetContainerSecurityOpts tests the logic of generating container security options from sandbox annotations.
+// TestGetSeccompSecurityOpts tests the logic of generating container seccomp options from sandbox annotations.
 // The actual profile loading logic is tested in dockertools.
 // TODO: Migrate the corresponding test to dockershim.
-func TestGetContainerSecurityOpts(t *testing.T) {
+func TestGetSeccompSecurityOpts(t *testing.T) {
 	containerName := "bar"
 	makeConfig := func(annotations map[string]string) *runtimeapi.PodSandboxConfig {
 		return makeSandboxConfigWithLabelsAndAnnotations("pod", "ns", "1234", 1, nil, annotations)
@@ -78,29 +78,52 @@ func TestGetContainerSecurityOpts(t *testing.T) {
 			v1.SeccompPodAnnotationKey: "docker/default",
 		}),
 		expectedOpts: nil,
+	}}
+
+	for i, test := range tests {
+		opts, err := getSeccompSecurityOpts(containerName, test.config, "test/seccomp/profile/root", '=')
+		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
+		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
+		for _, opt := range test.expectedOpts {
+			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)
+		}
+	}
+}
+
+// TestGetApparmorSecurityOpts tests the logic of generating container apparmor options from sandbox annotations.
+// The actual profile loading logic is tested in dockertools.
+// TODO: Migrate the corresponding test to dockershim.
+func TestGetApparmorSecurityOpts(t *testing.T) {
+	makeConfig := func(profile string) *runtimeapi.ContainerConfig {
+		return &runtimeapi.ContainerConfig{
+			Linux: &runtimeapi.LinuxContainerConfig{
+				SecurityContext: &runtimeapi.LinuxContainerSecurityContext{
+					ApparmorProfile: profile,
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		msg          string
+		config       *runtimeapi.ContainerConfig
+		expectedOpts []string
+	}{{
+		msg:          "No AppArmor options",
+		config:       makeConfig(""),
+		expectedOpts: nil,
 	}, {
-		msg: "AppArmor runtime/default",
-		config: makeConfig(map[string]string{
-			apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileRuntimeDefault,
-		}),
-		expectedOpts: []string{"seccomp=unconfined"},
+		msg:          "AppArmor runtime/default",
+		config:       makeConfig("runtime/default"),
+		expectedOpts: []string{},
 	}, {
-		msg: "AppArmor local profile",
-		config: makeConfig(map[string]string{
-			apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileNamePrefix + "foo",
-		}),
-		expectedOpts: []string{"seccomp=unconfined", "apparmor=foo"},
-	}, {
-		msg: "AppArmor and seccomp profile",
-		config: makeConfig(map[string]string{
-			v1.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
-			apparmor.ContainerAnnotationKeyPrefix + containerName:  apparmor.ProfileNamePrefix + "foo",
-		}),
+		msg:          "AppArmor local profile",
+		config:       makeConfig(apparmor.ProfileNamePrefix + "foo"),
 		expectedOpts: []string{"apparmor=foo"},
 	}}
 
 	for i, test := range tests {
-		opts, err := getContainerSecurityOpts(containerName, test.config, "test/seccomp/profile/root", '=')
+		opts, err := getApparmorSecurityOpts(test.config, '=')
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
 		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
 		for _, opt := range test.expectedOpts {
