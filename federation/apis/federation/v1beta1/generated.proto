@@ -89,7 +89,8 @@ message ClusterList {
 message ClusterSelectorRequirement {
   optional string key = 1;
 
-  // Matches the Operator in apimachinery
+  // The Operator defines how the Key is matched to the Values. One of "in", "notin",
+  // "exists", "!", "=", "!=", "gt" or "lt".
   optional string operator = 2;
 
   // An array of string values. If the operator is "in" or "notin",

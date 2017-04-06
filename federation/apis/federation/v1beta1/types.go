@@ -129,7 +129,8 @@ type ClusterSelector []ClusterSelectorRequirement
 // ClusterSelectorRequirement implements both set based match and exact match
 type ClusterSelectorRequirement struct {
 	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
-	// Matches the Operator in apimachinery
+	// The Operator defines how the Key is matched to the Values. One of "in", "notin",
+    // "exists", "!", "=", "!=", "gt" or "lt".
 	Operator string `json:"operator" protobuf:"bytes,2,opt,name=operator"`
 	// An array of string values. If the operator is "in" or "notin",
 	// the values array must be non-empty. If the operator is "exists" or "!",

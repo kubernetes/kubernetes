@@ -1674,7 +1674,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"operator": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Matches the Operator in apimachinery",
+								Description: "The Operator defines how the Key is matched to the Values. One of \"in\", \"notin\", \"exists\", \"!\", \"=\", \"!=\", \"gt\" or \"lt\".",
 								Type:        []string{"string"},
 								Format:      "",
 							},
