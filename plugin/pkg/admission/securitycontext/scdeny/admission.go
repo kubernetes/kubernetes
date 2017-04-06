@@ -25,13 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-const (
-	supplementalGroups = "SupplementalGroups"
-	seLinuxOption      = "SELinuxOption"
-	runAsUser          = "RunAsUser"
-	fsGroup            = "FSGroup"
-)
-
 func init() {
 	admission.RegisterPlugin("SecurityContextDeny", func(config io.Reader) (admission.Interface, error) {
 		return NewSecurityContextDeny(), nil
@@ -80,45 +73,33 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 }
 
 func checkPodSecurityContext(podContext *api.PodSecurityContext) error {
-	var (
-		kind string
-		err  error
-	)
 	if podContext != nil {
-		if podContext.SupplementalGroups != nil {
-			kind = supplementalGroups
-		} else if podContext.SELinuxOptions != nil {
-			kind = seLinuxOption
-		} else if podContext.RunAsUser != nil {
-			kind = runAsUser
-		} else if podContext.FSGroup != nil {
-			kind = fsGroup
+		if podContext.SELinuxOptions != nil {
+			return fmt.Errorf("pod.Spec.SecurityContext.SELinuxOptions is forbidden")
 		}
-
-		if kind != "" {
-			err = fmt.Errorf("pod.Spec.SecurityContext.%s is forbidden", kind)
+		if podContext.RunAsUser != nil {
+			return fmt.Errorf("pod.Spec.SecurityContext.RunAsUser is forbidden")
+		}
+		if podContext.SupplementalGroups != nil {
+			return fmt.Errorf("pod.Spec.SecurityContext.SupplementalGroups is forbidden")
+		}
+		if podContext.FSGroup != nil {
+			return fmt.Errorf("pod.Spec.SecurityContext.FSGroup is forbidden")
 		}
 	}
 
-	return err
+	return nil
 }
 
 func checkSecurityContext(context *api.SecurityContext) error {
-	var (
-		kind string
-		err  error
-	)
 	if context != nil {
 		if context.SELinuxOptions != nil {
-			kind = seLinuxOption
-		} else if context.RunAsUser != nil {
-			kind = runAsUser
+			return fmt.Errorf("SecurityContext.SELinuxOptions is forbidden")
 		}
-
-		if kind != "" {
-			err = fmt.Errorf("SecurityContext.%s is forbidden", kind)
+		if context.RunAsUser != nil {
+			return fmt.Errorf("SecurityContext.RunAsUser is forbidden")
 		}
 	}
 
-	return err
+	return nil
 }
