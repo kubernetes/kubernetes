@@ -81,6 +81,7 @@ go_test(
         "resource_usage_test.go",
         "restart_test.go",
         "runtime_conformance_test.go",
+        "security_context_test.go",
         "summary_test.go",
         "volume_manager_test.go",
     ],
