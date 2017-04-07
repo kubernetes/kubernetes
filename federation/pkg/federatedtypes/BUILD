@@ -39,7 +39,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//federation/pkg/typeadapters/crudtester:all-srcs",
+        "//federation/pkg/federatedtypes/crudtester:all-srcs",
     ],
     tags = ["automanaged"],
 )
