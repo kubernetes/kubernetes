@@ -186,8 +186,8 @@ func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, se
 	return info
 }
 
+type endpointsMap map[types.NamespacedName]*api.Endpoints
 type proxyServiceMap map[proxy.ServicePortName]*serviceInfo
-
 type proxyEndpointMap map[proxy.ServicePortName][]*endpointsInfo
 
 // Proxier is an iptables based proxy for connections between a localhost:lport
@@ -203,6 +203,7 @@ type Proxier struct {
 	// by Proxier.
 	// nil until we have seen an On*Update event.
 	allServices  []*api.Service
+	// FIXME: Change to endpointsMap and fix comment.
 	allEndpoints []*api.Endpoints
 
 	throttle flowcontrol.RateLimiter
@@ -536,7 +537,31 @@ func (proxier *Proxier) OnServiceUpdate(allServices []*api.Service) {
 
 	utilproxy.DeleteServiceConnections(proxier.exec, staleUDPServices.List())
 }
+/*
+func (proxier *Proxier) OnEndpointsAdd(endpoints *api.Endpoints) {
+	namespacedName := types.NamespaceName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	proxier.allEndpoints[namespacedName] = endpoints
+}
+
+func (proxier *Proxier) OnEndpointsUpdate(_, endpoints *api.Endpoints) {
+	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	proxier.allEndpoints[namespacedName] = endpoints
+}
+
+func (proxier *Proxier) OnEndpointsDelete(endpoints *api.Endpoints) {
+	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	delete(proxier.allEndpoints, namespacedName)
+}
+*/
 // OnEndpointsUpdate takes in a slice of updated endpoints.
 func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []*api.Endpoints) {
 	proxier.mu.Lock()
