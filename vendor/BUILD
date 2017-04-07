@@ -11248,6 +11248,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/etcdtest",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/testing",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd3",
+        "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/pkg/api/install",
     ],
 )
@@ -11258,6 +11259,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apiserver/pkg/apis/example",
+        "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/pkg/api/install",
     ],
 )
