@@ -13,7 +13,7 @@ import (
 
 type Isolator interface {
 	// preStart Hook to be implemented by custom isolators
-	PreStart(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*lifecycle.CgroupResource, error)
+	PreStart(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*lifecycle.IsolationControl, error)
 	// postStop Hook to be implemented by custom isolators
 	PostStop(cgroupInfo *lifecycle.CgroupInfo) error
 }
@@ -37,23 +37,20 @@ func (n NotifyHandler) preStart(event *lifecycle.Event) (*lifecycle.EventReply, 
 	pod, err := getPod(event.Pod)
 	if err != nil {
 		return &lifecycle.EventReply{
-			Error:          err.Error(),
-			CgroupInfo:     event.CgroupInfo,
-			CgroupResource: []*lifecycle.CgroupResource{},
+			Error:             err.Error(),
+			IsolationControls: []*lifecycle.IsolationControl{},
 		}, err
 	}
 	resources, err := n.isolator.PreStart(pod, event.CgroupInfo)
 	if err != nil {
 		return &lifecycle.EventReply{
-			Error:          err.Error(),
-			CgroupInfo:     event.CgroupInfo,
-			CgroupResource: []*lifecycle.CgroupResource{},
+			Error:             err.Error(),
+			IsolationControls: []*lifecycle.IsolationControl{},
 		}, err
 	}
 	return &lifecycle.EventReply{
-		Error:          "",
-		CgroupInfo:     event.CgroupInfo,
-		CgroupResource: resources,
+		Error:             "",
+		IsolationControls: resources,
 	}, nil
 }
 
@@ -61,15 +58,13 @@ func (n NotifyHandler) preStart(event *lifecycle.Event) (*lifecycle.EventReply, 
 func (n NotifyHandler) postStop(event *lifecycle.Event) (*lifecycle.EventReply, error) {
 	if err := n.isolator.PostStop(event.CgroupInfo); err != nil {
 		return &lifecycle.EventReply{
-			Error:          err.Error(),
-			CgroupInfo:     event.CgroupInfo,
-			CgroupResource: []*lifecycle.CgroupResource{},
+			Error:             err.Error(),
+			IsolationControls: []*lifecycle.IsolationControl{},
 		}, err
 	}
 	return &lifecycle.EventReply{
-		Error:          "",
-		CgroupInfo:     event.CgroupInfo,
-		CgroupResource: []*lifecycle.CgroupResource{},
+		Error:             "",
+		IsolationControls: []*lifecycle.IsolationControl{},
 	}, nil
 }
 

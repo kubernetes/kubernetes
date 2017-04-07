@@ -76,25 +76,25 @@ func asCPUList(cores []int) string {
 }
 
 // implementation of preStart method in  isolator Interface
-func (c *coreAffinityIsolator) PreStart(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*lifecycle.CgroupResource, error) {
+func (c *coreAffinityIsolator) PreStart(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*lifecycle.IsolationControl, error) {
 	oirCores := c.countCoresFromOIR(pod)
 	glog.Infof("Pod %s requested %d cores", pod.Name, oirCores)
 
 	if oirCores == 0 {
 		glog.Infof("Pod %q isn't managed by this isolator", pod.Name)
-		return []*lifecycle.CgroupResource{}, nil
+		return []*lifecycle.IsolationControl{}, nil
 	}
 
 	reservedCores, err := c.reserveCPUs(oirCores)
 	if err != nil {
 		c.reclaimCPUs(reservedCores)
-		return []*lifecycle.CgroupResource{}, err
+		return []*lifecycle.IsolationControl{}, err
 	}
 
-	cgroupResource := []*lifecycle.CgroupResource{
+	cgroupResource := []*lifecycle.IsolationControl{
 		{
-			Value:           asCPUList(reservedCores),
-			CgroupSubsystem: lifecycle.CgroupResource_CPUSET_CPUS,
+			Value: asCPUList(reservedCores),
+			Kind:  lifecycle.IsolationControl_CGROUP_CPUSET_CPUS,
 		},
 	}
 	c.cpuAssignmentMap[resource.Path] = reservedCores
