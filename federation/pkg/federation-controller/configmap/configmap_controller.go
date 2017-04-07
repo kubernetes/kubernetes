@@ -370,17 +370,17 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 		send, err := util.SendToCluster(cluster.Labels, desiredConfigMap.ObjectMeta.Annotations)
 		if !send && err == nil {
 			glog.V(5).Infof("Skipping cluster: %s for config map: %s reason: cluster selectors do not match: %-v %-v", cluster.ObjectMeta.Name, key, cluster.ObjectMeta.Labels, desiredConfigMap.ObjectMeta.Annotations[federationapi.FederationClusterSelector])
-            
-            // Only delete objects from target clusters if they exist
-            _, objExists, _ := configmapcontroller.configmapFederatedInformer.GetTargetStore().GetByKey(cluster.Name, key)
-            if objExists {
-                configmapcontroller.eventRecorder.Eventf(baseConfigMap, api.EventTypeNormal, "RemoveFromCluster", "Removing configmap from cluster %s", cluster.Name)
-                operations = append(operations, util.FederatedOperation{
-                    Type:        util.OperationTypeDelete,
-                    Obj:         desiredConfigMap,
-                    ClusterName: cluster.Name,
-                })
-            }
+
+			// Only delete objects from target clusters if they exist
+			_, objExists, _ := configmapcontroller.configmapFederatedInformer.GetTargetStore().GetByKey(cluster.Name, key)
+			if objExists {
+				configmapcontroller.eventRecorder.Eventf(baseConfigMap, api.EventTypeNormal, "RemoveFromCluster", "Removing configmap from cluster %s", cluster.Name)
+				operations = append(operations, util.FederatedOperation{
+					Type:        util.OperationTypeDelete,
+					Obj:         desiredConfigMap,
+					ClusterName: cluster.Name,
+				})
+			}
 			// Skip further processing for this cluster.
 			continue
 		} else if err != nil {
