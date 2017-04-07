@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "adapter.go",
+        "registry.go",
         "secret.go",
     ],
     tags = ["automanaged"],
@@ -21,6 +22,7 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
