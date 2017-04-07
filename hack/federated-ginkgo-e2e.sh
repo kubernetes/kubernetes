@@ -21,10 +21,14 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
+source "${KUBE_ROOT}/federation/cluster/common.sh"
 
 : "${FEDERATION_HOST_CLUSTER_ZONE?Must set FEDERATION_HOST_CLUSTER_ZONE env var}"
 
 (
     set-federation-zone-vars "${FEDERATION_HOST_CLUSTER_ZONE}"
+    # Export FEDERATION_KUBE_CONTEXT to ensure that it is available to
+    # ginkgo-e2e.sh and is thus passed on to the federation tests.
+    export FEDERATION_KUBE_CONTEXT
     "${KUBE_ROOT}/hack/ginkgo-e2e.sh" $@
 )
