@@ -33,7 +33,7 @@ type PersistentVolumeUpgradeTest struct {
 func (PersistentVolumeUpgradeTest) Name() string { return "persistent-volume-upgrade" }
 
 const (
-	pvTestFile string = "/mnt/pv_upgrade_test"
+	pvTestFile string = "/mnt/volume1/pv_upgrade_test"
 	pvTestData string = "keep it pv"
 	pvWriteCmd string = "echo \"" + pvTestData + "\" > " + pvTestFile
 	pvReadCmd  string = "cat " + pvTestFile
@@ -99,7 +99,7 @@ func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
 
 // testPod creates a pod that consumes a pv and prints it out. The output is then verified.
 func (t *PersistentVolumeUpgradeTest) testPod(f *framework.Framework, cmd string) {
-	pod := framework.CreatePod(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{t.pvc}, false, cmd)
+	pod := framework.MakePod(f.Namespace.Name, []*v1.PersistentVolumeClaim{t.pvc}, false, cmd)
 	expectedOutput := []string{pvTestData}
 	f.TestContainerOutput("pod consumes pv", pod, 0, expectedOutput)
 }
