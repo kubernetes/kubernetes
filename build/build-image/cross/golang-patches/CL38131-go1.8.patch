@@ -1,0 +1,53 @@
+From 15b37655bc0b786d3cd6e41553263963fbebd642 Mon Sep 17 00:00:00 2001
+From: Cherry Zhang <cherryyz@google.com>
+Date: Mon, 13 Mar 2017 08:24:46 -0400
+Subject: [PATCH] cmd/link: on PPC64, put plt stubs at beginning of Textp
+
+Put call stubs at the beginning (instead of the end). So the
+trampoline pass knows the addresses of the stubs, and it can
+insert trampolines when necessary.
+
+Fixes #19425.
+
+Change-Id: I1e06529ef837a6130df58917315610d45a6819ca
+Reviewed-on: https://go-review.googlesource.com/38131
+Run-TryBot: Cherry Zhang <cherryyz@google.com>
+TryBot-Result: Gobot Gobot <gobot@golang.org>
+Reviewed-by: Lynn Boger <laboger@linux.vnet.ibm.com>
+---
+ src/cmd/link/internal/ppc64/asm.go | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/src/cmd/link/internal/ppc64/asm.go b/src/cmd/link/internal/ppc64/asm.go
+index 97107b9..cf2c532 100644
+--- a/src/cmd/link/internal/ppc64/asm.go
++++ b/src/cmd/link/internal/ppc64/asm.go
+@@ -87,6 +87,7 @@ func genplt(ctxt *ld.Link) {
+ 	//
+ 	// This assumes "case 1" from the ABI, where the caller needs
+ 	// us to save and restore the TOC pointer.
++	var stubs []*ld.Symbol
+ 	for _, s := range ctxt.Textp {
+ 		for i := range s.R {
+ 			r := &s.R[i]
+@@ -108,7 +109,7 @@ func genplt(ctxt *ld.Link) {
+ 			if stub.Size == 0 {
+ 				// Need outer to resolve .TOC.
+ 				stub.Outer = s
+-				ctxt.Textp = append(ctxt.Textp, stub)
++				stubs = append(stubs, stub)
+ 				gencallstub(ctxt, 1, stub, r.Sym)
+ 			}
+ 
+@@ -121,6 +122,11 @@ func genplt(ctxt *ld.Link) {
+ 			ctxt.Arch.ByteOrder.PutUint32(s.P[r.Off+4:], o1)
+ 		}
+ 	}
++	// Put call stubs at the beginning (instead of the end).
++	// So when resolving the relocations to calls to the stubs,
++	// the addresses are known and trampolines can be inserted
++	// when necessary.
++	ctxt.Textp = append(stubs, ctxt.Textp...)
+ }
+ 
+ func genaddmoduledata(ctxt *ld.Link) {
