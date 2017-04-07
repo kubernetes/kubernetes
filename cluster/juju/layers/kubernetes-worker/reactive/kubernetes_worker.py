@@ -275,11 +275,27 @@ def send_data(tls):
     tls.request_server_cert(common_name, sans, certificate_name)
 
 
+@when('kube-api-endpoint.available', 'kube-control.dns.available',
+      'cni.available')
+def watch_for_changes(kube_api, kube_control, cni):
+    ''' Watch for configuration changes and signal if we need to restart the
+    worker services '''
+    servers = get_kube_api_servers(kube_api)
+    dns = kube_control.get_dns()
+    cluster_cidr = cni.get_config()['cidr']
+
+    if (data_changed('kube-api-servers', servers) or
+            data_changed('kube-dns', dns) or
+            data_changed('cluster-cidr', cluster_cidr)):
+
+        set_state('kubernetes-worker.restart-needed')
+
+
 @when('kubernetes-worker.snaps.installed', 'kube-api-endpoint.available',
       'tls_client.ca.saved', 'tls_client.client.certificate.saved',
       'tls_client.client.key.saved', 'tls_client.server.certificate.saved',
       'tls_client.server.key.saved', 'kube-control.dns.available',
-      'cni.available')
+      'cni.available', 'kubernetes-worker.restart-needed')
 def start_worker(kube_api, kube_control, cni):
     ''' Start kubelet using the provided API and DNS info.'''
     servers = get_kube_api_servers(kube_api)
@@ -295,20 +311,15 @@ def start_worker(kube_api, kube_control, cni):
         hookenv.log('Waiting for cluster cidr.')
         return
 
-    if (is_state('kubernetes-worker.restart-needed') or
-            data_changed('kube-api-servers', servers) or
-            data_changed('kube-dns', dns) or
-            data_changed('cluster-cidr', cluster_cidr)):
+    # set --allow-privileged flag for kubelet
+    set_privileged()
 
-        # set --allow-privileged flag for kubelet
-        set_privileged()
-
-        create_config(servers[0])
-        configure_worker_services(servers, dns, cluster_cidr)
-        set_state('kubernetes-worker.config.created')
-        restart_unit_services()
-        update_kubelet_status()
-        remove_state('kubernetes-worker.restart-needed')
+    create_config(servers[0])
+    configure_worker_services(servers, dns, cluster_cidr)
+    set_state('kubernetes-worker.config.created')
+    restart_unit_services()
+    update_kubelet_status()
+    remove_state('kubernetes-worker.restart-needed')
 
 
 @when('cni.connected')
@@ -624,7 +635,7 @@ def remove_nrpe_config(nagios=None):
 
 
 def set_privileged():
-    """Update the allow-privileged flag for kube-apiserver.
+    """Update the allow-privileged flag for kubelet.
 
     """
     privileged = hookenv.config('allow-privileged')
@@ -698,6 +709,7 @@ def enable_gpu():
 
 @when('kubernetes-worker.gpu.enabled')
 @when_not('kubernetes-worker.privileged')
+@when_not('kubernetes-worker.restart-needed')
 def disable_gpu():
     """Disable GPU usage on this node.
 
