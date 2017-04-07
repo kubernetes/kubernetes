@@ -129,9 +129,9 @@ func federationControlPlaneUpgrade(f *fedframework.Framework) {
 func federatedClustersUpgrade(f *fedframework.Framework) {
 	k8sVersion, err := framework.RealVersion(framework.TestContext.UpgradeTarget)
 	framework.ExpectNoError(err)
-	clusters, _ := getRegisteredClusters(UserAgentName, f)
+	clusters := f.GetRegisteredClusters()
 	for _, cluster := range clusters {
-		framework.ExpectNoError(fedframework.MasterUpgrade(cluster.name, k8sVersion))
+		framework.ExpectNoError(fedframework.MasterUpgrade(cluster.Name, k8sVersion))
 		framework.ExpectNoError(framework.CheckMasterVersion(cluster.Clientset, k8sVersion))
 
 		// TODO: Need to add Node upgrade. Add once this framework is stable
