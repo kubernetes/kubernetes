@@ -13785,6 +13785,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"ExperimentalDockershim": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Enable dockershim only mode.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 						"experimentalFailSwapOn": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Tells the Kubelet to fail to start if swap is enabled on the node.",

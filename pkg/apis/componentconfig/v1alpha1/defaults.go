@@ -418,6 +418,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.EnableCRI == nil {
 		obj.EnableCRI = boolVar(true)
 	}
+	if obj.ExperimentalDockershim == nil {
+		obj.ExperimentalDockershim = boolVar(false)
+	}
 }
 
 func boolVar(b bool) *bool {
