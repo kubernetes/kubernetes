@@ -110,7 +110,7 @@ func CanUseIPTablesProxier(iptver IPTablesVersioner, kcompat KernelCompatTester)
 		return false, err
 	}
 	if version.LessThan(minVersion) {
-		return false, nil
+		return false, fmt.Errorf("The iptables version at least %s", iptablesMinVersion)
 	}
 
 	// Check that the kernel supports what we need.

@@ -222,7 +222,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	var servicesHandler proxyconfig.ServiceConfigHandler
 	var endpointsHandler proxyconfig.EndpointsConfigHandler
 
-	proxyMode := getProxyMode(string(config.Mode), client.Core().Nodes(), hostname, iptInterface, iptables.LinuxKernelCompatTester{})
+	proxyMode := getProxyMode(string(config.Mode), iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")
 		if config.IPTablesMasqueradeBit == nil {
@@ -434,35 +434,27 @@ func getConntrackMax(config *options.ProxyServerConfig) (int, error) {
 	return 0, nil
 }
 
-type nodeGetter interface {
-	Get(hostname string, options metav1.GetOptions) (*api.Node, error)
-}
-
-func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
+func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
 	if proxyMode == proxyModeUserspace {
 		return proxyModeUserspace
-	} else if proxyMode == proxyModeIPTables {
-		return tryIPTablesProxy(iptver, kcompat)
-	} else if proxyMode != "" {
-		glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
-		return tryIPTablesProxy(iptver, kcompat)
 	}
+
+	if proxyMode != "" && proxyMode != proxyModeIPTables {
+		glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
+	}
+
 	return tryIPTablesProxy(iptver, kcompat)
 }
 
 func tryIPTablesProxy(iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
 	// guaranteed false on error, error only necessary for debugging
-	useIPTablesProxy, err := iptables.CanUseIPTablesProxier(iptver, kcompat)
+	_, err := iptables.CanUseIPTablesProxier(iptver, kcompat)
 	if err != nil {
-		glog.Errorf("Can't determine whether to use iptables proxy, using userspace proxier: %v", err)
+		glog.Errorf("Can't use iptables proxy, using userspace proxier: %v", err)
 		return proxyModeUserspace
 	}
-	if useIPTablesProxy {
-		return proxyModeIPTables
-	}
-	// Fallback.
-	glog.V(1).Infof("Can't use iptables proxy, using userspace proxier")
-	return proxyModeUserspace
+
+	return proxyModeIPTables
 }
 
 func (s *ProxyServer) birthCry() {
