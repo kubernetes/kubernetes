@@ -47,6 +47,7 @@ import (
 	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/fedtypes"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -189,8 +190,11 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		namespaceController.Run(wait.NeverStop)
 	}
 
-	if controllerEnabled(s.Controllers, serverResources, secretcontroller.ControllerName, secretcontroller.RequiredResources, true) {
-		secretcontroller.StartSecretController(restClientCfg, stopChan, minimizeLatency)
+	for kind, federatedType := range typeadapters.FederatedTypes() {
+		if controllerEnabled(s.Controllers, serverResources, federatedType.ControllerName, federatedType.RequiredResources, true) {
+			// TODO the generic controller doesn't belong in the secretcontroller package
+			secretcontroller.StartFederationSyncController(kind, federatedType.AdapterFactory, restClientCfg, stopChan, minimizeLatency)
+		}
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, configmapcontroller.ControllerName, configmapcontroller.RequiredResources, true) {

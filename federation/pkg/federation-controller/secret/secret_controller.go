@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
@@ -39,7 +38,6 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/federation/pkg/typeadapters"
 	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 
@@ -48,11 +46,6 @@ import (
 
 const (
 	allClustersKey = "ALL_CLUSTERS"
-	ControllerName = "secrets"
-)
-
-var (
-	RequiredResources = []schema.GroupVersionResource{apiv1.SchemeGroupVersion.WithResource("secrets")}
 )
 
 // FederationSyncController synchronizes the state of a federated type
@@ -91,16 +84,6 @@ type FederationSyncController struct {
 	updateTimeout         time.Duration
 
 	adapter typeadapters.FederatedTypeAdapter
-}
-
-// StartSecretController starts a new secret controller
-func StartSecretController(config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
-	StartFederationSyncController(typeadapters.SecretKind, typeadapters.NewSecretAdapter, config, stopChan, minimizeLatency)
-}
-
-// newSecretController returns a new secret controller
-func newSecretController(client federationclientset.Interface) *FederationSyncController {
-	return newFederationSyncController(client, typeadapters.NewSecretAdapter(client))
 }
 
 // StartFederationSyncController starts a new sync controller for a type adapter
