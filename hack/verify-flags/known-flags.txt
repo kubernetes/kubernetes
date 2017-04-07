@@ -236,6 +236,7 @@ experimental-bootstrap-kubeconfig
 experimental-bootstrap-token-auth
 experimental-check-node-capabilities-before-mount
 experimental-cri
+experimental-dockershim
 experimental-fail-swap-on
 experimental-kernel-memcg-notification
 experimental-keystone-ca-file
