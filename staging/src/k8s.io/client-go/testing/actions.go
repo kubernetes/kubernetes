@@ -284,7 +284,7 @@ type Action interface {
 	GetVerb() string
 	GetResource() schema.GroupVersionResource
 	GetSubresource() string
-	Matches(verb, resource string) bool
+	Matches(verb, resource, subresource string) bool
 }
 
 type GenericAction interface {
@@ -350,9 +350,10 @@ func (a ActionImpl) GetResource() schema.GroupVersionResource {
 func (a ActionImpl) GetSubresource() string {
 	return a.Subresource
 }
-func (a ActionImpl) Matches(verb, resource string) bool {
+func (a ActionImpl) Matches(verb, resource, subresource string) bool {
 	return strings.ToLower(verb) == strings.ToLower(a.Verb) &&
-		strings.ToLower(resource) == strings.ToLower(a.Resource.Resource)
+		strings.ToLower(resource) == strings.ToLower(a.Resource.Resource) &&
+		strings.ToLower(subresource) == strings.ToLower(a.Subresource)
 }
 
 type GenericActionImpl struct {
