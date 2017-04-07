@@ -16618,3 +16618,9 @@ go_library(
     tags = ["automanaged"],
     deps = ["//vendor:github.com/onsi/ginkgo/internal/spec"],
 )
+
+go_library(
+    name = "github.com/fatih/camelcase",
+    srcs = ["github.com/fatih/camelcase/camelcase.go"],
+    tags = ["automanaged"],
+)
