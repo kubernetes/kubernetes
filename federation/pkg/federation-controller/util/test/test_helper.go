@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"runtime/pprof"
 	"sync"
+	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,10 +32,13 @@ import (
 	core "k8s.io/client-go/testing"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	finalizersutil "k8s.io/kubernetes/federation/pkg/federation-controller/util/finalizers"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 
 	"github.com/golang/glog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -348,4 +352,10 @@ func MetaAndSpecCheckingFunction(expected runtime.Object) CheckingFunction {
 		}
 		return fmt.Errorf("Object different expected=%#v received=%#v", expected, obj)
 	}
+}
+
+func AssertHasFinalizer(t *testing.T, obj runtime.Object, finalizer string) {
+	hasFinalizer, err := finalizersutil.HasFinalizer(obj, finalizer)
+	require.Nil(t, err)
+	assert.True(t, hasFinalizer)
 }
