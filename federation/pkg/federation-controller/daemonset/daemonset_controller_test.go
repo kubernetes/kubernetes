@@ -104,8 +104,8 @@ func TestDaemonSetController(t *testing.T) {
 
 	// There should be an update to add both the finalizers.
 	updatedDaemonSet := GetDaemonSetFromChan(daemonsetUpdateChan)
-	assert.True(t, daemonsetController.hasFinalizerFunc(updatedDaemonSet, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	assert.True(t, daemonsetController.hasFinalizerFunc(updatedDaemonSet, metav1.FinalizerOrphanDependents))
+	AssertHasFinalizer(t, updatedDaemonSet, deletionhelper.FinalizerDeleteFromUnderlyingClusters)
+	AssertHasFinalizer(t, updatedDaemonSet, metav1.FinalizerOrphanDependents)
 	daemonset1 = *updatedDaemonSet
 
 	createdDaemonSet := GetDaemonSetFromChan(cluster1CreateChan)

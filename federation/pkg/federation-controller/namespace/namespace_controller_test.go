@@ -61,7 +61,7 @@ func TestNamespaceController(t *testing.T) {
 	RegisterFakeList(clusters, &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
 	RegisterFakeList(namespaces, &fakeClient.Fake, &apiv1.NamespaceList{Items: []apiv1.Namespace{}})
 	namespaceWatch := RegisterFakeWatch(namespaces, &fakeClient.Fake)
-	namespaceCreateChan := RegisterFakeCopyOnCreate(namespaces, &fakeClient.Fake, namespaceWatch)
+	namespaceUpdateChan := RegisterFakeCopyOnUpdate(namespaces, &fakeClient.Fake, namespaceWatch)
 	clusterWatch := RegisterFakeWatch(clusters, &fakeClient.Fake)
 
 	cluster1Client := &fakekubeclientset.Clientset{}
@@ -99,10 +99,9 @@ func TestNamespaceController(t *testing.T) {
 	// Test add federated namespace.
 	namespaceWatch.Add(&ns1)
 	// Verify that the DeleteFromUnderlyingClusters finalizer is added to the namespace.
-	// Note: finalize invokes the create action in Fake client.
-	// TODO: Seems like a bug. Should invoke update. Fix it.
-	updatedNamespace := GetNamespaceFromChan(namespaceCreateChan)
-	assert.True(t, namespaceController.hasFinalizerFunc(updatedNamespace, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
+	updatedNamespace := GetNamespaceFromChan(namespaceUpdateChan)
+	assert.NotNil(t, updatedNamespace)
+	AssertHasFinalizer(t, updatedNamespace, deletionhelper.FinalizerDeleteFromUnderlyingClusters)
 	ns1 = *updatedNamespace
 
 	// Verify that the namespace is created in underlying cluster1.
