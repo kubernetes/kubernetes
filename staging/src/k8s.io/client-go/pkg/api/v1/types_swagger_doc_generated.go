@@ -397,6 +397,7 @@ func (DownwardAPIVolumeSource) SwaggerDoc() map[string]string {
 var map_EmptyDirVolumeSource = map[string]string{
 	"":       "Represents an empty directory for a pod. Empty directory volumes support ownership management and SELinux relabeling.",
 	"medium": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
+	"size":   "Total amount of local storage required for this directory. The default is nil which means that the directory can use all available local storage on the node. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
 }
 
 func (EmptyDirVolumeSource) SwaggerDoc() map[string]string {
@@ -779,6 +780,15 @@ func (LocalObjectReference) SwaggerDoc() map[string]string {
 	return map_LocalObjectReference
 }
 
+var map_LocalStorageVolumeSource = map[string]string{
+	"":     "Represents a local storage logical partition path mapped into a pod. Local storage volumes are local to nodes.",
+	"path": "Path to the local storage logical partition represented by this volume. More info: http://kubernetes.io/docs/user-guide/volumes#local",
+}
+
+func (LocalStorageVolumeSource) SwaggerDoc() map[string]string {
+	return map_LocalStorageVolumeSource
+}
+
 var map_NFSVolumeSource = map[string]string{
 	"":         "Represents an NFS mount that lasts the lifetime of a pod. NFS volumes do not support ownership management or SELinux relabeling.",
 	"server":   "Server is the hostname or IP address of the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs",
@@ -1067,6 +1077,7 @@ var map_PersistentVolumeClaimSpec = map[string]string{
 	"resources":        "Resources represents the minimum resources the volume should have. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources",
 	"volumeName":       "VolumeName is the binding reference to the PersistentVolume backing this claim.",
 	"storageClassName": "Name of the StorageClass required by the claim. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1",
+	"volumeType":       "VolumeType refers to the storage type required by this claim. Defaults to \"remote\" storage. Accepted options include SemiPersistentLocalStorage.",
 }
 
 func (PersistentVolumeClaimSpec) SwaggerDoc() map[string]string {
@@ -1125,6 +1136,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+	"localStorage":         "LocalStorage represents a logical storage partition that is local to a node",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1931,6 +1943,7 @@ var map_VolumeSource = map[string]string{
 	"projected":            "Items for all in one resources secrets, configmaps, and downward API",
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+	"localStorage":         "LocalStorage represents a logical storage partition that is local to a node",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

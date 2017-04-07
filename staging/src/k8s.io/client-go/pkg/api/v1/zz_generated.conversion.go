@@ -1152,6 +1152,7 @@ func Convert_api_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource(in *api.D
 
 func autoConvert_v1_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource(in *EmptyDirVolumeSource, out *api.EmptyDirVolumeSource, s conversion.Scope) error {
 	out.Medium = api.StorageMedium(in.Medium)
+	out.SizeLimit = in.SizeLimit
 	return nil
 }
 
@@ -1161,6 +1162,7 @@ func Convert_v1_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource(in *EmptyDirVol
 
 func autoConvert_api_EmptyDirVolumeSource_To_v1_EmptyDirVolumeSource(in *api.EmptyDirVolumeSource, out *EmptyDirVolumeSource, s conversion.Scope) error {
 	out.Medium = StorageMedium(in.Medium)
+	out.SizeLimit = in.SizeLimit
 	return nil
 }
 

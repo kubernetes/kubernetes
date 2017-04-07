@@ -609,7 +609,7 @@ type EmptyDirVolumeSource struct {
 	// The default is nil which means that the directory can use all available local storage on the node.
 	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	// +optional
-	//	Size resource.Quantity
+	SizeLimit resource.Quantity
 }
 
 // StorageMedium defines ways that storage can be allocated to a volume.
@@ -2964,9 +2964,11 @@ const (
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
 	ResourceStorage ResourceName = "storage"
 	// Local Storage for overlay filesystem, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	ResourceStorageOverlay = "storage.kubernetes.io/overlay"
+	ResourceStorageOverlay ResourceName = "storage.kubernetes.io/overlay"
 	// Local Storage for scratch space, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	ResourceStorageScratch = "storage.kubernetes.io/scratch"
+	ResourceStorageScratch ResourceName = "storage.kubernetes.io/scratch"
+	// Local Storage for storing logs, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceStorageLogs ResourceName = "storage.kubernetes.io/logs"
 	// NVIDIA GPU, in devices. Alpha, might change: although fractional and allowing values >1, only one whole device per node is assigned.
 	ResourceNvidiaGPU ResourceName = "alpha.kubernetes.io/nvidia-gpu"
 	// Number of Pods that may be running on this Node: see ResourcePods
