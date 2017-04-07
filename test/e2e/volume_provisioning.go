@@ -61,33 +61,34 @@ const (
 )
 
 func testDynamicProvisioning(t storageClassTest, client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storage.StorageClass) {
+	var err error
 	if class != nil {
 		By("creating a StorageClass " + class.Name)
-		class, err := client.Storage().StorageClasses().Create(class)
+		class, err = client.StorageV1().StorageClasses().Create(class)
+		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			framework.Logf("deleting storage class %s", class.Name)
-			client.Storage().StorageClasses().Delete(class.Name, nil)
+			client.StorageV1().StorageClasses().Delete(class.Name, nil)
 		}()
-		Expect(err).NotTo(HaveOccurred())
 	}
 
 	By("creating a claim")
-	claim, err := client.Core().PersistentVolumeClaims(claim.Namespace).Create(claim)
+	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
+	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		framework.Logf("deleting claim %s/%s", claim.Namespace, claim.Name)
-		client.Core().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
+		client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
 	}()
-	Expect(err).NotTo(HaveOccurred())
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("checking the claim")
 	// Get new copy of the claim
-	claim, err = client.Core().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Get the bound PV
-	pv, err := client.Core().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Check sizes
@@ -125,7 +126,7 @@ func testDynamicProvisioning(t storageClassTest, client clientset.Interface, cla
 	runInPodWithVolume(client, claim.Namespace, claim.Name, "grep 'hello world' /mnt/test/data")
 
 	By("deleting the claim")
-	framework.ExpectNoError(client.Core().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
+	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
 
 	// Wait for the PV to get deleted. Technically, the first few delete
 	// attempts may fail, as the volume is still attached to a node because
@@ -216,182 +217,179 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 	})
 
 	framework.KubeDescribe("DynamicProvisioner", func() {
-		// This test checks that dynamic provisioning can provision a volume
-		// that can be used to persist data among pods.
+		It("should provision storage with different parameters [Slow] [Volume]", func() {
+			cloudZone := getRandomCloudZone(c)
 
-		tests := []storageClassTest{
-			{
-				"should provision SSD PD on GCE/GKE",
-				[]string{"gce", "gke"},
-				"kubernetes.io/gce-pd",
-				map[string]string{
-					"type": "pd-ssd",
-					// Check that GCE can parse "zone" parameter, however
-					// we can't create PDs in different than default zone
-					// as we don't know if we're running with Multizone=true
-					"zone": framework.TestContext.CloudConfig.Zone,
+			// This test checks that dynamic provisioning can provision a volume
+			// that can be used to persist data among pods.
+			tests := []storageClassTest{
+				{
+					"SSD PD on GCE/GKE",
+					[]string{"gce", "gke"},
+					"kubernetes.io/gce-pd",
+					map[string]string{
+						"type": "pd-ssd",
+						"zone": cloudZone,
+					},
+					"1.5Gi",
+					"2Gi",
+					func(volume *v1.PersistentVolume) error {
+						return checkGCEPD(volume, "pd-ssd")
+					},
 				},
-				"1.5Gi",
-				"2Gi",
-				func(volume *v1.PersistentVolume) error {
-					return checkGCEPD(volume, "pd-ssd")
+				{
+					"HDD PD on GCE/GKE",
+					[]string{"gce", "gke"},
+					"kubernetes.io/gce-pd",
+					map[string]string{
+						"type": "pd-standard",
+					},
+					"1.5Gi",
+					"2Gi",
+					func(volume *v1.PersistentVolume) error {
+						return checkGCEPD(volume, "pd-standard")
+					},
 				},
-			},
-			{
-				"should provision HDD PD on GCE/GKE",
-				[]string{"gce", "gke"},
-				"kubernetes.io/gce-pd",
-				map[string]string{
-					"type": "pd-standard",
+				// AWS
+				{
+					"gp2 EBS on AWS",
+					[]string{"aws"},
+					"kubernetes.io/aws-ebs",
+					map[string]string{
+						"type": "gp2",
+						"zone": cloudZone,
+					},
+					"1.5Gi",
+					"2Gi",
+					func(volume *v1.PersistentVolume) error {
+						return checkAWSEBS(volume, "gp2", false)
+					},
 				},
-				"1.5Gi",
-				"2Gi",
-				func(volume *v1.PersistentVolume) error {
-					return checkGCEPD(volume, "pd-standard")
+				{
+					"io1 EBS on AWS",
+					[]string{"aws"},
+					"kubernetes.io/aws-ebs",
+					map[string]string{
+						"type":      "io1",
+						"iopsPerGB": "50",
+					},
+					"3.5Gi",
+					"4Gi", // 4 GiB is minimum for io1
+					func(volume *v1.PersistentVolume) error {
+						return checkAWSEBS(volume, "io1", false)
+					},
 				},
-			},
-			// AWS
-			{
-				"should provision gp2 EBS on AWS",
-				[]string{"aws"},
-				"kubernetes.io/aws-ebs",
-				map[string]string{
-					"type": "gp2",
-					// Check that AWS can parse "zone" parameter, however
-					// we can't create PDs in different than default zone
-					// as we don't know zone names
-					"zone": framework.TestContext.CloudConfig.Zone,
+				{
+					"sc1 EBS on AWS",
+					[]string{"aws"},
+					"kubernetes.io/aws-ebs",
+					map[string]string{
+						"type": "sc1",
+					},
+					"500Gi", // minimum for sc1
+					"500Gi",
+					func(volume *v1.PersistentVolume) error {
+						return checkAWSEBS(volume, "sc1", false)
+					},
 				},
-				"1.5Gi",
-				"2Gi",
-				func(volume *v1.PersistentVolume) error {
-					return checkAWSEBS(volume, "gp2", false)
+				{
+					"st1 EBS on AWS",
+					[]string{"aws"},
+					"kubernetes.io/aws-ebs",
+					map[string]string{
+						"type": "st1",
+					},
+					"500Gi", // minimum for st1
+					"500Gi",
+					func(volume *v1.PersistentVolume) error {
+						return checkAWSEBS(volume, "st1", false)
+					},
 				},
-			},
-			{
-				"should provision io1 EBS on AWS",
-				[]string{"aws"},
-				"kubernetes.io/aws-ebs",
-				map[string]string{
-					"type":      "io1",
-					"iopsPerGB": "50",
+				{
+					"encrypted EBS on AWS",
+					[]string{"aws"},
+					"kubernetes.io/aws-ebs",
+					map[string]string{
+						"encrypted": "true",
+					},
+					"1Gi",
+					"1Gi",
+					func(volume *v1.PersistentVolume) error {
+						return checkAWSEBS(volume, "gp2", true)
+					},
 				},
-				"3.5Gi",
-				"4Gi", // 4 GiB is minimum for io1
-				func(volume *v1.PersistentVolume) error {
-					return checkAWSEBS(volume, "io1", false)
+				// OpenStack generic tests (works on all OpenStack deployments)
+				{
+					"generic Cinder volume on OpenStack",
+					[]string{"openstack"},
+					"kubernetes.io/cinder",
+					map[string]string{},
+					"1.5Gi",
+					"2Gi",
+					nil, // there is currently nothing to check on OpenStack
 				},
-			},
-			{
-				"should provision sc1 EBS on AWS",
-				[]string{"aws"},
-				"kubernetes.io/aws-ebs",
-				map[string]string{
-					"type": "sc1",
+				{
+					"Cinder volume with empty volume type and zone on OpenStack",
+					[]string{"openstack"},
+					"kubernetes.io/cinder",
+					map[string]string{
+						"type":         "",
+						"availability": "",
+					},
+					"1.5Gi",
+					"2Gi",
+					nil, // there is currently nothing to check on OpenStack
 				},
-				"500Gi", // minimum for sc1
-				"500Gi",
-				func(volume *v1.PersistentVolume) error {
-					return checkAWSEBS(volume, "sc1", false)
+				// vSphere generic test
+				{
+					"generic vSphere volume",
+					[]string{"vsphere"},
+					"kubernetes.io/vsphere-volume",
+					map[string]string{},
+					"1.5Gi",
+					"1.5Gi",
+					nil,
 				},
-			},
-			{
-				"should provision st1 EBS on AWS",
-				[]string{"aws"},
-				"kubernetes.io/aws-ebs",
-				map[string]string{
-					"type": "st1",
-				},
-				"500Gi", // minimum for st1
-				"500Gi",
-				func(volume *v1.PersistentVolume) error {
-					return checkAWSEBS(volume, "st1", false)
-				},
-			},
-			{
-				"should provision encrypted EBS on AWS",
-				[]string{"aws"},
-				"kubernetes.io/aws-ebs",
-				map[string]string{
-					"encrypted": "true",
-				},
-				"1Gi",
-				"1Gi",
-				func(volume *v1.PersistentVolume) error {
-					return checkAWSEBS(volume, "gp2", true)
-				},
-			},
-			// OpenStack generic tests (works on all OpenStack deployments)
-			{
-				"should provision generic Cinder volume on OpenStack",
-				[]string{"openstack"},
-				"kubernetes.io/cinder",
-				map[string]string{},
-				"1.5Gi",
-				"2Gi",
-				nil, // there is currently nothing to check on OpenStack
-			},
-			{
-				"should provision Cinder volume with empty volume type and zone on OpenStack",
-				[]string{"openstack"},
-				"kubernetes.io/cinder",
-				map[string]string{
-					"type":         "",
-					"availability": "",
-				},
-				"1.5Gi",
-				"2Gi",
-				nil, // there is currently nothing to check on OpenStack
-			},
-			// vSphere generic test
-			{
-				"should provision generic vSphere",
-				[]string{"vsphere"},
-				"kubernetes.io/vsphere-volume",
-				map[string]string{},
-				"1.5Gi",
-				"1.5Gi",
-				nil,
-			},
-		}
+			}
 
-		var betaTest *storageClassTest
-		for i, t := range tests {
-			// Beware of clojure, use local variables instead of those from
-			// outer scope
-			test := t
-			suffix := fmt.Sprintf("%d", i)
-			It(test.name+" [Slow] [Volume]", func() {
-				if len(t.cloudProviders) > 0 {
-					framework.SkipUnlessProviderIs(test.cloudProviders...)
+			var betaTest *storageClassTest
+			for i, t := range tests {
+				// Beware of clojure, use local variables instead of those from
+				// outer scope
+				test := t
+
+				if !framework.ProviderIs(test.cloudProviders...) {
+					framework.Logf("Skipping %q: cloud providers is not %v", test.name, test.cloudProviders)
+					continue
 				}
 
 				// Remember the last supported test for subsequent test of beta API
 				betaTest = &test
 
+				By("Testing " + test.name)
+				suffix := fmt.Sprintf("%d", i)
 				class := newStorageClass(test, ns, suffix)
 				claim := newClaim(test, ns, suffix)
 				claim.Spec.StorageClassName = &class.Name
 				testDynamicProvisioning(test, c, claim, class)
-			})
-		}
+			}
 
-		// Run the last test with storage.k8s.io/v1beta1 and beta annotation on pvc
-		if betaTest != nil {
-			It("Beta "+betaTest.name+" [Slow] [Volume]", func() {
+			// Run the last test with storage.k8s.io/v1beta1 and beta annotation on pvc
+			if betaTest != nil {
+				By("Testing " + betaTest.name + " with beta volume provisioning")
 				class := newBetaStorageClass(*betaTest, "beta")
 				// we need to create the class manually, testDynamicProvisioning does not accept beta class
 				class, err := c.StorageV1beta1().StorageClasses().Create(class)
-				defer deleteStorageClass(c, class.Name)
 				Expect(err).NotTo(HaveOccurred())
+				defer deleteStorageClass(c, class.Name)
 
 				claim := newClaim(*betaTest, ns, "beta")
 				claim.Annotations = map[string]string{
 					v1.BetaStorageClassAnnotation: class.Name,
 				}
 				testDynamicProvisioning(*betaTest, c, claim, nil)
-			})
-		}
+			}
+		})
 
 		// NOTE: Slow!  The test will wait up to 5 minutes (framework.ClaimProvisionTimeout) when there is
 		// no regression.
@@ -440,7 +438,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			By("Creating a claim and expecting it to timeout")
 			pvc := newClaim(test, ns, suffix)
 			pvc.Spec.StorageClassName = &sc.Name
-			pvc, err = c.Core().PersistentVolumeClaims(ns).Create(pvc)
+			pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
 			Expect(err).NotTo(HaveOccurred())
 			defer framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
 
@@ -468,7 +466,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			}
 
 			class := newStorageClass(test, ns, "race")
-			class, err := c.Storage().StorageClasses().Create(class)
+			class, err := c.StorageV1().StorageClasses().Create(class)
 			Expect(err).NotTo(HaveOccurred())
 			defer deleteStorageClass(c, class.Name)
 
@@ -591,17 +589,17 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 			By("creating a claim with default storageclass and expecting it to timeout")
 			claim := newClaim(test, ns, "default")
+			claim, err := c.CoreV1().PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
 			defer func() {
 				framework.DeletePersistentVolumeClaim(c, claim.Name, ns)
 			}()
-			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
-			Expect(err).NotTo(HaveOccurred())
 
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionTimeout)
 			Expect(err).To(HaveOccurred())
 			framework.Logf(err.Error())
-			claim, err = c.Core().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
+			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
 		})
@@ -622,17 +620,17 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 			By("creating a claim with default storageclass and expecting it to timeout")
 			claim := newClaim(test, ns, "default")
+			claim, err := c.CoreV1().PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
 			defer func() {
 				framework.DeletePersistentVolumeClaim(c, claim.Name, ns)
 			}()
-			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
-			Expect(err).NotTo(HaveOccurred())
 
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionTimeout)
 			Expect(err).To(HaveOccurred())
 			framework.Logf(err.Error())
-			claim, err = c.Core().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
+			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
 		})
@@ -751,7 +749,7 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 			},
 		},
 	}
-	pod, err := c.Core().Pods(ns).Create(pod)
+	pod, err := c.CoreV1().Pods(ns).Create(pod)
 	defer func() {
 		framework.DeletePodOrFail(c, ns, pod.Name)
 	}()
@@ -819,7 +817,7 @@ func newBetaStorageClass(t storageClassTest, suffix string) *storagebeta.Storage
 }
 
 func startExternalProvisioner(c clientset.Interface, ns string) *v1.Pod {
-	podClient := c.Core().Pods(ns)
+	podClient := c.CoreV1().Pods(ns)
 
 	provisionerPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -899,7 +897,7 @@ func waitForProvisionedVolumesDeleted(c clientset.Interface, scName string) ([]*
 	err := wait.Poll(10*time.Second, 300*time.Second, func() (bool, error) {
 		remainingPVs = []*v1.PersistentVolume{}
 
-		allPVs, err := c.Core().PersistentVolumes().List(metav1.ListOptions{})
+		allPVs, err := c.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
 		if err != nil {
 			return true, err
 		}
@@ -919,7 +917,7 @@ func waitForProvisionedVolumesDeleted(c clientset.Interface, scName string) ([]*
 
 // deleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"
 func deleteStorageClass(c clientset.Interface, className string) {
-	err := c.Storage().StorageClasses().Delete(className, nil)
+	err := c.StorageV1().StorageClasses().Delete(className, nil)
 	if err != nil && !apierrs.IsNotFound(err) {
 		Expect(err).NotTo(HaveOccurred())
 	}
@@ -931,4 +929,20 @@ func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.Persisten
 		framework.DeletePDWithRetry(pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName)
 		framework.DeletePersistentVolume(c, pv.Name)
 	}
+}
+
+func getRandomCloudZone(c clientset.Interface) string {
+	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	// collect values of zone label from all nodes
+	zones := sets.NewString()
+	for _, node := range nodes.Items {
+		if zone, found := node.Labels[metav1.LabelZoneFailureDomain]; found {
+			zones.Insert(zone)
+		}
+	}
+	// return "" in case that no node has zone label
+	zone, _ := zones.PopAny()
+	return zone
 }
