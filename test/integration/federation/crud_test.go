@@ -32,14 +32,15 @@ func TestFederationCRUD(t *testing.T) {
 	fedFixture.SetUp(t)
 	defer fedFixture.TearDown(t)
 
-	for kind, adapterFactory := range typeadapters.AdapterFactories() {
+	federatedTypes := typeadapters.FederatedTypes()
+	for kind, fedType := range federatedTypes {
 		t.Run(kind, func(t *testing.T) {
 			config := fedFixture.APIFixture.NewConfig()
-			fixture := framework.NewControllerFixture(t, kind, adapterFactory, config)
+			fixture := framework.NewControllerFixture(t, kind, fedType.AdapterFactory, config)
 			defer fixture.TearDown(t)
 
 			client := fedFixture.APIFixture.NewClient(fmt.Sprintf("crud-test-%s", kind))
-			adapter := adapterFactory(client)
+			adapter := fedType.AdapterFactory(client)
 
 			crudtester := framework.NewFederatedTypeCRUDTester(t, adapter, fedFixture.ClusterClients)
 			obj := adapter.NewTestObject(uuid.New())

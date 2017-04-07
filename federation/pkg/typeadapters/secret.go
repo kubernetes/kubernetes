@@ -19,6 +19,7 @@ package typeadapters
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -27,10 +28,13 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
-const SecretKind = "secret"
+const (
+	SecretKind           = "secret"
+	SecretControllerName = "secrets"
+)
 
 func init() {
-	RegisterAdapterFactory(SecretKind, NewSecretAdapter)
+	RegisterFederatedType(SecretKind, SecretControllerName, []schema.GroupVersionResource{apiv1.SchemeGroupVersion.WithResource(SecretControllerName)}, NewSecretAdapter)
 }
 
 type SecretAdapter struct {
