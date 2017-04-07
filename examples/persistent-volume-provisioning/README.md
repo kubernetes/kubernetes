@@ -173,6 +173,7 @@ parameters:
     pool: kube
     userId: kube
     userSecretName: ceph-secret-user
+    features: "exclusive-lock"
 ```
 
 * `monitors`: Ceph monitors, comma delimited. It is required.
@@ -182,6 +183,7 @@ parameters:
 * `pool`: Ceph RBD pool. Default is "rbd".
 * `userId`: Ceph client ID that is used to map the RBD image. Default is the same as `adminId`.
 * `userSecretName`: The name of Ceph Secret for `userId` to map RBD image. It must exist in the same namespace as PVCs. It is required.
+* `features`:  Comma separated RBD image features to enable. Currently supported features are `layering,exclusive-lock`. Note, RBD image features are only applicable to image format 2. Ensure the hosts have recent kernel RBD module that supports these features. Default is empty and use image format 1 for backward compatibility.
 
 #### Quobyte
 

@@ -356,8 +356,21 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDVolumeSource
 	for i := start; i < start+l; i++ {
 		mon := p.Mon[i%l]
 		glog.V(4).Infof("rbd: create %s size %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
-		output, err = p.rbdMounter.plugin.execCommand("rbd",
-			[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", "1"})
+		// create feature array
+		// if no feature, use image format 1 for backward compatibility
+		// otherwise, use image format 2 and append features
+		if len(p.features) == 0 {
+			output, err = p.rbdMounter.plugin.execCommand("rbd",
+				[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", "1"})
+		} else {
+			output, err = p.rbdMounter.plugin.execCommand("rbd",
+				[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", "2", "--image-feature", p.features})
+			enableOutput, enableErr := p.rbdMounter.plugin.execCommand("rbd",
+				[]string{"feature", "enable", p.rbdMounter.Image, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, p.features})
+			if enableErr != nil {
+				glog.Warningf("failed to enable rbd features %s for image %s, output:\n%v", p.features, p.rbdMounter.Image, string(enableOutput))
+			}
+		}
 		if err == nil {
 			break
 		} else {
@@ -368,7 +381,6 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDVolumeSource
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to create rbd image: %v, command output: %s", err, string(output))
 	}
-
 	return &v1.RBDVolumeSource{
 		CephMonitors: p.rbdMounter.Mon,
 		RBDImage:     p.rbdMounter.Image,
