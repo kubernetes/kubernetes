@@ -33,10 +33,10 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
-	"k8s.io/kubernetes/federation/pkg/typeadapters"
 	"k8s.io/kubernetes/pkg/api"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
@@ -83,11 +83,11 @@ type FederationSyncController struct {
 	smallDelay            time.Duration
 	updateTimeout         time.Duration
 
-	adapter typeadapters.FederatedTypeAdapter
+	adapter federatedtypes.FederatedTypeAdapter
 }
 
 // StartFederationSyncController starts a new sync controller for a type adapter
-func StartFederationSyncController(kind string, adapterFactory typeadapters.AdapterFactory, config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
+func StartFederationSyncController(kind string, adapterFactory federatedtypes.AdapterFactory, config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
 	restclient.AddUserAgent(config, fmt.Sprintf("%s-controller", kind))
 	client := federationclientset.NewForConfigOrDie(config)
 	adapter := adapterFactory(client)
@@ -100,7 +100,7 @@ func StartFederationSyncController(kind string, adapterFactory typeadapters.Adap
 }
 
 // newFederationSyncController returns a new sync controller for the given client and type adapter
-func newFederationSyncController(client federationclientset.Interface, adapter typeadapters.FederatedTypeAdapter) *FederationSyncController {
+func newFederationSyncController(client federationclientset.Interface, adapter federatedtypes.FederatedTypeAdapter) *FederationSyncController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
 	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: fmt.Sprintf("federated-%v-controller", adapter.Kind())})
