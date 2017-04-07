@@ -7187,6 +7187,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"backendType": {
+							SchemaProps: spec.SchemaProps{
+								Description: "RBD client type you want to use for mapping the Image to a block device. Defaults to \"krbd\". Tip: Ensure that the backend is supported by the host operating system. Examples: \"krbd\", \"rbd-nbd\". Implicitly inferred to be \"krbd\" if unspecified. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
 					},
 					Required: []string{"monitors", "image"},
 				},

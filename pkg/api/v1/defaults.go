@@ -371,6 +371,9 @@ func SetDefaults_RBDVolumeSource(obj *RBDVolumeSource) {
 	if obj.Keyring == "" {
 		obj.Keyring = "/etc/ceph/keyring"
 	}
+	if obj.BackendType == "" {
+		obj.BackendType = "krbd"
+	}
 }
 
 func SetDefaults_ScaleIOVolumeSource(obj *ScaleIOVolumeSource) {

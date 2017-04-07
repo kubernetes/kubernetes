@@ -3602,6 +3602,7 @@ func autoConvert_v1_RBDVolumeSource_To_api_RBDVolumeSource(in *RBDVolumeSource, 
 	out.Keyring = in.Keyring
 	out.SecretRef = (*api.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	out.ReadOnly = in.ReadOnly
+	out.BackendType = in.BackendType
 	return nil
 }
 
@@ -3622,6 +3623,7 @@ func autoConvert_api_RBDVolumeSource_To_v1_RBDVolumeSource(in *api.RBDVolumeSour
 	out.Keyring = in.Keyring
 	out.SecretRef = (*LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	out.ReadOnly = in.ReadOnly
+	out.BackendType = in.BackendType
 	return nil
 }
 
