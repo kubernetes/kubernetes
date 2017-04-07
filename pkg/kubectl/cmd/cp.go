@@ -34,7 +34,7 @@ import (
 )
 
 var (
-	cp_example = templates.Examples(`
+	cp_example = templates.Examples(i18n.T(`
 	    # !!!Important Note!!!
 	    # Requires that the 'tar' binary is present in your container
 	    # image.  If 'tar' is not present, 'kubectl cp' will fail.
@@ -49,7 +49,7 @@ var (
 		kubectl cp /tmp/foo <some-namespace>/<some-pod>:/tmp/bar
 
 		# Copy /tmp/foo from a remote pod to /tmp/bar locally
-		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`)
+		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`))
 
 	cpUsageStr = dedent.Dedent(`
 	    expected 'cp <file-spec-src> <file-spec-dest> [-c container]'.

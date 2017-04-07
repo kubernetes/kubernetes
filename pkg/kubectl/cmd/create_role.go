@@ -31,18 +31,19 @@ import (
 	internalversionrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
-	roleLong = templates.LongDesc(`
-		Create a role with single rule.`)
+	roleLong = templates.LongDesc(i18n.T(`
+		Create a role with single rule.`))
 
-	roleExample = templates.Examples(`
+	roleExample = templates.Examples(i18n.T(`
 		# Create a Role named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
 		kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods
 
 		# Create a Role named "pod-reader" with ResourceName specified
-		kubectl create role pod-reader --verb=get --verg=list --verb=watch --resource=pods --resource-name=readablepod`)
+		kubectl create role pod-reader --verb=get --verg=list --verb=watch --resource=pods --resource-name=readablepod`))
 
 	// Valid resource verb list for validation.
 	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "redirect", "deletecollection", "use"}
