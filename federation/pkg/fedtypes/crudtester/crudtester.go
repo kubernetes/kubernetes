@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/federation/pkg/typeadapters"
+	"k8s.io/kubernetes/federation/pkg/fedtypes"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
@@ -44,7 +44,7 @@ type TestLogger interface {
 // members of a federation.
 type FederatedTypeCRUDTester struct {
 	tl             TestLogger
-	adapter        typeadapters.FederatedTypeAdapter
+	adapter        fedtypes.FederatedTypeAdapter
 	kind           string
 	clusterClients []clientset.Interface
 	waitInterval   time.Duration
@@ -54,7 +54,7 @@ type FederatedTypeCRUDTester struct {
 	clusterWaitTimeout time.Duration
 }
 
-func NewFederatedTypeCRUDTester(testLogger TestLogger, adapter typeadapters.FederatedTypeAdapter, clusterClients []clientset.Interface, waitInterval, clusterWaitTimeout time.Duration) *FederatedTypeCRUDTester {
+func NewFederatedTypeCRUDTester(testLogger TestLogger, adapter fedtypes.FederatedTypeAdapter, clusterClients []clientset.Interface, waitInterval, clusterWaitTimeout time.Duration) *FederatedTypeCRUDTester {
 	return &FederatedTypeCRUDTester{
 		tl:                 testLogger,
 		adapter:            adapter,

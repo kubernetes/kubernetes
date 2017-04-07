@@ -21,7 +21,7 @@ import (
 
 	restclient "k8s.io/client-go/rest"
 	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
-	"k8s.io/kubernetes/federation/pkg/typeadapters"
+	"k8s.io/kubernetes/federation/pkg/fedtypes"
 )
 
 // ControllerFixture manages a federation controller for testing.
@@ -30,7 +30,7 @@ type ControllerFixture struct {
 }
 
 // NewControllerFixture initializes a new controller fixture
-func NewControllerFixture(t *testing.T, kind string, adapterFactory typeadapters.AdapterFactory, config *restclient.Config) *ControllerFixture {
+func NewControllerFixture(t *testing.T, kind string, adapterFactory fedtypes.AdapterFactory, config *restclient.Config) *ControllerFixture {
 	f := &ControllerFixture{
 		stopChan: make(chan struct{}),
 	}

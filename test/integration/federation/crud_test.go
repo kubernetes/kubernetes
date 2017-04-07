@@ -22,7 +22,7 @@ import (
 
 	"github.com/pborman/uuid"
 
-	"k8s.io/kubernetes/federation/pkg/typeadapters"
+	"k8s.io/kubernetes/federation/pkg/fedtypes"
 	"k8s.io/kubernetes/test/integration/federation/framework"
 )
 
@@ -32,7 +32,7 @@ func TestFederationCRUD(t *testing.T) {
 	fedFixture.SetUp(t)
 	defer fedFixture.TearDown(t)
 
-	federatedTypes := typeadapters.FederatedTypes()
+	federatedTypes := fedtypes.FederatedTypes()
 	for kind, fedType := range federatedTypes {
 		t.Run(kind, func(t *testing.T) {
 			config := fedFixture.APIFixture.NewConfig()
@@ -55,8 +55,8 @@ func TestFederationCRUD(t *testing.T) {
 		"Resources should not be deleted from underlying clusters when OrphanDependents is true": &orphanedDependents,
 		"Resources should not be deleted from underlying clusters when OrphanDependents is nil":  nil,
 	}
-	kind := typeadapters.SecretKind
-	adapterFactory := typeadapters.NewSecretAdapter
+	kind := fedtypes.SecretKind
+	adapterFactory := fedtypes.NewSecretAdapter
 	for testName, orphanDependents := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			config := fedFixture.APIFixture.NewConfig()

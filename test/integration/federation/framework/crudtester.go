@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/federation/pkg/typeadapters"
-	"k8s.io/kubernetes/federation/pkg/typeadapters/crudtester"
+	"k8s.io/kubernetes/federation/pkg/fedtypes"
+	"k8s.io/kubernetes/federation/pkg/fedtypes/crudtester"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
@@ -41,7 +41,7 @@ func (l *IntegrationLogger) Fatal(msg string) {
 	l.t.Fatal(msg)
 }
 
-func NewFederatedTypeCRUDTester(t *testing.T, adapter typeadapters.FederatedTypeAdapter, clusterClients []clientset.Interface) *crudtester.FederatedTypeCRUDTester {
+func NewFederatedTypeCRUDTester(t *testing.T, adapter fedtypes.FederatedTypeAdapter, clusterClients []clientset.Interface) *crudtester.FederatedTypeCRUDTester {
 	logger := &IntegrationLogger{t}
 	return crudtester.NewFederatedTypeCRUDTester(logger, adapter, clusterClients, DefaultWaitInterval, wait.ForeverTestTimeout)
 }
