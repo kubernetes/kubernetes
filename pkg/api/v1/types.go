@@ -3382,6 +3382,8 @@ const (
 	ResourceStorageOverlay ResourceName = "storage.kubernetes.io/overlay"
 	// Local Storage for scratch space, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceStorageScratch ResourceName = "storage.kubernetes.io/scratch"
+	// Local Storage for storing logs, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceStorageLogs ResourceName = "storage.kubernetes.io/logs"
 	// NVIDIA GPU, in devices. Alpha, might change: although fractional and allowing values >1, only one whole device per node is assigned.
 	ResourceNvidiaGPU ResourceName = "alpha.kubernetes.io/nvidia-gpu"
 	// Number of Pods that may be running on this Node: see ResourcePods
