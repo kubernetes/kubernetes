@@ -135,7 +135,6 @@ func (i *isolator) preStart(event *lifecycle.Event) (reply *lifecycle.EventReply
 	if err != nil {
 		return &lifecycle.EventReply{
 			Error:             err.Error(),
-			CgroupInfo:        event.CgroupInfo,
 			IsolationControls: []*lifecycle.IsolationControl{},
 		}, err
 	}
@@ -146,7 +145,6 @@ func (i *isolator) preStart(event *lifecycle.Event) (reply *lifecycle.EventReply
 		glog.Infof("Pod %q isn't managed by this isolator", pod.Name)
 		return &lifecycle.EventReply{
 			Error:             "",
-			CgroupInfo:        event.CgroupInfo,
 			IsolationControls: []*lifecycle.IsolationControl{},
 		}, nil
 	}
@@ -156,7 +154,6 @@ func (i *isolator) preStart(event *lifecycle.Event) (reply *lifecycle.EventReply
 		i.reclaimCPUs(reservedCores)
 		return &lifecycle.EventReply{
 			Error:             err.Error(),
-			CgroupInfo:        event.CgroupInfo,
 			IsolationControls: []*lifecycle.IsolationControl{},
 		}, err
 	}
@@ -174,7 +171,6 @@ func (i *isolator) preStart(event *lifecycle.Event) (reply *lifecycle.EventReply
 
 	return &lifecycle.EventReply{
 		Error:             "",
-		CgroupInfo:        event.CgroupInfo,
 		IsolationControls: controls,
 	}, nil
 }
@@ -189,7 +185,6 @@ func (i *isolator) postStop(event *lifecycle.Event) (reply *lifecycle.EventReply
 	glog.Infof("available cores after %v", i.CPUTopology)
 	return &lifecycle.EventReply{
 		Error:             "",
-		CgroupInfo:        event.CgroupInfo,
 		IsolationControls: []*lifecycle.IsolationControl{},
 	}, nil
 

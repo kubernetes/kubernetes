@@ -52,8 +52,7 @@ message Event {
 
 message EventReply {
   string error = 1;
-  CgroupInfo cgroup_info = 2;
-  repeated IsolationControl isolation_controls = 3;
+  repeated IsolationControl isolation_controls = 2;
 }
 
 message CgroupInfo {
