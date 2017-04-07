@@ -381,7 +381,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 			return err
 		}
 
-		newPodPortMapping := constructPodPortMapping(pod, ip4)
+		newPodPortMapping := hostport.ConstructPodPortMapping(pod, ip4)
 		if err := plugin.hostportSyncer.OpenPodHostportsAndSync(newPodPortMapping, BridgeName, activePodPortMappings); err != nil {
 			return err
 		}
@@ -638,33 +638,10 @@ func (plugin *kubenetNetworkPlugin) getPodPortMappings() ([]*hostport.PodPortMap
 			continue
 		}
 		if pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name); ok {
-			activePodPortMappings = append(activePodPortMappings, constructPodPortMapping(pod, podIP))
+			activePodPortMappings = append(activePodPortMappings, hostport.ConstructPodPortMapping(pod, podIP))
 		}
 	}
 	return activePodPortMappings, nil
-}
-
-func constructPodPortMapping(pod *v1.Pod, podIP net.IP) *hostport.PodPortMapping {
-	portMappings := make([]*hostport.PortMapping, 0)
-	for _, c := range pod.Spec.Containers {
-		for _, port := range c.Ports {
-			portMappings = append(portMappings, &hostport.PortMapping{
-				Name:          port.Name,
-				HostPort:      port.HostPort,
-				ContainerPort: port.ContainerPort,
-				Protocol:      port.Protocol,
-				HostIP:        port.HostIP,
-			})
-		}
-	}
-
-	return &hostport.PodPortMapping{
-		Namespace:    pod.Namespace,
-		Name:         pod.Name,
-		PortMappings: portMappings,
-		HostNetwork:  pod.Spec.HostNetwork,
-		IP:           podIP,
-	}
 }
 
 // ipamGarbageCollection will release unused IP.
