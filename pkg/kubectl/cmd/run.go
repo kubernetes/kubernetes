@@ -93,7 +93,7 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 		Use: "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
 		// run-container is deprecated
 		Aliases: []string{"run-container"},
-		Short:   i18n.T("Run a particular image on the cluster"),
+		Short:   i18n.T("Run a specified image on the cluster"),
 		Long:    run_long,
 		Example: run_example,
 		Run: func(cmd *cobra.Command, args []string) {

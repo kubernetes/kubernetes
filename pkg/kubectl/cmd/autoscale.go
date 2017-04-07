@@ -53,7 +53,7 @@ func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU] [flags]",
-		Short:   i18n.T("Auto-scale a Deployment, ReplicaSet, or ReplicationController"),
+		Short:   i18n.T("Automatically scale the set of pods that are managed by a replication controller"),
 		Long:    autoscaleLong,
 		Example: autoscaleExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -101,7 +101,7 @@ func NewCmdApply(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "apply -f FILENAME",
-		Short:   i18n.T("Apply a configuration to a resource by filename or stdin"),
+		Short:   i18n.T("Apply a configuration change to a resource from a file or stdin"),
 		Long:    apply_long,
 		Example: apply_example,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -52,7 +52,16 @@ var (
 		cat pod.json | kubectl create -f -
 
 		# Edit the data in docker-registry.yaml in JSON using the v1 API format then create the resource using the edited data.
-		kubectl create -f docker-registry.yaml --edit --output-version=v1 -o json`)
+		kubectl create -f docker-registry.yaml --edit --output-version=v1 -o json
+
+		# Create a service using the definition in example-service.yaml.
+		kubectl create -f example-service.yaml
+
+		# Create a replication controller using the definition in example-controller.yaml.
+		kubectl create -f example-controller.yaml
+
+		# Create the objects that are defined in any .yaml, .yml, or .json file within the <directory> directory.
+		kubectl create -f <directory>`)
 )
 
 func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
@@ -60,7 +69,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "create -f FILENAME",
-		Short:   i18n.T("Create a resource by filename or stdin"),
+		Short:   i18n.T("Create one or more resources from a file or stdin"),
 		Long:    create_long,
 		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {
