@@ -37,8 +37,7 @@ type HostPortManager interface {
 	// Add implements port mappings.
 	// id should be a unique identifier for a pod, e.g. podSandboxID.
 	// podPortMapping is the associated port mapping information for the pod.
-	// natInterfaceName is the interface that localhost used to talk to the given pod.
-	Add(id string, podPortMapping *PodPortMapping, natInterfaceName string) error
+	Add(id string, podPortMapping *PodPortMapping) error
 	// Remove cleans up matching port mappings
 	// Remove must be able to clean up port mappings without pod IP
 	Remove(id string, podPortMapping *PodPortMapping) error
@@ -53,6 +52,14 @@ type hostportManager struct {
 
 func NewHostportManager() HostPortManager {
 	iptInterface := utiliptables.New(utilexec.New(), utildbus.New(), utiliptables.ProtocolIpv4)
+
+	// Ensure the chain is linked from the root.
+	// FIXME: This is a hack. It will update as new pods come in, but we really
+	// should periodically resync this.
+	if err := ensureKubeHostportChainLinked(iptInterface); err != nil {
+		glog.Errorf("Failed to ensure hostport chains are linked, will retry on next pod creation: %v", err)
+	}
+
 	return &hostportManager{
 		hostPortMap: make(map[hostport]closeable),
 		iptables:    iptInterface,
@@ -60,7 +67,8 @@ func NewHostportManager() HostPortManager {
 	}
 }
 
-func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInterfaceName string) (err error) {
+// FIXME: this is only called when pods are first created, but if kubelet crashes, the port will not be re-opened.
+func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping) (err error) {
 	if podPortMapping == nil || podPortMapping.HostNetwork {
 		return nil
 	}
@@ -76,10 +84,6 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		return fmt.Errorf("invalid or missing IP of pod %s", podFullName)
 	}
 	podIP := podPortMapping.IP.String()
-
-	if err = ensureKubeHostportChains(hm.iptables, natInterfaceName); err != nil {
-		return err
-	}
 
 	// Ensure atomicity for port opening and iptables operations
 	hm.mu.Lock()
@@ -152,6 +156,12 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		// clean up opened host port if encounter any error
 		return utilerrors.NewAggregate([]error{err, hm.closeHostports(hostportMappings)})
 	}
+
+	// Ensure the chain is linked from the root.
+	if err = ensureKubeHostportChainLinked(hm.iptables); err != nil {
+		return err
+	}
+
 	return nil
 }
 

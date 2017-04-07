@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -36,11 +37,11 @@ import (
 type HostportSyncer interface {
 	// SyncHostports gathers all hostports on node and setup iptables rules to enable them.
 	// On each invocation existing ports are synced and stale rules are deleted.
-	SyncHostports(natInterfaceName string, activePodPortMappings []*PodPortMapping) error
+	SyncHostports(activePodPortMappings []*PodPortMapping) error
 	// OpenPodHostportsAndSync opens hostports for a new PodPortMapping, gathers all hostports on
 	// node, sets up iptables rules enable them. On each invocation existing ports are synced and stale rules are deleted.
 	// 'newPortMapping' must also be present in 'activePodPortMappings'.
-	OpenPodHostportsAndSync(newPortMapping *PodPortMapping, natInterfaceName string, activePodPortMappings []*PodPortMapping) error
+	OpenPodHostportsAndSync(newPortMapping *PodPortMapping, activePodPortMappings []*PodPortMapping) error
 }
 
 type hostportSyncer struct {
@@ -153,7 +154,7 @@ func hostportChainName(pm *PortMapping, podFullName string) utiliptables.Chain {
 // OpenPodHostportsAndSync opens hostports for a new PodPortMapping, gathers all hostports on
 // node, sets up iptables rules enable them. And finally clean up stale hostports.
 // 'newPortMapping' must also be present in 'activePodPortMappings'.
-func (h *hostportSyncer) OpenPodHostportsAndSync(newPortMapping *PodPortMapping, natInterfaceName string, activePodPortMappings []*PodPortMapping) error {
+func (h *hostportSyncer) OpenPodHostportsAndSync(newPortMapping *PodPortMapping, activePodPortMappings []*PodPortMapping) error {
 	// try to open pod host port if specified
 	if err := h.openHostports(newPortMapping); err != nil {
 		return err
@@ -171,11 +172,11 @@ func (h *hostportSyncer) OpenPodHostportsAndSync(newPortMapping *PodPortMapping,
 		activePodPortMappings = append(activePodPortMappings, newPortMapping)
 	}
 
-	return h.SyncHostports(natInterfaceName, activePodPortMappings)
+	return h.SyncHostports(activePodPortMappings)
 }
 
 // SyncHostports gathers all hostports on node and setup iptables rules enable them. And finally clean up stale hostports
-func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMappings []*PodPortMapping) error {
+func (h *hostportSyncer) SyncHostports(activePodPortMappings []*PodPortMapping) error {
 	start := time.Now()
 	defer func() {
 		glog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
@@ -185,9 +186,6 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	if err != nil {
 		return err
 	}
-
-	// Ensure KUBE-HOSTPORTS chains
-	ensureKubeHostportChains(h.iptables, natInterfaceName)
 
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
@@ -204,6 +202,11 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	writeLine(natChains, "*nat")
 	// Make sure we keep stats for the top-level chains, if they existed
 	// (which most should have because we created them above).
+	if chain, ok := existingNATChains[kubeLocalDestChain]; ok {
+		writeLine(natChains, chain)
+	} else {
+		writeLine(natChains, utiliptables.MakeChainLine(kubeLocalDestChain))
+	}
 	if chain, ok := existingNATChains[kubeHostportsChain]; ok {
 		writeLine(natChains, chain)
 	} else {
@@ -213,6 +216,33 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	// Accumulate NAT chains to keep.
 	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
 
+	// Populate the LOCALDEST chain.
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return err
+	}
+	// Only consider packets with dest of a real interface addr for hostports.
+	for _, a := range addrs {
+		astr := a.String() // CIDR notation
+		ip, ipnet, err := net.ParseCIDR(astr)
+		if err != nil {
+			return err
+		}
+		if ip.To4() != nil {
+			ipstr := ip.String()
+			if ip.IsLoopback() {
+				// Special case loopback devices.
+				ipstr = ipnet.String()
+			}
+			args := []string{
+				"-A", string(kubeLocalDestChain),
+				"-m", "comment", "--comment", `"maybe kube hostport"`,
+				"-d", ipstr,
+				"-j", string(kubeHostportsChain),
+			}
+			writeLine(natRules, args...)
+		}
+	}
 	for port, target := range hostportPodMap {
 		protocol := strings.ToLower(string(port.Protocol))
 		hostportChain := hostportChainName(port, target.podFullName)
@@ -277,6 +307,9 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	if err != nil {
 		return fmt.Errorf("Failed to execute iptables-restore: %v", err)
 	}
+
+	// Ensure hostport chains are linked into the root
+	ensureKubeHostportChainLinked(h.iptables)
 
 	h.cleanupHostportMap(hostportPodMap)
 	return nil

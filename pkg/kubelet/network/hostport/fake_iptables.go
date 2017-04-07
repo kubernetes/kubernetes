@@ -41,7 +41,10 @@ type fakeIPTables struct {
 
 func NewFakeIPTables() *fakeIPTables {
 	return &fakeIPTables{
-		tables: make(map[string]*fakeTable, 0),
+		tables: map[string]*fakeTable{
+			"nat":    makeTable(utiliptables.TableNAT),
+			"filter": makeTable(utiliptables.TableFilter),
+		},
 	}
 }
 
@@ -71,15 +74,19 @@ func (f *fakeIPTables) getChain(tableName utiliptables.Table, chainName utilipta
 	return table, chain, nil
 }
 
+func makeTable(tableName utiliptables.Table) *fakeTable {
+	return &fakeTable{
+		name:   tableName,
+		chains: make(map[string]*fakeChain),
+	}
+}
+
 func (f *fakeIPTables) ensureChain(tableName utiliptables.Table, chainName utiliptables.Chain) (bool, *fakeChain) {
 	table, chain, err := f.getChain(tableName, chainName)
 	if err != nil {
 		// either table or table+chain don't exist yet
 		if table == nil {
-			table = &fakeTable{
-				name:   tableName,
-				chains: make(map[string]*fakeChain),
-			}
+			table = makeTable(tableName)
 			f.tables[string(tableName)] = table
 		}
 		chain := &fakeChain{
