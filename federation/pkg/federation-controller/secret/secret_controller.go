@@ -95,7 +95,7 @@ type FederationSyncController struct {
 
 // StartSecretController starts a new secret controller
 func StartSecretController(config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
-	startFederationSyncController(&typeadapters.SecretAdapter{}, config, stopChan, minimizeLatency)
+	StartFederationSyncController(typeadapters.SecretKind, typeadapters.NewSecretAdapter, config, stopChan, minimizeLatency)
 }
 
 // newSecretController returns a new secret controller
@@ -103,16 +103,16 @@ func newSecretController(client federationclientset.Interface) *FederationSyncCo
 	return newFederationSyncController(client, typeadapters.NewSecretAdapter(client))
 }
 
-// startFederationSyncController starts a new sync controller for the given type adapter
-func startFederationSyncController(adapter typeadapters.FederatedTypeAdapter, config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
-	restclient.AddUserAgent(config, fmt.Sprintf("%s-controller", adapter.Kind()))
+// StartFederationSyncController starts a new sync controller for a type adapter
+func StartFederationSyncController(kind string, adapterFactory typeadapters.AdapterFactory, config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
+	restclient.AddUserAgent(config, fmt.Sprintf("%s-controller", kind))
 	client := federationclientset.NewForConfigOrDie(config)
-	adapter.SetClient(client)
+	adapter := adapterFactory(client)
 	controller := newFederationSyncController(client, adapter)
 	if minimizeLatency {
 		controller.minimizeLatency()
 	}
-	glog.Infof(fmt.Sprintf("Starting federated sync controller for %s resources", adapter.Kind()))
+	glog.Infof(fmt.Sprintf("Starting federated sync controller for %s resources", kind))
 	controller.Run(stopChan)
 }
 
