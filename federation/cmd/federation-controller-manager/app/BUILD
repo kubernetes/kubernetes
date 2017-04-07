@@ -32,6 +32,7 @@ go_library(
         "//federation/pkg/federation-controller/secret:go_default_library",
         "//federation/pkg/federation-controller/service:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
+        "//federation/pkg/fedtypes:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/golang/glog",
