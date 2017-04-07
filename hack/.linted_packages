@@ -45,6 +45,7 @@ examples/sharing-clusters
 federation/apis/core/install
 federation/apis/federation/install
 federation/cmd/federation-apiserver
+federation/cmd/federation-apiserver/app
 federation/cmd/federation-controller-manager
 federation/cmd/genfeddocs
 federation/cmd/kubefed
