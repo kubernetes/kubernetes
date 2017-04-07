@@ -250,7 +250,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		}
 		proxier = proxierIPTables
 		servicesHandler = proxierIPTables
-		endpointsHandler = proxierIPTables
+		endpointsEventHandler = proxierIPTables
 		// No turning back. Remove artifacts that might still exist from the userspace Proxier.
 		glog.V(0).Info("Tearing down userspace rules.")
 		userspace.CleanupLeftovers(iptInterface)
