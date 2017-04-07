@@ -22,6 +22,7 @@ go_library(
         "//federation/client/clientset_generated/federation_clientset/typed/core/v1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1:go_default_library",
+        "//pkg/api:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/client-go/discovery",
         "//vendor:k8s.io/client-go/rest",
