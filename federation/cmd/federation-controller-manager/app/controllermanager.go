@@ -44,8 +44,8 @@ import (
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
 	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
 	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
-	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
+	synccontroller "k8s.io/kubernetes/federation/pkg/federation-controller/sync"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -162,8 +162,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 
 	for kind, federatedType := range federatedtypes.FederatedTypes() {
 		if controllerEnabled(s.Controllers, serverResources, federatedType.ControllerName, federatedType.RequiredResources, true) {
-			// TODO the generic controller doesn't belong in the secretcontroller package
-			secretcontroller.StartFederationSyncController(kind, federatedType.AdapterFactory, restClientCfg, stopChan, minimizeLatency)
+			synccontroller.StartFederationSyncController(kind, federatedType.AdapterFactory, restClientCfg, stopChan, minimizeLatency)
 		}
 	}
 
