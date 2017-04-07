@@ -75,7 +75,7 @@ var (
 
 		` + valid_resources)
 
-	annotate_example = templates.Examples(`
+	annotate_example = templates.Examples(i18n.T(`
     # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
     # If the same annotation is set multiple times, only the last value will be applied
     kubectl annotate pods foo description='my frontend'
@@ -94,7 +94,7 @@ var (
 
     # Update pod 'foo' by removing an annotation named 'description' if it exists.
     # Does not require the --overwrite flag.
-    kubectl annotate pods foo description-`)
+    kubectl annotate pods foo description-`))
 )
 
 func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {

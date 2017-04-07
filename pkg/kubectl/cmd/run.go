@@ -48,12 +48,12 @@ import (
 )
 
 var (
-	run_long = templates.LongDesc(`
+	run_long = templates.LongDesc(i18n.T(`
 		Create and run a particular image, possibly replicated.
 
-		Creates a deployment or job to manage the created container(s).`)
+		Creates a deployment or job to manage the created container(s).`))
 
-	run_example = templates.Examples(`
+	run_example = templates.Examples(i18n.T(`
 		# Start a single instance of nginx.
 		kubectl run nginx --image=nginx
 
@@ -85,7 +85,7 @@ var (
 		kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'
 
 		# Start the cron job to compute π to 2000 places and print it out every 5 minutes.
-		kubectl run pi --schedule="0/5 * * * ?" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`)
+		kubectl run pi --schedule="0/5 * * * ?" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`))
 )
 
 func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {

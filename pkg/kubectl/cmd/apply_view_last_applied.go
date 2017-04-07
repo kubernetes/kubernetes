@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type ViewLastAppliedOptions struct {
@@ -42,25 +43,25 @@ type ViewLastAppliedOptions struct {
 }
 
 var (
-	applyViewLastAppliedLong = templates.LongDesc(`
+	applyViewLastAppliedLong = templates.LongDesc(i18n.T(`
 		View the latest last-applied-configuration annotations by type/name or file.
 
 		The default output will be printed to stdout in YAML format. One can use -o option
-		to change output format.`)
+		to change output format.`))
 
-	applyViewLastAppliedExample = templates.Examples(`
+	applyViewLastAppliedExample = templates.Examples(i18n.T(`
 		# View the last-applied-configuration annotations by type/name in YAML.
 		kubectl apply view-last-applied deployment/nginx
 
 		# View the last-applied-configuration annotations by file in JSON
-		kubectl apply view-last-applied -f deploy.yaml -o json`)
+		kubectl apply view-last-applied -f deploy.yaml -o json`))
 )
 
 func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	options := &ViewLastAppliedOptions{Out: out, ErrOut: err}
 	cmd := &cobra.Command{
 		Use:     "view-last-applied (TYPE [NAME | -l label] | TYPE/NAME | -f FILENAME)",
-		Short:   "View latest last-applied-configuration annotations of a resource/object",
+		Short:   i18n.T("View latest last-applied-configuration annotations of a resource/object"),
 		Long:    applyViewLastAppliedLong,
 		Example: applyViewLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
