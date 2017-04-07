@@ -27,10 +27,10 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
-const secretKind = "secret"
+const SecretKind = "secret"
 
 func init() {
-	RegisterAdapterFactory(secretKind, NewSecretAdapter)
+	RegisterAdapterFactory(SecretKind, NewSecretAdapter)
 }
 
 type SecretAdapter struct {
@@ -42,7 +42,7 @@ func NewSecretAdapter(client federationclientset.Interface) FederatedTypeAdapter
 }
 
 func (a *SecretAdapter) Kind() string {
-	return secretKind
+	return SecretKind
 }
 
 func (a *SecretAdapter) ObjectType() pkgruntime.Object {
