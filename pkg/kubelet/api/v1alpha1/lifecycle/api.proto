@@ -53,7 +53,7 @@ message Event {
 message EventReply {
   string error = 1;
   CgroupInfo cgroup_info = 2;
-  repeated CgroupResource cgroup_resource = 3;
+  repeated IsolationControl isolation_controls = 3;
 }
 
 message CgroupInfo {
@@ -66,10 +66,10 @@ message CgroupInfo {
   string path = 2;
 }
 
-message CgroupResource {
-  enum CgroupSubsystem {
-    CPUSET_CPUS = 0;
+message IsolationControl {
+  enum Kind {
+    CGROUP_CPUSET_CPUS = 0;
   };
-  CgroupSubsystem cgroup_subsystem = 1;
+  Kind kind = 1;
   string value = 2;
 }

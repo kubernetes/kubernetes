@@ -45,7 +45,7 @@ type EventDispatcher interface {
 	// can register themselves to receive lifecycle events.
 	Start(socketAddress string)
 
-	// Retrieving information about CgroupResources from replies
+	// Retrieving information about isolation controls from replies
 	ResourceConfigFromReplies(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig
 }
 
@@ -202,9 +202,9 @@ func (ed *eventDispatcher) Unregister(ctx context.Context, request *lifecycle.Un
 
 func (ed *eventDispatcher) ResourceConfigFromReplies(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig {
 	updatedResources := resources
-	for _, cgroupResource := range reply.CgroupResource {
-		if cgroupResource.CgroupSubsystem == lifecycle.CgroupResource_CPUSET_CPUS {
-			updatedResources.CpusetCpus = &cgroupResource.Value
+	for _, control := range reply.IsolationControls {
+		if control.Kind == lifecycle.IsolationControl_CGROUP_CPUSET_CPUS {
+			updatedResources.CpusetCpus = &control.Value
 		}
 	}
 	return updatedResources

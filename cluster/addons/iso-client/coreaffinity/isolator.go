@@ -134,9 +134,9 @@ func (i *isolator) preStart(event *lifecycle.Event) (reply *lifecycle.EventReply
 	pod, err := getPod(event.Pod)
 	if err != nil {
 		return &lifecycle.EventReply{
-			Error:          err.Error(),
-			CgroupInfo:     event.CgroupInfo,
-			CgroupResource: []*lifecycle.CgroupResource{},
+			Error:             err.Error(),
+			CgroupInfo:        event.CgroupInfo,
+			IsolationControls: []*lifecycle.IsolationControl{},
 		}, err
 	}
 	oirCores := i.countCoresFromOIR(pod)
@@ -145,9 +145,9 @@ func (i *isolator) preStart(event *lifecycle.Event) (reply *lifecycle.EventReply
 	if oirCores == 0 {
 		glog.Infof("Pod %q isn't managed by this isolator", pod.Name)
 		return &lifecycle.EventReply{
-			Error:          "",
-			CgroupInfo:     event.CgroupInfo,
-			CgroupResource: []*lifecycle.CgroupResource{},
+			Error:             "",
+			CgroupInfo:        event.CgroupInfo,
+			IsolationControls: []*lifecycle.IsolationControl{},
 		}, nil
 	}
 
@@ -155,16 +155,16 @@ func (i *isolator) preStart(event *lifecycle.Event) (reply *lifecycle.EventReply
 	if err != nil {
 		i.reclaimCPUs(reservedCores)
 		return &lifecycle.EventReply{
-			Error:          err.Error(),
-			CgroupInfo:     event.CgroupInfo,
-			CgroupResource: []*lifecycle.CgroupResource{},
+			Error:             err.Error(),
+			CgroupInfo:        event.CgroupInfo,
+			IsolationControls: []*lifecycle.IsolationControl{},
 		}, err
 	}
 
-	cgroupResource := []*lifecycle.CgroupResource{
+	controls := []*lifecycle.IsolationControl{
 		{
-			Value:           asCPUList(reservedCores),
-			CgroupSubsystem: lifecycle.CgroupResource_CPUSET_CPUS,
+			Value: asCPUList(reservedCores),
+			Kind:  lifecycle.IsolationControl_CGROUP_CPUSET_CPUS,
 		},
 	}
 	i.cpuAssignmentMap[event.CgroupInfo.Path] = reservedCores
@@ -173,9 +173,9 @@ func (i *isolator) preStart(event *lifecycle.Event) (reply *lifecycle.EventReply
 	glog.Infof("available cores after %v", i.CPUTopology)
 
 	return &lifecycle.EventReply{
-		Error:          "",
-		CgroupInfo:     event.CgroupInfo,
-		CgroupResource: cgroupResource,
+		Error:             "",
+		CgroupInfo:        event.CgroupInfo,
+		IsolationControls: controls,
 	}, nil
 }
 
@@ -188,9 +188,9 @@ func (i *isolator) postStop(event *lifecycle.Event) (reply *lifecycle.EventReply
 	glog.Infof("CPUs: %v have been revoked.", cpus)
 	glog.Infof("available cores after %v", i.CPUTopology)
 	return &lifecycle.EventReply{
-		Error:          "",
-		CgroupInfo:     event.CgroupInfo,
-		CgroupResource: []*lifecycle.CgroupResource{},
+		Error:             "",
+		CgroupInfo:        event.CgroupInfo,
+		IsolationControls: []*lifecycle.IsolationControl{},
 	}, nil
 
 }
