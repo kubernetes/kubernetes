@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package typeadapters
+package fedtypes
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,7 +57,7 @@ type FederatedTypeAdapter interface {
 }
 
 // AdapterFactory defines the function signature for factory methods
-// that create FederatedTypeAdapters.  Such methods should be
+// that create FederatedFedtypes.  Such methods should be
 // registered with RegisterAdapterFactory to ensure the type adapter
 // is discoverable.
 type AdapterFactory func(client federationclientset.Interface) FederatedTypeAdapter

@@ -190,7 +190,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		namespaceController.Run(wait.NeverStop)
 	}
 
-	for kind, federatedType := range typeadapters.FederatedTypes() {
+	for kind, federatedType := range fedtypes.FederatedTypes() {
 		if controllerEnabled(s.Controllers, serverResources, federatedType.ControllerName, federatedType.RequiredResources, true) {
 			// TODO the generic controller doesn't belong in the secretcontroller package
 			secretcontroller.StartFederationSyncController(kind, federatedType.AdapterFactory, restClientCfg, stopChan, minimizeLatency)
