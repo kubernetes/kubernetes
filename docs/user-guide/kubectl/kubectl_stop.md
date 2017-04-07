@@ -36,7 +36,7 @@ $ kubectl stop -f path/to/resources
 ### Options
 
 ```
-      --all[=false]: [-all] to select all the specified resources.
+      --all[=false]: select all resources in the namespace of the specified resource types.
   -f, --filename=[]: Filename, directory, or URL to file of resource(s) to be stopped.
       --grace-period=-1: Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.
       --ignore-not-found[=false]: Treat "resource not found" as a successful stop.
