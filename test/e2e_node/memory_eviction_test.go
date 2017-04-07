@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -54,7 +54,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 			logPodEvents(f)
 		})
 		Context("", func() {
-			tempSetCurrentKubeletConfig(f, func(c *componentconfig.KubeletConfiguration) {
+			tempSetCurrentKubeletConfig(f, func(c *nodeconfig.KubeletConfiguration) {
 				c.EvictionHard = evictionHard
 			})
 

@@ -30,26 +30,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
 
-func setDesiredConfiguration(initialConfig *componentconfig.KubeletConfiguration) {
+func setDesiredConfiguration(initialConfig *nodeconfig.KubeletConfiguration) {
 	initialConfig.EnforceNodeAllocatable = []string{"pods", "kube-reserved", "system-reserved"}
-	initialConfig.SystemReserved = componentconfig.ConfigurationMap{
+	initialConfig.SystemReserved = nodeconfig.ConfigurationMap{
 		"cpu":    "100m",
 		"memory": "100Mi",
 	}
-	initialConfig.KubeReserved = componentconfig.ConfigurationMap{
+	initialConfig.KubeReserved = nodeconfig.ConfigurationMap{
 		"cpu":    "100m",
 		"memory": "100Mi",
 	}
 	initialConfig.EvictionHard = "memory.available<100Mi"
 	// Necessary for allocatable cgroup creation.
-	initialConfig.CgroupsPerQOS = true
 	initialConfig.KubeReservedCgroup = kubeReservedCgroup
 	initialConfig.SystemReservedCgroup = systemReservedCgroup
 }
@@ -138,7 +137,7 @@ func destroyTemporaryCgroupsForReservation(cgroupManager cm.CgroupManager) error
 }
 
 func runTest(f *framework.Framework) error {
-	var oldCfg *componentconfig.KubeletConfiguration
+	var oldCfg *nodeconfig.KubeletConfiguration
 	subsystems, err := cm.GetCgroupSubsystems()
 	if err != nil {
 		return err
@@ -165,7 +164,7 @@ func runTest(f *framework.Framework) error {
 	if err != nil {
 		return err
 	}
-	newCfg := clone.(*componentconfig.KubeletConfiguration)
+	newCfg := clone.(*nodeconfig.KubeletConfiguration)
 	// Change existing kubelet configuration
 	setDesiredConfiguration(newCfg)
 	// Set the new kubelet configuration.

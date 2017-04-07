@@ -25,8 +25,8 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/spf13/viper"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig"
 )
 
 const defaultHost = "http://127.0.0.1:8080"
@@ -128,7 +128,9 @@ type NodeTestContextType struct {
 	// PrepullImages indicates whether node e2e framework should prepull images.
 	PrepullImages bool
 	// KubeletConfig is the kubelet configuration the test is running against.
-	KubeletConfig componentconfig.KubeletConfiguration
+	KubeletConfig nodeconfig.KubeletConfiguration
+	// KubeletFlags is the kubelet flags the test is running against.
+	KubeletFlags nodeconfig.KubeletFlags
 }
 
 type CloudConfig struct {

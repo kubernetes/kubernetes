@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -49,7 +49,7 @@ const (
 
 // effectiveHairpinMode determines the effective hairpin mode given the
 // configured mode, container runtime, and whether cbr0 should be configured.
-func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRuntime string, networkPlugin string) (componentconfig.HairpinMode, error) {
+func effectiveHairpinMode(hairpinMode nodeconfig.HairpinMode, containerRuntime string, networkPlugin string) (nodeconfig.HairpinMode, error) {
 	// The hairpin mode setting doesn't matter if:
 	// - We're not using a bridge network. This is hard to check because we might
 	//   be using a plugin.
@@ -57,20 +57,20 @@ func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRunt
 	//   to set the hairpin flag on the veth's of containers. Currently the
 	//   docker runtime is the only one that understands this.
 	// - It's set to "none".
-	if hairpinMode == componentconfig.PromiscuousBridge || hairpinMode == componentconfig.HairpinVeth {
+	if hairpinMode == nodeconfig.PromiscuousBridge || hairpinMode == nodeconfig.HairpinVeth {
 		// Only on docker.
 		if containerRuntime != "docker" {
 			glog.Warningf("Hairpin mode set to %q but container runtime is %q, ignoring", hairpinMode, containerRuntime)
-			return componentconfig.HairpinNone, nil
+			return nodeconfig.HairpinNone, nil
 		}
-		if hairpinMode == componentconfig.PromiscuousBridge && networkPlugin != "kubenet" {
+		if hairpinMode == nodeconfig.PromiscuousBridge && networkPlugin != "kubenet" {
 			// This is not a valid combination, since promiscuous-bridge only works on kubenet. Users might be using the
 			// default values (from before the hairpin-mode flag existed) and we
 			// should keep the old behavior.
-			glog.Warningf("Hairpin mode set to %q but kubenet is not enabled, falling back to %q", hairpinMode, componentconfig.HairpinVeth)
-			return componentconfig.HairpinVeth, nil
+			glog.Warningf("Hairpin mode set to %q but kubenet is not enabled, falling back to %q", hairpinMode, nodeconfig.HairpinVeth)
+			return nodeconfig.HairpinVeth, nil
 		}
-	} else if hairpinMode != componentconfig.HairpinNone {
+	} else if hairpinMode != nodeconfig.HairpinNone {
 		return "", fmt.Errorf("unknown value: %q", hairpinMode)
 	}
 	return hairpinMode, nil

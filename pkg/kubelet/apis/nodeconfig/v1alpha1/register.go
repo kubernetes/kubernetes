@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,10 +22,13 @@ import (
 )
 
 // GroupName is the group name use in this package
-const GroupName = "componentconfig"
+const (
+	GroupName = "nodeconfig"
+	Version   = "v1alpha1"
+)
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: Version}
 
 var (
 	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
@@ -42,10 +45,10 @@ func init() {
 	localSchemeBuilder.Register(addKnownTypes, addDefaultingFuncs)
 }
 
+// TODO(mtaufen): Split this out for each of the subtypes
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&KubeProxyConfiguration{},
-		&KubeSchedulerConfiguration{},
+		&KubeletConfiguration{},
 	)
 	return nil
 }

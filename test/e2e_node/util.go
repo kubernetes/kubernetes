@@ -32,8 +32,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	v1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig"
+	v1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig/v1alpha1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	// utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -77,20 +77,31 @@ func getNodeSummary() (*stats.Summary, error) {
 }
 
 // Returns the current KubeletConfiguration
-func getCurrentKubeletConfig() (*componentconfig.KubeletConfiguration, error) {
+func getCurrentKubeletConfig() (*nodeconfig.KubeletConfiguration, error) {
 	resp := pollConfigz(5*time.Minute, 5*time.Second)
-	kubeCfg, err := decodeConfigz(resp)
+	_, kubeCfg, err := decodeConfigz(resp)
 	if err != nil {
 		return nil, err
 	}
 	return kubeCfg, nil
 }
 
+// Returns the current Kubelet flags. This should ONLY be used to set the flags on the test context,
+// other tests should retrieve the values from the test context, since they won't change.
+func getCurrentKubeletFlags() (*nodeconfig.KubeletFlags, error) {
+	resp := pollConfigz(5*time.Minute, 5*time.Second)
+	kubeFlags, _, err := decodeConfigz(resp)
+	if err != nil {
+		return nil, err
+	}
+	return kubeFlags, nil
+}
+
 // Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
 // The change is reverted in the AfterEach of the context.
 // Returns true on success.
-func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *componentconfig.KubeletConfiguration)) {
-	var oldCfg *componentconfig.KubeletConfiguration
+func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *nodeconfig.KubeletConfiguration)) {
+	var oldCfg *nodeconfig.KubeletConfiguration
 	BeforeEach(func() {
 		configEnabled, err := isKubeletConfigEnabled(f)
 		framework.ExpectNoError(err)
@@ -99,7 +110,7 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 			framework.ExpectNoError(err)
 			clone, err := api.Scheme.DeepCopy(oldCfg)
 			framework.ExpectNoError(err)
-			newCfg := clone.(*componentconfig.KubeletConfiguration)
+			newCfg := clone.(*nodeconfig.KubeletConfiguration)
 			updateFunction(newCfg)
 			framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 		} else {
@@ -133,7 +144,7 @@ func getCurrentKubeletConfigMap(f *framework.Framework) (*v1.ConfigMap, error) {
 // Creates or updates the configmap for KubeletConfiguration, waits for the Kubelet to restart
 // with the new configuration. Returns an error if the configuration after waiting 40 seconds
 // doesn't match what you attempted to set, or if the dynamic configuration feature is disabled.
-func setKubeletConfiguration(f *framework.Framework, kubeCfg *componentconfig.KubeletConfiguration) error {
+func setKubeletConfiguration(f *framework.Framework, kubeCfg *nodeconfig.KubeletConfiguration) error {
 	const (
 		restartGap = 30 * time.Second
 	)
@@ -207,37 +218,38 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Respon
 	return resp
 }
 
-// Decodes the http response from /configz and returns a componentconfig.KubeletConfiguration (internal type).
-func decodeConfigz(resp *http.Response) (*componentconfig.KubeletConfiguration, error) {
+// Decodes the http response from /configz and returns a nodeconfig.KubeletConfiguration (internal type).
+func decodeConfigz(resp *http.Response) (*nodeconfig.KubeletFlags, *nodeconfig.KubeletConfiguration, error) {
 	// This hack because /configz reports the following structure:
-	// {"componentconfig": {the JSON representation of v1alpha1.KubeletConfiguration}}
+	// {"nodeconfig": {the JSON representation of v1alpha1.KubeletConfiguration}}
 	type configzWrapper struct {
-		ComponentConfig v1alpha1.KubeletConfiguration `json:"componentconfig"`
+		flags  nodeconfig.KubeletFlags       `json:"kubeletFlags"`
+		config v1alpha1.KubeletConfiguration `json:"nodeconfig"`
 	}
 
 	configz := configzWrapper{}
-	kubeCfg := componentconfig.KubeletConfiguration{}
+	kubeCfg := nodeconfig.KubeletConfiguration{}
 
 	contentsBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = json.Unmarshal(contentsBytes, &configz)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	err = api.Scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
+	err = api.Scheme.Convert(&configz.config, &kubeCfg, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &kubeCfg, nil
+	return &configz.flags, &kubeCfg, nil
 }
 
 // Constructs a Kubelet ConfigMap targeting the current node running the node e2e tests
-func makeKubeletConfigMap(nodeName string, kubeCfg *componentconfig.KubeletConfiguration) *v1.ConfigMap {
+func makeKubeletConfigMap(nodeName string, kubeCfg *nodeconfig.KubeletConfiguration) *v1.ConfigMap {
 	kubeCfgExt := v1alpha1.KubeletConfiguration{}
 	api.Scheme.Convert(kubeCfg, &kubeCfgExt, nil)
 
@@ -256,7 +268,7 @@ func makeKubeletConfigMap(nodeName string, kubeCfg *componentconfig.KubeletConfi
 }
 
 // Uses KubeletConfiguration to create a `kubelet-<node-name>` ConfigMap in the "kube-system" namespace.
-func createConfigMap(f *framework.Framework, kubeCfg *componentconfig.KubeletConfiguration) (*v1.ConfigMap, error) {
+func createConfigMap(f *framework.Framework, kubeCfg *nodeconfig.KubeletConfiguration) (*v1.ConfigMap, error) {
 	cmap := makeKubeletConfigMap(framework.TestContext.NodeName, kubeCfg)
 	cmap, err := f.ClientSet.Core().ConfigMaps("kube-system").Create(cmap)
 	if err != nil {
@@ -266,7 +278,7 @@ func createConfigMap(f *framework.Framework, kubeCfg *componentconfig.KubeletCon
 }
 
 // Similar to createConfigMap, except this updates an existing ConfigMap.
-func updateConfigMap(f *framework.Framework, kubeCfg *componentconfig.KubeletConfiguration) (*v1.ConfigMap, error) {
+func updateConfigMap(f *framework.Framework, kubeCfg *nodeconfig.KubeletConfiguration) (*v1.ConfigMap, error) {
 	cmap := makeKubeletConfigMap(framework.TestContext.NodeName, kubeCfg)
 	cmap, err := f.ClientSet.Core().ConfigMaps("kube-system").Update(cmap)
 	if err != nil {

@@ -19,13 +19,13 @@ package kubemark
 import (
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
-	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -42,8 +42,8 @@ import (
 )
 
 type HollowKubelet struct {
-	KubeletFlags         *options.KubeletFlags
-	KubeletConfiguration *componentconfig.KubeletConfiguration
+	KubeletFlags         *nodeconfig.KubeletFlags
+	KubeletConfiguration *nodeconfig.KubeletConfiguration
 	KubeletDeps          *kubelet.KubeletDeps
 }
 
@@ -100,15 +100,34 @@ func GetHollowKubeletConfig(
 	kubeletPort int,
 	kubeletReadOnlyPort int,
 	maxPods int,
-	podsPerCore int) (*options.KubeletFlags, *componentconfig.KubeletConfiguration) {
+	podsPerCore int) (*nodeconfig.KubeletFlags, *nodeconfig.KubeletConfiguration) {
 
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
 	manifestFilePath := utils.MakeTempDirOrDie("manifest", testRootDir)
 	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 
 	// Flags struct
-	f := &options.KubeletFlags{
-		HostnameOverride: nodeName,
+	f := &nodeconfig.KubeletFlags{
+		HostnameOverride:             nodeName,
+		RootDirectory:                testRootDir,
+		ManifestURL:                  "",
+		PodManifestPath:              manifestFilePath,
+		FileCheckFrequency:           metav1.Duration{Duration: 20 * time.Second},
+		HTTPCheckFrequency:           metav1.Duration{Duration: 20 * time.Second},
+		MinimumGCAge:                 metav1.Duration{Duration: 1 * time.Minute},
+		OutOfDiskTransitionFrequency: metav1.Duration{Duration: 5 * time.Minute},
+		DockerExecHandlerName:        "native",
+		LowDiskSpaceThresholdMB:      256,
+		RuntimeCgroups:               "",
+		CgroupRoot:                   "",
+		ContainerRuntime:             "docker",
+		MaxContainerCount:            100,
+		CgroupsPerQOS:                false,
+		KubeletCgroups:               "/kubelet",
+		SystemCgroups:                "",
+		RegisterSchedulable:          true,
+		EnableControllerAttachDetach: false,
+		MaxPerPodContainerCount:      2,
 	}
 
 	// Config struct
@@ -116,54 +135,35 @@ func GetHollowKubeletConfig(
 	// are set for fields not overridden in NewHollowKubelet.
 	tmp := &v1alpha1.KubeletConfiguration{}
 	api.Scheme.Default(tmp)
-	c := &componentconfig.KubeletConfiguration{}
+	c := &nodeconfig.KubeletConfiguration{}
 	api.Scheme.Convert(tmp, c, nil)
 
-	c.RootDirectory = testRootDir
-	c.ManifestURL = ""
 	c.Address = "0.0.0.0" /* bind address */
 	c.Port = int32(kubeletPort)
 	c.ReadOnlyPort = int32(kubeletReadOnlyPort)
-	c.PodManifestPath = manifestFilePath
-	c.FileCheckFrequency.Duration = 20 * time.Second
-	c.HTTPCheckFrequency.Duration = 20 * time.Second
-	c.MinimumGCAge.Duration = 1 * time.Minute
 	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second
 	c.SyncFrequency.Duration = 10 * time.Second
-	c.OutOfDiskTransitionFrequency.Duration = 5 * time.Minute
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
 	c.MaxPods = int32(maxPods)
 	c.PodsPerCore = int32(podsPerCore)
 	c.ClusterDNS = []string{}
-	c.DockerExecHandlerName = "native"
 	c.ImageGCHighThresholdPercent = 90
 	c.ImageGCLowThresholdPercent = 80
-	c.LowDiskSpaceThresholdMB = 256
 	c.VolumeStatsAggPeriod.Duration = time.Minute
-	c.CgroupRoot = ""
-	c.ContainerRuntime = "docker"
 	c.CPUCFSQuota = true
-	c.RuntimeCgroups = ""
-	c.EnableControllerAttachDetach = false
 	c.EnableCustomMetrics = false
 	c.EnableDebuggingHandlers = true
 	c.EnableServer = true
-	c.CgroupsPerQOS = false
 	// hairpin-veth is used to allow hairpin packets. Note that this deviates from
 	// what the "real" kubelet currently does, because there's no way to
 	// set promiscuous mode on docker0.
-	c.HairpinMode = componentconfig.HairpinVeth
-	c.MaxContainerCount = 100
+	c.HairpinMode = nodeconfig.HairpinVeth
 	c.MaxOpenFiles = 1024
-	c.MaxPerPodContainerCount = 2
 	c.RegisterNode = true
-	c.RegisterSchedulable = true
 	c.RegistryBurst = 10
 	c.RegistryPullQPS = 5.0
 	c.ResolverConfig = kubetypes.ResolvConfDefault
-	c.KubeletCgroups = "/kubelet"
 	c.SerializeImagePulls = true
-	c.SystemCgroups = ""
 	c.ProtectKernelDefaults = false
 
 	// TODO(mtaufen): Note that PodInfraContainerImage was being set to the empty value before,

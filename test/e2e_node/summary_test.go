@@ -338,15 +338,11 @@ func recent(d time.Duration) types.GomegaMatcher {
 }
 
 func recordSystemCgroupProcesses() {
-	cfg, err := getCurrentKubeletConfig()
-	if err != nil {
-		framework.Logf("Failed to read kubelet config: %v", err)
-		return
-	}
+	flags := framework.TestContext.KubeletFlags
 	cgroups := map[string]string{
-		"kubelet": cfg.KubeletCgroups,
-		"runtime": cfg.RuntimeCgroups,
-		"misc":    cfg.SystemCgroups,
+		"kubelet": flags.KubeletCgroups,
+		"runtime": flags.RuntimeCgroups,
+		"misc":    flags.SystemCgroups,
 	}
 	for name, cgroup := range cgroups {
 		if cgroup == "" {

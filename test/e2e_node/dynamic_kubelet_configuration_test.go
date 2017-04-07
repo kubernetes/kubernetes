@@ -17,12 +17,9 @@ limitations under the License.
 package e2e_node
 
 import (
-	"time"
-
-	"github.com/golang/glog"
-
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 )
 
@@ -40,12 +37,12 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 
 			// Change a safe value e.g. file check frequency.
 			// Make sure we're providing a value distinct from the current one.
-			oldFileCheckFrequency := kubeCfg.FileCheckFrequency.Duration
-			newFileCheckFrequency := 11 * time.Second
-			if kubeCfg.FileCheckFrequency.Duration == newFileCheckFrequency {
-				newFileCheckFrequency = 10 * time.Second
+			oldRegistryPullQPS := kubeCfg.RegistryPullQPS
+			newRegistryPullQPS := int32(5)
+			if kubeCfg.RegistryPullQPS == newRegistryPullQPS {
+				newRegistryPullQPS = 0
 			}
-			kubeCfg.FileCheckFrequency.Duration = newFileCheckFrequency
+			kubeCfg.RegistryPullQPS = newRegistryPullQPS
 
 			// Use the new config to create a new kube-{node-name} configmap in `kube-system` namespace.
 			// Note: setKubeletConfiguration will return an error if the Kubelet does not present the
@@ -54,7 +51,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 			framework.ExpectNoError(err)
 
 			// Change the config back to what it originally was.
-			kubeCfg.FileCheckFrequency.Duration = oldFileCheckFrequency
+			kubeCfg.RegistryPullQPS = oldRegistryPullQPS
 			err = setKubeletConfiguration(f, kubeCfg)
 			framework.ExpectNoError(err)
 		})
