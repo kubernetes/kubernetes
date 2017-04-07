@@ -25,6 +25,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/util/slice:go_default_library",
+        "//vendor:github.com/fatih/camelcase",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
