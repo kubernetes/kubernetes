@@ -14,7 +14,6 @@ go_library(
         "controller.go",
         "crudtester.go",
         "federation.go",
-        "secret.go",
         "util.go",
     ],
     tags = ["automanaged"],
