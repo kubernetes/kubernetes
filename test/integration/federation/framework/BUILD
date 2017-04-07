@@ -25,7 +25,7 @@ go_library(
         "//federation/pkg/federatedtypes:go_default_library",
         "//federation/pkg/federatedtypes/crudtester:go_default_library",
         "//federation/pkg/federation-controller/cluster:go_default_library",
-        "//federation/pkg/federation-controller/secret:go_default_library",
+        "//federation/pkg/federation-controller/sync:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/master:go_default_library",
         "//test/integration/framework:go_default_library",

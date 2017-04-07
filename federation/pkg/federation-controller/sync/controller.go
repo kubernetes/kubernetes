@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package secret
+package sync
 
 import (
 	"fmt"
@@ -207,7 +207,7 @@ func (s *FederationSyncController) minimizeLatency() {
 	s.updateTimeout = 5 * time.Second
 }
 
-// Returns true if the given object has the given finalizer in its ObjectMeta.
+// hasFinalizerFunc returns true if the given object has the given finalizer in its ObjectMeta.
 func (s *FederationSyncController) hasFinalizerFunc(obj pkgruntime.Object, finalizer string) bool {
 	meta := s.adapter.ObjectMeta(obj)
 	for i := range meta.Finalizers {
