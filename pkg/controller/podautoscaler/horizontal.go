@@ -430,8 +430,8 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 
 		// Do not upscale too much to prevent incorrect rapid increase of the number of master replicas caused by
 		// bogus CPU usage report from heapster/kubelet (like in issue #32304).
-		if desiredReplicas > calculateScaleUpLimit(currentReplicas) {
-			desiredReplicas = calculateScaleUpLimit(currentReplicas)
+		if scaleUpLimit := calculateScaleUpLimit(currentReplicas); desiredReplicas > scaleUpLimit {
+			desiredReplicas = scaleUpLimit
 		}
 
 		rescale = shouldScale(hpa, currentReplicas, desiredReplicas, timestamp)
@@ -445,7 +445,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
 		}
 		a.eventRecorder.Eventf(hpa, v1.EventTypeNormal, "SuccessfulRescale", "New size: %d; reason: %s", desiredReplicas, rescaleReason)
-		glog.Infof("Successfull rescale of %s, old size: %d, new size: %d, reason: %s",
+		glog.Infof("Successful rescale of %s, old size: %d, new size: %d, reason: %s",
 			hpa.Name, currentReplicas, desiredReplicas, rescaleReason)
 	} else {
 		glog.V(4).Infof("decided not to scale %s to %v (last scale time was %s)", reference, desiredReplicas, hpa.Status.LastScaleTime)
