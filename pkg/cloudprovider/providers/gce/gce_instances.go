@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -349,4 +350,18 @@ func (gce *GCECloud) isCurrentInstance(instanceID string) bool {
 	}
 
 	return currentInstanceID == canonicalizeInstanceName(instanceID)
+}
+
+// NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (gce *GCECloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+	return []v1.NodeAddress{}, errors.New("unimplemented")
+}
+
+// InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (gce *GCECloud) InstanceTypeByProviderID(providerID string) (string, error) {
+	return "", errors.New("unimplemented")
 }
