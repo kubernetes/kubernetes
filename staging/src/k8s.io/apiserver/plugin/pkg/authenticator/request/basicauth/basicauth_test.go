@@ -60,11 +60,13 @@ func TestBasicAuth(t *testing.T) {
 			ExpectedCalled:   true,
 			ExpectedUsername: "user_with_empty_password",
 			ExpectedPassword: "",
+			ExpectedErr:      true,
 		},
 		"valid basic header": {
 			ExpectedCalled:   true,
 			ExpectedUsername: "myuser",
 			ExpectedPassword: "mypassword:withcolon",
+			ExpectedErr:      true,
 		},
 		"password auth returned user": {
 			Password:         testPassword{User: &user.DefaultInfo{Name: "returneduser"}, OK: true},
