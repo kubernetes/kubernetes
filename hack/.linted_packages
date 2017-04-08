@@ -178,6 +178,7 @@ pkg/controller/volume/attachdetach/reconciler
 pkg/conversion
 pkg/conversion/queryparams
 pkg/credentialprovider/aws
+pkg/fieldpath
 pkg/fields
 pkg/hyperkube
 pkg/kubelet/api

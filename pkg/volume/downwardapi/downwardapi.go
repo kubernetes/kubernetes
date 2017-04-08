@@ -244,7 +244,7 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 			nodeAllocatable, err := host.GetNodeAllocatable()
 			if err != nil {
 				errlist = append(errlist, err)
-			} else if values, err := fieldpath.ExtractResourceValueByContainerNameAndNodeAllocatable(fileInfo.ResourceFieldRef, pod, containerName, nodeAllocatable); err != nil {
+			} else if values, err := v1.ExtractResourceValueByContainerNameAndNodeAllocatable(fileInfo.ResourceFieldRef, pod, containerName, nodeAllocatable); err != nil {
 				glog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
 				errlist = append(errlist, err)
 			} else {
