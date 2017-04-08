@@ -466,7 +466,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		clock:             clock.RealClock{},
 		outOfDiskTransitionFrequency:            kubeCfg.OutOfDiskTransitionFrequency.Duration,
 		enableCustomMetrics:                     kubeCfg.EnableCustomMetrics,
-		babysitDaemons:                          kubeCfg.BabysitDaemons,
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
 		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
@@ -1063,9 +1062,6 @@ type Kubelet struct {
 	// (make cbr0 promiscuous), "hairpin-veth" (set the hairpin flag on veth interfaces)
 	// or "none" (do nothing).
 	hairpinMode componentconfig.HairpinMode
-
-	// The node has babysitter process monitoring docker and kubelet
-	babysitDaemons bool
 
 	// handlers called during the tryUpdateNodeStatus cycle
 	setNodeStatusFuncs []func(*v1.Node) error

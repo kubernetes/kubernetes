@@ -355,7 +355,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	}
 	out.ExitOnLockContention = in.ExitOnLockContention
 	out.HairpinMode = in.HairpinMode
-	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
 	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
@@ -548,7 +547,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	}
 	out.ExitOnLockContention = in.ExitOnLockContention
 	out.HairpinMode = in.HairpinMode
-	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
 	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
