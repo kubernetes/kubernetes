@@ -406,8 +406,6 @@ type KubeletConfiguration struct {
 	// Generally, one must set --hairpin-mode=veth-flag to achieve hairpin NAT,
 	// because promiscous-bridge assumes the existence of a container bridge named cbr0.
 	HairpinMode string
-	// The node has babysitter process monitoring docker and kubelet.
-	BabysitDaemons bool
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32
 	// dockerExecHandlerName is the handler to use when executing a command

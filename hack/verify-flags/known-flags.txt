@@ -62,7 +62,6 @@ auth-provider
 auth-provider-arg
 auth-provider-arg
 azure-container-registry-config
-babysit-daemons
 basic-auth-file
 bench-pods
 bench-quiet
