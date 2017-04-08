@@ -1537,6 +1537,10 @@
 			"Rev": "8096f47503459bcc74d1f4c487b7e6e42e5746b5"
 		},
 		{
+			"ImportPath": "github.com/gorilla/websocket",
+			"Rev": "6eb6ad425a89d9da7a5549bc6da8f79ba5c17844"
+		},
+		{
 			"ImportPath": "github.com/grpc-ecosystem/grpc-gateway/runtime",
 			"Comment": "v1.0.0-8-gf52d055",
 			"Rev": "f52d055dc48aec25854ed7d31862f78913cf17d1"
@@ -2221,6 +2225,11 @@
 			"ImportPath": "github.com/rackspace/gophercloud/testhelper/client",
 			"Comment": "v1.0.0-1012-ge00690e",
 			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
+		},
+		{
+			"ImportPath": "github.com/rancher/go-rancher/client",
+			"Comment": "v0.1.0-196-g09693a8",
+			"Rev": "09693a8743ba5ee58c58c1b1e8a4abd17af00d45"
 		},
 		{
 			"ImportPath": "github.com/renstrom/dedent",
