@@ -321,6 +321,8 @@ message DeploymentStatus {
   optional int32 unavailableReplicas = 5;
 
   // Represents the latest available observations of a deployment's current state.
+  // +patchMergeKey=type
+  // +patchStrategy=merge
   repeated DeploymentCondition conditions = 6;
 }
 
@@ -818,6 +820,8 @@ message ReplicaSetStatus {
 
   // Represents the latest available observations of a replica set's current state.
   // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
   repeated ReplicaSetCondition conditions = 6;
 }
 
