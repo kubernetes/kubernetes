@@ -80,7 +80,7 @@ func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, error) {
 		Name:         opts.Name,
 		Size:         opts.Size,
 		VolumeType:   opts.VolumeType,
-		Availability: opts.Availability,
+		AvailabilityZone: opts.Availability,
 		Metadata:     opts.Metadata,
 	}
 
