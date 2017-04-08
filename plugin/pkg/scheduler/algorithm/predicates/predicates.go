@@ -836,8 +836,7 @@ func PodFitsHostPorts(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 		return true, nil, nil
 	}
 
-	// TODO: Aggregate it at the NodeInfo level.
-	existingPorts := GetUsedPorts(nodeInfo.Pods()...)
+	existingPorts := nodeInfo.UsedPorts()
 	for wport := range wantPorts {
 		if wport != 0 && existingPorts[wport] {
 			return false, []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts}, nil
