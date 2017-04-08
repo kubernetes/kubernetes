@@ -17,12 +17,12 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
-	"bytes"
-	"path/filepath"
-	"encoding/json"
 	"os"
+	"path/filepath"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -31,10 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/cmdtools"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/cmdtools"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
@@ -51,7 +51,7 @@ type DiffLastAppliedOptions struct {
 	Factory          cmdutil.Factory
 	Out              io.Writer
 	ErrOut           io.Writer
-	ext       	 string
+	ext              string
 }
 
 var (
@@ -107,26 +107,28 @@ func (o *DiffLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command,
 			return err
 		}
 
-		o.DiffBuffer1, err = runtime.Encode(o.Codec, info.VersionedObject)
-		if err != nil {
-			return err
-		}
-
-		// Verify the object exists in the cluster
-		if err := info.Get(); err != nil {
-			if errors.IsNotFound(err) {
+		/*
+			o.DiffBuffer1, err = runtime.Encode(o.Codec, info.VersionedObject)
+			if err != nil {
 				return err
-			} else {
+			}
+
+			// Verify the object exists in the cluster
+			if err := info.Get(); err != nil {
+				if errors.IsNotFound(err) {
+					return err
+				} else {
+					return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
+				}
+			}
+			o.DiffBuffer2, err = kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+			if err != nil {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
 			}
-		}
-		o.DiffBuffer2, err = kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
-		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
-		}
-		if o.DiffBuffer2 == nil {
-			return cmdutil.UsageError(cmd, "no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)
-		}
+			if o.DiffBuffer2 == nil {
+				return cmdutil.UsageError(cmd, "no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)
+			}
+		*/
 
 		return nil
 	})
@@ -153,7 +155,6 @@ func (o *DiffLastAppliedOptions) RunDiffLastApplied(f cmdutil.Factory, cmd *cobr
 	r2 := bytes.NewReader(buf2)
 
 	diff := cmdtools.NewDefaultCmdTool("diff", f.DiffEnvs())
-
 
 	_, _, err = diff.LaunchTempFile(fmt.Sprintf("%s-diff-", filepath.Base(os.Args[0])), o.ext, r1, r2)
 	if err != nil {
