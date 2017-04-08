@@ -322,6 +322,8 @@ type DeploymentStatus struct {
 	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty" protobuf:"varint,5,opt,name=unavailableReplicas"`
 
 	// Represents the latest available observations of a deployment's current state.
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	Conditions []DeploymentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,6,rep,name=conditions"`
 }
 
@@ -802,6 +804,8 @@ type ReplicaSetStatus struct {
 
 	// Represents the latest available observations of a replica set's current state.
 	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	Conditions []ReplicaSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,6,rep,name=conditions"`
 }
 
