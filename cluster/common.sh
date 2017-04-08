@@ -639,7 +639,6 @@ CLUSTER_REGISTRY_DISK_SIZE: $(yaml-quote ${CLUSTER_REGISTRY_DISK_SIZE:-})
 DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
 DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
 ENABLE_DNS_HORIZONTAL_AUTOSCALER: $(yaml-quote ${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false})
-ENABLE_IP_ALIASES: $(yaml-quote ${ENABLE_IP_ALIASES:-false})
 KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
 KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote ${NODE_PROBLEM_DETECTOR_TOKEN:-})
@@ -735,6 +734,17 @@ EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
 EOF
   fi
+
+  if [ -n "${PROVIDER_VARS:-}" ]; then
+    local var_name
+    local var_value
+
+    for var_name in ${PROVIDER_VARS}; do
+      eval "local var_value=\$(yaml-quote \${${var_name}})"
+      echo "${var_name}: ${var_value}" >>$file
+    done
+  fi
+
   if [[ "${master}" == "true" ]]; then
     # Master-only env vars.
     cat >>$file <<EOF
