@@ -280,7 +280,7 @@ func KnownControllers() []string {
 		serviceControllerName,
 		routeControllerName,
 		pvBinderControllerName,
-		attachDetatchControllerName,
+		attachDetachControllerName,
 	)
 
 	// add "special" controllers that aren't initialized normally
@@ -365,12 +365,12 @@ func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 }
 
 const (
-	saTokenControllerName       = "serviceaccount-token"
-	nodeControllerName          = "node"
-	serviceControllerName       = "service"
-	routeControllerName         = "route"
-	pvBinderControllerName      = "persistentvolume-binder"
-	attachDetatchControllerName = "attachdetach"
+	saTokenControllerName      = "serviceaccount-token"
+	nodeControllerName         = "node"
+	serviceControllerName      = "service"
+	routeControllerName        = "route"
+	pvBinderControllerName     = "persistentvolume-binder"
+	attachDetachControllerName = "attachdetach"
 )
 
 func StartControllers(controllers map[string]InitFunc, s *options.CMServer, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) error {
@@ -444,7 +444,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		glog.Infof("Started %q", controllerName)
 	}
 
-	// all the remaning plugins want this cloud variable
+	// all the remaining plugins want this cloud variable
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	if err != nil {
 		return fmt.Errorf("cloud provider could not be initialized: %v", err)
@@ -553,7 +553,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		glog.Warningf("%q is disabled", pvBinderControllerName)
 	}
 
-	if ctx.IsControllerEnabled(attachDetatchControllerName) {
+	if ctx.IsControllerEnabled(attachDetachControllerName) {
 		if s.ReconcilerSyncLoopPeriod.Duration < time.Second {
 			return fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
 		}
@@ -575,7 +575,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		go attachDetachController.Run(stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	} else {
-		glog.Warningf("%q is disabled", attachDetatchControllerName)
+		glog.Warningf("%q is disabled", attachDetachControllerName)
 	}
 
 	sharedInformers.Start(stop)
