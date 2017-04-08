@@ -2252,7 +2252,7 @@ func (f *Framework) MatchContainerOutput(
 			}
 			Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, container.Name, logs)
 		}
-		return fmt.Errorf("expected pod %q success: %v", createdPod.Name, err)
+		return fmt.Errorf("expected pod %q success: %v", createdPod.Name, podErr)
 	}
 
 	Logf("Trying to get logs from node %s pod %s container %s: %v",

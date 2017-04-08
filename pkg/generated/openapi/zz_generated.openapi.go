@@ -3971,11 +3971,32 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"chapAuthDiscovery": {
+							SchemaProps: spec.SchemaProps{
+								Description: "whether support iSCSI Discovery CHAP authentication",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"chapAuthSession": {
+							SchemaProps: spec.SchemaProps{
+								Description: "whether support iSCSI Session CHAP authentication",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"secretRef": {
+							SchemaProps: spec.SchemaProps{
+								Description: "CHAP secret for iSCSI target and initiator authentication",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.LocalObjectReference"),
+							},
+						},
 					},
 					Required: []string{"targetPortal", "iqn", "lun"},
 				},
 			},
-			Dependencies: []string{},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.LocalObjectReference"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.KeyToPath": {
 			Schema: spec.Schema{

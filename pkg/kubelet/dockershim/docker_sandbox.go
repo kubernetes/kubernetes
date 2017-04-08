@@ -218,14 +218,34 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 // sandbox, they should be forcibly removed.
 func (ds *dockerService) RemovePodSandbox(podSandboxID string) error {
 	var errs []error
+	opts := dockertypes.ContainerListOptions{All: true}
+
+	opts.Filter = dockerfilters.NewArgs()
+	f := newDockerFilter(&opts.Filter)
+	f.AddLabel(sandboxIDLabelKey, podSandboxID)
+
+	containers, err := ds.client.ListContainers(opts)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Remove all containers in the sandbox.
+	for i := range containers {
+		if err := ds.RemoveContainer(containers[i].ID); err != nil && !dockertools.IsContainerNotFoundError(err) {
+			errs = append(errs, err)
+		}
+	}
+
+	// Remove the sandbox container.
 	if err := ds.client.RemoveContainer(podSandboxID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); err != nil && !dockertools.IsContainerNotFoundError(err) {
 		errs = append(errs, err)
 	}
+
+	// Remove the checkpoint of the sandbox.
 	if err := ds.checkpointHandler.RemoveCheckpoint(podSandboxID); err != nil {
 		errs = append(errs, err)
 	}
 	return utilerrors.NewAggregate(errs)
-	// TODO: remove all containers in the sandbox.
 }
 
 // getIPFromPlugin interrogates the network plugin for an IP.

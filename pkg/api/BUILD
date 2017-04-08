@@ -11,6 +11,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "annotation_key_constants.go",
         "defaults.go",
         "doc.go",
         "field_constants.go",

@@ -55,11 +55,12 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 		return 0, 0, 0, time.Time{}, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
 	}
 
-	if len(podList.Items) == 0 {
+	itemsLen := len(podList.Items)
+	if itemsLen == 0 {
 		return 0, 0, 0, time.Time{}, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	requests := make(map[string]int64, len(podList.Items))
+	requests := make(map[string]int64, itemsLen)
 	readyPodCount := 0
 	unreadyPods := sets.NewString()
 	missingPods := sets.NewString()

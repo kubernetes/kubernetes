@@ -47,9 +47,8 @@ var FederatedServiceLabels = map[string]string{
 
 var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federated-service")
-	var clusters map[string]*cluster // All clusters, keyed by cluster name
+	var clusters fedframework.ClusterSlice
 	var federationName string
-	var primaryClusterName string // The name of the "primary" cluster
 
 	var _ = Describe("Without Clusters [NoCluster]", func() {
 		BeforeEach(func() {
@@ -84,7 +83,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				federationName = DefaultFederationName
 			}
 
-			clusters, primaryClusterName = getRegisteredClusters(UserAgentName, f)
+			clusters = f.GetRegisteredClusters()
 		})
 
 		Describe("Federated Service", func() {
@@ -146,6 +145,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 			var (
 				service      *v1.Service
 				serviceShard *v1.Service
+				backendPods  BackendPodMap
 			)
 
 			BeforeEach(func() {
@@ -153,7 +153,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 				nsName := f.FederationNamespace.Name
 
-				createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
+				backendPods = createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
 
 				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
 				obj, err := api.Scheme.DeepCopy(service)
@@ -191,7 +191,8 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				fedframework.SkipUnlessFederated(f.ClientSet)
 
 				nsName := f.FederationNamespace.Name
-				deleteBackendPodsOrFail(clusters, nsName)
+				deleteBackendPodsOrFail(clusters, backendPods)
+				backendPods = nil
 
 				if service != nil {
 					deleteServiceOrFail(f.FederationClientset, nsName, service.Name, nil)
@@ -244,8 +245,10 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				BeforeEach(func() {
 					fedframework.SkipUnlessFederated(f.ClientSet)
 
-					// Delete all the backend pods from the shard which is local to the discovery pod.
-					deleteOneBackendPodOrFail(clusters[primaryClusterName])
+					// Delete the backend pod from the shard which is local to the discovery pod.
+					primaryCluster := clusters[0]
+					backendPod := backendPods[primaryCluster.Name]
+					deleteOneBackendPodOrFail(primaryCluster, backendPod)
 
 				})
 
@@ -287,7 +290,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 // verifyCascadingDeletionForService verifies that services are deleted from
 // underlying clusters when orphan dependents is false and they are not
 // deleted when orphan dependents is true.
-func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, clusters fedframework.ClusterSlice, orphanDependents *bool, nsName string) {
 	service := createServiceOrFail(clientset, nsName, FederatedServiceName)
 	serviceName := service.Name
 	// Check subclusters if the service was created there.
@@ -313,8 +316,9 @@ func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, cluste
 	errMessages := []string{}
 	// service should be present in underlying clusters unless orphanDependents is false.
 	shouldExist := orphanDependents == nil || *orphanDependents == true
-	for clusterName, clusterClientset := range clusters {
-		_, err := clusterClientset.Core().Services(nsName).Get(serviceName, metav1.GetOptions{})
+	for _, cluster := range clusters {
+		clusterName := cluster.Name
+		_, err := cluster.Core().Services(nsName).Get(serviceName, metav1.GetOptions{})
 		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for service %s in cluster %s, expected service to exist", serviceName, clusterName))
 		} else if !shouldExist && !errors.IsNotFound(err) {

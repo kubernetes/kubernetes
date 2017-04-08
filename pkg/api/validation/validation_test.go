@@ -948,6 +948,42 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "iscsi.iqn",
 		},
+		{
+			name: "empty secret",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal:      "127.0.0.1",
+						IQN:               "iqn.2015-02.example.com:test",
+						Lun:               1,
+						FSType:            "ext4",
+						ReadOnly:          false,
+						DiscoveryCHAPAuth: true,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "iscsi.secretRef",
+		},
+		{
+			name: "empty secret",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal:    "127.0.0.1",
+						IQN:             "iqn.2015-02.example.com:test",
+						Lun:             1,
+						FSType:          "ext4",
+						ReadOnly:        false,
+						SessionCHAPAuth: true,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "iscsi.secretRef",
+		},
 		// Secret
 		{
 			name: "valid Secret",

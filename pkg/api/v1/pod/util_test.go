@@ -253,7 +253,11 @@ func TestPodSecrets(t *testing.T) {
 				VolumeSource: v1.VolumeSource{
 					ScaleIO: &v1.ScaleIOVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef"}}}}},
+							Name: "Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef"}}}}, {
+				VolumeSource: v1.VolumeSource{
+					ISCSI: &v1.ISCSIVolumeSource{
+						SecretRef: &v1.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.ISCSI.SecretRef"}}}}},
 		},
 	}
 	extractedNames := sets.NewString()
@@ -282,6 +286,7 @@ func TestPodSecrets(t *testing.T) {
 		"Spec.Volumes[*].VolumeSource.Secret",
 		"Spec.Volumes[*].VolumeSource.Secret.SecretName",
 		"Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef",
+		"Spec.Volumes[*].VolumeSource.ISCSI.SecretRef",
 	)
 	secretPaths := collectSecretPaths(t, nil, "", reflect.TypeOf(&v1.Pod{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)

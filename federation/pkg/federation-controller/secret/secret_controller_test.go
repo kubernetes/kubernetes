@@ -66,7 +66,7 @@ func TestSecretController(t *testing.T) {
 	RegisterFakeList(secrets, &cluster2Client.Fake, &apiv1.SecretList{Items: []apiv1.Secret{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate(secrets, &cluster2Client.Fake, cluster2Watch)
 
-	secretController := NewSecretController(fakeClient)
+	secretController := newSecretController(fakeClient)
 	informerClientFactory := func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
@@ -77,12 +77,9 @@ func TestSecretController(t *testing.T) {
 			return nil, fmt.Errorf("Unknown cluster")
 		}
 	}
-	setClientFactory(secretController.secretFederatedInformer, informerClientFactory)
+	setClientFactory(secretController.informer, informerClientFactory)
 
-	secretController.clusterAvailableDelay = time.Second
-	secretController.secretReviewDelay = 50 * time.Millisecond
-	secretController.smallDelay = 20 * time.Millisecond
-	secretController.updateTimeout = 5 * time.Second
+	secretController.minimizeLatency()
 
 	stop := make(chan struct{})
 	secretController.Run(stop)
@@ -118,7 +115,7 @@ func TestSecretController(t *testing.T) {
 
 	// Wait for the secret to appear in the informer store
 	err := WaitForStoreUpdate(
-		secretController.secretFederatedInformer.GetTargetStore(),
+		secretController.informer.GetTargetStore(),
 		cluster1.Name, types.NamespacedName{Namespace: secret1.Namespace, Name: secret1.Name}.String(), wait.ForeverTestTimeout)
 	assert.Nil(t, err, "secret should have appeared in the informer store")
 
@@ -149,7 +146,7 @@ func TestSecretController(t *testing.T) {
 
 	// Wait for the secret to be updated in the informer store.
 	err = WaitForSecretStoreUpdate(
-		secretController.secretFederatedInformer.GetTargetStore(),
+		secretController.informer.GetTargetStore(),
 		cluster1.Name, types.NamespacedName{Namespace: secret1.Namespace, Name: secret1.Name}.String(),
 		&secret1, wait.ForeverTestTimeout)
 	assert.NoError(t, err, "secret should have been updated in the informer store")

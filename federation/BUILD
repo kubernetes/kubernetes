@@ -29,6 +29,7 @@ filegroup(
         "//federation/pkg/dnsprovider:all-srcs",
         "//federation/pkg/federation-controller:all-srcs",
         "//federation/pkg/kubefed:all-srcs",
+        "//federation/pkg/typeadapters:all-srcs",
         "//federation/registry/cluster:all-srcs",
     ],
     tags = ["automanaged"],

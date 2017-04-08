@@ -43,7 +43,7 @@ const (
 
 // Create/delete daemonset api objects
 var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", func() {
-	var clusters map[string]*cluster // All clusters, keyed by cluster name
+	var clusters fedframework.ClusterSlice
 
 	f := fedframework.NewDefaultFederatedFramework("federated-daemonset")
 
@@ -51,7 +51,7 @@ var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", fun
 
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			clusters, _ = getRegisteredClusters(UserAgentName, f)
+			clusters = f.GetRegisteredClusters()
 		})
 
 		AfterEach(func() {
@@ -114,7 +114,7 @@ func deleteAllDaemonSetsOrFail(clientset *fedclientset.Clientset, nsName string)
 // verifyCascadingDeletionForDS verifies that daemonsets are deleted from
 // underlying clusters when orphan dependents is false and they are not
 // deleted when orphan dependents is true.
-func verifyCascadingDeletionForDS(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+func verifyCascadingDeletionForDS(clientset *fedclientset.Clientset, clusters fedframework.ClusterSlice, orphanDependents *bool, nsName string) {
 	daemonset := createDaemonSetOrFail(clientset, nsName)
 	daemonsetName := daemonset.Name
 	// Check subclusters if the daemonset was created there.
@@ -140,8 +140,9 @@ func verifyCascadingDeletionForDS(clientset *fedclientset.Clientset, clusters ma
 	errMessages := []string{}
 	// daemon set should be present in underlying clusters unless orphanDependents is false.
 	shouldExist := orphanDependents == nil || *orphanDependents == true
-	for clusterName, clusterClientset := range clusters {
-		_, err := clusterClientset.Extensions().DaemonSets(nsName).Get(daemonsetName, metav1.GetOptions{})
+	for _, cluster := range clusters {
+		clusterName := cluster.Name
+		_, err := cluster.Extensions().DaemonSets(nsName).Get(daemonsetName, metav1.GetOptions{})
 		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for daemonset %s in cluster %s, expected daemonset to exist", daemonsetName, clusterName))
 		} else if !shouldExist && !errors.IsNotFound(err) {
@@ -233,7 +234,7 @@ func updateDaemonSetOrFail(clientset *fedclientset.Clientset, namespace string) 
 	return newDaemonSet
 }
 
-func waitForDaemonSetShardsOrFail(namespace string, daemonset *v1beta1.DaemonSet, clusters map[string]*cluster) {
+func waitForDaemonSetShardsOrFail(namespace string, daemonset *v1beta1.DaemonSet, clusters fedframework.ClusterSlice) {
 	framework.Logf("Waiting for daemonset %q in %d clusters", daemonset.Name, len(clusters))
 	for _, c := range clusters {
 		waitForDaemonSetOrFail(c.Clientset, namespace, daemonset, true, FederatedDaemonSetTimeout)
@@ -263,7 +264,7 @@ func waitForDaemonSetOrFail(clientset *kubeclientset.Clientset, namespace string
 	}
 }
 
-func waitForDaemonSetShardsUpdatedOrFail(namespace string, daemonset *v1beta1.DaemonSet, clusters map[string]*cluster) {
+func waitForDaemonSetShardsUpdatedOrFail(namespace string, daemonset *v1beta1.DaemonSet, clusters fedframework.ClusterSlice) {
 	framework.Logf("Waiting for daemonset %q in %d clusters", daemonset.Name, len(clusters))
 	for _, c := range clusters {
 		waitForDaemonSetUpdateOrFail(c.Clientset, namespace, daemonset, FederatedDaemonSetTimeout)

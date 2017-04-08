@@ -568,10 +568,15 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				// The unix socket for kubelet <-> dockershim communication.
 				ep = "/var/run/dockershim.sock"
 			)
-			kubeCfg.RemoteRuntimeEndpoint, kubeCfg.RemoteImageEndpoint = ep, ep
+			if len(kubeCfg.RemoteRuntimeEndpoint) == 0 {
+				kubeCfg.RemoteRuntimeEndpoint = ep
+			}
+			if len(kubeCfg.RemoteImageEndpoint) == 0 {
+				kubeCfg.RemoteImageEndpoint = ep
+			}
 
 			glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-			server := dockerremote.NewDockerServer(ep, ds)
+			server := dockerremote.NewDockerServer(kubeCfg.RemoteRuntimeEndpoint, ds)
 			if err := server.Start(); err != nil {
 				return nil, err
 			}

@@ -281,6 +281,7 @@ garbage-collector-enabled
 gather-logs-sizes
 gather-metrics-at-teardown
 gather-resource-usage
+gce-multizone
 gce-project
 gce-service-account
 gce-upgrade-script

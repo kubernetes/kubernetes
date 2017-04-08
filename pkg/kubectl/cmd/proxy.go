@@ -33,7 +33,7 @@ import (
 
 var (
 	default_port = 8001
-	proxy_long   = templates.LongDesc(`
+	proxy_long   = templates.LongDesc(i18n.T(`
 		To proxy all of the kubernetes api and nothing else, use:
 
 		    $ kubectl proxy --api-prefix=/
@@ -48,9 +48,9 @@ var (
 
 		    $ kubectl proxy --api-prefix=/custom/
 
-		The above lets you 'curl localhost:8001/custom/api/v1/pods'`)
+		The above lets you 'curl localhost:8001/custom/api/v1/pods'`))
 
-	proxy_example = templates.Examples(`
+	proxy_example = templates.Examples(i18n.T(`
 		# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
 		kubectl proxy --port=8011 --www=./local/www/
 
@@ -60,7 +60,7 @@ var (
 
 		# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
 		# This makes e.g. the pods api available at localhost:8001/k8s-api/v1/pods/
-		kubectl proxy --api-prefix=/k8s-api`)
+		kubectl proxy --api-prefix=/k8s-api`))
 )
 
 func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {

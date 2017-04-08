@@ -29,12 +29,12 @@ import (
 )
 
 var (
-	clusterRoleBindingLong = templates.LongDesc(`
-		Create a ClusterRoleBinding for a particular ClusterRole.`)
+	clusterRoleBindingLong = templates.LongDesc(i18n.T(`
+		Create a ClusterRoleBinding for a particular ClusterRole.`))
 
-	clusterRoleBindingExample = templates.Examples(`
+	clusterRoleBindingExample = templates.Examples(i18n.T(`
 		  # Create a ClusterRoleBinding for user1, user2, and group1 using the cluster-admin ClusterRole
-		  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1`)
+		  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1`))
 )
 
 // ClusterRoleBinding is a command to ease creating ClusterRoleBindings.

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	clustercache "k8s.io/kubernetes/federation/client/cache"
@@ -53,8 +54,17 @@ type ClusterController struct {
 	clusterStore      clustercache.StoreToClusterLister
 }
 
-// NewclusterController returns a new cluster controller
-func NewclusterController(federationClient federationclientset.Interface, clusterMonitorPeriod time.Duration) *ClusterController {
+// StartClusterController starts a new cluster controller
+func StartClusterController(config *restclient.Config, stopChan <-chan struct{}, clusterMonitorPeriod time.Duration) {
+	restclient.AddUserAgent(config, "cluster-controller")
+	client := federationclientset.NewForConfigOrDie(config)
+	controller := newClusterController(client, clusterMonitorPeriod)
+	glog.Infof("Starting cluster controller")
+	controller.Run(stopChan)
+}
+
+// newClusterController returns a new cluster controller
+func newClusterController(federationClient federationclientset.Interface, clusterMonitorPeriod time.Duration) *ClusterController {
 	cc := &ClusterController{
 		knownClusterSet:         make(sets.String),
 		federationClient:        federationClient,
@@ -112,15 +122,15 @@ func (cc *ClusterController) addToClusterSet(obj interface{}) {
 }
 
 // Run begins watching and syncing.
-func (cc *ClusterController) Run() {
+func (cc *ClusterController) Run(stopChan <-chan struct{}) {
 	defer utilruntime.HandleCrash()
-	go cc.clusterController.Run(wait.NeverStop)
+	go cc.clusterController.Run(stopChan)
 	// monitor cluster status periodically, in phase 1 we just get the health state from "/healthz"
 	go wait.Until(func() {
 		if err := cc.UpdateClusterStatus(); err != nil {
 			glog.Errorf("Error monitoring cluster status: %v", err)
 		}
-	}, cc.clusterMonitorPeriod, wait.NeverStop)
+	}, cc.clusterMonitorPeriod, stopChan)
 }
 
 func (cc *ClusterController) GetClusterClient(cluster *federationv1beta1.Cluster) (*ClusterClient, error) {
