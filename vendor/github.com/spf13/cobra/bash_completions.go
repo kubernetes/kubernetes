@@ -87,8 +87,8 @@ __handle_reply()
                 local index flag
                 flag="${cur%%=*}"
                 __index_of_word "${flag}" "${flags_with_completion[@]}"
+                COMPREPLY=()
                 if [[ ${index} -ge 0 ]]; then
-                    COMPREPLY=()
                     PREFIX=""
                     cur="${cur#*=}"
                     ${flags_completion[${index}]}
