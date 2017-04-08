@@ -25,9 +25,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	fedv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -157,10 +155,6 @@ func (f *Framework) FederationAfterEach() {
 		framework.DumpEventsInNamespace(func(opts metav1.ListOptions, ns string) (*v1.EventList, error) {
 			return f.FederationClientset.Core().Events(ns).List(opts)
 		}, f.FederationNamespace.Name)
-		// Print logs of federation control plane pods (federation-apiserver and federation-controller-manager)
-		framework.LogPodsWithLabels(f.ClientSet, fedv1beta1.FederationNamespaceSystem, map[string]string{"app": "federated-cluster"}, framework.Logf)
-		// Print logs of kube-dns pod
-		framework.LogPodsWithLabels(f.ClientSet, api.NamespaceSystem, map[string]string{"k8s-app": "kube-dns"}, framework.Logf)
 	}
 }
 
