@@ -3,8 +3,10 @@ package gophercloud
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"strconv"
 	"time"
 )
@@ -58,6 +60,78 @@ func (r Result) ExtractInto(to interface{}) error {
 	err = json.Unmarshal(b, to)
 
 	return err
+}
+
+func (r Result) extractIntoPtr(to interface{}, label string) error {
+	if label == "" {
+		return r.ExtractInto(&to)
+	}
+
+	var m map[string]interface{}
+	err := r.ExtractInto(&m)
+	if err != nil {
+		return err
+	}
+
+	b, err := json.Marshal(m[label])
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(b, &to)
+	return err
+}
+
+// ExtractIntoStructPtr will unmarshal the Result (r) into the provided
+// interface{} (to).
+//
+// NOTE: For internal use only
+//
+// `to` must be a pointer to an underlying struct type
+//
+// If provided, `label` will be filtered out of the response
+// body prior to `r` being unmarshalled into `to`.
+func (r Result) ExtractIntoStructPtr(to interface{}, label string) error {
+	if r.Err != nil {
+		return r.Err
+	}
+
+	t := reflect.TypeOf(to)
+	if k := t.Kind(); k != reflect.Ptr {
+		return fmt.Errorf("Expected pointer, got %v", k)
+	}
+	switch t.Elem().Kind() {
+	case reflect.Struct:
+		return r.extractIntoPtr(to, label)
+	default:
+		return fmt.Errorf("Expected pointer to struct, got: %v", t)
+	}
+}
+
+// ExtractIntoSlicePtr will unmarshal the Result (r) into the provided
+// interface{} (to).
+//
+// NOTE: For internal use only
+//
+// `to` must be a pointer to an underlying slice type
+//
+// If provided, `label` will be filtered out of the response
+// body prior to `r` being unmarshalled into `to`.
+func (r Result) ExtractIntoSlicePtr(to interface{}, label string) error {
+	if r.Err != nil {
+		return r.Err
+	}
+
+	t := reflect.TypeOf(to)
+	if k := t.Kind(); k != reflect.Ptr {
+		return fmt.Errorf("Expected pointer, got %v", k)
+	}
+	switch t.Elem().Kind() {
+	case reflect.Slice:
+		return r.extractIntoPtr(to, label)
+	default:
+		return fmt.Errorf("Expected pointer to slice, got: %v", t)
+	}
 }
 
 // PrettyPrintJSON creates a string containing the full response body as
