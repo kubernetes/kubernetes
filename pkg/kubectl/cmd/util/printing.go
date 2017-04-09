@@ -30,6 +30,72 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// PrinterOptions contains all printing related options.
+type PrinterOptions struct {
+	Output           string
+	AllowMissingKeys bool
+	OutputVersion    string
+	NoHeaders        bool
+	ShowLabels       bool
+	Template         string
+	SortBy           string
+	ShowAll          bool
+}
+
+func (o PrinterOptions) Printer(mapper meta.RESTMapper, typer runtime.ObjectTyper, decoders []runtime.Decoder) (printers.ResourcePrinter, bool, error) {
+	outputFormat := o.Output
+	templateFile := o.Template
+
+	// templates are logically optional for specifying a format.
+	// TODO once https://github.com/kubernetes/kubernetes/issues/12668 is fixed, this should fall back to GetFlagString
+	if len(outputFormat) == 0 && len(templateFile) != 0 {
+		outputFormat = "template"
+	}
+
+	templateFormat := []string{
+		"go-template=", "go-template-file=", "jsonpath=", "jsonpath-file=", "custom-columns=", "custom-columns-file=",
+	}
+	for _, format := range templateFormat {
+		if strings.HasPrefix(outputFormat, format) {
+			templateFile = outputFormat[len(format):]
+			outputFormat = format[:len(format)-1]
+		}
+	}
+
+	printer, generic, err := printers.GetStandardPrinter(outputFormat, templateFile, o.NoHeaders, o.AllowMissingKeys, mapper, typer, decoders)
+	if err != nil {
+		return nil, generic, err
+	}
+
+	return o.wrapSortingPrinter(printer), generic, nil
+}
+
+func (o PrinterOptions) wrapSortingPrinter(printer printers.ResourcePrinter) printers.ResourcePrinter {
+	if len(o.SortBy) == 0 {
+		return printer
+	}
+
+	return &kubectl.SortingPrinter{
+		Delegate:  printer,
+		SortField: fmt.Sprintf("{%s}", o.SortBy),
+	}
+}
+
+func AddPrinterVarFlags(cmd *cobra.Command, options *PrinterOptions) {
+	cmd.Flags().StringVarP(&options.Output, "output", "o", "", "Output format. One of: json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")
+	cmd.Flags().BoolVar(&options.AllowMissingKeys, "allow-missing-template-keys", true, "If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats.")
+	cmd.Flags().BoolVar(&options.NoHeaders, "no-headers", false, "When using the default or custom-column output format, don't print headers.")
+	cmd.Flags().BoolVar(&options.ShowLabels, "show-labels", false, "When printing, show all labels as the last column (default hide labels column)")
+	cmd.Flags().StringVar(&options.Template, "template", "", "Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].")
+	cmd.MarkFlagFilename("template")
+	cmd.Flags().StringVar(&options.SortBy, "sort-by", "", "If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.")
+	cmd.Flags().BoolVarP(&options.ShowAll, "show-all", "a", false, "When printing, show all resources (default hide terminated pods.)")
+
+	cmd.Flags().StringVar(&options.OutputVersion, "output-version", "", "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
+	cmd.Flags().MarkDeprecated("output-version", "the resource is used exactly as fetched from the API. To get a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
+	cmd.Flags().MarkHidden("output-version")
+}
+
 // AddPrinterFlags adds printing related flags to a command (e.g. output format, no headers, template path)
 func AddPrinterFlags(cmd *cobra.Command) {
 	AddNonDeprecatedPrinterFlags(cmd)

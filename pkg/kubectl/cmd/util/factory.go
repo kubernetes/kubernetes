@@ -232,6 +232,11 @@ type BuilderFactory interface {
 	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
 	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
 	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)
+	// PrinterWithOption returns a printer with specific option. Returns a printer, true if the printer
+	// is generic (is not internal), or an error if a printer could not be found.
+	PrinterWithOption(o PrinterOptions) (printers.ResourcePrinter, bool, error)
+	// PrinterForMappingWithOption is the alias of PrinterForMapping
+	PrinterForMappingWithOption(o PrinterOptions, mapping *meta.RESTMapping, isWatch, withNamespace bool) (printers.ResourcePrinter, error)
 	// PrintObject prints an api object given command line flags to modify the output format
 	PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	// One stop shopping for a Builder
