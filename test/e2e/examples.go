@@ -223,45 +223,6 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		})
 	})
 
-	framework.KubeDescribe("Cassandra", func() {
-		It("should create and scale cassandra", func() {
-			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/cassandra", file)
-			}
-			serviceYaml := mkpath("cassandra-service.yaml")
-			controllerYaml := mkpath("cassandra-controller.yaml")
-			nsFlag := fmt.Sprintf("--namespace=%v", ns)
-
-			By("Starting the cassandra service")
-			framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)
-			framework.Logf("wait for service")
-			err := framework.WaitForService(c, ns, "cassandra", true, framework.Poll, framework.ServiceRespondingTimeout)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Create an RC with n nodes in it.  Each node will then be verified.
-			By("Creating a Cassandra RC")
-			framework.RunKubectlOrDie("create", "-f", controllerYaml, nsFlag)
-			label := labels.SelectorFromSet(labels.Set(map[string]string{"app": "cassandra"}))
-			err = testutils.WaitForPodsWithLabelRunning(c, ns, label)
-			Expect(err).NotTo(HaveOccurred())
-			forEachPod("app", "cassandra", func(pod v1.Pod) {
-				framework.Logf("Verifying pod %v ", pod.Name)
-				// TODO how do we do this better?  Ready Probe?
-				_, err = framework.LookForStringInLog(ns, pod.Name, "cassandra", "Starting listening for CQL clients", serverStartTimeout)
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			By("Finding each node in the nodetool status lines")
-			forEachPod("app", "cassandra", func(pod v1.Pod) {
-				output := framework.RunKubectlOrDie("exec", pod.Name, nsFlag, "--", "nodetool", "status")
-				matched, _ := regexp.MatchString("UN.*"+pod.Status.PodIP, output)
-				if matched != true {
-					framework.Failf("Cassandra pod ip %s is not reporting Up and Normal 'UN' via nodetool status", pod.Status.PodIP)
-				}
-			})
-		})
-	})
-
 	framework.KubeDescribe("CassandraStatefulSet", func() {
 		It("should create statefulset", func() {
 			mkpath := func(file string) string {
