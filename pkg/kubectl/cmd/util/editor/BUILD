@@ -10,11 +10,31 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["editor.go"],
+    srcs = [
+        "editoptions.go",
+        "editor.go",
+    ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/kubectl:go_default_library",
+        "//pkg/kubectl/cmd/util:go_default_library",
+        "//pkg/kubectl/resource:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/util/crlf:go_default_library",
         "//pkg/util/term:go_default_library",
+        "//vendor:github.com/evanphx/json-patch",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/mergepatch",
+        "//vendor:k8s.io/apimachinery/pkg/util/strategicpatch",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apimachinery/pkg/util/yaml",
     ],
 )
 
