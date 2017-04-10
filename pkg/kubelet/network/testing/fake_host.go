@@ -65,9 +65,9 @@ func (nh *fakeNamespaceGetter) GetNetNS(containerID string) (string, error) {
 }
 
 type FakePortMappingGetter struct {
-	mem map[string][]*hostport.PortMapping
+	PortMaps map[string][]*hostport.PortMapping
 }
 
 func (pm *FakePortMappingGetter) GetPodPortMappings(containerID string) ([]*hostport.PortMapping, error) {
-	return pm.mem[containerID], nil
+	return pm.PortMaps[containerID], nil
 }
