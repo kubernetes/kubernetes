@@ -126,6 +126,20 @@ func getNestedString(obj map[string]interface{}, fields ...string) string {
 	return ""
 }
 
+func getNestedInt64(obj map[string]interface{}, fields ...string) int64 {
+	if str, ok := getNestedField(obj, fields...).(int64); ok {
+		return str
+	}
+	return 0
+}
+
+func getNestedInt64Pointer(obj map[string]interface{}, fields ...string) *int64 {
+	if str, ok := getNestedField(obj, fields...).(*int64); ok {
+		return str
+	}
+	return nil
+}
+
 func getNestedSlice(obj map[string]interface{}, fields ...string) []string {
 	if m, ok := getNestedField(obj, fields...).([]interface{}); ok {
 		strSlice := make([]string, 0, len(m))
@@ -355,6 +369,14 @@ func (u *Unstructured) SetResourceVersion(version string) {
 	u.setNestedField(version, "metadata", "resourceVersion")
 }
 
+func (u *Unstructured) GetGeneration() int64 {
+	return getNestedInt64(u.Object, "metadata", "generation")
+}
+
+func (u *Unstructured) SetGeneration(generation int64) {
+	u.setNestedField(generation, "metadata", "generation")
+}
+
 func (u *Unstructured) GetSelfLink() string {
 	return getNestedString(u.Object, "metadata", "selfLink")
 }
@@ -386,6 +408,14 @@ func (u *Unstructured) GetDeletionTimestamp() *metav1.Time {
 func (u *Unstructured) SetDeletionTimestamp(timestamp *metav1.Time) {
 	ts, _ := timestamp.MarshalQueryParameter()
 	u.setNestedField(ts, "metadata", "deletionTimestamp")
+}
+
+func (u *Unstructured) GetDeletionGracePeriodSeconds() *int64 {
+	return getNestedInt64Pointer(u.Object, "metadata", "deletionGracePeriodSeconds")
+}
+
+func (u *Unstructured) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds *int64) {
+	u.setNestedField(deletionGracePeriodSeconds, "metadata", "deletionGracePeriodSeconds")
 }
 
 func (u *Unstructured) GetLabels() map[string]string {

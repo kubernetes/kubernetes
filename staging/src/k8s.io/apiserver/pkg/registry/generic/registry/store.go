@@ -331,17 +331,17 @@ func (e *Store) shouldDeleteDuringUpdate(ctx genericapirequest.Context, key stri
 	if !e.EnableGarbageCollection {
 		return false
 	}
-	newMeta, err := metav1.ObjectMetaFor(obj)
+	newMeta, err := meta.Accessor(obj)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return false
 	}
-	oldMeta, err := metav1.ObjectMetaFor(existing)
+	oldMeta, err := meta.Accessor(existing)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return false
 	}
-	return len(newMeta.Finalizers) == 0 && oldMeta.DeletionGracePeriodSeconds != nil && *oldMeta.DeletionGracePeriodSeconds == 0
+	return len(newMeta.GetFinalizers()) == 0 && oldMeta.GetDeletionGracePeriodSeconds() != nil && *oldMeta.GetDeletionGracePeriodSeconds() == 0
 }
 
 // deleteForEmptyFinalizers handles deleting an object once its finalizer list
@@ -652,7 +652,7 @@ func shouldUpdateFinalizers(e *Store, accessor metav1.Object, options *metav1.De
 // DeletionTimestamp to "now". Finalizers are watching for such updates and will
 // finalize the object if their IDs are present in the object's Finalizers list.
 func markAsDeleting(obj runtime.Object) (err error) {
-	objectMeta, kerr := metav1.ObjectMetaFor(obj)
+	objectMeta, kerr := meta.Accessor(obj)
 	if kerr != nil {
 		return kerr
 	}
@@ -660,12 +660,12 @@ func markAsDeleting(obj runtime.Object) (err error) {
 	// This handles Generation bump for resources that don't support graceful
 	// deletion. For resources that support graceful deletion is handle in
 	// pkg/api/rest/delete.go
-	if objectMeta.DeletionTimestamp == nil && objectMeta.Generation > 0 {
-		objectMeta.Generation++
+	if objectMeta.GetDeletionTimestamp() == nil && objectMeta.GetGeneration() > 0 {
+		objectMeta.SetGeneration(objectMeta.GetGeneration() + 1)
 	}
-	objectMeta.DeletionTimestamp = &now
+	objectMeta.SetDeletionTimestamp(&now)
 	var zero int64 = 0
-	objectMeta.DeletionGracePeriodSeconds = &zero
+	objectMeta.SetDeletionGracePeriodSeconds(&zero)
 	return nil
 }
 

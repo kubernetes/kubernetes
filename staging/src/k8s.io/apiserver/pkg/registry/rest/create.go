@@ -18,6 +18,7 @@ package rest
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,28 +72,28 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx genericapirequest.Context, ob
 			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
 		}
 	} else {
-		objectMeta.Namespace = metav1.NamespaceNone
+		objectMeta.SetNamespace(metav1.NamespaceNone)
 	}
-	objectMeta.DeletionTimestamp = nil
-	objectMeta.DeletionGracePeriodSeconds = nil
+	objectMeta.SetDeletionTimestamp(nil)
+	objectMeta.SetDeletionGracePeriodSeconds(nil)
 	strategy.PrepareForCreate(ctx, obj)
 	FillObjectMetaSystemFields(ctx, objectMeta)
-	if len(objectMeta.GenerateName) > 0 && len(objectMeta.Name) == 0 {
-		objectMeta.Name = strategy.GenerateName(objectMeta.GenerateName)
+	if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
+		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))
 	}
 
 	// ClusterName is ignored and should not be saved
-	objectMeta.ClusterName = ""
+	objectMeta.SetClusterName("")
 
 	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
-		return errors.NewInvalid(kind.GroupKind(), objectMeta.Name, errs)
+		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
 	}
 
 	// Custom validation (including name validation) passed
 	// Now run common validation on object meta
 	// Do this *after* custom validation so that specific error messages are shown whenever possible
-	if errs := genericvalidation.ValidateObjectMeta(objectMeta, strategy.NamespaceScoped(), path.ValidatePathSegmentName, field.NewPath("metadata")); len(errs) > 0 {
-		return errors.NewInvalid(kind.GroupKind(), objectMeta.Name, errs)
+	if errs := genericvalidation.ValidateObjectMetaAccessor(objectMeta, strategy.NamespaceScoped(), path.ValidatePathSegmentName, field.NewPath("metadata")); len(errs) > 0 {
+		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
 	}
 
 	strategy.Canonicalize(obj)
@@ -112,7 +113,7 @@ func CheckGeneratedNameError(strategy RESTCreateStrategy, err error, obj runtime
 		return kerr
 	}
 
-	if len(objectMeta.GenerateName) == 0 {
+	if len(objectMeta.GetGenerateName()) == 0 {
 		return err
 	}
 
@@ -120,8 +121,8 @@ func CheckGeneratedNameError(strategy RESTCreateStrategy, err error, obj runtime
 }
 
 // objectMetaAndKind retrieves kind and ObjectMeta from a runtime object, or returns an error.
-func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (*metav1.ObjectMeta, schema.GroupVersionKind, error) {
-	objectMeta, err := metav1.ObjectMetaFor(obj)
+func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (metav1.Object, schema.GroupVersionKind, error) {
+	objectMeta, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, schema.GroupVersionKind{}, errors.NewInternalError(err)
 	}
