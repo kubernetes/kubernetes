@@ -57,6 +57,7 @@ go_library(
         "//plugin/pkg/admission/persistentvolume/label:go_default_library",
         "//plugin/pkg/admission/podnodeselector:go_default_library",
         "//plugin/pkg/admission/podpreset:go_default_library",
+        "//plugin/pkg/admission/podtolerationrestriction:go_default_library",
         "//plugin/pkg/admission/resourcequota:go_default_library",
         "//plugin/pkg/admission/security/podsecuritypolicy:go_default_library",
         "//plugin/pkg/admission/securitycontext/scdeny:go_default_library",
