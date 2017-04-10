@@ -71,8 +71,8 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx genericapirequest.Context, ob
 		return false, false, errors.NewInvalid(schema.GroupKind{}, "", errs)
 	}
 	// Checking the Preconditions here to fail early. They'll be enforced later on when we actually do the deletion, too.
-	if options.Preconditions != nil && options.Preconditions.UID != nil && *options.Preconditions.UID != objectMeta.UID {
-		return false, false, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, objectMeta.Name, fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", *options.Preconditions.UID, objectMeta.UID))
+	if options.Preconditions != nil && options.Preconditions.UID != nil && *options.Preconditions.UID != objectMeta.GetUID() {
+		return false, false, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, objectMeta.GetName(), fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", *options.Preconditions.UID, objectMeta.GetUID()))
 	}
 	gracefulStrategy, ok := strategy.(RESTGracefulDeleteStrategy)
 	if !ok {
@@ -81,7 +81,7 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx genericapirequest.Context, ob
 		return false, false, nil
 	}
 	// if the object is already being deleted, no need to update generation.
-	if objectMeta.DeletionTimestamp != nil {
+	if objectMeta.GetDeletionTimestamp() != nil {
 		// if we are already being deleted, we may only shorten the deletion grace period
 		// this means the object was gracefully deleted previously but deletionGracePeriodSeconds was not set,
 		// so we force deletion immediately
@@ -93,24 +93,24 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx genericapirequest.Context, ob
 		// a resource was previously left in a state that was non-recoverable.  We
 		// check if the existing stored resource has a grace period as 0 and if so
 		// attempt to delete immediately in order to recover from this scenario.
-		if objectMeta.DeletionGracePeriodSeconds == nil || *objectMeta.DeletionGracePeriodSeconds == 0 {
+		if objectMeta.GetDeletionGracePeriodSeconds() == nil || *objectMeta.GetDeletionGracePeriodSeconds() == 0 {
 			return false, false, nil
 		}
 		// only a shorter grace period may be provided by a user
 		if options.GracePeriodSeconds != nil {
 			period := int64(*options.GracePeriodSeconds)
-			if period >= *objectMeta.DeletionGracePeriodSeconds {
+			if period >= *objectMeta.GetDeletionGracePeriodSeconds() {
 				return false, true, nil
 			}
 			newDeletionTimestamp := metav1.NewTime(
-				objectMeta.DeletionTimestamp.Add(-time.Second * time.Duration(*objectMeta.DeletionGracePeriodSeconds)).
+				objectMeta.GetDeletionTimestamp().Add(-time.Second * time.Duration(*objectMeta.GetDeletionGracePeriodSeconds())).
 					Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
-			objectMeta.DeletionTimestamp = &newDeletionTimestamp
-			objectMeta.DeletionGracePeriodSeconds = &period
+			objectMeta.SetDeletionTimestamp(&newDeletionTimestamp)
+			objectMeta.SetDeletionGracePeriodSeconds(&period)
 			return true, false, nil
 		}
 		// graceful deletion is pending, do nothing
-		options.GracePeriodSeconds = objectMeta.DeletionGracePeriodSeconds
+		options.GracePeriodSeconds = objectMeta.GetDeletionGracePeriodSeconds()
 		return false, true, nil
 	}
 
@@ -118,14 +118,14 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx genericapirequest.Context, ob
 		return false, false, nil
 	}
 	now := metav1.NewTime(metav1.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
-	objectMeta.DeletionTimestamp = &now
-	objectMeta.DeletionGracePeriodSeconds = options.GracePeriodSeconds
+	objectMeta.SetDeletionTimestamp(&now)
+	objectMeta.SetDeletionGracePeriodSeconds(options.GracePeriodSeconds)
 	// If it's the first graceful deletion we are going to set the DeletionTimestamp to non-nil.
 	// Controllers of the object that's being deleted shouldn't take any nontrivial actions, hence its behavior changes.
 	// Thus we need to bump object's Generation (if set). This handles generation bump during graceful deletion.
 	// The bump for objects that don't support graceful deletion is handled in pkg/registry/generic/registry/store.go.
-	if objectMeta.Generation > 0 {
-		objectMeta.Generation++
+	if objectMeta.GetGeneration() > 0 {
+		objectMeta.SetGeneration(objectMeta.GetGeneration() + 1)
 	}
 	return true, false, nil
 }
