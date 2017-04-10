@@ -3,6 +3,7 @@ approvers:
 - saad-ali
 - thockin
 - matchstick
+- kerneltime
 reviewers:
 - abithap
 - abrarshivani
@@ -20,3 +21,4 @@ reviewers:
 - jingxu97
 - rkouj
 - msau42
+- kerneltime
