@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/ref"
+	resourcehelper "k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -1115,7 +1116,7 @@ func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolver
 			}
 			w.Write(LEVEL_3, "%s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
 		case e.ValueFrom.ResourceFieldRef != nil:
-			valueFrom, err := api.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
+			valueFrom, err := resourcehelper.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
 			if err != nil {
 				valueFrom = ""
 			}
@@ -2337,7 +2338,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 	}
 
 	for _, pod := range nodeNonTerminatedPodsList.Items {
-		req, limit, err := api.PodRequestsAndLimits(&pod)
+		req, limit, err := resourcehelper.PodRequestsAndLimits(&pod)
 		if err != nil {
 			return err
 		}
@@ -2385,7 +2386,7 @@ func filterTerminatedPods(pods []*api.Pod) []*api.Pod {
 func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
 	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
 	for _, pod := range podList.Items {
-		podReqs, podLimits, err := api.PodRequestsAndLimits(&pod)
+		podReqs, podLimits, err := resourcehelper.PodRequestsAndLimits(&pod)
 		if err != nil {
 			return nil, nil, err
 		}
