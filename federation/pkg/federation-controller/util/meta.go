@@ -19,9 +19,14 @@ package util
 import (
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
+)
+
+const (
+	FederationOnlyAnnotation = "federation.kubernetes.io/federation-only"
 )
 
 // Copies cluster-independent, user provided data from the given ObjectMeta struct. If in
@@ -91,4 +96,17 @@ func DeepCopyApiTypeOrPanic(item interface{}) interface{} {
 		panic(err)
 	}
 	return result
+}
+
+func IsFederationOnlyObject(object runtime.Object) bool {
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		return false
+	}
+	annotations := accessor.GetAnnotations()
+	federationOnlyObject, exist := annotations[FederationOnlyAnnotation]
+	if exist && federationOnlyObject == "true" {
+		return true
+	}
+	return false
 }
