@@ -50,30 +50,6 @@ import (
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
-// ContextFunc returns a Context given a request - a context must be returned
-type ContextFunc func(req *restful.Request) request.Context
-
-// ScopeNamer handles accessing names from requests and objects
-type ScopeNamer interface {
-	// Namespace returns the appropriate namespace value from the request (may be empty) or an
-	// error.
-	Namespace(req *restful.Request) (namespace string, err error)
-	// Name returns the name from the request, and an optional namespace value if this is a namespace
-	// scoped call. An error is returned if the name is not available.
-	Name(req *restful.Request) (namespace, name string, err error)
-	// ObjectName returns the namespace and name from an object if they exist, or an error if the object
-	// does not support names.
-	ObjectName(obj runtime.Object) (namespace, name string, err error)
-	// SetSelfLink sets the provided URL onto the object. The method should return nil if the object
-	// does not support selfLinks.
-	SetSelfLink(obj runtime.Object, url string) error
-	// GenerateLink creates an encoded URI for a given runtime object that represents the canonical path
-	// and query.
-	GenerateLink(req *restful.Request, obj runtime.Object) (uri string, err error)
-	// GenerateLink creates an encoded URI for a list that represents the canonical path and query.
-	GenerateListLink(req *restful.Request) (uri string, err error)
-}
-
 // RequestScope encapsulates common fields across all RESTful handler methods.
 type RequestScope struct {
 	Namer ScopeNamer
@@ -112,12 +88,12 @@ const MaxRetryWhenPatchConflicts = 5
 func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
-		namespace, name, err := scope.Namer.Name(req)
+		namespace, name, err := scope.Namer.Name(req.Request)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
-		ctx := scope.ContextFunc(req)
+		ctx := scope.ContextFunc(req.Request)
 		ctx = request.WithNamespace(ctx, namespace)
 
 		result, err := getter(ctx, name, req)
@@ -196,12 +172,12 @@ func getRequestOptions(req *restful.Request, scope RequestScope, into runtime.Ob
 func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, restPath string) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
-		namespace, name, err := scope.Namer.Name(req)
+		namespace, name, err := scope.Namer.Name(req.Request)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
-		ctx := scope.ContextFunc(req)
+		ctx := scope.ContextFunc(req.Request)
 		ctx = request.WithNamespace(ctx, namespace)
 		opts, subpath, subpathKey := connecter.NewConnectOptions()
 		if err := getRequestOptions(req, scope, opts, subpath, subpathKey); err != nil {
@@ -254,7 +230,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 
 		w := res.ResponseWriter
 
-		namespace, err := scope.Namer.Namespace(req)
+		namespace, err := scope.Namer.Namespace(req.Request)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
@@ -263,12 +239,12 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		// Watches for single objects are routed to this function.
 		// Treat a /name parameter the same as a field selector entry.
 		hasName := true
-		_, name, err := scope.Namer.Name(req)
+		_, name, err := scope.Namer.Name(req.Request)
 		if err != nil {
 			hasName = false
 		}
 
-		ctx := scope.ContextFunc(req)
+		ctx := scope.ContextFunc(req.Request)
 		ctx = request.WithNamespace(ctx, namespace)
 
 		opts := metainternalversion.ListOptions{}
@@ -371,16 +347,16 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			err             error
 		)
 		if includeName {
-			namespace, name, err = scope.Namer.Name(req)
+			namespace, name, err = scope.Namer.Name(req.Request)
 		} else {
-			namespace, err = scope.Namer.Namespace(req)
+			namespace, err = scope.Namer.Namespace(req.Request)
 		}
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
 
-		ctx := scope.ContextFunc(req)
+		ctx := scope.ContextFunc(req.Request)
 		ctx = request.WithNamespace(ctx, namespace)
 
 		gv := scope.Kind.GroupVersion()
@@ -476,13 +452,13 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		// api_installer)
 		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
 
-		namespace, name, err := scope.Namer.Name(req)
+		namespace, name, err := scope.Namer.Name(req.Request)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
 
-		ctx := scope.ContextFunc(req)
+		ctx := scope.ContextFunc(req.Request)
 		ctx = request.WithNamespace(ctx, namespace)
 
 		versionedObj, err := converter.ConvertToVersion(r.New(), scope.Kind.GroupVersion())
@@ -790,12 +766,12 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
 
-		namespace, name, err := scope.Namer.Name(req)
+		namespace, name, err := scope.Namer.Name(req.Request)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
-		ctx := scope.ContextFunc(req)
+		ctx := scope.ContextFunc(req.Request)
 		ctx = request.WithNamespace(ctx, namespace)
 
 		body, err := readBody(req.Request)
@@ -877,12 +853,12 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
 
-		namespace, name, err := scope.Namer.Name(req)
+		namespace, name, err := scope.Namer.Name(req.Request)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
-		ctx := scope.ContextFunc(req)
+		ctx := scope.ContextFunc(req.Request)
 		ctx = request.WithNamespace(ctx, namespace)
 
 		options := &metav1.DeleteOptions{}
@@ -985,13 +961,13 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
 
-		namespace, err := scope.Namer.Namespace(req)
+		namespace, err := scope.Namer.Namespace(req.Request)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
 
-		ctx := scope.ContextFunc(req)
+		ctx := scope.ContextFunc(req.Request)
 		ctx = request.WithNamespace(ctx, namespace)
 
 		if admit != nil && admit.Handles(admission.Delete) {
@@ -1139,7 +1115,7 @@ func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime
 // plus the path and query generated by the provided linkFunc
 func setSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer) error {
 	// TODO: SelfLink generation should return a full URL?
-	uri, err := namer.GenerateLink(req, obj)
+	uri, err := namer.GenerateLink(req.Request, obj)
 	if err != nil {
 		return nil
 	}
@@ -1163,21 +1139,22 @@ func hasUID(obj runtime.Object) (bool, error) {
 
 // checkName checks the provided name against the request
 func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) error {
-	if objNamespace, objName, err := namer.ObjectName(obj); err == nil {
-		if err != nil {
-			return err
-		}
-		if objName != name {
+	objNamespace, objName, err := namer.ObjectName(obj)
+	if err != nil {
+		return errors.NewBadRequest(fmt.Sprintf(
+			"the name of the object (%s based on URL) was undeterminable: %v", name, err))
+	}
+	if objName != name {
+		return errors.NewBadRequest(fmt.Sprintf(
+			"the name of the object (%s) does not match the name on the URL (%s)", objName, name))
+	}
+	if len(namespace) > 0 {
+		if len(objNamespace) > 0 && objNamespace != namespace {
 			return errors.NewBadRequest(fmt.Sprintf(
-				"the name of the object (%s) does not match the name on the URL (%s)", objName, name))
-		}
-		if len(namespace) > 0 {
-			if len(objNamespace) > 0 && objNamespace != namespace {
-				return errors.NewBadRequest(fmt.Sprintf(
-					"the namespace of the object (%s) does not match the namespace on the request (%s)", objNamespace, namespace))
-			}
+				"the namespace of the object (%s) does not match the namespace on the request (%s)", objNamespace, namespace))
 		}
 	}
+
 	return nil
 }
 
@@ -1188,7 +1165,7 @@ func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer)
 		return 0, nil
 	}
 
-	uri, err := namer.GenerateListLink(req)
+	uri, err := namer.GenerateListLink(req.Request)
 	if err != nil {
 		return 0, err
 	}

@@ -9950,7 +9950,6 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/endpoints/testing",
         "//vendor:k8s.io/apiserver/pkg/registry/rest",
-        "//vendor:k8s.io/client-go/pkg/api",
     ],
 )
 
@@ -10041,7 +10040,6 @@ go_test(
     library = ":k8s.io/apiserver/pkg/endpoints/handlers",
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/evanphx/json-patch",
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -10064,6 +10062,7 @@ go_library(
     srcs = [
         "k8s.io/apiserver/pkg/endpoints/handlers/discovery.go",
         "k8s.io/apiserver/pkg/endpoints/handlers/doc.go",
+        "k8s.io/apiserver/pkg/endpoints/handlers/namer.go",
         "k8s.io/apiserver/pkg/endpoints/handlers/patch.go",
         "k8s.io/apiserver/pkg/endpoints/handlers/proxy.go",
         "k8s.io/apiserver/pkg/endpoints/handlers/rest.go",
