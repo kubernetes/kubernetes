@@ -203,15 +203,31 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 			errList = append(errList, err)
 		}
 	}
-	if err := ds.client.StopContainer(podSandboxID, defaultSandboxGracePeriod); err != nil {
-		glog.Errorf("Failed to stop sandbox %q: %v", podSandboxID, err)
-		// Do not return error if the container does not exist
-		if !dockertools.IsContainerNotFoundError(err) {
+
+	opts := dockertypes.ContainerListOptions{All: true}
+	opts.Filter = dockerfilters.NewArgs()
+	f := newDockerFilter(&opts.Filter)
+	f.AddLabel(sandboxIDLabelKey, podSandboxID)
+
+	containers, err := ds.client.ListContainers(opts)
+	if err != nil {
+		errList = append(errList, err)
+	}
+
+	// Stop all containers in the sandbox.
+	for i := range containers {
+		fmt.Println(containers[i].ID)
+		if err := ds.client.StopContainer(containers[i].ID, defaultSandboxGracePeriod); err != nil && !dockertools.IsContainerNotFoundError(err) {
 			errList = append(errList, err)
 		}
 	}
+
+	// Stop the sandbox container.
+	if err := ds.client.StopContainer(podSandboxID, defaultSandboxGracePeriod); err != nil && !dockertools.IsContainerNotFoundError(err) {
+		errList = append(errList, err)
+	}
+
 	return utilerrors.NewAggregate(errList)
-	// TODO: Stop all running containers in the sandbox.
 }
 
 // RemovePodSandbox removes the sandbox. If there are running containers in the
