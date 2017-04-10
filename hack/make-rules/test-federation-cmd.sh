@@ -58,16 +58,28 @@ function run_federation_controller_manager() {
   kubectl config set-context "context" --cluster="apiserver" --kubeconfig="${kubeconfig}"
   kubectl config use-context "context" --kubeconfig="${kubeconfig}"
 
+  cat << EOF > /tmp/dns-provider.conf
+[Global]
+etcd-endpoints = http://127.0.0.1:2379
+zones = f8n.io
+EOF
+
   # Start controller manager
   kube::log::status "Starting federation-controller-manager"
   "${KUBE_OUTPUT_HOSTBIN}/federation-controller-manager" \
     --port="${CTLRMGR_PORT}" \
     --kubeconfig="${kubeconfig}" \
     --kube-api-content-type="${KUBE_TEST_API_TYPE-}" \
+    --federation-name=federation \
+    --dns-provider=coredns \
+    --dns-provider-config=/tmp/dns-provider.conf \
+    --zone-name=f8n.io \
     --master="127.0.0.1:${API_PORT}" 1>&2 &
   CTLRMGR_PID=$!
 
   kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager"
+
+  rm -rf /tmp/dns-provider.conf
 }
 
 kube::log::status "Running kubectl tests for federation-apiserver"

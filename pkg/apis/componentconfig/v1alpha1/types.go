@@ -134,6 +134,19 @@ type KubeSchedulerConfiguration struct {
 	LockObjectNamespace string `json:"lockObjectNamespace"`
 	// LockObjectName defines the lock object name
 	LockObjectName string `json:"lockObjectName"`
+	// PolicyConfigMapName is the name of the ConfigMap object that specifies
+	// the scheduler's policy config. If UseLegacyPolicyConfig is true, scheduler
+	// uses PolicyConfigFile. If UseLegacyPolicyConfig is false and
+	// PolicyConfigMapName is not empty, the ConfigMap object with this name must
+	// exist in PolicyConfigMapNamespace before scheduler initialization.
+	PolicyConfigMapName string `json:"policyConfigMapName"`
+	// PolicyConfigMapNamespace is the namespace where the above policy config map
+	// is located. If none is provided default system namespace ("kube-system")
+	// will be used.
+	PolicyConfigMapNamespace string `json:"policyConfigMapNamespace"`
+	// UseLegacyPolicyConfig tells the scheduler to ignore Policy ConfigMap and
+	// to use PolicyConfigFile if available.
+	UseLegacyPolicyConfig bool `json:"useLegacyPolicyConfig"`
 }
 
 // HairpinMode denotes how the kubelet should configure networking to handle

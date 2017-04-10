@@ -13050,8 +13050,29 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"policyConfigMapName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "PolicyConfigMapName is the name of the ConfigMap object that specifies the scheduler's policy config. If UseLegacyPolicyConfig is true, scheduler uses PolicyConfigFile. If UseLegacyPolicyConfig is false and PolicyConfigMapName is not empty, the ConfigMap object with this name must exist in PolicyConfigMapNamespace before scheduler initialization.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"policyConfigMapNamespace": {
+							SchemaProps: spec.SchemaProps{
+								Description: "PolicyConfigMapNamespace is the namespace where the above policy config map is located. If none is provided default system namespace (\"kube-system\") will be used.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"useLegacyPolicyConfig": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UseLegacyPolicyConfig tells the scheduler to ignore Policy ConfigMap and to use PolicyConfigFile if available.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 					},
-					Required: []string{"port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection", "lockObjectNamespace", "lockObjectName"},
+					Required: []string{"port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection", "lockObjectNamespace", "lockObjectName", "policyConfigMapName", "policyConfigMapNamespace", "useLegacyPolicyConfig"},
 				},
 			},
 			Dependencies: []string{
