@@ -203,28 +203,37 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 			errList = append(errList, err)
 		}
 	}
-	if err := ds.client.StopContainer(podSandboxID, defaultSandboxGracePeriod); err != nil {
-		glog.Errorf("Failed to stop sandbox %q: %v", podSandboxID, err)
-		// Do not return error if the container does not exist
-		if !dockertools.IsContainerNotFoundError(err) {
-			errList = append(errList, err)
+
+	// Get all the containers in the PodSandbox.
+	containers, err := ds.getContainersInPodSandbox(podSandboxID)
+	if err != nil {
+		errList = append(errList, err)
+	}
+
+	// Stop all containers in the sandbox.
+	for i := range containers {
+		if containers[i].State == "running" {
+			if err := ds.StopContainer(containers[i].ID, int64(defaultSandboxGracePeriod)); err != nil && !dockertools.IsContainerNotFoundError(err) {
+				errList = append(errList, err)
+			}
 		}
 	}
+
+	// Stop the sandbox container.
+	if err := ds.client.StopContainer(podSandboxID, defaultSandboxGracePeriod); err != nil && !dockertools.IsContainerNotFoundError(err) {
+		errList = append(errList, err)
+	}
+
 	return utilerrors.NewAggregate(errList)
-	// TODO: Stop all running containers in the sandbox.
 }
 
 // RemovePodSandbox removes the sandbox. If there are running containers in the
 // sandbox, they should be forcibly removed.
 func (ds *dockerService) RemovePodSandbox(podSandboxID string) error {
 	var errs []error
-	opts := dockertypes.ContainerListOptions{All: true}
 
-	opts.Filter = dockerfilters.NewArgs()
-	f := newDockerFilter(&opts.Filter)
-	f.AddLabel(sandboxIDLabelKey, podSandboxID)
-
-	containers, err := ds.client.ListContainers(opts)
+	// Get all the containers in the PodSandbox.
+	containers, err := ds.getContainersInPodSandbox(podSandboxID)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -657,4 +666,14 @@ func rewriteFile(filePath, stringToWrite string) error {
 
 	_, err = f.WriteString(stringToWrite)
 	return err
+}
+
+// getContainersInPodSandbox gets the containers in the given PodSandbox.
+func (ds *dockerService) getContainersInPodSandbox(podSandboxID string) ([]dockertypes.Container, error) {
+	opts := dockertypes.ContainerListOptions{All: true}
+	opts.Filter = dockerfilters.NewArgs()
+	f := newDockerFilter(&opts.Filter)
+	f.AddLabel(sandboxIDLabelKey, podSandboxID)
+
+	return ds.client.ListContainers(opts)
 }
