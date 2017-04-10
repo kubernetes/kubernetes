@@ -17,7 +17,6 @@ go_library(
         "field_constants.go",
         "json.go",
         "methods.go",
-        "ref.go",
         "register.go",
         "resource_helpers.go",
         "types.go",
@@ -25,7 +24,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
         "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
@@ -45,7 +43,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "methods_test.go",
-        "ref_test.go",
         "resource_helpers_test.go",
     ],
     library = ":go_default_library",
@@ -53,8 +50,6 @@ go_test(
     deps = [
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
 )
 
@@ -120,6 +115,7 @@ filegroup(
         "//pkg/api/install:all-srcs",
         "//pkg/api/meta:all-srcs",
         "//pkg/api/pod:all-srcs",
+        "//pkg/api/ref:all-srcs",
         "//pkg/api/resource:all-srcs",
         "//pkg/api/service:all-srcs",
         "//pkg/api/testapi:all-srcs",
