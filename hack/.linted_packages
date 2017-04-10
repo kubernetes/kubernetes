@@ -57,6 +57,7 @@ pkg/api/errors
 pkg/api/events
 pkg/api/install
 pkg/api/meta
+pkg/api/pod
 pkg/api/resource
 pkg/api/service
 pkg/api/v1

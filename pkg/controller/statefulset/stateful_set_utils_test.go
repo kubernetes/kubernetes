@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	podapi "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -79,12 +78,12 @@ func TestIdentityMatches(t *testing.T) {
 		t.Error("identity matches for a Pod with the wrong namespace")
 	}
 	pod = newStatefulSetPod(set, 1)
-	delete(pod.Annotations, podapi.PodHostnameAnnotation)
+	pod.Spec.Hostname = ""
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod with no hostname")
 	}
 	pod = newStatefulSetPod(set, 1)
-	delete(pod.Annotations, podapi.PodSubdomainAnnotation)
+	pod.Spec.Subdomain = ""
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod with no subdomain")
 	}
@@ -138,7 +137,7 @@ func TestUpdateIdentity(t *testing.T) {
 		t.Error("updateIdentity failed to update the Pods namespace")
 	}
 	pod = newStatefulSetPod(set, 1)
-	delete(pod.Annotations, podapi.PodHostnameAnnotation)
+	pod.Spec.Hostname = ""
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod with no hostname")
 	}
@@ -147,22 +146,13 @@ func TestUpdateIdentity(t *testing.T) {
 		t.Error("updateIdentity failed to update the Pod's hostname")
 	}
 	pod = newStatefulSetPod(set, 1)
-	delete(pod.Annotations, podapi.PodSubdomainAnnotation)
+	pod.Spec.Subdomain = ""
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod with no subdomain")
 	}
 	updateIdentity(set, pod)
 	if !identityMatches(set, pod) {
 		t.Error("updateIdentity failed to update the Pod's subdomain")
-	}
-	pod = newStatefulSetPod(set, 1)
-	pod.Annotations = nil
-	if identityMatches(set, pod) {
-		t.Error("identity matches for a Pod no annotations")
-	}
-	updateIdentity(set, pod)
-	if !identityMatches(set, pod) {
-		t.Error("updateIdentity failed to update the Pod's annotations")
 	}
 }
 
