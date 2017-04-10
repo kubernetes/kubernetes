@@ -51,9 +51,41 @@ func TestScopeNamingGenerateLink(t *testing.T) {
 			Kind: "Service",
 		},
 	}
-	_, err := s.GenerateLink(&restful.Request{}, service)
+	uri, err := s.GenerateLink(&restful.Request{}, service)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
+	}
+	if uri != selfLinker.expectedSet {
+		t.Errorf("Mismatch in expected selflink uri. Expected '%s', got '%s'", selfLinker.expectedSet, uri)
+	}
+}
+
+func TestRootScopeNamingGenerateLink(t *testing.T) {
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		expectedSet: "/api/v1/nodes/foo/status",
+		name:        "foo",
+	}
+	s := rootScopeNaming{
+		meta.RESTScopeRoot,
+		selfLinker,
+		"/api/v1/nodes",
+		"/status",
+	}
+	service := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Service",
+		},
+	}
+	uri, err := s.GenerateLink(&restful.Request{}, service)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if uri != selfLinker.expectedSet {
+		t.Errorf("Mismatch in expected selflink uri. Expected '%s', got '%s'", selfLinker.expectedSet, uri)
 	}
 }
 
