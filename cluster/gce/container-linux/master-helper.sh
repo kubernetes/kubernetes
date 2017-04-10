@@ -66,6 +66,10 @@ function replicate-master-instance() {
 
 function create-master-instance-internal() {
   local gcloud="gcloud"
+  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
+    gcloud="gcloud alpha"
+  fi
+
   local -r master_name="${1}"
   local -r address="${2:-}"
 
@@ -74,20 +78,20 @@ function create-master-instance-internal() {
     preemptible_master="--preemptible --maintenance-policy TERMINATE"
   fi
 
-  local network="--network ${NETWORK} --can-ip-forward"
-  if [[ -n ${address} ]]; then
-    network="$network --address ${address}"
-  fi
+  local network=$(make-gcloud-network-argument \
+    "${NETWORK}" "${address:-}" \
+    "${ENABLE_IP_ALIASES:-}" "${IP_ALIAS_SUBNETWORK:-}" "${IP_ALIAS_SIZE:-}")
 
-  if [[ ${ENABLE_IP_ALIASES} = "true" ]]; then
-    gcloud="gcloud alpha"
-    network="--network-interface network=${NETWORK}"
-    # if address is omitted, instance will not receive an external IP.
-    network="${network},address=${address}"
-    network="${network},subnet=${IP_ALIAS_SUBNETWORK}"
-    network="${network},aliases=pods-default:${IP_ALIAS_SIZE}"
-    network="${network} --no-can-ip-forward"
-  fi
+  local metadata="kube-env=${KUBE_TEMP}/master-kube-env.yaml"
+  metadata="${metadata},user-data=${KUBE_ROOT}/cluster/gce/container-linux/master.yaml"
+  metadata="${metadata},configure-sh=${KUBE_ROOT}/cluster/gce/container-linux/configure.sh"
+  metadata="${metadata},cluster-name=${KUBE_TEMP}/cluster-name.txt"
+
+  local disk="name=${master_name}-pd"
+  disk="${disk},device-name=master-pd"
+  disk="${disk},mode=rw"
+  disk="${disk},boot=no"
+  disk="${disk},auto-delete=no"
 
   ${gcloud} compute instances create "${master_name}" \
     --project "${PROJECT}" \
@@ -97,10 +101,8 @@ function create-master-instance-internal() {
     --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
-    --can-ip-forward \
-    --metadata-from-file \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/container-linux/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/container-linux/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
-    --disk "name=${master_name}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
+    --metadata-from-file "${metadata}" \
+    --disk "${disk}" \
     --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-30}" \
     ${preemptible_master} \
     ${network}
@@ -110,8 +112,11 @@ function get-metadata() {
   local zone="${1}"
   local name="${2}"
   local key="${3}"
+
+  local metadata_url="http://metadata.google.internal/computeMetadata/v1/instance/attributes/${key}"
+
   gcloud compute ssh "${name}" \
     --project "${PROJECT}" \
     --zone "${zone}" \
-    --command "curl \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/${key}\" -H \"Metadata-Flavor: Google\"" 2>/dev/null
+    --command "curl '${metadata_url}' -H 'Metadata-Flavor: Google'" 2>/dev/null
 }

@@ -449,6 +449,32 @@ function create-firewall-rule() {
   done
 }
 
+# Format the string argument for gcloud network.
+function make-gcloud-network-argument() {
+  local network="$1"
+  local address="$2"
+  local enable_ip_alias="$3"
+  local alias_subnetwork="$4"
+  local alias_size="$5"
+
+  local ret=""
+
+  if [[ "${enable_ip_alias}" == 'true' ]]; then
+    ret="--network-interface --no-can-ip-forward"
+    ret="${ret} network=${network}"
+    # If address is omitted, instance will not receive an external IP.
+    ret="${ret},address=${address}"
+    ret="${ret},subnet=${alias_subnetwork}"
+    ret="${ret},aliases=pods-default:${alias_size}"
+  elif [[ -n ${address} ]]; then
+    ret="--network ${network}"
+    ret="${ret} --can-ip-forward"
+    ret="${ret} --address ${address}"
+  fi
+
+  echo "${ret}"
+}
+
 # $1: version (required)
 function get-template-name-from-version() {
   # trim template name to pass gce name validation
@@ -476,6 +502,9 @@ function create-node-template() {
   fi
 
   local gcloud="gcloud"
+  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
+    gcloud="gcloud alpha"
+  fi
 
   local preemptible_minions=""
   if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
@@ -489,16 +518,9 @@ function create-node-template() {
       done
   fi
 
-  local network="--network ${NETWORK} --can-ip-forward"
-  if [[ ${ENABLE_IP_ALIASES} = "true" ]]; then
-    gcloud="gcloud alpha"
-    local network="--network-interface network=${NETWORK}"
-    # if address is omitted, instance will not receive an external IP.
-    network="${network},address="
-    network="${network},subnet=${IP_ALIAS_SUBNETWORK}"
-    network="${network},aliases=pods-default:${IP_ALIAS_SIZE}"
-    network="${network} --no-can-ip-forward"
-  fi
+  local network=$(make-gcloud-network-argument \
+    "${NETWORK}" "" \
+    "${ENABLE_IP_ALIASES:-}" "${IP_ALIAS_SUBNETWORK:-}" "${IP_ALIAS_SIZE:-}")
 
   local attempt=1
   while true; do
@@ -717,6 +739,11 @@ function create-subnetwork() {
       exit 1
     fi
 
+    if [ -z ${NODE_IP_RANGE:-} ]; then
+      echo "${color_red}NODE_IP_RANGE must be specified{color_norm}"
+      exit 1
+    fi
+
     echo "Creating subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
     gcloud alpha compute networks subnets create \
       ${IP_ALIAS_SUBNETWORK} \
@@ -757,11 +784,7 @@ function delete-network() {
 }
 
 function delete-subnetwork() {
-  if [[ -z "${ENABLE_IP_ALIASES+x}" ]]; then
-    return
-  fi
-
-  if [[ ${ENABLE_IP_ALIASES} != "true" ]]; then
+  if [[ ${ENABLE_IP_ALIASES:-} != "true" ]]; then
     return
   fi
 

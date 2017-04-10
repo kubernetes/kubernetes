@@ -205,13 +205,22 @@ ENABLE_RESCHEDULER="${KUBE_ENABLE_RESCHEDULER:-true}"
 
 # Optional: Enable allocation of pod IPs using IP aliases.
 #
+# ALPHA FEATURE.
+#
 # IP_ALIAS_SIZE is the size of the podCIDR allocated to a node.
 # IP_ALIAS_SUBNETWORK is the subnetwork to allocate from. If empty, a
 #   new subnetwork will be created for the cluster.
 ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-false}
-# Size of ranges allocated to each node. gcloud alpha supports only /32 and /24.
-IP_ALIAS_SIZE=${KUBE_GCE_IP_ALIAS_SIZE:-/24}
-IP_ALIAS_SUBNETWORK=${KUBE_GCE_IP_ALIAS_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-default}
+if [ ${ENABLE_IP_ALIASES} = true ]; then
+  # Size of ranges allocated to each node. gcloud alpha supports only /32 and /24.
+  IP_ALIAS_SIZE=${KUBE_GCE_IP_ALIAS_SIZE:-/24}
+  IP_ALIAS_SUBNETWORK=${KUBE_GCE_IP_ALIAS_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-default}
+  # NODE_IP_RANGE is used when ENABLE_IP_ALIASES=true. It is the primary range in
+  # the subnet and is the range used for node instance IPs.
+  NODE_IP_RANGE="${NODE_IP_RANGE:-10.40.0.0/22}"
+  # Add to the provider custom variables.
+  PROVIDER_VARS="${PROVIDER_VARS} ENABLE_IP_ALIASES"
+fi
 
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
 ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota}"
