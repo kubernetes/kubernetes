@@ -57,6 +57,56 @@ func TestScopeNamingGenerateLink(t *testing.T) {
 	}
 }
 
+func TestRootScopeNamingGenerateLink(t *testing.T) {
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		expectedSet: "/api/v1/namespaces/other/services/foo",
+		name:        "foo",
+		namespace:   "other",
+	}
+	service := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "other",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Service",
+		},
+	}
+	tests := []struct {
+		n            rootScopeNaming
+		expectedLink string
+	}{
+		{
+			n: rootScopeNaming{
+				meta.RESTScopeNamespace,
+				selfLinker,
+				"pre",
+				"",
+			},
+			expectedLink: "pre/foo",
+		},
+		{
+			n: rootScopeNaming{
+				meta.RESTScopeNamespace,
+				selfLinker,
+				"pre",
+				"suf",
+			},
+			expectedLink: "pre/foo/suf",
+		},
+	}
+	for _, tt := range tests {
+		link, err := tt.n.GenerateLink(&restful.Request{}, service)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		if link != tt.expectedLink {
+			t.Errorf("expected link %v but got %v", tt.expectedLink, link)
+		}
+	}
+}
+
 func TestIsVowel(t *testing.T) {
 	tests := []struct {
 		name string

@@ -850,7 +850,10 @@ func (n rootScopeNaming) GenerateLink(req *restful.Request, obj runtime.Object) 
 			return "", err
 		}
 	}
-	return n.pathPrefix + url.QueryEscape(name) + n.pathSuffix, nil
+	if len(n.pathSuffix) == 0 {
+		return n.pathPrefix + "/" + url.QueryEscape(name), nil
+	}
+	return n.pathPrefix + "/" + url.QueryEscape(name) + "/" + n.pathSuffix, nil
 }
 
 // GenerateListLink returns the appropriate path and query to locate a list by its canonical path.
