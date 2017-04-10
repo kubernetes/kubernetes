@@ -9,16 +9,9 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "api.go",
-        "conf.go",
-    ],
+    srcs = ["types.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor/github.com/containernetworking/cni/pkg/invoke:go_default_library",
-        "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
-        "//vendor/github.com/containernetworking/cni/pkg/version:go_default_library",
-    ],
+    deps = ["//vendor/github.com/containernetworking/cni/pkg/types:go_default_library"],
 )
 
 filegroup(

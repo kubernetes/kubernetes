@@ -10,14 +10,16 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "api.go",
         "conf.go",
+        "plugin.go",
+        "reconcile.go",
+        "version.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor/github.com/containernetworking/cni/pkg/invoke:go_default_library",
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
-        "//vendor/github.com/containernetworking/cni/pkg/version:go_default_library",
+        "//vendor/github.com/containernetworking/cni/pkg/types/020:go_default_library",
+        "//vendor/github.com/containernetworking/cni/pkg/types/current:go_default_library",
     ],
 )
 
