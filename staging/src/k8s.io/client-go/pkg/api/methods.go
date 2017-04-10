@@ -19,7 +19,11 @@ limitations under the License.
 
 package api
 
-import "fmt"
+import (
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
 
 // MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
 // if the two tolerations have same <key,effect,operator,value> combination, regard as they match.
@@ -44,3 +48,12 @@ func (t *Taint) ToString() string {
 	}
 	return fmt.Sprintf("%v=%v:%v", t.Key, t.Value, t.Effect)
 }
+
+func (obj *ObjectReference) SetGroupVersionKind(gvk schema.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *ObjectReference) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+
+func (obj *ObjectReference) GetObjectKind() schema.ObjectKind { return obj }
