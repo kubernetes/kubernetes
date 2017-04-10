@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 )
 
 func TestValidate(t *testing.T) {
@@ -75,7 +76,7 @@ func TestValidate(t *testing.T) {
 		}
 		testAllowed := func(key string, category string) {
 			pod.Annotations = map[string]string{
-				key: api.PodAnnotationsFromSysctls(sysctls),
+				key: helper.PodAnnotationsFromSysctls(sysctls),
 			}
 			errs = strategy.Validate(pod)
 			if len(errs) != 0 {
@@ -85,7 +86,7 @@ func TestValidate(t *testing.T) {
 		testDisallowed := func(key string, category string) {
 			for _, s := range v.disallowed {
 				pod.Annotations = map[string]string{
-					key: api.PodAnnotationsFromSysctls([]api.Sysctl{{Name: s, Value: "dummy"}}),
+					key: helper.PodAnnotationsFromSysctls([]api.Sysctl{{Name: s, Value: "dummy"}}),
 				}
 				errs = strategy.Validate(pod)
 				if len(errs) == 0 {

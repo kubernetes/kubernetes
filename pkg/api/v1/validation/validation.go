@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -68,7 +68,7 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 func validateContainerResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
 	if len(strings.Split(value, "/")) == 1 {
-		if !api.IsStandardContainerResourceName(value) {
+		if !helper.IsStandardContainerResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
 		}
 	}
@@ -79,7 +79,7 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 func ValidateResourceQuantityValue(resource string, value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
-	if api.IsIntegerResourceName(resource) {
+	if helper.IsIntegerResourceName(resource) {
 		if value.MilliValue()%int64(1000) != int64(0) {
 			allErrs = append(allErrs, field.Invalid(fldPath, value, isNotIntegerErrorMsg))
 		}
@@ -108,7 +108,7 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 	}
 
 	if len(strings.Split(value, "/")) == 1 {
-		if !api.IsStandardResourceName(value) {
+		if !helper.IsStandardResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource type or fully qualified"))
 		}
 	}
