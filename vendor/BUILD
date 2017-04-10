@@ -5412,6 +5412,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/onsi/ginkgo/config",
+        "//vendor:github.com/onsi/ginkgo/internal/spec_iterator",
         "//vendor:github.com/onsi/ginkgo/reporters",
         "//vendor:github.com/onsi/ginkgo/reporters/stenographer",
         "//vendor:github.com/onsi/ginkgo/types",
@@ -5421,7 +5422,6 @@ go_library(
 go_library(
     name = "github.com/onsi/ginkgo/internal/spec",
     srcs = [
-        "github.com/onsi/ginkgo/internal/spec/index_computer.go",
         "github.com/onsi/ginkgo/internal/spec/spec.go",
         "github.com/onsi/ginkgo/internal/spec/specs.go",
     ],
@@ -5444,6 +5444,7 @@ go_library(
         "//vendor:github.com/onsi/ginkgo/config",
         "//vendor:github.com/onsi/ginkgo/internal/leafnodes",
         "//vendor:github.com/onsi/ginkgo/internal/spec",
+        "//vendor:github.com/onsi/ginkgo/internal/spec_iterator",
         "//vendor:github.com/onsi/ginkgo/internal/writer",
         "//vendor:github.com/onsi/ginkgo/reporters",
         "//vendor:github.com/onsi/ginkgo/types",
@@ -5460,6 +5461,7 @@ go_library(
         "//vendor:github.com/onsi/ginkgo/internal/failer",
         "//vendor:github.com/onsi/ginkgo/internal/leafnodes",
         "//vendor:github.com/onsi/ginkgo/internal/spec",
+        "//vendor:github.com/onsi/ginkgo/internal/spec_iterator",
         "//vendor:github.com/onsi/ginkgo/internal/specrunner",
         "//vendor:github.com/onsi/ginkgo/internal/writer",
         "//vendor:github.com/onsi/ginkgo/reporters",
@@ -16599,4 +16601,17 @@ go_test(
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/kubernetes/fake",
     ],
+)
+
+go_library(
+    name = "github.com/onsi/ginkgo/internal/spec_iterator",
+    srcs = [
+        "github.com/onsi/ginkgo/internal/spec_iterator/index_computer.go",
+        "github.com/onsi/ginkgo/internal/spec_iterator/parallel_spec_iterator.go",
+        "github.com/onsi/ginkgo/internal/spec_iterator/serial_spec_iterator.go",
+        "github.com/onsi/ginkgo/internal/spec_iterator/sharded_parallel_spec_iterator.go",
+        "github.com/onsi/ginkgo/internal/spec_iterator/spec_iterator.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/onsi/ginkgo/internal/spec"],
 )
