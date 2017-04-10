@@ -58,6 +58,7 @@ go_test(
         "navigation_step_parser_test.go",
         "unset_test.go",
         "use_context_test.go",
+        "view_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
