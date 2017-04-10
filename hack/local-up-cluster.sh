@@ -66,6 +66,9 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 # enable swagger ui
 ENABLE_SWAGGER_UI=${ENABLE_SWAGGER_UI:-false}
 
+# enable kubernetes dashboard
+ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
+
 # enable audit log
 ENABLE_APISERVER_BASIC_AUDIT=${ENABLE_APISERVER_BASIC_AUDIT:-false}
 
@@ -714,6 +717,15 @@ function start_kubedns {
     fi
 }
 
+function start_kubedashboard {
+    if [[ "${ENABLE_CLUSTER_DASHBOARD}" = true ]]; then
+        echo "Creating kubernetes-dashboard"       
+        # use kubectl to create the dashboard
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f https://rawgit.com/kubernetes/dashboard/master/src/deploy/kubernetes-dashboard.yaml
+        echo "kubernetes-dashboard deployment and service successfully deployed."
+    fi
+}
+
 function create_psp_policy {
     echo "Create podsecuritypolicy policies for RBAC."
     ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/examples/podsecuritypolicy/rbac/policies.yaml
@@ -826,6 +838,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   start_controller_manager
   start_kubeproxy
   start_kubedns
+  start_kubedashboard
 fi
 
 if [[ "${START_MODE}" != "nokubelet" ]]; then
