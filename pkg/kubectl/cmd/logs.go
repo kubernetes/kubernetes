@@ -187,9 +187,6 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 		if logOptions.Follow {
 			return cmdutil.UsageError(cmd, "only one of follow (-f) or selector (-l) is allowed")
 		}
-		if len(logOptions.Container) != 0 {
-			return cmdutil.UsageError(cmd, "a container cannot be specified when using a selector (-l)")
-		}
 		if logOptions.TailLines == nil {
 			logOptions.TailLines = &selectorTail
 		}
