@@ -1,4 +1,4 @@
-package coreaffinityisolator
+package coreaffinity
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/cluster/addons/iso-client/coreaffinity/cputopology"
 	"k8s.io/kubernetes/cluster/addons/iso-client/coreaffinity/discovery"
+	"k8s.io/kubernetes/cluster/addons/iso-client/opaque"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 )
@@ -21,6 +22,9 @@ type coreAffinityIsolator struct {
 // Constructor for Isolator
 func New(name string) (*coreAffinityIsolator, error) {
 	topology, err := discovery.DiscoverTopology()
+	if err := opaque.AdvertiseOpaqueResource(name, topology.GetTotalCPUs()); err != nil {
+		return nil, fmt.Errorf("Cannot advertise OIR: %v ", err)
+	}
 	return &coreAffinityIsolator{
 		Name:             name,
 		CPUTopology:      topology,
@@ -75,8 +79,8 @@ func asCPUList(cores []int) string {
 	return strings.Join(coresStr, ",")
 }
 
-// implementation of preStart method in  isolator Interface
-func (c *coreAffinityIsolator) PreStart(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*lifecycle.IsolationControl, error) {
+// implementation of preStart method in  "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle".Isolator
+func (c *coreAffinityIsolator) PreStartPod(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*lifecycle.IsolationControl, error) {
 	oirCores := c.countCoresFromOIR(pod)
 	glog.Infof("Pod %s requested %d cores", pod.Name, oirCores)
 
@@ -101,10 +105,13 @@ func (c *coreAffinityIsolator) PreStart(pod *v1.Pod, resource *lifecycle.CgroupI
 	return cgroupResource, nil
 }
 
-// implementation of postStop method in isolator Interface
-func (c *coreAffinityIsolator) PostStop(cgroupInfo *lifecycle.CgroupInfo) error {
+// implementation of postStop method in "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle".Isolator
+func (c *coreAffinityIsolator) PostStopPod(cgroupInfo *lifecycle.CgroupInfo) error {
 	cpus := c.cpuAssignmentMap[cgroupInfo.Path]
 	c.reclaimCPUs(cpus)
 	delete(c.cpuAssignmentMap, cgroupInfo.Path)
 	return nil
+}
+func (c *coreAffinityIsolator) ShutDown() {
+	opaque.RemoveOpaqueResource(c.Name)
 }

@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/transport"
 )
 
 // body for opaque resource request
@@ -23,7 +26,7 @@ func toRequestBody(operation string, name string, value string) ([]byte, error) 
 	return json.Marshal([]patchOperation{
 		patchOperation{
 			Operation: operation,
-			Path:      generateOpaqueResourcePath(name),
+			Path:      opaqueResourcePath(name),
 			Value:     value,
 		},
 	})
@@ -34,22 +37,15 @@ func getNode() (string, error) {
 	return os.Hostname()
 }
 
-// path for opaque resources
-func generateOpaqueResourcePath(name string) string {
-	return fmt.Sprintf("/status/capacity/pod.alpha.kubernetes.io~1opaque-int-resource-%s", name)
+// Escape forward slashes in the resource name per the JSON Pointer spec.
+// See https://tools.ietf.org/html/rfc6901#section-3
+func escapeResourcePath(resName api.ResourceName) string {
+	return strings.Replace(string(resName), "/", "~1", -1)
 }
 
-// generate url for adding or removing opaque resources
-func generateOpaqueResourceUrl() (string, error) {
-	host, err := getApiServer()
-	if err != nil {
-		return host, err
-	}
-	node, err := getNode()
-	if err != nil {
-		return node, err
-	}
-	return fmt.Sprintf("%s/api/v1/nodes/%s/status", host, node), nil
+// genereate OIR path for patch operation
+func opaqueResourcePath(name string) string {
+	return fmt.Sprintf("/status/capacity/%s", escapeResourcePath(api.OpaqueIntResourceName(name)))
 }
 
 // Getting config for accesing apiserver, assuming pod ir run within the cluster
@@ -70,69 +66,38 @@ func prepareRequest(body []byte, url string) (*http.Request, error) {
 	return http.NewRequest(http.MethodPatch, url, bytes.NewBuffer(body))
 }
 
-//Setting application/json-patch+json header
-func setPatchHeader(req *http.Request) {
-	req.Header.Set("Content-Type", "application/json-patch+json")
-}
-
-func createHttpClient() (*http.Client, error) {
-	// TODO: test it against insecure apiserver
-	config, err := getClientConfig()
-	if err != nil {
-		return nil, err
-	}
-	transportConfig, err := config.TransportConfig()
-	if err != nil {
-		return nil, err
-	}
-	transport, err := transport.New(transportConfig)
-	if err != nil {
-		return nil, err
-	}
-	return &http.Client{Transport: transport}, nil
-}
-
-func AdvertiseOpaqueResource(name string, value string) error {
+func AdvertiseOpaqueResource(name string, value int) error {
 	return makeRequest("add", name, value)
 }
 
 func RemoveOpaqueResource(name string) error {
-	return makeRequest("remove", name, "1")
+	return makeRequest("remove", name, 1)
 }
 
-func makeRequest(operation string, name string, value string) error {
-	body, err := toRequestBody(operation, name, value)
+func makeRequest(operation string, name string, value int) error {
+	// prepare body for OIR operation
+	body, err := toRequestBody(operation, name, fmt.Sprintf("%d", value))
 	if err != nil {
-		return err
+		return fmt.Errorf("Cannot marshall requestBody to json: %v", err)
 	}
 
-	url, err := generateOpaqueResourceUrl()
+	// get InClusterConfig
+	config, err := getClientConfig()
 	if err != nil {
-		return err
+		return fmt.Errorf("Cannot get client config: %v", err)
 	}
 
-	req, err := prepareRequest(body, url)
+	// create a k8s-client
+	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return err
+		return fmt.Errorf("Cannot create k8s client: %v", err)
 	}
-	// Setting proper header for PATCH request
-	setPatchHeader(req)
-
-	client, err := createHttpClient()
+	node, err := getNode()
 	if err != nil {
-		return err
+		return fmt.Errorf("Cannot get node name: %v", err)
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
+	// make patch request to add/remove OIR
+	return clientset.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(node).SubResource("status").Body(body).Do().Error()
 
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("Cannot set  opaque %s", name)
-	}
-
-	return nil
 }

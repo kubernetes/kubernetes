@@ -14,7 +14,7 @@ type EventDispatcherClient struct {
 }
 
 // Constructor for EventDispatcherClient
-func newEventDispatcherClient(serverAddress string, name string) (*EventDispatcherClient, error) {
+func NewEventDispatcherClient(name string, serverAddress string) (*EventDispatcherClient, error) {
 	clientConn, err := grpc.Dial(serverAddress, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
@@ -27,21 +27,17 @@ func newEventDispatcherClient(serverAddress string, name string) (*EventDispatch
 }
 
 // Create RegisterRequest and register EventDispatcherClient
-func RegisterIsolator(name string, serverAddress string, clientAddress string) (*EventDispatcherClient, error) {
-	client, err := newEventDispatcherClient(serverAddress, name)
-	if err != nil {
-		return nil, err
-	}
+func (e *EventDispatcherClient) RegisterIsolator(clientAddress string) error {
 	registerRequest := &lifecycle.RegisterRequest{
 		SocketAddress: clientAddress,
-		Name:          client.Name,
+		Name:          e.Name,
 	}
 
-	if _, err := client.Register(client.Ctx, registerRequest); err != nil {
-		return nil, err
+	if _, err := e.EventDispatcherClient.Register(e.Ctx, registerRequest); err != nil {
+		return err
 	}
 
-	return client, nil
+	return nil
 }
 
 func (e *EventDispatcherClient) UnregisterIsolator() error {
