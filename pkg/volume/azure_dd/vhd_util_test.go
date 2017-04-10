@@ -53,10 +53,14 @@ func (fi *fakeFileInfo) Sys() interface{} {
 }
 
 var (
-	lun      = 1
-	lunStr   = "1"
-	diskPath = "4:0:0:" + lunStr
-	devName  = "sda"
+	lun       = 1
+	lunStr    = "1"
+	diskPath  = "4:0:0:" + lunStr
+	devName   = "sdd"
+	lun1      = 2
+	lunStr1   = "2"
+	diskPath1 = "3:0:0:" + lunStr1
+	devName1  = "sde"
 )
 
 type fakeIOHandler struct{}
@@ -85,12 +89,21 @@ func (handler *fakeIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 			name: devName,
 		}
 		return []os.FileInfo{n}, nil
+	case "/sys/bus/scsi/devices/" + diskPath1 + "/block":
+		n := &fakeFileInfo{
+			name: devName1,
+		}
+		return []os.FileInfo{n}, nil
 	}
 	return nil, fmt.Errorf("bad dir")
 }
 
 func (handler *fakeIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	return nil
+}
+
+func (handler *fakeIOHandler) Readlink(name string) (string, error) {
+	return "/dev/azure/disk/sda", nil
 }
 
 func TestIoHandler(t *testing.T) {
@@ -101,16 +114,21 @@ func TestIoHandler(t *testing.T) {
 			func() ([]byte, error) {
 				return []byte("Msft    \nVirtual Disk \n"), nil
 			},
+			// cat
+			func() ([]byte, error) {
+				return []byte("Msft    \nVirtual Disk \n"), nil
+			},
 		},
 	}
 	fake := exec.FakeExec{
 		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
 	disk, err := findDiskByLun(lun, &fakeIOHandler{}, &fake)
 	// if no disk matches lun, exit
 	if disk != "/dev/"+devName || err != nil {
-		t.Errorf("no data disk disk found: disk %v err %v", disk, err)
+		t.Errorf("no data disk found: disk %v err %v", disk, err)
 	}
 }
