@@ -1,7 +1,9 @@
 package mapstructure
 
 import (
+	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -17,9 +19,25 @@ func (e *Error) Error() string {
 		points[i] = fmt.Sprintf("* %s", err)
 	}
 
+	sort.Strings(points)
 	return fmt.Sprintf(
 		"%d error(s) decoding:\n\n%s",
 		len(e.Errors), strings.Join(points, "\n"))
+}
+
+// WrappedErrors implements the errwrap.Wrapper interface to make this
+// return value more useful with the errwrap and go-multierror libraries.
+func (e *Error) WrappedErrors() []error {
+	if e == nil {
+		return nil
+	}
+
+	result := make([]error, len(e.Errors))
+	for i, e := range e.Errors {
+		result[i] = errors.New(e)
+	}
+
+	return result
 }
 
 func appendErrors(errors []string, err error) []string {

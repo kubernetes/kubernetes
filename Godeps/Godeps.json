@@ -1865,7 +1865,7 @@
 		},
 		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
-			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
+			"Rev": "53818660ed4955e899c0bcafa97299a388bd7c8e"
 		},
 		{
 			"ImportPath": "github.com/mreiferson/go-httpclient",
