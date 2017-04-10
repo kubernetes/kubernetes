@@ -90,10 +90,13 @@ func (c *VolumeNodeChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 		return false, nil, fmt.Errorf("node not found")
 	}
 
+	glog.V(2).Infof("Inside local volume predicate for node %q for pod %q", node.Name, pod.Name)
 	if err := c.handleUnboundClaims(pod, node); err != nil {
+		glog.V(2).Infof("Handle unbound claims returns error: %v", err.Error())
 		return false, nil, err
 	}
 
+	glog.V(2).Infof("Checking for prebound local volumes")
 	namespace := pod.Namespace
 	manifest := &(pod.Spec)
 	for i := range manifest.Volumes {
@@ -164,6 +167,11 @@ func (c *VolumeNodeChecker) handleUnboundClaims(pod *v1.Pod, node *v1.Node) erro
 		if pvc == nil {
 			return fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
 		}
+
+		if metav1.HasAnnotation(pvc.ObjectMeta, annBindCompleted) {
+			glog.V(2).Infof("pod %q pvc %q already bound, skipping", pod.Name, pvcName)
+			continue
+		}
 		// Handle binding for local PVs here.
 		if pvc.Spec.VolumeType != nil && *pvc.Spec.VolumeType == v1.SemiPersistentLocalStorage {
 			unboundClaims = append(unboundClaims, pvc)
@@ -200,7 +208,7 @@ func (c *VolumeNodeChecker) handleUnboundClaims(pod *v1.Pod, node *v1.Node) erro
 	for _, boundClaim := range boundClaims {
 		err := c.bind(boundClaim.volume, boundClaim.claim)
 		if err != nil {
-			glog.Fatalf("<vishh> Handle this error!")
+			glog.Infof("<vishh> Handle this error!: %v", err.Error())
 		}
 	}
 	return nil
@@ -298,8 +306,6 @@ func (c *VolumeNodeChecker) findBestVolumeForClaim(claim *v1.PersistentVolumeCla
 // bindVolumeToClaim modifes given volume to be bound to a claim and saves it to
 // API server. The claim is not modified in this method!
 func (c *VolumeNodeChecker) bindVolumeToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
-	glog.V(4).Infof("updating PersistentVolume[%s]: binding to %q", volume.Name, claimToClaimKey(claim))
-
 	dirty := false
 
 	// Check if the volume was already bound (either by user or by controller)
@@ -325,6 +331,9 @@ func (c *VolumeNodeChecker) bindVolumeToClaim(volume *v1.PersistentVolume, claim
 		volume.Spec.ClaimRef.Namespace != claim.Namespace ||
 		volume.Spec.ClaimRef.UID != claim.UID {
 
+		// MSAU: hack
+		claim.Kind = "PersistentVolumeClaim"
+		claim.APIVersion = "v1"
 		claimRef, err := v1.GetReference(api.Scheme, claim)
 		if err != nil {
 			return nil, fmt.Errorf("Unexpected error getting claim reference: %v", err)
@@ -347,18 +356,18 @@ func (c *VolumeNodeChecker) bindVolumeToClaim(volume *v1.PersistentVolume, claim
 			glog.V(4).Infof("updating PersistentVolume[%s]: binding to %q failed: %v", volume.Name, claimToClaimKey(claim), err)
 			return newVol, err
 		}
-		glog.V(4).Infof("updating PersistentVolume[%s]: bound to %q", newVol.Name, claimToClaimKey(claim))
+		glog.V(2).Infof("updating PersistentVolume[%s]: bound to %q", newVol.Name, claimToClaimKey(claim))
 		return newVol, nil
 	}
 
-	glog.V(4).Infof("updating PersistentVolume[%s]: already bound to %q", volume.Name, claimToClaimKey(claim))
+	glog.V(2).Infof("updating PersistentVolume[%s]: already bound to %q", volume.Name, claimToClaimKey(claim))
 	return volume, nil
 }
 
 // bindClaimToVolume modifies the given claim to be bound to a volume and
 // saves it to API server. The volume is not modified in this method!
 func (c *VolumeNodeChecker) bindClaimToVolume(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) (*v1.PersistentVolumeClaim, error) {
-	glog.V(4).Infof("updating PersistentVolumeClaim[%s]: binding to %q", claimToClaimKey(claim), volume.Name)
+	glog.V(2).Infof("updating PersistentVolumeClaim[%s]: binding to %q", claimToClaimKey(claim), volume.Name)
 
 	dirty := false
 
@@ -401,23 +410,23 @@ func (c *VolumeNodeChecker) bindClaimToVolume(claim *v1.PersistentVolumeClaim, v
 		glog.V(2).Infof("volume %q bound to claim %q", volume.Name, claimToClaimKey(claim))
 		newClaim, err := c.client.Core().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
 		if err != nil {
-			glog.V(4).Infof("updating PersistentVolumeClaim[%s]: binding to %q failed: %v", claimToClaimKey(claim), volume.Name, err)
+			glog.V(2).Infof("updating PersistentVolumeClaim[%s]: binding to %q failed: %v", claimToClaimKey(claim), volume.Name, err)
 			return newClaim, err
 		}
-		glog.V(4).Infof("updating PersistentVolumeClaim[%s]: bound to %q", claimToClaimKey(claim), volume.Name)
+		glog.V(2).Infof("updating PersistentVolumeClaim[%s]: bound to %q", claimToClaimKey(claim), volume.Name)
 		return newClaim, nil
 	}
 
-	glog.V(4).Infof("updating PersistentVolumeClaim[%s]: already bound to %q", claimToClaimKey(claim), volume.Name)
+	glog.V(2).Infof("updating PersistentVolumeClaim[%s]: already bound to %q", claimToClaimKey(claim), volume.Name)
 	return claim, nil
 }
 
 // updateVolumePhase saves new volume phase to API server.
 func (c *VolumeNodeChecker) updateVolumePhase(volume *v1.PersistentVolume, phase v1.PersistentVolumePhase, message string) (*v1.PersistentVolume, error) {
-	glog.V(4).Infof("updating PersistentVolume[%s]: set phase %s", volume.Name, phase)
+	glog.V(2).Infof("updating PersistentVolume[%s]: set phase %s", volume.Name, phase)
 	if volume.Status.Phase == phase {
 		// Nothing to do.
-		glog.V(4).Infof("updating PersistentVolume[%s]: phase %s already set", volume.Name, phase)
+		glog.V(2).Infof("updating PersistentVolume[%s]: phase %s already set", volume.Name, phase)
 		return volume, nil
 	}
 
@@ -435,7 +444,7 @@ func (c *VolumeNodeChecker) updateVolumePhase(volume *v1.PersistentVolume, phase
 
 	newVol, err := c.client.Core().PersistentVolumes().UpdateStatus(volumeClone)
 	if err != nil {
-		glog.V(4).Infof("updating PersistentVolume[%s]: set phase %s failed: %v", volume.Name, phase, err)
+		glog.V(2).Infof("updating PersistentVolume[%s]: set phase %s failed: %v", volume.Name, phase, err)
 		return newVol, err
 	}
 	glog.V(2).Infof("volume %q entered phase %q", volume.Name, phase)
@@ -448,7 +457,7 @@ func (c *VolumeNodeChecker) updateVolumePhase(volume *v1.PersistentVolume, phase
 //  phasephase - phase to set
 //  volume - volume which Capacity is set into claim.Status.Capacity
 func (c *VolumeNodeChecker) updateClaimStatus(claim *v1.PersistentVolumeClaim, phase v1.PersistentVolumeClaimPhase, volume *v1.PersistentVolume) (*v1.PersistentVolumeClaim, error) {
-	glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: set phase %s", claimToClaimKey(claim), phase)
+	glog.V(2).Infof("updating PersistentVolumeClaim[%s] status: set phase %s", claimToClaimKey(claim), phase)
 
 	dirty := false
 
@@ -496,13 +505,13 @@ func (c *VolumeNodeChecker) updateClaimStatus(claim *v1.PersistentVolumeClaim, p
 
 	if !dirty {
 		// Nothing to do.
-		glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: phase %s already set", claimToClaimKey(claim), phase)
+		glog.V(2).Infof("updating PersistentVolumeClaim[%s] status: phase %s already set", claimToClaimKey(claim), phase)
 		return claim, nil
 	}
 
 	newClaim, err := c.client.Core().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(claimClone)
 	if err != nil {
-		glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: set phase %s failed: %v", claimToClaimKey(claim), phase, err)
+		glog.V(2).Infof("updating PersistentVolumeClaim[%s] status: set phase %s failed: %v", claimToClaimKey(claim), phase, err)
 		return newClaim, err
 	}
 	glog.V(2).Infof("claim %q entered phase %q", claimToClaimKey(claim), phase)
@@ -528,32 +537,32 @@ func (c *VolumeNodeChecker) bind(volume *v1.PersistentVolume, claim *v1.Persiste
 	var updatedClaim *v1.PersistentVolumeClaim
 	var updatedVolume *v1.PersistentVolume
 
-	glog.V(4).Infof("binding volume %q to claim %q", volume.Name, claimToClaimKey(claim))
+	glog.V(2).Infof("binding volume %q to claim %q", volume.Name, claimToClaimKey(claim))
 
 	if updatedVolume, err = c.bindVolumeToClaim(volume, claim); err != nil {
-		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the volume: %v", volume.Name, claimToClaimKey(claim), err)
+		glog.V(2).Infof("error binding volume %q to claim %q: failed saving the volume: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
 	volume = updatedVolume
 
 	if updatedVolume, err = c.updateVolumePhase(volume, v1.VolumeBound, ""); err != nil {
-		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the volume status: %v", volume.Name, claimToClaimKey(claim), err)
+		glog.V(2).Infof("error binding volume %q to claim %q: failed saving the volume status: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
 	volume = updatedVolume
 
 	if updatedClaim, err = c.bindClaimToVolume(claim, volume); err != nil {
-		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the claim: %v", volume.Name, claimToClaimKey(claim), err)
+		glog.V(2).Infof("error binding volume %q to claim %q: failed saving the claim: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
 	claim = updatedClaim
 
 	if updatedClaim, err = c.updateClaimStatus(claim, v1.ClaimBound, volume); err != nil {
-		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the claim status: %v", volume.Name, claimToClaimKey(claim), err)
+		glog.V(2).Infof("error binding volume %q to claim %q: failed saving the claim status: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
 	claim = updatedClaim
 
-	glog.V(4).Infof("volume %q bound to claim %q", volume.Name, claimToClaimKey(claim))
+	glog.V(2).Infof("volume %q bound to claim %q", volume.Name, claimToClaimKey(claim))
 	return nil
 }

@@ -353,7 +353,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("replicasets").RuleOrDie(),
 				rbac.NewRule(Read...).Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
 				// things that pods use
-				rbac.NewRule(Read...).Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups("*").Resources("persistentvolumeclaims", "persistentvolumes", "persistentvolumes/status", "persistentvolumeclaims/status").RuleOrDie(),
 			},
 		},
 		{
