@@ -63,6 +63,8 @@ go_library(
         "//pkg/api/annotations:go_default_library",
         "//pkg/api/events:go_default_library",
         "//pkg/api/helper:go_default_library",
+        "//pkg/api/ref:go_default_library",
+        "//pkg/api/resource:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/batch:go_default_library",

@@ -14,8 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package resource only exists until heapster rebases
-// TODO genericapiserver remove this empty package.  Godep fails without this because heapster relies
-// on this package.  This will allow us to start splitting packages, but will force
-// heapster to update on their next kube rebase.
-package resource
+//TODO: consider making these methods functions, because we don't want helper
+//functions in the k8s.io/api repo.
+
+package api
+
+import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
+
+func (obj *ObjectReference) SetGroupVersionKind(gvk schema.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+
+func (obj *ObjectReference) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+
+func (obj *ObjectReference) GetObjectKind() schema.ObjectKind { return obj }
