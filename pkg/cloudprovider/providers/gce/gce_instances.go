@@ -217,10 +217,10 @@ func (gce *GCECloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
 }
 
-// PodCIDRs returns a list of CIDR ranges that are assigned to the
+// AliasRanges returns a list of CIDR ranges that are assigned to the
 // `node` for allocation to pods. Returns a list of the form
 // "<ip>/<netmask>".
-func (gce *GCECloud) PodCIDRs(nodeName types.NodeName) (cidrs []string, err error) {
+func (gce *GCECloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err error) {
 	var instance *gceInstance
 	instance, err = gce.getInstanceByName(mapNodeNameToInstanceName(nodeName))
 	if err != nil {

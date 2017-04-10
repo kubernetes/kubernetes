@@ -77,7 +77,7 @@ func NewCloudCIDRAllocator(
 func (ca *cloudCIDRAllocator) AllocateOrOccupyCIDR(node *v1.Node) error {
 	glog.V(2).Infof("Updating PodCIDR for node %v", node.Name)
 
-	cidrs, err := ca.cloud.PodCIDRs(types.NodeName(node.Name))
+	cidrs, err := ca.cloud.AliasRanges(types.NodeName(node.Name))
 
 	if err != nil {
 		recordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
