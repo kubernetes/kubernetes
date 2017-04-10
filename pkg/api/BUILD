@@ -18,7 +18,7 @@ go_library(
         "json.go",
         "objectreference.go",
         "register.go",
-        "resource_helpers.go",
+        "resource.go",
         "taint.go",
         "toleration.go",
         "types.go",
@@ -43,16 +43,9 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "resource_helpers_test.go",
-        "taint_test.go",
-    ],
+    srcs = ["taint_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/apimachinery/pkg/api/resource",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-    ],
 )
 
 go_test(
