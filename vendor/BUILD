@@ -63,6 +63,7 @@ filegroup(
         "//vendor/github.com/containernetworking/cni/libcni:all-srcs",
         "//vendor/github.com/containernetworking/cni/pkg/invoke:all-srcs",
         "//vendor/github.com/containernetworking/cni/pkg/types:all-srcs",
+        "//vendor/github.com/containernetworking/cni/pkg/version:all-srcs",
         "//vendor/github.com/coreos/etcd/alarm:all-srcs",
         "//vendor/github.com/coreos/etcd/auth:all-srcs",
         "//vendor/github.com/coreos/etcd/client:all-srcs",
