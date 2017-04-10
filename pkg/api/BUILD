@@ -18,7 +18,6 @@ go_library(
         "json.go",
         "methods.go",
         "register.go",
-        "resource_helpers.go",
         "types.go",
         "zz_generated.deepcopy.go",
     ],
@@ -41,16 +40,9 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "methods_test.go",
-        "resource_helpers_test.go",
-    ],
+    srcs = ["methods_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/apimachinery/pkg/api/resource",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-    ],
 )
 
 go_test(
