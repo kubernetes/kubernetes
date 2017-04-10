@@ -985,6 +985,11 @@ func (s *ServiceController) syncService(key string) error {
 			return err
 		}
 		service := copy.(*v1.Service)
+		if util.IsFederationOnlyObject(service) {
+			// Should not reconcile federation-only objects
+			glog.V(4).Infof("Skipping federation only Service: %s", key)
+			return nil
+		}
 		cachedService = s.serviceCache.getOrCreate(key)
 		err, retryDelay = s.processServiceUpdate(cachedService, service, key)
 	}

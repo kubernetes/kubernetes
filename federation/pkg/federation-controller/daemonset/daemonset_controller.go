@@ -364,6 +364,11 @@ func (daemonsetcontroller *DaemonSetController) reconcileDaemonSet(namespace str
 		daemonsetcontroller.deliverDaemonSet(namespace, daemonsetName, 0, true)
 		return
 	}
+	if util.IsFederationOnlyObject(baseDaemonSet) {
+		// Should not reconcile federation-only objects
+		glog.V(4).Infof("Skipping federation only DaemonSet: %s", key)
+		return
+	}
 	if baseDaemonSet.DeletionTimestamp != nil {
 		if err := daemonsetcontroller.delete(baseDaemonSet); err != nil {
 			glog.Errorf("Failed to delete %s: %v", daemonsetName, err)

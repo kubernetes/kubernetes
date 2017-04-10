@@ -363,6 +363,11 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		nc.deliverNamespace(namespace, 0, true)
 		return
 	}
+	if util.IsFederationOnlyObject(baseNamespace) {
+		// Should not reconcile federation-only objects
+		glog.V(4).Infof("Skipping federation only Namespace: %s", namespace)
+		return
+	}
 	if baseNamespace.DeletionTimestamp != nil {
 		if err := nc.delete(baseNamespace); err != nil {
 			glog.Errorf("Failed to delete %s: %v", namespace, err)
