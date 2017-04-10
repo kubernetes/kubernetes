@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 )
 
 var (
@@ -97,7 +98,7 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 	}
 
 	if !toleratesNodeNotReady {
-		api.AddOrUpdateTolerationInPod(pod, &api.Toleration{
+		helper.AddOrUpdateTolerationInPod(pod, &api.Toleration{
 			Key:               metav1.TaintNodeNotReady,
 			Operator:          api.TolerationOpExists,
 			Effect:            api.TaintEffectNoExecute,
@@ -106,7 +107,7 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 	}
 
 	if !toleratesNodeUnreachable {
-		api.AddOrUpdateTolerationInPod(pod, &api.Toleration{
+		helper.AddOrUpdateTolerationInPod(pod, &api.Toleration{
 			Key:               metav1.TaintNodeUnreachable,
 			Operator:          api.TolerationOpExists,
 			Effect:            api.TaintEffectNoExecute,
