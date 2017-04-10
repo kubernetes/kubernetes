@@ -21,16 +21,6 @@ package api
 
 import "fmt"
 
-// MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
-// if the two tolerations have same <key,effect,operator,value> combination, regard as they match.
-// TODO: uniqueness check for tolerations in api validations.
-func (t *Toleration) MatchToleration(tolerationToMatch *Toleration) bool {
-	return t.Key == tolerationToMatch.Key &&
-		t.Effect == tolerationToMatch.Effect &&
-		t.Operator == tolerationToMatch.Operator &&
-		t.Value == tolerationToMatch.Value
-}
-
 // MatchTaint checks if the taint matches taintToMatch. Taints are unique by key:effect,
 // if the two taints have same key:effect, regard as they match.
 func (t *Taint) MatchTaint(taintToMatch Taint) bool {
