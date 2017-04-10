@@ -28,12 +28,22 @@ type MockCNI struct {
 	mock.Mock
 }
 
-func (m *MockCNI) AddNetwork(net *libcni.NetworkConfig, rt *libcni.RuntimeConf) (*types.Result, error) {
+func (m *MockCNI) AddNetwork(net *libcni.NetworkConfig, rt *libcni.RuntimeConf) (types.Result, error) {
 	args := m.Called(net, rt)
-	return args.Get(0).(*types.Result), args.Error(1)
+	return args.Get(0).(types.Result), args.Error(1)
 }
 
 func (m *MockCNI) DelNetwork(net *libcni.NetworkConfig, rt *libcni.RuntimeConf) error {
 	args := m.Called(net, rt)
 	return args.Error(0)
+}
+
+func (m *MockCNI) DelNetworkList(net *libcni.NetworkConfigList, rt *libcni.RuntimeConf) error {
+	args := m.Called(net, rt)
+	return args.Error(0)
+}
+
+func (m *MockCNI) AddNetworkList(net *libcni.NetworkConfigList, rt *libcni.RuntimeConf) (types.Result, error) {
+	args := m.Called(net, rt)
+	return args.Get(0).(types.Result), args.Error(1)
 }

@@ -29,6 +29,7 @@ go_library(
         "//pkg/util/sysctl:go_default_library",
         "//vendor:github.com/containernetworking/cni/libcni",
         "//vendor:github.com/containernetworking/cni/pkg/types",
+        "//vendor:github.com/containernetworking/cni/pkg/types/020",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/vishvananda/netlink",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",

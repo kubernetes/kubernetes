@@ -1130,6 +1130,7 @@ go_library(
     deps = [
         "//vendor:github.com/containernetworking/cni/pkg/invoke",
         "//vendor:github.com/containernetworking/cni/pkg/types",
+        "//vendor:github.com/containernetworking/cni/pkg/version",
     ],
 )
 
@@ -1140,9 +1141,14 @@ go_library(
         "github.com/containernetworking/cni/pkg/invoke/delegate.go",
         "github.com/containernetworking/cni/pkg/invoke/exec.go",
         "github.com/containernetworking/cni/pkg/invoke/find.go",
+        "github.com/containernetworking/cni/pkg/invoke/os_unix.go",
+        "github.com/containernetworking/cni/pkg/invoke/raw_exec.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/containernetworking/cni/pkg/types"],
+    deps = [
+        "//vendor:github.com/containernetworking/cni/pkg/types",
+        "//vendor:github.com/containernetworking/cni/pkg/version",
+    ],
 )
 
 go_library(
@@ -16599,5 +16605,38 @@ go_test(
         "//vendor:k8s.io/client-go/informers",
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/kubernetes/fake",
+    ],
+)
+
+go_library(
+    name = "github.com/containernetworking/cni/pkg/types/020",
+    srcs = ["github.com/containernetworking/cni/pkg/types/020/types.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/containernetworking/cni/pkg/types"],
+)
+
+go_library(
+    name = "github.com/containernetworking/cni/pkg/types/current",
+    srcs = ["github.com/containernetworking/cni/pkg/types/current/types.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/containernetworking/cni/pkg/types",
+        "//vendor:github.com/containernetworking/cni/pkg/types/020",
+    ],
+)
+
+go_library(
+    name = "github.com/containernetworking/cni/pkg/version",
+    srcs = [
+        "github.com/containernetworking/cni/pkg/version/conf.go",
+        "github.com/containernetworking/cni/pkg/version/plugin.go",
+        "github.com/containernetworking/cni/pkg/version/reconcile.go",
+        "github.com/containernetworking/cni/pkg/version/version.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/containernetworking/cni/pkg/types",
+        "//vendor:github.com/containernetworking/cni/pkg/types/020",
+        "//vendor:github.com/containernetworking/cni/pkg/types/current",
     ],
 )
