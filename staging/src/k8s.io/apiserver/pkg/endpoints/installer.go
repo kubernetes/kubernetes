@@ -35,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/net/httpheader"
+	"k8s.io/apimachinery/pkg/util/net/mediatype"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
@@ -122,7 +124,7 @@ func (a *APIInstaller) NewWebService() *restful.WebService {
 	// Backwards compatibility, we accepted objects with empty content-type at V1.
 	// If we stop using go-restful, we can default empty content-type to application/json on an
 	// endpoint by endpoint basis
-	ws.Consumes("*/*")
+	ws.Consumes(mediatype.Wildcard)
 	mediaTypes, streamMediaTypes := negotiation.MediaTypesForSerializer(a.group.Serializer)
 	ws.Produces(append(mediaTypes, streamMediaTypes...)...)
 	ws.ApiVersion(a.group.GroupVersion.String())
@@ -344,12 +346,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var ctxFn handlers.ContextFunc
 	ctxFn = func(req *restful.Request) request.Context {
 		if context == nil {
-			return request.WithUserAgent(request.NewContext(), req.HeaderParameter("User-Agent"))
+			return request.WithUserAgent(request.NewContext(), req.HeaderParameter(httpheader.UserAgent))
 		}
 		if ctx, ok := context.Get(req.Request); ok {
-			return request.WithUserAgent(ctx, req.HeaderParameter("User-Agent"))
+			return request.WithUserAgent(ctx, req.HeaderParameter(httpheader.UserAgent))
 		}
-		return request.WithUserAgent(request.NewContext(), req.HeaderParameter("User-Agent"))
+		return request.WithUserAgent(request.NewContext(), req.HeaderParameter(httpheader.UserAgent))
 	}
 
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
@@ -784,8 +786,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					To(handler).
 					Doc(doc).
 					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource) + operationSuffix).
-					Produces("*/*").
-					Consumes("*/*").
+					Produces(mediatype.Wildcard).
+					Consumes(mediatype.Wildcard).
 					Writes("string")
 				if versionedConnectOptions != nil {
 					if err := addObjectParams(ws, route, versionedConnectOptions); err != nil {
@@ -982,8 +984,8 @@ func addProxyRoute(ws *restful.WebService, method string, prefix string, path st
 	proxyRoute := ws.Method(method).Path(path).To(handler).
 		Doc(doc).
 		Operation("proxy" + strings.Title(method) + namespaced + kind + strings.Title(subresource) + operationSuffix).
-		Produces("*/*").
-		Consumes("*/*").
+		Produces(mediatype.Wildcard).
+		Consumes(mediatype.Wildcard).
 		Writes("string")
 	addParams(proxyRoute, params)
 	ws.Route(proxyRoute)
