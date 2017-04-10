@@ -22,6 +22,7 @@ package api
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -57,3 +58,38 @@ func (obj *ObjectReference) GroupVersionKind() schema.GroupVersionKind {
 }
 
 func (obj *ObjectReference) GetObjectKind() schema.ObjectKind { return obj }
+
+// Returns string version of ResourceName.
+func (self ResourceName) String() string {
+	return string(self)
+}
+
+// Returns the CPU limit if specified.
+func (self *ResourceList) Cpu() *resource.Quantity {
+	if val, ok := (*self)[ResourceCPU]; ok {
+		return &val
+	}
+	return &resource.Quantity{Format: resource.DecimalSI}
+}
+
+// Returns the Memory limit if specified.
+func (self *ResourceList) Memory() *resource.Quantity {
+	if val, ok := (*self)[ResourceMemory]; ok {
+		return &val
+	}
+	return &resource.Quantity{Format: resource.BinarySI}
+}
+
+func (self *ResourceList) Pods() *resource.Quantity {
+	if val, ok := (*self)[ResourcePods]; ok {
+		return &val
+	}
+	return &resource.Quantity{}
+}
+
+func (self *ResourceList) NvidiaGPU() *resource.Quantity {
+	if val, ok := (*self)[ResourceNvidiaGPU]; ok {
+		return &val
+	}
+	return &resource.Quantity{}
+}

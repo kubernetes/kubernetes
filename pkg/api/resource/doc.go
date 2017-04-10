@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package resource only exists until heapster rebases
+// Package resource has to exist until heapster rebases
 // TODO genericapiserver remove this empty package.  Godep fails without this because heapster relies
 // on this package.  This will allow us to start splitting packages, but will force
 // heapster to update on their next kube rebase.
