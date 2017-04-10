@@ -206,7 +206,7 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService, de
 
 	proxyPath := "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
 	// v1. is a special case for the legacy API.  It proxies to a wider set of endpoints.
-	if apiService.Name == "v1." {
+	if apiService.Name == legacyAPIServiceName {
 		proxyPath = "/api"
 	}
 
