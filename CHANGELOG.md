@@ -734,6 +734,9 @@ Also, please note:
   * The bootstrap token system now allows token management and expiration
 * The [`kubefed` federation bootstrap tool](https://kubernetes.io/docs/tutorials/federation/set-up-cluster-federation-kubefed/) has also graduated to beta.
 * Interaction with container runtimes is now through the CRI interface, enabling easier integration of runtimes with the kubelet. Docker remains the default runtime via Docker-CRI (which moves to beta).
+  * **WARNING:** A [known issue](https://github.com/kubernetes/kubernetes/issues/44041)
+    in v1.6.0 causes `Pod.Spec.HostPid` (using the host PID namespace for the pod) to always
+    be false. Please wait for v1.6.2, which will include a fix for this issue.
 * Various scheduling features have graduated to beta:
   * You can now use [multiple schedulers](https://kubernetes.io/docs/admin/multiple-schedulers/)
   * [Nodes](https://kubernetes.io/docs/user-guide/node-selection/#node-affinity-beta-feature) and [pods](https://kubernetes.io/docs/user-guide/node-selection/#inter-pod-affinity-and-anti-affinity-beta-feature) now support affinity and anti-affinity
