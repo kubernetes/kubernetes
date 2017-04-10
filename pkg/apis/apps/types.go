@@ -22,6 +22,7 @@ import (
 )
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
@@ -93,6 +94,8 @@ type StatefulSetStatus struct {
 	// Replicas is the number of actual replicas.
 	Replicas int32
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSetList is a collection of StatefulSets.
 type StatefulSetList struct {

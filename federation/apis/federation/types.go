@@ -92,6 +92,7 @@ type ClusterStatus struct {
 
 // +genclient=true
 // +nonNamespaced=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.
 type Cluster struct {
@@ -108,6 +109,8 @@ type Cluster struct {
 	// +optional
 	Status ClusterStatus
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // A list of all the kubernetes clusters registered to the federation
 type ClusterList struct {

@@ -25,6 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type KubeProxyConfiguration struct {
 	metav1.TypeMeta
 
@@ -119,6 +121,8 @@ const (
 	// dropped by the container bridge.
 	HairpinNone = "none"
 )
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // TODO: curate the ordering and structure of this config object
 type KubeletConfiguration struct {
@@ -563,6 +567,8 @@ type KubeletAnonymousAuthentication struct {
 	Enabled bool
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta
 
@@ -622,6 +628,8 @@ type LeaderElectionConfiguration struct {
 	// leader election is enabled.
 	RetryPeriod metav1.Duration
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type KubeControllerManagerConfiguration struct {
 	metav1.TypeMeta

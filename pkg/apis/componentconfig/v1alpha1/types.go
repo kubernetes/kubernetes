@@ -21,6 +21,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type KubeProxyConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -98,6 +100,8 @@ const (
 	ProxyModeIPTables  ProxyMode = "iptables"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -174,6 +178,8 @@ type LeaderElectionConfiguration struct {
 	// leader election is enabled.
 	RetryPeriod metav1.Duration `json:"retryPeriod"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`

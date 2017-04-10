@@ -21,6 +21,8 @@ import (
 )
 
 // +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // MetadataOnlyObject allows decoding only the apiVersion, kind, and metadata fields of
 // JSON data.
 // TODO: enable meta-only decoding for protobuf.
@@ -31,6 +33,8 @@ type MetadataOnlyObject struct {
 }
 
 // +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // MetadataOnlyObjectList allows decoding from JSON data only the typemeta and metadata of
 // a list, and those of the enclosing objects.
 // TODO: enable meta-only decoding for protobuf.

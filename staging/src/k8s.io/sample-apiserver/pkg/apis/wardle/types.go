@@ -18,6 +18,8 @@ package wardle
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // FlunderList is a list of Flunder objects.
 type FlunderList struct {
 	metav1.TypeMeta
@@ -33,6 +35,7 @@ type FlunderStatus struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Flunder struct {
 	metav1.TypeMeta

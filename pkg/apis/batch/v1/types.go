@@ -22,6 +22,7 @@ import (
 )
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Job represents the configuration of a single job.
 type Job struct {
@@ -41,6 +42,8 @@ type Job struct {
 	// +optional
 	Status JobStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // JobList is a collection of jobs.
 type JobList struct {

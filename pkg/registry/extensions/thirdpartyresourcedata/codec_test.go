@@ -31,6 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type Foo struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
@@ -42,6 +44,8 @@ type Foo struct {
 func (*Foo) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type FooList struct {
 	metav1.TypeMeta `json:",inline"`

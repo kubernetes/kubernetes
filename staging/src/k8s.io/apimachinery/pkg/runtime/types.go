@@ -35,7 +35,6 @@ import "k8s.io/apimachinery/pkg/runtime/schema"
 // +k8s:deepcopy-gen=true
 // +protobuf=true
 // +k8s:openapi-gen=true
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TypeMeta struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
@@ -111,6 +110,7 @@ type RawExtension struct {
 // metadata and field mutatation.
 //
 // +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +protobuf=true
 // +k8s:openapi-gen=true
 type Unknown struct {

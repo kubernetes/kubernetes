@@ -21,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // AdmissionConfiguration provides versioned configuration for admission controllers.
 type AdmissionConfiguration struct {
 	metav1.TypeMeta `json:",inline"`

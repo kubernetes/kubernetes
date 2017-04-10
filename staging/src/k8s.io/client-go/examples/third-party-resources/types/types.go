@@ -24,12 +24,15 @@ import (
 )
 
 // +k8s:deepcopy-gen=true
+
 type ExampleSpec struct {
 	Foo string `json:"foo"`
 	Bar bool   `json:"bar"`
 }
 
 // +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type Example struct {
 	metav1.TypeMeta `json:",inline"`
 	Metadata        metav1.ObjectMeta `json:"metadata"`
@@ -38,6 +41,8 @@ type Example struct {
 }
 
 // +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type ExampleList struct {
 	metav1.TypeMeta `json:",inline"`
 	Metadata        metav1.ListMeta `json:"metadata"`

@@ -43,6 +43,8 @@ import (
 	_ "k8s.io/client-go/pkg/api/install"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type testPatchType struct {
 	metav1.TypeMeta `json:",inline"`
 

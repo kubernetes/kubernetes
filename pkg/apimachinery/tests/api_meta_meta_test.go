@@ -336,6 +336,8 @@ func TestTypeMetaSelfLinker(t *testing.T) {
 	}
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type MyAPIObject2 struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta

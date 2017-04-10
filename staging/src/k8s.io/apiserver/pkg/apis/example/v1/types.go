@@ -27,6 +27,8 @@ type (
 	RestartPolicy    string
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
 	metav1.TypeMeta `json:",inline"`
@@ -177,6 +179,8 @@ type PodSpec struct {
 	// +optional
 	SchedulerName string `json:"schedulername,omitempty" protobuf:"bytes,19,opt,name=schedulername"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodList is a list of Pods.
 type PodList struct {

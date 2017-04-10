@@ -30,6 +30,8 @@ type EnvParams struct {
 	EtcdImage        string
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type MasterConfiguration struct {
 	metav1.TypeMeta
 
@@ -83,6 +85,8 @@ type Etcd struct {
 	CertFile  string
 	KeyFile   string
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type NodeConfiguration struct {
 	metav1.TypeMeta

@@ -79,22 +79,30 @@ func TestListTypes(t *testing.T) {
 	}
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type WithoutMetaDataList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta
 	Items []interface{} `json:"items"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type WithoutItemsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type WrongItemsJSONTagList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []interface{} `json:"items,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // If a type has Items, its name should end with "List"
 type ListWithWrongName struct {

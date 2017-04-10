@@ -24,6 +24,8 @@ import (
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type Policy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Holds the information to configure the fit predicate functions

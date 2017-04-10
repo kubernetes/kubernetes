@@ -36,7 +36,6 @@ import (
 // with strings representing the type of the object and its API schema version.
 // Structures that are versioned or persisted should inline TypeMeta.
 // +k8s:deepcopy-gen=false
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TypeMeta struct {
 	// Kind is a string value representing the REST resource this object represents.
 	// Servers may infer this from the endpoint the client submits requests to.
@@ -268,6 +267,8 @@ type OwnerReference struct {
 	BlockOwnerDeletion *bool `json:"blockOwnerDeletion,omitempty" protobuf:"varint,7,opt,name=blockOwnerDeletion"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ListOptions is the query options to a standard REST list call.
 type ListOptions struct {
 	TypeMeta `json:",inline"`
@@ -297,6 +298,8 @@ type ListOptions struct {
 	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" protobuf:"varint,5,opt,name=timeoutSeconds"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ExportOptions is the query options to the standard REST get call.
 type ExportOptions struct {
 	TypeMeta `json:",inline"`
@@ -305,6 +308,8 @@ type ExportOptions struct {
 	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.
 	Exact bool `json:"exact" protobuf:"varint,2,opt,name=exact"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // GetOptions is the standard query options to the standard REST get call.
 type GetOptions struct {
@@ -333,6 +338,8 @@ const (
 	// cascading, i.e., the dependents will be deleted with Foreground.
 	DeletePropagationForeground DeletionPropagation = "Foreground"
 )
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeleteOptions may be provided when deleting an API object.
 type DeleteOptions struct {
@@ -371,6 +378,8 @@ type Preconditions struct {
 	// +optional
 	UID *types.UID `json:"uid,omitempty" protobuf:"bytes,1,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Status is a return value for calls that don't return other objects.
 type Status struct {
@@ -619,6 +628,7 @@ const (
 // discover the API at /api, which is the root path of the legacy v1 API.
 //
 // +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type APIVersions struct {
 	TypeMeta `json:",inline"`
 	// versions are the api versions that are available.
@@ -633,6 +643,8 @@ type APIVersions struct {
 	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" protobuf:"bytes,2,rep,name=serverAddressByClientCIDRs"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // APIGroupList is a list of APIGroup, to allow clients to discover the API at
 // /apis.
 type APIGroupList struct {
@@ -640,6 +652,8 @@ type APIGroupList struct {
 	// groups is a list of APIGroup.
 	Groups []APIGroup `json:"groups" protobuf:"bytes,1,rep,name=groups"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // APIGroup contains the name, the supported versions, and the preferred version
 // of a group.
@@ -710,6 +724,8 @@ type Verbs []string
 func (vs Verbs) String() string {
 	return fmt.Sprintf("%v", []string(vs))
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the
 // resources supported in a specific group and version, and if the resource

@@ -115,6 +115,8 @@ func TestThirdPartyMultiple(t *testing.T) {
 // TODO make multiple versions work.  they've been broken
 var versionsToTest = []string{"v1"}
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type Foo struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
@@ -122,6 +124,8 @@ type Foo struct {
 	SomeField  string `json:"someField"`
 	OtherField int    `json:"otherField"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type FooList struct {
 	metav1.TypeMeta `json:",inline"`
