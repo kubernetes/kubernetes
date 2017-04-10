@@ -1277,7 +1277,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		// This means that an unknown provisioner is requested. Report an event
 		// and wait for the external provisioner
 		if storageClass != nil {
-			msg := fmt.Sprintf("cannot find provisioner %q, expecting that a volume for the claim is provisioned either manually or via external software", storageClass.Provisioner)
+			msg := fmt.Sprintf("waiting for a volume to be created, either by external provisioner %q or manually created by system administrator", storageClass.Provisioner)
 			ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ExternalProvisioning", msg)
 			glog.V(3).Infof("provisioning claim %q: %s", claimToClaimKey(claim), msg)
 		} else {
