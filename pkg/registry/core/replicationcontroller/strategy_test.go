@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
@@ -180,7 +181,7 @@ func TestValidateUpdate(t *testing.T) {
 		},
 	}
 	// Conversion sets this annotation
-	oldController.Annotations[api.NonConvertibleAnnotationPrefix+"/"+"spec.selector"] = "no way"
+	oldController.Annotations[helper.NonConvertibleAnnotationPrefix+"/"+"spec.selector"] = "no way"
 
 	// Deep-copy so we won't mutate both selectors.
 	objCopy, err := api.Scheme.DeepCopy(oldController)

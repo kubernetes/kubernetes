@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/events"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -847,7 +848,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 		w.Write(LEVEL_0, "Name:\t%s\n", pv.Name)
 		printLabelsMultiline(w, "Labels", pv.Labels)
 		printAnnotationsMultiline(w, "Annotations", pv.Annotations)
-		w.Write(LEVEL_0, "StorageClass:\t%s\n", api.GetPersistentVolumeClass(pv))
+		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClass(pv))
 		w.Write(LEVEL_0, "Status:\t%s\n", pv.Status.Phase)
 		if pv.Spec.ClaimRef != nil {
 			w.Write(LEVEL_0, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
@@ -855,7 +856,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			w.Write(LEVEL_0, "Claim:\t%s\n", "")
 		}
 		w.Write(LEVEL_0, "Reclaim Policy:\t%v\n", pv.Spec.PersistentVolumeReclaimPolicy)
-		w.Write(LEVEL_0, "Access Modes:\t%s\n", api.GetAccessModesAsString(pv.Spec.AccessModes))
+		w.Write(LEVEL_0, "Access Modes:\t%s\n", helper.GetAccessModesAsString(pv.Spec.AccessModes))
 		w.Write(LEVEL_0, "Capacity:\t%s\n", storage.String())
 		w.Write(LEVEL_0, "Message:\t%s\n", pv.Status.Message)
 		w.Write(LEVEL_0, "Source:\n")
@@ -915,7 +916,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 	capacity := ""
 	accessModes := ""
 	if pvc.Spec.VolumeName != "" {
-		accessModes = api.GetAccessModesAsString(pvc.Status.AccessModes)
+		accessModes = helper.GetAccessModesAsString(pvc.Status.AccessModes)
 		storage = pvc.Status.Capacity[api.ResourceStorage]
 		capacity = storage.String()
 	}
@@ -926,7 +927,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
-		w.Write(LEVEL_0, "StorageClass:\t%s\n", api.GetPersistentVolumeClaimClass(pvc))
+		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClaimClass(pvc))
 		w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
 		w.Write(LEVEL_0, "Volume:\t%s\n", pvc.Spec.VolumeName)
 		printLabelsMultiline(w, "Labels", pvc.Labels)
@@ -1225,7 +1226,7 @@ func describeVolumeClaimTemplates(templates []api.PersistentVolumeClaim, w Prefi
 	w.Write(LEVEL_0, "Volume Claims:\n")
 	for _, pvc := range templates {
 		w.Write(LEVEL_1, "Name:\t%s\n", pvc.Name)
-		w.Write(LEVEL_1, "StorageClass:\t%s\n", api.GetPersistentVolumeClaimClass(&pvc))
+		w.Write(LEVEL_1, "StorageClass:\t%s\n", helper.GetPersistentVolumeClaimClass(&pvc))
 		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.NewString())
 		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.NewString())
 		if capacity, ok := pvc.Spec.Resources.Requests[api.ResourceStorage]; ok {
