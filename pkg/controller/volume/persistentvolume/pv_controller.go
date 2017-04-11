@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -232,8 +233,8 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 		return fmt.Errorf("Storage capacity of volume[%s] requested by claim[%v] is not enough", volume.Name, claimToClaimKey(claim))
 	}
 
-	requestedClass := v1.GetPersistentVolumeClaimClass(claim)
-	if v1.GetPersistentVolumeClass(volume) != requestedClass {
+	requestedClass := v1helper.GetPersistentVolumeClaimClass(claim)
+	if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
 		return fmt.Errorf("Class of volume[%s] is not the same as claim[%v]", volume.Name, claimToClaimKey(claim))
 	}
 
@@ -258,7 +259,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: no volume found", claimToClaimKey(claim))
 			// No PV could be found
 			// OBSERVATION: pvc is "Pending", will retry
-			if v1.GetPersistentVolumeClaimClass(claim) != "" {
+			if v1helper.GetPersistentVolumeClaimClass(claim) != "" {
 				if err = ctrl.provisionClaim(claim); err != nil {
 					return err
 				}
@@ -1245,7 +1246,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		return
 	}
 
-	claimClass := v1.GetPersistentVolumeClaimClass(claim)
+	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
 	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
@@ -1461,7 +1462,7 @@ func (ctrl *PersistentVolumeController) newRecyclerEventRecorder(volume *v1.Pers
 func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *v1.PersistentVolumeClaim) (vol.ProvisionableVolumePlugin, *storage.StorageClass, error) {
 	// provisionClaim() which leads here is never called with claimClass=="", we
 	// can save some checks.
-	claimClass := v1.GetPersistentVolumeClaimClass(claim)
+	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	class, err := ctrl.classLister.Get(claimClass)
 	if err != nil {
 		return nil, nil, err

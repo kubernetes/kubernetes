@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
@@ -858,7 +859,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 	// Add infinite toleration for taint notReady:NoExecute here
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns not ready.
-	v1.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
+	v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
 		Key:      metav1.TaintNodeNotReady,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
@@ -868,7 +869,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 	// Add infinite toleration for taint unreachable:NoExecute here
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns unreachable.
-	v1.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
+	v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
 		Key:      metav1.TaintNodeUnreachable,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,

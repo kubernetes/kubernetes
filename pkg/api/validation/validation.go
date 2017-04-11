@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/helper"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -2160,7 +2161,7 @@ func ValidateNodeSelector(nodeSelector *api.NodeSelector, fldPath *field.Path) f
 func ValidateAvoidPodsInNodeAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	v1Avoids, err := v1.GetAvoidPodsFromNodeAnnotations(annotations)
+	v1Avoids, err := v1helper.GetAvoidPodsFromNodeAnnotations(annotations)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("AvoidPods"), api.PreferAvoidPodsAnnotationKey, err.Error()))
 		return allErrs
