@@ -27,8 +27,9 @@ type authApplierV3 struct {
 
 	// mu serializes Apply so that user isn't corrupted and so that
 	// serialized requests don't leak data from TOCTOU errors
-	mu   sync.Mutex
-	user string
+	mu sync.Mutex
+
+	authInfo auth.AuthInfo
 }
 
 func newAuthApplierV3(as auth.AuthStore, base applierV3) *authApplierV3 {
@@ -41,45 +42,57 @@ func (aa *authApplierV3) Apply(r *pb.InternalRaftRequest) *applyResult {
 	if r.Header != nil {
 		// backward-compatible with pre-3.0 releases when internalRaftRequest
 		// does not have header field
-		aa.user = r.Header.Username
+		aa.authInfo.Username = r.Header.Username
+		aa.authInfo.Revision = r.Header.AuthRevision
 	}
-	if needAdminPermission(r) && !aa.as.IsAdminPermitted(aa.user) {
-		aa.user = ""
-		return &applyResult{err: auth.ErrPermissionDenied}
+	if needAdminPermission(r) {
+		if err := aa.as.IsAdminPermitted(&aa.authInfo); err != nil {
+			aa.authInfo.Username = ""
+			aa.authInfo.Revision = 0
+			return &applyResult{err: err}
+		}
 	}
 	ret := aa.applierV3.Apply(r)
-	aa.user = ""
+	aa.authInfo.Username = ""
+	aa.authInfo.Revision = 0
 	return ret
 }
 
 func (aa *authApplierV3) Put(txnID int64, r *pb.PutRequest) (*pb.PutResponse, error) {
-	if !aa.as.IsPutPermitted(aa.user, r.Key) {
-		return nil, auth.ErrPermissionDenied
+	if err := aa.as.IsPutPermitted(&aa.authInfo, r.Key); err != nil {
+		return nil, err
 	}
-	if r.PrevKv && !aa.as.IsRangePermitted(aa.user, r.Key, nil) {
-		return nil, auth.ErrPermissionDenied
+	if r.PrevKv {
+		err := aa.as.IsRangePermitted(&aa.authInfo, r.Key, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return aa.applierV3.Put(txnID, r)
 }
 
 func (aa *authApplierV3) Range(txnID int64, r *pb.RangeRequest) (*pb.RangeResponse, error) {
-	if !aa.as.IsRangePermitted(aa.user, r.Key, r.RangeEnd) {
-		return nil, auth.ErrPermissionDenied
+	if err := aa.as.IsRangePermitted(&aa.authInfo, r.Key, r.RangeEnd); err != nil {
+		return nil, err
 	}
 	return aa.applierV3.Range(txnID, r)
 }
 
 func (aa *authApplierV3) DeleteRange(txnID int64, r *pb.DeleteRangeRequest) (*pb.DeleteRangeResponse, error) {
-	if !aa.as.IsDeleteRangePermitted(aa.user, r.Key, r.RangeEnd) {
-		return nil, auth.ErrPermissionDenied
+	if err := aa.as.IsDeleteRangePermitted(&aa.authInfo, r.Key, r.RangeEnd); err != nil {
+		return nil, err
 	}
-	if r.PrevKv && !aa.as.IsRangePermitted(aa.user, r.Key, r.RangeEnd) {
-		return nil, auth.ErrPermissionDenied
+	if r.PrevKv {
+		err := aa.as.IsRangePermitted(&aa.authInfo, r.Key, r.RangeEnd)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	return aa.applierV3.DeleteRange(txnID, r)
 }
 
-func (aa *authApplierV3) checkTxnReqsPermission(reqs []*pb.RequestOp) bool {
+func checkTxnReqsPermission(as auth.AuthStore, ai *auth.AuthInfo, reqs []*pb.RequestOp) error {
 	for _, requ := range reqs {
 		switch tv := requ.Request.(type) {
 		case *pb.RequestOp_RequestRange:
@@ -87,8 +100,8 @@ func (aa *authApplierV3) checkTxnReqsPermission(reqs []*pb.RequestOp) bool {
 				continue
 			}
 
-			if !aa.as.IsRangePermitted(aa.user, tv.RequestRange.Key, tv.RequestRange.RangeEnd) {
-				return false
+			if err := as.IsRangePermitted(ai, tv.RequestRange.Key, tv.RequestRange.RangeEnd); err != nil {
+				return err
 			}
 
 		case *pb.RequestOp_RequestPut:
@@ -96,8 +109,8 @@ func (aa *authApplierV3) checkTxnReqsPermission(reqs []*pb.RequestOp) bool {
 				continue
 			}
 
-			if !aa.as.IsPutPermitted(aa.user, tv.RequestPut.Key) {
-				return false
+			if err := as.IsPutPermitted(ai, tv.RequestPut.Key); err != nil {
+				return err
 			}
 
 		case *pb.RequestOp_RequestDeleteRange:
@@ -105,29 +118,42 @@ func (aa *authApplierV3) checkTxnReqsPermission(reqs []*pb.RequestOp) bool {
 				continue
 			}
 
-			if tv.RequestDeleteRange.PrevKv && !aa.as.IsRangePermitted(aa.user, tv.RequestDeleteRange.Key, tv.RequestDeleteRange.RangeEnd) {
-				return false
+			if tv.RequestDeleteRange.PrevKv {
+				err := as.IsRangePermitted(ai, tv.RequestDeleteRange.Key, tv.RequestDeleteRange.RangeEnd)
+				if err != nil {
+					return err
+				}
+			}
+
+			err := as.IsDeleteRangePermitted(ai, tv.RequestDeleteRange.Key, tv.RequestDeleteRange.RangeEnd)
+			if err != nil {
+				return err
 			}
 		}
 	}
 
-	return true
+	return nil
+}
+
+func checkTxnAuth(as auth.AuthStore, ai *auth.AuthInfo, rt *pb.TxnRequest) error {
+	for _, c := range rt.Compare {
+		if err := as.IsRangePermitted(ai, c.Key, nil); err != nil {
+			return err
+		}
+	}
+	if err := checkTxnReqsPermission(as, ai, rt.Success); err != nil {
+		return err
+	}
+	if err := checkTxnReqsPermission(as, ai, rt.Failure); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (aa *authApplierV3) Txn(rt *pb.TxnRequest) (*pb.TxnResponse, error) {
-	for _, c := range rt.Compare {
-		if !aa.as.IsRangePermitted(aa.user, c.Key, nil) {
-			return nil, auth.ErrPermissionDenied
-		}
+	if err := checkTxnAuth(aa.as, &aa.authInfo, rt); err != nil {
+		return nil, err
 	}
-
-	if !aa.checkTxnReqsPermission(rt.Success) {
-		return nil, auth.ErrPermissionDenied
-	}
-	if !aa.checkTxnReqsPermission(rt.Failure) {
-		return nil, auth.ErrPermissionDenied
-	}
-
 	return aa.applierV3.Txn(rt)
 }
 

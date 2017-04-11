@@ -21,7 +21,13 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 )
+
+// ErrNoAddrAvilable is returned by Get() when the balancer does not have
+// any active connection to endpoints at the time.
+// This error is returned only when opts.BlockingWait is true.
+var ErrNoAddrAvilable = grpc.Errorf(codes.Unavailable, "there is no address available")
 
 // simpleBalancer does the bare minimum to expose multiple eps
 // to the grpc reconnection code path
@@ -41,6 +47,11 @@ type simpleBalancer struct {
 	upEps map[string]struct{}
 	// upc closes when upEps transitions from empty to non-zero or the balancer closes.
 	upc chan struct{}
+
+	// grpc issues TLS cert checks using the string passed into dial so
+	// that string must be the host. To recover the full scheme://host URL,
+	// have a map from hosts to the original endpoint.
+	host2ep map[string]string
 
 	// pinAddr is the currently pinned address; set to the empty string on
 	// intialization and shutdown.
@@ -62,16 +73,60 @@ func newSimpleBalancer(eps []string) *simpleBalancer {
 		readyc:   make(chan struct{}),
 		upEps:    make(map[string]struct{}),
 		upc:      make(chan struct{}),
+		host2ep:  getHost2ep(eps),
 	}
 	return sb
 }
 
-func (b *simpleBalancer) Start(target string) error { return nil }
+func (b *simpleBalancer) Start(target string, config grpc.BalancerConfig) error { return nil }
 
 func (b *simpleBalancer) ConnectNotify() <-chan struct{} {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.upc
+}
+
+func (b *simpleBalancer) getEndpoint(host string) string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.host2ep[host]
+}
+
+func getHost2ep(eps []string) map[string]string {
+	hm := make(map[string]string, len(eps))
+	for i := range eps {
+		_, host, _ := parseEndpoint(eps[i])
+		hm[host] = eps[i]
+	}
+	return hm
+}
+
+func (b *simpleBalancer) updateAddrs(eps []string) {
+	np := getHost2ep(eps)
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	match := len(np) == len(b.host2ep)
+	for k, v := range np {
+		if b.host2ep[k] != v {
+			match = false
+			break
+		}
+	}
+	if match {
+		// same endpoints, so no need to update address
+		return
+	}
+
+	b.host2ep = np
+
+	addrs := make([]grpc.Address, 0, len(eps))
+	for i := range eps {
+		addrs = append(addrs, grpc.Address{Addr: getHost(eps[i])})
+	}
+	b.addrs = addrs
+	b.notifyCh <- addrs
 }
 
 func (b *simpleBalancer) Up(addr grpc.Address) func(error) {
@@ -113,6 +168,25 @@ func (b *simpleBalancer) Up(addr grpc.Address) func(error) {
 
 func (b *simpleBalancer) Get(ctx context.Context, opts grpc.BalancerGetOptions) (grpc.Address, func(), error) {
 	var addr string
+
+	// If opts.BlockingWait is false (for fail-fast RPCs), it should return
+	// an address it has notified via Notify immediately instead of blocking.
+	if !opts.BlockingWait {
+		b.mu.RLock()
+		closed := b.closed
+		addr = b.pinAddr
+		upEps := len(b.upEps)
+		b.mu.RUnlock()
+		if closed {
+			return grpc.Address{Addr: ""}, nil, grpc.ErrClientConnClosing
+		}
+
+		if upEps == 0 {
+			return grpc.Address{Addr: ""}, nil, ErrNoAddrAvilable
+		}
+		return grpc.Address{Addr: addr}, func() {}, nil
+	}
+
 	for {
 		b.mu.RLock()
 		ch := b.upc

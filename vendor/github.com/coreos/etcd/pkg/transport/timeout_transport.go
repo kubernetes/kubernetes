@@ -35,7 +35,7 @@ func NewTimeoutTransport(info TLSInfo, dialtimeoutd, rdtimeoutd, wtimeoutd time.
 		// it should not be put back to http transport as an idle connection for future usage.
 		tr.MaxIdleConnsPerHost = -1
 	} else {
-		// allow more idle connections between peers to avoid unncessary port allocation.
+		// allow more idle connections between peers to avoid unnecessary port allocation.
 		tr.MaxIdleConnsPerHost = 1024
 	}
 

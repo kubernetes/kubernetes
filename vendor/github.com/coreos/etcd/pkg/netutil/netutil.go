@@ -20,22 +20,27 @@ import (
 	"net/url"
 	"reflect"
 	"sort"
+	"time"
+
+	"golang.org/x/net/context"
 
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/pkg/capnslog"
 )
 
 var (
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd/pkg", "netutil")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "pkg/netutil")
 
 	// indirection for testing
 	resolveTCPAddr = net.ResolveTCPAddr
 )
 
+const retryInterval = time.Second
+
 // resolveTCPAddrs is a convenience wrapper for net.ResolveTCPAddr.
 // resolveTCPAddrs return a new set of url.URLs, in which all DNS hostnames
 // are resolved.
-func resolveTCPAddrs(urls [][]url.URL) ([][]url.URL, error) {
+func resolveTCPAddrs(ctx context.Context, urls [][]url.URL) ([][]url.URL, error) {
 	newurls := make([][]url.URL, 0)
 	for _, us := range urls {
 		nus := make([]url.URL, len(us))
@@ -47,37 +52,52 @@ func resolveTCPAddrs(urls [][]url.URL) ([][]url.URL, error) {
 			nus[i] = *nu
 		}
 		for i, u := range nus {
-			host, _, err := net.SplitHostPort(u.Host)
+			h, err := resolveURL(ctx, u)
 			if err != nil {
-				plog.Errorf("could not parse url %s during tcp resolving", u.Host)
 				return nil, err
 			}
-			if host == "localhost" {
-				continue
+			if h != "" {
+				nus[i].Host = h
 			}
-			if net.ParseIP(host) != nil {
-				continue
-			}
-			tcpAddr, err := resolveTCPAddr("tcp", u.Host)
-			if err != nil {
-				plog.Errorf("could not resolve host %s", u.Host)
-				return nil, err
-			}
-			plog.Infof("resolving %s to %s", u.Host, tcpAddr.String())
-			nus[i].Host = tcpAddr.String()
 		}
 		newurls = append(newurls, nus)
 	}
 	return newurls, nil
 }
 
+func resolveURL(ctx context.Context, u url.URL) (string, error) {
+	for ctx.Err() == nil {
+		host, _, err := net.SplitHostPort(u.Host)
+		if err != nil {
+			plog.Errorf("could not parse url %s during tcp resolving", u.Host)
+			return "", err
+		}
+		if host == "localhost" || net.ParseIP(host) != nil {
+			return "", nil
+		}
+		tcpAddr, err := resolveTCPAddr("tcp", u.Host)
+		if err == nil {
+			plog.Infof("resolving %s to %s", u.Host, tcpAddr.String())
+			return tcpAddr.String(), nil
+		}
+		plog.Warningf("failed resolving host %s (%v); retrying in %v", u.Host, err, retryInterval)
+		select {
+		case <-ctx.Done():
+			plog.Errorf("could not resolve host %s", u.Host)
+			return "", err
+		case <-time.After(retryInterval):
+		}
+	}
+	return "", ctx.Err()
+}
+
 // urlsEqual checks equality of url.URLS between two arrays.
 // This check pass even if an URL is in hostname and opposite is in IP address.
-func urlsEqual(a []url.URL, b []url.URL) bool {
+func urlsEqual(ctx context.Context, a []url.URL, b []url.URL) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	urls, err := resolveTCPAddrs([][]url.URL{a, b})
+	urls, err := resolveTCPAddrs(ctx, [][]url.URL{a, b})
 	if err != nil {
 		return false
 	}
@@ -93,7 +113,7 @@ func urlsEqual(a []url.URL, b []url.URL) bool {
 	return true
 }
 
-func URLStringsEqual(a []string, b []string) bool {
+func URLStringsEqual(ctx context.Context, a []string, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -114,7 +134,7 @@ func URLStringsEqual(a []string, b []string) bool {
 		urlsB = append(urlsB, *u)
 	}
 
-	return urlsEqual(urlsA, urlsB)
+	return urlsEqual(ctx, urlsA, urlsB)
 }
 
 func IsNetworkTimeoutError(err error) bool {
