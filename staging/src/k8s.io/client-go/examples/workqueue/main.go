@@ -95,11 +95,14 @@ func (c *Controller) handleErr(err error, key interface{}) {
 		return
 	}
 
+	c.queue.Forget(key)
 	runtime.HandleError(err)
 	glog.Infof("Dropping deployment %q out of the queue: %v", key, err)
 }
 
 func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
+	defer runtime.HandleCrash()
+
 	// Let the workers stop when we are done
 	defer c.queue.ShutDown()
 	glog.Info("Starting Pod controller")
@@ -108,7 +111,8 @@ func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 
 	// Wait for all involved caches to be synced, before processing items from the queue is started
 	if !cache.WaitForCacheSync(stopCh, c.informer.HasSynced) {
-		glog.Fatal("Timed out waiting for caches to sync")
+		runtime.HandleError(fmt.Errorf("Timed out waiting for caches to sync"))
+		return
 	}
 
 	for i := 0; i < threadiness; i++ {
