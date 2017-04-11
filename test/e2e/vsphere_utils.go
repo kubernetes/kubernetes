@@ -203,7 +203,7 @@ func getVSphereStorageClassSpec(name string, scParameters map[string]string) *st
 
 func getVSphereClaimSpecWithStorageClassAnnotation(ns string, storageclass *storage.StorageClass) *v1.PersistentVolumeClaim {
 	scAnnotation := make(map[string]string)
-	scAnnotation["volume.beta.kubernetes.io/storage-class"] = storageclass.Name
+	scAnnotation[v1.BetaStorageClassAnnotation] = storageclass.Name
 
 	claim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
