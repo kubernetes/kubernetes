@@ -75,8 +75,10 @@ ensure-local-disks() {
       ssdnum=`echo $ssd | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
       echo "Formatting and mounting local SSD $ssd to /mnt/disks/ssd$ssdnum"
       mkdir -p /mnt/disks/ssd$ssdnum
-      /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${ssd}" /mnt/disks/ssd$ssdnum &>/var/log/local-ssd-$ssdnum-mount.log || \
-      { echo "Local SSD $ssdnum mount failed, review /var/log/local-ssd-$ssdnum-mount.log"; return 1; }
+      if ! /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" -o "discard,defaults" "${ssd}" /mnt/disks/ssd$ssdnum &>/var/log/local-ssd-$ssdnum-mount.log || ! mount -t ext4 -o "remount,nobarrier" ${ssd} /mnt/disks/ssd$ssdnum &>/var/log/local-ssd-$ssdnum-mount.log; then
+          echo "Local SSD $ssdnum mount failed, review /var/log/local-ssd-$ssdnum-mount.log";
+          return 1;
+      fi
     else
       echo "No local SSD disks found."
     fi

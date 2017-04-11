@@ -67,11 +67,14 @@ function create-dirs {
 }
 
 # Formats the given device ($1) if needed and mounts it at given mount point
-# ($2).
+# ($2) with non-default options specified via ($3).
 function safe-format-and-mount() {
   device=$1
   mountpoint=$2
-
+  local options="discard,defaults"
+  if [[ ! -z $3 ]]; then
+      options="$options,$3"
+  fi
   # Format only if the disk is not already formatted.
   if ! tune2fs -l "${device}" ; then
     echo "Formatting '${device}'"
@@ -80,7 +83,9 @@ function safe-format-and-mount() {
 
   mkdir -p "${mountpoint}"
   echo "Mounting '${device}' at '${mountpoint}'"
-  mount -o discard,defaults "${device}" "${mountpoint}"
+  mount "${device}" "${mountpoint}" -o $options
+  # Some of the mount options are applied only on a remount.
+  mount "${device}" "${mountpoint}" -o remount,$options
 }
 
 # Local ssds, if present, are mounted at /mnt/disks/ssdN.
@@ -90,7 +95,8 @@ function ensure-local-ssds() {
       ssdnum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
       ssdmount="/mnt/disks/ssd${ssdnum}/"
       mkdir -p ${ssdmount}
-      safe-format-and-mount "${ssd}" ${ssdmount}
+      # Disable fsync by adding the 'nobarrier' mount option.
+      safe-format-and-mount "${ssd}" ${ssdmount} "nobarrier"
       echo "Mounted local SSD $ssd at ${ssdmount}"
       chmod a+w ${ssdmount}
     else
