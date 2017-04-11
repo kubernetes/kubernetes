@@ -1,65 +1,63 @@
 #!/bin/bash
 #
 ### BEGIN INIT INFO
-# Provides:   kubelet 
+# Provides:   mount-propagation
 # Required-Start:    $local_fs $network $syslog
 # Required-Stop:
-# Should-Start:      mount-propagation
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: The Kubernetes node container manager
+# Short-Description: Shared mount propagation helper
 # Description:
-#   The Kubernetes container manager maintains docker state against a state file.
+#   This helper makes sure that root filesystem is mounted with shared mount propagation.
 ### END INIT INFO
 
 
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
-DESC="The Kubernetes container manager"
-NAME=kubelet
-DAEMON=/usr/local/bin/kubelet
-DAEMON_ARGS=""
-DAEMON_LOG_FILE=/var/log/$NAME.log
+DESC="shared mount propagation"
+NAME=mount-propagation
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
-DAEMON_USER=root
-
-# Exit if the package is not installed
-[ -x "$DAEMON" ] || exit 0
-
-# Read configuration variable file if it is present
-[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+DOCKERDEVICEMAPPER=/var/lib/docker/devicemapper
 
 # Define LSB log_* functions.
 # Depend on lsb-base (>= 3.2-14) to ensure that this file is present
 # and status_of_proc is working.
 . /lib/lsb/init-functions
 
+remount_all()
+{
+        # "mount --make-rshared /" in Debian Wheezy won't recursively make all
+        # mounts shared, it has too old util-linux package.
+        # We must manually walk through all mounts and make all of them rshared
+        # explicitly.
+
+        # 5th column in mountinfo is the mount point
+        MOUNTS=$( awk '{ print $5; }' </proc/1/mountinfo )
+        for MOUNT in $MOUNTS; do
+                if [[ "$MOUNT" == "$DOCKERDEVICEMAPPER" ]]; then
+                        # Skip docker device mapper mount, it *must* be private
+                        continue
+                fi
+                mount --make-rshared "$MOUNT" || return 1
+        done
+        return 0
+}
+
 #
 # Function that starts the daemon/service
 #
 do_start()
 {
-        # Avoid a potential race at boot time when both monit and init.d start
-        # the same service
-        PIDS=$(pidof $DAEMON)
-        for PID in ${PIDS}; do
-            kill -9 $PID
-	done
-
         # Return
         #   0 if daemon has been started
         #   1 if daemon was already running
         #   2 if daemon could not be started
-        start-stop-daemon --start --quiet --background --no-close \
-                --make-pidfile --pidfile $PIDFILE \
-                --exec $DAEMON -c $DAEMON_USER --test > /dev/null \
-                || return 1
-        start-stop-daemon --start --quiet --background --no-close \
-                --make-pidfile --pidfile $PIDFILE \
-                --exec $DAEMON -c $DAEMON_USER -- \
-                $DAEMON_ARGS >> $DAEMON_LOG_FILE 2>&1 \
-                || return 2
+        remount_all || exit 2
+        if [ -e $PIDFILE ]; then
+                return 1
+        fi
+        return 0
 }
 
 #
@@ -72,14 +70,24 @@ do_stop()
         #   1 if daemon was already stopped
         #   2 if daemon could not be stopped
         #   other if a failure occurred
-        start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $NAME
-        RETVAL="$?"
-        [ "$RETVAL" = 2 ] && return 2
-        # Many daemons don't delete their pidfiles when they exit.
-        rm -f $PIDFILE
-        return "$RETVAL"
+
+        # We don't have any state before the service started, we don't know
+        # what needs to be mounted back to (r)private. Do nothing (instead
+        # of potentially breaking the system).
+        if [ -e $PIDFILE ]; then
+                rm $PIDFILE
+                return 0
+        fi
+        return 1
 }
 
+do_status()
+{
+        if [ -e $PIDFILE ]; then
+                return 0
+        fi
+        return 1
+}
 
 case "$1" in
   start)
@@ -99,7 +107,7 @@ case "$1" in
         esac
         ;;
   status)
-        status_of_proc -p $PIDFILE "$DAEMON" "$NAME" && exit 0 || exit $?
+        do_status && exit 0 || exit $?
         ;;
 
   restart|force-reload)
