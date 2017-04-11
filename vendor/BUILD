@@ -13885,6 +13885,7 @@ go_library(
 go_library(
     name = "k8s.io/client-go/pkg/api",
     srcs = [
+        "k8s.io/client-go/pkg/api/annotation_key_constants.go",
         "k8s.io/client-go/pkg/api/defaults.go",
         "k8s.io/client-go/pkg/api/doc.go",
         "k8s.io/client-go/pkg/api/field_constants.go",

@@ -139,6 +139,8 @@ message JobStatus {
   // Conditions represent the latest available observations of an object's current state.
   // More info: http://kubernetes.io/docs/user-guide/jobs
   // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
   repeated JobCondition conditions = 1;
 
   // StartTime represents time when the job was acknowledged by the Job Manager.
