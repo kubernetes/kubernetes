@@ -226,7 +226,7 @@ func (f *fixture) run_(deploymentName string, startInformers bool, expectError b
 		}
 
 		expectedAction := f.actions[i]
-		if !expectedAction.Matches(action.GetVerb(), action.GetResource().Resource) {
+		if !expectedAction.Matches(action.GetVerb(), action.GetResource().Resource, action.GetSubresource()) {
 			f.t.Errorf("Expected\n\t%#v\ngot\n\t%#v", expectedAction, action)
 			continue
 		}
@@ -241,12 +241,12 @@ func filterInformerActions(actions []core.Action) []core.Action {
 	ret := []core.Action{}
 	for _, action := range actions {
 		if len(action.GetNamespace()) == 0 &&
-			(action.Matches("list", "pods") ||
-				action.Matches("list", "deployments") ||
-				action.Matches("list", "replicasets") ||
-				action.Matches("watch", "pods") ||
-				action.Matches("watch", "deployments") ||
-				action.Matches("watch", "replicasets")) {
+			(action.Matches("list", "pods", action.GetSubresource()) ||
+				action.Matches("list", "deployments", action.GetSubresource()) ||
+				action.Matches("list", "replicasets", action.GetSubresource()) ||
+				action.Matches("watch", "pods", action.GetSubresource()) ||
+				action.Matches("watch", "deployments", action.GetSubresource()) ||
+				action.Matches("watch", "replicasets", action.GetSubresource())) {
 			continue
 		}
 		ret = append(ret, action)
