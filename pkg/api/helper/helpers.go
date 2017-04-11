@@ -112,6 +112,18 @@ func IsStandardContainerResourceName(str string) bool {
 	return standardContainerResources.Has(str)
 }
 
+var nonstandardContainerResources = sets.NewString(
+	string(api.ResourceStorageOverlay),
+	string(api.ResourceStorageScratch),
+	string(api.ResourceNvidiaGPU),
+)
+
+// IsNonstandardContainerResourceName returns true if the container can make a resource request
+// for the specified nonstandard resource
+func IsNonstandardContainerResourceName(str string) bool {
+	return nonstandardContainerResources.Has(str)
+}
+
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
 // integer resource prefix.
 func IsOpaqueIntResourceName(name api.ResourceName) bool {

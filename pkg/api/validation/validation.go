@@ -3419,11 +3419,19 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 func validateContainerResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
 
-	if len(strings.Split(value, "/")) == 1 {
+	length := len(strings.Split(value, "/"))
+	if length == 1 {
 		if !helper.IsStandardContainerResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
 		}
+	} else if length == 2 {
+		if !helper.IsNonstandardContainerResourceName(value) && !helper.IsOpaqueIntResourceName(api.ResourceName(value)) {
+			return append(allErrs, field.Invalid(fldPath, value, "must be a nonstandard resource for containers"))
+		}
+	} else {
+		return append(allErrs, field.Invalid(fldPath, value, "must be a valid resource for containers"))
 	}
+
 	return field.ErrorList{}
 }
 
