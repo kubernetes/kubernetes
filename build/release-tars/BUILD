@@ -68,11 +68,13 @@ NODE_TARGETS = [
 # No need to duplicate CLIENT_TARGETS or NODE_TARGETS here,
 # since we include them in the actual build rule.
 SERVER_TARGETS = [
+    "//cmd/cloud-controller-manager",
     "//cmd/hyperkube",
     "//cmd/kube-apiserver",
     "//cmd/kube-controller-manager",
     "//cmd/kubeadm",
     "//plugin/cmd/kube-scheduler",
+    "//vendor/k8s.io/kube-aggregator",
 ]
 
 # kube::golang::test_targets
