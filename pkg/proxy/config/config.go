@@ -45,21 +45,6 @@ type ServiceConfigHandler interface {
 	OnServiceUpdate(services []*api.Service)
 }
 
-// EndpointsConfigHandler is an abstract interface of objects which receive update notifications for the set of endpoints.
-type EndpointsConfigHandler interface {
-	// OnEndpointsUpdate gets called when endpoints configuration is changed for a given
-	// service on any of the configuration sources. An example is when a new
-	// service comes up, or when containers come up or down for an existing service.
-	//
-	// NOTE: For efficiency, endpoints are being passed by reference, thus,
-	// OnEndpointsUpdate should NOT modify pointers of a given slice.
-	// Those endpoints objects are shared with other layers of the system and
-	// are guaranteed to be immutable with the assumption that are also
-	// not mutated by those handlers. Make a deep copy if you need to modify
-	// them in your code.
-	OnEndpointsUpdate(endpoints []*api.Endpoints)
-}
-
 // EndpointsHandler is an abstract interface o objects which receive
 // notifications about endpoints object changes.
 type EndpointsHandler interface {
@@ -83,11 +68,6 @@ type EndpointsConfig struct {
 	lister        listers.EndpointsLister
 	listerSynced  cache.InformerSynced
 	eventHandlers []EndpointsHandler
-	// TODO: Remove handlers by switching them to eventHandlers.
-	handlers []EndpointsConfigHandler
-	// updates channel is used to trigger registered handlers.
-	updates chan struct{}
-	stop    chan struct{}
 }
 
 // NewEndpointsConfig creates a new EndpointsConfig.
@@ -95,12 +75,6 @@ func NewEndpointsConfig(endpointsInformer coreinformers.EndpointsInformer, resyn
 	result := &EndpointsConfig{
 		lister:       endpointsInformer.Lister(),
 		listerSynced: endpointsInformer.Informer().HasSynced,
-		// The updates channel is used to send interrupts to the Endpoints handler.
-		// It's buffered because we never want to block for as long as there is a
-		// pending interrupt, but don't want to drop them if the handler is doing
-		// work.
-		updates: make(chan struct{}, 1),
-		stop:    make(chan struct{}),
 	}
 
 	endpointsInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -115,11 +89,6 @@ func NewEndpointsConfig(endpointsInformer coreinformers.EndpointsInformer, resyn
 	return result
 }
 
-// RegisterHandler registers a handler which is called on every endpoints change.
-func (c *EndpointsConfig) RegisterHandler(handler EndpointsConfigHandler) {
-	c.handlers = append(c.handlers, handler)
-}
-
 // RegisterEventHandler registers a handler which is called on every endpoints change.
 func (c *EndpointsConfig) RegisterEventHandler(handler EndpointsHandler) {
 	c.eventHandlers = append(c.eventHandlers, handler)
@@ -132,40 +101,12 @@ func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
 		return
 	}
 
-	// We have synced informers. Now we can start delivering updates
-	// to the registered handler.
-	go func() {
-		for i := range c.eventHandlers {
-			glog.V(3).Infof("Calling handler.OnEndpointsSynced()")
-			c.eventHandlers[i].OnEndpointsSynced()
-		}
-		for {
-			select {
-			case <-c.updates:
-				endpoints, err := c.lister.List(labels.Everything())
-				if err != nil {
-					glog.Errorf("Error while listing endpoints from cache: %v", err)
-					// This will cause a retry (if there isn't any other trigger in-flight).
-					c.dispatchUpdate()
-					continue
-				}
-				if endpoints == nil {
-					endpoints = []*api.Endpoints{}
-				}
-				for i := range c.handlers {
-					glog.V(3).Infof("Calling handler.OnEndpointsUpdate()")
-					c.handlers[i].OnEndpointsUpdate(endpoints)
-				}
-			case <-c.stop:
-				return
-			}
-		}
-	}()
-	// Close updates channel when stopCh is closed.
-	go func() {
-		<-stopCh
-		close(c.stop)
-	}()
+	for i := range c.eventHandlers {
+		glog.V(3).Infof("Calling handler.OnEndpointsSynced()")
+		c.eventHandlers[i].OnEndpointsSynced()
+	}
+
+	<-stopCh
 }
 
 func (c *EndpointsConfig) handleAddEndpoints(obj interface{}) {
@@ -178,7 +119,6 @@ func (c *EndpointsConfig) handleAddEndpoints(obj interface{}) {
 		glog.V(4).Infof("Calling handler.OnEndpointsAdd")
 		c.eventHandlers[i].OnEndpointsAdd(endpoints)
 	}
-	c.dispatchUpdate()
 }
 
 func (c *EndpointsConfig) handleUpdateEndpoints(oldObj, newObj interface{}) {
@@ -196,7 +136,6 @@ func (c *EndpointsConfig) handleUpdateEndpoints(oldObj, newObj interface{}) {
 		glog.V(4).Infof("Calling handler.OnEndpointsUpdate")
 		c.eventHandlers[i].OnEndpointsUpdate(oldEndpoints, endpoints)
 	}
-	c.dispatchUpdate()
 }
 
 func (c *EndpointsConfig) handleDeleteEndpoints(obj interface{}) {
@@ -215,18 +154,6 @@ func (c *EndpointsConfig) handleDeleteEndpoints(obj interface{}) {
 	for i := range c.eventHandlers {
 		glog.V(4).Infof("Calling handler.OnEndpointsUpdate")
 		c.eventHandlers[i].OnEndpointsDelete(endpoints)
-	}
-	c.dispatchUpdate()
-}
-
-func (c *EndpointsConfig) dispatchUpdate() {
-	select {
-	case c.updates <- struct{}{}:
-		// Work enqueued successfully
-	case <-c.stop:
-		// We're shut down / avoid logging the message below
-	default:
-		glog.V(4).Infof("Endpoints handler already has a pending interrupt.")
 	}
 }
 

@@ -220,9 +220,6 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 
 	var proxier proxy.ProxyProvider
 	var servicesHandler proxyconfig.ServiceConfigHandler
-	// TODO: Migrate all handlers to EndpointsHandler type and
-	// get rid of this one.
-	var endpointsHandler proxyconfig.EndpointsConfigHandler
 	var endpointsEventHandler proxyconfig.EndpointsHandler
 
 	proxyMode := getProxyMode(string(config.Mode), client.Core().Nodes(), hostname, iptInterface, iptables.LinuxKernelCompatTester{})
@@ -321,12 +318,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	go serviceConfig.Run(wait.NeverStop)
 
 	endpointsConfig := proxyconfig.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), config.ConfigSyncPeriod)
-	if endpointsHandler != nil {
-		endpointsConfig.RegisterHandler(endpointsHandler)
-	}
-	if endpointsEventHandler != nil {
-		endpointsConfig.RegisterEventHandler(endpointsEventHandler)
-	}
+	endpointsConfig.RegisterEventHandler(endpointsEventHandler)
 	go endpointsConfig.Run(wait.NeverStop)
 
 	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those
