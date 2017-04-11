@@ -1,0 +1,87 @@
+#!/bin/bash -e
+#
+# Run all tests
+#   ./test
+#   ./test -v
+#
+# Run tests for one package
+#   PKG=./foo ./test
+#   PKG=bar ./test
+#
+
+# Invoke ./cover for HTML output
+COVER=${COVER:-"-cover"}
+
+PROJ="go-systemd"
+ORG_PATH="github.com/coreos"
+REPO_PATH="${ORG_PATH}/${PROJ}"
+
+# As a convenience, set up a self-contained GOPATH if none set
+if [ -z "$GOPATH" ]; then
+	if [ ! -h gopath/src/${REPO_PATH} ]; then
+		mkdir -p gopath/src/${ORG_PATH}
+		ln -s ../../../.. gopath/src/${REPO_PATH} || exit 255
+	fi
+	export GOPATH=${PWD}/gopath
+	go get -u github.com/godbus/dbus
+	go get -u github.com/coreos/pkg/dlopen
+fi
+
+TESTABLE="activation daemon journal login1 machine1 unit"
+FORMATTABLE="$TESTABLE sdjournal dbus"
+if [ -e "/run/systemd/system/" ]; then
+	TESTABLE="${TESTABLE} sdjournal"
+	if [ "$EUID" == "0" ]; then
+		# testing actual systemd behaviour requires root
+		TESTABLE="${TESTABLE} dbus"
+	fi
+fi
+
+
+# user has not provided PKG override
+if [ -z "$PKG" ]; then
+	TEST=$TESTABLE
+	FMT=$FORMATTABLE
+
+# user has provided PKG override
+else
+	# strip out slashes and dots from PKG=./foo/
+	TEST=${PKG//\//}
+	TEST=${TEST//./}
+
+	# only run gofmt on packages provided by user
+	FMT="$TEST"
+fi
+
+# split TEST into an array and prepend REPO_PATH to each local package
+split=(${TEST// / })
+TEST=${split[@]/#/${REPO_PATH}/}
+
+echo "Running tests..."
+go test -v ${COVER} $@ ${TEST}
+
+echo "Checking gofmt..."
+fmtRes=$(gofmt -l $FMT)
+if [ -n "${fmtRes}" ]; then
+	echo -e "gofmt checking failed:\n${fmtRes}"
+	exit 255
+fi
+
+echo "Checking govet..."
+vetRes=$(go vet $TEST)
+if [ -n "${vetRes}" ]; then
+	echo -e "govet checking failed:\n${vetRes}"
+	exit 255
+fi
+
+echo "Checking for license header..."
+licRes=$(for file in $(find . -type f -iname '*.go' ! -path './gopath/*'); do
+		head -n3 "${file}" | grep -Eq "(Copyright|generated|GENERATED)" || echo -e "  ${file}"
+	done;)
+if [ -n "${licRes}" ]; then
+	echo -e "license header checking failed:\n${licRes}"
+	exit 255
+fi
+
+
+echo "Success"

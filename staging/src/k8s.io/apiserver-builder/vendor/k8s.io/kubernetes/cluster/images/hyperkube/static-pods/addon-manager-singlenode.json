@@ -1,0 +1,52 @@
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "kube-addon-manager",
+    "namespace": "kube-system",
+    "version": "v1"
+  },
+  "spec": {
+    "hostNetwork": true,
+    "containers": [
+      {
+        "name": "kube-addon-manager",
+        "image": "REGISTRY/kube-addon-manager-ARCH:v6.4-beta.1",
+        "resources": {
+          "requests": {
+            "cpu": "5m",
+            "memory": "50Mi"
+          }
+        },
+        "volumeMounts": [
+          {
+            "name": "addons",
+            "mountPath": "/etc/kubernetes/addons",
+            "readOnly": true
+          }
+        ]
+      },
+      {
+        "name": "kube-addon-manager-data",
+        "image": "REGISTRY/hyperkube-ARCH:VERSION",
+        "command": [
+          "/copy-addons.sh",
+          "singlenode"
+        ],
+        "volumeMounts": [
+          {
+            "name": "addons",
+            "mountPath": "/srv/kubernetes/addons",
+            "readOnly": false
+          }
+        ]
+      }
+    ],
+    "volumes":[
+      {
+        "name": "addons",
+        "emptyDir": {}
+      }
+    ]
+  }
+}

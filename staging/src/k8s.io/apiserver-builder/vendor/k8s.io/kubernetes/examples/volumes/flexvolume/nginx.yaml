@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  namespace: default
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    volumeMounts:
+    - name: test
+      mountPath: /data
+    ports:
+    - containerPort: 80
+  volumes:
+  - name: test
+    flexVolume:
+      driver: "kubernetes.io/lvm"
+      fsType: "ext4"
+      options:
+        volumeID: "vol1"
+        size: "1000m"
+        volumegroup: "kube_vg"

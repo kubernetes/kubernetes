@@ -1,0 +1,388 @@
+syntax = "proto2";
+option go_package = "search";
+
+package search;
+
+message Scope {
+  enum Type {
+    USER_BY_CANONICAL_ID = 1;
+    USER_BY_EMAIL = 2;
+    GROUP_BY_CANONICAL_ID = 3;
+    GROUP_BY_EMAIL = 4;
+    GROUP_BY_DOMAIN = 5;
+    ALL_USERS = 6;
+    ALL_AUTHENTICATED_USERS = 7;
+  }
+
+  optional Type type = 1;
+  optional string value = 2;
+}
+
+message Entry {
+  enum Permission {
+    READ = 1;
+    WRITE = 2;
+    FULL_CONTROL = 3;
+  }
+
+  optional Scope scope = 1;
+  optional Permission permission = 2;
+  optional string display_name = 3;
+}
+
+message AccessControlList {
+  optional string owner = 1;
+  repeated Entry entries = 2;
+}
+
+message FieldValue {
+  enum ContentType {
+    TEXT = 0;
+    HTML = 1;
+    ATOM = 2;
+    DATE = 3;
+    NUMBER = 4;
+    GEO = 5;
+  }
+
+  optional ContentType type = 1 [default = TEXT];
+
+  optional string language = 2 [default = "en"];
+
+  optional string string_value = 3;
+
+  optional group Geo = 4 {
+    required double lat = 5;
+    required double lng = 6;
+  }
+}
+
+message Field {
+  required string name = 1;
+  required FieldValue value = 2;
+}
+
+message FieldTypes {
+  required string name = 1;
+  repeated FieldValue.ContentType type = 2;
+}
+
+message IndexShardSettings {
+  repeated int32 prev_num_shards = 1;
+  required int32 num_shards = 2 [default=1];
+  repeated int32 prev_num_shards_search_false = 3;
+  optional string local_replica = 4 [default = ""];
+}
+
+message FacetValue {
+  enum ContentType {
+    ATOM = 2;
+    NUMBER = 4;
+  }
+
+  optional ContentType type = 1 [default = ATOM];
+  optional string string_value = 3;
+}
+
+message Facet {
+  required string name = 1;
+  required FacetValue value = 2;
+}
+
+message DocumentMetadata  {
+  optional int64 version = 1;
+  optional int64 committed_st_version = 2;
+}
+
+message Document {
+  optional string id = 1;
+  optional string language = 2 [default = "en"];
+  repeated Field field = 3;
+  optional int32 order_id = 4;
+
+  enum Storage {
+    DISK = 0;
+  }
+
+  optional Storage storage = 5 [default = DISK];
+  repeated Facet facet = 8;
+}
+
+message SearchServiceError {
+  enum ErrorCode {
+    OK = 0;
+    INVALID_REQUEST = 1;
+    TRANSIENT_ERROR = 2;
+    INTERNAL_ERROR = 3;
+    PERMISSION_DENIED = 4;
+    TIMEOUT = 5;
+    CONCURRENT_TRANSACTION = 6;
+  }
+}
+
+message RequestStatus {
+  required SearchServiceError.ErrorCode code = 1;
+  optional string error_detail = 2;
+  optional int32 canonical_code = 3;
+}
+
+message IndexSpec {
+  required string name = 1;
+
+  enum Consistency {
+    GLOBAL = 0;
+    PER_DOCUMENT = 1;
+  }
+  optional Consistency consistency = 2 [default = PER_DOCUMENT];
+
+  optional string namespace = 3;
+  optional int32 version = 4;
+
+  enum Source {
+    SEARCH = 0;
+    DATASTORE = 1;
+    CLOUD_STORAGE = 2;
+  }
+  optional Source source = 5 [default = SEARCH];
+
+  enum Mode {
+    PRIORITY = 0;
+    BACKGROUND = 1;
+  }
+  optional Mode mode = 6 [default = PRIORITY];
+}
+
+message IndexMetadata {
+  required IndexSpec index_spec = 1;
+
+  repeated FieldTypes field = 2;
+
+  message Storage {
+    optional int64 amount_used = 1;
+    optional int64 limit = 2;
+  }
+  optional Storage storage = 3;
+}
+
+message IndexDocumentParams {
+  repeated Document document = 1;
+
+  enum Freshness {
+    SYNCHRONOUSLY = 0;
+    WHEN_CONVENIENT = 1;
+  }
+  optional Freshness freshness = 2 [default = SYNCHRONOUSLY, deprecated=true];
+
+  required IndexSpec index_spec = 3;
+}
+
+message IndexDocumentRequest {
+  required IndexDocumentParams params = 1;
+
+  optional bytes app_id = 3;
+}
+
+message IndexDocumentResponse {
+  repeated RequestStatus status = 1;
+
+  repeated string doc_id = 2;
+}
+
+message DeleteDocumentParams {
+  repeated string doc_id = 1;
+
+  required IndexSpec index_spec = 2;
+}
+
+message DeleteDocumentRequest {
+  required DeleteDocumentParams params = 1;
+
+  optional bytes app_id = 3;
+}
+
+message DeleteDocumentResponse {
+  repeated RequestStatus status = 1;
+}
+
+message ListDocumentsParams {
+  required IndexSpec index_spec = 1;
+  optional string start_doc_id = 2;
+  optional bool include_start_doc = 3 [default = true];
+  optional int32 limit = 4 [default = 100];
+  optional bool keys_only = 5;
+}
+
+message ListDocumentsRequest {
+  required ListDocumentsParams params = 1;
+
+  optional bytes app_id = 2;
+}
+
+message ListDocumentsResponse {
+  required RequestStatus status = 1;
+
+  repeated Document document = 2;
+}
+
+message ListIndexesParams {
+  optional bool fetch_schema = 1;
+  optional int32 limit = 2 [default = 20];
+  optional string namespace = 3;
+  optional string start_index_name = 4;
+  optional bool include_start_index = 5 [default = true];
+  optional string index_name_prefix = 6;
+  optional int32 offset = 7;
+  optional IndexSpec.Source source = 8 [default = SEARCH];
+}
+
+message ListIndexesRequest {
+  required ListIndexesParams params = 1;
+
+  optional bytes app_id = 3;
+}
+
+message ListIndexesResponse {
+  required RequestStatus status = 1;
+  repeated IndexMetadata index_metadata = 2;
+}
+
+message DeleteSchemaParams {
+  optional IndexSpec.Source source = 1 [default = SEARCH];
+  repeated IndexSpec index_spec = 2;
+}
+
+message DeleteSchemaRequest {
+  required DeleteSchemaParams params = 1;
+
+  optional bytes app_id = 3;
+}
+
+message DeleteSchemaResponse {
+  repeated RequestStatus status = 1;
+}
+
+message SortSpec {
+  required string sort_expression = 1;
+  optional bool sort_descending = 2 [default = true];
+  optional string default_value_text = 4;
+  optional double default_value_numeric = 5;
+}
+
+message ScorerSpec {
+  enum Scorer {
+    RESCORING_MATCH_SCORER = 0;
+    MATCH_SCORER = 2;
+  }
+  optional Scorer scorer = 1 [default = MATCH_SCORER];
+
+  optional int32 limit = 2 [default = 1000];
+  optional string match_scorer_parameters = 9;
+}
+
+message FieldSpec {
+  repeated string name = 1;
+
+  repeated group Expression = 2 {
+    required string name = 3;
+    required string expression = 4;
+  }
+}
+
+message FacetRange {
+  optional string name = 1;
+  optional string start = 2;
+  optional string end = 3;
+}
+
+message FacetRequestParam {
+  optional int32 value_limit = 1;
+  repeated FacetRange range = 2;
+  repeated string value_constraint = 3;
+}
+
+message FacetAutoDetectParam {
+  optional int32 value_limit = 1 [default = 10];
+}
+
+message FacetRequest {
+  required string name = 1;
+  optional FacetRequestParam params = 2;
+}
+
+message FacetRefinement {
+  required string name = 1;
+  optional string value = 2;
+
+  message Range {
+    optional string start = 1;
+    optional string end = 2;
+  }
+  optional Range range = 3;
+}
+
+message SearchParams {
+  required IndexSpec index_spec = 1;
+  required string query = 2;
+  optional string cursor = 4;
+  optional int32 offset = 11;
+
+  enum CursorType {
+    NONE = 0;
+    SINGLE = 1;
+    PER_RESULT = 2;
+  }
+  optional CursorType cursor_type = 5 [default = NONE];
+
+  optional int32 limit = 6 [default = 20];
+  optional int32 matched_count_accuracy = 7;
+  repeated SortSpec sort_spec = 8;
+  optional ScorerSpec scorer_spec = 9;
+  optional FieldSpec field_spec = 10;
+  optional bool keys_only = 12;
+
+  enum ParsingMode {
+    STRICT = 0;
+    RELAXED = 1;
+  }
+  optional ParsingMode parsing_mode = 13 [default = STRICT];
+
+  optional int32 auto_discover_facet_count = 15 [default = 0];
+  repeated FacetRequest include_facet = 16;
+  repeated FacetRefinement facet_refinement = 17;
+  optional FacetAutoDetectParam facet_auto_detect_param = 18;
+  optional int32 facet_depth = 19 [default=1000];
+}
+
+message SearchRequest {
+  required SearchParams params = 1;
+
+  optional bytes app_id = 3;
+}
+
+message FacetResultValue {
+  required string name = 1;
+  required int32 count = 2;
+  required FacetRefinement refinement = 3;
+}
+
+message FacetResult {
+  required string name = 1;
+  repeated FacetResultValue value = 2;
+}
+
+message SearchResult {
+  required Document document = 1;
+  repeated Field expression = 4;
+  repeated double score = 2;
+  optional string cursor = 3;
+}
+
+message SearchResponse {
+  repeated SearchResult result = 1;
+  required int64 matched_count = 2;
+  required RequestStatus status = 3;
+  optional string cursor = 4;
+  repeated FacetResult facet_result = 5;
+
+  extensions 1000 to 9999;
+}

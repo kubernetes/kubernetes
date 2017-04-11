@@ -1,0 +1,9 @@
+[Unit]
+Description=Run docker-healthcheck once
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kubernetes/helpers/docker-healthcheck
+
+[Install]
+WantedBy=multi-user.target

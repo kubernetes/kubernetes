@@ -1,0 +1,91 @@
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {
+  "name": "k8s-master",
+  "namespace": "kube-system"
+},
+"spec":{
+  "hostNetwork": true,
+  "containers":[
+    {
+      "name": "controller-manager",
+      "image": "REGISTRY/hyperkube-ARCH:VERSION",
+      "command": [
+        "/hyperkube",
+        "controller-manager",
+        "--master=127.0.0.1:8080",
+        "--service-account-private-key-file=/srv/kubernetes/server.key",
+        "--root-ca-file=/srv/kubernetes/ca.crt",
+        "--min-resync-period=3m",
+        "--leader-elect=true",
+        "--cluster-cidr=10.1.0.0/16",
+        "--v=2"
+      ],
+      "volumeMounts": [
+        {
+          "name": "data",
+          "mountPath": "/srv/kubernetes"
+        }
+      ]
+    },
+    {
+      "name": "apiserver",
+      "image": "REGISTRY/hyperkube-ARCH:VERSION",
+      "command": [
+        "/hyperkube",
+        "apiserver",
+        "--service-cluster-ip-range=10.0.0.1/24",
+        "--insecure-bind-address=0.0.0.0",
+        "--etcd-servers=http://127.0.0.1:2379",
+        "--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
+        "--client-ca-file=/srv/kubernetes/ca.crt",
+        "--basic-auth-file=/srv/kubernetes/basic_auth.csv",
+        "--min-request-timeout=300",
+        "--tls-cert-file=/srv/kubernetes/server.cert",
+        "--tls-private-key-file=/srv/kubernetes/server.key",
+        "--token-auth-file=/srv/kubernetes/known_tokens.csv",
+        "--allow-privileged=true",
+        "--v=2"
+      ],
+      "volumeMounts": [
+        {
+          "name": "data",
+          "mountPath": "/srv/kubernetes"
+        }
+      ]
+    },
+    {
+      "name": "scheduler",
+      "image": "REGISTRY/hyperkube-ARCH:VERSION",
+      "command": [
+        "/hyperkube",
+        "scheduler",
+        "--master=127.0.0.1:8080",
+        "--leader-elect=true",
+        "--v=2"
+      ]
+    },
+    {
+      "name": "setup",
+      "image": "REGISTRY/hyperkube-ARCH:VERSION",
+      "command": [
+        "/setup-files.sh",
+        "IP:10.0.0.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local"
+      ],
+      "volumeMounts": [
+        {
+          "name": "data",
+          "mountPath": "/srv/kubernetes"
+        }
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "name": "data",
+      "emptyDir": {}
+    }
+  ]
+ }
+}

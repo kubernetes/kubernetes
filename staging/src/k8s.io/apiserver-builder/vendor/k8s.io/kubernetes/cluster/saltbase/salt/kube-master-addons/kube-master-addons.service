@@ -1,0 +1,9 @@
+[Unit]
+Description=Kubernetes-Master Addon Object Manager
+Documentation=https://github.com/kubernetes/kubernetes
+
+[Service]
+ExecStart=/etc/kubernetes/kube-master-addons.sh
+
+[Install]
+WantedBy=multi-user.target

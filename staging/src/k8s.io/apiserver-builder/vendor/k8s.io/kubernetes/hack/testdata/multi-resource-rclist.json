@@ -1,0 +1,74 @@
+{
+   "kind":"ReplicationControllerList",
+   "apiVersion":"v1",
+   "items":[
+      {
+         "kind":"ReplicationController",
+         "apiVersion":"v1",
+         "metadata":{
+            "name":"mock",
+            "labels":{
+               "app":"mock",
+               "status":"replaced"
+            }
+         },
+         "spec":{
+            "replicas":1,
+            "selector":{
+               "app":"mock"
+            },
+            "template":{
+               "metadata":{
+                  "labels":{
+                     "app":"mock"
+                  }
+               },
+               "spec":{
+                  "containers":[{
+                    "name": "mock-container",
+                    "image": "gcr.io/google-containers/pause:2.0",
+                    "ports":[{
+                        "containerPort":9949,
+                        "protocol":"TCP"
+                     }]
+                  }]
+               }
+            }
+         }
+      },
+      {
+        "kind":"ReplicationController",
+        "apiVersion":"v1",
+        "metadata":{
+          "name":"mock2",
+          "labels":{
+            "app":"mock2",
+            "status":"replaced"
+          }
+        },
+        "spec":{
+          "replicas":1,
+          "selector":{
+            "app":"mock2"
+          },
+          "template":{
+            "metadata":{
+              "labels":{
+                "app":"mock2"
+              }
+            },
+            "spec":{
+              "containers":[{
+                "name": "mock-container",
+                "image": "gcr.io/google-containers/pause:2.0",
+                "ports":[{
+                  "containerPort":9949,
+                  "protocol":"TCP"
+                }]
+              }]
+            }
+          }
+        }
+      }
+   ]
+}

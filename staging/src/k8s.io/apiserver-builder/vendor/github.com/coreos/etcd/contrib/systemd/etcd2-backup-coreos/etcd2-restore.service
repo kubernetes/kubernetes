@@ -1,0 +1,26 @@
+[Unit]
+Description=Restore single-node etcd2 node from rclone endpoint
+Conflicts=etcd2.service etcd2-backup.service
+Before=etcd2.service etcd2-backup.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/rm -rf ${ETCD_DATA_DIR}/member
+ExecStartPre=/usr/bin/mkdir -p ${ETCD_RESTORE_DIR}
+ExecStartPre=/usr/bin/rm -rf ${ETCD_RESTORE_DIR}/member
+
+# Copy the last backup from rclone endpoint
+ExecStartPre=/usr/bin/docker run --rm \
+			     -v ${RCLONE_CONFIG_PATH}:/etc/rclone.conf \
+			     -v ${ETCD_RESTORE_DIR}:/etcd2backup \
+			     quay.io/coreos/rclone:latest \
+			        --config /etc/rclone.conf --checksum=${RCLONE_CHECKSUM} \
+				   copy ${RCLONE_ENDPOINT}/%m /etcd2backup
+
+ExecStartPre=/usr/bin/ls -R ${ETCD_RESTORE_DIR}
+ExecStartPre=/opt/bin/etcd2-restore -etcd-name ${ETCD_NAME} -etcd-peer-urls ${ETCD_INITIAL_ADVERTISE_PEER_URLS}
+ExecStartPre=/usr/bin/cp -r ${ETCD_RESTORE_DIR}/member ${ETCD_DATA_DIR}/member
+ExecStart=/usr/bin/chown -R etcd:etcd ${ETCD_DATA_DIR}/member
+
+[Install]
+WantedBy=multi-user.target

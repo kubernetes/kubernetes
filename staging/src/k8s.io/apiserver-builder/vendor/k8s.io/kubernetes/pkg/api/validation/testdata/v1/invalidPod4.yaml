@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: redis-master
+  name: name
+spec:
+  containers:
+  - image: gcr.io/fake_project/fake_image:fake_tag
+    name: master
+    args:
+    -
+    command:
+    -

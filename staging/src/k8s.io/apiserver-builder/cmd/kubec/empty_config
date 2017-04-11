@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Config
+current-context: minikube
+contexts:
+- context:
+    cluster: minikube
+    user: minikube
+  name: minikube
+clusters:
+- cluster:
+    certificate-authority: /var/run/kubernetes/apiserver.crt
+    server: https://127.0.0.1:9443
+  name: minikube
+users:
+- name: minikube
+  user:
+    client-certificate: /var/run/kubernetes/apiserver.crt
+    client-key: /var/run/kubernetes/apiserver.key
+preferences: {}

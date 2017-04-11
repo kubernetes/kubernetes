@@ -1,0 +1,42 @@
+{
+  "kind": "ReplicationController",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "slow-rc",
+    "labels": {
+      "name": "nettest"
+    }
+  },
+  "spec": {
+    "replicas": 8,
+    "selector": {
+      "name": "nettest"
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "nettest"
+        }
+      },
+      "spec": {
+        "terminationGracePeriodSeconds": 5,
+        "containers": [
+          {
+            "name": "webserver",
+            "image": "gcr.io/google_containers/nettest:1.8",
+            "args": [
+              "-service=nettest",
+              "-delay-shutdown=10"
+            ],
+            "ports": [
+              {
+                "containerPort": 8080,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

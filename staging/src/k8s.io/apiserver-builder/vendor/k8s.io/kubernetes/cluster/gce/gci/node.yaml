@@ -1,0 +1,123 @@
+#cloud-config
+
+write_files:
+  - path: /etc/systemd/system/kube-node-installation.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Download and install k8s binaries and configurations
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=/bin/mkdir -p /home/kubernetes/bin
+      ExecStartPre=/bin/mount --bind /home/kubernetes/bin /home/kubernetes/bin
+      ExecStartPre=/bin/mount -o remount,exec /home/kubernetes/bin
+      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error	-H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure.sh
+      ExecStart=/home/kubernetes/bin/configure.sh
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-node-configuration.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Configure kubernetes node
+      After=kube-node-installation.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure-helper.sh
+      ExecStart=/home/kubernetes/bin/configure-helper.sh
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-docker-monitor.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes health monitoring for docker
+      After=kube-node-configuration.service
+
+      [Service]
+      Restart=always
+      RestartSec=10
+      RemainAfterExit=yes
+      RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
+      ExecStart=/home/kubernetes/bin/health-monitor.sh docker
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kubelet-monitor.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes health monitoring for kubelet
+      After=kube-node-configuration.service
+
+      [Service]
+      Restart=always
+      RestartSec=10
+      RemainAfterExit=yes
+      RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
+      ExecStart=/home/kubernetes/bin/health-monitor.sh kubelet
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-logrotate.timer
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Hourly kube-logrotate invocation
+
+      [Timer]
+      OnCalendar=hourly
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-logrotate.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes log rotation
+      After=kube-node-configuration.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=-/usr/sbin/logrotate /etc/logrotate.conf
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kubernetes.target
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes
+
+runcmd:
+ - systemctl daemon-reload
+ - systemctl enable kube-node-installation.service
+ - systemctl enable kube-node-configuration.service
+ - systemctl enable kube-docker-monitor.service
+ - systemctl enable kubelet-monitor.service
+ - systemctl enable kube-logrotate.timer
+ - systemctl enable kube-logrotate.service
+ - systemctl start kubernetes.target

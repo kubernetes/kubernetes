@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: wildfly-rc
+  labels:
+    name: wildfly
+    context: docker-k8s-lab
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: wildfly
+    spec:
+      containers:
+      - name: wildfly-rc-pod
+        image: arungupta/wildfly-mysql-javaee7:k8s
+        ports:
+        - containerPort: 8080

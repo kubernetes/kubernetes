@@ -1,0 +1,96 @@
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: rd
+spec:
+  serviceName: "redis"
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: redis
+      annotations:
+        pod.alpha.kubernetes.io/init-containers: '[
+            {
+                "name": "install",
+                "image": "gcr.io/google_containers/redis-install-3.2.0:e2e",
+                "imagePullPolicy": "Always",
+                "args": ["--install-into=/opt", "--work-dir=/work-dir"],
+                "volumeMounts": [
+                    {
+                        "name": "opt",
+                        "mountPath": "/opt"
+                    },
+                    {
+                        "name": "workdir",
+                        "mountPath": "/work-dir"
+                    }
+                ]
+            },
+            {
+                "name": "bootstrap",
+                "image": "debian:jessie",
+                "command": ["/work-dir/peer-finder"],
+                "args": ["-on-start=\"/work-dir/on-start.sh\"", "-service=redis"],
+                "env": [
+                  {
+                      "name": "POD_NAMESPACE",
+                      "valueFrom": {
+                          "fieldRef": {
+                              "apiVersion": "v1",
+                              "fieldPath": "metadata.namespace"
+                          }
+                      }
+                   }
+                ],
+                "volumeMounts": [
+                    {
+                        "name": "opt",
+                        "mountPath": "/opt"
+                    },
+                    {
+                        "name": "workdir",
+                        "mountPath": "/work-dir"
+                    }
+                ]
+            }
+        ]'
+    spec:
+      containers:
+      - name: redis
+        image: debian:jessie
+        ports:
+        - containerPort: 6379
+          name: peer
+        command:
+        - /opt/redis/redis-server
+        args:
+        - /opt/redis/redis.conf
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "/opt/redis/redis-cli -h $(hostname) ping"
+          initialDelaySeconds: 15
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: datadir
+          mountPath: /data
+        - name: opt
+          mountPath: /opt
+      volumes:
+      - name: opt
+        emptyDir: {}
+      - name: workdir
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+      annotations:
+        volume.alpha.kubernetes.io/storage-class: anything
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi

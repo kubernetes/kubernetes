@@ -1,0 +1,31 @@
+{
+  "table_of_contents": {},
+  "docs": [
+    {
+      "filename": "_overview.md"
+    },
+    {
+      "filename": "_innsmouth.md"
+    },
+    {
+      "filename": "_generated_deepone_v1_innsmouth_concept.md"
+    },
+    {
+      "filename": "_miskatonic.md"
+    },
+    {
+      "filename": "_generated_university_v1beta1_miskatonic_concept.md"
+    },
+    {
+      "filename": "_definitions.md"
+    },
+    {
+      "filename": "_generated_status_v1_meta_definition.md"
+    },
+    {
+      "filename": "_oldversions.md"
+    }
+  ],
+  "title": "Kubernetes API Reference Docs",
+  "copyright": "\u003ca href=\"https://github.com/kubernetes/kubernetes\"\u003eCopyright 2016 The Kubernetes Authors.\u003c/a\u003e"
+}

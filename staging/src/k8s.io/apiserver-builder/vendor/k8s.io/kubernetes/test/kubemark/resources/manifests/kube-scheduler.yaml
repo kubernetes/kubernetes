@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-scheduler
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  nodeName: {{instance_prefix}}-master
+  containers:
+  - name: kube-scheduler
+    image: {{kube_docker_registry}}/kube-scheduler:{{kube-scheduler_docker_tag}}
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 100m
+    command:
+    - /bin/sh
+    - -c
+    - /usr/local/bin/kube-scheduler
+      {{params}}
+      1>>/var/log/kube-scheduler.log 2>&1
+    livenessProbe:
+      httpGet:
+        host: 127.0.0.1
+        path: /healthz
+        port: 10251
+        scheme: HTTP
+      initialDelaySeconds: 15
+      timeoutSeconds: 15
+    volumeMounts:
+    - name: srvkube
+      mountPath: /etc/srv/kubernetes
+      readOnly: true
+    - name: logfile
+      mountPath: /var/log/kube-scheduler.log
+  volumes:
+  - name: srvkube
+    hostPath:
+      path: /etc/srv/kubernetes
+  - name: logfile
+    hostPath:
+      path: /var/log/kube-scheduler.log

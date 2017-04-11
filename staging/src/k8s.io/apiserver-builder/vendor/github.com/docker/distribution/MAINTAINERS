@@ -1,0 +1,63 @@
+# Distribution maintainers file
+#
+# This file describes who runs the docker/distribution project and how.
+# This is a living document - if you see something out of date or missing, speak up!
+#
+# It is structured to be consumable by both humans and programs.
+# To extract its contents programmatically, use any TOML-compliant parser.
+#
+# This file is compiled into the MAINTAINERS file in docker/opensource.
+#
+[Org]
+	[Org."Core maintainers"]
+		people = [
+			"aaronlehmann",
+			"dmcgowan",
+			"dmp42",
+			"richardscothern",
+			"shykes",
+			"stevvooe",
+		]
+
+[people]
+
+# A reference list of all people associated with the project.
+# All other sections should refer to people by their canonical key
+# in the people section.
+
+	# ADD YOURSELF HERE IN ALPHABETICAL ORDER
+
+	[people.aaronlehmann]
+	Name = "Aaron Lehmann"
+	Email = "aaron.lehmann@docker.com"
+	GitHub = "aaronlehmann"
+
+	[people.brianbland]
+	Name = "Brian Bland"
+	Email = "brian.bland@docker.com"
+	GitHub = "BrianBland"
+
+	[people.dmcgowan]
+	Name = "Derek McGowan"
+	Email = "derek@mcgstyle.net"
+	GitHub = "dmcgowan"
+
+	[people.dmp42]
+	Name = "Olivier Gambier"
+	Email = "olivier@docker.com"
+	GitHub = "dmp42"
+
+	[people.richardscothern]
+	Name = "Richard Scothern"
+	Email = "richard.scothern@gmail.com"
+	GitHub = "richardscothern"
+
+	[people.shykes]
+	Name = "Solomon Hykes"
+	Email = "solomon@docker.com"
+	GitHub = "shykes"
+
+	[people.stevvooe]
+	Name = "Stephen Day"
+	Email = "stephen.day@docker.com"
+	GitHub = "stevvooe"

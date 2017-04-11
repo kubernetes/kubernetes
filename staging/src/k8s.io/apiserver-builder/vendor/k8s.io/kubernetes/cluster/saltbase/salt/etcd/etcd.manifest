@@ -1,0 +1,110 @@
+{% set etcd_protocol = 'http' -%}
+{% set etcd_creds = '' -%}
+{% if pillar.get('etcd_over_ssl', '').lower() == 'true' -%}
+  {% set etcd_protocol = 'https' -%}
+  {% set etcd_creds = '--peer-trusted-ca-file /srv/kubernetes/etcd-ca.crt --peer-cert-file /srv/kubernetes/etcd-peer.crt --peer-key-file /srv/kubernetes/etcd-peer.key -peer-client-cert-auth' -%}
+{% endif -%}
+{% set hostname = pillar.get('hostname', '') -%}
+{% set cluster_state = (pillar.get('initial_etcd_cluster_state') or 'new') -%}
+{% set etcd_cluster_array = (pillar.get('initial_etcd_cluster') or hostname).split(',') -%}
+{% set etcd_cluster = '' -%}
+{# We use vars dictionary to pass variables set inside the for loop, because jinja defines new variables inside the for loop that hide variables from the outside. #}
+{% set vars = {'etcd_cluster': ''} -%}
+{% for host in etcd_cluster_array -%}
+  {% if etcd_cluster != '' -%}
+    {% set etcd_cluster = etcd_cluster ~ ',' -%}
+  {% endif -%}
+  {% set etcd_cluster = etcd_cluster ~ 'etcd-' ~ host ~ '=' ~ etcd_protocol ~'://' ~ host ~ ':' ~ server_port -%}
+  {% do vars.update({'etcd_cluster': etcd_cluster}) -%}
+{% endfor -%}
+{% set etcd_cluster = vars.etcd_cluster -%}
+{% set quota_bytes = '' -%}
+{% if pillar.get('storage_backend', 'etcd3') == 'etcd3' -%}
+  {% set quota_bytes = '--quota-backend-bytes=4294967296' -%}
+{% endif -%}
+{% set srv_kube_path = "/srv/kubernetes" -%}
+
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {
+  "name":"etcd-server{{ suffix }}",
+  "namespace": "kube-system"
+},
+"spec":{
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "etcd-container",
+    "image": "gcr.io/google_containers/etcd:{{ pillar.get('etcd_docker_tag', '3.0.17') }}",
+    "resources": {
+      "requests": {
+        "cpu": {{ cpulimit }}
+      }
+    },
+    "command": [
+              "/bin/sh",
+              "-c",
+              "if [ -e /usr/local/bin/migrate-if-needed.sh ]; then /usr/local/bin/migrate-if-needed.sh 1>>/var/log/etcd{{ suffix }}.log 2>&1; fi; /usr/local/bin/etcd --name etcd-{{ hostname }} --listen-peer-urls {{ etcd_protocol }}://{{ hostname }}:{{ server_port }} --initial-advertise-peer-urls {{ etcd_protocol }}://{{ hostname }}:{{ server_port }} --advertise-client-urls http://127.0.0.1:{{ port }} --listen-client-urls http://127.0.0.1:{{ port }} {{ quota_bytes }} --data-dir /var/etcd/data{{ suffix }} --initial-cluster-state {{ cluster_state }} --initial-cluster {{ etcd_cluster }} {{ etcd_creds }} 1>>/var/log/etcd{{ suffix }}.log 2>&1"
+            ],
+    "env": [
+      { "name": "TARGET_STORAGE",
+        "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
+      },
+      { "name": "TARGET_VERSION",
+        "value": "{{ pillar.get('etcd_version', '3.0.17') }}"
+      },
+      { "name": "DATA_DIRECTORY",
+        "value": "/var/etcd/data{{ suffix }}"
+      }
+        ],
+    "livenessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": {{ port }},
+        "path": "/health"
+      },
+      "initialDelaySeconds": 15,
+      "timeoutSeconds": 15
+    },
+    "ports": [
+      { "name": "serverport",
+        "containerPort": {{ server_port }},
+        "hostPort": {{ server_port }} 
+      },
+      { "name": "clientport",
+        "containerPort": {{ port }},
+        "hostPort": {{ port }}
+      }
+        ],
+    "volumeMounts": [
+      { "name": "varetcd",
+        "mountPath": "/var/etcd",
+        "readOnly": false
+      },
+      { "name": "varlogetcd",
+        "mountPath": "/var/log/etcd{{ suffix }}.log",
+        "readOnly": false
+      },
+      { "name": "etc",
+        "mountPath": "{{ srv_kube_path }}",
+        "readOnly": false
+      }
+    ]
+    }
+],
+"volumes":[
+  { "name": "varetcd",
+    "hostPath": {
+        "path": "/mnt/master-pd/var/etcd"}
+  },
+  { "name": "varlogetcd",
+    "hostPath": {
+        "path": "/var/log/etcd{{ suffix }}.log"}
+  },
+  { "name": "etc",
+    "hostPath": {
+        "path": "{{ srv_kube_path }}"}
+  }
+]
+}}

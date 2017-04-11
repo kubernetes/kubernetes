@@ -1,0 +1,83 @@
+syntax = "proto2";
+option go_package = "xmpp";
+
+package appengine;
+
+message XmppServiceError {
+  enum ErrorCode {
+    UNSPECIFIED_ERROR = 1;
+    INVALID_JID = 2;
+    NO_BODY = 3;
+    INVALID_XML = 4;
+    INVALID_TYPE = 5;
+    INVALID_SHOW = 6;
+    EXCEEDED_MAX_SIZE = 7;
+    APPID_ALIAS_REQUIRED = 8;
+    NONDEFAULT_MODULE = 9;
+  }
+}
+
+message PresenceRequest {
+  required string jid = 1;
+  optional string from_jid = 2;
+}
+
+message PresenceResponse {
+  enum SHOW {
+    NORMAL = 0;
+    AWAY = 1;
+    DO_NOT_DISTURB = 2;
+    CHAT = 3;
+    EXTENDED_AWAY = 4;
+  }
+
+  required bool is_available = 1;
+  optional SHOW presence = 2;
+  optional bool valid = 3;
+}
+
+message BulkPresenceRequest {
+  repeated string jid = 1;
+  optional string from_jid = 2;
+}
+
+message BulkPresenceResponse {
+  repeated PresenceResponse presence_response = 1;
+}
+
+message XmppMessageRequest {
+  repeated string jid = 1;
+  required string body = 2;
+  optional bool raw_xml = 3 [ default = false ];
+  optional string type = 4 [ default = "chat" ];
+  optional string from_jid = 5;
+}
+
+message XmppMessageResponse {
+  enum XmppMessageStatus {
+    NO_ERROR = 0;
+    INVALID_JID = 1;
+    OTHER_ERROR = 2;
+  }
+
+  repeated XmppMessageStatus status = 1;
+}
+
+message XmppSendPresenceRequest {
+  required string jid = 1;
+  optional string type = 2;
+  optional string show = 3;
+  optional string status = 4;
+  optional string from_jid = 5;
+}
+
+message XmppSendPresenceResponse {
+}
+
+message XmppInviteRequest {
+  required string jid = 1;
+  optional string from_jid = 2;
+}
+
+message XmppInviteResponse {
+}

@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: flocker-ghost
+  labels:
+    app: flocker-ghost
+spec:
+  ports:
+    # the port that this service should serve on
+  - port: 80
+    targetPort: 80
+  selector:
+    app: flocker-ghost
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: flocker-ghost
+  # these labels can be applied automatically
+  # from the labels in the pod template if not set
+  labels:
+    purpose: demo
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: flocker-ghost
+    spec:
+      containers:
+      - name: flocker-ghost
+        image: ghost:0.7.1
+        env:
+        - name: GET_HOSTS_FROM
+          value: dns
+        ports:
+        - containerPort: 2368
+          hostPort: 80
+          protocol: TCP
+        volumeMounts:
+          # name must match the volume name below
+          - name: ghost-data
+            mountPath: "/var/lib/ghost"
+      volumes:
+        - name: ghost-data
+          flocker:
+            datasetName: my-flocker-vol

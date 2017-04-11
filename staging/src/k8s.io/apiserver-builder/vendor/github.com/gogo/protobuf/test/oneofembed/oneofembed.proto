@@ -1,0 +1,18 @@
+syntax = "proto3";
+package proto;
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.populate_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.testgen_all) = true;
+
+message Foo {
+        Bar bar = 1 [(gogoproto.embed) = true];
+}
+
+message Bar {
+        oneof pick {
+                bool a = 11;
+                bool b = 12;
+        }
+}

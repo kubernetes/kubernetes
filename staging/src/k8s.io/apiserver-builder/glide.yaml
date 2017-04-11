@@ -1,0 +1,35 @@
+package: k8s.io/apiserver-builder
+import:
+- package: github.com/go-openapi/spec
+- package: github.com/golang/glog
+- package: github.com/pkg/errors
+- package: github.com/spf13/cobra
+- package: github.com/spf13/pflag
+- package: k8s.io/apimachinery
+- package: k8s.io/apiserver
+- package: k8s.io/client-go
+- package: k8s.io/gengo
+- package: k8s.io/kubernetes
+  subpackages:
+  - pkg/api
+  - pkg/api/install
+  - pkg/apis/apps
+  - pkg/apis/apps/install
+  - pkg/apis/authentication/install
+  - pkg/apis/authorization/install
+  - pkg/apis/autoscaling
+  - pkg/apis/autoscaling/install
+  - pkg/apis/batch
+  - pkg/apis/batch/install
+  - pkg/apis/certificates
+  - pkg/apis/certificates/install
+  - pkg/apis/extensions
+  - pkg/apis/extensions/install
+  - pkg/apis/policy
+  - pkg/apis/policy/install
+  - pkg/apis/rbac
+  - pkg/apis/rbac/install
+  - pkg/apis/settings
+  - pkg/apis/settings/install
+  - pkg/apis/storage
+  - pkg/apis/storage/install

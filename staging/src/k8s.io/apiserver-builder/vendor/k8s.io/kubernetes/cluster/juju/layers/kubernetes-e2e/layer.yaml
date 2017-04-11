@@ -1,0 +1,10 @@
+repo: https://github.com/juju-solutions/layer-kubernetes-e2e
+includes:
+  - layer:basic
+  - layer:tls-client
+  - interface:http
+options:
+  tls-client:
+    ca_certificate_path: '/srv/kubernetes/ca.crt'
+    client_certificate_path: '/srv/kubernetes/client.crt'
+    client_key_path: '/srv/kubernetes/client.key'

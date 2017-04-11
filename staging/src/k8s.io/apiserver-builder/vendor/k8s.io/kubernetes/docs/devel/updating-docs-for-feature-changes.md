@@ -1,0 +1,1 @@
+This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/devel/updating-docs-for-feature-changes.md](https://github.com/kubernetes/community/blob/master/contributors/devel/updating-docs-for-feature-changes.md)

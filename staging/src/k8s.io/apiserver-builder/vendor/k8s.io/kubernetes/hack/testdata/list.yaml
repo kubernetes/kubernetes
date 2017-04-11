@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: list-service-test
+  spec:
+    ports:
+    - protocol: TCP
+      port: 80
+    selector:
+      app: list-deployment-test
+- apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    name: list-deployment-test
+    labels:
+      app: list-deployment-test
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: list-deployment-test
+      spec:
+        containers:
+          - name: nginx
+            image: nginx

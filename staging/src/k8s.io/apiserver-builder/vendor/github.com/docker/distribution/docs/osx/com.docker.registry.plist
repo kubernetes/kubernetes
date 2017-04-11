@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.docker.registry</string>
+	<key>KeepAlive</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>/Users/Shared/Registry/registry.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/Shared/Registry/registry.log</string>
+	<key>Program</key>
+	<string>/usr/local/libexec/registry</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/local/libexec/registry</string>
+		<string>/Users/Shared/Registry/config.yml</string>
+	</array>
+	<key>Sockets</key>
+	<dict>
+		<key>http-listen-address</key>
+		<dict>
+			<key>SockServiceName</key>
+			<string>5000</string>
+			<key>SockType</key>
+			<string>dgram</string>
+			<key>SockFamily</key>
+			<string>IPv4</string>
+		</dict>
+		<key>http-debug-address</key>
+		<dict>
+			<key>SockServiceName</key>
+			<string>5001</string>
+			<key>SockType</key>
+			<string>dgram</string>
+			<key>SockFamily</key>
+			<string>IPv4</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

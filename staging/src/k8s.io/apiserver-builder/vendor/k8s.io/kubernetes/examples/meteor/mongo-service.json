@@ -1,0 +1,22 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "mongo",
+    "labels": {
+      "name": "mongo"
+    }
+  },
+  "spec": {
+    "ports": [
+      {
+        "port": 27017,
+        "targetPort": "mongo"
+      }
+    ],
+    "selector": {
+      "name": "mongo",
+      "role": "mongo"
+    }
+  }
+}

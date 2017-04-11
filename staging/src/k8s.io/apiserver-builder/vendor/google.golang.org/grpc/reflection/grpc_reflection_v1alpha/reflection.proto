@@ -1,0 +1,151 @@
+// Copyright 2016, Google Inc.
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//     * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+// Service exported by server reflection
+
+syntax = "proto3";
+
+package grpc.reflection.v1alpha;
+
+service ServerReflection {
+  // The reflection service is structured as a bidirectional stream, ensuring
+  // all related requests go to a single server.
+  rpc ServerReflectionInfo(stream ServerReflectionRequest)
+      returns (stream ServerReflectionResponse);
+}
+
+// The message sent by the client when calling ServerReflectionInfo method.
+message ServerReflectionRequest {
+  string host = 1;
+  // To use reflection service, the client should set one of the following
+  // fields in message_request. The server distinguishes requests by their
+  // defined field and then handles them using corresponding methods.
+  oneof message_request {
+    // Find a proto file by the file name.
+    string file_by_filename = 3;
+
+    // Find the proto file that declares the given fully-qualified symbol name.
+    // This field should be a fully-qualified symbol name
+    // (e.g. <package>.<service>[.<method>] or <package>.<type>).
+    string file_containing_symbol = 4;
+
+    // Find the proto file which defines an extension extending the given
+    // message type with the given field number.
+    ExtensionRequest file_containing_extension = 5;
+
+    // Finds the tag numbers used by all known extensions of extendee_type, and
+    // appends them to ExtensionNumberResponse in an undefined order.
+    // Its corresponding method is best-effort: it's not guaranteed that the
+    // reflection service will implement this method, and it's not guaranteed
+    // that this method will provide all extensions. Returns
+    // StatusCode::UNIMPLEMENTED if it's not implemented.
+    // This field should be a fully-qualified type name. The format is
+    // <package>.<type>
+    string all_extension_numbers_of_type = 6;
+
+    // List the full names of registered services. The content will not be
+    // checked.
+    string list_services = 7;
+  }
+}
+
+// The type name and extension number sent by the client when requesting
+// file_containing_extension.
+message ExtensionRequest {
+  // Fully-qualified type name. The format should be <package>.<type>
+  string containing_type = 1;
+  int32 extension_number = 2;
+}
+
+// The message sent by the server to answer ServerReflectionInfo method.
+message ServerReflectionResponse {
+  string valid_host = 1;
+  ServerReflectionRequest original_request = 2;
+  // The server set one of the following fields accroding to the message_request
+  // in the request.
+  oneof message_response {
+    // This message is used to answer file_by_filename, file_containing_symbol,
+    // file_containing_extension requests with transitive dependencies. As
+    // the repeated label is not allowed in oneof fields, we use a
+    // FileDescriptorResponse message to encapsulate the repeated fields.
+    // The reflection service is allowed to avoid sending FileDescriptorProtos
+    // that were previously sent in response to earlier requests in the stream.
+    FileDescriptorResponse file_descriptor_response = 4;
+
+    // This message is used to answer all_extension_numbers_of_type requst.
+    ExtensionNumberResponse all_extension_numbers_response = 5;
+
+    // This message is used to answer list_services request.
+    ListServiceResponse list_services_response = 6;
+
+    // This message is used when an error occurs.
+    ErrorResponse error_response = 7;
+  }
+}
+
+// Serialized FileDescriptorProto messages sent by the server answering
+// a file_by_filename, file_containing_symbol, or file_containing_extension
+// request.
+message FileDescriptorResponse {
+  // Serialized FileDescriptorProto messages. We avoid taking a dependency on
+  // descriptor.proto, which uses proto2 only features, by making them opaque
+  // bytes instead.
+  repeated bytes file_descriptor_proto = 1;
+}
+
+// A list of extension numbers sent by the server answering
+// all_extension_numbers_of_type request.
+message ExtensionNumberResponse {
+  // Full name of the base type, including the package name. The format
+  // is <package>.<type>
+  string base_type_name = 1;
+  repeated int32 extension_number = 2;
+}
+
+// A list of ServiceResponse sent by the server answering list_services request.
+message ListServiceResponse {
+  // The information of each service may be expanded in the future, so we use
+  // ServiceResponse message to encapsulate it.
+  repeated ServiceResponse service = 1;
+}
+
+// The information of a single service used by ListServiceResponse to answer
+// list_services request.
+message ServiceResponse {
+  // Full name of a registered service, including its package name. The format
+  // is <package>.<service>
+  string name = 1;
+}
+
+// The error code and error message sent by the server when an error occurs.
+message ErrorResponse {
+  // This field uses the error codes defined in grpc::StatusCode.
+  int32 error_code = 1;
+  string error_message = 2;
+}

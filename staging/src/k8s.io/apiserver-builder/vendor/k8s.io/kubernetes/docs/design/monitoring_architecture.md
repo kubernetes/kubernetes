@@ -1,0 +1,1 @@
+This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/monitoring_architecture.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/monitoring_architecture.md)

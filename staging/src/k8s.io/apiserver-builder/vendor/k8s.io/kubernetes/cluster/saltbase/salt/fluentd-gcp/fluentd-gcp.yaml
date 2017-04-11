@@ -1,0 +1,479 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fluentd-cloud-logging
+  namespace: kube-system
+  labels:
+    k8s-app: fluentd-logging
+  # This annotation ensures that fluentd does not get evicted if the node
+  # supports critical pod annotation based priority scheme.
+  # Note that this does not guarantee admission on the nodes (#40573).
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ''
+spec:
+  dnsPolicy: Default
+  containers:
+  - name: fluentd-cloud-logging
+    image: gcr.io/google_containers/fluentd-gcp:2.0.2
+    # If fluentd consumes its own logs, the following situation may happen:
+    # fluentd fails to send a chunk to the server => writes it to the log =>
+    # tries to send this message to the server => fails to send a chunk and so on.
+    # Writing to a file, which is not exported to the back-end prevents it.
+    # It also allows to increase the fluentd verbosity by default.
+    command:
+      - '/bin/sh'
+      - '-c'
+      - |-
+        mkdir /etc/fluent/config.d &&
+          echo "$FLUENTD_CONFIG" > /etc/fluent/config.d/main.conf &&
+          /run.sh $FLUENTD_ARGS 2>&1 >>/var/log/fluentd.log
+    env:
+    - name: FLUENTD_ARGS
+      value: --no-supervisor
+    # Keep this config as close as possible to cluster/addons/fluentd-gcp/fluentd-gcp-configmap.yaml
+    # Note that backslashes should be doubled, because this is interpreted as shell variable
+    # TODO(crassirostris): Refactor this
+    - name: FLUENTD_CONFIG
+      value: |-
+        # This configuration file for Fluentd is used
+        # to watch changes to Docker log files that live in the
+        # directory /var/lib/docker/containers/ and are symbolically
+        # linked to from the /var/log/containers directory using names that capture the
+        # pod name and container name. These logs are then submitted to
+        # Google Cloud Logging which assumes the installation of the cloud-logging plug-in.
+        #
+        # Example
+        # =======
+        # A line in the Docker log file might look like this JSON:
+        #
+        # {"log":"2014/09/25 21:15:03 Got request with path wombat\\n",
+        #  "stream":"stderr",
+        #   "time":"2014-09-25T21:15:03.499185026Z"}
+        #
+        # The record reformer is used to write the tag to focus on the pod name
+        # and the Kubernetes container name. For example a Docker container's logs
+        # might be in the directory:
+        #  /var/lib/docker/containers/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b
+        # and in the file:
+        #  997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b-json.log
+        # where 997599971ee6... is the Docker ID of the running container.
+        # The Kubernetes kubelet makes a symbolic link to this file on the host machine
+        # in the /var/log/containers directory which includes the pod name and the Kubernetes
+        # container name:
+        #    synthetic-logger-0.25lps-pod_default-synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+        #    ->
+        #    /var/lib/docker/containers/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b-json.log
+        # The /var/log directory on the host is mapped to the /var/log directory in the container
+        # running this instance of Fluentd and we end up collecting the file:
+        #   /var/log/containers/synthetic-logger-0.25lps-pod_default-synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+        # This results in the tag:
+        #  var.log.containers.synthetic-logger-0.25lps-pod_default-synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+        # The record reformer is used is discard the var.log.containers prefix and
+        # the Docker container ID suffix and "kubernetes." is pre-pended giving the tag:
+        #   kubernetes.synthetic-logger-0.25lps-pod_default-synth-lgr
+        # Tag is then parsed by google_cloud plugin and translated to the metadata,
+        # visible in the log viewer
+
+        # Example:
+        # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
+        <source>
+          type tail
+          format json
+          time_key time
+          path /var/log/containers/*.log
+          pos_file /var/log/gcp-containers.log.pos
+          time_format %Y-%m-%dT%H:%M:%S.%N%Z
+          tag reform.*
+          read_from_head true
+        </source>
+
+        <filter reform.**>
+          type parser
+          format /^(?<severity>\\w)(?<time>\\d{4} [^\\s]*)\\s+(?<pid>\\d+)\\s+(?<source>[^ \\]]+)\\] (?<log>.*)/
+          reserve_data true
+          suppress_parse_error_log true
+          key_name log
+        </filter>
+
+        <match reform.**>
+          type record_reformer
+          enable_ruby true
+          tag raw.kubernetes.${tag_suffix[4].split('-')[0..-2].join('-')}
+        </match>
+
+        # Detect exceptions in the log output and forward them as one log entry.
+        <match raw.kubernetes.**>
+          @type copy
+
+          <store>
+            @type prometheus
+
+            <metric>
+              type counter
+              name logging_line_count
+              desc Total number of lines generated by application containers
+              <labels>
+                tag ${tag}
+              </labels>
+            </metric>
+          </store>
+          <store>
+            @type detect_exceptions
+
+            remove_tag_prefix raw
+            message log
+            stream stream
+            multiline_flush_interval 5
+            max_bytes 500000
+            max_lines 1000
+          </store>
+        </match>
+
+        # Example:
+        # 2015-12-21 23:17:22,066 [salt.state       ][INFO    ] Completed state [net.ipv4.ip_forward] at time 23:17:22.066081
+        <source>
+          type tail
+          format /^(?<time>[^ ]* [^ ,]*)[^\\[]*\\[[^\\]]*\\]\\[(?<severity>[^ \\]]*) *\\] (?<message>.*)$/
+          time_format %Y-%m-%d %H:%M:%S
+          path /var/log/salt/minion
+          pos_file /var/log/gcp-salt.pos
+          tag salt
+        </source>
+
+        # Example:
+        # Dec 21 23:17:22 gke-foo-1-1-4b5cbd14-node-4eoj startupscript: Finished running startup script /var/run/google.startup.script
+        <source>
+          type tail
+          format syslog
+          path /var/log/startupscript.log
+          pos_file /var/log/gcp-startupscript.log.pos
+          tag startupscript
+        </source>
+
+        # Examples:
+        # time="2016-02-04T06:51:03.053580605Z" level=info msg="GET /containers/json"
+        # time="2016-02-04T07:53:57.505612354Z" level=error msg="HTTP Error" err="No such image: -f" statusCode=404
+        <source>
+          type tail
+          format /^time="(?<time>[^)]*)" level=(?<severity>[^ ]*) msg="(?<message>[^"]*)"( err="(?<error>[^"]*)")?( statusCode=($<status_code>\\d+))?/
+          path /var/log/docker.log
+          pos_file /var/log/gcp-docker.log.pos
+          tag docker
+        </source>
+
+        # Example:
+        # 2016/02/04 06:52:38 filePurge: successfully removed file /var/etcd/data/member/wal/00000000000006d0-00000000010a23d1.wal
+        <source>
+          type tail
+          # Not parsing this, because it doesn't have anything particularly useful to
+          # parse out of it (like severities).
+          format none
+          path /var/log/etcd.log
+          pos_file /var/log/gcp-etcd.log.pos
+          tag etcd
+        </source>
+
+        # Multi-line parsing is required for all the kube logs because very large log
+        # statements, such as those that include entire object bodies, get split into
+        # multiple lines by glog.
+
+        # Example:
+        # I0204 07:32:30.020537    3368 server.go:1048] POST /stats/container/: (13.972191ms) 200 [[Go-http-client/1.1] 10.244.1.3:40537]
+        <source>
+          type tail
+          format multiline
+          multiline_flush_interval 5s
+          format_firstline /^\\w\\d{4}/
+          format1 /^(?<severity>\\w)(?<time>\\d{4} [^\\s]*)\\s+(?<pid>\\d+)\\s+(?<source>[^ \\]]+)\\] (?<message>.*)/
+          time_format %m%d %H:%M:%S.%N
+          path /var/log/kubelet.log
+          pos_file /var/log/gcp-kubelet.log.pos
+          tag kubelet
+        </source>
+
+        # Example:
+        # I1118 21:26:53.975789       6 proxier.go:1096] Port "nodePort for kube-system/default-http-backend:http" (:31429/tcp) was open before and is still needed
+        <source>
+          type tail
+          format multiline
+          multiline_flush_interval 5s
+          format_firstline /^\\w\\d{4}/
+          format1 /^(?<severity>\\w)(?<time>\\d{4} [^\\s]*)\\s+(?<pid>\\d+)\\s+(?<source>[^ \\]]+)\\] (?<message>.*)/
+          time_format %m%d %H:%M:%S.%N
+          path /var/log/kube-proxy.log
+          pos_file /var/log/gcp-kube-proxy.log.pos
+          tag kube-proxy
+        </source>
+
+        # Example:
+        # I0204 07:00:19.604280       5 handlers.go:131] GET /api/v1/nodes: (1.624207ms) 200 [[kube-controller-manager/v1.1.3 (linux/amd64) kubernetes/6a81b50] 127.0.0.1:38266]
+        <source>
+          type tail
+          format multiline
+          multiline_flush_interval 5s
+          format_firstline /^\\w\\d{4}/
+          format1 /^(?<severity>\\w)(?<time>\\d{4} [^\\s]*)\\s+(?<pid>\\d+)\\s+(?<source>[^ \\]]+)\\] (?<message>.*)/
+          time_format %m%d %H:%M:%S.%N
+          path /var/log/kube-apiserver.log
+          pos_file /var/log/gcp-kube-apiserver.log.pos
+          tag kube-apiserver
+        </source>
+
+        # Example:
+        # 2017-02-09T00:15:57.992775796Z AUDIT: id="90c73c7c-97d6-4b65-9461-f94606ff825f" ip="104.132.1.72" method="GET" user="kubecfg" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods"
+        # 2017-02-09T00:15:57.993528822Z AUDIT: id="90c73c7c-97d6-4b65-9461-f94606ff825f" response="200"
+        <source>
+          type tail
+          format multiline
+          multiline_flush_interval 5s
+          format_firstline /^\\S+\\s+AUDIT:/
+          # Fields must be explicitly captured by name to be parsed into the record.
+          # Fields may not always be present, and order may change, so this just looks
+          # for a list of key="\\"quoted\\" value" pairs separated by spaces.
+          # Unknown fields are ignored.
+          # Note: We can't separate query/response lines as format1/format2 because
+          #       they don't always come one after the other for a given query.
+          # TODO: Maybe add a JSON output mode to audit log so we can get rid of this?
+          format1 /^(?<time>\\S+) AUDIT:(?: (?:id="(?<id>(?:[^"\\\\]|\\\\.)*)"|ip="(?<ip>(?:[^"\\\\]|\\\\.)*)"|method="(?<method>(?:[^"\\\\]|\\\\.)*)"|user="(?<user>(?:[^"\\\\]|\\\\.)*)"|groups="(?<groups>(?:[^"\\\\]|\\\\.)*)"|as="(?<as>(?:[^"\\\\]|\\\\.)*)"|asgroups="(?<asgroups>(?:[^"\\\\]|\\\\.)*)"|namespace="(?<namespace>(?:[^"\\\\]|\\\\.)*)"|uri="(?<uri>(?:[^"\\\\]|\\\\.)*)"|response="(?<response>(?:[^"\\\\]|\\\\.)*)"|\\w+="(?:[^"\\\\]|\\\\.)*"))*/
+          time_format %FT%T.%L%Z
+          path /var/log/kube-apiserver-audit.log
+          pos_file /var/log/gcp-kube-apiserver-audit.log.pos
+          tag kube-apiserver-audit
+        </source>
+
+        # Example:
+        # I0204 06:55:31.872680       5 servicecontroller.go:277] LB already exists and doesn't need update for service kube-system/kube-ui
+        <source>
+          type tail
+          format multiline
+          multiline_flush_interval 5s
+          format_firstline /^\\w\\d{4}/
+          format1 /^(?<severity>\\w)(?<time>\\d{4} [^\\s]*)\\s+(?<pid>\\d+)\\s+(?<source>[^ \\]]+)\\] (?<message>.*)/
+          time_format %m%d %H:%M:%S.%N
+          path /var/log/kube-controller-manager.log
+          pos_file /var/log/gcp-kube-controller-manager.log.pos
+          tag kube-controller-manager
+        </source>
+
+        # Example:
+        # W0204 06:49:18.239674       7 reflector.go:245] pkg/scheduler/factory/factory.go:193: watch of *api.Service ended with: 401: The event in requested index is outdated and cleared (the requested history has been cleared [2578313/2577886]) [2579312]
+        <source>
+          type tail
+          format multiline
+          multiline_flush_interval 5s
+          format_firstline /^\\w\\d{4}/
+          format1 /^(?<severity>\\w)(?<time>\\d{4} [^\\s]*)\\s+(?<pid>\\d+)\\s+(?<source>[^ \\]]+)\\] (?<message>.*)/
+          time_format %m%d %H:%M:%S.%N
+          path /var/log/kube-scheduler.log
+          pos_file /var/log/gcp-kube-scheduler.log.pos
+          tag kube-scheduler
+        </source>
+
+        # Example:
+        # I1104 10:36:20.242766       5 rescheduler.go:73] Running Rescheduler
+        <source>
+          type tail
+          format multiline
+          multiline_flush_interval 5s
+          format_firstline /^\\w\\d{4}/
+          format1 /^(?<severity>\\w)(?<time>\\d{4} [^\\s]*)\\s+(?<pid>\\d+)\\s+(?<source>[^ \\]]+)\\] (?<message>.*)/
+          time_format %m%d %H:%M:%S.%N
+          path /var/log/rescheduler.log
+          pos_file /var/log/gcp-rescheduler.log.pos
+          tag rescheduler
+        </source>
+
+        # Example:
+        # I0603 15:31:05.793605       6 cluster_manager.go:230] Reading config from path /etc/gce.conf
+        <source>
+          type tail
+          format multiline
+          multiline_flush_interval 5s
+          format_firstline /^\\w\\d{4}/
+          format1 /^(?<severity>\\w)(?<time>\\d{4} [^\\s]*)\\s+(?<pid>\\d+)\\s+(?<source>[^ \\]]+)\\] (?<message>.*)/
+          time_format %m%d %H:%M:%S.%N
+          path /var/log/glbc.log
+          pos_file /var/log/gcp-glbc.log.pos
+          tag glbc
+        </source>
+
+        # Example:
+        # I0603 15:31:05.793605       6 cluster_manager.go:230] Reading config from path /etc/gce.conf
+        <source>
+          type tail
+          format multiline
+          multiline_flush_interval 5s
+          format_firstline /^\\w\\d{4}/
+          format1 /^(?<severity>\\w)(?<time>\\d{4} [^\\s]*)\\s+(?<pid>\\d+)\\s+(?<source>[^ \\]]+)\\] (?<message>.*)/
+          time_format %m%d %H:%M:%S.%N
+          path /var/log/cluster-autoscaler.log
+          pos_file /var/log/gcp-cluster-autoscaler.log.pos
+          tag cluster-autoscaler
+        </source>
+
+        # Logs from systemd-journal for interesting services.
+        <source>
+          type systemd
+          filters [{ "_SYSTEMD_UNIT": "docker.service" }]
+          pos_file /var/log/gcp-journald-docker.pos
+          read_from_head true
+          tag docker
+        </source>
+
+        <source>
+          type systemd
+          filters [{ "_SYSTEMD_UNIT": "kubelet.service" }]
+          pos_file /var/log/gcp-journald-kubelet.pos
+          read_from_head true
+          tag kubelet
+        </source>
+
+        # Prometheus monitoring
+        <source>
+          @type prometheus
+          port 80
+        </source>
+
+        <source>
+          @type prometheus_monitor
+        </source>
+
+        # We use 2 output stanzas - one to handle the container logs and one to handle
+        # the node daemon logs, the latter of which explicitly sends its logs to the
+        # compute.googleapis.com service rather than container.googleapis.com to keep
+        # them separate since most users don't care about the node logs.
+        <match kubernetes.**>
+          @type copy
+
+          <store>
+            @type google_cloud
+
+            # Set the buffer type to file to improve the reliability and reduce the memory consumption
+            buffer_type file
+            buffer_path /var/log/fluentd-buffers/kubernetes.containers.buffer
+            # Set queue_full action to block because we want to pause gracefully
+            # in case of the off-the-limits load instead of throwing an exception
+            buffer_queue_full_action block
+            # Set the chunk limit conservatively to avoid exceeding the GCL limit
+            # of 10MiB per write request.
+            buffer_chunk_limit 2M
+            # Cap the combined memory usage of this buffer and the one below to
+            # 2MiB/chunk * (6 + 2) chunks = 16 MiB
+            buffer_queue_limit 6
+            # Never wait more than 5 seconds before flushing logs in the non-error case.
+            flush_interval 5s
+            # Never wait longer than 30 seconds between retries.
+            max_retry_wait 30
+            # Disable the limit on the number of retries (retry forever).
+            disable_retry_limit
+            # Use multiple threads for processing.
+            num_threads 2
+          </store>
+          <store>
+            @type prometheus
+
+            <metric>
+              type counter
+              name logging_entry_count
+              desc Total number of log entries generated by either an application container or a system component
+              <labels>
+                tag ${tag}
+                component container
+              </labels>
+            </metric>
+          </store>
+        </match>
+
+        # Keep a smaller buffer here since these logs are less important than the user's
+        # container logs.
+        <match **>
+          @type copy
+
+          <store>
+            @type google_cloud
+
+            detect_subservice false
+            buffer_type file
+            buffer_path /var/log/fluentd-buffers/kubernetes.system.buffer
+            buffer_queue_full_action block
+            buffer_chunk_limit 2M
+            buffer_queue_limit 2
+            flush_interval 5s
+            max_retry_wait 30
+            disable_retry_limit
+            num_threads 2
+          </store>
+          <store>
+            @type prometheus
+
+            <metric>
+              type counter
+              name logging_entry_count
+              desc Total number of log entries generated by either an application container or a system component
+              <labels>
+                tag ${tag}
+                component system
+              </labels>
+            </metric>
+          </store>
+        </match>
+    resources:
+      limits:
+        memory: 300Mi
+      requests:
+        # Any change here should be accompanied by a proportional change in CPU
+        # requests of other per-node add-ons (e.g. kube-proxy).
+        cpu: 100m
+        memory: 200Mi
+    volumeMounts:
+    - name: varlog
+      mountPath: /var/log
+    - name: varlibdockercontainers
+      mountPath: /var/lib/docker/containers
+      readOnly: true
+    - name: libsystemddir
+      mountPath: /host/lib
+      readOnly: true
+    # Liveness probe is aimed to help in situarions where fluentd
+    # silently hangs for no apparent reasons until manual restart.
+    # The idea of this probe is that if fluentd is not queueing or
+    # flushing chunks for 5 minutes, something is not right. If
+    # you want to change the fluentd configuration, reducing amount of
+    # logs fluentd collects, consider changing the threshold or turning
+    # liveness probe off completely.
+    livenessProbe:
+      initialDelaySeconds: 600
+      periodSeconds: 60
+      exec:
+        command:
+        - '/bin/sh'
+        - '-c'
+        - >
+          LIVENESS_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-300};
+          STUCK_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-900};
+          if [ ! -e /var/log/fluentd-buffers ];
+          then
+            exit 1;
+          fi;
+          LAST_MODIFIED_DATE=`stat /var/log/fluentd-buffers | grep Modify | sed -r "s/Modify: (.*)/\1/"`;
+          LAST_MODIFIED_TIMESTAMP=`date -d "$LAST_MODIFIED_DATE" +%s`;
+          if [ `date +%s` -gt `expr $LAST_MODIFIED_TIMESTAMP + $STUCK_THRESHOLD_SECONDS` ];
+          then
+            rm -rf /var/log/fluentd-buffers;
+            exit 1;
+          fi;
+          if [ `date +%s` -gt `expr $LAST_MODIFIED_TIMESTAMP + $LIVENESS_THRESHOLD_SECONDS` ];
+          then
+            exit 1;
+          fi;
+  terminationGracePeriodSeconds: 30
+  volumes:
+  - name: varlog
+    hostPath:
+      path: /var/log
+  - name: varlibdockercontainers
+    hostPath:
+      path: /var/lib/docker/containers
+  - name: libsystemddir
+    hostPath:
+      path: /usr/lib64

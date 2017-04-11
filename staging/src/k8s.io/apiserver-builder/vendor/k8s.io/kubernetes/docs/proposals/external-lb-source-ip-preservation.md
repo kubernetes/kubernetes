@@ -1,0 +1,1 @@
+This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/external-lb-source-ip-preservation.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/external-lb-source-ip-preservation.md)

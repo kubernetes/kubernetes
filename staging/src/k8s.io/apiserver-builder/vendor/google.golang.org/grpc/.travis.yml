@@ -1,0 +1,21 @@
+language: go
+
+go:
+  - 1.5.4
+  - 1.6.3
+
+go_import_path: google.golang.org/grpc
+
+before_install:
+  - go get golang.org/x/tools/cmd/goimports
+  - go get github.com/golang/lint/golint
+  - go get github.com/axw/gocov/gocov
+  - go get github.com/mattn/goveralls
+  - go get golang.org/x/tools/cmd/cover
+
+script:
+  - '! gofmt -s -d -l . 2>&1 | read'
+  - '! goimports -l . | read'
+  - '! golint ./... | grep -vE "(_string|\.pb)\.go:"'
+  - '! go tool vet -all . 2>&1 | grep -vE "constant [0-9]+ not a string in call to Errorf"'
+  - make test testrace

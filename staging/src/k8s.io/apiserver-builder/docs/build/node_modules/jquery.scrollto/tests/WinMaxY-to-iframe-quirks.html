@@ -1,0 +1,19 @@
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+	<title>jQuery.scrollTo - Test Window MaxY to Iframe - Quirks Mode</title>
+	<script type="text/javascript" src="https://code.jquery.com/jquery-1.11.0.js"></script>
+	<script type="text/javascript" src="../jquery.scrollTo.js"></script>
+	<script type="text/javascript" src="test.js"></script>
+</head>
+<body>
+	<h1>jQuery.scrollTo - Test Window MaxY to Iframe - Quirks Mode</h1>
+	
+	<iframe src="WinMaxY-quirks.html?notest" style="width:500px"></iframe>
+	
+	<script type="text/javascript">
+		setTimeout(function(){
+			$('iframe').test();
+		}, 1500 );
+	</script>
+</html>

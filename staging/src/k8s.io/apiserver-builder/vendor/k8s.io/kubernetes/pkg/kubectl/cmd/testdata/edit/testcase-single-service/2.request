@@ -1,0 +1,21 @@
+{
+	"metadata": {
+		"labels": {
+			"new-label": "new-value"
+		}
+	},
+	"spec": {
+		"ports": [
+			{
+				"$patch": "delete",
+				"port": 80
+			},
+			{
+				"name": "80",
+				"port": 81,
+				"protocol": "TCP",
+				"targetPort": 80
+			}
+		]
+	}
+}

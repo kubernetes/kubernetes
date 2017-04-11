@@ -1,0 +1,25 @@
+{
+	"kind": "Status",
+	"apiVersion": "v1",
+	"metadata": {},
+	"status": "Failure",
+	"message": "Service \"svc1\" is invalid: [spec.clusterIP: Invalid value: \"10.0.0.10\": field is immutable, spec.ports[0].protocol: Unsupported value: \"VHF\": supported values: TCP, UDP]",
+	"reason": "Invalid",
+	"details": {
+		"name": "svc1",
+		"kind": "Service",
+		"causes": [
+			{
+				"reason": "FieldValueInvalid",
+				"message": "Invalid value: \"10.0.0.10\": field is immutable",
+				"field": "spec.clusterIP"
+			},
+			{
+				"reason": "FieldValueNotSupported",
+				"message": "Unsupported value: \"VHF\": supported values: TCP, UDP",
+				"field": "spec.ports[0].protocol"
+			}
+		]
+	},
+	"code": 422
+}

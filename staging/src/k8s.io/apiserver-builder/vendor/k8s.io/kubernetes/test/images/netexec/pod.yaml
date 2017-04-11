@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netexec
+  labels:
+    app: netexec
+spec:
+  containers:
+  - name: netexec
+    image: gcr.io/google_containers/netexec:1.5
+    ports:
+    - containerPort: 8080
+      protocol: TCP
+    - containerPort: 8081
+      protocol: UDP
+    # give this pod the same liveness and readiness probe because
+    # we always want the kubelet to restart it if it becomes
+    # unready, and at the same time we want to observe readiness
+    # as a signal to start testing.
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      periodSeconds: 10
+      successThreshold: 1
+    readinessProbe:
+      httpGet:
+        path: /healthz
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      periodSeconds: 10
+      successThreshold: 1

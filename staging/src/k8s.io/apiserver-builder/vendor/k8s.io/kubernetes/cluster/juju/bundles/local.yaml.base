@@ -1,0 +1,18 @@
+services:
+  kubernetes:
+    charm: __CHARM_DIR__/builds/kubernetes
+    annotations:
+      "gui-x": "600"
+      "gui-y": "0"
+    expose: true
+    num_units: 2
+  etcd:
+    charm: cs:~containers/etcd
+    annotations:
+      "gui-x": "300"
+      "gui-y": "0"
+    num_units: 1
+relations:
+  - - "kubernetes:etcd"
+    - "etcd:db"
+series: xenial

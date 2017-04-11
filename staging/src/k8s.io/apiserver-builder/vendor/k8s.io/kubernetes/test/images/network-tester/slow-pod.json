@@ -1,0 +1,28 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "slow-pod",
+    "labels": {
+      "name": "nettest"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "webserver",
+        "image": "gcr.io/google_containers/nettest:1.8",
+        "args": [
+          "-service=nettest",
+          "-delay-shutdown=10"
+        ],
+        "ports": [
+          {
+            "containerPort": 8080,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    ]
+  }
+}

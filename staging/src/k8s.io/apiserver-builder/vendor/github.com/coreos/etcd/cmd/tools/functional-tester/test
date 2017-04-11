@@ -1,0 +1,23 @@
+#!/bin/sh -e
+set -x
+set -e
+
+# 1. build etcd binaries
+[ -f bin/etcd ] || ./build
+
+# 2. build agent & tester
+[ -f bin/etcd-agent -a -f bin/etcd-tester ] || ./tools/functional-tester/build
+
+# 3. build docker image (alpine based)
+mkdir -p ./tools/functional-tester/docker/bin
+cp -v bin/etcd-agent bin/etcd-tester bin/etcd ./tools/functional-tester/docker/bin
+docker-compose -f tools/functional-tester/docker/docker-compose.yml build
+
+# 4. create network (assumption - no overlaps)
+docker network ls | grep etcd-functional || docker network create --subnet 172.20.0.0/16 etcd-functional
+
+# 5. run cluster and tester (assumption - agents'll get first ip addresses)
+docker-compose -f tools/functional-tester/docker/docker-compose.yml up -d a1 a2 a3
+
+# 6. run tester
+docker-compose -f tools/functional-tester/docker/docker-compose.yml run tester

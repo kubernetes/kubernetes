@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rescheduler-v0.3.0
+  namespace: kube-system
+  labels:
+    k8s-app: rescheduler
+    version: v0.3.0
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "Rescheduler"
+spec:
+  hostNetwork: true
+  containers:
+  - image: gcr.io/google-containers/rescheduler:v0.3.0
+    name: rescheduler
+    volumeMounts:
+    - mountPath: /var/log/rescheduler.log
+      name: logfile
+      readOnly: false
+    # TODO: Make resource requirements depend on the size of the cluster
+    resources:
+      requests:
+        cpu: 10m
+        memory: 100Mi
+    command:
+    # TODO: split this out into args when we no longer need to pipe stdout to a file #6428
+    - sh
+    - -c
+    - '/rescheduler --running-in-cluster=false 1>>/var/log/rescheduler.log 2>&1'
+  volumes:
+  - hostPath:
+      path: /var/log/rescheduler.log
+    name: logfile

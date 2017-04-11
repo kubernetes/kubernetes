@@ -1,0 +1,1 @@
+<li><@= pet.name @></li>
