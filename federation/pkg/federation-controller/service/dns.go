@@ -280,8 +280,8 @@ func (s *ServiceController) ensureDnsRrsets(dnsZone dnsprovider.Zone, dnsName st
 
 /* ensureDnsRecords ensures (idempotently, and with minimum mutations) that all of the DNS records for a service in a given cluster are correct,
 given the current state of that service in that cluster.  This should be called every time the state of a service might have changed
-(either w.r.t. it's loadbalancer address, or if the number of healthy backend endpoints for that service transitioned from zero to non-zero
-(or vice verse).  Only shards of the service which have both a loadbalancer ingress IP address or hostname AND at least one healthy backend endpoint
+(either w.r.t. its loadbalancer address, or if the number of healthy backend endpoints for that service transitioned from zero to non-zero
+(or vice versa).  Only shards of the service which have both a loadbalancer ingress IP address or hostname AND at least one healthy backend endpoint
 are included in DNS records for that service (at all of zone, region and global levels). All other addresses are removed.  Also, if no shards exist
 in the zone or region of the cluster, a CNAME reference to the next higher level is ensured to exist. */
 func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *cachedService) error {
@@ -291,16 +291,16 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	// mysvc.myns.myfed.svc.z1.r1.mydomain.com  (for zone z1 in region r1)
 	//         - an A record to IP address of specific shard in that zone (if that shard exists and has healthy endpoints)
 	//         - OR a CNAME record to the next level up, i.e. mysvc.myns.myfed.svc.r1.mydomain.com  (if a healthy shard does not exist in zone z1)
-	// mysvc.myns.myfed.svc.r1.federation
+	// mysvc.myns.myfed.svc.r1.mydomain.com
 	//         - a set of A records to IP addresses of all healthy shards in region r1, if one or more of these exist
 	//         - OR a CNAME record to the next level up, i.e. mysvc.myns.myfed.svc.mydomain.com (if no healthy shards exist in region r1)
-	// mysvc.myns.myfed.svc.federation
+	// mysvc.myns.myfed.svc.mydomain.com
 	//         - a set of A records to IP addresses of all healthy shards in all regions, if one or more of these exist.
-	//         - no record (NXRECORD response) if no healthy shards exist in any regions)
+	//         - no record (NXRECORD response) if no healthy shards exist in any regions
 	//
 	// For each cached service, cachedService.lastState tracks the current known state of the service, while cachedService.appliedState contains
-	// the state of the service when we last successfully sync'd it's DNS records.
-	// So this time around we only need to patch that (add new records, remove deleted records, and update changed records.
+	// the state of the service when we last successfully synced its DNS records.
+	// So this time around we only need to patch that (add new records, remove deleted records, and update changed records).
 	//
 	if s == nil {
 		return fmt.Errorf("nil ServiceController passed to ServiceController.ensureDnsRecords(clusterName: %s, cachedService: %v)", clusterName, cachedService)
