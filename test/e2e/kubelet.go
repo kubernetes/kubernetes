@@ -419,7 +419,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 	})
 
 	// Test host cleanup when disrupting the volume environment.
-	framework.KubeDescribe("host cleanup with volume mounts [Disruptive][Volume][HostCleanup]", func() {
+	framework.KubeDescribe("host cleanup with volume mounts [Volume][HostCleanup][Flaky]", func() {
 
 		type hostCleanupTest struct {
 			itDescr string
