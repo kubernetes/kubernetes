@@ -18,12 +18,14 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
@@ -37,19 +39,65 @@ type Controller struct {
 	indexer  cache.Indexer
 	queue    workqueue.RateLimitingInterface
 	informer cache.Controller
-	f        ControllerFunc
 }
 
-func NewController(queue workqueue.RateLimitingInterface, indexer cache.Indexer, informer cache.Controller, f ControllerFunc) *Controller {
+func NewController(queue workqueue.RateLimitingInterface, indexer cache.Indexer, informer cache.Controller) *Controller {
 	return &Controller{
 		informer: informer,
 		indexer:  indexer,
 		queue:    queue,
-		f:        f,
 	}
 }
 
-type ControllerFunc func(cache.Indexer, workqueue.RateLimitingInterface) bool
+func (c *Controller) processNextItem() bool {
+	// Wait until there is a new item in the working queue
+	key, quit := c.queue.Get()
+	if quit {
+		return false
+	}
+	// Tell the queue that we are done with processing this key. This unblocks the key for other workers
+	// This allows safe parallel processing because two pods with the same key are never processed in
+	// parallel.
+	defer c.queue.Done(key)
+
+	err := c.syncToStdout(key.(string))
+	c.handleErr(err, key)
+	return true
+}
+
+func (c *Controller) syncToStdout(key string) error {
+	obj, exists, err := c.indexer.GetByKey(key)
+	if err != nil {
+		glog.Errorf("Fetching object with key %s from store failed with %v", key, err)
+		return err
+	}
+
+	if !exists {
+		// Below we will warm up our cache with a Pod, so that we will see a delete for one pod
+		fmt.Printf("Pod %s does not exist anymore\n", key)
+	} else {
+		// Note that you also have to check the uid if you have a local controlled resource, which
+		// is dependent on the actual instance, to detect that a Pod was recreated with the same name
+		fmt.Printf("Sync/Add/Update for Pod %s\n", obj.(*v1.Pod).GetName())
+	}
+	return nil
+}
+
+func (c *Controller) handleErr(err error, key interface{}) {
+	if err == nil {
+		c.queue.Forget(key)
+		return
+	}
+
+	if c.queue.NumRequeues(key) < 5 {
+		glog.Infof("Error syncing controller %v: %v", key, err)
+		c.queue.AddRateLimited(key)
+		return
+	}
+
+	runtime.HandleError(err)
+	glog.Infof("Dropping deployment %q out of the queue: %v", key, err)
+}
 
 func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 	// Let the workers stop when we are done
@@ -72,7 +120,7 @@ func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 }
 
 func (c *Controller) runWorker() {
-	for c.f(c.indexer, c.queue) {
+	for c.processNextItem() {
 	}
 }
 
@@ -128,45 +176,7 @@ func main() {
 		},
 	}, cache.Indexers{})
 
-	controller := NewController(queue, indexer, informer, func(indexer cache.Indexer, queue workqueue.RateLimitingInterface) bool {
-		// Wait until there is a new item in the working queue
-		key, quit := queue.Get()
-		if quit {
-			return false
-		}
-		// Tell the queue that we are done with processing this key. This unblocks the key for other workers
-		// This allows safe parallel processing because two pods with the same key are never processed in
-		// parallel.
-		defer queue.Done(key)
-		// Fetch the latest Pod state from cache
-		obj, exists, err := indexer.GetByKey(key.(string))
-
-		if err != nil {
-			// TODO: Does this make sense?
-			// Tricky what to do in this situation. One thing we can do, is enqueueing it a few times to
-			// add some backoff delays on the invalid key. This way we avoid hotlooping
-			// on invalid keys.
-			if queue.NumRequeues(key) < 5 {
-				queue.AddRateLimited(key)
-			} else {
-				queue.Forget(key)
-			}
-			glog.Fatalf("Fetching object with key %s from store failed", key.(string))
-			return true
-		}
-
-		if !exists {
-			// Below we will warm up our cache with a Pod, so that we will see a delete for one pod
-			glog.Infof("Pod %s does not exist anymore\n", key.(string))
-		} else {
-			// Note that you also have to check the uid if you have a local controlled resource, which
-			// is dependent on the actual instance, to detect that a Pod was recreated with the same name
-			glog.Infof("Sync/Add/Update for Pod %s\n", obj.(*v1.Pod).GetName())
-		}
-		// On a successful run, forget the error history of the key
-		queue.Forget(key)
-		return true
-	})
+	controller := NewController(queue, indexer, informer)
 
 	// We can now warm up the cache for initial synchronization
 	// Le's suppose that we knew about a pod mypod on our last run, so we add it to the cache
