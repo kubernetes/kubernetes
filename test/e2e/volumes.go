@@ -47,14 +47,14 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 func DeleteCinderVolume(name string) error {
@@ -519,6 +519,16 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			defer func() {
+				// - Determine the NodeName from the pod spec to which the volume is mounted.
+				// - Forcibly detach the PD and wait for success
+				// - Once detached, delete the PD.
+				pod, err := f.PodClient().Get(config.Prefix+"-client", metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred(), "Failed getting pod %q.", config.Prefix+"-client")
+				framework.Logf("Detaching PD %q from Node %q", volumeName, pod.Spec.NodeName)
+				err = detachPD(types.NodeName(pod.Spec.NodeName), volumeName)
+				Expect(err).NotTo(HaveOccurred(), "Failed to detach PD %q from node %q", volumeName, pod.Spec.NodeName)
+				err = waitForPDDetach(volumeName, types.NodeName(pod.Spec.NodeName))
+				Expect(err).NotTo(HaveOccurred(), "Timeout waiting for PD %q to detach from client %q on node %q", volumeName, pod.Name, pod.Spec.NodeName)
 				framework.DeletePDWithRetry(volumeName)
 			}()
 
