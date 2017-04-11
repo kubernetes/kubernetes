@@ -727,13 +727,15 @@ func TestGetByFormatForcesFlag(t *testing.T) {
 	errBuf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdGet(f, buf, errBuf)
-	cmd.SetOutput(buf)
-	cmd.Flags().Lookup("output").Value.Set("yaml")
-	cmd.Run(cmd, []string{"pods"})
 
-	showAllFlag, _ := cmd.Flags().GetBool("show-all")
-	if showAllFlag {
-		t.Errorf("expected showAll to not be true when getting resource")
+	options := &GetOptions{}
+	err := options.Complete(f, buf, errBuf, cmd, []string{"pods", "foo"})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if !options.ShowAll {
+		t.Errorf("expected showAll to be true when getting resource by name")
 	}
 }
 

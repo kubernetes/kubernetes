@@ -460,6 +460,14 @@ func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMa
 	return f.tf.Printer, f.tf.Err
 }
 
+func (f *FakeFactory) PrinterWithOption(_ cmdutil.PrinterOptions) (printers.ResourcePrinter, bool, error) {
+	return f.tf.CommandPrinter, f.tf.GenericPrinter, f.tf.Err
+}
+
+func (f *FakeFactory) PrinterForMappingWithOption(_ cmdutil.PrinterOptions, mapping *meta.RESTMapping, isWatch, withNamespace bool) (printers.ResourcePrinter, error) {
+	return f.tf.Printer, f.tf.Err
+}
+
 func (f *FakeFactory) NewBuilder() *resource.Builder {
 	return nil
 }
@@ -688,6 +696,14 @@ func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper,
 
 func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
+}
+
+func (f *fakeAPIFactory) PrinterForMappingWithOption(_ cmdutil.PrinterOptions, mapping *meta.RESTMapping, isWatch, withNamespace bool) (printers.ResourcePrinter, error) {
+	return f.tf.Printer, f.tf.Err
+}
+
+func (f *fakeAPIFactory) PrinterWithOption(_ cmdutil.PrinterOptions) (printers.ResourcePrinter, bool, error) {
+	return f.tf.CommandPrinter, f.tf.GenericPrinter, f.tf.Err
 }
 
 func (f *fakeAPIFactory) NewBuilder() *resource.Builder {

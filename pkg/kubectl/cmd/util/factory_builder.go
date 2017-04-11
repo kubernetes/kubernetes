@@ -93,6 +93,48 @@ func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTM
 	return printer, nil
 }
 
+func (f *ring2Factory) PrinterWithOption(o PrinterOptions) (printers.ResourcePrinter, bool, error) {
+	mapper, typer := f.objectMappingFactory.Object()
+	// TODO: used by the custom column implementation and the name implementation, break this dependency
+	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
+	return o.Printer(mapper, typer, decoders)
+}
+
+func (f *ring2Factory) PrinterForMappingWithOption(o PrinterOptions, mapping *meta.RESTMapping, isWatch, withNamespace bool) (printers.ResourcePrinter, error) {
+	printer, generic, err := f.PrinterWithOption(o)
+	if err != nil {
+		return nil, err
+	}
+
+	// Make sure we output versioned data for generic printers
+	if generic {
+		if mapping == nil {
+			return nil, fmt.Errorf("no serialization format found")
+		}
+		version := mapping.GroupVersionKind.GroupVersion()
+		if version.Empty() {
+			return nil, fmt.Errorf("no serialization format found")
+		}
+
+		printer = printers.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion())
+	} else {
+		printer, err = f.clientAccessFactory.Printer(mapping, printers.PrintOptions{
+			NoHeaders:          o.NoHeaders,
+			WithNamespace:      withNamespace,
+			Wide:               false,
+			ShowAll:            o.ShowAll,
+			ShowLabels:         o.ShowLabels,
+			AbsoluteTimestamps: isWatch,
+			ColumnLabels:       nil,
+		})
+		if err != nil {
+			return nil, err
+		}
+		printer = o.wrapSortingPrinter(printer)
+	}
+	return printer, nil
+}
+
 func (f *ring2Factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
 	// try to get a typed object
 	_, typer := f.objectMappingFactory.Object()
