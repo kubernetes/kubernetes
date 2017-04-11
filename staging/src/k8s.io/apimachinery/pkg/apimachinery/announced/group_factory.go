@@ -89,6 +89,17 @@ func (gmf *GroupMetaFactory) Announce(groupFactoryRegistry APIGroupFactoryRegist
 		panic(err)
 	}
 	return gmf
+
+}
+
+// AnnounceIfNotAnnounced is the same as Announce, except that it returns nil
+// if gmf.GroupArgs.GroupName is already registered in groupFactoryRegistry,
+// instead of panicing.
+func (gmf *GroupMetaFactory) AnnounceIfNotAnnounced(groupFactoryRegistry APIGroupFactoryRegistry) *GroupMetaFactory {
+	if _, ok := groupFactoryRegistry[gmf.GroupArgs.GroupName]; ok {
+		return nil
+	}
+	return gmf.Announce(groupFactoryRegistry)
 }
 
 // GroupMetaFactory has the logic for actually assembling and registering a group.
@@ -241,6 +252,9 @@ func (gmf *GroupMetaFactory) Enable(m *registered.APIRegistrationManager, scheme
 // It's really bad that this is called in init() methods, but supporting this
 // temporarily lets us do the change incrementally.
 func (gmf *GroupMetaFactory) RegisterAndEnable(registry *registered.APIRegistrationManager, scheme *runtime.Scheme) error {
+	if gmf == nil {
+		return nil
+	}
 	if err := gmf.Register(registry); err != nil {
 		return err
 	}
