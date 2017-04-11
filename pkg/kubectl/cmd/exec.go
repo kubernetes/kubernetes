@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"time"
 
 	dockerterm "github.com/docker/docker/pkg/term"
 	"github.com/spf13/cobra"
@@ -81,18 +82,19 @@ func NewCmdExec(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", false, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", false, "Stdin is a TTY")
+	cmdutil.AddRemoteStreamFlags(cmd)
 	return cmd
 }
 
 // RemoteExecutor defines the interface accepted by the Exec command - provided for test stubbing
 type RemoteExecutor interface {
-	Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue term.TerminalSizeQueue) error
+	Execute(method string, url *url.URL, config *restclient.Config, streamTimeout time.Duration, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue term.TerminalSizeQueue) error
 }
 
 // DefaultRemoteExecutor is the standard implementation of remote command execution
 type DefaultRemoteExecutor struct{}
 
-func (*DefaultRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue term.TerminalSizeQueue) error {
+func (*DefaultRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, streamTimeout time.Duration, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue term.TerminalSizeQueue) error {
 	exec, err := remotecommand.NewExecutor(config, method, url)
 	if err != nil {
 		return err
@@ -104,6 +106,7 @@ func (*DefaultRemoteExecutor) Execute(method string, url *url.URL, config *restc
 		Stderr:             stderr,
 		Tty:                tty,
 		TerminalSizeQueue:  terminalSizeQueue,
+		StreamTimeout:      streamTimeout,
 	})
 }
 
@@ -120,6 +123,11 @@ type StreamOptions struct {
 	In              io.Reader
 	Out             io.Writer
 	Err             io.Writer
+
+	// maximum amount of time to wait for stdout/stderr to finish copying
+	// in the remote shell. If value is "0" (default), the remote shell
+	// will remain open until stdout and stderr are finished copying.
+	StreamTimeout time.Duration
 
 	// for testing
 	overrideStreams func() (io.ReadCloser, io.Writer, io.Writer)
@@ -159,6 +167,8 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 			return cmdutil.UsageError(cmd, execUsageStr)
 		}
 	}
+
+	p.StreamTimeout = cmdutil.GetFlagDuration(cmd, "stream-timeout")
 
 	cmdParent := cmd.Parent()
 	if cmdParent != nil {
@@ -316,7 +326,7 @@ func (p *ExecOptions) Run() error {
 			TTY:       t.Raw,
 		}, api.ParameterCodec)
 
-		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
+		return p.Executor.Execute("POST", req.URL(), p.Config, p.StreamTimeout, p.In, p.Out, p.Err, t.Raw, sizeQueue)
 	}
 
 	if err := t.Safe(fn); err != nil {

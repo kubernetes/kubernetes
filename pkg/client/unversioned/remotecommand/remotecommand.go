@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -42,6 +43,7 @@ type StreamOptions struct {
 	Stderr             io.Writer
 	Tty                bool
 	TerminalSizeQueue  term.TerminalSizeQueue
+	StreamTimeout      time.Duration
 }
 
 // Executor is an interface for transporting shell-style streams.
