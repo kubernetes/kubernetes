@@ -51,6 +51,7 @@ type Clusters interface {
 	Master(clusterName string) (string, error)
 }
 
+// TODO(#43173): Deprecate this common GetLoadBalancerName() function and use per-provider getLoadBalancerName() instead.
 // TODO(#6812): Use a shorter name that's less likely to be longer than cloud
 // providers' name length limits.
 func GetLoadBalancerName(service *v1.Service) string {
