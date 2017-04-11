@@ -237,7 +237,7 @@ func (ds *dockerService) RemovePodSandbox(podSandboxID string) error {
 	}
 
 	// Remove the sandbox container.
-	if err := ds.client.RemoveContainer(podSandboxID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); err != nil && !dockertools.IsContainerNotFoundError(err) {
+	if err := ds.client.RemoveContainer(podSandboxID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true, Force: true}); err != nil && !dockertools.IsContainerNotFoundError(err) {
 		errs = append(errs, err)
 	}
 
