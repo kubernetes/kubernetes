@@ -29,9 +29,6 @@ import (
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
-	if _, ok := groupFactoryRegistry[api.GroupName]; ok {
-		return
-	}
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  api.GroupName,
@@ -63,7 +60,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		announced.VersionToSchemeFunc{
 			v1.SchemeGroupVersion.Version: v1.AddToScheme,
 		},
-	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
+	).AnnounceIfNotAnnounced(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)
 	}
 }
