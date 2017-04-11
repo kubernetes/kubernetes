@@ -13945,13 +13945,15 @@ go_library(
 go_library(
     name = "k8s.io/client-go/pkg/api/v1",
     srcs = [
+        "k8s.io/client-go/pkg/api/v1/annotation_key_constants.go",
         "k8s.io/client-go/pkg/api/v1/conversion.go",
         "k8s.io/client-go/pkg/api/v1/defaults.go",
         "k8s.io/client-go/pkg/api/v1/doc.go",
         "k8s.io/client-go/pkg/api/v1/generate.go",
         "k8s.io/client-go/pkg/api/v1/generated.pb.go",
-        "k8s.io/client-go/pkg/api/v1/helpers.go",
         "k8s.io/client-go/pkg/api/v1/meta.go",
+        "k8s.io/client-go/pkg/api/v1/methods.go",
+        "k8s.io/client-go/pkg/api/v1/nonstandard_types.go",
         "k8s.io/client-go/pkg/api/v1/ref.go",
         "k8s.io/client-go/pkg/api/v1/register.go",
         "k8s.io/client-go/pkg/api/v1/resource_helpers.go",
@@ -13971,17 +13973,13 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/selection",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/util/rand",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/helper",
         "//vendor:k8s.io/client-go/pkg/apis/extensions",
         "//vendor:k8s.io/client-go/pkg/util",
         "//vendor:k8s.io/client-go/pkg/util/parsers",
@@ -16772,6 +16770,18 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/selection",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/pkg/api",
+    ],
+)
+
+go_test(
+    name = "k8s.io/client-go/pkg/api/helper_test",
+    srcs = ["k8s.io/client-go/pkg/api/helper/helpers_test.go"],
+    library = ":k8s.io/client-go/pkg/api/helper",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/client-go/pkg/api",
     ],
 )

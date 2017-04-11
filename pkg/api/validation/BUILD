@@ -23,6 +23,7 @@ go_library(
         "//pkg/api/service:go_default_library",
         "//pkg/api/util:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/helper:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/security/apparmor:go_default_library",
