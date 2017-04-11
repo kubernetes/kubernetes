@@ -436,6 +436,9 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 	proxier.haveReceivedServiceUpdate = true
 
 	activeServices := make(map[proxy.ServicePortName]bool) // use a map as a set
+	// Warning: activeLocalServices is used as a surgical fix in 1.5 for the health check bug (#44053).
+	//          This fix does not exist on 1.6+ as we overhauled healthcheck package completely.
+	activeLocalServices := make(map[types.NamespacedName]bool) // use a map as a set
 
 	for i := range allServices {
 		service := &allServices[i]
@@ -482,6 +485,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 			info.loadBalancerSourceRanges = service.Spec.LoadBalancerSourceRanges
 			info.onlyNodeLocalEndpoints = apiservice.NeedsHealthCheck(service) && featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly() && (service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort)
 			if info.onlyNodeLocalEndpoints {
+				activeLocalServices[serviceName.NamespacedName] = true
 				p := apiservice.GetServiceHealthCheckNodePort(service)
 				if p == 0 {
 					glog.Errorf("Service does not contain necessary annotation %v",
@@ -512,11 +516,16 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 				staleUDPServices.Insert(info.clusterIP.String())
 			}
 			delete(proxier.serviceMap, name)
+
 			if info.onlyNodeLocalEndpoints && info.healthCheckNodePort > 0 {
-				// Remove ServiceListener health check nodePorts from the health checker
-				// TODO - Stats
-				glog.V(4).Infof("Deleting health check for %+v, port %v", name.NamespacedName, info.healthCheckNodePort)
-				healthcheck.DeleteServiceListener(name.NamespacedName, info.healthCheckNodePort)
+				// Remove health check when service disappeared, but not when service+port disappeared.
+				// Changes on service's ports should not trigger health check deletion.
+				if !activeLocalServices[name.NamespacedName] {
+					// Remove ServiceListener health check nodePorts from the health checker
+					// TODO - Stats
+					glog.V(4).Infof("Deleting health check for %+v, port %v", name.NamespacedName, info.healthCheckNodePort)
+					healthcheck.DeleteServiceListener(name.NamespacedName, info.healthCheckNodePort)
+				}
 			}
 		}
 	}
