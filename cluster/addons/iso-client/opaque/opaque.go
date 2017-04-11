@@ -18,18 +18,16 @@ import (
 type patchOperation struct {
 	Operation string `json:"op"`
 	Path      string `json:"path"`
-	Value     string `json:"value"`
+	Value     string `json:"value,omitempty"`
 }
 
-func toRequestBody(operation string, name string, value string) ([]byte, error) {
+func toRequestBody(patchStruct patchOperation) ([]byte, error) {
 	// body is in form of [{"op": "add", "path": "somepath","value": "somevalue"}]
-	return json.Marshal([]patchOperation{
-		patchOperation{
-			Operation: operation,
-			Path:      opaqueResourcePath(name),
-			Value:     value,
+	return json.Marshal(
+		[]patchOperation{
+			patchStruct,
 		},
-	})
+	)
 }
 
 // TODO: check if kubelet is overriding hostname and return it instead
@@ -40,7 +38,11 @@ func getNode() (string, error) {
 // Escape forward slashes in the resource name per the JSON Pointer spec.
 // See https://tools.ietf.org/html/rfc6901#section-3
 func escapeResourcePath(resName api.ResourceName) string {
-	return strings.Replace(string(resName), "/", "~1", -1)
+	replacer := strings.NewReplacer(
+		"/", "~1",
+		"~", "~0",
+	)
+	return replacer.Replace(string(resName))
 }
 
 // genereate OIR path for patch operation
@@ -67,18 +69,30 @@ func prepareRequest(body []byte, url string) (*http.Request, error) {
 }
 
 func AdvertiseOpaqueResource(name string, value int) error {
-	return makeRequest("add", name, value)
+	// prepare body for OIR operation
+	patch := patchOperation{
+		Path:      opaqueResourcePath(name),
+		Operation: "add",
+		Value:     fmt.Sprintf("%d", value),
+	}
+
+	return makeRequest(patch)
 }
 
 func RemoveOpaqueResource(name string) error {
-	return makeRequest("remove", name, 1)
+	// prepare body for OIR operation
+	patch := patchOperation{
+		Operation: "remove",
+		Path:      opaqueResourcePath(name),
+	}
+
+	return makeRequest(patch)
 }
 
-func makeRequest(operation string, name string, value int) error {
-	// prepare body for OIR operation
-	body, err := toRequestBody(operation, name, fmt.Sprintf("%d", value))
+func makeRequest(patchBody patchOperation) error {
+	body, err := toRequestBody(patchBody)
 	if err != nil {
-		return fmt.Errorf("Cannot marshall requestBody to json: %v", err)
+		return fmt.Errorf("Cannot marshall request's body to json: %v", err)
 	}
 
 	// get InClusterConfig
@@ -99,5 +113,4 @@ func makeRequest(operation string, name string, value int) error {
 
 	// make patch request to add/remove OIR
 	return clientset.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(node).SubResource("status").Body(body).Do().Error()
-
 }

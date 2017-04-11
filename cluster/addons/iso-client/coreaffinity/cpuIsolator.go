@@ -14,26 +14,28 @@ import (
 )
 
 type coreAffinityIsolator struct {
-	Name             string
+	name             string
 	cpuAssignmentMap map[string][]int
 	CPUTopology      *cputopology.CPUTopology
+}
+
+// implementation of Init() method in  "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle".Isolator
+func (c *coreAffinityIsolator) Init() error {
+	return opaque.AdvertiseOpaqueResource(c.name, c.CPUTopology.GetTotalCPUs())
 }
 
 // Constructor for Isolator
 func New(name string) (*coreAffinityIsolator, error) {
 	topology, err := discovery.DiscoverTopology()
-	if err := opaque.AdvertiseOpaqueResource(name, topology.GetTotalCPUs()); err != nil {
-		return nil, fmt.Errorf("Cannot advertise OIR: %v ", err)
-	}
 	return &coreAffinityIsolator{
-		Name:             name,
+		name:             name,
 		CPUTopology:      topology,
 		cpuAssignmentMap: make(map[string][]int),
 	}, err
 }
 
 func (c *coreAffinityIsolator) gatherContainerRequest(container v1.Container) int64 {
-	resource, ok := container.Resources.Requests[v1.OpaqueIntResourceName(c.Name)]
+	resource, ok := container.Resources.Requests[v1.OpaqueIntResourceName(c.name)]
 	if !ok {
 		return 0
 	}
@@ -113,5 +115,10 @@ func (c *coreAffinityIsolator) PostStopPod(cgroupInfo *lifecycle.CgroupInfo) err
 	return nil
 }
 func (c *coreAffinityIsolator) ShutDown() {
-	opaque.RemoveOpaqueResource(c.Name)
+	opaque.RemoveOpaqueResource(c.name)
+}
+
+// implementation of Name method in "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle".Isolator
+func (c *coreAffinityIsolator) Name() string {
+	return c.name
 }

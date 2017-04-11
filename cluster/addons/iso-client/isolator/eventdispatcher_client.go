@@ -14,7 +14,7 @@ type EventDispatcherClient struct {
 }
 
 // Constructor for EventDispatcherClient
-func NewEventDispatcherClient(name string, serverAddress string) (*EventDispatcherClient, error) {
+func newEventDispatcherClient(name string, serverAddress string) (*EventDispatcherClient, error) {
 	clientConn, err := grpc.Dial(serverAddress, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
