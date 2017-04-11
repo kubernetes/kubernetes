@@ -58,6 +58,11 @@ func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 
 	go c.informer.Run(stopCh)
 
+	// Wait for all involved caches to be synced, before processing items from the queue is started
+	if !cache.WaitForCacheSync(stopCh, c.informer.HasSynced) {
+		glog.Fatal("Timed out waiting for caches to sync")
+	}
+
 	for i := 0; i < threadiness; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
