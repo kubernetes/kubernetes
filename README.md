@@ -70,7 +70,7 @@ That said, if you have questions, reach out to us
 [CNCF]: https://www.cncf.io/about
 [communication]: https://github.com/kubernetes/community/blob/master/communication.md
 [community repository]: https://github.com/kubernetes/community
-[containerized applications]: http://kubernetes.io/docs/whatisk8s
+[containerized applications]: https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/
 [developer's documentation]: https://github.com/kubernetes/community/tree/master/contributors/devel
 [Docker environment]: https://docs.docker.com/engine
 [Go environment]: https://golang.org/doc/install

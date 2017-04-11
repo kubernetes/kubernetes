@@ -29,9 +29,10 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/federation/apis/core"
 	_ "k8s.io/kubernetes/federation/apis/core/install"
-	"k8s.io/kubernetes/federation/apis/core/v1"
+	corev1 "k8s.io/kubernetes/federation/apis/core/v1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
@@ -41,28 +42,56 @@ import (
 	servicestore "k8s.io/kubernetes/pkg/registry/core/service/storage"
 )
 
-func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
-	serviceStore, serviceStatusStore := servicestore.NewREST(optsGetter)
-	namespaceStore, namespaceStatusStore, namespaceFinalizeStore := namespacestore.NewREST(optsGetter)
-	secretStore := secretstore.NewREST(optsGetter)
-	configMapStore := configmapstore.NewREST(optsGetter)
-	eventStore := eventstore.NewREST(optsGetter, uint64(s.EventTTL.Seconds()))
-
-	coreResources := map[string]rest.Storage{
-		"secrets":             secretStore,
-		"services":            serviceStore,
-		"services/status":     serviceStatusStore,
-		"namespaces":          namespaceStore,
-		"namespaces/status":   namespaceStatusStore,
-		"namespaces/finalize": namespaceFinalizeStore,
-		"events":              eventStore,
-		"configmaps":          configMapStore,
+func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter, apiResourceConfigSource storage.APIResourceConfigSource) {
+	servicesStorageFn := func() map[string]rest.Storage {
+		serviceStore, serviceStatusStore := servicestore.NewREST(optsGetter)
+		return map[string]rest.Storage{
+			"services":        serviceStore,
+			"services/status": serviceStatusStore,
+		}
+	}
+	namespacesStorageFn := func() map[string]rest.Storage {
+		namespaceStore, namespaceStatusStore, namespaceFinalizeStore := namespacestore.NewREST(optsGetter)
+		return map[string]rest.Storage{
+			"namespaces":          namespaceStore,
+			"namespaces/status":   namespaceStatusStore,
+			"namespaces/finalize": namespaceFinalizeStore,
+		}
+	}
+	secretsStorageFn := func() map[string]rest.Storage {
+		secretStore := secretstore.NewREST(optsGetter)
+		return map[string]rest.Storage{
+			"secrets": secretStore,
+		}
+	}
+	configmapsStorageFn := func() map[string]rest.Storage {
+		configMapStore := configmapstore.NewREST(optsGetter)
+		return map[string]rest.Storage{
+			"configmaps": configMapStore,
+		}
+	}
+	eventsStorageFn := func() map[string]rest.Storage {
+		eventStore := eventstore.NewREST(optsGetter, uint64(s.EventTTL.Seconds()))
+		return map[string]rest.Storage{
+			"events": eventStore,
+		}
+	}
+	resourcesStorageMap := map[string]getResourcesStorageFunc{
+		"services":   servicesStorageFn,
+		"namespaces": namespacesStorageFn,
+		"secrets":    secretsStorageFn,
+		"configmaps": configmapsStorageFn,
+		"events":     eventsStorageFn,
+	}
+	shouldInstallGroup, resources := enabledResources(corev1.SchemeGroupVersion, resourcesStorageMap, apiResourceConfigSource)
+	if !shouldInstallGroup {
+		return
 	}
 	coreGroupMeta := api.Registry.GroupOrDie(core.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *coreGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-			v1.SchemeGroupVersion.Version: coreResources,
+			corev1.SchemeGroupVersion.Version: resources,
 		},
 		OptionsExternalVersion: &api.Registry.GroupOrDie(core.GroupName).GroupVersion,
 		Scheme:                 core.Scheme,

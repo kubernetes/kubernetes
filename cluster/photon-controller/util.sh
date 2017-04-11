@@ -156,7 +156,7 @@ function kube-up {
   verify-prereqs
   verify-ssh-prereqs
   verify-photon-config
-  ensure-temp-dir
+  kube::util::ensure-temp-dir
 
   find-release-tars
   find-image-id

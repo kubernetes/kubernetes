@@ -420,6 +420,9 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableCRI, &out.EnableCRI, s); err != nil {
 		return err
 	}
+	if err := v1.Convert_Pointer_bool_To_bool(&in.ExperimentalDockershim, &out.ExperimentalDockershim, s); err != nil {
+		return err
+	}
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
 	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
@@ -615,6 +618,9 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.FeatureGates = in.FeatureGates
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableCRI, &out.EnableCRI, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_bool_To_Pointer_bool(&in.ExperimentalDockershim, &out.ExperimentalDockershim, s); err != nil {
 		return err
 	}
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn

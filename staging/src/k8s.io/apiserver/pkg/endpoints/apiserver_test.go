@@ -26,6 +26,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -331,7 +332,17 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		}
 	}
 
-	return &defaultAPIServer{mux, container}
+	handler := genericapifilters.WithRequestInfo(mux, testRequestInfoResolver(), requestContextMapper)
+	handler = request.WithRequestContext(handler, requestContextMapper)
+
+	return &defaultAPIServer{handler, container}
+}
+
+func testRequestInfoResolver() *request.RequestInfoFactory {
+	return &request.RequestInfoFactory{
+		APIPrefixes:          sets.NewString("api", "apis"),
+		GrouplessAPIPrefixes: sets.NewString("api"),
+	}
 }
 
 func TestSimpleSetupRight(t *testing.T) {
@@ -746,7 +757,7 @@ func TestNotFound(t *testing.T) {
 		"groupless root DELETE with extra segment":    {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
 		"groupless root PUT without extra segment":    {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
 		"groupless root PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
-		"groupless root watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/", http.StatusNotFound},
+		"groupless root watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/", http.StatusInternalServerError},
 
 		"groupless namespaced PATCH method":                 {"PATCH", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
 		"groupless namespaced GET long prefix":              {"GET", "/" + grouplessPrefix + "/", http.StatusNotFound},
@@ -757,7 +768,7 @@ func TestNotFound(t *testing.T) {
 		"groupless namespaced DELETE with extra segment":    {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
 		"groupless namespaced PUT without extra segment":    {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
 		"groupless namespaced PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"groupless namespaced watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/", http.StatusNotFound},
+		"groupless namespaced watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/", http.StatusInternalServerError},
 		"groupless namespaced watch with bad method":        {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
 		"groupless namespaced watch param with bad method":  {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar?watch=true", http.StatusMethodNotAllowed},
 
@@ -777,7 +788,7 @@ func TestNotFound(t *testing.T) {
 		"root DELETE with extra segment":    {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
 		"root PUT without extra segment":    {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
 		"root PUT with extra segment":       {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
-		"root watch missing storage":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/", http.StatusNotFound},
+		"root watch missing storage":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/", http.StatusInternalServerError},
 		// TODO: JTL: "root watch with bad method":        {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simpleroot/bar", http.StatusMethodNotAllowed},
 
 		"namespaced PATCH method":                 {"PATCH", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
@@ -789,7 +800,7 @@ func TestNotFound(t *testing.T) {
 		"namespaced DELETE with extra segment":    {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
 		"namespaced PUT without extra segment":    {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
 		"namespaced PUT with extra segment":       {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"namespaced watch missing storage":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/", http.StatusNotFound},
+		"namespaced watch missing storage":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/", http.StatusInternalServerError},
 		"namespaced watch with bad method":        {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
 		"namespaced watch param with bad method":  {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar?watch=true", http.StatusMethodNotAllowed},
 	}
@@ -1081,7 +1092,7 @@ func TestList(t *testing.T) {
 		if !simpleStorage.namespacePresent {
 			t.Errorf("%d: namespace not set", i)
 		} else if simpleStorage.actualNamespace != testCase.namespace {
-			t.Errorf("%d: unexpected resource namespace: %s", i, simpleStorage.actualNamespace)
+			t.Errorf("%d: %q unexpected resource namespace: %s", i, testCase.url, simpleStorage.actualNamespace)
 		}
 		if simpleStorage.requestedLabelSelector == nil || simpleStorage.requestedLabelSelector.String() != testCase.label {
 			t.Errorf("%d: unexpected label selector: %v", i, simpleStorage.requestedLabelSelector)
@@ -1169,6 +1180,7 @@ func TestNonEmptyList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	t.Log(body)
 
 	if len(listOut.Items) != 1 {
 		t.Errorf("Unexpected response: %#v", listOut)
@@ -2220,10 +2232,12 @@ func TestPatch(t *testing.T) {
 	client := http.Client{}
 	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
 	request.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
-	_, err = client.Do(request)
+	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	dump, _ := httputil.DumpResponse(response, true)
+	t.Log(string(dump))
 
 	if simpleStorage.updated == nil || simpleStorage.updated.Labels["foo"] != "bar" {
 		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
@@ -2292,10 +2306,12 @@ func TestUpdate(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	_, err = client.Do(request)
+	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	dump, _ := httputil.DumpResponse(response, true)
+	t.Log(string(dump))
 
 	if simpleStorage.updated == nil || simpleStorage.updated.Name != item.Name {
 		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
@@ -2333,6 +2349,9 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	dump, _ := httputil.DumpResponse(response, true)
+	t.Log(string(dump))
+
 	if response.StatusCode != http.StatusForbidden {
 		t.Errorf("Unexpected response %#v", response)
 	}
@@ -2343,7 +2362,7 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := handleDeny(storage)
+	handler := handle(storage)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -2363,6 +2382,8 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if response.StatusCode != http.StatusBadRequest {
+		dump, _ := httputil.DumpResponse(response, true)
+		t.Log(string(dump))
 		t.Errorf("Unexpected response %#v", response)
 	}
 }
@@ -2394,13 +2415,16 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	dump, _ := httputil.DumpResponse(response, true)
+	t.Log(string(dump))
+
 	if response.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected response %#v", response)
 	}
 }
 
-// when the object name and namespace can't be retrieved, skip name checking
-func TestUpdateAllowsMismatchedNamespaceOnError(t *testing.T) {
+// when the object name and namespace can't be retrieved, don't update.  It isn't safe.
+func TestUpdateDisallowsMismatchedNamespaceOnError(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
@@ -2428,13 +2452,15 @@ func TestUpdateAllowsMismatchedNamespaceOnError(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	_, err = client.Do(request)
+	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	dump, _ := httputil.DumpResponse(response, true)
+	t.Log(string(dump))
 
-	if simpleStorage.updated == nil || simpleStorage.updated.Name != item.Name {
-		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
+	if simpleStorage.updated != nil {
+		t.Errorf("Unexpected update value %#v.", simpleStorage.updated)
 	}
 	if selfLinker.called {
 		t.Errorf("self link ignored")
@@ -2605,14 +2631,17 @@ func TestUpdateREST(t *testing.T) {
 	}
 
 	testREST := func(t *testing.T, container *restful.Container, barCode int) {
+		handler := genericapifilters.WithRequestInfo(container, newTestRequestInfoResolver(), requestContextMapper)
+		handler = request.WithRequestContext(handler, requestContextMapper)
+
 		w := httptest.NewRecorder()
-		container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/foo/test"}})
+		handler.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/foo/test"}})
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected OK: %#v", w)
 		}
 
 		w = httptest.NewRecorder()
-		container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/bar/test"}})
+		handler.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/bar/test"}})
 		if w.Code != barCode {
 			t.Errorf("expected response code %d for GET to bar but received %d", barCode, w.Code)
 		}
@@ -2716,16 +2745,19 @@ func TestParentResourceIsRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	handler := genericapifilters.WithRequestInfo(container, newTestRequestInfoResolver(), requestContextMapper)
+	handler = request.WithRequestContext(handler, requestContextMapper)
+
 	// resource is NOT registered in the root scope
 	w := httptest.NewRecorder()
-	container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/simple/test/sub"}})
+	handler.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/simple/test/sub"}})
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected not found: %#v", w)
 	}
 
 	// resource is registered in the namespace scope
 	w = httptest.NewRecorder()
-	container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/simple/test/sub"}})
+	handler.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/simple/test/sub"}})
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected OK: %#v", w)
 	}

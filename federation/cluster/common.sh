@@ -250,7 +250,7 @@ function create-federation-api-objects {
     done
 
     # Create server certificates.
-    ensure-temp-dir
+    kube::util::ensure-temp-dir
     echo "Creating federation apiserver certs for federation api host: ${FEDERATION_API_HOST} ( is this a dns name?: ${IS_DNS_NAME} )"
     MASTER_NAME="federation-apiserver" create-federation-apiserver-certs ${FEDERATION_API_HOST}
     export FEDERATION_APISERVER_CA_CERT_BASE64="${FEDERATION_APISERVER_CA_CERT_BASE64}"

@@ -97,7 +97,7 @@ import (
 //
 // The binding is two-step process. PV.Spec.ClaimRef is modified first and
 // PVC.Spec.VolumeName second. At any point of this transaction, the PV or PVC
-// can be modified by user or other controller or completelly deleted. Also,
+// can be modified by user or other controller or completely deleted. Also,
 // two (or more) controllers may try to bind different volumes to different
 // claims at the same time. The controller must recover from any conflicts
 // that may arise from these conditions.
@@ -1277,7 +1277,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		// This means that an unknown provisioner is requested. Report an event
 		// and wait for the external provisioner
 		if storageClass != nil {
-			msg := fmt.Sprintf("cannot find provisioner %q, expecting that a volume for the claim is provisioned either manually or via external software", storageClass.Provisioner)
+			msg := fmt.Sprintf("waiting for a volume to be created, either by external provisioner %q or manually created by system administrator", storageClass.Provisioner)
 			ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ExternalProvisioning", msg)
 			glog.V(3).Infof("provisioning claim %q: %s", claimToClaimKey(claim), msg)
 		} else {

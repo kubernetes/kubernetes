@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -131,47 +132,60 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
-func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
+func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
+	metadata, err := meta.Accessor(objMeta)
+	if err != nil {
+		allErrs := field.ErrorList{}
+		allErrs = append(allErrs, field.Invalid(fldPath, objMeta, err.Error()))
+		return allErrs
+	}
+	return ValidateObjectMetaAccessor(metadata, requiresNamespace, nameFn, fldPath)
+}
+
+// ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
+// been performed.
+// It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
+func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(meta.GenerateName) != 0 {
-		for _, msg := range nameFn(meta.GenerateName, true) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("generateName"), meta.GenerateName, msg))
+	if len(meta.GetGenerateName()) != 0 {
+		for _, msg := range nameFn(meta.GetGenerateName(), true) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("generateName"), meta.GetGenerateName(), msg))
 		}
 	}
 	// If the generated name validates, but the calculated value does not, it's a problem with generation, and we
 	// report it here. This may confuse users, but indicates a programming bug and still must be validated.
 	// If there are multiple fields out of which one is required then add an or as a separator
-	if len(meta.Name) == 0 {
+	if len(meta.GetName()) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "name or generateName is required"))
 	} else {
-		for _, msg := range nameFn(meta.Name, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), meta.Name, msg))
+		for _, msg := range nameFn(meta.GetName(), false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), meta.GetName(), msg))
 		}
 	}
 	if requiresNamespace {
-		if len(meta.Namespace) == 0 {
+		if len(meta.GetNamespace()) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
 		} else {
-			for _, msg := range ValidateNamespaceName(meta.Namespace, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), meta.Namespace, msg))
+			for _, msg := range ValidateNamespaceName(meta.GetNamespace(), false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), meta.GetNamespace(), msg))
 			}
 		}
 	} else {
-		if len(meta.Namespace) != 0 {
+		if len(meta.GetNamespace()) != 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("namespace"), "not allowed on this type"))
 		}
 	}
-	if len(meta.ClusterName) != 0 {
-		for _, msg := range ValidateClusterName(meta.ClusterName, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterName"), meta.ClusterName, msg))
+	if len(meta.GetClusterName()) != 0 {
+		for _, msg := range ValidateClusterName(meta.GetClusterName(), false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterName"), meta.GetClusterName(), msg))
 		}
 	}
-	allErrs = append(allErrs, ValidateNonnegativeField(meta.Generation, fldPath.Child("generation"))...)
-	allErrs = append(allErrs, v1validation.ValidateLabels(meta.Labels, fldPath.Child("labels"))...)
-	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, fldPath.Child("annotations"))...)
-	allErrs = append(allErrs, ValidateOwnerReferences(meta.OwnerReferences, fldPath.Child("ownerReferences"))...)
-	allErrs = append(allErrs, ValidateFinalizers(meta.Finalizers, fldPath.Child("finalizers"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(meta.GetGeneration(), fldPath.Child("generation"))...)
+	allErrs = append(allErrs, v1validation.ValidateLabels(meta.GetLabels(), fldPath.Child("labels"))...)
+	allErrs = append(allErrs, ValidateAnnotations(meta.GetAnnotations(), fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, ValidateOwnerReferences(meta.GetOwnerReferences(), fldPath.Child("ownerReferences"))...)
+	allErrs = append(allErrs, ValidateFinalizers(meta.GetFinalizers(), fldPath.Child("finalizers"))...)
 	return allErrs
 }
 
@@ -197,65 +211,81 @@ func ValidateFinalizers(finalizers []string, fldPath *field.Path) field.ErrorLis
 
 // ValidateObjectMetaUpdate validates an object's metadata when updated
 func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
+	newMetadata, err := meta.Accessor(newMeta)
+	if err != nil {
+		allErrs := field.ErrorList{}
+		allErrs = append(allErrs, field.Invalid(fldPath, newMeta, err.Error()))
+		return allErrs
+	}
+	oldMetadata, err := meta.Accessor(oldMeta)
+	if err != nil {
+		allErrs := field.ErrorList{}
+		allErrs = append(allErrs, field.Invalid(fldPath, oldMeta, err.Error()))
+		return allErrs
+	}
+	return ValidateObjectMetaAccessorUpdate(newMetadata, oldMetadata, fldPath)
+}
+
+func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if !RepairMalformedUpdates && newMeta.UID != oldMeta.UID {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), newMeta.UID, "field is immutable"))
+	if !RepairMalformedUpdates && newMeta.GetUID() != oldMeta.GetUID() {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), newMeta.GetUID(), "field is immutable"))
 	}
 	// in the event it is left empty, set it, to allow clients more flexibility
 	// TODO: remove the following code that repairs the update request when we retire the clients that modify the immutable fields.
 	// Please do not copy this pattern elsewhere; validation functions should not be modifying the objects they are passed!
 	if RepairMalformedUpdates {
-		if len(newMeta.UID) == 0 {
-			newMeta.UID = oldMeta.UID
+		if len(newMeta.GetUID()) == 0 {
+			newMeta.SetUID(oldMeta.GetUID())
 		}
 		// ignore changes to timestamp
-		if oldMeta.CreationTimestamp.IsZero() {
-			oldMeta.CreationTimestamp = newMeta.CreationTimestamp
+		if oldCreationTime := oldMeta.GetCreationTimestamp(); oldCreationTime.IsZero() {
+			oldMeta.SetCreationTimestamp(newMeta.GetCreationTimestamp())
 		} else {
-			newMeta.CreationTimestamp = oldMeta.CreationTimestamp
+			newMeta.SetCreationTimestamp(oldMeta.GetCreationTimestamp())
 		}
 		// an object can never remove a deletion timestamp or clear/change grace period seconds
-		if !oldMeta.DeletionTimestamp.IsZero() {
-			newMeta.DeletionTimestamp = oldMeta.DeletionTimestamp
+		if !oldMeta.GetDeletionTimestamp().IsZero() {
+			newMeta.SetDeletionTimestamp(oldMeta.GetDeletionTimestamp())
 		}
-		if oldMeta.DeletionGracePeriodSeconds != nil && newMeta.DeletionGracePeriodSeconds == nil {
-			newMeta.DeletionGracePeriodSeconds = oldMeta.DeletionGracePeriodSeconds
+		if oldMeta.GetDeletionGracePeriodSeconds() != nil && newMeta.GetDeletionGracePeriodSeconds() == nil {
+			newMeta.SetDeletionGracePeriodSeconds(oldMeta.GetDeletionGracePeriodSeconds())
 		}
 	}
 
 	// TODO: needs to check if newMeta==nil && oldMeta !=nil after the repair logic is removed.
-	if newMeta.DeletionGracePeriodSeconds != nil && (oldMeta.DeletionGracePeriodSeconds == nil || *newMeta.DeletionGracePeriodSeconds != *oldMeta.DeletionGracePeriodSeconds) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), newMeta.DeletionGracePeriodSeconds, "field is immutable; may only be changed via deletion"))
+	if newMeta.GetDeletionGracePeriodSeconds() != nil && (oldMeta.GetDeletionGracePeriodSeconds() == nil || *newMeta.GetDeletionGracePeriodSeconds() != *oldMeta.GetDeletionGracePeriodSeconds()) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), newMeta.GetDeletionGracePeriodSeconds(), "field is immutable; may only be changed via deletion"))
 	}
-	if newMeta.DeletionTimestamp != nil && (oldMeta.DeletionTimestamp == nil || !newMeta.DeletionTimestamp.Equal(*oldMeta.DeletionTimestamp)) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("deletionTimestamp"), newMeta.DeletionTimestamp, "field is immutable; may only be changed via deletion"))
+	if newMeta.GetDeletionTimestamp() != nil && (oldMeta.GetDeletionTimestamp() == nil || !newMeta.GetDeletionTimestamp().Equal(*oldMeta.GetDeletionTimestamp())) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("deletionTimestamp"), newMeta.GetDeletionTimestamp(), "field is immutable; may only be changed via deletion"))
 	}
 
 	// Finalizers cannot be added if the object is already being deleted.
-	if oldMeta.DeletionTimestamp != nil {
-		allErrs = append(allErrs, ValidateNoNewFinalizers(newMeta.Finalizers, oldMeta.Finalizers, fldPath.Child("finalizers"))...)
+	if oldMeta.GetDeletionTimestamp() != nil {
+		allErrs = append(allErrs, ValidateNoNewFinalizers(newMeta.GetFinalizers(), oldMeta.GetFinalizers(), fldPath.Child("finalizers"))...)
 	}
 
 	// Reject updates that don't specify a resource version
-	if len(newMeta.ResourceVersion) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newMeta.ResourceVersion, "must be specified for an update"))
+	if len(newMeta.GetResourceVersion()) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newMeta.GetResourceVersion(), "must be specified for an update"))
 	}
 
 	// Generation shouldn't be decremented
-	if newMeta.Generation < oldMeta.Generation {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), newMeta.Generation, "must not be decremented"))
+	if newMeta.GetGeneration() < oldMeta.GetGeneration() {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), newMeta.GetGeneration(), "must not be decremented"))
 	}
 
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.Name, oldMeta.Name, fldPath.Child("name"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.Namespace, oldMeta.Namespace, fldPath.Child("namespace"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.UID, oldMeta.UID, fldPath.Child("uid"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.CreationTimestamp, oldMeta.CreationTimestamp, fldPath.Child("creationTimestamp"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.ClusterName, oldMeta.ClusterName, fldPath.Child("clusterName"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetName(), oldMeta.GetName(), fldPath.Child("name"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetNamespace(), oldMeta.GetNamespace(), fldPath.Child("namespace"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetUID(), oldMeta.GetUID(), fldPath.Child("uid"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetCreationTimestamp(), oldMeta.GetCreationTimestamp(), fldPath.Child("creationTimestamp"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetClusterName(), oldMeta.GetClusterName(), fldPath.Child("clusterName"))...)
 
-	allErrs = append(allErrs, v1validation.ValidateLabels(newMeta.Labels, fldPath.Child("labels"))...)
-	allErrs = append(allErrs, ValidateAnnotations(newMeta.Annotations, fldPath.Child("annotations"))...)
-	allErrs = append(allErrs, ValidateOwnerReferences(newMeta.OwnerReferences, fldPath.Child("ownerReferences"))...)
+	allErrs = append(allErrs, v1validation.ValidateLabels(newMeta.GetLabels(), fldPath.Child("labels"))...)
+	allErrs = append(allErrs, ValidateAnnotations(newMeta.GetAnnotations(), fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, ValidateOwnerReferences(newMeta.GetOwnerReferences(), fldPath.Child("ownerReferences"))...)
 
 	return allErrs
 }

@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
-	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -113,14 +112,6 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.Pod
 		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
 	}
 
-	// TODO: remove these after we EOL the annotations.
-	if hostname, exists := annotations[utilpod.PodHostnameAnnotation]; exists {
-		allErrs = append(allErrs, ValidateDNS1123Label(hostname, fldPath.Key(utilpod.PodHostnameAnnotation))...)
-	}
-	if subdomain, exists := annotations[utilpod.PodSubdomainAnnotation]; exists {
-		allErrs = append(allErrs, ValidateDNS1123Label(subdomain, fldPath.Key(utilpod.PodSubdomainAnnotation))...)
-	}
-
 	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
 	allErrs = append(allErrs, ValidateAppArmorPodAnnotations(annotations, spec, fldPath)...)
 
@@ -155,7 +146,7 @@ func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath 
 	}
 
 	if len(tolerations) > 0 {
-		allErrs = append(allErrs, validateTolerations(tolerations, fldPath.Child(api.TolerationsAnnotationKey))...)
+		allErrs = append(allErrs, ValidateTolerations(tolerations, fldPath.Child(api.TolerationsAnnotationKey))...)
 	}
 
 	return allErrs
@@ -2003,12 +1994,12 @@ func validateOnlyAddedTolerations(newTolerations []api.Toleration, oldToleration
 		}
 	}
 
-	allErrs = append(allErrs, validateTolerations(newTolerations, fldPath)...)
+	allErrs = append(allErrs, ValidateTolerations(newTolerations, fldPath)...)
 	return allErrs
 }
 
-// validateTolerations tests if given tolerations have valid data.
-func validateTolerations(tolerations []api.Toleration, fldPath *field.Path) field.ErrorList {
+// ValidateTolerations tests if given tolerations have valid data.
+func ValidateTolerations(tolerations []api.Toleration, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	for i, toleration := range tolerations {
 		idxPath := fldPath.Index(i)
@@ -2105,7 +2096,7 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	if len(spec.Tolerations) > 0 {
-		allErrs = append(allErrs, validateTolerations(spec.Tolerations, fldPath.Child("tolerations"))...)
+		allErrs = append(allErrs, ValidateTolerations(spec.Tolerations, fldPath.Child("tolerations"))...)
 	}
 
 	return allErrs

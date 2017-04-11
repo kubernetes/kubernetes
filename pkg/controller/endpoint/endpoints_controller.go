@@ -213,28 +213,8 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 }
 
 func hostNameAndDomainAreEqual(pod1, pod2 *v1.Pod) bool {
-	return getHostname(pod1) == getHostname(pod2) &&
-		getSubdomain(pod1) == getSubdomain(pod2)
-}
-
-func getHostname(pod *v1.Pod) string {
-	if len(pod.Spec.Hostname) > 0 {
-		return pod.Spec.Hostname
-	}
-	if pod.Annotations != nil {
-		return pod.Annotations[podutil.PodHostnameAnnotation]
-	}
-	return ""
-}
-
-func getSubdomain(pod *v1.Pod) string {
-	if len(pod.Spec.Subdomain) > 0 {
-		return pod.Spec.Subdomain
-	}
-	if pod.Annotations != nil {
-		return pod.Annotations[podutil.PodSubdomainAnnotation]
-	}
-	return ""
+	return pod1.Spec.Hostname == pod2.Spec.Hostname &&
+		pod1.Spec.Subdomain == pod2.Spec.Subdomain
 }
 
 // When a pod is deleted, enqueue the services the pod used to be a member of.
@@ -389,9 +369,9 @@ func (e *EndpointController) syncService(key string) error {
 					ResourceVersion: pod.ObjectMeta.ResourceVersion,
 				}}
 
-			hostname := getHostname(pod)
+			hostname := pod.Spec.Hostname
 			if len(hostname) > 0 &&
-				getSubdomain(pod) == service.Name &&
+				pod.Spec.Subdomain == service.Name &&
 				service.Namespace == pod.Namespace {
 				epa.Hostname = hostname
 			}

@@ -18,20 +18,6 @@ package pod
 
 import "k8s.io/kubernetes/pkg/api"
 
-const (
-	// TODO: to be deleted after v1.3 is released. PodSpec has a dedicated Hostname field.
-	// The annotation value is a string specifying the hostname to be used for the pod e.g 'my-webserver-1'
-	PodHostnameAnnotation = "pod.beta.kubernetes.io/hostname"
-
-	// TODO: to be deleted after v1.3 is released. PodSpec has a dedicated Subdomain field.
-	// The annotation value is a string specifying the subdomain e.g. "my-web-service"
-	// If specified, on the pod itself, "<hostname>.my-web-service.<namespace>.svc.<cluster domain>" would resolve to
-	// the pod's IP.
-	// If there is a headless service named "my-web-service" in the same namespace as the pod, then,
-	// <hostname>.my-web-service.<namespace>.svc.<cluster domain>" would be resolved by the cluster DNS Server.
-	PodSubdomainAnnotation = "pod.beta.kubernetes.io/subdomain"
-)
-
 // VisitPodSecretNames invokes the visitor function with the name of every secret
 // referenced by the pod spec. If visitor returns false, visiting is short-circuited.
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
