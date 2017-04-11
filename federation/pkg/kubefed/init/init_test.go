@@ -322,8 +322,10 @@ func TestMarshallAndMergeOverrides(t *testing.T) {
 			expectedErr:    "wrong format for override arg: wrong-format-arg",
 		},
 		{
-			overrideParams: "wrong-format-arg=override=wrong-format-arg=override",
-			expectedErr:    "wrong format for override arg: wrong-format-arg=override=wrong-format-arg=override",
+			// TODO: Multiple arg values separated by , are not supported yet
+			overrideParams: "multiple-equalto-char=first-key=1",
+			expectedSet:    sets.NewString("arg2=val2", "arg1=val1", "multiple-equalto-char=first-key=1"),
+			expectedErr:    "",
 		},
 		{
 			overrideParams: "=wrong-format-only-value",

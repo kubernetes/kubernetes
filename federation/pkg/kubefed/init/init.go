@@ -922,7 +922,7 @@ func marshallOverrides(overrideArgString string) (map[string]string, error) {
 	argsMap := make(map[string]string)
 	overrideArgs := strings.Split(overrideArgString, ",")
 	for _, overrideArg := range overrideArgs {
-		splitArg := strings.Split(overrideArg, "=")
+		splitArg := strings.SplitN(overrideArg, "=", 2)
 		if len(splitArg) != 2 {
 			return nil, fmt.Errorf("wrong format for override arg: %s", overrideArg)
 		}
