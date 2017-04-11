@@ -37,7 +37,14 @@ import (
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
 func (gce *GCECloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	// For backword compatibility we had to fetch the loadBalancerName this way or else a simple assignment for annotations["currentLB"] would be enough.
+	annotations := service.GetAnnotations()
+	var loadBalancerName string
+	if value, ok := annotations["currentLB"]; ok {
+		loadBalancerName = value
+	} else {
+		loadBalancerName = cloudprovider.GetLoadBalancerName(service)
+	}
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, gce.region, loadBalancerName).Do()
 	if err == nil {
 		status := &v1.LoadBalancerStatus{}
@@ -69,7 +76,13 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 		return nil, err
 	}
 
-	loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
+	loadBalancerName := gce.getLoadBalancerName(apiService)
+
+	annotations := make(map[string]string)
+	annotations["currentLB"] = loadBalancerName
+	apiService.SetAnnotations(annotations)
+	glog.Infof("Current LoadBalancer Name Annotation:%v", apiService.GetAnnotations())
+
 	loadBalancerIP := apiService.Spec.LoadBalancerIP
 	ports := apiService.Spec.Ports
 	portStr := []string{}
@@ -350,7 +363,15 @@ func (gce *GCECloud) UpdateLoadBalancer(clusterName string, service *v1.Service,
 		return err
 	}
 
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+        // For backword compatibility we had to fetch the loadBalancerName this way or else a simple assignment for annotations["currentLB"] would be enough.
+        annotations := service.GetAnnotations()
+        var loadBalancerName string
+        if value, ok := annotations["currentLB"]; ok {
+                loadBalancerName = value
+        } else {
+                loadBalancerName = cloudprovider.GetLoadBalancerName(service)
+        }
+
 	pool, err := gce.service.TargetPools.Get(gce.projectID, gce.region, loadBalancerName).Do()
 	if err != nil {
 		return err
@@ -365,7 +386,15 @@ func (gce *GCECloud) UpdateLoadBalancer(clusterName string, service *v1.Service,
 
 // EnsureLoadBalancerDeleted is an implementation of LoadBalancer.EnsureLoadBalancerDeleted.
 func (gce *GCECloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+        // For backword compatibility we had to fetch the loadBalancerName this way or else a simple assignment for annotations["currentLB"] would be enough.
+        annotations := service.GetAnnotations()
+        var loadBalancerName string
+        if value, ok := annotations["currentLB"]; ok {
+                loadBalancerName = value
+        } else {
+                loadBalancerName = cloudprovider.GetLoadBalancerName(service)
+        }
+
 	glog.V(2).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v)", clusterName, service.Namespace, service.Name, loadBalancerName,
 		gce.region)
 
@@ -561,6 +590,13 @@ func (gce *GCECloud) updateTargetPool(loadBalancerName string, existing sets.Str
 
 func (gce *GCECloud) targetPoolURL(name, region string) string {
 	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/targetPools/%s", gce.projectID, region, name)
+}
+
+func (gce *GCECloud) getLoadBalancerName(service *v1.Service) string {
+        //GCE requires that the name of a load balancer starts with a lower case letter.
+        ret := "a" + string(service.UID)
+        ret = strings.Replace(ret, "-", "", -1)
+        return ret
 }
 
 func (gce *GCECloud) ensureHttpHealthCheck(name, path string, port int32) (hc *compute.HttpHealthCheck, err error) {
