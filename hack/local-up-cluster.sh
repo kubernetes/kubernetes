@@ -805,7 +805,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
 fi
 
 kube::util::test_openssl_installed
-kube::util::test_cfssl_installed
+kube::util::ensure-cfssl
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
 if [ "$GO_OUT" == "" ]; then

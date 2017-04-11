@@ -40,6 +40,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	triple "k8s.io/client-go/util/cert/triple"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -276,13 +277,13 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	}
 
 	// 1. Create a namespace for federation system components
-	_, err = createNamespace(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+	_, err = createNamespace(hostClientset, i.commonOptions.Name, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
 	if err != nil {
 		return err
 	}
 
 	// 2. Expose a network endpoint for the federation API server
-	svc, ips, hostnames, err := createService(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.apiServerAdvertiseAddress, i.options.apiServerServiceType, i.options.dryRun)
+	svc, ips, hostnames, err := createService(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.commonOptions.Name, i.options.apiServerAdvertiseAddress, i.options.apiServerServiceType, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -294,7 +295,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	}
 
 	// 3b. Create the secret containing the credentials.
-	_, err = createAPIServerCredentialsSecret(hostClientset, i.commonOptions.FederationSystemNamespace, serverCredName, credentials, i.options.dryRun)
+	_, err = createAPIServerCredentialsSecret(hostClientset, i.commonOptions.FederationSystemNamespace, serverCredName, i.commonOptions.Name, credentials, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -310,7 +311,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	// stores its data.
 	var pvc *api.PersistentVolumeClaim
 	if i.options.etcdPersistentStorage {
-		pvc, err = createPVC(hostClientset, i.commonOptions.FederationSystemNamespace, svc.Name, i.options.etcdPVCapacity, i.options.dryRun)
+		pvc, err = createPVC(hostClientset, i.commonOptions.FederationSystemNamespace, svc.Name, i.commonOptions.Name, i.options.etcdPVCapacity, i.options.dryRun)
 		if err != nil {
 			return err
 		}
@@ -325,7 +326,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	}
 
 	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.image, advertiseAddress, serverCredName, i.options.apiServerEnableHTTPBasicAuth, i.options.apiServerEnableTokenAuth, i.options.apiServerOverrides, pvc, i.options.dryRun)
+	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.commonOptions.Name, i.options.image, advertiseAddress, serverCredName, i.options.apiServerEnableHTTPBasicAuth, i.options.apiServerEnableTokenAuth, i.options.apiServerOverrides, pvc, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -339,21 +340,21 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	if rbacAvailable {
 		// 7a. Create a service account in the host cluster for federation
 		// controller manager.
-		sa, err = createControllerManagerSA(rbacVersionedClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+		sa, err = createControllerManagerSA(rbacVersionedClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, i.options.dryRun)
 		if err != nil {
 			return err
 		}
 
 		// 7b. Create RBAC role and role binding for federation controller
 		// manager service account.
-		_, _, err = createRoleBindings(rbacVersionedClientset, i.commonOptions.FederationSystemNamespace, sa.Name, i.options.dryRun)
+		_, _, err = createRoleBindings(rbacVersionedClientset, i.commonOptions.FederationSystemNamespace, sa.Name, i.commonOptions.Name, i.options.dryRun)
 		if err != nil {
 			return err
 		}
 	}
 
 	// 7c. Create a dns-provider config secret
-	dnsProviderSecret, err := createDNSProviderConfigSecret(hostClientset, i.commonOptions.FederationSystemNamespace, dnsProviderSecretName, dnsProviderConfigBytes, i.options.dryRun)
+	dnsProviderSecret, err := createDNSProviderConfigSecret(hostClientset, i.commonOptions.FederationSystemNamespace, dnsProviderSecretName, i.commonOptions.Name, dnsProviderConfigBytes, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -400,10 +401,11 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	return err
 }
 
-func createNamespace(clientset client.Interface, namespace string, dryRun bool) (*api.Namespace, error) {
+func createNamespace(clientset client.Interface, federationName, namespace string, dryRun bool) (*api.Namespace, error) {
 	ns := &api.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
+			Name:        namespace,
+			Annotations: map[string]string{federation.FederationNameAnnotation: federationName},
 		},
 	}
 
@@ -414,12 +416,13 @@ func createNamespace(clientset client.Interface, namespace string, dryRun bool) 
 	return clientset.Core().Namespaces().Create(ns)
 }
 
-func createService(clientset client.Interface, namespace, svcName, apiserverAdvertiseAddress string, apiserverServiceType v1.ServiceType, dryRun bool) (*api.Service, []string, []string, error) {
+func createService(clientset client.Interface, namespace, svcName, federationName, apiserverAdvertiseAddress string, apiserverServiceType v1.ServiceType, dryRun bool) (*api.Service, []string, []string, error) {
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      svcName,
-			Namespace: namespace,
-			Labels:    componentLabel,
+			Name:        svcName,
+			Namespace:   namespace,
+			Labels:      componentLabel,
+			Annotations: map[string]string{federation.FederationNameAnnotation: federationName},
 		},
 		Spec: api.ServiceSpec{
 			Type:     api.ServiceType(apiserverServiceType),
@@ -563,7 +566,7 @@ func genCerts(svcNamespace, name, svcName, localDNSZoneName string, ips, hostnam
 	}, nil
 }
 
-func createAPIServerCredentialsSecret(clientset client.Interface, namespace, credentialsName string, credentials *credentials, dryRun bool) (*api.Secret, error) {
+func createAPIServerCredentialsSecret(clientset client.Interface, namespace, credentialsName, federationName string, credentials *credentials, dryRun bool) (*api.Secret, error) {
 	// Build the secret object with API server credentials.
 	data := map[string][]byte{
 		"ca.crt":     certutil.EncodeCertPEM(credentials.certEntKeyPairs.ca.Cert),
@@ -579,8 +582,9 @@ func createAPIServerCredentialsSecret(clientset client.Interface, namespace, cre
 
 	secret := &api.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      credentialsName,
-			Namespace: namespace,
+			Name:        credentialsName,
+			Namespace:   namespace,
+			Annotations: map[string]string{federation.FederationNameAnnotation: federationName},
 		},
 		Data: data,
 	}
@@ -602,10 +606,10 @@ func createControllerManagerKubeconfigSecret(clientset client.Interface, namespa
 		certutil.EncodeCertPEM(entKeyPairs.controllerManager.Cert),
 	)
 
-	return util.CreateKubeconfigSecret(clientset, config, namespace, kubeconfigName, dryRun)
+	return util.CreateKubeconfigSecret(clientset, config, namespace, kubeconfigName, name, "", dryRun)
 }
 
-func createPVC(clientset client.Interface, namespace, svcName, etcdPVCapacity string, dryRun bool) (*api.PersistentVolumeClaim, error) {
+func createPVC(clientset client.Interface, namespace, svcName, federationName, etcdPVCapacity string, dryRun bool) (*api.PersistentVolumeClaim, error) {
 	capacity, err := resource.ParseQuantity(etcdPVCapacity)
 	if err != nil {
 		return nil, err
@@ -618,7 +622,7 @@ func createPVC(clientset client.Interface, namespace, svcName, etcdPVCapacity st
 			Labels:    componentLabel,
 			Annotations: map[string]string{
 				"volume.alpha.kubernetes.io/storage-class": "yes",
-			},
+				federation.FederationNameAnnotation:        federationName},
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{
@@ -639,7 +643,7 @@ func createPVC(clientset client.Interface, namespace, svcName, etcdPVCapacity st
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset client.Interface, namespace, name, image, advertiseAddress, credentialsName string, hasHTTPBasicAuthFile, hasTokenAuthFile bool, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
+func createAPIServer(clientset client.Interface, namespace, name, federationName, image, advertiseAddress, credentialsName string, hasHTTPBasicAuthFile, hasTokenAuthFile bool, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -669,16 +673,18 @@ func createAPIServer(clientset client.Interface, namespace, name, image, adverti
 
 	dep := &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels:    componentLabel,
+			Name:        name,
+			Namespace:   namespace,
+			Labels:      componentLabel,
+			Annotations: map[string]string{federation.FederationNameAnnotation: federationName},
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: 1,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   name,
-					Labels: apiserverPodLabels,
+					Name:        name,
+					Labels:      apiserverPodLabels,
+					Annotations: map[string]string{federation.FederationNameAnnotation: federationName},
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -756,15 +762,17 @@ func createAPIServer(clientset client.Interface, namespace, name, image, adverti
 		return dep, nil
 	}
 
-	return clientset.Extensions().Deployments(namespace).Create(dep)
+	createdDep, err := clientset.Extensions().Deployments(namespace).Create(dep)
+	return createdDep, err
 }
 
-func createControllerManagerSA(clientset client.Interface, namespace string, dryRun bool) (*api.ServiceAccount, error) {
+func createControllerManagerSA(clientset client.Interface, namespace, federationName string, dryRun bool) (*api.ServiceAccount, error) {
 	sa := &api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ControllerManagerSA,
-			Namespace: namespace,
-			Labels:    componentLabel,
+			Name:        ControllerManagerSA,
+			Namespace:   namespace,
+			Labels:      componentLabel,
+			Annotations: map[string]string{federation.FederationNameAnnotation: federationName},
 		},
 	}
 	if dryRun {
@@ -773,15 +781,16 @@ func createControllerManagerSA(clientset client.Interface, namespace string, dry
 	return clientset.Core().ServiceAccounts(namespace).Create(sa)
 }
 
-func createRoleBindings(clientset client.Interface, namespace, saName string, dryRun bool) (*rbac.Role, *rbac.RoleBinding, error) {
+func createRoleBindings(clientset client.Interface, namespace, saName, federationName string, dryRun bool) (*rbac.Role, *rbac.RoleBinding, error) {
 	roleName := "federation-system:federation-controller-manager"
 	role := &rbac.Role{
 		// a role to use for bootstrapping the federation-controller-manager so it can access
 		// secrets in the host cluster to access other clusters.
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleName,
-			Namespace: namespace,
-			Labels:    componentLabel,
+			Name:        roleName,
+			Namespace:   namespace,
+			Labels:      componentLabel,
+			Annotations: map[string]string{federation.FederationNameAnnotation: federationName},
 		},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch").Groups(legacyAPIGroup).Resources("secrets").RuleOrDie(),
@@ -793,6 +802,7 @@ func createRoleBindings(clientset client.Interface, namespace, saName string, dr
 		return nil, nil, err
 	}
 	rolebinding.Labels = componentLabel
+	rolebinding.Annotations = map[string]string{federation.FederationNameAnnotation: federationName}
 
 	if dryRun {
 		return role, &rolebinding, nil
@@ -839,15 +849,17 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 				// https://github.com/kubernetes/dns/blob/master/pkg/dns/federation/federation.go
 				// TODO v2: Until kube-dns can handle trailing periods we strip them all.
 				//          See https://github.com/kubernetes/dns/issues/67
-				util.FedDomainMapKey: fmt.Sprintf("%s=%s", name, strings.TrimRight(dnsZoneName, ".")),
+				util.FedDomainMapKey:                fmt.Sprintf("%s=%s", name, strings.TrimRight(dnsZoneName, ".")),
+				federation.FederationNameAnnotation: name,
 			},
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: 1,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   cmName,
-					Labels: controllerManagerPodLabels,
+					Name:        cmName,
+					Labels:      controllerManagerPodLabels,
+					Annotations: map[string]string{federation.FederationNameAnnotation: name},
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -912,7 +924,7 @@ func marshallOverrides(overrideArgString string) (map[string]string, error) {
 	argsMap := make(map[string]string)
 	overrideArgs := strings.Split(overrideArgString, ",")
 	for _, overrideArg := range overrideArgs {
-		splitArg := strings.Split(overrideArg, "=")
+		splitArg := strings.SplitN(overrideArg, "=", 2)
 		if len(splitArg) != 2 {
 			return nil, fmt.Errorf("wrong format for override arg: %s", overrideArg)
 		}
@@ -1049,15 +1061,16 @@ func updateKubeconfig(config util.AdminConfig, name, endpoint, kubeConfigPath st
 	return nil
 }
 
-func createDNSProviderConfigSecret(clientset client.Interface, namespace, name string, dnsProviderConfigBytes []byte, dryRun bool) (*api.Secret, error) {
+func createDNSProviderConfigSecret(clientset client.Interface, namespace, name, federationName string, dnsProviderConfigBytes []byte, dryRun bool) (*api.Secret, error) {
 	if dnsProviderConfigBytes == nil {
 		return nil, nil
 	}
 
 	secretSpec := &api.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:        name,
+			Namespace:   namespace,
+			Annotations: map[string]string{federation.FederationNameAnnotation: federationName},
 		},
 		Data: map[string][]byte{
 			name: dnsProviderConfigBytes,

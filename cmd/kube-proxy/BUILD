@@ -11,6 +11,7 @@ load(
 go_binary(
     name = "kube-proxy",
     library = ":go_default_library",
+    linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
 )
 
