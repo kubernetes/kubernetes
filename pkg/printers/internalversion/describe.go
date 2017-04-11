@@ -2068,9 +2068,10 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 					c.Message)
 			}
 		}
-		addresses := make([]string, 0, len(node.Status.Addresses))
+
+		w.Write(LEVEL_0, "Addresses:\n")
 		for _, address := range node.Status.Addresses {
-			addresses = append(addresses, address.Address)
+			w.Write(LEVEL_1, "%s:\t%s\n", address.Type, address.Address)
 		}
 
 		printResourceList := func(resourceList api.ResourceList) {
@@ -2085,7 +2086,6 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 			}
 		}
 
-		w.Write(LEVEL_0, "Addresses:\t%s\n", strings.Join(addresses, ","))
 		if len(node.Status.Capacity) > 0 {
 			w.Write(LEVEL_0, "Capacity:\n")
 			printResourceList(node.Status.Capacity)
