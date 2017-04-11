@@ -109,8 +109,13 @@ func InstrumentRouteFunc(verb, resource string, routeFunc restful.RouteFunction)
 }
 
 func cleanUserAgent(ua string) string {
+	// We collapse all "web browser"-type user agents into one "browser" to reduce metric cardinality.
 	if strings.HasPrefix(ua, "Mozilla/") {
 		return "Browser"
+	}
+	// If an old "kubectl.exe" has passed us its full path, we discard the path portion.
+	if exeIdx := strings.LastIndex(strings.ToLower(ua), "kubectl.exe"); exeIdx != -1 {
+		return ua[exeIdx:]
 	}
 	return ua
 }
