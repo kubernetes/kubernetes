@@ -329,7 +329,7 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
-	tmpDir, err := volume.RenameDirectory(dir, ed.volName+".deleting~")
+	tmpDir, err := volume.RenameDirectory(dir, ed.volName+".deleting~", true)
 	if err != nil {
 		return err
 	}
