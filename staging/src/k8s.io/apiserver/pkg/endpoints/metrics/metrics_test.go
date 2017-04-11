@@ -31,6 +31,14 @@ func TestCleanUserAgent(t *testing.T) {
 			In:  "kubectl/v1.2.4",
 			Out: "kubectl/v1.2.4",
 		},
+		{
+			In:  `C:\Users\Kubernetes\kubectl.exe/v1.5.4`,
+			Out: "kubectl.exe/v1.5.4",
+		},
+		{
+			In:  `C:\Program Files\kubectl.exe/v1.5.4`,
+			Out: "kubectl.exe/v1.5.4",
+		},
 	} {
 		if cleanUserAgent(tc.In) != tc.Out {
 			t.Errorf("Failed to clean User-Agent: %s", tc.In)
