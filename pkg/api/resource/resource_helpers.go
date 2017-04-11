@@ -27,6 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+// GetContainerStatus extracts the status of container "name" from "statuses".
+// It also returns if "name" exists.
 func GetContainerStatus(statuses []api.ContainerStatus, name string) (api.ContainerStatus, bool) {
 	for i := range statuses {
 		if statuses[i].Name == name {
@@ -36,6 +38,8 @@ func GetContainerStatus(statuses []api.ContainerStatus, name string) (api.Contai
 	return api.ContainerStatus{}, false
 }
 
+// GetExistingContainerStatus extracts the status of container "name" from "statuses",
+// and returns empty status if "name" does not exist.
 func GetExistingContainerStatus(statuses []api.ContainerStatus, name string) api.ContainerStatus {
 	for i := range statuses {
 		if statuses[i].Name == name {
@@ -68,13 +72,13 @@ func IsPodReady(pod *api.Pod) bool {
 	return IsPodReadyConditionTrue(pod.Status)
 }
 
-// IsPodReady retruns true if a pod is ready; false otherwise.
+// IsPodReadyConditionTrue retruns true if a pod is ready; false otherwise.
 func IsPodReadyConditionTrue(status api.PodStatus) bool {
 	condition := GetPodReadyCondition(status)
 	return condition != nil && condition.Status == api.ConditionTrue
 }
 
-// Extracts the pod ready condition from the given status and returns that.
+// GetPodReadyCondition extracts the pod ready condition from the given status and returns that.
 // Returns nil if the condition is not present.
 func GetPodReadyCondition(status api.PodStatus) *api.PodCondition {
 	_, condition := GetPodCondition(&status, api.PodReady)
@@ -109,7 +113,7 @@ func GetNodeCondition(status *api.NodeStatus, conditionType api.NodeConditionTyp
 	return -1, nil
 }
 
-// Updates existing pod condition or creates a new one. Sets LastTransitionTime to now if the
+// UpdatePodCondition updates existing pod condition or creates a new one. Sets LastTransitionTime to now if the
 // status has changed.
 // Returns true if pod condition has changed or has been added.
 func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool {
@@ -121,22 +125,21 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 		// We are adding new pod condition.
 		status.Conditions = append(status.Conditions, *condition)
 		return true
-	} else {
-		// We are updating an existing condition, so we need to check if it has changed.
-		if condition.Status == oldCondition.Status {
-			condition.LastTransitionTime = oldCondition.LastTransitionTime
-		}
-
-		isEqual := condition.Status == oldCondition.Status &&
-			condition.Reason == oldCondition.Reason &&
-			condition.Message == oldCondition.Message &&
-			condition.LastProbeTime.Equal(oldCondition.LastProbeTime) &&
-			condition.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
-
-		status.Conditions[conditionIndex] = *condition
-		// Return true if one of the fields have changed.
-		return !isEqual
 	}
+	// We are updating an existing condition, so we need to check if it has changed.
+	if condition.Status == oldCondition.Status {
+		condition.LastTransitionTime = oldCondition.LastTransitionTime
+	}
+
+	isEqual := condition.Status == oldCondition.Status &&
+		condition.Reason == oldCondition.Reason &&
+		condition.Message == oldCondition.Message &&
+		condition.LastProbeTime.Equal(oldCondition.LastProbeTime) &&
+		condition.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
+
+	status.Conditions[conditionIndex] = *condition
+	// Return true if one of the fields have changed.
+	return !isEqual
 }
 
 // IsNodeReady returns true if a node is ready; false otherwise.
