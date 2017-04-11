@@ -51,9 +51,10 @@ type Clusters interface {
 	Master(clusterName string) (string, error)
 }
 
+// TODO(#43173): Deprecate this common GetLoadBalancerName() function after v1.9 ships and use per-provider getLoadBalancerName() instead.
 // TODO(#6812): Use a shorter name that's less likely to be longer than cloud
 // providers' name length limits.
-func GetLoadBalancerName(service *v1.Service) string {
+func DeprecatedGetLoadBalancerName(service *v1.Service) string {
 	//GCE requires that the name of a load balancer starts with a lower case letter.
 	ret := "a" + string(service.UID)
 	ret = strings.Replace(ret, "-", "", -1)
@@ -78,6 +79,8 @@ func GetInstanceProviderID(cloud Interface, nodeName types.NodeName) (string, er
 
 // LoadBalancer is an abstract, pluggable interface for load balancers.
 type LoadBalancer interface {
+	// Returns per-provider load balancer name based on service.
+	GetLoadBalancerName(service *v1.Service) string
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.

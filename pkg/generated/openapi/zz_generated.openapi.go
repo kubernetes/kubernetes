@@ -4377,6 +4377,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "LoadBalancer Name.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
 					},
 				},
 			},
