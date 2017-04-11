@@ -1612,25 +1612,34 @@ func TestGetMatchingPolicies(t *testing.T) {
 			},
 			expectedPolicies: sets.NewString("policy1", "policy2", "policy4", "policy5"),
 		},
-		"policies are allowed for nil user info": {
-			user:    nil,
-			sa:      &user.DefaultInfo{Name: "sa"},
-			ns:      "test",
-			allowed: map[string]map[string]map[string]bool{}, // authorizer not consulted
+		"policies are not allowed for nil user info": {
+			user: nil,
+			sa:   &user.DefaultInfo{Name: "sa"},
+			ns:   "test",
+			allowed: map[string]map[string]map[string]bool{
+				"sa": {
+					"test": {"policy1": true},
+				},
+				"user": {
+					"test": {"policy2": true},
+				},
+			},
 			inPolicies: []*extensions.PodSecurityPolicy{
 				policyWithName("policy1"),
 				policyWithName("policy2"),
 				policyWithName("policy3"),
 			},
-			// all policies are allowed regardless of the permissions when user info is nil
-			// (ie. a request hitting the unsecure port)
-			expectedPolicies: sets.NewString("policy1", "policy2", "policy3"),
+			// only the policies for the sa are allowed when user info is nil
+			expectedPolicies: sets.NewString("policy1"),
 		},
 		"policies are not allowed for nil sa info": {
 			user: &user.DefaultInfo{Name: "user"},
 			sa:   nil,
 			ns:   "test",
 			allowed: map[string]map[string]map[string]bool{
+				"sa": {
+					"test": {"policy1": true},
+				},
 				"user": {
 					"test": {"policy2": true},
 				},
@@ -1642,6 +1651,26 @@ func TestGetMatchingPolicies(t *testing.T) {
 			},
 			// only the policies for the user are allowed when sa info is nil
 			expectedPolicies: sets.NewString("policy2"),
+		},
+		"policies are not allowed for nil sa and user info": {
+			user: nil,
+			sa:   nil,
+			ns:   "test",
+			allowed: map[string]map[string]map[string]bool{
+				"sa": {
+					"test": {"policy1": true},
+				},
+				"user": {
+					"test": {"policy2": true},
+				},
+			},
+			inPolicies: []*extensions.PodSecurityPolicy{
+				policyWithName("policy1"),
+				policyWithName("policy2"),
+				policyWithName("policy3"),
+			},
+			// no policies are allowed if sa and user are both nil
+			expectedPolicies: sets.NewString(),
 		},
 	}
 	for k, v := range tests {
