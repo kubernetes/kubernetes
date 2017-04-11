@@ -1729,7 +1729,9 @@ func Test_buildNewEndpointsMap(t *testing.T) {
 			endpoint:        "1.1.1.1:11",
 			servicePortName: makeServicePortName("ns1", "ep1", ""),
 		}},
-		expectedHealthchecks: map[types.NamespacedName]int{},
+		expectedHealthchecks: map[types.NamespacedName]int{
+			makeNSN("ns1", "ep1"): 0,
+		},
 	}, {
 		// Case[8]: add an IP and port
 		newEndpoints: []*api.Endpoints{
@@ -2050,6 +2052,7 @@ func Test_buildNewEndpointsMap(t *testing.T) {
 			servicePortName: makeServicePortName("ns4", "ep4", "p45"),
 		}},
 		expectedHealthchecks: map[types.NamespacedName]int{
+			makeNSN("ns2", "ep2"): 0,
 			makeNSN("ns4", "ep4"): 1,
 		},
 	}}

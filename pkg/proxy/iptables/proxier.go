@@ -570,6 +570,11 @@ func buildNewEndpointsMap(allEndpoints []*api.Endpoints, curMap proxyEndpointMap
 				glog.V(4).Infof("Stale endpoint %v -> %v", svcPort, ep.endpoint)
 				staleSet[endpointServicePair{endpoint: ep.endpoint, servicePortName: svcPort}] = true
 			}
+
+			// Reset local endpoints count to 0 for existing OnlyLocal services.
+			if ep.isLocal {
+				hcEndpoints[svcPort.NamespacedName] = 0
+			}
 		}
 	}
 
