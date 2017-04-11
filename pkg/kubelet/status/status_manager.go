@@ -81,7 +81,7 @@ type PodStatusProvider interface {
 // An object which provides guarantees that a pod can be saftely deleted.
 type PodDeletionSafetyProvider interface {
 	// A function which returns true if the pod can safely be deleted
-	OkToDeletePod(pod *v1.Pod) bool
+	OkToDeletePod(pod *v1.Pod, status v1.PodStatus) bool
 }
 
 // Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
@@ -443,11 +443,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		if err == nil {
 			glog.V(3).Infof("Status for pod %q updated successfully: (%d, %+v)", format.Pod(pod), status.version, status.status)
 			m.apiStatusVersions[pod.UID] = status.version
-			if kubepod.IsMirrorPod(pod) {
-				// We don't handle graceful deletion of mirror pods.
-				return
-			}
-			if !m.podDeletionSafety.OkToDeletePod(pod) {
+			if !m.canBeDeleted(pod, status.status) {
 				return
 			}
 			deleteOptions := metav1.NewDeleteOptions(0)
@@ -469,16 +465,18 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 // This method is not thread safe, and most only be accessed by the sync thread.
 func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 	latest, ok := m.apiStatusVersions[uid]
-	return !ok || latest < status.version || m.couldBeDeleted(uid, status.status)
-}
-
-func (m *manager) couldBeDeleted(uid types.UID, status v1.PodStatus) bool {
-	// The pod could be a static pod, so we should translate first.
+	if !ok || latest < status.version {
+		return true
+	}
 	pod, ok := m.podManager.GetPodByUID(uid)
 	if !ok {
 		return false
 	}
-	return !kubepod.IsMirrorPod(pod) && m.podDeletionSafety.OkToDeletePod(pod)
+	return m.canBeDeleted(pod, status.status)
+}
+
+func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
+	return !kubepod.IsMirrorPod(pod) && m.podDeletionSafety.OkToDeletePod(pod, status) && pod.DeletionTimestamp != nil
 }
 
 // needsReconcile compares the given status with the status in the pod manager (which

@@ -74,6 +74,8 @@ type managerImpl struct {
 	resourceToNodeReclaimFuncs map[v1.ResourceName]nodeReclaimFuncs
 	// last observations from synchronize
 	lastObservations signalObservations
+	// the pod that was most recently evicted
+	previousEvictedPod *v1.Pod
 	// notifiersInitialized indicates if the threshold notifiers have been initialized (i.e. synchronize() has been called once)
 	notifiersInitialized bool
 }
@@ -134,9 +136,9 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 }
 
 // Start starts the control loop to observe and response to low compute resources.
-func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, nodeProvider NodeProvider, monitoringInterval time.Duration) {
+func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, activePodsFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, nodeProvider NodeProvider, monitoringInterval time.Duration) {
 	// start the eviction manager monitoring
-	go wait.Until(func() { m.synchronize(diskInfoProvider, podFunc, nodeProvider) }, monitoringInterval, wait.NeverStop)
+	go wait.Until(func() { m.synchronize(diskInfoProvider, activePodsFunc, podCleanedUpFunc, nodeProvider) }, monitoringInterval, wait.NeverStop)
 }
 
 // IsUnderMemoryPressure returns true if the node is under memory pressure.
@@ -187,7 +189,7 @@ func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observatio
 }
 
 // synchronize is the main control loop that enforces eviction thresholds.
-func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, nodeProvider NodeProvider) {
+func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, activePodsFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, nodeProvider NodeProvider) {
 	// if we have nothing to do, just return
 	thresholds := m.config.Thresholds
 	if len(thresholds) == 0 {
@@ -224,7 +226,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, false, func(desc string) {
 			glog.Infof("soft memory eviction threshold crossed at %s", desc)
 			// TODO wait grace period for soft memory limit
-			m.synchronize(diskInfoProvider, podFunc, nodeProvider)
+			m.synchronize(diskInfoProvider, activePodsFunc, podCleanedUpFunc, nodeProvider)
 		})
 		if err != nil {
 			glog.Warningf("eviction manager: failed to create hard memory threshold notifier: %v", err)
@@ -232,7 +234,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		// start hard memory notification
 		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, true, func(desc string) {
 			glog.Infof("hard memory eviction threshold crossed at %s", desc)
-			m.synchronize(diskInfoProvider, podFunc, nodeProvider)
+			m.synchronize(diskInfoProvider, activePodsFunc, podCleanedUpFunc, nodeProvider)
 		})
 		if err != nil {
 			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
@@ -310,6 +312,12 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return
 	}
 
+	if m.previousEvictedPod != nil && !podCleanedUpFunc(m.previousEvictedPod) {
+		glog.Infof("eviction manager: previously evicted pod %s still exists; skipping eviction", format.Pod(m.previousEvictedPod))
+		return
+	}
+	m.previousEvictedPod = nil
+
 	glog.Infof("eviction manager: must evict pod(s) to reclaim %v", resourceToReclaim)
 
 	// rank the pods for eviction
@@ -320,7 +328,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	}
 
 	// the only candidates viable for eviction are those pods that had anything running.
-	activePods := podFunc()
+	activePods := activePodsFunc()
 	if len(activePods) == 0 {
 		glog.Errorf("eviction manager: eviction thresholds have been met, but no pods are active to evict")
 		return
@@ -360,6 +368,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		}
 		// success, so we return until the next housekeeping interval
 		glog.Infof("eviction manager: pod %s evicted successfully", format.Pod(pod))
+		m.previousEvictedPod = pod
 		return
 	}
 	glog.Infof("eviction manager: unable to evict any pods from the node")

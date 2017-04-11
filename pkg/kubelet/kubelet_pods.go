@@ -719,12 +719,8 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 // OkToDeletePod returns true if all required node-level resources that a pod was consuming have
 // been reclaimed by the kubelet.  Reclaiming resources is a prerequisite to deleting a pod from the
 // API server.
-func (kl *Kubelet) OkToDeletePod(pod *v1.Pod) bool {
-	if pod.DeletionTimestamp == nil {
-		// We shouldnt delete pods whose DeletionTimestamp is not set
-		return false
-	}
-	if !notRunning(pod.Status.ContainerStatuses) {
+func (kl *Kubelet) OkToDeletePod(pod *v1.Pod, status v1.PodStatus) bool {
+	if !notRunning(status.ContainerStatuses) {
 		// We shouldnt delete pods that still have running containers
 		glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 		return false
@@ -742,6 +738,14 @@ func (kl *Kubelet) OkToDeletePod(pod *v1.Pod) bool {
 		}
 	}
 	return true
+}
+
+func (kl *Kubelet) okToDeletePod(pod *v1.Pod) bool {
+	status, ok := kl.statusManager.GetPodStatus(pod.UID)
+	if !ok {
+		status = pod.Status
+	}
+	return kl.OkToDeletePod(pod, status)
 }
 
 // notRunning returns true if every status is terminated or waiting, or the status list
