@@ -3,19 +3,17 @@ language: go
 go:
   - 1.5.4
   - 1.6.3
+  - 1.7
 
 go_import_path: google.golang.org/grpc
 
 before_install:
-  - go get golang.org/x/tools/cmd/goimports
-  - go get github.com/golang/lint/golint
-  - go get github.com/axw/gocov/gocov
-  - go get github.com/mattn/goveralls
-  - go get golang.org/x/tools/cmd/cover
+  - if [[ $TRAVIS_GO_VERSION != 1.5* ]]; then go get github.com/golang/lint/golint; fi
+  - go get -u golang.org/x/tools/cmd/goimports github.com/axw/gocov/gocov github.com/mattn/goveralls golang.org/x/tools/cmd/cover
 
 script:
   - '! gofmt -s -d -l . 2>&1 | read'
   - '! goimports -l . | read'
-  - '! golint ./... | grep -vE "(_string|\.pb)\.go:"'
-  - '! go tool vet -all . 2>&1 | grep -vE "constant [0-9]+ not a string in call to Errorf"'
+  - 'if [[ $TRAVIS_GO_VERSION != 1.5* ]]; then ! golint ./... | grep -vE "(_string|\.pb)\.go:"; fi'
+  - '! go tool vet -all . 2>&1 | grep -vE "constant [0-9]+ not a string in call to Errorf" | grep -vF .pb.go:' # https://github.com/golang/protobuf/issues/214
   - make test testrace

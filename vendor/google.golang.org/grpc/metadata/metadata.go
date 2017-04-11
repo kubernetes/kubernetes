@@ -117,10 +117,17 @@ func (md MD) Len() int {
 
 // Copy returns a copy of md.
 func (md MD) Copy() MD {
+	return Join(md)
+}
+
+// Join joins any number of MDs into a single MD.
+// The order of values for each key is determined by the order in which
+// the MDs containing those values are presented to Join.
+func Join(mds ...MD) MD {
 	out := MD{}
-	for k, v := range md {
-		for _, i := range v {
-			out[k] = append(out[k], i)
+	for _, md := range mds {
+		for k, v := range md {
+			out[k] = append(out[k], v...)
 		}
 	}
 	return out
