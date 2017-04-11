@@ -86,7 +86,7 @@ function start_kube-aggregator {
 }
 
 kube::util::test_openssl_installed
-kube::util::test_cfssl_installed
+kube::util::ensure-cfssl
 
 start_kube-aggregator
 

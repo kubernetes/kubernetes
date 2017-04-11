@@ -1,4 +1,4 @@
-package spec
+package spec_iterator
 
 func ParallelizedIndexRange(length int, parallelTotal int, parallelNode int) (startIndex int, count int) {
 	if length == 0 {

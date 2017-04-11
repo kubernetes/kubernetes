@@ -20,7 +20,6 @@ limitations under the License.
 package app
 
 import (
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -46,7 +45,6 @@ import (
 	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
 	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -56,16 +54,6 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
-)
-
-const (
-	// "federation-apiserver-kubeconfig" was the old name we used to
-	// store Federation API server kubeconfig secret. We are
-	// deprecating it in favor of `--kubeconfig` flag but giving people
-	// time to migrate.
-	// TODO(madhusudancs): this name is deprecated in 1.5 and should be
-	// removed in 1.6. Remove it in 1.6.
-	DeprecatedKubeconfigSecretName = "federation-apiserver-kubeconfig"
 )
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
@@ -97,28 +85,10 @@ func Run(s *options.CMServer) error {
 		glog.Errorf("unable to register configz: %s", err)
 	}
 
-	// If s.Kubeconfig flag is empty, try with the deprecated name in 1.5.
-	// TODO(madhusudancs): Remove this in 1.6.
-	var restClientCfg *restclient.Config
-	var err error
-	if len(s.Kubeconfig) <= 0 {
-		restClientCfg, err = restClientConfigFromSecret(s.Master)
-		if err != nil {
-			return err
-		}
-	} else {
-		// Create the config to talk to federation-apiserver.
-		restClientCfg, err = clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
-		if err != nil || restClientCfg == nil {
-			// Retry with the deprecated name in 1.5.
-			// TODO(madhusudancs): Remove this in 1.6.
-			glog.V(2).Infof("Couldn't build the rest client config from flags: %v", err)
-			glog.V(2).Infof("Trying with deprecated secret: %s", DeprecatedKubeconfigSecretName)
-			restClientCfg, err = restClientConfigFromSecret(s.Master)
-			if err != nil {
-				return err
-			}
-		}
+	restClientCfg, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
+	if err != nil || restClientCfg == nil {
+		glog.V(2).Infof("Couldn't build the rest client config from flags: %v", err)
+		return err
 	}
 
 	// Override restClientCfg qps/burst settings from flags
@@ -227,17 +197,6 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	}
 
 	select {}
-}
-
-// TODO(madhusudancs): Remove this in 1.6. This is only temporary to give an
-// upgrade path in 1.4/1.5.
-func restClientConfigFromSecret(master string) (*restclient.Config, error) {
-	kubeconfigGetter := util.KubeconfigGetterForSecret(DeprecatedKubeconfigSecretName)
-	restClientCfg, err := clientcmd.BuildConfigFromKubeconfigGetter(master, kubeconfigGetter)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find the Federation API server kubeconfig, tried the --kubeconfig flag and the deprecated secret %s: %v", DeprecatedKubeconfigSecretName, err)
-	}
-	return restClientCfg, nil
 }
 
 func controllerEnabled(controllers utilflag.ConfigurationMap, serverResources []*metav1.APIResourceList, controller string, requiredResources []schema.GroupVersionResource, defaultValue bool) bool {

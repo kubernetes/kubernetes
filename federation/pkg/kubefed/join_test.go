@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/kubernetes/federation/apis/federation"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
@@ -40,6 +41,11 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
+
+// testFederationName is a name to use for the federation in tests. Since the federation
+// name is recovered from the federation itself, this constant is an appropriate
+// functional replica.
+const testFederationName = "test-federation"
 
 func TestJoinFederation(t *testing.T) {
 	cmdErrMsg := ""
@@ -253,6 +259,10 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: util.DefaultFederationSystemNamespace,
+			Annotations: map[string]string{
+				federation.FederationNameAnnotation: testFederationName,
+				federation.ClusterNameAnnotation:    clusterName,
+			},
 		},
 		Data: map[string][]byte{
 			"kubeconfig": configBytes,
@@ -275,7 +285,8 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 					Name:      cmName,
 					Namespace: util.DefaultFederationSystemNamespace,
 					Annotations: map[string]string{
-						util.FedDomainMapKey: fmt.Sprintf("%s=%s", clusterCtx, "test-dns-zone"),
+						util.FedDomainMapKey:                fmt.Sprintf("%s=%s", clusterCtx, "test-dns-zone"),
+						federation.FederationNameAnnotation: testFederationName,
 					},
 				},
 			},
@@ -324,6 +335,10 @@ func fakeJoinTargetClusterFactory(clusterName, clusterCtx string) (cmdutil.Facto
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      util.KubeDnsConfigmapName,
 			Namespace: metav1.NamespaceSystem,
+			Annotations: map[string]string{
+				federation.FederationNameAnnotation: testFederationName,
+				federation.ClusterNameAnnotation:    clusterName,
+			},
 		},
 		Data: map[string]string{
 			util.FedDomainMapKey: fmt.Sprintf("%s=%s", clusterCtx, "test-dns-zone"),
