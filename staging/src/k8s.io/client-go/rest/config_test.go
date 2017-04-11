@@ -19,6 +19,7 @@ package rest
 import (
 	"io"
 	"net/http"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -32,6 +33,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/flowcontrol"
 
+	"github.com/stretchr/testify/assert"
 	_ "k8s.io/client-go/pkg/api/install"
 )
 
@@ -98,6 +100,42 @@ func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
 	if !strings.Contains(config.UserAgent, "kubernetes/") {
 		t.Errorf("no user agent set: %#v", config)
 	}
+}
+
+func TestAdjustVersion(t *testing.T) {
+	assert := assert.New(t)
+	assert.Equal("1.2.3", adjustVersion("1.2.3-alpha4"))
+	assert.Equal("1.2.3", adjustVersion("1.2.3-alpha"))
+	assert.Equal("1.2.3", adjustVersion("1.2.3"))
+	assert.Equal("unknown", adjustVersion(""))
+}
+
+func TestAdjustCommit(t *testing.T) {
+	assert := assert.New(t)
+	assert.Equal("1234567", adjustCommit("1234567890"))
+	assert.Equal("123456", adjustCommit("123456"))
+	assert.Equal("unknown", adjustCommit(""))
+}
+
+func TestAdjustCommand(t *testing.T) {
+	assert := assert.New(t)
+	assert.Equal("beans", adjustCommand(filepath.Join("home", "bob", "Downloads", "beans")))
+	assert.Equal("beans", adjustCommand(filepath.Join(".", "beans")))
+	assert.Equal("beans", adjustCommand("beans"))
+	assert.Equal("unknown", adjustCommand(""))
+}
+
+func TestBuildUserAgent(t *testing.T) {
+	assert.New(t).Equal(
+		"lynx/nicest (beos/itanium) kubernetes/baaaaaaaaad",
+		buildUserAgent(
+			"lynx", "nicest",
+			"beos", "itanium", "baaaaaaaaad"))
+}
+
+// This function untestable since it doesn't accept arguments.
+func TestDefaultKubernetesUserAgent(t *testing.T) {
+	assert.New(t).Contains(DefaultKubernetesUserAgent(), "kubernetes")
 }
 
 func TestRESTClientRequires(t *testing.T) {
