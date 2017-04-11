@@ -32,6 +32,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/flowcontrol"
 
+	"github.com/stretchr/testify/assert"
 	_ "k8s.io/client-go/pkg/api/install"
 )
 
@@ -98,6 +99,38 @@ func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
 	if !strings.Contains(config.UserAgent, "kubernetes/") {
 		t.Errorf("no user agent set: %#v", config)
 	}
+}
+
+func TestAdjustVersion(t *testing.T) {
+	assert := assert.New(t)
+	assert.Equal("1.2.3", adjustVersion("1.2.3-alpha4"))
+	assert.Equal("1.2.3", adjustVersion("1.2.3-alpha"))
+	assert.Equal("1.2.3", adjustVersion("1.2.3"))
+}
+
+func TestAdjustCommit(t *testing.T) {
+	assert := assert.New(t)
+	assert.Equal("1234567", adjustCommit("1234567890"))
+	assert.Equal("123456", adjustCommit("123456"))
+	assert.Equal("unknown", adjustCommit(""))
+}
+
+// This test expects to run on linux, and would fail with a Windows
+// path like C:\Users\Bob\Downloads\beans since its impl is os dependent.
+func TestAdjustCommand(t *testing.T) {
+	assert := assert.New(t)
+	assert.Equal("beans", adjustCommand("/home/bob/Downloads/junk/beans"))
+	assert.Equal("beans", adjustCommand("./beans"))
+	assert.Equal("beans", adjustCommand("beans"))
+}
+
+func TestBuildUserAgent(t *testing.T) {
+	assert.New(t).Equal("lynx/1.2.3-alpha (beos/itanium) kubernetes/0123abcdef", buildUserAgent("lynx", "1.2.3-alpha", "beos", "itanium", "0123abcdef"))
+}
+
+// This function untestable since it doesn't accept arguments.
+func TestDefaultKubernetesUserAgent(t *testing.T) {
+	assert.New(t).Contains(DefaultKubernetesUserAgent(), "kubernetes")
 }
 
 func TestRESTClientRequires(t *testing.T) {
