@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+
+	"github.com/golang/glog"
 )
 
 // HealthzChecker is a named healthz checker.
@@ -61,10 +63,13 @@ func NamedCheck(name string, check func(r *http.Request) error) HealthzChecker {
 // InstallHandler registers a handler for health checking on the path "/healthz" to mux.
 func InstallHandler(mux mux, checks ...HealthzChecker) {
 	if len(checks) == 0 {
+		glog.Info("No default health checks specified. Installing the ping handler.")
 		checks = []HealthzChecker{PingHealthz}
 	}
+	glog.Infof("Installing %v healthz checkers", len(checks))
 	mux.Handle("/healthz", handleRootHealthz(checks...))
 	for _, check := range checks {
+		glog.Infof("Installing %q healthz checker", check.Name())
 		mux.Handle(fmt.Sprintf("/healthz/%v", check.Name()), adaptCheckToHandler(check.Check))
 	}
 }
