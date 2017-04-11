@@ -316,7 +316,7 @@ func TestSetListToMatchingType(t *testing.T) {
 		t.Fatalf("Expected %v, got %v", e, a)
 	}
 	for i := range list {
-		if e, a := list[i], pl.Items[i]; e != a {
+		if e, a := list[i], &pl.Items[i]; !reflect.DeepEqual(e, a) {
 			t.Fatalf("%d: unmatched: %s", i, diff.ObjectDiff(e, a))
 		}
 	}
