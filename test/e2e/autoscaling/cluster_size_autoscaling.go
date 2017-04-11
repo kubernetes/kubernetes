@@ -735,7 +735,8 @@ func waitForAllCaPodsReadyInNamespace(f *framework.Framework, c clientset.Interf
 	return fmt.Errorf("Some pods are still not running: %v", notready)
 }
 
-func setMigSizes(sizes map[string]int) {
+func setMigSizes(sizes map[string]int) bool {
+	madeChanges := false
 	for mig, desiredSize := range sizes {
 		currentSize, err := framework.GroupSize(mig)
 		framework.ExpectNoError(err)
@@ -743,8 +744,10 @@ func setMigSizes(sizes map[string]int) {
 			By(fmt.Sprintf("Setting size of %s to %d", mig, desiredSize))
 			err = framework.ResizeGroup(mig, int32(desiredSize))
 			framework.ExpectNoError(err)
+			madeChanges = true
 		}
 	}
+	return madeChanges
 }
 
 func makeNodeUnschedulable(c clientset.Interface, node *v1.Node) error {
@@ -899,8 +902,19 @@ func manuallyIncreaseClusterSize(f *framework.Framework, originalSizes map[strin
 		increasedSize += val + newNodesForScaledownTests
 	}
 	setMigSizes(newSizes)
-	framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-		func(size int) bool { return size >= increasedSize }, scaleUpTimeout))
+
+	checkClusterSize := func(size int) bool {
+		if size >= increasedSize {
+			return true
+		}
+		resized := setMigSizes(newSizes)
+		if resized {
+			glog.Warning("Unexpected node group size while waiting for cluster resize. Setting size to target again.")
+		}
+		return false
+	}
+
+	framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet, checkClusterSize, scaleUpTimeout))
 	return increasedSize
 }
 
