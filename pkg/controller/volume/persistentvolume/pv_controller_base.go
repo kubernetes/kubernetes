@@ -67,7 +67,7 @@ type ControllerParameters struct {
 }
 
 // NewController creates a new PersistentVolume controller
-func NewController(p ControllerParameters) *PersistentVolumeController {
+func NewController(p ControllerParameters) (*PersistentVolumeController, error) {
 	eventRecorder := p.EventRecorder
 	if eventRecorder == nil {
 		broadcaster := record.NewBroadcaster()
@@ -90,7 +90,9 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 		volumeQueue:                   workqueue.NewNamed("volumes"),
 	}
 
-	controller.volumePluginMgr.InitPlugins(p.VolumePlugins, controller)
+	if err := controller.volumePluginMgr.InitPlugins(p.VolumePlugins, controller); err != nil {
+		return nil, fmt.Errorf("Could not initialize volume plugins for PersistentVolume Controller: %v", err)
+	}
 
 	p.VolumeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
@@ -116,7 +118,7 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 
 	controller.classLister = p.ClassInformer.Lister()
 	controller.classListerSynced = p.ClassInformer.Informer().HasSynced
-	return controller
+	return controller, nil
 }
 
 // initializeCaches fills all controller caches with initial data from etcd in
