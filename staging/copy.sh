@@ -217,7 +217,7 @@ if [ "${FAIL_ON_CHANGES}" = true ]; then
   echo "running FAIL_ON_CHANGES"
   # ignore base.go in diff
   cp "${CLIENT_REPO}/pkg/version/base.go" "${CLIENT_REPO_TEMP}/pkg/version/"
-  if diff -NauprB  -I '^\s*\"Comment\"' -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
+  if diff -NauprB -I 'BUILD' -I '^\s*\"Comment\"' -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
     echo "${CLIENT_REPO} up to date."
     exit 0
   else
