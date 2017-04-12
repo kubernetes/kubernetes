@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package resource
 
 import (
 	"fmt"
@@ -25,59 +25,29 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-// Returns string version of ResourceName.
-func (self ResourceName) String() string {
-	return string(self)
-}
-
-// Returns the CPU limit if specified.
-func (self *ResourceList) Cpu() *resource.Quantity {
-	if val, ok := (*self)[ResourceCPU]; ok {
-		return &val
-	}
-	return &resource.Quantity{Format: resource.DecimalSI}
-}
-
-// Returns the Memory limit if specified.
-func (self *ResourceList) Memory() *resource.Quantity {
-	if val, ok := (*self)[ResourceMemory]; ok {
-		return &val
-	}
-	return &resource.Quantity{Format: resource.BinarySI}
-}
-
-func (self *ResourceList) Pods() *resource.Quantity {
-	if val, ok := (*self)[ResourcePods]; ok {
-		return &val
-	}
-	return &resource.Quantity{}
-}
-
-func (self *ResourceList) NvidiaGPU() *resource.Quantity {
-	if val, ok := (*self)[ResourceNvidiaGPU]; ok {
-		return &val
-	}
-	return &resource.Quantity{}
-}
-
-func GetContainerStatus(statuses []ContainerStatus, name string) (ContainerStatus, bool) {
+// GetContainerStatus extracts the status of container "name" from "statuses".
+// It also returns if "name" exists.
+func GetContainerStatus(statuses []v1.ContainerStatus, name string) (v1.ContainerStatus, bool) {
 	for i := range statuses {
 		if statuses[i].Name == name {
 			return statuses[i], true
 		}
 	}
-	return ContainerStatus{}, false
+	return v1.ContainerStatus{}, false
 }
 
-func GetExistingContainerStatus(statuses []ContainerStatus, name string) ContainerStatus {
+// GetExistingContainerStatus extracts the status of container "name" from "statuses",
+// and returns empty status if "name" does not exist.
+func GetExistingContainerStatus(statuses []v1.ContainerStatus, name string) v1.ContainerStatus {
 	for i := range statuses {
 		if statuses[i].Name == name {
 			return statuses[i]
 		}
 	}
-	return ContainerStatus{}
+	return v1.ContainerStatus{}
 }
 
 // IsPodAvailable returns true if a pod is available; false otherwise.
@@ -85,7 +55,7 @@ func GetExistingContainerStatus(statuses []ContainerStatus, name string) Contain
 // of that, there are two cases when a pod can be considered available:
 // 1. minReadySeconds == 0, or
 // 2. LastTransitionTime (is set) + minReadySeconds < current time
-func IsPodAvailable(pod *Pod, minReadySeconds int32, now metav1.Time) bool {
+func IsPodAvailable(pod *v1.Pod, minReadySeconds int32, now metav1.Time) bool {
 	if !IsPodReady(pod) {
 		return false
 	}
@@ -99,26 +69,26 @@ func IsPodAvailable(pod *Pod, minReadySeconds int32, now metav1.Time) bool {
 }
 
 // IsPodReady returns true if a pod is ready; false otherwise.
-func IsPodReady(pod *Pod) bool {
+func IsPodReady(pod *v1.Pod) bool {
 	return IsPodReadyConditionTrue(pod.Status)
 }
 
 // IsPodReady retruns true if a pod is ready; false otherwise.
-func IsPodReadyConditionTrue(status PodStatus) bool {
+func IsPodReadyConditionTrue(status v1.PodStatus) bool {
 	condition := GetPodReadyCondition(status)
-	return condition != nil && condition.Status == ConditionTrue
+	return condition != nil && condition.Status == v1.ConditionTrue
 }
 
 // Extracts the pod ready condition from the given status and returns that.
 // Returns nil if the condition is not present.
-func GetPodReadyCondition(status PodStatus) *PodCondition {
-	_, condition := GetPodCondition(&status, PodReady)
+func GetPodReadyCondition(status v1.PodStatus) *v1.PodCondition {
+	_, condition := GetPodCondition(&status, v1.PodReady)
 	return condition
 }
 
 // GetPodCondition extracts the provided condition from the given status and returns that.
 // Returns nil and -1 if the condition is not present, and the index of the located condition.
-func GetPodCondition(status *PodStatus, conditionType PodConditionType) (int, *PodCondition) {
+func GetPodCondition(status *v1.PodStatus, conditionType v1.PodConditionType) (int, *v1.PodCondition) {
 	if status == nil {
 		return -1, nil
 	}
@@ -132,7 +102,7 @@ func GetPodCondition(status *PodStatus, conditionType PodConditionType) (int, *P
 
 // GetNodeCondition extracts the provided condition from the given status and returns that.
 // Returns nil and -1 if the condition is not present, and the index of the located condition.
-func GetNodeCondition(status *NodeStatus, conditionType NodeConditionType) (int, *NodeCondition) {
+func GetNodeCondition(status *v1.NodeStatus, conditionType v1.NodeConditionType) (int, *v1.NodeCondition) {
 	if status == nil {
 		return -1, nil
 	}
@@ -147,7 +117,7 @@ func GetNodeCondition(status *NodeStatus, conditionType NodeConditionType) (int,
 // Updates existing pod condition or creates a new one. Sets LastTransitionTime to now if the
 // status has changed.
 // Returns true if pod condition has changed or has been added.
-func UpdatePodCondition(status *PodStatus, condition *PodCondition) bool {
+func UpdatePodCondition(status *v1.PodStatus, condition *v1.PodCondition) bool {
 	condition.LastTransitionTime = metav1.Now()
 	// Try to find this pod condition.
 	conditionIndex, oldCondition := GetPodCondition(status, condition.Type)
@@ -175,10 +145,10 @@ func UpdatePodCondition(status *PodStatus, condition *PodCondition) bool {
 }
 
 // IsNodeReady returns true if a node is ready; false otherwise.
-func IsNodeReady(node *Node) bool {
+func IsNodeReady(node *v1.Node) bool {
 	for _, c := range node.Status.Conditions {
-		if c.Type == NodeReady {
-			return c.Status == ConditionTrue
+		if c.Type == v1.NodeReady {
+			return c.Status == v1.ConditionTrue
 		}
 	}
 	return false
@@ -186,8 +156,8 @@ func IsNodeReady(node *Node) bool {
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
 // containers of the pod.
-func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, limits map[ResourceName]resource.Quantity, err error) {
-	reqs, limits = map[ResourceName]resource.Quantity{}, map[ResourceName]resource.Quantity{}
+func PodRequestsAndLimits(pod *v1.Pod) (reqs map[v1.ResourceName]resource.Quantity, limits map[v1.ResourceName]resource.Quantity, err error) {
+	reqs, limits = map[v1.ResourceName]resource.Quantity{}, map[v1.ResourceName]resource.Quantity{}
 	for _, container := range pod.Spec.Containers {
 		for name, quantity := range container.Resources.Requests {
 			if value, ok := reqs[name]; !ok {
@@ -233,14 +203,14 @@ func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, li
 }
 
 // finds and returns the request for a specific resource.
-func GetResourceRequest(pod *Pod, resource ResourceName) int64 {
-	if resource == ResourcePods {
+func GetResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
+	if resource == v1.ResourcePods {
 		return 1
 	}
 	totalResources := int64(0)
 	for _, container := range pod.Spec.Containers {
 		if rQuantity, ok := container.Resources.Requests[resource]; ok {
-			if resource == ResourceCPU {
+			if resource == v1.ResourceCPU {
 				totalResources += rQuantity.MilliValue()
 			} else {
 				totalResources += rQuantity.Value()
@@ -250,7 +220,7 @@ func GetResourceRequest(pod *Pod, resource ResourceName) int64 {
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
 		if rQuantity, ok := container.Resources.Requests[resource]; ok {
-			if resource == ResourceCPU && rQuantity.MilliValue() > totalResources {
+			if resource == v1.ResourceCPU && rQuantity.MilliValue() > totalResources {
 				totalResources = rQuantity.MilliValue()
 			} else if rQuantity.Value() > totalResources {
 				totalResources = rQuantity.Value()
@@ -262,7 +232,7 @@ func GetResourceRequest(pod *Pod, resource ResourceName) int64 {
 
 // ExtractResourceValueByContainerName extracts the value of a resource
 // by providing container name
-func ExtractResourceValueByContainerName(fs *ResourceFieldSelector, pod *Pod, containerName string) (string, error) {
+func ExtractResourceValueByContainerName(fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string) (string, error) {
 	container, err := findContainerInPod(pod, containerName)
 	if err != nil {
 		return "", err
@@ -272,7 +242,7 @@ func ExtractResourceValueByContainerName(fs *ResourceFieldSelector, pod *Pod, co
 
 // ExtractResourceValueByContainerNameAndNodeAllocatable extracts the value of a resource
 // by providing container name and node allocatable
-func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *ResourceFieldSelector, pod *Pod, containerName string, nodeAllocatable ResourceList) (string, error) {
+func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string, nodeAllocatable v1.ResourceList) (string, error) {
 	realContainer, err := findContainerInPod(pod, containerName)
 	if err != nil {
 		return "", err
@@ -283,7 +253,7 @@ func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *ResourceFieldSele
 		return "", fmt.Errorf("failed to perform a deep copy of container object: %v", err)
 	}
 
-	container, ok := containerCopy.(*Container)
+	container, ok := containerCopy.(*v1.Container)
 	if !ok {
 		return "", fmt.Errorf("unexpected type returned from deep copy of container object")
 	}
@@ -295,7 +265,7 @@ func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *ResourceFieldSele
 
 // ExtractContainerResourceValue extracts the value of a resource
 // in an already known container
-func ExtractContainerResourceValue(fs *ResourceFieldSelector, container *Container) (string, error) {
+func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.Container) (string, error) {
 	divisor := resource.Quantity{}
 	if divisor.Cmp(fs.Divisor) == 0 {
 		divisor = resource.MustParse("1")
@@ -332,7 +302,7 @@ func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Q
 }
 
 // findContainerInPod finds a container by its name in the provided pod
-func findContainerInPod(pod *Pod, containerName string) (*Container, error) {
+func findContainerInPod(pod *v1.Pod, containerName string) (*v1.Container, error) {
 	for _, container := range pod.Spec.Containers {
 		if container.Name == containerName {
 			return &container, nil
@@ -343,12 +313,12 @@ func findContainerInPod(pod *Pod, containerName string) (*Container, error) {
 
 // MergeContainerResourceLimits checks if a limit is applied for
 // the container, and if not, it sets the limit to the passed resource list.
-func MergeContainerResourceLimits(container *Container,
-	allocatable ResourceList) {
+func MergeContainerResourceLimits(container *v1.Container,
+	allocatable v1.ResourceList) {
 	if container.Resources.Limits == nil {
-		container.Resources.Limits = make(ResourceList)
+		container.Resources.Limits = make(v1.ResourceList)
 	}
-	for _, resource := range []ResourceName{ResourceCPU, ResourceMemory} {
+	for _, resource := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory} {
 		if quantity, exists := container.Resources.Limits[resource]; !exists || quantity.IsZero() {
 			if cap, exists := allocatable[resource]; exists {
 				container.Resources.Limits[resource] = *cap.Copy()

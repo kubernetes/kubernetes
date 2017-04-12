@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/v1/resource"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -51,7 +51,7 @@ func Validate(kubeconfigPath string) error {
 			return false, nil
 		}
 		n := &nodeList.Items[0]
-		if !v1.IsNodeReady(n) {
+		if !resource.IsNodeReady(n) {
 			fmt.Println("[validate] First node has registered, but is not ready yet")
 			return false, nil
 		}

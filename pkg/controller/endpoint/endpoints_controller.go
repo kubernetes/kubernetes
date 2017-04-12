@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -380,7 +381,7 @@ func (e *EndpointController) syncService(key string) error {
 				epa.Hostname = hostname
 			}
 
-			if tolerateUnreadyEndpoints || v1.IsPodReady(pod) {
+			if tolerateUnreadyEndpoints || resource.IsPodReady(pod) {
 				subsets = append(subsets, v1.EndpointSubset{
 					Addresses: []v1.EndpointAddress{epa},
 					Ports:     []v1.EndpointPort{epp},

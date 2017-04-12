@@ -356,7 +356,7 @@ func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp metav1.Time, eve
 func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, eventtype, reason, message string) {
 	f.Lock()
 	defer f.Unlock()
-	ref, err := clientv1.GetReference(api.Scheme, obj)
+	ref, err := clientref.GetReference(api.Scheme, obj)
 	if err != nil {
 		glog.Errorf("Encoutered error while getting reference: %v", err)
 		return

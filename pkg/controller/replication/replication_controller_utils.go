@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 )
 
@@ -106,9 +107,9 @@ func calculateStatus(rc *v1.ReplicationController, filteredPods []*v1.Pod, manag
 		if templateLabel.Matches(labels.Set(pod.Labels)) {
 			fullyLabeledReplicasCount++
 		}
-		if v1.IsPodReady(pod) {
+		if resource.IsPodReady(pod) {
 			readyReplicasCount++
-			if v1.IsPodAvailable(pod, rc.Spec.MinReadySeconds, metav1.Now()) {
+			if resource.IsPodAvailable(pod, rc.Spec.MinReadySeconds, metav1.Now()) {
 				availableReplicasCount++
 			}
 		}

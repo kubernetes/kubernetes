@@ -35,6 +35,7 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/generated"
@@ -213,7 +214,7 @@ func (s *StatefulSetTester) Scale(ss *apps.StatefulSet, count int32) error {
 	if pollErr != nil {
 		unhealthy := []string{}
 		for _, statefulPod := range statefulPodList.Items {
-			delTs, phase, readiness := statefulPod.DeletionTimestamp, statefulPod.Status.Phase, v1.IsPodReady(&statefulPod)
+			delTs, phase, readiness := statefulPod.DeletionTimestamp, statefulPod.Status.Phase, v1resource.IsPodReady(&statefulPod)
 			if delTs != nil || phase != v1.PodRunning || !readiness {
 				unhealthy = append(unhealthy, fmt.Sprintf("%v: deletion %v, phase %v, readiness %v", statefulPod.Name, delTs, phase, readiness))
 			}
@@ -290,7 +291,7 @@ func (s *StatefulSetTester) waitForRunning(numStatefulPods int32, ss *apps.State
 				return false, fmt.Errorf("Too many pods scheduled, expected %d got %d", numStatefulPods, len(podList.Items))
 			}
 			for _, p := range podList.Items {
-				isReady := v1.IsPodReady(&p)
+				isReady := v1resource.IsPodReady(&p)
 				desiredReadiness := shouldBeReady == isReady
 				Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
 				if p.Status.Phase != v1.PodRunning || !desiredReadiness {
