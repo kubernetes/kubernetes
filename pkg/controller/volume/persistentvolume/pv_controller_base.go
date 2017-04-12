@@ -56,7 +56,6 @@ import (
 type ControllerParameters struct {
 	KubeClient                clientset.Interface
 	SyncPeriod                time.Duration
-	AlphaProvisioner          vol.ProvisionableVolumePlugin
 	VolumePlugins             []vol.VolumePlugin
 	Cloud                     cloudprovider.Interface
 	ClusterName               string
@@ -87,17 +86,11 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 		clusterName:                   p.ClusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
-		alphaProvisioner:              p.AlphaProvisioner,
 		claimQueue:                    workqueue.NewNamed("claims"),
 		volumeQueue:                   workqueue.NewNamed("volumes"),
 	}
 
 	controller.volumePluginMgr.InitPlugins(p.VolumePlugins, controller)
-	if controller.alphaProvisioner != nil {
-		if err := controller.alphaProvisioner.Init(controller); err != nil {
-			glog.Errorf("PersistentVolumeController: error initializing alpha provisioner plugin: %v", err)
-		}
-	}
 
 	p.VolumeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{

@@ -825,9 +825,6 @@ func wrapTestWithPluginCalls(expectedRecycleCalls, expectedDeleteCalls []error, 
 			provisionCalls: expectedProvisionCalls,
 		}
 		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, ctrl)
-		if expectedProvisionCalls != nil {
-			ctrl.alphaProvisioner = plugin
-		}
 		return toWrap(ctrl, reactor, test)
 	}
 }
