@@ -76,7 +76,7 @@ func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (err e
 	// the _OWNER_
 	newBlockingRefs := newBlockingOwnerDeletionRefs(attributes.GetObject(), attributes.GetOldObject())
 	for _, ref := range newBlockingRefs {
-		attribute, err := a.toDeleteAttribute(ref, attributes)
+		attribute, err := a.ownerRefToDeleteAttribute(ref, attributes)
 		if err != nil {
 			return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion in this case because cannot find RESTMapping for APIVersion %s Kind %s: %v, %v", ref.APIVersion, ref.Kind, reason, err))
 		}
@@ -122,7 +122,7 @@ func isChangingOwnerReference(newObj, oldObj runtime.Object) bool {
 }
 
 // translates ref to a DeleteAttribute deleting the object referred by the ref.
-func (a *gcPermissionsEnforcement) toDeleteAttribute(ref metav1.OwnerReference, attributes admission.Attributes) (authorizer.AttributesRecord, error) {
+func (a *gcPermissionsEnforcement) ownerRefToDeleteAttribute(ref metav1.OwnerReference, attributes admission.Attributes) (authorizer.AttributesRecord, error) {
 	groupVersion, err := schema.ParseGroupVersion(ref.APIVersion)
 	if err != nil {
 		return authorizer.AttributesRecord{}, err
@@ -165,7 +165,7 @@ func indexByUID(refs []metav1.OwnerReference) map[types.UID]metav1.OwnerReferenc
 }
 
 // Returns new blocking ownerReferences, and references whose blockOwnerDeletion
-// field is changed from false to true.
+// field is changed from nil or false to true.
 func newBlockingOwnerDeletionRefs(newObj, oldObj runtime.Object) []metav1.OwnerReference {
 	newMeta, err := meta.Accessor(newObj)
 	if err != nil {
@@ -174,6 +174,9 @@ func newBlockingOwnerDeletionRefs(newObj, oldObj runtime.Object) []metav1.OwnerR
 	}
 	newRefs := newMeta.GetOwnerReferences()
 	blockingNewRefs := blockingOwnerRefs(newRefs)
+	if len(blockingNewRefs) == 0 {
+		return nil
+	}
 
 	if oldObj == nil {
 		return blockingNewRefs
@@ -187,13 +190,14 @@ func newBlockingOwnerDeletionRefs(newObj, oldObj runtime.Object) []metav1.OwnerR
 	var ret []metav1.OwnerReference
 	indexedOldRefs := indexByUID(oldMeta.GetOwnerReferences())
 	for _, ref := range blockingNewRefs {
-		if oldRef, ok := indexedOldRefs[ref.UID]; ok {
-			wasNotBlocking := oldRef.BlockOwnerDeletion == nil || *oldRef.BlockOwnerDeletion == false
-			if wasNotBlocking {
-				ret = append(ret, ref)
-			}
-		} else {
-			// if ref is newly added, and it's blocking, also return it.
+		oldRef, ok := indexedOldRefs[ref.UID]
+		if !ok {
+			// if ref is newly added, and it's blocking, then returns it.
+			ret = append(ret, ref)
+			continue
+		}
+		wasNotBlocking := oldRef.BlockOwnerDeletion == nil || *oldRef.BlockOwnerDeletion == false
+		if wasNotBlocking {
 			ret = append(ret, ref)
 		}
 	}
@@ -211,6 +215,9 @@ func (a *gcPermissionsEnforcement) SetRESTMapper(restMapper meta.RESTMapper) {
 func (a *gcPermissionsEnforcement) Validate() error {
 	if a.authorizer == nil {
 		return fmt.Errorf("missing authorizer")
+	}
+	if a.restMapper == nil {
+		return fmt.Errorf("missing restMapper")
 	}
 	return nil
 }
