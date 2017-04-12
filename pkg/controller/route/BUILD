@@ -21,6 +21,7 @@ go_library(
         "//pkg/client/informers/informers_generated/externalversions/core/v1:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/node:go_default_library",
         "//vendor:github.com/golang/glog",
