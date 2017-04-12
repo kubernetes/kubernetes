@@ -19,6 +19,8 @@ package apiregistration
 import (
 	"sort"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func SortedByGroup(servers []*APIService) [][]*APIService {
@@ -56,4 +58,9 @@ func (s ByPriority) Less(i, j int) bool {
 		return strings.Compare(s[i].Name, s[j].Name) < 0
 	}
 	return s[i].Spec.Priority < s[j].Spec.Priority
+}
+
+func APIServiceNameToGroupVersion(apiServiceName string) schema.GroupVersion {
+	tokens := strings.SplitN(apiServiceName, ".", 2)
+	return schema.GroupVersion{Group: tokens[1], Version: tokens[0]}
 }
