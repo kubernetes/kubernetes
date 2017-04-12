@@ -147,22 +147,22 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			func(size int) bool { return size <= nodeCount }, time.Second))
 	})
 
-	simpleScaleUpTest := func() {
+	simpleScaleUpTest := func(unready int) {
 		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false, 1*time.Second)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
 		// Verify, that cluster size is increased
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
+		framework.ExpectNoError(WaitForClusterSizeFuncWithUnready(f.ClientSet,
+			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout, unready))
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	}
 
 	It("should increase cluster size if pending pods are small [Feature:ClusterSizeAutoscalingScaleUp]",
-		simpleScaleUpTest)
+		func() { simpleScaleUpTest(0) })
 
 	It("should increase cluster size if pending pods are small and one node is broken [Feature:ClusterSizeAutoscalingScaleUp]",
 		func() {
-			framework.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), simpleScaleUpTest)
+			framework.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), func() { simpleScaleUpTest(1) })
 		})
 
 	It("shouldn't trigger additional scale-ups during processing scale-up [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -342,7 +342,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+2, scaleUpTimeout+5*time.Minute))
 	})
 
-	simpleScaleDownTest := func() {
+	simpleScaleDownTest := func(unready int) {
 		By("Manually increase cluster size")
 		increasedSize := 0
 		newSizes := make(map[string]int)
@@ -352,18 +352,19 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		}
 		setMigSizes(newSizes)
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size >= increasedSize }, scaleUpTimeout))
+			func(size int) bool { return size >= increasedSize }, scaleUpTimeout), unready)
 
 		By("Some node should be removed")
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size < increasedSize }, scaleDownTimeout))
+			func(size int) bool { return size < increasedSize }, scaleDownTimeout), unready)
 	}
 
-	It("should correctly scale down after a node is not needed [Feature:ClusterSizeAutoscalingScaleDown]", simpleScaleDownTest)
+	It("should correctly scale down after a node is not needed [Feature:ClusterSizeAutoscalingScaleDown]",
+		func() { simpleScaleDownTest(0) })
 
-	It("should increase cluster size if pending pods are small and one node is broken [Feature:ClusterSizeAutoscalingScaleUp]",
+	It("should correctly scale down after a node is not needed and one node is broken [Feature:ClusterSizeAutoscalingScaleDown]",
 		func() {
-			framework.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), simpleScaleDownTest)
+			framework.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), func() { simpleScaleDownTest(1) })
 		})
 
 	It("should correctly scale down after a node is not needed when there is non autoscaled pool[Feature:ClusterSizeAutoscalingScaleDown]", func() {
@@ -697,6 +698,11 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 
 // WaitForClusterSize waits until the cluster size matches the given function.
 func WaitForClusterSizeFunc(c clientset.Interface, sizeFunc func(int) bool, timeout time.Duration) error {
+	return WaitForClusterSizeFuncWithUnready(c, sizeFunc, timeout, 0)
+}
+
+// WaitForClusterSizeWithUnready waits until the cluster size matches the given function and assumes some unready nodes.
+func WaitForClusterSizeFuncWithUnready(c clientset.Interface, sizeFunc func(int) bool, timeout time.Duration, expectedUnready int) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		nodes, err := c.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
@@ -713,7 +719,7 @@ func WaitForClusterSizeFunc(c clientset.Interface, sizeFunc func(int) bool, time
 		})
 		numReady := len(nodes.Items)
 
-		if numNodes == numReady && sizeFunc(numReady) {
+		if numNodes == numReady+expectedUnready && sizeFunc(numNodes) {
 			glog.Infof("Cluster has reached the desired size")
 			return nil
 		}
