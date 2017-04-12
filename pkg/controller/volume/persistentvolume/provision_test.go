@@ -391,7 +391,10 @@ func TestProvisionMultiSync(t *testing.T) {
 
 // When provisioning is disabled, provisioning a claim should instantly return nil
 func TestDisablingDynamicProvisioner(t *testing.T) {
-	ctrl := newTestController(nil, nil, false)
+	ctrl, err := newTestController(nil, nil, false)
+	if err != nil {
+		t.Fatalf("Construct PersistentVolume controller failed: %v", err)
+	}
 	retVal := ctrl.provisionClaim(nil)
 	if retVal != nil {
 		t.Errorf("Expected nil return but got %v", retVal)
