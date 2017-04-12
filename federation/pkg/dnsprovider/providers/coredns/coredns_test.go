@@ -254,8 +254,17 @@ func TestResourceRecordSetsReplace(t *testing.T) {
 	tests.CommonTestResourceRecordSetsReplace(t, zone)
 }
 
-/* TestResourceRecordSetsReplaceAll verifies that we can remove an RRS and create one with a different name*/
+/* TestResourceRecordSetsReplaceAll verifies that we can remove an RRS and create one with a different name */
 func TestResourceRecordSetsReplaceAll(t *testing.T) {
 	zone := firstZone(t)
 	tests.CommonTestResourceRecordSetsReplaceAll(t, zone)
+}
+
+/* TestResourceRecordSetsWithMixedTypes  verifies that we can add records with different types.
+   Note: Can not run CommonTestResourceRecordSetsDifferentTypes for coredns, because ResoureRecordSets.List()
+   is not implemented, and Get() API will aggregate rrdata (IPs) for rrsets with the same name, causing
+   a failure. Instead, we do this test, which uses different names. */
+func TestResourceRecordSetsWithMixedTypes(t *testing.T) {
+	zone := firstZone(t)
+	tests.CommonTestResourceRecordSetsWithMixedTypes(t, zone)
 }

@@ -288,7 +288,7 @@ func TestResourceRecordSetsReplaceAll(t *testing.T) {
 	tests.CommonTestResourceRecordSetsReplaceAll(t, zone)
 }
 
-/* TestResourceRecordSetsHonorsType verifies that we can add records of the same name but different types */
+/* TestResourceRecordSetsDifferentTypes verifies that we can add records of the same name but different types */
 func TestResourceRecordSetsDifferentTypes(t *testing.T) {
 	zone := firstZone(t)
 	tests.CommonTestResourceRecordSetsDifferentTypes(t, zone)
