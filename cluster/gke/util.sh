@@ -142,7 +142,7 @@ function kube-up() {
   # Make the specified network if we need to.
   if ! "${GCLOUD}" compute networks --project "${PROJECT}" describe "${NETWORK}" &>/dev/null; then
     echo "Creating new network: ${NETWORK}" >&2
-    with-retry 3 "${GCLOUD}" compute networks create "${NETWORK}" --project="${PROJECT}" --range "${NETWORK_RANGE}"
+    with-retry 3 "${GCLOUD}" compute networks create "${NETWORK}" --project="${PROJECT}" --mode=auto
   else
     echo "... Using network: ${NETWORK}" >&2
   fi
