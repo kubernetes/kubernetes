@@ -28,6 +28,12 @@ else
     KUBERNETES_PROVIDER="${KUBERNETES_PROVIDER:-gce}"
 fi
 
+# PROVIDER_VARS is a list of cloud provider specific variables. Note:
+# this is a list of the _names_ of the variables, not the value of the
+# variables. Providers can add variables to be appended to kube-env.
+# (see `build-kube-env`).
+PROVIDER_VARS=""
+
 PROVIDER_UTILS="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 if [ -f ${PROVIDER_UTILS} ]; then
     source "${PROVIDER_UTILS}"
