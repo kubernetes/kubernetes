@@ -20,28 +20,29 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-
-	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
-	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
-	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 
+	"k8s.io/client-go/tools/cache"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-
-	clientv1 "k8s.io/client-go/pkg/api/v1"
-
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/api/validation"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
@@ -76,41 +77,44 @@ func createClient(s *options.SchedulerServer) (*clientset.Clientset, error) {
 func CreateScheduler(
 	s *options.SchedulerServer,
 	kubecli *clientset.Clientset,
-	nodeInformer coreinformers.NodeInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	replicationControllerInformer coreinformers.ReplicationControllerInformer,
-	replicaSetInformer extensionsinformers.ReplicaSetInformer,
-	statefulSetInformer appsinformers.StatefulSetInformer,
-	serviceInformer coreinformers.ServiceInformer,
+  informerFactory informers.SharedInformerFactory,
 	recorder record.EventRecorder,
 ) (*scheduler.Scheduler, error) {
 	configurator := factory.NewConfigFactory(
 		s.SchedulerName,
 		kubecli,
-		nodeInformer,
-		pvInformer,
-		pvcInformer,
-		replicationControllerInformer,
-		replicaSetInformer,
-		statefulSetInformer,
-		serviceInformer,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
 		s.HardPodAffinitySymmetricWeight,
 	)
 
 	// Rebuild the configurator with a default Create(...) method.
-	configurator = &schedulerConfigurator{
+	schedConfigurator := &schedulerConfigurator{
 		configurator,
 		s.PolicyConfigFile,
 		s.AlgorithmProvider,
 		s.PolicyConfigMapName,
 		s.PolicyConfigMapNamespace,
 		s.UseLegacyPolicyConfig,
+		nil,
 	}
 
-	return scheduler.NewFromConfigurator(configurator, func(cfg *scheduler.Config) {
+	scheduler, err := scheduler.NewFromConfigurator(schedConfigurator, func(cfg *scheduler.Config) {
 		cfg.Recorder = recorder
+		schedConfigurator.schedulerConfig = cfg
 	})
+
+	// Install event handlers for changes to the scheduler's ConfigMap
+	if !s.UseLegacyPolicyConfig && len(s.PolicyConfigMapName) != 0 {
+		schedConfigurator.SetupPolicyConfigMapEventHandlers(kubecli, informerFactory)
+	}
+
+	return scheduler, err
 }
 
 // schedulerConfigurator is an interface wrapper that provides a way to create
@@ -122,11 +126,12 @@ type schedulerConfigurator struct {
 	policyConfigMap          string
 	policyConfigMapNamespace string
 	useLegacyPolicyConfig    bool
+	schedulerConfig          *scheduler.Config
 }
 
 // getSchedulerPolicyConfig finds and decodes scheduler's policy config. If no
 // such policy is found, it returns nil, nil.
-func (sc schedulerConfigurator) getSchedulerPolicyConfig() (*schedulerapi.Policy, error) {
+func (sc *schedulerConfigurator) getSchedulerPolicyConfig() (*schedulerapi.Policy, error) {
 	var configData []byte
 	var policyConfigMapFound bool
 	var policy schedulerapi.Policy
@@ -185,4 +190,114 @@ func (sc schedulerConfigurator) Create() (*scheduler.Config, error) {
 	}
 
 	return sc.CreateFromConfig(*policy)
+}
+
+func (sc *schedulerConfigurator) SetupPolicyConfigMapEventHandlers(client clientset.Interface, informerFactory informers.SharedInformerFactory) {
+	// selector targets only the scheduler's policy ConfigMap.
+	selector := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), "configmaps", sc.policyConfigMapNamespace, fields.OneTermEqualSelector(api.ObjectNameField, string(sc.policyConfigMap)))
+
+	sharedIndexInformer := informerFactory.InformerFor(&v1.ConfigMap{}, func(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+		sharedIndexInformer := cache.NewSharedIndexInformer(
+			selector,
+			&v1.ConfigMap{},
+			resyncPeriod,
+			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		)
+		return sharedIndexInformer
+	})
+
+	sharedIndexInformer.AddEventHandlerWithResyncPeriod(
+		cache.ResourceEventHandlerFuncs {
+			AddFunc:    nil, // scheduler aborts if its policy ConfigMap does not exist. So, we do not need and "add" handler.
+			UpdateFunc: sc.updatePolicyConfigMap,
+			DeleteFunc: sc.deletePolicyConfigMap,
+		},
+		0,
+	)
+}
+
+// verifyNewPolicyConfig verifies that the new object received by the ConfigMap watch is a valid policy config.
+func verifyNewPolicyConfig(obj interface{}) error {
+	newConfig, ok := obj.(*v1.ConfigMap)
+	if !ok {
+		return fmt.Errorf("cannot convert obj to *v1.ConfigMap: %v", obj)
+	}
+	newPolicy, ok := newConfig.Data[options.SchedulerPolicyConfigMapKey]
+	if !ok {
+		return fmt.Errorf("No element with key = '%v' is found in the ConfigMap.Data", options.SchedulerPolicyConfigMapKey)
+	}
+	configData := []byte(newPolicy)
+	var policy schedulerapi.Policy
+	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+		return fmt.Errorf("invalid scheduler policy configuration: %v", err)
+	}
+	// validate the policy configuration
+	if err := validation.ValidatePolicy(policy); err != nil {
+		return fmt.Errorf("The new scheduler policy is invalid. Will keep using the old policy! Error: %v", err)
+	}
+	return nil
+}
+
+func (sc *schedulerConfigurator) addPolicyConfigMap(obj interface{}) {
+	glog.Info("Received a request to add a scheduler policy config.")
+	err := verifyNewPolicyConfig(obj)
+	if err != nil {
+		glog.Error(err)
+		return
+	}
+	// If things are in order, kill the scheduler to apply the new config.
+	sc.KillScheduler()
+}
+
+func (sc *schedulerConfigurator) updatePolicyConfigMap(oldObj, newObj interface{}) {
+	glog.Info("Received an update to the scheduler policy config.")
+	_, ok := oldObj.(*v1.ConfigMap)
+	if !ok {
+		glog.Errorf("cannot convert oldObj to *v1.ConfigMap: %v", oldObj)
+		return
+	}
+	err := verifyNewPolicyConfig(newObj)
+	if err != nil {
+		glog.Error(err)
+		return
+	}
+	// If things are in order, kill the scheduler to apply the new config.
+	sc.KillScheduler()
+}
+
+
+func (sc *schedulerConfigurator) deletePolicyConfigMap(obj interface{}) {
+	glog.Info("Scheduler's policy ConfigMap is deleted.")
+	switch t := obj.(type) {
+	case *v1.ConfigMap:  // Nothing is needed. Jump out of the switch.
+	case cache.DeletedFinalStateUnknown:
+		_, ok := t.Obj.(*v1.ConfigMap)
+		if !ok {
+			glog.Errorf("cannot convert to *v1.ConfigMap: %v", t.Obj)
+			return
+		}
+	default:
+		glog.Errorf("cannot convert to *v1.ConfigMap: %v", t)
+		return
+	}
+	sc.KillScheduler()
+}
+
+// schedulerKillFunc is a function that kills the scheduler. It is here mainly for testability. Tests set it to a function to perform an action that can be verified in tests instead of the default behavior which causes the scheduler to die.
+var SchedulerKillFunc func() = nil
+
+func (sc *schedulerConfigurator) KillScheduler() {
+	if SchedulerKillFunc != nil {
+		SchedulerKillFunc()
+	} else {
+		if sc.schedulerConfig != nil {
+			glog.Infof("Scheduler is going to die (and restarted) in order to update its policy.")
+			close(sc.schedulerConfig.StopEverything)
+			// The sleep is only to allow cleanups to happen.
+			time.Sleep(2 * time.Second)
+			glog.Flush()
+			os.Exit(0)
+		}
+		glog.Infof("Scheduler is not going to exit, as it doesn't seem to be initialized yet.")
+	}
 }
