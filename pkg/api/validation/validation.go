@@ -3185,7 +3185,7 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 		}
 	}
 	if len(strings.Split(value, "/")) == 2 {
-		if !api.IsNvidiaGpuResourceName(value) && !api.IsOpaqueIntResourceName(api.ResourceName(value)) {
+		if !helper.IsNvidiaGpuResourceName(value) && !helper.IsOpaqueIntResourceName(api.ResourceName(value)) {
 			return append(allErrs, field.Invalid(fldPath, value, fmt.Sprintf("must be %s or an opaque integer resource for containers", api.ResourceNvidiaGPU)))
 		}
 	}
