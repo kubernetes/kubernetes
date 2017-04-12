@@ -96,8 +96,13 @@ func (ds *dockerService) RemoveImage(image *runtimeapi.ImageSpec) error {
 			}
 		}
 		return nil
+	} else if err != nil && dockertools.IsImageNotFoundError(err) {
+		return nil
 	}
 
 	_, err = ds.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{PruneChildren: true})
-	return err
+	if err != nil && !dockertools.IsImageNotFoundError(err) {
+		return err
+	}
+	return nil
 }

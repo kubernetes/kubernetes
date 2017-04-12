@@ -24,6 +24,7 @@ import (
 	"io"
 	"io/ioutil"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -380,7 +381,14 @@ func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemov
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return nil, ctxErr
 	}
-	return resp, err
+	if err != nil {
+		// TODO:Use native error tester once ImageNotFoundError supported in ImageRemove()
+		if strings.Contains(err.Error(), "No such image:") {
+			err = ImageNotFoundError{ID: image}
+		}
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
@@ -620,7 +628,7 @@ type ImageNotFoundError struct {
 }
 
 func (e ImageNotFoundError) Error() string {
-	return fmt.Sprintf("no such image: %q", e.ID)
+	return fmt.Sprintf("No such image: %q", e.ID)
 }
 
 // IsImageNotFoundError checks whether the error is image not found error. This is exposed
