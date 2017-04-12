@@ -518,37 +518,39 @@ func (nc *NodeController) onNodeDelete(originalObj interface{}) {
 }
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
-func (nc *NodeController) Run() {
-	go func() {
-		defer utilruntime.HandleCrash()
+func (nc *NodeController) Run(stopCh <-chan struct{}) {
+	defer utilruntime.HandleCrash()
 
-		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
-			utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
-			return
+	glog.Infof("Starting node controller")
+	defer glog.Infof("Shutting down node controller")
+
+	if !controller.WaitForCacheSync("node", stopCh, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
+		return
+	}
+
+	// Incorporate the results of node status pushed from kubelet to master.
+	go wait.Until(func() {
+		if err := nc.monitorNodeStatus(); err != nil {
+			glog.Errorf("Error monitoring node status: %v", err)
 		}
+	}, nc.nodeMonitorPeriod, wait.NeverStop)
 
-		// Incorporate the results of node status pushed from kubelet to master.
-		go wait.Until(func() {
-			if err := nc.monitorNodeStatus(); err != nil {
-				glog.Errorf("Error monitoring node status: %v", err)
-			}
-		}, nc.nodeMonitorPeriod, wait.NeverStop)
+	if nc.runTaintManager {
+		go nc.taintManager.Run(wait.NeverStop)
+	}
 
-		if nc.runTaintManager {
-			go nc.taintManager.Run(wait.NeverStop)
-		}
+	if nc.useTaintBasedEvictions {
+		// Handling taint based evictions. Because we don't want a dedicated logic in TaintManager for NC-originated
+		// taints and we normally don't rate limit evictions caused by taints, we need to rate limit adding taints.
+		go wait.Until(nc.doTaintingPass, nodeEvictionPeriod, wait.NeverStop)
+	} else {
+		// Managing eviction of nodes:
+		// When we delete pods off a node, if the node was not empty at the time we then
+		// queue an eviction watcher. If we hit an error, retry deletion.
+		go wait.Until(nc.doEvictionPass, nodeEvictionPeriod, wait.NeverStop)
+	}
 
-		if nc.useTaintBasedEvictions {
-			// Handling taint based evictions. Because we don't want a dedicated logic in TaintManager for NC-originated
-			// taints and we normally don't rate limit evictions caused by taints, we need to rate limit adding taints.
-			go wait.Until(nc.doTaintingPass, nodeEvictionPeriod, wait.NeverStop)
-		} else {
-			// Managing eviction of nodes:
-			// When we delete pods off a node, if the node was not empty at the time we then
-			// queue an eviction watcher. If we hit an error, retry deletion.
-			go wait.Until(nc.doEvictionPass, nodeEvictionPeriod, wait.NeverStop)
-		}
-	}()
+	<-stopCh
 }
 
 // monitorNodeStatus verifies node status are constantly updated by kubelet, and if not,

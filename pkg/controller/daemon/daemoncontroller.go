@@ -196,10 +196,10 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer dsc.queue.ShutDown()
 
-	glog.Infof("Starting Daemon Sets controller manager")
+	glog.Infof("Starting daemon sets controller")
+	defer glog.Infof("Shutting down daemon sets controller")
 
-	if !cache.WaitForCacheSync(stopCh, dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.dsStoreSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("daemon sets", stopCh, dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.dsStoreSynced) {
 		return
 	}
 
@@ -208,7 +208,6 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
-	glog.Infof("Shutting down Daemon Set Controller")
 }
 
 func (dsc *DaemonSetsController) runWorker() {
