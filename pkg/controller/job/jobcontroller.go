@@ -364,7 +364,19 @@ func (jm *JobController) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
-	cm := controller.NewPodControllerRefManager(jm.podControl, j, selector, controllerKind)
+	// If any adoptions are attempted, we should first recheck for deletion
+	// with an uncached quorum read sometime after listing Pods (see #42639).
+	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
+		fresh, err := jm.kubeClient.BatchV1().Jobs(j.Namespace).Get(j.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		if fresh.UID != j.UID {
+			return nil, fmt.Errorf("original Job %v/%v is gone: got uid %v, wanted %v", j.Namespace, j.Name, fresh.UID, j.UID)
+		}
+		return fresh, nil
+	})
+	cm := controller.NewPodControllerRefManager(jm.podControl, j, selector, controllerKind, canAdoptFunc)
 	return cm.ClaimPods(pods)
 }
 
