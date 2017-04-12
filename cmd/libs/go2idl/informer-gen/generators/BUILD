@@ -24,12 +24,12 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/libs/go2idl/client-gen/types:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/gengo/args",
-        "//vendor:k8s.io/gengo/generator",
-        "//vendor:k8s.io/gengo/namer",
-        "//vendor:k8s.io/gengo/types",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/gengo/args:go_default_library",
+        "//vendor/k8s.io/gengo/generator:go_default_library",
+        "//vendor/k8s.io/gengo/namer:go_default_library",
+        "//vendor/k8s.io/gengo/types:go_default_library",
     ],
 )
 

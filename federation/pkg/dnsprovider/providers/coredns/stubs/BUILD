@@ -12,8 +12,8 @@ go_library(
     srcs = ["corednsapi.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/coreos/etcd/client",
-        "//vendor:golang.org/x/net/context",
+        "//vendor/github.com/coreos/etcd/client:go_default_library",
+        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

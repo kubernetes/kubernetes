@@ -19,8 +19,8 @@ go_library(
     deps = [
         "//pkg/apis/authentication/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1:go_default_library",
-        "//vendor:k8s.io/client-go/rest",
-        "//vendor:k8s.io/client-go/testing",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/testing:go_default_library",
     ],
 )
 

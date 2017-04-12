@@ -12,7 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["deadlock-detector.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/glog"],
+    deps = ["//vendor/github.com/golang/glog:go_default_library"],
 )
 
 go_test(

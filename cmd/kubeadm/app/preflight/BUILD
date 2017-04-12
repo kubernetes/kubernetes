@@ -20,8 +20,8 @@ go_library(
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/node:go_default_library",
         "//test/e2e_node/system:go_default_library",
-        "//vendor:github.com/PuerkitoBio/purell",
-        "//vendor:github.com/blang/semver",
+        "//vendor/github.com/PuerkitoBio/purell:go_default_library",
+        "//vendor/github.com/blang/semver:go_default_library",
     ],
 )
 
@@ -32,7 +32,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//vendor:github.com/renstrom/dedent",
+        "//vendor/github.com/renstrom/dedent:go_default_library",
     ],
 )
 
