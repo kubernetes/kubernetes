@@ -247,6 +247,8 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(pod *v1.Pod) {
 		return
 	}
 
+	allVolumesAdded := true
+
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
 		volumeSpec, volumeGidValue, err :=
@@ -257,6 +259,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(pod *v1.Pod) {
 				podVolume.Name,
 				format.Pod(pod),
 				err)
+			allVolumesAdded = false
 			continue
 		}
 
@@ -270,6 +273,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(pod *v1.Pod) {
 				volumeSpec.Name(),
 				uniquePodName,
 				err)
+			allVolumesAdded = false
 		}
 
 		glog.V(10).Infof(
@@ -279,7 +283,11 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(pod *v1.Pod) {
 			uniquePodName)
 	}
 
-	dswp.markPodProcessed(uniquePodName)
+	// some of the volume additions may have failed, should not mark this pod as fully processed
+	if allVolumesAdded {
+		dswp.markPodProcessed(uniquePodName)
+	}
+
 }
 
 // podPreviouslyProcessed returns true if the volumes for this pod have already
@@ -314,6 +322,7 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 
 // createVolumeSpec creates and returns a mutatable volume.Spec object for the
 // specified volume. It dereference any PVC to get PV objects, if needed.
+// Returns an error if unable to obtain the volume at this time.
 func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 	podVolume v1.Volume, podNamespace string) (*volume.Spec, string, error) {
 	if pvcSource :=
@@ -396,6 +405,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 	}
 
 	if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
+
 		return "", "", fmt.Errorf(
 			"PVC %s/%s has non-bound phase (%q) or empty pvc.Spec.VolumeName (%q)",
 			namespace,
