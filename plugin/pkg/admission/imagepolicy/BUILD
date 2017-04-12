@@ -20,6 +20,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
         "//pkg/apis/imagepolicy/v1alpha1:go_default_library",
+        "//pkg/kubeapiserver/admission:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
