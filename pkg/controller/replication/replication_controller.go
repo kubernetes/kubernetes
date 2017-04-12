@@ -202,8 +202,7 @@ func (rm *ReplicationManager) updateRC(old, cur interface{}) {
 	oldRC := old.(*v1.ReplicationController)
 	curRC := cur.(*v1.ReplicationController)
 
-	// TODO: Remove when #31981 is resolved!
-	glog.Infof("Observed updated replication controller %v. Desired pod count change: %d->%d", curRC.Name, *(oldRC.Spec.Replicas), *(curRC.Spec.Replicas))
+	glog.V(4).Infof("Observed updated replication controller %v. Desired pod count change: %d->%d", curRC.Name, *(oldRC.Spec.Replicas), *(curRC.Spec.Replicas))
 
 	// You might imagine that we only really need to enqueue the
 	// controller when Spec changes, but it is safer to sync any
