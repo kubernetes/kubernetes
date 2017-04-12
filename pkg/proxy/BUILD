@@ -14,7 +14,7 @@ go_library(
         "types.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/types"],
+    deps = ["//vendor/k8s.io/apimachinery/pkg/types:go_default_library"],
 )
 
 filegroup(

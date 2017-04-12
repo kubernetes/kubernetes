@@ -22,8 +22,8 @@ go_library(
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/volume:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 
@@ -35,9 +35,9 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 

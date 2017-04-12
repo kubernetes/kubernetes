@@ -23,8 +23,8 @@ go_library(
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],
 )
 
@@ -40,7 +40,7 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/util/iptables:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
 

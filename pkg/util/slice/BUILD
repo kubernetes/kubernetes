@@ -12,7 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["slice.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/util/rand"],
+    deps = ["//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library"],
 )
 
 go_test(

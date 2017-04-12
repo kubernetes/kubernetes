@@ -14,8 +14,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/generated:go_default_library",
-        "//vendor:github.com/chai2010/gettext-go/gettext",
-        "//vendor:github.com/golang/glog",
+        "//vendor/github.com/chai2010/gettext-go/gettext:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
     ],
 )
 

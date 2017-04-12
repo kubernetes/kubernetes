@@ -21,11 +21,11 @@ go_library(
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/util/term:go_default_library",
-        "//vendor:github.com/emicklei/go-restful",
-        "//vendor:google.golang.org/grpc",
-        "//vendor:google.golang.org/grpc/codes",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/client-go/util/clock",
+        "//vendor/github.com/emicklei/go-restful:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/client-go/util/clock:go_default_library",
     ],
 )
 
@@ -43,11 +43,11 @@ go_test(
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/util/term:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:github.com/stretchr/testify/require",
-        "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/rest",
-        "//vendor:k8s.io/client-go/util/clock",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/api:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/util/clock:go_default_library",
     ],
 )
 
