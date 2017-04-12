@@ -66,6 +66,7 @@ static="static"
 storageclass="storageclass"
 subjectaccessreviews="subjectaccessreviews"
 thirdpartyresources="thirdpartyresources"
+daemonsets="daemonsets"
 
 
 # Stops the running kubectl proxy, if there is one.
@@ -2628,6 +2629,22 @@ run_rs_tests() {
   fi
 }
 
+run_daemonset_tests() {
+  kube::log::status "Testing kubectl(v1:daemonsets)"
+
+  ### Create a rolling update DaemonSet
+  # Pre-condition: no DaemonSet exists
+  kube::test::get_object_assert daemonsets "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl apply -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
+  # Template Generation should be 1
+  kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '1'
+  kubectl apply -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
+  # Template Generation should stay 1
+  kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '1'
+  kubectl delete -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
+}
+
 run_multi_resources_tests() {
   kube::log::status "Testing kubectl(v1:multiple resources)"
 
@@ -2852,6 +2869,7 @@ runTests() {
   deployment_second_image_field="(index .spec.template.spec.containers 1).image"
   change_cause_annotation='.*kubernetes.io/change-cause.*'
   pdb_min_available=".spec.minAvailable"
+  template_generation_field=".spec.templateGeneration"
 
   # Make sure "default" namespace exists.
   if kube::test::if_supports_resource "${namespaces}" ; then
@@ -3238,6 +3256,14 @@ runTests() {
     run_service_tests
   fi
 
+
+  ##################
+  # DaemonSets     #
+  ##################
+
+  if kube::test::if_supports_resource "${daemonsets}" ; then
+    run_daemonset_tests
+  fi
 
   ###########################
   # Replication controllers #
