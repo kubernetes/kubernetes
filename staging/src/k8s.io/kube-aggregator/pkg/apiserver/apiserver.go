@@ -178,6 +178,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		endpointsLister: s.endpointsLister,
 	}
 	s.GenericAPIServer.HandlerContainer.Handle("/apis", apisHandler)
+	s.GenericAPIServer.HandlerContainer.Handle("/apis/", apisHandler)
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), kubeInformers.Core().V1().Services(), s)
 

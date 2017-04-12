@@ -93,6 +93,7 @@ func (p *pipeline) handle() {
 				if isMsgSnap(m) {
 					p.raft.ReportSnapshot(m.To, raft.SnapshotFailure)
 				}
+				sentFailures.WithLabelValues(types.ID(m.To).String()).Inc()
 				continue
 			}
 
@@ -117,7 +118,7 @@ func (p *pipeline) post(data []byte) (err error) {
 	req := createPostRequest(u, RaftPrefix, bytes.NewBuffer(data), "application/protobuf", p.tr.URLs, p.tr.ID, p.tr.ClusterID)
 
 	done := make(chan struct{}, 1)
-	cancel := httputil.RequestCanceler(p.tr.pipelineRt, req)
+	cancel := httputil.RequestCanceler(req)
 	go func() {
 		select {
 		case <-done:

@@ -182,7 +182,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 					},
 				}
 				for _, info := range infos {
-					l.Items = append(l.Items, info.Object.(*unstructured.Unstructured))
+					l.Items = append(l.Items, *info.Object.(*unstructured.Unstructured))
 				}
 				originalObj = l
 			}

@@ -578,7 +578,7 @@ func TestClusterIPReject(t *testing.T) {
 	}
 	fp.syncProxyRules(syncReasonForce)
 
-	svcChain := string(servicePortChainName(svcPortName, strings.ToLower(string(api.ProtocolTCP))))
+	svcChain := string(servicePortChainName(svcPortName.String(), strings.ToLower(string(api.ProtocolTCP))))
 	svcRules := ipt.GetRules(svcChain)
 	if len(svcRules) != 0 {
 		errorf(fmt.Sprintf("Unexpected rule for chain %v service %v without endpoints", svcChain, svcPortName), svcRules, t)
@@ -628,8 +628,8 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 	fp.syncProxyRules(syncReasonForce)
 
 	epStr := fmt.Sprintf("%s:%d", epIP, svcPort)
-	svcChain := string(servicePortChainName(svcPortName, strings.ToLower(string(api.ProtocolTCP))))
-	epChain := string(servicePortEndpointChainName(svcPortName, strings.ToLower(string(api.ProtocolTCP)), epStr))
+	svcChain := string(servicePortChainName(svcPortName.String(), strings.ToLower(string(api.ProtocolTCP))))
+	epChain := string(servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(api.ProtocolTCP)), epStr))
 
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
 	if !hasJump(kubeSvcRules, svcChain, svcIP, svcPort) {
@@ -692,9 +692,9 @@ func TestLoadBalancer(t *testing.T) {
 	fp.syncProxyRules(syncReasonForce)
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
-	fwChain := string(serviceFirewallChainName(svcPortName, proto))
-	svcChain := string(servicePortChainName(svcPortName, proto))
-	//lbChain := string(serviceLBChainName(svcPortName, proto))
+	fwChain := string(serviceFirewallChainName(svcPortName.String(), proto))
+	svcChain := string(servicePortChainName(svcPortName.String(), proto))
+	//lbChain := string(serviceLBChainName(svcPortName.String(), proto))
 
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
 	if !hasJump(kubeSvcRules, fwChain, svcLBIP, svcPort) {
@@ -749,7 +749,7 @@ func TestNodePort(t *testing.T) {
 	fp.syncProxyRules(syncReasonForce)
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
-	svcChain := string(servicePortChainName(svcPortName, proto))
+	svcChain := string(servicePortChainName(svcPortName.String(), proto))
 
 	kubeNodePortRules := ipt.GetRules(string(kubeNodePortsChain))
 	if !hasJump(kubeNodePortRules, svcChain, "", svcNodePort) {
@@ -847,11 +847,11 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	fp.syncProxyRules(syncReasonForce)
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
-	fwChain := string(serviceFirewallChainName(svcPortName, proto))
-	lbChain := string(serviceLBChainName(svcPortName, proto))
+	fwChain := string(serviceFirewallChainName(svcPortName.String(), proto))
+	lbChain := string(serviceLBChainName(svcPortName.String(), proto))
 
-	nonLocalEpChain := string(servicePortEndpointChainName(svcPortName, strings.ToLower(string(api.ProtocolTCP)), epStrLocal))
-	localEpChain := string(servicePortEndpointChainName(svcPortName, strings.ToLower(string(api.ProtocolTCP)), epStrNonLocal))
+	nonLocalEpChain := string(servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(api.ProtocolTCP)), epStrLocal))
+	localEpChain := string(servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(api.ProtocolTCP)), epStrNonLocal))
 
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
 	if !hasJump(kubeSvcRules, fwChain, svcLBIP, svcPort) {
@@ -938,17 +938,17 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	fp.syncProxyRules(syncReasonForce)
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
-	lbChain := string(serviceLBChainName(svcPortName, proto))
+	lbChain := string(serviceLBChainName(svcPortName.String(), proto))
 
-	nonLocalEpChain := string(servicePortEndpointChainName(svcPortName, proto, epStrLocal))
-	localEpChain := string(servicePortEndpointChainName(svcPortName, proto, epStrNonLocal))
+	nonLocalEpChain := string(servicePortEndpointChainName(svcPortName.String(), proto, epStrLocal))
+	localEpChain := string(servicePortEndpointChainName(svcPortName.String(), proto, epStrNonLocal))
 
 	kubeNodePortRules := ipt.GetRules(string(kubeNodePortsChain))
 	if !hasJump(kubeNodePortRules, lbChain, "", svcNodePort) {
 		errorf(fmt.Sprintf("Failed to find jump to lb chain %v", lbChain), kubeNodePortRules, t)
 	}
 
-	svcChain := string(servicePortChainName(svcPortName, proto))
+	svcChain := string(servicePortChainName(svcPortName.String(), proto))
 	lbRules := ipt.GetRules(lbChain)
 	if hasJump(lbRules, nonLocalEpChain, "", 0) {
 		errorf(fmt.Sprintf("Found jump from lb chain %v to non-local ep %v", lbChain, epStrLocal), lbRules, t)

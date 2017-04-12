@@ -33,7 +33,6 @@ import (
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/wsstream"
 
-	"github.com/emicklei/go-restful"
 	"golang.org/x/net/websocket"
 )
 
@@ -62,18 +61,18 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatch handles serving requests to the server
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatch(watcher watch.Interface, scope RequestScope, req *restful.Request, res *restful.Response, timeout time.Duration) {
+func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, w http.ResponseWriter, timeout time.Duration) {
 	// negotiate for the stream serializer
-	serializer, err := negotiation.NegotiateOutputStreamSerializer(req.Request, scope.Serializer)
+	serializer, err := negotiation.NegotiateOutputStreamSerializer(req, scope.Serializer)
 	if err != nil {
-		scope.err(err, res.ResponseWriter, req.Request)
+		scope.err(err, w, req)
 		return
 	}
 	framer := serializer.StreamSerializer.Framer
 	streamSerializer := serializer.StreamSerializer.Serializer
 	embedded := serializer.Serializer
 	if framer == nil {
-		scope.err(fmt.Errorf("no framer defined for %q available for embedded encoding", serializer.MediaType), res.ResponseWriter, req.Request)
+		scope.err(fmt.Errorf("no framer defined for %q available for embedded encoding", serializer.MediaType), w, req)
 		return
 	}
 	encoder := scope.Serializer.EncoderForVersion(streamSerializer, scope.Kind.GroupVersion())
@@ -107,7 +106,7 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *restful.Reques
 		TimeoutFactory: &realTimeoutFactory{timeout},
 	}
 
-	server.ServeHTTP(res.ResponseWriter, req.Request)
+	server.ServeHTTP(w, req)
 }
 
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.

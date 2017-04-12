@@ -652,8 +652,8 @@ func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string, newEndpoi
 // returns the associated 16 character hash. This is computed by hashing (sha256)
 // then encoding to base32 and truncating to 16 chars. We do this because IPTables
 // Chain Names must be <= 28 chars long, and the longer they are the harder they are to read.
-func portProtoHash(s proxy.ServicePortName, protocol string) string {
-	hash := sha256.Sum256([]byte(s.String() + protocol))
+func portProtoHash(servicePortName string, protocol string) string {
+	hash := sha256.Sum256([]byte(servicePortName + protocol))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return encoded[:16]
 }
@@ -661,15 +661,15 @@ func portProtoHash(s proxy.ServicePortName, protocol string) string {
 // servicePortChainName takes the ServicePortName for a service and
 // returns the associated iptables chain.  This is computed by hashing (sha256)
 // then encoding to base32 and truncating with the prefix "KUBE-SVC-".
-func servicePortChainName(s proxy.ServicePortName, protocol string) utiliptables.Chain {
-	return utiliptables.Chain("KUBE-SVC-" + portProtoHash(s, protocol))
+func servicePortChainName(servicePortName string, protocol string) utiliptables.Chain {
+	return utiliptables.Chain("KUBE-SVC-" + portProtoHash(servicePortName, protocol))
 }
 
 // serviceFirewallChainName takes the ServicePortName for a service and
 // returns the associated iptables chain.  This is computed by hashing (sha256)
 // then encoding to base32 and truncating with the prefix "KUBE-FW-".
-func serviceFirewallChainName(s proxy.ServicePortName, protocol string) utiliptables.Chain {
-	return utiliptables.Chain("KUBE-FW-" + portProtoHash(s, protocol))
+func serviceFirewallChainName(servicePortName string, protocol string) utiliptables.Chain {
+	return utiliptables.Chain("KUBE-FW-" + portProtoHash(servicePortName, protocol))
 }
 
 // serviceLBPortChainName takes the ServicePortName for a service and
@@ -677,13 +677,13 @@ func serviceFirewallChainName(s proxy.ServicePortName, protocol string) utilipta
 // then encoding to base32 and truncating with the prefix "KUBE-XLB-".  We do
 // this because IPTables Chain Names must be <= 28 chars long, and the longer
 // they are the harder they are to read.
-func serviceLBChainName(s proxy.ServicePortName, protocol string) utiliptables.Chain {
-	return utiliptables.Chain("KUBE-XLB-" + portProtoHash(s, protocol))
+func serviceLBChainName(servicePortName string, protocol string) utiliptables.Chain {
+	return utiliptables.Chain("KUBE-XLB-" + portProtoHash(servicePortName, protocol))
 }
 
 // This is the same as servicePortChainName but with the endpoint included.
-func servicePortEndpointChainName(s proxy.ServicePortName, protocol string, endpoint string) utiliptables.Chain {
-	hash := sha256.Sum256([]byte(s.String() + protocol + endpoint))
+func servicePortEndpointChainName(servicePortName string, protocol string, endpoint string) utiliptables.Chain {
+	hash := sha256.Sum256([]byte(servicePortName + protocol + endpoint))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return utiliptables.Chain("KUBE-SEP-" + encoded[:16])
 }
@@ -887,9 +887,12 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	// Build rules for each service.
 	for svcName, svcInfo := range newServices {
 		protocol := strings.ToLower(string(svcInfo.protocol))
+		// Precompute svcNameString; with many services the many calls
+		// to ServicePortName.String() show up in CPU profiles.
+		svcNameString := svcName.String()
 
 		// Create the per-service chain, retaining counters if possible.
-		svcChain := servicePortChainName(svcName, protocol)
+		svcChain := servicePortChainName(svcNameString, protocol)
 		if chain, ok := existingNATChains[svcChain]; ok {
 			writeLine(natChains, chain)
 		} else {
@@ -897,7 +900,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 		}
 		activeNATChains[svcChain] = true
 
-		svcXlbChain := serviceLBChainName(svcName, protocol)
+		svcXlbChain := serviceLBChainName(svcNameString, protocol)
 		if svcInfo.onlyNodeLocalEndpoints {
 			// Only for services with the externalTraffic annotation set to OnlyLocal
 			// create the per-service LB chain, retaining counters if possible.
@@ -915,7 +918,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 		// Capture the clusterIP.
 		args := []string{
 			"-A", string(kubeServicesChain),
-			"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcName.String()),
+			"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcNameString),
 			"-m", protocol, "-p", protocol,
 			"-d", fmt.Sprintf("%s/32", svcInfo.clusterIP.String()),
 			"--dport", fmt.Sprintf("%d", svcInfo.port),
@@ -937,7 +940,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 				glog.Errorf("can't determine if IP is local, assuming not: %v", err)
 			} else if local {
 				lp := localPort{
-					desc:     "externalIP for " + svcName.String(),
+					desc:     "externalIP for " + svcNameString,
 					ip:       externalIP,
 					port:     svcInfo.port,
 					protocol: protocol,
@@ -965,7 +968,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 			} // We're holding the port, so it's OK to install iptables rules.
 			args := []string{
 				"-A", string(kubeServicesChain),
-				"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcName.String()),
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcNameString),
 				"-m", protocol, "-p", protocol,
 				"-d", fmt.Sprintf("%s/32", externalIP),
 				"--dport", fmt.Sprintf("%d", svcInfo.port),
@@ -991,7 +994,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 		for _, ingress := range svcInfo.loadBalancerStatus.Ingress {
 			if ingress.IP != "" {
 				// create service firewall chain
-				fwChain := serviceFirewallChainName(svcName, protocol)
+				fwChain := serviceFirewallChainName(svcNameString, protocol)
 				if chain, ok := existingNATChains[fwChain]; ok {
 					writeLine(natChains, chain)
 				} else {
@@ -1004,7 +1007,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 
 				args := []string{
 					"-A", string(kubeServicesChain),
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcName.String()),
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
 					"-m", protocol, "-p", protocol,
 					"-d", fmt.Sprintf("%s/32", ingress.IP),
 					"--dport", fmt.Sprintf("%d", svcInfo.port),
@@ -1014,7 +1017,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 
 				args = []string{
 					"-A", string(fwChain),
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcName.String()),
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
 				}
 
 				// Each source match rule in the FW chain may jump to either the SVC or the XLB chain
@@ -1061,7 +1064,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 			// Hold the local port open so no other process can open it
 			// (because the socket might open but it would never work).
 			lp := localPort{
-				desc:     "nodePort for " + svcName.String(),
+				desc:     "nodePort for " + svcNameString,
 				ip:       "",
 				port:     svcInfo.nodePort,
 				protocol: protocol,
@@ -1083,7 +1086,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 
 			args := []string{
 				"-A", string(kubeNodePortsChain),
-				"-m", "comment", "--comment", svcName.String(),
+				"-m", "comment", "--comment", svcNameString,
 				"-m", protocol, "-p", protocol,
 				"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
 			}
@@ -1105,7 +1108,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 			if len(newEndpoints[svcName]) == 0 {
 				writeLine(filterRules,
 					"-A", string(kubeServicesChain),
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcName.String()),
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 					"-m", "addrtype", "--dst-type", "LOCAL",
 					"-m", protocol, "-p", protocol,
 					"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
@@ -1118,7 +1121,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 		if len(newEndpoints[svcName]) == 0 {
 			writeLine(filterRules,
 				"-A", string(kubeServicesChain),
-				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcName.String()),
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 				"-m", protocol, "-p", protocol,
 				"-d", fmt.Sprintf("%s/32", svcInfo.clusterIP.String()),
 				"--dport", fmt.Sprintf("%d", svcInfo.port),
@@ -1136,7 +1139,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 		endpointChains := make([]utiliptables.Chain, 0)
 		for _, ep := range newEndpoints[svcName] {
 			endpoints = append(endpoints, ep)
-			endpointChain := servicePortEndpointChainName(svcName, protocol, ep.endpoint)
+			endpointChain := servicePortEndpointChainName(svcNameString, protocol, ep.endpoint)
 			endpointChains = append(endpointChains, endpointChain)
 
 			// Create the endpoint chain, retaining counters if possible.
@@ -1153,7 +1156,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 			for _, endpointChain := range endpointChains {
 				writeLine(natRules,
 					"-A", string(svcChain),
-					"-m", "comment", "--comment", svcName.String(),
+					"-m", "comment", "--comment", svcNameString,
 					"-m", "recent", "--name", string(endpointChain),
 					"--rcheck", "--seconds", fmt.Sprintf("%d", svcInfo.stickyMaxAgeMinutes*60), "--reap",
 					"-j", string(endpointChain))
@@ -1166,7 +1169,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 			// Balancing rules in the per-service chain.
 			args := []string{
 				"-A", string(svcChain),
-				"-m", "comment", "--comment", svcName.String(),
+				"-m", "comment", "--comment", svcNameString,
 			}
 			if i < (n - 1) {
 				// Each rule is a probabilistic match.
@@ -1182,7 +1185,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 			// Rules in the per-endpoint chain.
 			args = []string{
 				"-A", string(endpointChain),
-				"-m", "comment", "--comment", svcName.String(),
+				"-m", "comment", "--comment", svcNameString,
 			}
 			// Handle traffic that loops back to the originator with SNAT.
 			writeLine(natRules, append(args,
@@ -1233,7 +1236,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 			args := []string{
 				"-A", string(svcXlbChain),
 				"-m", "comment", "--comment",
-				fmt.Sprintf(`"%s has no local endpoints"`, svcName.String()),
+				fmt.Sprintf(`"%s has no local endpoints"`, svcNameString),
 				"-j",
 				string(KubeMarkDropChain),
 			}
@@ -1245,7 +1248,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 				args := []string{
 					"-A", string(svcXlbChain),
 					"-m", "comment", "--comment",
-					fmt.Sprintf(`"Balancing rule %d for %s"`, i, svcName.String()),
+					fmt.Sprintf(`"Balancing rule %d for %s"`, i, svcNameString),
 				}
 				if i < (numLocalEndpoints - 1) {
 					// Each rule is a probabilistic match.

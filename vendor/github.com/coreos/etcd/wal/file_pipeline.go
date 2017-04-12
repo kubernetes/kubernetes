@@ -17,7 +17,7 @@ package wal
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/coreos/etcd/pkg/fileutil"
 )
@@ -65,7 +65,7 @@ func (fp *filePipeline) Close() error {
 
 func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
 	// count % 2 so this file isn't the same as the one last published
-	fpath := path.Join(fp.dir, fmt.Sprintf("%d.tmp", fp.count%2))
+	fpath := filepath.Join(fp.dir, fmt.Sprintf("%d.tmp", fp.count%2))
 	if f, err = fileutil.LockFile(fpath, os.O_CREATE|os.O_WRONLY, fileutil.PrivateFileMode); err != nil {
 		return nil, err
 	}
