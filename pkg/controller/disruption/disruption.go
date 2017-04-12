@@ -492,7 +492,7 @@ func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
 
 	expectedCount, desiredHealthy, err := dc.getExpectedPodCount(pdb, pods)
 	if err != nil {
-		dc.recorder.Eventf(pdb, v1.EventTypeNormal, "ExpectedPods", "Failed to calculate the number of expected pods: %v", err)
+		dc.recorder.Eventf(pdb, v1.EventTypeWarning, "ExpectedPods", "Failed to calculate the number of expected pods: %v", err)
 		return err
 	}
 
