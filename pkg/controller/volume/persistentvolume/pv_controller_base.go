@@ -273,19 +273,23 @@ func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeCl
 
 // Run starts all of this controller's control loops
 func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
-	glog.V(1).Infof("starting PersistentVolumeController")
-	if !cache.WaitForCacheSync(stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for volume caches to sync"))
+	defer utilruntime.HandleCrash()
+	defer ctrl.claimQueue.ShutDown()
+	defer ctrl.volumeQueue.ShutDown()
+
+	glog.Infof("Starting persistent volume controller")
+	defer glog.Infof("Shutting down peristent volume controller")
+
+	if !controller.WaitForCacheSync("persistent volume", stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced) {
 		return
 	}
+
 	ctrl.initializeCaches(ctrl.volumeLister, ctrl.claimLister)
+
 	go wait.Until(ctrl.volumeWorker, time.Second, stopCh)
 	go wait.Until(ctrl.claimWorker, time.Second, stopCh)
 
 	<-stopCh
-
-	ctrl.claimQueue.ShutDown()
-	ctrl.volumeQueue.ShutDown()
 }
 
 // volumeWorker processes items from volumeQueue. It must run only once,

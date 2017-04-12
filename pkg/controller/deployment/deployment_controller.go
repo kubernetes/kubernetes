@@ -150,9 +150,9 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	defer dc.queue.ShutDown()
 
 	glog.Infof("Starting deployment controller")
+	defer glog.Infof("Shutting down deployment controller")
 
-	if !cache.WaitForCacheSync(stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("deployment", stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
 	}
 
@@ -161,7 +161,6 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
-	glog.Infof("Shutting down deployment controller")
 }
 
 func (dc *DeploymentController) addDeployment(obj interface{}) {

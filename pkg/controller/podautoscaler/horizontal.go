@@ -136,10 +136,10 @@ func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer a.queue.ShutDown()
 
-	glog.Infof("Starting HPA Controller")
+	glog.Infof("Starting HPA controller")
+	defer glog.Infof("Shutting down HPA controller")
 
-	if !cache.WaitForCacheSync(stopCh, a.hpaListerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("HPA", stopCh, a.hpaListerSynced) {
 		return
 	}
 
@@ -147,7 +147,6 @@ func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	go wait.Until(a.worker, time.Second, stopCh)
 
 	<-stopCh
-	glog.Infof("Shutting down HPA Controller")
 }
 
 // obj could be an *v1.HorizontalPodAutoscaler, or a DeletionFinalStateUnknown marker item.

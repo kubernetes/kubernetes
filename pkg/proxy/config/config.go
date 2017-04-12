@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/core/internalversion"
 	listers "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/config"
 )
 
@@ -127,14 +128,20 @@ func (c *EndpointsConfig) RegisterEventHandler(handler EndpointsHandler) {
 
 // Run starts the goroutine responsible for calling registered handlers.
 func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
-	if !cache.WaitForCacheSync(stopCh, c.listerSynced) {
-		utilruntime.HandleError(fmt.Errorf("endpoint controller not synced"))
+	defer utilruntime.HandleCrash()
+
+	glog.Info("Starting endpoints config controller")
+	defer glog.Info("Shutting down endpoints config controller")
+
+	if !controller.WaitForCacheSync("endpoints config", stopCh, c.listerSynced) {
 		return
 	}
 
 	// We have synced informers. Now we can start delivering updates
 	// to the registered handler.
 	go func() {
+		defer utilruntime.HandleCrash()
+
 		for i := range c.eventHandlers {
 			glog.V(3).Infof("Calling handler.OnEndpointsSynced()")
 			c.eventHandlers[i].OnEndpointsSynced()
@@ -166,6 +173,8 @@ func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
 		<-stopCh
 		close(c.stop)
 	}()
+
+	<-stopCh
 }
 
 func (c *EndpointsConfig) handleAddEndpoints(obj interface{}) {
@@ -274,14 +283,19 @@ func (c *ServiceConfig) RegisterHandler(handler ServiceConfigHandler) {
 // Run starts the goroutine responsible for calling
 // registered handlers.
 func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
-	if !cache.WaitForCacheSync(stopCh, c.listerSynced) {
-		utilruntime.HandleError(fmt.Errorf("service controller not synced"))
+	defer utilruntime.HandleCrash()
+
+	glog.Info("Starting service config controller")
+	defer glog.Info("Shutting down service config controller")
+
+	if !controller.WaitForCacheSync("service config", stopCh, c.listerSynced) {
 		return
 	}
 
 	// We have synced informers. Now we can start delivering updates
 	// to the registered handler.
 	go func() {
+		defer utilruntime.HandleCrash()
 		for {
 			select {
 			case <-c.updates:
@@ -309,6 +323,8 @@ func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 		<-stopCh
 		close(c.stop)
 	}()
+
+	<-stopCh
 }
 
 func (c *ServiceConfig) handleAddService(_ interface{}) {

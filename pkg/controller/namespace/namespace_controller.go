@@ -186,10 +186,10 @@ func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer nm.queue.ShutDown()
 
-	glog.Info("Starting the NamespaceController")
+	glog.Info("Starting namespace controller")
+	defer glog.Infof("Shutting down namespace controller")
 
-	if !cache.WaitForCacheSync(stopCh, nm.listerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("namespace", stopCh, nm.listerSynced) {
 		return
 	}
 
@@ -198,6 +198,4 @@ func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
-
-	glog.Info("Shutting down NamespaceController")
 }
