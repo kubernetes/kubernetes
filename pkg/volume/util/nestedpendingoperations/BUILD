@@ -16,8 +16,8 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
         "//pkg/volume/util/types:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
     ],
 )
 
@@ -29,7 +29,7 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/volume/util/types:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
     ],
 )
 

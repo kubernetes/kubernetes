@@ -15,7 +15,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/util/mount:go_default_library",
-        "//vendor:k8s.io/client-go/util/testing",
+        "//vendor/k8s.io/client-go/util/testing:go_default_library",
     ],
 )
 

@@ -30,10 +30,10 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/master:go_default_library",
         "//test/integration/framework:go_default_library",
-        "//vendor:github.com/pborman/uuid",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/client-go/rest",
+        "//vendor/github.com/pborman/uuid:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
 

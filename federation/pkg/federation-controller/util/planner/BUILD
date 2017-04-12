@@ -22,7 +22,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
 

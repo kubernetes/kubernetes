@@ -15,7 +15,7 @@ go_library(
     deps = [
         "//federation/apis/federation:go_default_library",
         "//pkg/api/validation:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 
@@ -27,7 +27,7 @@ go_test(
     deps = [
         "//federation/apis/federation:go_default_library",
         "//pkg/api:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )
 
