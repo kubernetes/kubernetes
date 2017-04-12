@@ -26,6 +26,7 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
+	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -49,6 +50,20 @@ func (gce *GCECloud) NodeAddresses(_ types.NodeName) ([]v1.NodeAddress, error) {
 		{Type: v1.NodeInternalIP, Address: internalIP},
 		{Type: v1.NodeExternalIP, Address: externalIP},
 	}, nil
+}
+
+// This method will not be called from the node that is requesting this ID.
+// i.e. metadata service and other local methods cannot be used here
+func (gce *GCECloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+	return []v1.NodeAddress{}, errors.New("unimplemented")
+}
+
+// InstanceTypeByProviderID returns the cloudprovider instance type of the node
+// with the specified unique providerID This method will not be called from the
+// node that is requesting this ID. i.e. metadata service and other local
+// methods cannot be used here
+func (gce *GCECloud) InstanceTypeByProviderID(providerID string) (string, error) {
+	return "", errors.New("unimplemented")
 }
 
 // ExternalID returns the cloud provider ID of the node with the specified NodeName (deprecated).
@@ -202,6 +217,31 @@ func (gce *GCECloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
 }
 
+// AliasRanges returns a list of CIDR ranges that are assigned to the
+// `node` for allocation to pods. Returns a list of the form
+// "<ip>/<netmask>".
+func (gce *GCECloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err error) {
+	var instance *gceInstance
+	instance, err = gce.getInstanceByName(mapNodeNameToInstanceName(nodeName))
+	if err != nil {
+		return
+	}
+
+	var res *computealpha.Instance
+	res, err = gce.serviceAlpha.Instances.Get(
+		gce.projectID, instance.Zone, instance.Name).Do()
+	if err != nil {
+		return
+	}
+
+	for _, networkInterface := range res.NetworkInterfaces {
+		for _, aliasIpRange := range networkInterface.AliasIpRanges {
+			cidrs = append(cidrs, aliasIpRange.IpCidrRange)
+		}
+	}
+	return
+}
+
 // Gets the named instances, returning cloudprovider.InstanceNotFound if any instance is not found
 func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 	instances := make(map[string]*gceInstance)
@@ -350,18 +390,4 @@ func (gce *GCECloud) isCurrentInstance(instanceID string) bool {
 	}
 
 	return currentInstanceID == canonicalizeInstanceName(instanceID)
-}
-
-// NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
-// This method will not be called from the node that is requesting this ID. i.e. metadata service
-// and other local methods cannot be used here
-func (gce *GCECloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	return []v1.NodeAddress{}, errors.New("unimplemented")
-}
-
-// InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
-// This method will not be called from the node that is requesting this ID. i.e. metadata service
-// and other local methods cannot be used here
-func (gce *GCECloud) InstanceTypeByProviderID(providerID string) (string, error) {
-	return "", errors.New("unimplemented")
 }

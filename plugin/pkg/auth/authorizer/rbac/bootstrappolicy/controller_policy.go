@@ -168,7 +168,7 @@ func init() {
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "node-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "update", "delete", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-			rbac.NewRule("update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
+			rbac.NewRule("patch", "update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
 			// used for pod eviction
 			rbac.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
 			rbac.NewRule("list", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
