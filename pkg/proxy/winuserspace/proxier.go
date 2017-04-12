@@ -262,7 +262,7 @@ func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPo
 		socket:              sock,
 		timeout:             timeout,
 		activeClients:       newClientCache(),
-		dnsClients:          newDnsClientCache(),
+		dnsClients:          newDNSClientCache(),
 		sessionAffinityType: api.ServiceAffinityNone, // default
 	}
 	proxier.setServiceInfo(servicePortPortalName, si)
