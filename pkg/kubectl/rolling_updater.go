@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/retry"
@@ -625,7 +626,7 @@ func CreateNewControllerFromCurrentController(rcClient coreclient.ReplicationCon
 		newRc.Spec.Template.Spec.Containers[containerIndex].ImagePullPolicy = cfg.PullPolicy
 	}
 
-	newHash, err := api.HashObject(newRc, codec)
+	newHash, err := helper.HashObject(newRc, codec)
 	if err != nil {
 		return nil, err
 	}

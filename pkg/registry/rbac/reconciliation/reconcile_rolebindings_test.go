@@ -19,7 +19,7 @@ package reconciliation
 import (
 	"testing"
 
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
@@ -81,10 +81,10 @@ func TestDiffObjectReferenceLists(t *testing.T) {
 
 	for k, tc := range tests {
 		onlyA, onlyB := diffSubjectLists(tc.A, tc.B)
-		if !api.Semantic.DeepEqual(onlyA, tc.ExpectedOnlyA) {
+		if !helper.Semantic.DeepEqual(onlyA, tc.ExpectedOnlyA) {
 			t.Errorf("%s: Expected %#v, got %#v", k, tc.ExpectedOnlyA, onlyA)
 		}
-		if !api.Semantic.DeepEqual(onlyB, tc.ExpectedOnlyB) {
+		if !helper.Semantic.DeepEqual(onlyB, tc.ExpectedOnlyB) {
 			t.Errorf("%s: Expected %#v, got %#v", k, tc.ExpectedOnlyB, onlyB)
 		}
 	}
@@ -174,7 +174,7 @@ func TestComputeUpdate(t *testing.T) {
 			t.Errorf("%s: Expected\n\t%v\ngot\n\t%v (%v)", k, tc.ExpectedUpdateNeeded, updateNeeded, result.Operation)
 			continue
 		}
-		if updateNeeded && !api.Semantic.DeepEqual(updatedBinding, tc.ExpectedUpdatedBinding) {
+		if updateNeeded && !helper.Semantic.DeepEqual(updatedBinding, tc.ExpectedUpdatedBinding) {
 			t.Errorf("%s: Expected\n\t%v %v\ngot\n\t%v %v", k, tc.ExpectedUpdatedBinding.RoleRef, tc.ExpectedUpdatedBinding.Subjects, updatedBinding.RoleRef, updatedBinding.Subjects)
 		}
 	}

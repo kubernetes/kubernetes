@@ -46,6 +46,7 @@ import (
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -1243,7 +1244,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, sa) {
+				if !helper.Semantic.DeepEqual(got, sa) {
 					return nil, fmt.Errorf("unexpected service account object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, sa))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &sa)}, nil
@@ -1257,7 +1258,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, role) {
+				if !helper.Semantic.DeepEqual(got, role) {
 					return nil, fmt.Errorf("unexpected role object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, role))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &role)}, nil
@@ -1271,7 +1272,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, rolebinding) {
+				if !helper.Semantic.DeepEqual(got, rolebinding) {
 					return nil, fmt.Errorf("unexpected rolebinding object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, rolebinding))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &rolebinding)}, nil
