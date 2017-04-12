@@ -26,5 +26,6 @@ func main() {
 	if err := app.Run(); err != nil {
 		os.Exit(1)
 	}
+	// no-op change
 	os.Exit(0)
 }
