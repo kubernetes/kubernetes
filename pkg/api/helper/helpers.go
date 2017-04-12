@@ -117,7 +117,7 @@ func IsStandardContainerResourceName(str string) bool {
 
 // IsNvidiaGpuResourceName returns true if the resource name equals to ResourceNvidiaGPU
 func IsNvidiaGpuResourceName(str string) bool {
-	return strings.Compare(str, string(ResourceNvidiaGPU)) == 0
+	return strings.Compare(str, string(api.ResourceNvidiaGPU)) == 0
 }
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
