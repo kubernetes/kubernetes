@@ -11056,6 +11056,7 @@ go_library(
     deps = [
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/gorilla/mux",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",

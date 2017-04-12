@@ -173,12 +173,10 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	apisHandler := &apisHandler{
 		codecs:          Codecs,
 		lister:          s.lister,
-		delegate:        s.GenericAPIServer.FallThroughHandler,
 		serviceLister:   s.serviceLister,
 		endpointsLister: s.endpointsLister,
 	}
-	s.GenericAPIServer.HandlerContainer.Handle("/apis", apisHandler)
-	s.GenericAPIServer.HandlerContainer.Handle("/apis/", apisHandler)
+	s.GenericAPIServer.FallThroughHandler.Handle("/apis", apisHandler)
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), kubeInformers.Core().V1().Services(), s)
 
@@ -221,7 +219,6 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService, de
 	proxyHandler.updateAPIService(apiService, destinationHost)
 	s.proxyHandlers[apiService.Name] = proxyHandler
 	s.GenericAPIServer.FallThroughHandler.Handle(proxyPath, proxyHandler)
-	s.GenericAPIServer.FallThroughHandler.UnlistedHandle(proxyPath+"/", proxyHandler)
 
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {
@@ -245,7 +242,6 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService, de
 	}
 	// aggregation is protected
 	s.GenericAPIServer.FallThroughHandler.Handle(groupPath, groupDiscoveryHandler)
-	s.GenericAPIServer.FallThroughHandler.UnlistedHandle(groupPath+"/", groupDiscoveryHandler)
 	s.handledGroups.Insert(apiService.Spec.Group)
 }
 
