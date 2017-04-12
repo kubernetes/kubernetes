@@ -17,8 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
-	"strings"
-
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -41,19 +40,6 @@ const (
 	pvWriteCmd string = "echo \"" + pvTestData + "\" > " + pvTestFile
 	pvReadCmd  string = "cat " + pvTestFile
 )
-
-// convert []error to a string.
-func errsToString(errs []error) string {
-	var str string
-	if len(errs) > 0 {
-		errmsgs := []string{}
-		for _, e := range errs {
-			errmsgs = append(errmsgs, e.Error())
-		}
-		str = strings.Join(errmsgs, "; ")
-	}
-	return str
-}
 
 func (t *PersistentVolumeUpgradeTest) createGCEVolume() *v1.PersistentVolumeSource {
 	diskName, err := framework.CreatePDWithRetry()
@@ -116,9 +102,8 @@ func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
 	if err := t.deleteGCEVolume(t.pvSource); err != nil {
 		errs = append(errs, err)
 	}
-	errmsg := errsToString(errs)
-	if len(errmsg) > 0 {
-		framework.Failf("Failed to delete 1 or more PVs/PVCs and/or the GCE volume. Errors: %v", errmsg)
+	if len(errs) > 0 {
+		framework.Failf("Failed to delete 1 or more PVs/PVCs and/or the GCE volume. Errors: %v", utilerrors.NewAggregate(errs))
 	}
 }
 
