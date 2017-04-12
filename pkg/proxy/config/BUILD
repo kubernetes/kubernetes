@@ -19,6 +19,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/core/internalversion:go_default_library",
         "//pkg/client/listers/core/internalversion:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/util/config:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/labels",
