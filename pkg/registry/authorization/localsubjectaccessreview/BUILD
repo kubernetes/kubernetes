@@ -15,10 +15,10 @@ go_library(
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/authorization/validation:go_default_library",
         "//pkg/registry/authorization/util:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
-        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
     ],
 )
 

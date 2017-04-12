@@ -11,7 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = ["options.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/spf13/pflag"],
+    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 
 filegroup(
