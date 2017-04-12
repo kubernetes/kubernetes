@@ -393,6 +393,7 @@ staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregis
 staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion
 staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion
 staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1alpha1
+staging/src/k8s.io/kube-aggregator/pkg/controllers
 staging/src/k8s.io/sample-apiserver
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/install
 test/e2e/perftype
