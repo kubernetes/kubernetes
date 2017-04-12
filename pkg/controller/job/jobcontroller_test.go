@@ -677,13 +677,13 @@ func TestGetPodsForJob(t *testing.T) {
 }
 
 func TestGetPodsForJobAdopt(t *testing.T) {
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	clientset := fake.NewSimpleClientset(job1)
 	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	job1 := newJob(1, 1)
-	job1.Name = "job1"
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
 
 	pod1 := newPod("pod1", job1)
@@ -699,6 +699,70 @@ func TestGetPodsForJobAdopt(t *testing.T) {
 	}
 	if got, want := len(pods), 2; got != want {
 		t.Errorf("len(pods) = %v, want %v", got, want)
+	}
+}
+
+func TestGetPodsForJobNoAdoptIfBeingDeleted(t *testing.T) {
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	job1.DeletionTimestamp = &metav1.Time{}
+	clientset := fake.NewSimpleClientset(job1)
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+
+	pod1 := newPod("pod1", job1)
+	pod2 := newPod("pod2", job1)
+	// Make this pod an orphan. It should not be adopted because the Job is being deleted.
+	pod2.OwnerReferences = nil
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+
+	pods, err := jm.getPodsForJob(job1)
+	if err != nil {
+		t.Fatalf("getPodsForJob() error: %v", err)
+	}
+	if got, want := len(pods), 1; got != want {
+		t.Errorf("len(pods) = %v, want %v", got, want)
+	}
+	if got, want := pods[0].Name, pod1.Name; got != want {
+		t.Errorf("pod.Name = %q, want %q", got, want)
+	}
+}
+
+func TestGetPodsForJobNoAdoptIfBeingDeletedRace(t *testing.T) {
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	// The up-to-date object says it's being deleted.
+	job1.DeletionTimestamp = &metav1.Time{}
+	clientset := fake.NewSimpleClientset(job1)
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	// The cache says it's NOT being deleted.
+	cachedJob := *job1
+	cachedJob.DeletionTimestamp = nil
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(&cachedJob)
+
+	pod1 := newPod("pod1", job1)
+	pod2 := newPod("pod2", job1)
+	// Make this pod an orphan. It should not be adopted because the Job is being deleted.
+	pod2.OwnerReferences = nil
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+
+	pods, err := jm.getPodsForJob(job1)
+	if err != nil {
+		t.Fatalf("getPodsForJob() error: %v", err)
+	}
+	if got, want := len(pods), 1; got != want {
+		t.Errorf("len(pods) = %v, want %v", got, want)
+	}
+	if got, want := pods[0].Name, pod1.Name; got != want {
+		t.Errorf("pod.Name = %q, want %q", got, want)
 	}
 }
 
