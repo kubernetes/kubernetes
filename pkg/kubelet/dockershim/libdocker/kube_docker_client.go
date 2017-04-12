@@ -382,6 +382,9 @@ func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemov
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return nil, ctxErr
 	}
+	if isImageNotFoundError(err) {
+		return nil, ImageNotFoundError{ID: image}
+	}
 	return resp, err
 }
 
