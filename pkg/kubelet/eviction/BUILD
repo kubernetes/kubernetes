@@ -66,6 +66,7 @@ go_library(
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/eviction/api:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
+        "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
