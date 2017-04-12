@@ -141,165 +141,168 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 	Context(fmt.Sprintf("when we run containers that should cause %s", testCondition), func() {
 
 		tempSetCurrentKubeletConfig(f, updateFunction)
-		BeforeEach(func() {
-			By("seting up pods to be used by tests")
-			for _, spec := range podTestSpecs {
-				By(fmt.Sprintf("creating pod with container: %s", spec.pod.Name))
-				f.PodClient().CreateSync(&spec.pod)
-			}
-		})
+		// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
+		Context("With kubeconfig updated", func() {
+			BeforeEach(func() {
+				By("seting up pods to be used by tests")
+				for _, spec := range podTestSpecs {
+					By(fmt.Sprintf("creating pod with container: %s", spec.pod.Name))
+					f.PodClient().CreateSync(&spec.pod)
+				}
+			})
 
-		It(fmt.Sprintf("should eventually see %s, and then evict all of the correct pods", testCondition), func() {
-			configEnabled, err := isKubeletConfigEnabled(f)
-			framework.ExpectNoError(err)
-			if !configEnabled {
-				framework.Skipf("Dynamic kubelet config must be enabled for this test to run.")
-			}
-			Eventually(func() error {
-				hasPressure, err := hasPressureCondition(f, testCondition)
-				if err != nil {
-					return err
+			It(fmt.Sprintf("should eventually see %s, and then evict all of the correct pods", testCondition), func() {
+				configEnabled, err := isKubeletConfigEnabled(f)
+				framework.ExpectNoError(err)
+				if !configEnabled {
+					framework.Skipf("Dynamic kubelet config must be enabled for this test to run.")
 				}
-				if hasPressure {
-					return nil
-				}
-				return fmt.Errorf("Condition: %s not encountered", testCondition)
-			}, evictionTestTimeout, evictionPollInterval).Should(BeNil())
+				Eventually(func() error {
+					hasPressure, err := hasPressureCondition(f, testCondition)
+					if err != nil {
+						return err
+					}
+					if hasPressure {
+						return nil
+					}
+					return fmt.Errorf("Condition: %s not encountered", testCondition)
+				}, evictionTestTimeout, evictionPollInterval).Should(BeNil())
 
-			Eventually(func() error {
-				// Gather current information
-				updatedPodList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
-				updatedPods := updatedPodList.Items
-				for _, p := range updatedPods {
-					framework.Logf("fetching pod %s; phase= %v", p.Name, p.Status.Phase)
-				}
-				_, err = hasPressureCondition(f, testCondition)
-				if err != nil {
-					return err
-				}
-
-				By("checking eviction ordering and ensuring important pods dont fail")
-				done := true
-				for _, priorityPodSpec := range podTestSpecs {
-					var priorityPod v1.Pod
+				Eventually(func() error {
+					// Gather current information
+					updatedPodList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+					updatedPods := updatedPodList.Items
 					for _, p := range updatedPods {
-						if p.Name == priorityPodSpec.pod.Name {
-							priorityPod = p
-						}
+						framework.Logf("fetching pod %s; phase= %v", p.Name, p.Status.Phase)
 					}
-					Expect(priorityPod).NotTo(BeNil())
+					_, err = hasPressureCondition(f, testCondition)
+					if err != nil {
+						return err
+					}
 
-					// Check eviction ordering.
-					// Note: it is alright for a priority 1 and priority 2 pod (for example) to fail in the same round
-					for _, lowPriorityPodSpec := range podTestSpecs {
-						var lowPriorityPod v1.Pod
+					By("checking eviction ordering and ensuring important pods dont fail")
+					done := true
+					for _, priorityPodSpec := range podTestSpecs {
+						var priorityPod v1.Pod
 						for _, p := range updatedPods {
-							if p.Name == lowPriorityPodSpec.pod.Name {
-								lowPriorityPod = p
+							if p.Name == priorityPodSpec.pod.Name {
+								priorityPod = p
 							}
 						}
-						Expect(lowPriorityPod).NotTo(BeNil())
-						if priorityPodSpec.evictionPriority < lowPriorityPodSpec.evictionPriority && lowPriorityPod.Status.Phase == v1.PodRunning {
+						Expect(priorityPod).NotTo(BeNil())
+
+						// Check eviction ordering.
+						// Note: it is alright for a priority 1 and priority 2 pod (for example) to fail in the same round
+						for _, lowPriorityPodSpec := range podTestSpecs {
+							var lowPriorityPod v1.Pod
+							for _, p := range updatedPods {
+								if p.Name == lowPriorityPodSpec.pod.Name {
+									lowPriorityPod = p
+								}
+							}
+							Expect(lowPriorityPod).NotTo(BeNil())
+							if priorityPodSpec.evictionPriority < lowPriorityPodSpec.evictionPriority && lowPriorityPod.Status.Phase == v1.PodRunning {
+								Expect(priorityPod.Status.Phase).NotTo(Equal(v1.PodFailed),
+									fmt.Sprintf("%s pod failed before %s pod", priorityPodSpec.pod.Name, lowPriorityPodSpec.pod.Name))
+							}
+						}
+
+						// EvictionPriority 0 pods should not fail
+						if priorityPodSpec.evictionPriority == 0 {
 							Expect(priorityPod.Status.Phase).NotTo(Equal(v1.PodFailed),
-								fmt.Sprintf("%s pod failed before %s pod", priorityPodSpec.pod.Name, lowPriorityPodSpec.pod.Name))
+								fmt.Sprintf("%s pod failed (and shouldn't have failed)", priorityPod.Name))
+						}
+
+						// If a pod that is not evictionPriority 0 has not been evicted, we are not done
+						if priorityPodSpec.evictionPriority != 0 && priorityPod.Status.Phase != v1.PodFailed {
+							done = false
 						}
 					}
-
-					// EvictionPriority 0 pods should not fail
-					if priorityPodSpec.evictionPriority == 0 {
-						Expect(priorityPod.Status.Phase).NotTo(Equal(v1.PodFailed),
-							fmt.Sprintf("%s pod failed (and shouldn't have failed)", priorityPod.Name))
+					if done {
+						return nil
 					}
+					return fmt.Errorf("pods that caused %s have not been evicted.", testCondition)
+				}, evictionTestTimeout, evictionPollInterval).Should(BeNil())
 
-					// If a pod that is not evictionPriority 0 has not been evicted, we are not done
-					if priorityPodSpec.evictionPriority != 0 && priorityPod.Status.Phase != v1.PodFailed {
-						done = false
+				// We observe pressure from the API server.  The eviction manager observes pressure from the kubelet internal stats.
+				// This means the eviction manager will observe pressure before we will, creating a delay between when the eviction manager
+				// evicts a pod, and when we observe the pressure by querrying the API server.  Add a delay here to account for this delay
+				By("making sure pressure from test has surfaced before continuing")
+				time.Sleep(pressureDelay)
+
+				By("making sure conditions eventually return to normal")
+				Eventually(func() error {
+					hasPressure, err := hasPressureCondition(f, testCondition)
+					if err != nil {
+						return err
 					}
-				}
-				if done {
+					if hasPressure {
+						return fmt.Errorf("Conditions havent returned to normal, we still have %s", testCondition)
+					}
 					return nil
-				}
-				return fmt.Errorf("pods that caused %s have not been evicted.", testCondition)
-			}, evictionTestTimeout, evictionPollInterval).Should(BeNil())
+				}, evictionTestTimeout, evictionPollInterval).Should(BeNil())
 
-			// We observe pressure from the API server.  The eviction manager observes pressure from the kubelet internal stats.
-			// This means the eviction manager will observe pressure before we will, creating a delay between when the eviction manager
-			// evicts a pod, and when we observe the pressure by querrying the API server.  Add a delay here to account for this delay
-			By("making sure pressure from test has surfaced before continuing")
-			time.Sleep(pressureDelay)
-
-			By("making sure conditions eventually return to normal")
-			Eventually(func() error {
-				hasPressure, err := hasPressureCondition(f, testCondition)
-				if err != nil {
-					return err
-				}
-				if hasPressure {
-					return fmt.Errorf("Conditions havent returned to normal, we still have %s", testCondition)
-				}
-				return nil
-			}, evictionTestTimeout, evictionPollInterval).Should(BeNil())
-
-			By("making sure conditions do not return, and that pods that shouldnt fail dont fail")
-			Consistently(func() error {
-				hasPressure, err := hasPressureCondition(f, testCondition)
-				if err != nil {
-					// Race conditions sometimes occur when checking pressure condition due to #38710 (Docker bug)
-					// Do not fail the test when this occurs, since this is expected to happen occasionally.
-					framework.Logf("Failed to check pressure condition. Error: %v", err)
-					return nil
-				}
-				if hasPressure {
-					return fmt.Errorf("%s dissappeared and then reappeared", testCondition)
-				}
-				// Gather current information
-				updatedPodList, _ := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
-				for _, priorityPodSpec := range podTestSpecs {
-					// EvictionPriority 0 pods should not fail
-					if priorityPodSpec.evictionPriority == 0 {
-						for _, p := range updatedPodList.Items {
-							if p.Name == priorityPodSpec.pod.Name && p.Status.Phase == v1.PodFailed {
-								return fmt.Errorf("%s pod failed (delayed) and shouldn't have failed", p.Name)
+				By("making sure conditions do not return, and that pods that shouldnt fail dont fail")
+				Consistently(func() error {
+					hasPressure, err := hasPressureCondition(f, testCondition)
+					if err != nil {
+						// Race conditions sometimes occur when checking pressure condition due to #38710 (Docker bug)
+						// Do not fail the test when this occurs, since this is expected to happen occasionally.
+						framework.Logf("Failed to check pressure condition. Error: %v", err)
+						return nil
+					}
+					if hasPressure {
+						return fmt.Errorf("%s dissappeared and then reappeared", testCondition)
+					}
+					// Gather current information
+					updatedPodList, _ := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+					for _, priorityPodSpec := range podTestSpecs {
+						// EvictionPriority 0 pods should not fail
+						if priorityPodSpec.evictionPriority == 0 {
+							for _, p := range updatedPodList.Items {
+								if p.Name == priorityPodSpec.pod.Name && p.Status.Phase == v1.PodFailed {
+									return fmt.Errorf("%s pod failed (delayed) and shouldn't have failed", p.Name)
+								}
 							}
 						}
 					}
-				}
-				return nil
-			}, postTestConditionMonitoringPeriod, evictionPollInterval).Should(BeNil())
+					return nil
+				}, postTestConditionMonitoringPeriod, evictionPollInterval).Should(BeNil())
 
-			By("making sure we can start a new pod after the test")
-			podName := "test-admit-pod"
-			f.PodClient().CreateSync(&v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: podName,
-				},
-				Spec: v1.PodSpec{
-					RestartPolicy: v1.RestartPolicyNever,
-					Containers: []v1.Container{
-						{
-							Image: framework.GetPauseImageNameForHostArch(),
-							Name:  podName,
+				By("making sure we can start a new pod after the test")
+				podName := "test-admit-pod"
+				f.PodClient().CreateSync(&v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: podName,
+					},
+					Spec: v1.PodSpec{
+						RestartPolicy: v1.RestartPolicyNever,
+						Containers: []v1.Container{
+							{
+								Image: framework.GetPauseImageNameForHostArch(),
+								Name:  podName,
+							},
 						},
 					},
-				},
+				})
 			})
-		})
 
-		AfterEach(func() {
-			By("deleting pods")
-			for _, spec := range podTestSpecs {
-				By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
-				f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			}
-
-			if CurrentGinkgoTestDescription().Failed {
-				if framework.TestContext.DumpLogsOnFailure {
-					logPodEvents(f)
-					logNodeEvents(f)
+			AfterEach(func() {
+				By("deleting pods")
+				for _, spec := range podTestSpecs {
+					By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
+					f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 				}
-				By("sleeping to allow for cleanup of test")
-				time.Sleep(postTestConditionMonitoringPeriod)
-			}
+
+				if CurrentGinkgoTestDescription().Failed {
+					if framework.TestContext.DumpLogsOnFailure {
+						logPodEvents(f)
+						logNodeEvents(f)
+					}
+					By("sleeping to allow for cleanup of test")
+					time.Sleep(postTestConditionMonitoringPeriod)
+				}
+			})
 		})
 	})
 }
