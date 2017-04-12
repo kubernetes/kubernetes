@@ -105,21 +105,25 @@ func (jm *CronJobController) Run(stopCh <-chan struct{}) {
 
 // syncAll lists all the CronJobs and Jobs and reconciles them.
 func (jm *CronJobController) syncAll() {
-	sjl, err := jm.kubeClient.BatchV2alpha1().CronJobs(metav1.NamespaceAll).List(metav1.ListOptions{})
-	if err != nil {
-		glog.Errorf("Error listing cronjobs: %v", err)
-		return
-	}
-	sjs := sjl.Items
-	glog.V(4).Infof("Found %d cronjobs", len(sjs))
-
+	// List children (Jobs) before parents (CronJob).
+	// This guarantees that if we see any Job that got orphaned by the GC orphan finalizer,
+	// we must also see that the parent CronJob has non-nil DeletionTimestamp (see #42639).
+	// Note that this only works because we are NOT using any caches here.
 	jl, err := jm.kubeClient.BatchV1().Jobs(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
-		glog.Errorf("Error listing jobs")
+		utilruntime.HandleError(fmt.Errorf("can't list Jobs: %v", err))
 		return
 	}
 	js := jl.Items
 	glog.V(4).Infof("Found %d jobs", len(js))
+
+	sjl, err := jm.kubeClient.BatchV2alpha1().CronJobs(metav1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("can't list CronJobs: %v", err))
+		return
+	}
+	sjs := sjl.Items
+	glog.V(4).Infof("Found %d cronjobs", len(sjs))
 
 	jobsBySj := groupJobsByParent(js)
 	glog.V(4).Infof("Found %d groups", len(jobsBySj))
