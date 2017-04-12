@@ -34,11 +34,13 @@ import (
 // the parameter is nil.
 type Factory func(config io.Reader) (Interface, error)
 
+type Plugins struct {
+	lock     sync.Mutex
+	registry map[string]Factory
+}
+
 // All registered admission options.
 var (
-	pluginsMutex sync.Mutex
-	plugins      = make(map[string]Factory)
-
 	// PluginEnabledFn checks whether a plugin is enabled.  By default, if you ask about it, it's enabled.
 	PluginEnabledFn = func(name string, config io.Reader) bool {
 		return true
@@ -48,39 +50,42 @@ var (
 // PluginEnabledFunc is a function type that can provide an external check on whether an admission plugin may be enabled
 type PluginEnabledFunc func(name string, config io.Reader) bool
 
-// GetPlugins enumerates the names of all registered plugins.
-func GetPlugins() []string {
-	pluginsMutex.Lock()
-	defer pluginsMutex.Unlock()
+// Registered enumerates the names of all registered plugins.
+func (ps *Plugins) Registered() []string {
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
 	keys := []string{}
-	for k := range plugins {
+	for k := range ps.registry {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	return keys
 }
 
-// RegisterPlugin registers a plugin Factory by name. This
+// Register registers a plugin Factory by name. This
 // is expected to happen during app startup.
-func RegisterPlugin(name string, plugin Factory) {
-	pluginsMutex.Lock()
-	defer pluginsMutex.Unlock()
-	_, found := plugins[name]
+func (ps *Plugins) Register(name string, plugin Factory) {
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
+	_, found := ps.registry[name]
 	if found {
 		glog.Fatalf("Admission plugin %q was registered twice", name)
 	}
+	if ps.registry == nil {
+		ps.registry = map[string]Factory{}
+	}
 	glog.V(1).Infof("Registered admission plugin %q", name)
-	plugins[name] = plugin
+	ps.registry[name] = plugin
 }
 
 // getPlugin creates an instance of the named plugin.  It returns `false` if the
 // the name is not known. The error is returned only when the named provider was
 // known but failed to initialize.  The config parameter specifies the io.Reader
 // handler of the configuration file for the cloud provider, or nil for no configuration.
-func getPlugin(name string, config io.Reader) (Interface, bool, error) {
-	pluginsMutex.Lock()
-	defer pluginsMutex.Unlock()
-	f, found := plugins[name]
+func (ps *Plugins) getPlugin(name string, config io.Reader) (Interface, bool, error) {
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
+	f, found := ps.registry[name]
 	if !found {
 		return nil, false, nil
 	}
@@ -113,7 +118,7 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
-func NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginInitializer PluginInitializer) (Interface, error) {
+func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginInitializer PluginInitializer) (Interface, error) {
 	plugins := []Interface{}
 	for _, pluginName := range pluginNames {
 		pluginConfig, err := configProvider.ConfigFor(pluginName)
@@ -121,7 +126,7 @@ func NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginI
 			return nil, err
 		}
 
-		plugin, err := InitPlugin(pluginName, pluginConfig, pluginInitializer)
+		plugin, err := ps.InitPlugin(pluginName, pluginConfig, pluginInitializer)
 		if err != nil {
 			return nil, err
 		}
@@ -133,13 +138,13 @@ func NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginI
 }
 
 // InitPlugin creates an instance of the named interface.
-func InitPlugin(name string, config io.Reader, pluginInitializer PluginInitializer) (Interface, error) {
+func (ps *Plugins) InitPlugin(name string, config io.Reader, pluginInitializer PluginInitializer) (Interface, error) {
 	if name == "" {
 		glog.Info("No admission plugin specified.")
 		return nil, nil
 	}
 
-	plugin, found, err := getPlugin(name, config)
+	plugin, found, err := ps.getPlugin(name, config)
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't init admission plugin %q: %v", name, err)
 	}

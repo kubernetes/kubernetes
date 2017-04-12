@@ -37,7 +37,7 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("PodTolerationRestriction", func(config io.Reader) (admission.Interface, error) {
+	kubeapiserveradmission.Plugins.Register("PodTolerationRestriction", func(config io.Reader) (admission.Interface, error) {
 		pluginConfig, err := loadConfiguration(config)
 		if err != nil {
 			return nil, err
