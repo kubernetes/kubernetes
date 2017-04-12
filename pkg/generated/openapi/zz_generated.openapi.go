@@ -5007,13 +5007,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
-						"phase": {
-							SchemaProps: spec.SchemaProps{
-								Description: "NodePhase is the recently observed lifecycle phase of the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase The field is never populated, and now is deprecated.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
 						"conditions": {
 							VendorExtensible: spec.VendorExtensible{
 								Extensions: spec.Extensions{
