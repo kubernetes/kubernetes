@@ -2391,7 +2391,6 @@ func Convert_api_NodeSpec_To_v1_NodeSpec(in *api.NodeSpec, out *NodeSpec, s conv
 func autoConvert_v1_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *api.NodeStatus, s conversion.Scope) error {
 	out.Capacity = *(*api.ResourceList)(unsafe.Pointer(&in.Capacity))
 	out.Allocatable = *(*api.ResourceList)(unsafe.Pointer(&in.Allocatable))
-	out.Phase = api.NodePhase(in.Phase)
 	out.Conditions = *(*[]api.NodeCondition)(unsafe.Pointer(&in.Conditions))
 	out.Addresses = *(*[]api.NodeAddress)(unsafe.Pointer(&in.Addresses))
 	if err := Convert_v1_NodeDaemonEndpoints_To_api_NodeDaemonEndpoints(&in.DaemonEndpoints, &out.DaemonEndpoints, s); err != nil {
@@ -2413,7 +2412,6 @@ func Convert_v1_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *api.NodeStatus
 func autoConvert_api_NodeStatus_To_v1_NodeStatus(in *api.NodeStatus, out *NodeStatus, s conversion.Scope) error {
 	out.Capacity = *(*ResourceList)(unsafe.Pointer(&in.Capacity))
 	out.Allocatable = *(*ResourceList)(unsafe.Pointer(&in.Allocatable))
-	out.Phase = NodePhase(in.Phase)
 	out.Conditions = *(*[]NodeCondition)(unsafe.Pointer(&in.Conditions))
 	out.Addresses = *(*[]NodeAddress)(unsafe.Pointer(&in.Addresses))
 	if err := Convert_api_NodeDaemonEndpoints_To_v1_NodeDaemonEndpoints(&in.DaemonEndpoints, &out.DaemonEndpoints, s); err != nil {
