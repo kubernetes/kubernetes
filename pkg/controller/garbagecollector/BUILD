@@ -24,6 +24,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/client/retry:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/workqueue/prometheus:go_default_library",

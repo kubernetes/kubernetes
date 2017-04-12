@@ -20,6 +20,7 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/extensions/internalversion:go_default_library",
         "//pkg/client/listers/extensions/internalversion:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/registry/extensions/rest:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata/storage:go_default_library",

@@ -24,6 +24,7 @@ go_library(
         "//pkg/client/informers/informers_generated/externalversions/core/v1:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/client/retry:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/registry/core/secret:go_default_library",
         "//pkg/registry/core/secret/storage:go_default_library",
         "//pkg/registry/core/serviceaccount:go_default_library",
