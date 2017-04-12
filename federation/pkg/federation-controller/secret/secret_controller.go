@@ -372,7 +372,7 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 	if meta.DeletionTimestamp != nil {
 		if err := s.delete(obj, namespacedName); err != nil {
 			glog.Errorf("Failed to delete %s %s: %v", kind, namespacedName, err)
-			s.eventRecorder.Eventf(obj, api.EventTypeNormal, "DeleteFailed",
+			s.eventRecorder.Eventf(obj, api.EventTypeWarning, "DeleteFailed",
 				"%s delete failed: %v", strings.ToTitle(kind), err)
 			s.deliver(namespacedName, 0, true)
 		}
@@ -442,7 +442,7 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 	}
 	err = s.updater.UpdateWithOnError(operations, s.updateTimeout,
 		func(op util.FederatedOperation, operror error) {
-			s.eventRecorder.Eventf(obj, api.EventTypeNormal, "UpdateInClusterFailed",
+			s.eventRecorder.Eventf(obj, api.EventTypeWarning, "UpdateInClusterFailed",
 				"%s update in cluster %s failed: %v", strings.ToTitle(kind), op.ClusterName, operror)
 		})
 
