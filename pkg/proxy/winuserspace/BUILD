@@ -38,7 +38,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "proxier_test.go",
-        "proxysocket_test.go",
         "roundrobin_test.go",
     ],
     library = ":go_default_library",
