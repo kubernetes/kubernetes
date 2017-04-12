@@ -79,14 +79,8 @@ func Run(s *options.SchedulerServer) error {
 	sched, err := CreateScheduler(
 		s,
 		kubecli,
-		informerFactory.Core().V1().Nodes(),
+		informerFactory,
 		podInformer,
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
 		recorder,
 	)
 	if err != nil {
