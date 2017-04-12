@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -33,7 +34,6 @@ import (
 // Validate PV/PVC, create and verify writer pod, delete the PVC, and validate the PV's
 // phase. Note: the PV is deleted in the AfterEach, not here.
 func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
-
 	// 1. verify that the PV and PVC have bound correctly
 	By("Validating the PV-PVC binding")
 	framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
@@ -54,7 +54,6 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 // Note: this func is serialized, we wait for each pod to be deleted before creating the
 //   next pod. Adding concurrency is a TODO item.
 func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string, pvols framework.PVMap, claims framework.PVCMap, expectPhase v1.PersistentVolumePhase) error {
-
 	var err error
 
 	// 1. verify each PV permits write access to a client pod
@@ -96,19 +95,6 @@ func initNFSserverPod(c clientset.Interface, ns string) *v1.Pod {
 		ServerPorts: []int{2049},
 		ServerArgs:  []string{"-G", "777", "/exports"},
 	})
-}
-
-// convert []error to a string.
-func errsToString(errs []error) string {
-	var str string
-	if len(errs) > 0 {
-		errmsgs := []string{}
-		for _, e := range errs {
-			errmsgs = append(errmsgs, e.Error())
-		}
-		str = strings.Join(errmsgs, "; ")
-	}
-	return str
 }
 
 var _ = framework.KubeDescribe("PersistentVolumes [Volume]", func() {
@@ -179,7 +165,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume]", func() {
 			AfterEach(func() {
 				framework.Logf("AfterEach: Cleaning up test resources.")
 				if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", errsToString(errs))
+					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 				}
 			})
 
@@ -298,7 +284,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume]", func() {
 			AfterEach(func() {
 				framework.Logf("AfterEach: Cleaning up test resources.")
 				if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", errsToString(errs))
+					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 				}
 			})
 

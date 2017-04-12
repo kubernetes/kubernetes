@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -108,7 +109,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:GCEPD [Volume]", func() {
 		if c != nil {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod))
 			if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", errsToString(errs))
+				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			clientPod, pv, pvc, node = nil, nil, nil, ""
 			if diskName != "" {
