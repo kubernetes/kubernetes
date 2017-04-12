@@ -413,7 +413,9 @@ func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition 
 		ev, err := watch.Until(0, w, func(ev watch.Event) (bool, error) {
 			return exitCondition(ev)
 		})
-		result = ev.Object.(*api.Pod)
+		if ev != nil {
+			result = ev.Object.(*api.Pod)
+		}
 		return err
 	})
 	return result, err
