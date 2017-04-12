@@ -74,6 +74,8 @@ func (rrsets ResourceRecordSets) Get(name string) ([]dnsprovider.ResourceRecordS
 			rrset.rrsType = rrstype.CNAME
 		case ip.To4() != nil:
 			rrset.rrsType = rrstype.A
+		default: // must be IPv6 address
+			rrset.rrsType = rrstype.AAAA
 		}
 		rrset.rrdatas = append(rrset.rrdatas, service.Host)
 		rrset.ttl = int64(service.TTL)

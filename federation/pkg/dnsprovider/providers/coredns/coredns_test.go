@@ -254,8 +254,14 @@ func TestResourceRecordSetsReplace(t *testing.T) {
 	tests.CommonTestResourceRecordSetsReplace(t, zone)
 }
 
-/* TestResourceRecordSetsReplaceAll verifies that we can remove an RRS and create one with a different name*/
+/* TestResourceRecordSetsReplaceAll verifies that we can remove an RRS and create one with a different name */
 func TestResourceRecordSetsReplaceAll(t *testing.T) {
 	zone := firstZone(t)
 	tests.CommonTestResourceRecordSetsReplaceAll(t, zone)
+}
+
+/* TestResourceRecordSetsDifferentTypes verifies that we can add records with same name, but different types */
+func TestResourceRecordSetsDifferentTypes(t *testing.T) {
+	zone := firstZone(t)
+	tests.CommonTestResourceRecordSetsDifferentTypes(t, zone)
 }

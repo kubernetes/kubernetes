@@ -30,9 +30,7 @@ func CommonTestResourceRecordSetsReplace(t *testing.T, zone dnsprovider.Zone) {
 
 	sets := rrs(t, zone)
 	rrset := rrsets.New("alpha.test.com", []string{"8.8.4.4"}, 40, rrstype.A)
-	addRrsetOrFail(t, sets, rrset)
-	defer sets.StartChangeset().Remove(rrset).Apply()
-	t.Logf("Successfully added resource record set: %v", rrset)
+	defer addRrsetOrFail(t, sets, rrset)()
 
 	// Replace the record (change ttl and rrdatas)
 	newRrset := rrsets.New("alpha.test.com", []string{"8.8.8.8"}, 80, rrstype.A)
@@ -40,9 +38,9 @@ func CommonTestResourceRecordSetsReplace(t *testing.T, zone dnsprovider.Zone) {
 	if err != nil {
 		t.Errorf("Failed to replace resource record set %v -> %v: %v", rrset, newRrset, err)
 	} else {
+		defer sets.StartChangeset().Remove(newRrset).Apply()
 		t.Logf("Correctly replaced resource record %v -> %v", rrset, newRrset)
 	}
-	defer sets.StartChangeset().Remove(newRrset).Apply()
 
 	// Check that the record was updated
 	assertHasRecord(t, sets, newRrset)
@@ -54,9 +52,7 @@ func CommonTestResourceRecordSetsReplaceAll(t *testing.T, zone dnsprovider.Zone)
 
 	sets := rrs(t, zone)
 	rrset := rrsets.New("alpha.test.com", []string{"8.8.4.4"}, 40, rrstype.A)
-	addRrsetOrFail(t, sets, rrset)
-	defer sets.StartChangeset().Remove(rrset).Apply()
-	t.Logf("Successfully added resource record set: %v", rrset)
+	defer addRrsetOrFail(t, sets, rrset)()
 
 	newRrset := rrsets.New("beta.test.com", []string{"8.8.8.8"}, 80, rrstype.A)
 
@@ -74,24 +70,18 @@ func CommonTestResourceRecordSetsReplaceAll(t *testing.T, zone dnsprovider.Zone)
 	assertNotHasRecord(t, sets, rrset.Name(), rrset.Type())
 }
 
-/* CommonTestResourceRecordSetsHonorsType verifies that we can add records of the same name but different types */
+/* CommonTestResourceRecordSetsDifferentType verifies that we can add records of the same name but different types */
 func CommonTestResourceRecordSetsDifferentTypes(t *testing.T, zone dnsprovider.Zone) {
 	rrsets, _ := zone.ResourceRecordSets()
 
 	sets := rrs(t, zone)
 	rrset := rrsets.New("alpha.test.com", []string{"8.8.4.4"}, 40, rrstype.A)
-	addRrsetOrFail(t, sets, rrset)
-	defer sets.StartChangeset().Remove(rrset).Apply()
-	t.Logf("Successfully added resource record set: %v", rrset)
+	defer addRrsetOrFail(t, sets, rrset)()
 
 	aaaaRrset := rrsets.New("alpha.test.com", []string{"2001:4860:4860::8888"}, 80, rrstype.AAAA)
 
 	// Add the resource with the same name but different type
-	err := sets.StartChangeset().Add(aaaaRrset).Apply()
-	if err != nil {
-		t.Errorf("Failed to add resource record set %v: %v", aaaaRrset, err)
-	}
-	defer sets.StartChangeset().Remove(aaaaRrset).Apply()
+	defer addRrsetOrFail(t, sets, aaaaRrset)()
 
 	// Check that both records exist
 	assertHasRecord(t, sets, aaaaRrset)
@@ -187,9 +177,12 @@ func assertEquivalent(t *testing.T, l, r dnsprovider.ResourceRecordSet) {
 	}
 }
 
-func addRrsetOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, rrset dnsprovider.ResourceRecordSet) {
+func addRrsetOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, rrset dnsprovider.ResourceRecordSet) func() {
 	err := rrsets.StartChangeset().Add(rrset).Apply()
 	if err != nil {
-		t.Fatalf("Failed to add recordsets: %v", err)
+		t.Fatalf("Failed to add recordset %v: %v", rrset, err)
+	} else {
+		t.Logf("Successfully added resource record set: %v", rrset)
 	}
+	return func() { rrsets.StartChangeset().Remove(rrset).Apply() }
 }
