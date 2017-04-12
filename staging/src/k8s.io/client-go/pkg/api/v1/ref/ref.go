@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package ref
 
 import (
 	"errors"
@@ -22,10 +22,9 @@ import (
 	"net/url"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 var (
@@ -38,11 +37,11 @@ var (
 // object, or an error if the object doesn't follow the conventions
 // that would allow this.
 // TODO: should take a meta.Interface see http://issue.k8s.io/7127
-func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*ObjectReference, error) {
+func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*v1.ObjectReference, error) {
 	if obj == nil {
 		return nil, ErrNilObject
 	}
-	if ref, ok := obj.(*ObjectReference); ok {
+	if ref, ok := obj.(*v1.ObjectReference); ok {
 		// Don't make a reference to a reference.
 		return ref, nil
 	}
@@ -94,14 +93,14 @@ func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*ObjectReference,
 
 	// only has list metadata
 	if objectMeta == nil {
-		return &ObjectReference{
+		return &v1.ObjectReference{
 			Kind:            kind,
 			APIVersion:      version,
 			ResourceVersion: listMeta.GetResourceVersion(),
 		}, nil
 	}
 
-	return &ObjectReference{
+	return &v1.ObjectReference{
 		Kind:            kind,
 		APIVersion:      version,
 		Name:            objectMeta.GetName(),
@@ -112,7 +111,7 @@ func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*ObjectReference,
 }
 
 // GetPartialReference is exactly like GetReference, but allows you to set the FieldPath.
-func GetPartialReference(scheme *runtime.Scheme, obj runtime.Object, fieldPath string) (*ObjectReference, error) {
+func GetPartialReference(scheme *runtime.Scheme, obj runtime.Object, fieldPath string) (*v1.ObjectReference, error) {
 	ref, err := GetReference(scheme, obj)
 	if err != nil {
 		return nil, err
@@ -120,14 +119,3 @@ func GetPartialReference(scheme *runtime.Scheme, obj runtime.Object, fieldPath s
 	ref.FieldPath = fieldPath
 	return ref, nil
 }
-
-// IsAnAPIObject allows clients to preemptively get a reference to an API object and pass it to places that
-// intend only to get a reference to that object. This simplifies the event recording interface.
-func (obj *ObjectReference) SetGroupVersionKind(gvk schema.GroupVersionKind) {
-	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
-}
-func (obj *ObjectReference) GroupVersionKind() schema.GroupVersionKind {
-	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
-}
-
-func (obj *ObjectReference) GetObjectKind() schema.ObjectKind { return obj }
