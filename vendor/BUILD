@@ -8200,6 +8200,18 @@ go_library(
 )
 
 go_library(
+    name = "google.golang.org/api/compute/v0.alpha",
+    srcs = ["google.golang.org/api/compute/v0.alpha/compute-gen.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/net/context",
+        "//vendor:golang.org/x/net/context/ctxhttp",
+        "//vendor:google.golang.org/api/gensupport",
+        "//vendor:google.golang.org/api/googleapi",
+    ],
+)
+
+go_library(
     name = "google.golang.org/api/compute/v1",
     srcs = ["google.golang.org/api/compute/v1/compute-gen.go"],
     tags = ["automanaged"],
@@ -8241,7 +8253,9 @@ go_library(
         "google.golang.org/api/gensupport/backoff.go",
         "google.golang.org/api/gensupport/buffer.go",
         "google.golang.org/api/gensupport/doc.go",
+        "google.golang.org/api/gensupport/header.go",
         "google.golang.org/api/gensupport/json.go",
+        "google.golang.org/api/gensupport/jsonfloat.go",
         "google.golang.org/api/gensupport/media.go",
         "google.golang.org/api/gensupport/params.go",
         "google.golang.org/api/gensupport/resumable.go",
@@ -12180,7 +12194,6 @@ go_library(
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/pkg/apis/extensions/v1beta1",
-        "//vendor:k8s.io/client-go/plugin/pkg/client/auth/gcp",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
     ],
@@ -13889,8 +13902,8 @@ go_library(
         "k8s.io/client-go/pkg/api/defaults.go",
         "k8s.io/client-go/pkg/api/doc.go",
         "k8s.io/client-go/pkg/api/field_constants.go",
-        "k8s.io/client-go/pkg/api/helpers.go",
         "k8s.io/client-go/pkg/api/json.go",
+        "k8s.io/client-go/pkg/api/methods.go",
         "k8s.io/client-go/pkg/api/ref.go",
         "k8s.io/client-go/pkg/api/register.go",
         "k8s.io/client-go/pkg/api/resource_helpers.go",
@@ -13899,7 +13912,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
@@ -13911,10 +13923,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
-        "//vendor:k8s.io/apimachinery/pkg/selection",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
@@ -13971,6 +13981,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/api/helper",
         "//vendor:k8s.io/client-go/pkg/apis/extensions",
         "//vendor:k8s.io/client-go/pkg/util",
         "//vendor:k8s.io/client-go/pkg/util/parsers",
@@ -16746,4 +16757,21 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/client-go/pkg/api/helper",
+    srcs = ["k8s.io/client-go/pkg/api/helper/helpers.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/selection",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/pkg/api",
+    ],
 )

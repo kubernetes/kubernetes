@@ -147,7 +147,7 @@ echo "rewriting Godeps.json"
 # The entries for k8s.io/apimahcinery are not removed from Godeps.json, though
 # they contain the invalid commit revision. The publish robot will set the
 # correct commit revision.
-go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}" --ignored-prefixes="k8s.io/client-go,k8s.io/kubernetes" --rewritten-prefixes="k8s.io/apimachinery"
+go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --override-import-path="${CLIENT_REPO_FROM_SRC}" --ignored-prefixes="k8s.io/client-go,k8s.io/kubernetes" --rewritten-prefixes="k8s.io/apimachinery"
 
 echo "rewriting imports"
 grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \

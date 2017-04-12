@@ -280,7 +280,7 @@ function create-master-pki {
 # and should never be touched again (except perhaps an additional service
 # account, see NB below.) One exception is if METADATA_CLOBBERS_CONFIG is
 # enabled. In that case the basic_auth.csv file will be rewritten to make
-# sure it matches the metadata source of truth. 
+# sure it matches the metadata source of truth.
 function create-master-auth {
   echo "Creating master auth files"
   local -r auth_dir="/etc/srv/kubernetes"
@@ -1100,7 +1100,7 @@ function start-kube-apiserver {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
 
   # Enable ABAC mode unless the user explicitly opts out with ENABLE_LEGACY_ABAC=false
-  if [[ "${ENABLE_LEGACY_ABAC:-}" != "false" ]]; then  
+  if [[ "${ENABLE_LEGACY_ABAC:-}" != "false" ]]; then
     echo "Warning: Enabling legacy ABAC policy. All service accounts will have superuser API access. Set ENABLE_LEGACY_ABAC=false to disable this."
     # Create the ABAC file if it doesn't exist yet, or if we have a KUBE_USER set (to ensure the right user is given permissions)
     if [[ -n "${KUBE_USER:-}" || ! -e /etc/srv/kubernetes/abac-authz-policy.jsonl ]]; then
@@ -1204,6 +1204,10 @@ function start-kube-controller-manager {
   fi
   if [[ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]]; then
     params+=" --terminated-pod-gc-threshold=${TERMINATED_POD_GC_THRESHOLD}"
+  fi
+  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
+    params+=" --cidr-allocator-type=CloudAllocator"
+    params+=" --configure-cloud-routes=false"
   fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"

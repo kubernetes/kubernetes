@@ -477,6 +477,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 			serviceCIDR,
 			int(s.NodeCIDRMaskSize),
 			s.AllocateNodeCIDRs,
+			nodecontroller.CIDRAllocatorType(s.CIDRAllocatorType),
 			s.EnableTaintManager,
 			utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
 		)
@@ -530,14 +531,9 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	}
 
 	if ctx.IsControllerEnabled(pvBinderControllerName) {
-		alphaProvisioner, err := NewAlphaVolumeProvisioner(cloud, s.VolumeConfiguration)
-		if err != nil {
-			return fmt.Errorf("an backward-compatible provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
-		}
 		params := persistentvolumecontroller.ControllerParameters{
 			KubeClient:                clientBuilder.ClientOrDie("persistent-volume-binder"),
 			SyncPeriod:                s.PVClaimBinderSyncPeriod.Duration,
-			AlphaProvisioner:          alphaProvisioner,
 			VolumePlugins:             ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
 			Cloud:                     cloud,
 			ClusterName:               s.ClusterName,
@@ -546,7 +542,10 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 			ClassInformer:             sharedInformers.Storage().V1beta1().StorageClasses(),
 			EnableDynamicProvisioning: s.VolumeConfiguration.EnableDynamicProvisioning,
 		}
-		volumeController := persistentvolumecontroller.NewController(params)
+		volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
+		if volumeControllerErr != nil {
+			return fmt.Errorf("failed to construct persistentvolume controller: %v", volumeControllerErr)
+		}
 		go volumeController.Run(stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	} else {

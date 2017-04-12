@@ -47,6 +47,7 @@ go_test(
         "//federation/pkg/kubefed/testing:go_default_library",
         "//federation/pkg/kubefed/util:go_default_library",
         "//pkg/api:go_default_library",
+        "//pkg/api/helper:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",

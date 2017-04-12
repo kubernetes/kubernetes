@@ -36,6 +36,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
 	"google.golang.org/api/gensupport"
@@ -77,6 +78,7 @@ const (
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	service                  *compute.Service
+	serviceAlpha             *computealpha.Service
 	containerService         *container.Service
 	projectID                string
 	region                   string
@@ -211,43 +213,29 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 func CreateGCECloud(projectID, region, zone string, managedZones []string, networkURL string, nodeTags []string,
 	nodeInstancePrefix string, tokenSource oauth2.TokenSource, useMetadataServer bool) (*GCECloud, error) {
 
-	if tokenSource == nil {
-		var err error
-		tokenSource, err = google.DefaultTokenSource(
-			oauth2.NoContext,
-			compute.CloudPlatformScope,
-			compute.ComputeScope)
-		glog.Infof("Using DefaultTokenSource %#v", tokenSource)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		glog.Infof("Using existing Token Source %#v", tokenSource)
-	}
-
-	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
-		if _, err := tokenSource.Token(); err != nil {
-			glog.Errorf("error fetching initial token: %v", err)
-			return false, nil
-		}
-		return true, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
-	svc, err := compute.New(client)
+	client, err := newOauthClient(tokenSource)
 	if err != nil {
 		return nil, err
 	}
 
-	containerSvc, err := container.New(client)
+	service, err := compute.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err = newOauthClient(tokenSource)
+	serviceAlpha, err := computealpha.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	containerService, err := container.New(client)
 	if err != nil {
 		return nil, err
 	}
 
 	if networkURL == "" {
-		networkName, err := getNetworkNameViaAPICall(svc, projectID)
+		networkName, err := getNetworkNameViaAPICall(service, projectID)
 		if err != nil {
 			return nil, err
 		}
@@ -255,7 +243,7 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 	}
 
 	if len(managedZones) == 0 {
-		managedZones, err = getZonesForRegion(svc, projectID, region)
+		managedZones, err = getZonesForRegion(service, projectID, region)
 		if err != nil {
 			return nil, err
 		}
@@ -267,8 +255,9 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(10, 100) // 10 qps, 100 bucket size.
 
 	return &GCECloud{
-		service:                  svc,
-		containerService:         containerSvc,
+		service:                  service,
+		serviceAlpha:             serviceAlpha,
+		containerService:         containerService,
 		projectID:                projectID,
 		region:                   region,
 		localZone:                zone,
@@ -377,4 +366,32 @@ func getZonesForRegion(svc *compute.Service, projectID, region string) ([]string
 		}
 	}
 	return zones, nil
+}
+
+func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
+	if tokenSource == nil {
+		var err error
+		tokenSource, err = google.DefaultTokenSource(
+			oauth2.NoContext,
+			compute.CloudPlatformScope,
+			compute.ComputeScope)
+		glog.Infof("Using DefaultTokenSource %#v", tokenSource)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		glog.Infof("Using existing Token Source %#v", tokenSource)
+	}
+
+	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
+		if _, err := tokenSource.Token(); err != nil {
+			glog.Errorf("error fetching initial token: %v", err)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return oauth2.NewClient(oauth2.NoContext, tokenSource), nil
 }

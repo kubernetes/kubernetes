@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/events"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -62,6 +63,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -554,7 +556,12 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			w.Write(LEVEL_0, "Message:\t%s\n", pod.Status.Message)
 		}
 		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
-		w.Write(LEVEL_0, "Controllers:\t%s\n", printControllers(pod.Annotations))
+		if createdBy := printCreator(pod.Annotations); len(createdBy) > 0 {
+			w.Write(LEVEL_0, "Created By:\t%s\n", createdBy)
+		}
+		if controlledBy := printController(pod); len(controlledBy) > 0 {
+			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
+		}
 
 		if len(pod.Spec.InitContainers) > 0 {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
@@ -583,7 +590,14 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 	})
 }
 
-func printControllers(annotation map[string]string) string {
+func printController(controllee metav1.Object) string {
+	if controllerRef := controller.GetControllerOf(controllee); controllerRef != nil {
+		return fmt.Sprintf("%s/%s", controllerRef.Kind, controllerRef.Name)
+	}
+	return ""
+}
+
+func printCreator(annotation map[string]string) string {
 	value, ok := annotation[api.CreatedByAnnotation]
 	if ok {
 		var r api.SerializedReference
@@ -592,7 +606,7 @@ func printControllers(annotation map[string]string) string {
 			return fmt.Sprintf("%s/%s", r.Reference.Kind, r.Reference.Name)
 		}
 	}
-	return "<none>"
+	return ""
 }
 
 func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
@@ -847,7 +861,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 		w.Write(LEVEL_0, "Name:\t%s\n", pv.Name)
 		printLabelsMultiline(w, "Labels", pv.Labels)
 		printAnnotationsMultiline(w, "Annotations", pv.Annotations)
-		w.Write(LEVEL_0, "StorageClass:\t%s\n", api.GetPersistentVolumeClass(pv))
+		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClass(pv))
 		w.Write(LEVEL_0, "Status:\t%s\n", pv.Status.Phase)
 		if pv.Spec.ClaimRef != nil {
 			w.Write(LEVEL_0, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
@@ -855,7 +869,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			w.Write(LEVEL_0, "Claim:\t%s\n", "")
 		}
 		w.Write(LEVEL_0, "Reclaim Policy:\t%v\n", pv.Spec.PersistentVolumeReclaimPolicy)
-		w.Write(LEVEL_0, "Access Modes:\t%s\n", api.GetAccessModesAsString(pv.Spec.AccessModes))
+		w.Write(LEVEL_0, "Access Modes:\t%s\n", helper.GetAccessModesAsString(pv.Spec.AccessModes))
 		w.Write(LEVEL_0, "Capacity:\t%s\n", storage.String())
 		w.Write(LEVEL_0, "Message:\t%s\n", pv.Status.Message)
 		w.Write(LEVEL_0, "Source:\n")
@@ -915,7 +929,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 	capacity := ""
 	accessModes := ""
 	if pvc.Spec.VolumeName != "" {
-		accessModes = api.GetAccessModesAsString(pvc.Status.AccessModes)
+		accessModes = helper.GetAccessModesAsString(pvc.Status.AccessModes)
 		storage = pvc.Status.Capacity[api.ResourceStorage]
 		capacity = storage.String()
 	}
@@ -926,7 +940,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
-		w.Write(LEVEL_0, "StorageClass:\t%s\n", api.GetPersistentVolumeClaimClass(pvc))
+		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClaimClass(pvc))
 		w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
 		w.Write(LEVEL_0, "Volume:\t%s\n", pvc.Spec.VolumeName)
 		printLabelsMultiline(w, "Labels", pvc.Labels)
@@ -1225,7 +1239,7 @@ func describeVolumeClaimTemplates(templates []api.PersistentVolumeClaim, w Prefi
 	w.Write(LEVEL_0, "Volume Claims:\n")
 	for _, pvc := range templates {
 		w.Write(LEVEL_1, "Name:\t%s\n", pvc.Name)
-		w.Write(LEVEL_1, "StorageClass:\t%s\n", api.GetPersistentVolumeClaimClass(&pvc))
+		w.Write(LEVEL_1, "StorageClass:\t%s\n", helper.GetPersistentVolumeClaimClass(&pvc))
 		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.NewString())
 		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.NewString())
 		if capacity, ok := pvc.Spec.Resources.Requests[api.ResourceStorage]; ok {
@@ -1357,6 +1371,9 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		w.Write(LEVEL_0, "Selector:\t%s\n", metav1.FormatLabelSelector(rs.Spec.Selector))
 		printLabelsMultiline(w, "Labels", rs.Labels)
 		printAnnotationsMultiline(w, "Annotations", rs.Annotations)
+		if controlledBy := printController(rs); len(controlledBy) > 0 {
+			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
+		}
 		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
 		w.Write(LEVEL_0, "Pods Status:\t")
 		if getPodErr != nil {
@@ -1400,6 +1417,9 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		printLabelsMultiline(w, "Labels", job.Labels)
 		printAnnotationsMultiline(w, "Annotations", job.Annotations)
+		if createdBy := printCreator(job.Annotations); len(createdBy) > 0 {
+			w.Write(LEVEL_0, "Created By:\t%s\n", createdBy)
+		}
 		w.Write(LEVEL_0, "Parallelism:\t%d\n", *job.Spec.Parallelism)
 		if job.Spec.Completions != nil {
 			w.Write(LEVEL_0, "Completions:\t%d\n", *job.Spec.Completions)
