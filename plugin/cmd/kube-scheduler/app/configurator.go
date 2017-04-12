@@ -47,6 +47,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const SchedulerPolicyConfigMapKey string = "policy.cfg"
+
 func createRecorder(kubecli *clientset.Clientset, s *options.SchedulerServer) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -139,17 +141,13 @@ func (sc schedulerConfigurator) getSchedulerPolicyConfig() (*schedulerapi.Policy
 			return nil, fmt.Errorf("Error getting scheduler policy ConfigMap: %v.", err)
 		}
 		if policyConfigMap != nil {
-			// We expect the first element in the Data member of the ConfigMap to
-			// contain the policy config.
-			if len(policyConfigMap.Data) != 1 {
-				return nil, fmt.Errorf("ConfigMap %v has %v entries in its 'Data'. It must have only one.", sc.policyConfigMap, len(policyConfigMap.Data))
+			val, ok := policyConfigMap.Data[SchedulerPolicyConfigMapKey]
+			if !ok {
+				return nil, fmt.Errorf("No element with key = '%v' is found in the ConfigMap 'Data'.", SchedulerPolicyConfigMapKey)
 			}
 			policyConfigMapFound = true
-			// This loop should iterate only once, as we have already checked the length of Data.
-			for _, val := range policyConfigMap.Data {
-				glog.V(5).Infof("Scheduler policy ConfigMap: %v", val)
-				configData = []byte(val)
-			}
+			glog.V(5).Infof("Scheduler policy ConfigMap: %v", val)
+			configData = []byte(val)
 		}
 	}
 
