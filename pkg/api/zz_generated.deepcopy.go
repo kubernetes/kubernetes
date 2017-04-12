@@ -65,7 +65,6 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerStateTerminated, InType: reflect.TypeOf(&ContainerStateTerminated{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerStateWaiting, InType: reflect.TypeOf(&ContainerStateWaiting{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerStatus, InType: reflect.TypeOf(&ContainerStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ConversionError, InType: reflect.TypeOf(&ConversionError{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DaemonEndpoint, InType: reflect.TypeOf(&DaemonEndpoint{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DeleteOptions, InType: reflect.TypeOf(&DeleteOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DownwardAPIProjection, InType: reflect.TypeOf(&DownwardAPIProjection{})},
@@ -702,31 +701,6 @@ func DeepCopy_api_ContainerStatus(in interface{}, out interface{}, c *conversion
 		}
 		if err := DeepCopy_api_ContainerState(&in.LastTerminationState, &out.LastTerminationState, c); err != nil {
 			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_api_ConversionError(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ConversionError)
-		out := out.(*ConversionError)
-		*out = *in
-		// in.In is kind 'Interface'
-		if in.In != nil {
-			if newVal, err := c.DeepCopy(&in.In); err != nil {
-				return err
-			} else {
-				out.In = *newVal.(*interface{})
-			}
-		}
-		// in.Out is kind 'Interface'
-		if in.Out != nil {
-			if newVal, err := c.DeepCopy(&in.Out); err != nil {
-				return err
-			} else {
-				out.Out = *newVal.(*interface{})
-			}
 		}
 		return nil
 	}

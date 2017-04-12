@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -172,7 +173,7 @@ func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, se
 		protocol:  port.Protocol,
 		nodePort:  int(port.NodePort),
 		// Deep-copy in case the service instance changes
-		loadBalancerStatus:       *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
+		loadBalancerStatus:       *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
 		sessionAffinityType:      service.Spec.SessionAffinity,
 		stickyMaxAgeMinutes:      180, // TODO: paramaterize this in the API.
 		externalIPs:              make([]string, len(service.Spec.ExternalIPs)),
@@ -462,7 +463,7 @@ func buildNewServiceMap(allServices []*api.Service, oldServiceMap proxyServiceMa
 		}
 
 		// if ClusterIP is "None" or empty, skip proxying
-		if !api.IsServiceIPSet(service) {
+		if !helper.IsServiceIPSet(service) {
 			glog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
 			continue
 		}

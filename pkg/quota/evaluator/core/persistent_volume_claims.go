@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
@@ -104,7 +105,7 @@ func (p *pvcEvaluator) Constraints(required []api.ResourceName, item runtime.Obj
 
 	// these are the items that we will be handling based on the objects actual storage-class
 	pvcRequiredSet := append([]api.ResourceName{}, pvcResources...)
-	if storageClassRef := api.GetPersistentVolumeClaimClass(pvc); len(storageClassRef) > 0 {
+	if storageClassRef := helper.GetPersistentVolumeClaimClass(pvc); len(storageClassRef) > 0 {
 		pvcRequiredSet = append(pvcRequiredSet, ResourceByStorageClass(storageClassRef, api.ResourcePersistentVolumeClaims))
 		pvcRequiredSet = append(pvcRequiredSet, ResourceByStorageClass(storageClassRef, api.ResourceRequestsStorage))
 	}
@@ -175,7 +176,7 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (api.ResourceList, error) {
 	if err != nil {
 		return result, err
 	}
-	storageClassRef := api.GetPersistentVolumeClaimClass(pvc)
+	storageClassRef := helper.GetPersistentVolumeClaimClass(pvc)
 
 	// charge for claim
 	result[api.ResourcePersistentVolumeClaims] = resource.MustParse("1")

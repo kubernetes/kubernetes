@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -3712,10 +3713,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("10"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("10"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("20"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("20"),
 							},
 						},
 						TerminationMessagePolicy: "File",
@@ -3737,10 +3738,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("10"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("10"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("20"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("20"),
 							},
 						},
 						TerminationMessagePolicy: "File",
@@ -4211,10 +4212,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("2"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("2"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("1"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("1"),
 							},
 						},
 					},
@@ -4233,7 +4234,7 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
 							},
 						},
 					},
@@ -4252,7 +4253,7 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
 							},
 						},
 					},
@@ -4272,10 +4273,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("5"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
 							},
 						},
 					},
@@ -4294,10 +4295,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("5"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
 							},
 						},
 					},
@@ -6739,8 +6740,8 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.OpaqueIntResourceName("A"):       resource.MustParse("5"),
-					api.OpaqueIntResourceName("B"):       resource.MustParse("10"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("5"),
+					helper.OpaqueIntResourceName("B"):    resource.MustParse("10"),
 				},
 			},
 		}, true},
@@ -6756,7 +6757,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.OpaqueIntResourceName("A"):       resource.MustParse("500m"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("500m"),
 				},
 			},
 		}, false},
@@ -6772,12 +6773,12 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.OpaqueIntResourceName("A"):       resource.MustParse("5"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("5"),
 				},
 				Allocatable: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.OpaqueIntResourceName("A"):       resource.MustParse("4.5"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("4.5"),
 				},
 			},
 		}, false},
