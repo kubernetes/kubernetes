@@ -335,7 +335,7 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 	if configMap.DeletionTimestamp != nil {
 		if err := configmapcontroller.delete(configMap); err != nil {
 			glog.Errorf("Failed to delete %s: %v", configmap, err)
-			configmapcontroller.eventRecorder.Eventf(configMap, api.EventTypeNormal, "DeleteFailed",
+			configmapcontroller.eventRecorder.Eventf(configMap, api.EventTypeWarning, "DeleteFailed",
 				"ConfigMap delete failed: %v", err)
 			configmapcontroller.deliverConfigMap(configmap, 0, true)
 		}
@@ -410,7 +410,7 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 	}
 	err = configmapcontroller.federatedUpdater.UpdateWithOnError(operations, configmapcontroller.updateTimeout,
 		func(op util.FederatedOperation, operror error) {
-			configmapcontroller.eventRecorder.Eventf(configMap, api.EventTypeNormal, "UpdateInClusterFailed",
+			configmapcontroller.eventRecorder.Eventf(configMap, api.EventTypeWarning, "UpdateInClusterFailed",
 				"ConfigMap update in cluster %s failed: %v", op.ClusterName, operror)
 		})
 

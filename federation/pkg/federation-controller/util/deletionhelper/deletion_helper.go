@@ -152,7 +152,7 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 	}
 	err = dh.updater.UpdateWithOnError(operations, dh.updateTimeout, func(op util.FederatedOperation, operror error) {
 		objName := dh.objNameFunc(op.Obj)
-		dh.eventRecorder.Eventf(obj, api.EventTypeNormal, "DeleteInClusterFailed",
+		dh.eventRecorder.Eventf(obj, api.EventTypeWarning, "DeleteInClusterFailed",
 			"Failed to delete obj %s in cluster %s: %v", objName, op.ClusterName, operror)
 	})
 	if err != nil {
