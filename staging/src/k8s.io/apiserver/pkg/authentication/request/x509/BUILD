@@ -11,6 +11,12 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["x509_test.go"],
+    data = [
+        "testdata/client-expired.pem",
+        "testdata/client-valid.pem",
+        "testdata/intermediate.pem",
+        "testdata/root.pem",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [

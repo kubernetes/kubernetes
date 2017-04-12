@@ -23,5 +23,8 @@ go_library(
         "io.go",
         "pem.go",
     ],
+    data = [
+        "testdata/dontUseThisKey.pem",
+    ],
     tags = ["automanaged"],
 )
