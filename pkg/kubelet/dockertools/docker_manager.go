@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	knetwork "k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/hairpin"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -200,7 +201,7 @@ type DockerManager struct {
 
 // A subset of the pod.Manager interface extracted for testing purposes.
 type podGetter interface {
-	GetPodByUID(kubetypes.UID) (*v1.Pod, bool)
+	GetPodByUID(kubetypes.UID) (*kubepod.Pod, bool)
 }
 
 func PodInfraContainerEnv(env map[string]string) kubecontainer.Option {
@@ -1045,7 +1046,7 @@ func (dm *DockerManager) podInfraContainerChanged(pod *v1.Pod, podInfraContainer
 	var ports []v1.ContainerPort
 
 	// Check network mode.
-	if kubecontainer.IsHostNetworkPod(pod) {
+	if kubecontainer.IsHostNetworkPod(&pod.Spec) {
 		dockerPodInfraContainer, err := dm.client.InspectContainer(podInfraContainerStatus.ID.ID)
 		if err != nil {
 			return false, err
@@ -1762,7 +1763,7 @@ func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container,
 	}
 
 	utsMode := ""
-	if kubecontainer.IsHostNetworkPod(pod) {
+	if kubecontainer.IsHostNetworkPod(&pod.Spec) {
 		utsMode = namespaceModeHost
 	}
 
@@ -1867,7 +1868,7 @@ func (dm *DockerManager) calculateOomScoreAdj(pod *v1.Pod, container *v1.Contain
 	if container.Name == PodInfraContainerName {
 		oomScoreAdj = qos.PodInfraOOMAdj
 	} else {
-		oomScoreAdj = qos.GetContainerOOMScoreAdjust(pod, container, int64(dm.machineInfo.MemoryCapacity))
+		oomScoreAdj = qos.GetContainerOOMScoreAdjust(&pod.Spec, container, int64(dm.machineInfo.MemoryCapacity))
 
 	}
 
@@ -1962,7 +1963,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *v1.Pod) (kubecontainer.Doc
 	netNamespace := ""
 	var ports []v1.ContainerPort
 
-	if kubecontainer.IsHostNetworkPod(pod) {
+	if kubecontainer.IsHostNetworkPod(&pod.Spec) {
 		netNamespace = namespaceModeHost
 	} else if dm.pluginDisablesDockerNetworking() {
 		netNamespace = "none"
@@ -2086,7 +2087,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *v1.Pod, podStatus *kube
 
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
+			if kubecontainer.ShouldContainerBeRestarted(&container, &pod.Spec, podStatus) {
 				// If we are here it means that the container is dead and should be restarted, or never existed and should
 				// be created. We may be inserting this ID again if the container has changed and it has
 				// RestartPolicy::Always, but it's not a big deal.
@@ -2285,7 +2286,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 
 		setupNetworkResult := kubecontainer.NewSyncResult(kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod))
 		result.AddSyncResult(setupNetworkResult)
-		if !kubecontainer.IsHostNetworkPod(pod) {
+		if !kubecontainer.IsHostNetworkPod(&pod.Spec) {
 			if err := dm.network.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID.ContainerID(), pod.Annotations); err != nil {
 				setupNetworkResult.Fail(kubecontainer.ErrSetupNetwork, err.Error())
 				glog.Error(err)

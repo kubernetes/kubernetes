@@ -17,12 +17,11 @@ limitations under the License.
 package testing
 
 import (
-	"k8s.io/kubernetes/pkg/api/v1"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 type FakePodDeletionSafetyProvider struct{}
 
-func (f *FakePodDeletionSafetyProvider) OkToDeletePod(pod *v1.Pod) bool {
-	return !kubepod.IsMirrorPod(pod) && pod.DeletionTimestamp != nil
+func (f *FakePodDeletionSafetyProvider) OkToDeletePod(pod *kubepod.Pod) bool {
+	return !pod.IsMirror() && pod.DeletionTimestampIsSet()
 }

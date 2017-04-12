@@ -20,7 +20,6 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -30,7 +29,7 @@ type Manager interface {
 	Get(kubecontainer.ContainerID) (Result, bool)
 	// Set sets the cached result for the container with the given ID.
 	// The pod is only included to be sent with the update.
-	Set(kubecontainer.ContainerID, Result, *v1.Pod)
+	Set(kubecontainer.ContainerID, Result, types.UID)
 	// Remove clears the cached result for the container with the given ID.
 	Remove(kubecontainer.ContainerID)
 	// Updates creates a channel that receives an Update whenever its result changes (but not
@@ -92,9 +91,9 @@ func (m *manager) Get(id kubecontainer.ContainerID) (Result, bool) {
 	return result, found
 }
 
-func (m *manager) Set(id kubecontainer.ContainerID, result Result, pod *v1.Pod) {
+func (m *manager) Set(id kubecontainer.ContainerID, result Result, podUID types.UID) {
 	if m.setInternal(id, result) {
-		m.updates <- Update{id, result, pod.UID}
+		m.updates <- Update{id, result, podUID}
 	}
 }
 

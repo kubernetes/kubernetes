@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
@@ -1801,8 +1802,8 @@ func TestGarbageCollect(t *testing.T) {
 		}
 
 		fr.pods = tt.pods
-		for _, p := range tt.apiPods {
-			getter.pods[p.UID] = p
+		for _, apiPod := range tt.apiPods {
+			getter.pods[apiPod.UID] = kubepod.NewPod(apiPod)
 		}
 
 		allSourcesReady := true
@@ -1830,7 +1831,7 @@ func TestGarbageCollect(t *testing.T) {
 		ctrl.Finish()
 		fakeOS.Removes = []string{}
 		fs.resetFailedUnits = []string{}
-		getter.pods = make(map[kubetypes.UID]*v1.Pod)
+		getter.pods = make(map[kubetypes.UID]*kubepod.Pod)
 	}
 }
 

@@ -25,18 +25,19 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api/v1"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 // mockPodStatusProvider returns the status on the specified pod
 type mockPodStatusProvider struct {
-	pods []*v1.Pod
+	pods []*kubepod.Pod
 }
 
 // GetPodStatus returns the status on the associated pod with matching uid (if found)
 func (m *mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
 	for _, pod := range m.pods {
-		if pod.UID == uid {
-			return pod.Status, true
+		if pod.UID() == uid {
+			return *pod.GetStatus(), true
 		}
 	}
 	return v1.PodStatus{}, false
@@ -44,8 +45,27 @@ func (m *mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool)
 
 // TestActiveDeadlineHandler verifies the active deadline handler functions as expected.
 func TestActiveDeadlineHandler(t *testing.T) {
-	pods := newTestPods(4)
+	apiPods := newTestPods(4)
+
+	now := metav1.Now()
+	startTime := metav1.NewTime(now.Time.Add(-1 * time.Minute))
+
+	// this pod has exceeded its active deadline
+	exceededActiveDeadlineSeconds := int64(30)
+	apiPods[0].Status.StartTime = &startTime
+	apiPods[0].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
+
+	// this pod has not exceeded its active deadline
+	notYetActiveDeadlineSeconds := int64(120)
+	apiPods[1].Status.StartTime = &startTime
+	apiPods[1].Spec.ActiveDeadlineSeconds = &notYetActiveDeadlineSeconds
+
+	// this pod has no deadline
+	apiPods[2].Status.StartTime = &startTime
+	apiPods[2].Spec.ActiveDeadlineSeconds = nil
+
 	fakeClock := clock.NewFakeClock(time.Now())
+	pods := kubepod.FromAPIPods(apiPods)
 	podStatusProvider := &mockPodStatusProvider{pods: pods}
 	fakeRecorder := &record.FakeRecorder{}
 	handler, err := newActiveDeadlineHandler(podStatusProvider, fakeRecorder, fakeClock)
@@ -53,25 +73,8 @@ func TestActiveDeadlineHandler(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	now := metav1.Now()
-	startTime := metav1.NewTime(now.Time.Add(-1 * time.Minute))
-
-	// this pod has exceeded its active deadline
-	exceededActiveDeadlineSeconds := int64(30)
-	pods[0].Status.StartTime = &startTime
-	pods[0].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
-
-	// this pod has not exceeded its active deadline
-	notYetActiveDeadlineSeconds := int64(120)
-	pods[1].Status.StartTime = &startTime
-	pods[1].Spec.ActiveDeadlineSeconds = &notYetActiveDeadlineSeconds
-
-	// this pod has no deadline
-	pods[2].Status.StartTime = &startTime
-	pods[2].Spec.ActiveDeadlineSeconds = nil
-
 	testCases := []struct {
-		pod      *v1.Pod
+		pod      *kubepod.Pod
 		expected bool
 	}{{pods[0], true}, {pods[1], false}, {pods[2], false}, {pods[3], false}}
 

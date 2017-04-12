@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 )
 
@@ -183,21 +184,21 @@ func TestComposeDNSSearch(t *testing.T) {
 }
 
 func TestCleanupBandwidthLimits(t *testing.T) {
-	testPod := func(name, ingress string) *v1.Pod {
+	testPod := func(name, ingress string) *kubepod.Pod {
 		pod := podWithUidNameNs("", name, "")
 
 		if len(ingress) != 0 {
 			pod.Annotations["kubernetes.io/ingress-bandwidth"] = ingress
 		}
 
-		return pod
+		return kubepod.NewPod(pod)
 	}
 
 	// TODO(random-liu): We removed the test case for pod status not cached here. We should add a higher
 	// layer status getter function and test that function instead.
 	tests := []struct {
 		status           *v1.PodStatus
-		pods             []*v1.Pod
+		pods             []*kubepod.Pod
 		inputCIDRs       []string
 		expectResetCIDRs []string
 		name             string
@@ -207,7 +208,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 				PodIP: "1.2.3.4",
 				Phase: v1.PodRunning,
 			},
-			pods: []*v1.Pod{
+			pods: []*kubepod.Pod{
 				testPod("foo", "10M"),
 				testPod("bar", ""),
 			},
@@ -220,7 +221,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 				PodIP: "1.2.3.4",
 				Phase: v1.PodFailed,
 			},
-			pods: []*v1.Pod{
+			pods: []*kubepod.Pod{
 				testPod("foo", "10M"),
 				testPod("bar", ""),
 			},
@@ -233,7 +234,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 				PodIP: "1.2.3.4",
 				Phase: v1.PodFailed,
 			},
-			pods: []*v1.Pod{
+			pods: []*kubepod.Pod{
 				testPod("foo", ""),
 				testPod("bar", ""),
 			},

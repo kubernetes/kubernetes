@@ -31,7 +31,7 @@ import (
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 )
@@ -365,9 +365,9 @@ func memoryUsage(memStats *statsapi.MemoryStats) *resource.Quantity {
 
 // localVolumeNames returns the set of volumes for the pod that are local
 // TODO: sumamry API should report what volumes consume local storage rather than hard-code here.
-func localVolumeNames(pod *v1.Pod) []string {
+func localVolumeNames(pod *kubepod.Pod) []string {
 	result := []string{}
-	for _, volume := range pod.Spec.Volumes {
+	for _, volume := range pod.GetSpec().Volumes {
 		if volume.HostPath != nil ||
 			(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
 			volume.ConfigMap != nil ||
@@ -379,7 +379,7 @@ func localVolumeNames(pod *v1.Pod) []string {
 }
 
 // podDiskUsage aggregates pod disk usage and inode consumption for the specified stats to measure.
-func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
+func podDiskUsage(podStats statsapi.PodStats, pod *kubepod.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
 	disk := resource.Quantity{Format: resource.BinarySI}
 	inodes := resource.Quantity{Format: resource.BinarySI}
 	for _, container := range podStats.Containers {
@@ -447,8 +447,8 @@ func cachedStatsFunc(podStats []statsapi.PodStats) statsFunc {
 	for i := range podStats {
 		uid2PodStats[podStats[i].PodRef.UID] = podStats[i]
 	}
-	return func(pod *v1.Pod) (statsapi.PodStats, bool) {
-		stats, found := uid2PodStats[string(pod.UID)]
+	return func(pod *kubepod.Pod) (statsapi.PodStats, bool) {
+		stats, found := uid2PodStats[string(pod.UID())]
 		return stats, found
 	}
 }
@@ -459,16 +459,16 @@ func cachedStatsFunc(podStats []statsapi.PodStats) statsFunc {
 //    0 if p1 == p2
 //   +1 if p1 >  p2
 //
-type cmpFunc func(p1, p2 *v1.Pod) int
+type cmpFunc func(p1, p2 *kubepod.Pod) int
 
 // multiSorter implements the Sort interface, sorting changes within.
 type multiSorter struct {
-	pods []*v1.Pod
+	pods []*kubepod.Pod
 	cmp  []cmpFunc
 }
 
 // Sort sorts the argument slice according to the less functions passed to OrderedBy.
-func (ms *multiSorter) Sort(pods []*v1.Pod) {
+func (ms *multiSorter) Sort(pods []*kubepod.Pod) {
 	ms.pods = pods
 	sort.Sort(ms)
 }
@@ -512,9 +512,9 @@ func (ms *multiSorter) Less(i, j int) bool {
 }
 
 // qosComparator compares pods by QoS (BestEffort < Burstable < Guaranteed)
-func qosComparator(p1, p2 *v1.Pod) int {
-	qosP1 := qos.GetPodQOS(p1)
-	qosP2 := qos.GetPodQOS(p2)
+func qosComparator(p1, p2 *kubepod.Pod) int {
+	qosP1 := p1.GetQOS()
+	qosP2 := p2.GetQOS()
 	// its a tie
 	if qosP1 == qosP2 {
 		return 0
@@ -536,7 +536,7 @@ func qosComparator(p1, p2 *v1.Pod) int {
 
 // memory compares pods by largest consumer of memory relative to request.
 func memory(stats statsFunc) cmpFunc {
-	return func(p1, p2 *v1.Pod) int {
+	return func(p1, p2 *kubepod.Pod) int {
 		p1Stats, found := stats(p1)
 		// if we have no usage stats for p1, we want p2 first
 		if !found {
@@ -560,7 +560,7 @@ func memory(stats statsFunc) cmpFunc {
 
 		// adjust p1, p2 usage relative to the request (if any)
 		p1Memory := p1Usage[v1.ResourceMemory]
-		p1Spec, err := core.PodUsageFunc(p1)
+		p1Spec, err := core.PodUsageFunc(p1.GetAPIPod())
 		if err != nil {
 			return -1
 		}
@@ -568,7 +568,7 @@ func memory(stats statsFunc) cmpFunc {
 		p1Memory.Sub(p1Request)
 
 		p2Memory := p2Usage[v1.ResourceMemory]
-		p2Spec, err := core.PodUsageFunc(p2)
+		p2Spec, err := core.PodUsageFunc(p2.GetAPIPod())
 		if err != nil {
 			return 1
 		}
@@ -582,7 +582,7 @@ func memory(stats statsFunc) cmpFunc {
 
 // disk compares pods by largest consumer of disk relative to request for the specified disk resource.
 func disk(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource v1.ResourceName) cmpFunc {
-	return func(p1, p2 *v1.Pod) int {
+	return func(p1, p2 *kubepod.Pod) int {
 		p1Stats, found := stats(p1)
 		// if we have no usage stats for p1, we want p2 first
 		if !found {
@@ -614,13 +614,13 @@ func disk(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource v1.Resou
 }
 
 // rankMemoryPressure orders the input pods for eviction in response to memory pressure.
-func rankMemoryPressure(pods []*v1.Pod, stats statsFunc) {
+func rankMemoryPressure(pods []*kubepod.Pod, stats statsFunc) {
 	orderedBy(qosComparator, memory(stats)).Sort(pods)
 }
 
 // rankDiskPressureFunc returns a rankFunc that measures the specified fs stats.
 func rankDiskPressureFunc(fsStatsToMeasure []fsStatsType, diskResource v1.ResourceName) rankFunc {
-	return func(pods []*v1.Pod, stats statsFunc) {
+	return func(pods []*kubepod.Pod, stats statsFunc) {
 		orderedBy(qosComparator, disk(stats, fsStatsToMeasure, diskResource)).Sort(pods)
 	}
 }

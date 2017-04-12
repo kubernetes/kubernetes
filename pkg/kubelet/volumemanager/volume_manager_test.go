@@ -57,8 +57,8 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager())
 
-	node, pod, pv, claim := createObjects()
-	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+	node, apiPod, pv, claim := createObjects()
+	kubeClient := fake.NewSimpleClientset(node, apiPod, pv, claim)
 
 	manager, err := newTestVolumeManager(tmpDir, podManager, kubeClient)
 	if err != nil {
@@ -68,7 +68,8 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	stopCh := runVolumeManager(manager)
 	defer close(stopCh)
 
-	podManager.SetPods([]*v1.Pod{pod})
+	pods := podManager.SetPods([]*v1.Pod{apiPod})
+	pod := pods[0]
 
 	// Fake node status update
 	go simulateVolumeInUseUpdate(
@@ -81,8 +82,8 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		t.Errorf("Expected success: %v", err)
 	}
 
-	expectedMounted := pod.Spec.Volumes[0].Name
-	actualMounted := manager.GetMountedVolumesForPod(types.UniquePodName(pod.ObjectMeta.UID))
+	expectedMounted := pod.GetSpec().Volumes[0].Name
+	actualMounted := manager.GetMountedVolumesForPod(types.UniquePodName(pod.UID()))
 	if _, ok := actualMounted[expectedMounted]; !ok || (len(actualMounted) != 1) {
 		t.Errorf("Expected %v to be mounted to pod but got %v", expectedMounted, actualMounted)
 	}
@@ -102,9 +103,9 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager())
 
-	node, pod, _, claim := createObjects()
+	node, apiPod, _, claim := createObjects()
 
-	existingGid := pod.Spec.SecurityContext.SupplementalGroups[0]
+	existingGid := apiPod.Spec.SecurityContext.SupplementalGroups[0]
 
 	cases := []struct {
 		gidAnnotation string
@@ -147,7 +148,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 				},
 			},
 		}
-		kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+		kubeClient := fake.NewSimpleClientset(node, apiPod, pv, claim)
 
 		manager, err := newTestVolumeManager(tmpDir, podManager, kubeClient)
 		if err != nil {
@@ -160,7 +161,8 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			close(stopCh)
 		}()
 
-		podManager.SetPods([]*v1.Pod{pod})
+		pods := podManager.SetPods([]*v1.Pod{apiPod})
+		pod := pods[0]
 
 		// Fake node status update
 		go simulateVolumeInUseUpdate(
@@ -174,7 +176,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			continue
 		}
 
-		actual := manager.GetExtraSupplementalGroupsForPod(pod)
+		actual := manager.GetExtraSupplementalGroupsForPod(pod.GetAPIPod())
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("Expected supplemental groups %v, got %v", tc.expected, actual)
 		}

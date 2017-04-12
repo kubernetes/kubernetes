@@ -123,7 +123,7 @@ func TestRunOnce(t *testing.T) {
 		UID:       types.UID(kb.nodeName),
 		Namespace: "",
 	}
-	fakeKillPodFunc := func(pod *v1.Pod, podStatus v1.PodStatus, gracePeriodOverride *int64) error {
+	fakeKillPodFunc := func(pod *kubepod.Pod, podStatus v1.PodStatus, gracePeriodOverride *int64) error {
 		return nil
 	}
 	evictionManager, evictionAdmitHandler := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, nil, kb.recorder, nodeRef, kb.clock)

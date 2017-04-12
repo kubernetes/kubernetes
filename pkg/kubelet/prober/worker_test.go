@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -188,7 +189,7 @@ func TestSuccessThreshold(t *testing.T) {
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
 
 	// Start out failure.
-	w.resultsManager.Set(testContainerID, results.Failure, &v1.Pod{})
+	w.resultsManager.Set(testContainerID, results.Failure, uuid.NewUUID())
 
 	for i := 0; i < 2; i++ {
 		// Probe defaults to Failure.

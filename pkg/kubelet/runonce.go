@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
@@ -66,21 +67,22 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 }
 
 // runOnce runs a given set of pods and returns their status.
-func (kl *Kubelet) runOnce(pods []*v1.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
+func (kl *Kubelet) runOnce(apiPods []*v1.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
 	ch := make(chan RunPodResult)
-	admitted := []*v1.Pod{}
-	for _, pod := range pods {
+	admitted := []*kubepod.Pod{}
+	for _, apiPod := range apiPods {
+		pod := kubepod.NewPod(apiPod)
 		// Check if we can admit the pod.
 		if ok, reason, message := kl.canAdmitPod(admitted, pod); !ok {
 			kl.rejectPod(pod, reason, message)
-			results = append(results, RunPodResult{pod, nil})
+			results = append(results, RunPodResult{pod.GetAPIPod(), nil})
 			continue
 		}
 
 		admitted = append(admitted, pod)
-		go func(pod *v1.Pod) {
+		go func(pod *kubepod.Pod) {
 			err := kl.runPod(pod, retryDelay)
-			ch <- RunPodResult{pod, err}
+			ch <- RunPodResult{pod.GetAPIPod(), err}
 		}(pod)
 	}
 
@@ -100,29 +102,29 @@ func (kl *Kubelet) runOnce(pods []*v1.Pod, retryDelay time.Duration) (results []
 	if len(failedPods) > 0 {
 		return results, fmt.Errorf("error running pods: %v", failedPods)
 	}
-	glog.Infof("%d pods started", len(pods))
+	glog.Infof("%d pods started", len(apiPods))
 	return results, err
 }
 
 // runPod runs a single pod and wait until all containers are running.
-func (kl *Kubelet) runPod(pod *v1.Pod, retryDelay time.Duration) error {
+func (kl *Kubelet) runPod(pod *kubepod.Pod, retryDelay time.Duration) error {
 	delay := retryDelay
 	retry := 0
 	for {
-		status, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+		status, err := kl.containerRuntime.GetPodStatus(pod.UID(), pod.Name(), pod.Namespace())
 		if err != nil {
-			return fmt.Errorf("Unable to get status for pod %q: %v", format.Pod(pod), err)
+			return fmt.Errorf("Unable to get status for pod %q: %v", pod.String(), err)
 		}
 
 		if kl.isPodRunning(pod, status) {
-			glog.Infof("pod %q containers running", format.Pod(pod))
+			glog.Infof("pod %q containers running", pod.String())
 			return nil
 		}
-		glog.Infof("pod %q containers not running: syncing", format.Pod(pod))
+		glog.Infof("pod %q containers not running: syncing", pod.String())
 
-		glog.Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
-		if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-			glog.Errorf("Failed creating a mirror pod %q: %v", format.Pod(pod), err)
+		glog.Infof("Creating a mirror pod for static pod %q", pod.String())
+		if err := kl.podManager.CreateMirrorPod(pod.GetAPIPod()); err != nil {
+			glog.Errorf("Failed creating a mirror pod %q: %v", pod.String(), err)
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		if err = kl.syncPod(syncPodOptions{
@@ -131,13 +133,13 @@ func (kl *Kubelet) runPod(pod *v1.Pod, retryDelay time.Duration) error {
 			podStatus:  status,
 			updateType: kubetypes.SyncPodUpdate,
 		}); err != nil {
-			return fmt.Errorf("error syncing pod %q: %v", format.Pod(pod), err)
+			return fmt.Errorf("error syncing pod %q: %v", pod.String(), err)
 		}
 		if retry >= runOnceMaxRetries {
-			return fmt.Errorf("timeout error: pod %q containers not running after %d retries", format.Pod(pod), runOnceMaxRetries)
+			return fmt.Errorf("timeout error: pod %q containers not running after %d retries", pod.String(), runOnceMaxRetries)
 		}
 		// TODO(proppy): health checking would be better than waiting + checking the state at the next iteration.
-		glog.Infof("pod %q containers synced, waiting for %v", format.Pod(pod), delay)
+		glog.Infof("pod %q containers synced, waiting for %v", pod.String(), delay)
 		time.Sleep(delay)
 		retry++
 		delay *= runOnceRetryDelayBackoff
@@ -145,11 +147,11 @@ func (kl *Kubelet) runPod(pod *v1.Pod, retryDelay time.Duration) error {
 }
 
 // isPodRunning returns true if all containers of a manifest are running.
-func (kl *Kubelet) isPodRunning(pod *v1.Pod, status *kubecontainer.PodStatus) bool {
-	for _, c := range pod.Spec.Containers {
+func (kl *Kubelet) isPodRunning(pod *kubepod.Pod, status *kubecontainer.PodStatus) bool {
+	for _, c := range pod.GetSpec().Containers {
 		cs := status.FindContainerStatusByName(c.Name)
 		if cs == nil || cs.State != kubecontainer.ContainerStateRunning {
-			glog.Infof("Container %q for pod %q not running", c.Name, format.Pod(pod))
+			glog.Infof("Container %q for pod %q not running", c.Name, pod.String())
 			return false
 		}
 	}

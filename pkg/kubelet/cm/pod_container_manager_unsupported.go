@@ -21,6 +21,7 @@ package cm
 import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 type unsupportedPodContainerManager struct {
@@ -28,15 +29,15 @@ type unsupportedPodContainerManager struct {
 
 var _ PodContainerManager = &unsupportedPodContainerManager{}
 
-func (m *unsupportedPodContainerManager) Exists(_ *v1.Pod) bool {
+func (m *unsupportedPodContainerManager) Exists(_ *kubepod.Pod) bool {
 	return true
 }
 
-func (m *unsupportedPodContainerManager) EnsureExists(_ *v1.Pod) error {
+func (m *unsupportedPodContainerManager) EnsureExists(_ *kubepod.Pod) error {
 	return nil
 }
 
-func (m *unsupportedPodContainerManager) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
+func (m *unsupportedPodContainerManager) GetPodContainerName(_ *v1.PodSpec, _ types.UID) (CgroupName, string) {
 	return "", ""
 }
 

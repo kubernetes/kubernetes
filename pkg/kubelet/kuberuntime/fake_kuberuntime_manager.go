@@ -24,13 +24,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
 
@@ -45,14 +45,14 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 }
 
 type fakePodGetter struct {
-	pods map[types.UID]*v1.Pod
+	pods map[types.UID]*kubepod.Pod
 }
 
 func newFakePodGetter() *fakePodGetter {
-	return &fakePodGetter{make(map[types.UID]*v1.Pod)}
+	return &fakePodGetter{make(map[types.UID]*kubepod.Pod)}
 }
 
-func (f *fakePodGetter) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
+func (f *fakePodGetter) GetPodByUID(uid types.UID) (*kubepod.Pod, bool) {
 	pod, found := f.pods[uid]
 	return pod, found
 }

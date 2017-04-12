@@ -19,15 +19,16 @@ package testing
 import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 type FakeManager struct{}
 
 // Unused methods.
-func (_ FakeManager) AddPod(_ *v1.Pod)        {}
-func (_ FakeManager) RemovePod(_ *v1.Pod)     {}
-func (_ FakeManager) CleanupPods(_ []*v1.Pod) {}
-func (_ FakeManager) Start()                  {}
+func (_ FakeManager) AddPod(_ *kubepod.Pod)        {}
+func (_ FakeManager) RemovePod(_ *kubepod.Pod)     {}
+func (_ FakeManager) CleanupPods(_ []*kubepod.Pod) {}
+func (_ FakeManager) Start()                       {}
 
 func (_ FakeManager) UpdatePodStatus(_ types.UID, podStatus *v1.PodStatus) {
 	for i := range podStatus.ContainerStatuses {

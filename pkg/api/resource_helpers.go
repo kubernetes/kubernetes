@@ -185,9 +185,9 @@ func IsNodeReady(node *Node) bool {
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
 // containers of the pod.
-func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, limits map[ResourceName]resource.Quantity, err error) {
+func PodRequestsAndLimits(podSpec *PodSpec) (reqs map[ResourceName]resource.Quantity, limits map[ResourceName]resource.Quantity, err error) {
 	reqs, limits = map[ResourceName]resource.Quantity{}, map[ResourceName]resource.Quantity{}
-	for _, container := range pod.Spec.Containers {
+	for _, container := range podSpec.Containers {
 		for name, quantity := range container.Resources.Requests {
 			if value, ok := reqs[name]; !ok {
 				reqs[name] = *quantity.Copy()
@@ -206,7 +206,7 @@ func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, li
 		}
 	}
 	// init containers define the minimum of any resource
-	for _, container := range pod.Spec.InitContainers {
+	for _, container := range podSpec.InitContainers {
 		for name, quantity := range container.Resources.Requests {
 			value, ok := reqs[name]
 			if !ok {

@@ -27,7 +27,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 // fakeRktInterface mocks the rktapi.PublicAPIClient interface for testing purpose.
@@ -178,14 +178,14 @@ func (f *fakeRktCli) Reset() {
 }
 
 type fakePodGetter struct {
-	pods map[types.UID]*v1.Pod
+	pods map[types.UID]*kubepod.Pod
 }
 
 func newFakePodGetter() *fakePodGetter {
-	return &fakePodGetter{pods: make(map[types.UID]*v1.Pod)}
+	return &fakePodGetter{pods: make(map[types.UID]*kubepod.Pod)}
 }
 
-func (f fakePodGetter) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
+func (f fakePodGetter) GetPodByUID(uid types.UID) (*kubepod.Pod, bool) {
 	p, found := f.pods[uid]
 	return p, found
 }

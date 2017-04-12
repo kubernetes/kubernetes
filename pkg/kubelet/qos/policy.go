@@ -37,8 +37,8 @@ const (
 // multiplied by 10 (barring exceptional cases) + a configurable quantity which is between -1000
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
-func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) int {
-	switch GetPodQOS(pod) {
+func GetContainerOOMScoreAdjust(spec *v1.PodSpec, container *v1.Container, memoryCapacity int64) int {
+	switch GetPodQOS(spec) {
 	case v1.PodQOSGuaranteed:
 		// Guaranteed containers should be the last to get killed.
 		return guaranteedOOMScoreAdj

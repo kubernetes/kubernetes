@@ -187,14 +187,6 @@ type Pod struct {
 	Sandboxes []*Container
 }
 
-// PodPair contains both runtime#Pod and api#Pod
-type PodPair struct {
-	// APIPod is the v1.Pod
-	APIPod *v1.Pod
-	// RunningPod is the pod defined in pkg/kubelet/container/runtime#Pod
-	RunningPod *Pod
-}
-
 // ContainerID is a type that identifies a container.
 type ContainerID struct {
 	// The type of the container runtime. e.g. 'docker', 'rkt'.

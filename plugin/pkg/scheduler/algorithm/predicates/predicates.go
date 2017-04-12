@@ -1231,7 +1231,7 @@ func PodToleratesNodeTaints(pod *v1.Pod, meta interface{}, nodeInfo *schedulerca
 
 // Determine if a pod is scheduled with best-effort QoS
 func isPodBestEffort(pod *v1.Pod) bool {
-	return qos.GetPodQOS(pod) == v1.PodQOSBestEffort
+	return qos.GetPodQOS(&pod.Spec) == v1.PodQOSBestEffort
 }
 
 // CheckNodeMemoryPressurePredicate checks if a pod can be scheduled on a node
