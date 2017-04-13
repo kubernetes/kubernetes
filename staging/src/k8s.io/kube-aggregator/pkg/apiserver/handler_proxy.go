@@ -25,7 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericrest "k8s.io/apiserver/pkg/registry/generic/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 
@@ -147,7 +149,8 @@ func maybeWrapForConnectionUpgrades(restConfig *restclient.Config, rt http.Round
 	if err != nil {
 		return nil, true, err
 	}
-	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig)
+	followRedirects := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
+	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, followRedirects)
 	wrappedRT, err := restclient.HTTPWrappersForConfig(restConfig, upgradeRoundTripper)
 	if err != nil {
 		return nil, true, err
