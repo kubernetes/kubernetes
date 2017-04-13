@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -124,8 +125,9 @@ func (lcm *localCM) GetNodeAllocatableReservation() v1.ResourceList {
 func TestUpdateNewNodeStatus(t *testing.T) {
 	// generate one more than maxImagesInNodeStatus in inputImageList
 	inputImageList, expectedImageList := generateTestingImageList(maxImagesInNodeStatus + 1)
+	podList := []*containertest.FakePod{}
 	testKubelet := newTestKubeletWithImageList(
-		t, inputImageList, false /* controllerAttachDetachEnabled */)
+		t, inputImageList, podList, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubelet.containerManager = &localCM{

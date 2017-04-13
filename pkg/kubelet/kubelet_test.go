@@ -132,17 +132,22 @@ func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubel
 			Size:     456,
 		},
 	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled)
+	podList := []*containertest.FakePod{}
+	return newTestKubeletWithImageList(t, imageList, podList, controllerAttachDetachEnabled)
 }
 
 func newTestKubeletWithImageList(
 	t *testing.T,
 	imageList []kubecontainer.Image,
+	podList []*containertest.FakePod,
 	controllerAttachDetachEnabled bool) *TestKubelet {
-	fakeRuntime := &containertest.FakeRuntime{}
-	fakeRuntime.RuntimeType = "test"
-	fakeRuntime.VersionInfo = "1.5.0"
-	fakeRuntime.ImageList = imageList
+	fakeRuntime := &containertest.FakeRuntime{
+		RuntimeType: "test",
+		VersionInfo: "1.5.0",
+		ImageList:   imageList,
+		AllPodList:  podList,
+	}
+
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
