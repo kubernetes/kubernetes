@@ -736,7 +736,9 @@ function create-subnetwork() {
   # Look for the subnet, it must exist and have a secondary range
   # configured.
   local subnet=$(gcloud alpha compute networks subnets describe \
-    --region ${REGION} ${IP_ALIAS_SUBNETWORK} 2>/dev/null)
+    --project "${PROJECT}" \
+    --region ${REGION} \
+    ${IP_ALIAS_SUBNETWORK} 2>/dev/null)
   if [[ -z ${subnet} ]]; then
     # Only allow auto-creation for default subnets
     if [[ ${IP_ALIAS_SUBNETWORK} != ${INSTANCE_PREFIX}-subnet-default ]]; then
@@ -753,6 +755,7 @@ function create-subnetwork() {
     gcloud alpha compute networks subnets create \
       ${IP_ALIAS_SUBNETWORK} \
       --description "Automatically generated subnet for ${INSTANCE_PREFIX} cluster. This will be removed on cluster teardown." \
+      --project "${PROJECT}" \
       --network ${NETWORK} \
       --region ${REGION} \
       --range ${NODE_IP_RANGE} \
@@ -800,9 +803,13 @@ function delete-subnetwork() {
 
   echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
   if [[ -n $(gcloud alpha compute networks subnets describe \
-        --region ${REGION} ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
+        --project "${PROJECT}" \
+        --region ${REGION} \
+        ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
     gcloud alpha --quiet compute networks subnets delete \
-      --region ${REGION} ${IP_ALIAS_SUBNETWORK}
+      --project "${PROJECT}" \
+      --region ${REGION} \
+      ${IP_ALIAS_SUBNETWORK}
   fi
 }
 
