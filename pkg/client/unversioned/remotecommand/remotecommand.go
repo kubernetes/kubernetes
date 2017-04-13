@@ -78,7 +78,7 @@ func NewExecutor(config *restclient.Config, method string, url *url.URL) (Stream
 		return nil, err
 	}
 
-	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig)
+	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, true)
 	wrapper, err := restclient.HTTPWrappersForConfig(config, upgradeRoundTripper)
 	if err != nil {
 		return nil, err

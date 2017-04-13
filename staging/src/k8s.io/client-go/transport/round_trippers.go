@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
 
 // HTTPWrappersForConfig wraps a round tripper with any relevant layered
@@ -105,7 +107,7 @@ func NewAuthProxyRoundTripper(username string, groups []string, extra map[string
 }
 
 func (rt *authProxyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	req = cloneRequest(req)
+	req = utilnet.CloneRequest(req)
 	SetAuthProxyHeaders(req, rt.username, rt.groups, rt.extra)
 
 	return rt.rt.RoundTrip(req)
@@ -155,7 +157,7 @@ func (rt *userAgentRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	if len(req.Header.Get("User-Agent")) != 0 {
 		return rt.rt.RoundTrip(req)
 	}
-	req = cloneRequest(req)
+	req = utilnet.CloneRequest(req)
 	req.Header.Set("User-Agent", rt.agent)
 	return rt.rt.RoundTrip(req)
 }
@@ -186,7 +188,7 @@ func (rt *basicAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	if len(req.Header.Get("Authorization")) != 0 {
 		return rt.rt.RoundTrip(req)
 	}
-	req = cloneRequest(req)
+	req = utilnet.CloneRequest(req)
 	req.SetBasicAuth(rt.username, rt.password)
 	return rt.rt.RoundTrip(req)
 }
@@ -236,7 +238,7 @@ func (rt *impersonatingRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 	if len(req.Header.Get(ImpersonateUserHeader)) != 0 {
 		return rt.delegate.RoundTrip(req)
 	}
-	req = cloneRequest(req)
+	req = utilnet.CloneRequest(req)
 	req.Header.Set(ImpersonateUserHeader, rt.impersonate.UserName)
 
 	for _, group := range rt.impersonate.Groups {
@@ -277,7 +279,7 @@ func (rt *bearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 		return rt.rt.RoundTrip(req)
 	}
 
-	req = cloneRequest(req)
+	req = utilnet.CloneRequest(req)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.bearer))
 	return rt.rt.RoundTrip(req)
 }
@@ -291,20 +293,6 @@ func (rt *bearerAuthRoundTripper) CancelRequest(req *http.Request) {
 }
 
 func (rt *bearerAuthRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
-
-// cloneRequest returns a clone of the provided *http.Request.
-// The clone is a shallow copy of the struct and its Header map.
-func cloneRequest(r *http.Request) *http.Request {
-	// shallow copy of the struct
-	r2 := new(http.Request)
-	*r2 = *r
-	// deep copy of the Header
-	r2.Header = make(http.Header)
-	for k, s := range r.Header {
-		r2.Header[k] = s
-	}
-	return r2
-}
 
 // requestInfo keeps track of information about a request/response combination
 type requestInfo struct {

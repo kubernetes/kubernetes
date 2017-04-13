@@ -432,6 +432,7 @@ func TestProxyUpgrade(t *testing.T) {
 					Location:           serverURL,
 					Transport:          tc.ProxyTransport,
 					InterceptRedirects: redirect,
+					Responder:          &noErrorsAllowed{t: t},
 				}
 				proxy := httptest.NewServer(proxyHandler)
 				defer proxy.Close()
@@ -457,6 +458,14 @@ func TestProxyUpgrade(t *testing.T) {
 			}()
 		}
 	}
+}
+
+type noErrorsAllowed struct {
+	t *testing.T
+}
+
+func (r *noErrorsAllowed) Error(err error) {
+	r.t.Error(err)
 }
 
 func TestProxyUpgradeErrorResponse(t *testing.T) {
