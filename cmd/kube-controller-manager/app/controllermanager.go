@@ -243,14 +243,14 @@ func (c ControllerContext) IsControllerEnabled(name string) bool {
 
 func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, controllers ...string) bool {
 	hasStar := false
-	for _, controller := range controllers {
-		if controller == name {
+	for _, ctrl := range controllers {
+		if ctrl == name {
 			return true
 		}
-		if controller == "-"+name {
+		if ctrl == "-"+name {
 			return false
 		}
-		if controller == "*" {
+		if ctrl == "*" {
 			hasStar = true
 		}
 	}
