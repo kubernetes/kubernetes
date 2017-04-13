@@ -139,10 +139,12 @@ func newTestKubeletWithImageList(
 	t *testing.T,
 	imageList []kubecontainer.Image,
 	controllerAttachDetachEnabled bool) *TestKubelet {
-	fakeRuntime := &containertest.FakeRuntime{}
-	fakeRuntime.RuntimeType = "test"
-	fakeRuntime.VersionInfo = "1.5.0"
-	fakeRuntime.ImageList = imageList
+	fakeRuntime := &containertest.FakeRuntime{
+		RuntimeType: "test",
+		VersionInfo: "1.5.0",
+		ImageList:   imageList,
+	}
+
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
