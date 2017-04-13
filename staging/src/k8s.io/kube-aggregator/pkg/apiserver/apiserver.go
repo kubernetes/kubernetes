@@ -173,12 +173,11 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	apisHandler := &apisHandler{
 		codecs:          Codecs,
 		lister:          s.lister,
-		delegate:        s.GenericAPIServer.FallThroughHandler,
 		serviceLister:   s.serviceLister,
 		endpointsLister: s.endpointsLister,
 	}
-	s.GenericAPIServer.HandlerContainer.Handle("/apis", apisHandler)
-	s.GenericAPIServer.HandlerContainer.Handle("/apis/", apisHandler)
+	s.GenericAPIServer.FallThroughHandler.Handle("/apis", apisHandler)
+	s.GenericAPIServer.FallThroughHandler.UnlistedHandle("/apis/", apisHandler)
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), kubeInformers.Core().V1().Services(), s)
 

@@ -40,8 +40,6 @@ type apisHandler struct {
 
 	serviceLister   v1listers.ServiceLister
 	endpointsLister v1listers.EndpointsLister
-
-	delegate http.Handler
 }
 
 var discoveryGroup = metav1.APIGroup{
@@ -59,12 +57,6 @@ var discoveryGroup = metav1.APIGroup{
 }
 
 func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// don't handle URLs that aren't /apis
-	if req.URL.Path != "/apis" && req.URL.Path != "/apis/" {
-		r.delegate.ServeHTTP(w, req)
-		return
-	}
-
 	discoveryGroupList := &metav1.APIGroupList{
 		// always add OUR api group to the list first.  Since we'll never have a registered APIService for it
 		// and since this is the crux of the API, having this first will give our names priority.  It's good to be king.
@@ -158,12 +150,6 @@ type apiGroupHandler struct {
 }
 
 func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// don't handle URLs that aren't /apis/<groupName>
-	if req.URL.Path != "/apis/"+r.groupName && req.URL.Path != "/apis/"+r.groupName+"/" {
-		r.delegate.ServeHTTP(w, req)
-		return
-	}
-
 	apiServices, err := r.lister.List(labels.Everything())
 	if statusErr, ok := err.(*apierrors.StatusError); ok && err != nil {
 		responsewriters.WriteRawJSON(int(statusErr.Status().Code), statusErr.Status(), w)
