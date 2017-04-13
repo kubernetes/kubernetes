@@ -27,6 +27,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/helper:go_default_library",
         "//pkg/util/node:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",

@@ -11,16 +11,19 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "annotation_key_constants.go",
         "conversion.go",
         "defaults.go",
         "doc.go",
         "generate.go",
         "generated.pb.go",
-        "helpers.go",
         "meta.go",
+        "nonstandard_types.go",
         "ref.go",
         "register.go",
         "resource_helpers.go",
+        "taint.go",
+        "toleration.go",
         "types.generated.go",
         "types.go",
         "types_swagger_doc_generated.go",
@@ -31,7 +34,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/helper:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/parsers:go_default_library",
@@ -42,14 +44,11 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/selection",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/util/rand",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
@@ -81,17 +80,16 @@ go_test(
 go_test(
     name = "go_default_test",
     srcs = [
-        "helpers_test.go",
         "resource_helpers_test.go",
+        "taint_test.go",
+        "toleration_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
     ],
 )
 
@@ -107,6 +105,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/api/v1/endpoints:all-srcs",
+        "//pkg/api/v1/helper:all-srcs",
         "//pkg/api/v1/pod:all-srcs",
         "//pkg/api/v1/service:all-srcs",
         "//pkg/api/v1/validation:all-srcs",
