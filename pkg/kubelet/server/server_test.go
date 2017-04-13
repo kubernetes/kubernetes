@@ -1552,11 +1552,20 @@ func TestServePortForward(t *testing.T) {
 			url = fmt.Sprintf("%s/portForward/%s/%s", fw.testHTTPServer.URL, podNamespace, podName)
 		}
 
-		upgradeRoundTripper := spdy.NewRoundTripper(nil)
-		c := &http.Client{Transport: upgradeRoundTripper}
-		// Don't follow redirects, since we want to inspect the redirect response.
-		c.CheckRedirect = func(*http.Request, []*http.Request) error {
-			return http.ErrUseLastResponse
+		var (
+			upgradeRoundTripper httpstream.UpgradeRoundTripper
+			c                   *http.Client
+		)
+
+		if len(test.responseLocation) > 0 {
+			c = &http.Client{}
+			// Don't follow redirects, since we want to inspect the redirect response.
+			c.CheckRedirect = func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			}
+		} else {
+			upgradeRoundTripper = spdy.NewRoundTripper(nil)
+			c = &http.Client{Transport: upgradeRoundTripper}
 		}
 
 		resp, err := c.Post(url, "", nil)

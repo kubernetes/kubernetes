@@ -213,29 +213,96 @@ func (s *SpdyRoundTripper) proxyAuth(proxyURL *url.URL) string {
 // clients may call SpdyRoundTripper.Connection() to retrieve the upgraded
 // connection.
 func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	// TODO what's the best way to clone the request?
-	r := *req
-	req = &r
-	req.Header.Add(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
-	req.Header.Add(httpstream.HeaderUpgrade, HeaderSpdy31)
+	const (
+		maxRedirects = 10
+	)
 
-	conn, err := s.dial(req)
-	if err != nil {
-		return nil, err
+	var (
+		location         = req.URL
+		method           = req.Method
+		intermediateConn net.Conn
+		resp             *http.Response
+	)
+
+	defer func() {
+		if intermediateConn != nil {
+			intermediateConn.Close()
+		}
+	}()
+
+	r := new(http.Request)
+	// shallow clone
+	*r = *req
+	// deep copy headers
+	header := make(http.Header, len(req.Header))
+	for key, values := range req.Header {
+		newValues := make([]string, len(values))
+		copy(newValues, values)
+		header[key] = newValues
 	}
 
-	err = req.Write(conn)
-	if err != nil {
-		return nil, err
+	header.Add(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
+	header.Add(httpstream.HeaderUpgrade, HeaderSpdy31)
+
+redirectLoop:
+	for redirects := 0; ; redirects++ {
+		if redirects > maxRedirects {
+			return nil, fmt.Errorf("too many redirects (%d)", redirects)
+		}
+		if redirects != 0 {
+			// Redirected requests switch to "GET" according to the HTTP spec:
+			// https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3
+			method = "GET"
+		}
+
+		r, err := http.NewRequest(method, location.String(), req.Body)
+		if err != nil {
+			return nil, err
+		}
+		r.Header = header
+
+		intermediateConn, err = s.dial(r)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := r.Write(intermediateConn); err != nil {
+			return nil, err
+		}
+
+		resp, err = http.ReadResponse(bufio.NewReader(intermediateConn), r)
+		if err != nil {
+			// Unable to read the backend response; let the client handle it.
+			break redirectLoop
+		}
+
+		switch resp.StatusCode {
+		case http.StatusFound:
+			// Redirect, continue.
+		default:
+			// Don't redirect.
+			break redirectLoop
+		}
+
+		resp.Body.Close() // not used
+
+		// Reset the connection.
+		intermediateConn.Close()
+		intermediateConn = nil
+
+		// Prepare to follow the redirect.
+		redirectStr := resp.Header.Get("Location")
+		if redirectStr == "" {
+			return nil, fmt.Errorf("%d response missing Location header", resp.StatusCode)
+		}
+		location, err = r.URL.Parse(redirectStr)
+		if err != nil {
+			return nil, fmt.Errorf("malformed Location header: %v", err)
+		}
 	}
 
-	resp, err := http.ReadResponse(bufio.NewReader(conn), req)
-	if err != nil {
-		return nil, err
-	}
-
-	s.conn = conn
-
+	s.conn = intermediateConn
+	intermediateConn = nil // Don't close the connection when we return it.
 	return resp, nil
 }
 
