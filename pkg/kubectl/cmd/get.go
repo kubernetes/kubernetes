@@ -504,6 +504,6 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 	}
 	w.Flush()
-	cmdutil.PrintFilterCount(errOut, len(objs), filteredResourceCount, len(allErrs), "", filterOpts, options.IgnoreNotFound)
+	cmdutil.PrintFilterCount(errOut, len(objs), filteredResourceCount, len(allErrs), filterOpts, options.IgnoreNotFound)
 	return utilerrors.NewAggregate(allErrs)
 }

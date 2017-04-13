@@ -300,7 +300,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdExec(f, in, out, err),
 				NewCmdPortForward(f, out, err),
 				NewCmdProxy(f, out),
-				NewCmdCp(f, in, out, err),
+				NewCmdCp(f, out, err),
 				auth.NewCmdAuth(f, out, err),
 			},
 		},
@@ -318,7 +318,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				NewCmdLabel(f, out),
 				NewCmdAnnotate(f, out),
-				NewCmdCompletion(f, out, ""),
+				NewCmdCompletion(out, ""),
 			},
 		},
 	}
@@ -353,7 +353,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
-	cmds.AddCommand(NewCmdOptions(out))
+	cmds.AddCommand(NewCmdOptions())
 
 	return cmds
 }

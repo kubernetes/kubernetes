@@ -286,9 +286,9 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 
 			switch editMode {
 			case NormalEditMode:
-				err = visitToPatch(infos, updatedVisitor, mapper, encoder, out, errOut, &results, file)
+				err = visitToPatch(infos, updatedVisitor, mapper, encoder, out, errOut, &results)
 			case EditBeforeCreateMode:
-				err = visitToCreate(updatedVisitor, mapper, out, errOut, &results, file)
+				err = visitToCreate(updatedVisitor, mapper, out)
 			default:
 				err = fmt.Errorf("Unsupported edit mode %q", editMode)
 			}
@@ -420,7 +420,6 @@ func visitToPatch(
 	encoder runtime.Encoder,
 	out, errOut io.Writer,
 	results *editResults,
-	file string,
 ) error {
 	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		editObjUID, err := meta.NewAccessor().UID(info.Object)
@@ -521,7 +520,7 @@ func visitToPatch(
 	return err
 }
 
-func visitToCreate(createVisitor resource.Visitor, mapper meta.RESTMapper, out, errOut io.Writer, results *editResults, file string) error {
+func visitToCreate(createVisitor resource.Visitor, mapper meta.RESTMapper, out io.Writer) error {
 	err := createVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		if err := createAndRefresh(info); err != nil {
 			return err
