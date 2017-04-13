@@ -17,6 +17,9 @@ limitations under the License.
 package nvidia
 
 import (
+	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,6 +37,52 @@ type testActivePodsLister struct {
 
 func (tapl *testActivePodsLister) GetActivePods() []*v1.Pod {
 	return tapl.activePods
+}
+
+func makeValidTestProcFile() string {
+	content := []byte("aaa\t10debbb\tccc\nddd\teee\tfff\nggg\t10dehhh\tiii\n")
+	tmpfile, err := ioutil.TempFile("", "tmp")
+	if err != nil {
+		fmt.Print(err)
+	}
+	if _, err := tmpfile.Write(content); err != nil {
+		fmt.Print(err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		fmt.Print(err)
+	}
+	devicesFile := tmpfile.Name()
+	return devicesFile
+}
+
+func makeDummyDevDir() string {
+	content := []byte("dummy content")
+	dir, err := ioutil.TempDir("", "tmpdir")
+	if err != nil {
+		fmt.Print(err)
+	}
+	fakeDevices := []string{"nvidia1", "nvidia2"}
+	for _, fileName := range fakeDevices {
+		tmpfn := filepath.Join(dir, fileName)
+		if err := ioutil.WriteFile(tmpfn, content, 0666); err != nil {
+			fmt.Print(err)
+		}
+	}
+	return dir
+}
+
+func TestDiscoverGPUS(t *testing.T) {
+	testProc := makeValidTestProcFile()
+	testDir := makeDummyDevDir()
+	foundGPUs, err := expectedGPUs(testProc)
+	as := assert.New(t)
+	as.Nil(err)
+	as.Equal(foundGPUs, 2)
+	testGpuManager := &nvidiaGPUManager{
+		allGPUs: sets.NewString(),
+	}
+	err = testGpuManager.discoverGPUs(testProc, testDir)
+	as.Nil(err)
 }
 
 func makeTestPod(numContainers, gpusPerContainer int) *v1.Pod {
@@ -69,7 +118,6 @@ func TestMultiContainerPodGPUAllocation(t *testing.T) {
 		allocated:        newPodGPUs(),
 	}
 
-	// Expect that no devices are in use.
 	gpusInUse := testGpuManager.gpusInUse()
 	as := assert.New(t)
 	as.Equal(len(gpusInUse.devices()), 0)
