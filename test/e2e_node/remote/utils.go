@@ -61,6 +61,9 @@ func setupCNI(host, workspace string) error {
 		return fmt.Errorf("failed to install cni plugin on %q: %v output: %q", host, err, output)
 	}
 
+	// The added CNI network config is not needed for kubenet. It is only
+	// used when testing the CNI network plugin, but is added in both cases
+	// for consistency and simplicity.
 	glog.V(2).Infof("Adding CNI configuration on %q", host)
 	cniConfigPath := filepath.Join(workspace, cniConfDirectory)
 	cmd = getSSHCommand(" ; ",
