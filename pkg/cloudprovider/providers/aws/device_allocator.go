@@ -16,7 +16,12 @@ limitations under the License.
 
 package aws
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+
+	"github.com/golang/glog"
+)
 
 // ExistingDevices is a map of assigned devices. Presence of a key with a device
 // name in the map means that the device is allocated. Value is irrelevant and
@@ -40,12 +45,27 @@ type DeviceAllocator interface {
 	// name. Only the device suffix is returned, e.g. "ba" for "/dev/xvdba".
 	// It's up to the called to add appropriate "/dev/sd" or "/dev/xvd" prefix.
 	GetNext(existingDevices ExistingDevices) (mountDevice, error)
+
+	// LockForUse will lock the device allocator, so as another goroutine can't use it
+	LockForUse()
+
+	// Mark for use makes last selected device as taken
+	MarkForUse()
+
+	// Unlock the device allocator
+	Unlock()
 }
 
 type deviceAllocator struct {
 	possibleDevices []mountDevice
-	lastIndex       int
+	// last index which was allocated successfully
+	lastIndex int
+	// last position from which device was chosen
+	lastPos    int
+	deviceLock sync.Mutex
 }
+
+var _ DeviceAllocator = &deviceAllocator{}
 
 // Allocates device names according to scheme ba..bz, ca..cz
 // it moves along the ring and always picks next device until
@@ -61,6 +81,7 @@ func NewDeviceAllocator(lastIndex int) DeviceAllocator {
 	return &deviceAllocator{
 		possibleDevices: possibleDevices,
 		lastIndex:       lastIndex,
+		lastPos:         lastIndex,
 	}
 }
 
@@ -70,13 +91,26 @@ func (d *deviceAllocator) GetNext(existingDevices ExistingDevices) (mountDevice,
 	for {
 		candidate, foundIndex = d.nextDevice(foundIndex + 1)
 		if _, found := existingDevices[candidate]; !found {
-			d.lastIndex = foundIndex
+			d.lastPos = foundIndex
 			return candidate, nil
 		}
 		if foundIndex == d.lastIndex {
 			return "", fmt.Errorf("no devices are available")
 		}
 	}
+}
+
+func (d *deviceAllocator) LockForUse() {
+	d.deviceLock.Lock()
+}
+
+func (d *deviceAllocator) MarkForUse() {
+	glog.V(3).Infof("AWS DeviceAllocator.MarkForUse marking device %s as taken", d.possibleDevices[d.lastPos])
+	d.lastIndex = d.lastPos
+}
+
+func (d *deviceAllocator) Unlock() {
+	d.deviceLock.Unlock()
 }
 
 func (d *deviceAllocator) nextDevice(nextIndex int) (mountDevice, int) {
