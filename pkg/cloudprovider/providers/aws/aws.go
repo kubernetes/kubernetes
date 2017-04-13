@@ -1229,8 +1229,7 @@ func (i *awsInstance) describeInstance() (*ec2.Instance, error) {
 func (c *Cloud) getMountDevice(
 	i *awsInstance,
 	info *ec2.Instance,
-	volumeID awsVolumeID,
-	assign bool) (assigned mountDevice, alreadyAttached bool, err error) {
+	volumeID awsVolumeID) (assigned mountDevice, alreadyAttached bool, err error) {
 	instanceType := i.getInstanceType()
 	if instanceType == nil {
 		return "", false, fmt.Errorf("could not get instance type for instance: %s", i.awsID)
@@ -1264,18 +1263,70 @@ func (c *Cloud) getMountDevice(
 	// Check to see if this volume is already assigned a device on this machine
 	for mountDevice, mappingVolumeID := range deviceMappings {
 		if volumeID == mappingVolumeID {
-			if assign {
-				glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountDevice, mappingVolumeID)
-			}
 			return mountDevice, true, nil
 		}
 	}
+	return mountDevice(""), false, nil
+}
 
-	if !assign {
-		return mountDevice(""), false, nil
+func (c *Cloud) attachNewDevice(i *awsInstance, info *ec2.Instance, volumeID awsVolumeID) (mountDevice, error) {
+	chosen, deviceAllocator, alreadyAttached, err := c.allocateDiskDevice(i, info, volumeID)
+	if deviceAllocator != nil {
+		defer deviceAllocator.Unlock()
 	}
 
-	// Find the next unused device name
+	if err != nil {
+		return "", err
+	}
+
+	glog.V(2).Infof("Assigned mount device %s -> volume %s", chosen, volumeID)
+	if !alreadyAttached {
+		attachResult, attachErr := c.performAwsAttach(chosen, volumeID, i)
+		if attachResult && deviceAllocator != nil {
+			deviceAllocator.MarkForUse()
+		}
+		return chosen, attachErr
+	}
+	return chosen, nil
+}
+
+// allocates new disk device on the node
+func (c *Cloud) allocateDiskDevice(i *awsInstance, info *ec2.Instance, volumeID awsVolumeID) (mountDevice, DeviceAllocator, bool, error) {
+	instanceType := i.getInstanceType()
+	if instanceType == nil {
+		return "", nil, false, fmt.Errorf("could not get instance type for instance: %s", i.awsID)
+	}
+
+	deviceMappings := map[mountDevice]awsVolumeID{}
+	for _, blockDevice := range info.BlockDeviceMappings {
+		name := aws.StringValue(blockDevice.DeviceName)
+		if strings.HasPrefix(name, "/dev/sd") {
+			name = name[7:]
+		}
+		if strings.HasPrefix(name, "/dev/xvd") {
+			name = name[8:]
+		}
+		if len(name) < 1 || len(name) > 2 {
+			glog.Warningf("Unexpected EBS DeviceName: %q", aws.StringValue(blockDevice.DeviceName))
+		}
+		deviceMappings[mountDevice(name)] = awsVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
+	}
+
+	c.attachingMutex.Lock()
+	defer c.attachingMutex.Unlock()
+	for mountDevice, volume := range c.attaching[i.nodeName] {
+		deviceMappings[mountDevice] = volume
+	}
+
+	// Check to see if this volume is already assigned a device on this machine
+	for mountDevice, mappingVolumeID := range deviceMappings {
+		if volumeID == mappingVolumeID {
+			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountDevice, mappingVolumeID)
+			return mountDevice, nil, true, nil
+		}
+	}
+
+	// Get device allocator
 	deviceAllocator := c.deviceAllocators[i.nodeName]
 	if deviceAllocator == nil {
 		// we want device names with two significant characters, starting with /dev/xvdbb
@@ -1284,10 +1335,11 @@ func (c *Cloud) getMountDevice(
 		deviceAllocator = NewDeviceAllocator(0)
 		c.deviceAllocators[i.nodeName] = deviceAllocator
 	}
+	deviceAllocator.LockForUse()
 	chosen, err := deviceAllocator.GetNext(deviceMappings)
 	if err != nil {
 		glog.Warningf("Could not assign a mount device.  mappings=%v, error: %v", deviceMappings, err)
-		return "", false, fmt.Errorf("Too many EBS volumes attached to node %s.", i.nodeName)
+		return "", deviceAllocator, false, fmt.Errorf("Too many EBS volumes attached to node %s.", i.nodeName)
 	}
 
 	attaching := c.attaching[i.nodeName]
@@ -1296,9 +1348,29 @@ func (c *Cloud) getMountDevice(
 		c.attaching[i.nodeName] = attaching
 	}
 	attaching[chosen] = volumeID
-	glog.V(2).Infof("Assigned mount device %s -> volume %s", chosen, volumeID)
+	return chosen, deviceAllocator, false, nil
+}
 
-	return chosen, false, nil
+// performAwsAttach actually performs attach on AWS. This must be called with a lock so as we don't munge on
+// device names
+func (c *Cloud) performAwsAttach(chosen mountDevice, volumeID awsVolumeID, i *awsInstance) (bool, error) {
+	// We are using xvd names (so we are HVM only)
+	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
+	ec2Device := "/dev/xvd" + string(chosen)
+
+	request := &ec2.AttachVolumeInput{
+		Device:     aws.String(ec2Device),
+		InstanceId: aws.String(i.awsID),
+		VolumeId:   volumeID.awsString(),
+	}
+
+	attachResponse, err := c.ec2.AttachVolume(request)
+	if err != nil {
+		return false, fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", volumeID, i.awsID, err)
+	}
+
+	glog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", volumeID, i.awsID, attachResponse)
+	return true, nil
 }
 
 // endAttaching removes the entry from the "attachments in progress" map
@@ -1506,8 +1578,6 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 
 	// mountDevice will hold the device where we should try to attach the disk
 	var mountDevice mountDevice
-	// alreadyAttached is true if we have already called AttachVolume on this disk
-	var alreadyAttached bool
 
 	// attachEnded is set to true if the attach operation completed
 	// (successfully or not), and is thus no longer in progress
@@ -1520,8 +1590,9 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 		}
 	}()
 
-	mountDevice, alreadyAttached, err = c.getMountDevice(awsInstance, info, disk.awsID, true)
+	mountDevice, err = c.attachNewDevice(awsInstance, info, disk.awsID)
 	if err != nil {
+		attachEnded = true
 		return "", err
 	}
 
@@ -1531,28 +1602,10 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
 	ec2Device := "/dev/xvd" + string(mountDevice)
 
-	if !alreadyAttached {
-		request := &ec2.AttachVolumeInput{
-			Device:     aws.String(ec2Device),
-			InstanceId: aws.String(awsInstance.awsID),
-			VolumeId:   disk.awsID.awsString(),
-		}
-
-		attachResponse, err := c.ec2.AttachVolume(request)
-		if err != nil {
-			attachEnded = true
-			// TODO: Check if the volume was concurrently attached?
-			return "", fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", disk.awsID, awsInstance.awsID, err)
-		}
-
-		glog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", disk.awsID, awsInstance.awsID, attachResponse)
-	}
-
 	attachment, err := disk.waitForAttachmentStatus("attached")
 	if err != nil {
 		return "", err
 	}
-
 	// The attach operation has finished
 	attachEnded = true
 
@@ -1594,7 +1647,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		return "", err
 	}
 
-	mountDevice, alreadyAttached, err := c.getMountDevice(awsInstance, info, disk.awsID, false)
+	mountDevice, alreadyAttached, err := c.getMountDevice(awsInstance, info, disk.awsID)
 	if err != nil {
 		return "", err
 	}
