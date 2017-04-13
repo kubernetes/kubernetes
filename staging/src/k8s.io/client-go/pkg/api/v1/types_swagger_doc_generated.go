@@ -905,6 +905,15 @@ func (NodeProxyOptions) SwaggerDoc() map[string]string {
 	return map_NodeProxyOptions
 }
 
+var map_NodeResources = map[string]string{
+	"":         "NodeResources is an object for conveying resource information about a node. see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.",
+	"Capacity": "Capacity represents the available resources of a node",
+}
+
+func (NodeResources) SwaggerDoc() map[string]string {
+	return map_NodeResources
+}
+
 var map_NodeSelector = map[string]string{
 	"":                  "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
 	"nodeSelectorTerms": "Required. A list of node selector terms. The terms are ORed.",
@@ -1838,6 +1847,16 @@ var map_ServiceStatus = map[string]string{
 
 func (ServiceStatus) SwaggerDoc() map[string]string {
 	return map_ServiceStatus
+}
+
+var map_Sysctl = map[string]string{
+	"":      "Sysctl defines a kernel parameter to be set",
+	"Name":  "Name of a property to set",
+	"Value": "Value of a property to set",
+}
+
+func (Sysctl) SwaggerDoc() map[string]string {
+	return map_Sysctl
 }
 
 var map_TCPSocketAction = map[string]string{

@@ -37,6 +37,7 @@ go_library(
         "//cmd/kubelet/app/options:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/validation:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",

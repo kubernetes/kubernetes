@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
@@ -71,8 +72,8 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.Pe
 }
 
 var (
-	opaqueResourceA = v1.OpaqueIntResourceName("AAA")
-	opaqueResourceB = v1.OpaqueIntResourceName("BBB")
+	opaqueResourceA = v1helper.OpaqueIntResourceName("AAA")
+	opaqueResourceB = v1helper.OpaqueIntResourceName("BBB")
 )
 
 func makeResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA int64) v1.NodeResources {
@@ -4686,7 +4687,7 @@ func TestInterPodAffinityAnnotationsWithMultipleNodes(t *testing.T) {
 			if !fits && !reflect.DeepEqual(reasons, affinityExpectedFailureReasons) {
 				t.Errorf("%s: unexpected failure reasons: %v", test.test, reasons)
 			}
-			affinity, err := v1.GetAffinityFromPodAnnotations(test.pod.ObjectMeta.Annotations)
+			affinity, err := v1helper.GetAffinityFromPodAnnotations(test.pod.ObjectMeta.Annotations)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", test.test, err)
 			}

@@ -19,6 +19,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/helper:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
@@ -43,6 +44,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/helper:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//plugin/pkg/scheduler/testing:go_default_library",
