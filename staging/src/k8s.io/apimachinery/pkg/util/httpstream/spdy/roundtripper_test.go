@@ -20,10 +20,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/elazarl/goproxy"
@@ -373,6 +376,102 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 		if proxyCalledWithAuthHeader != expectedProxyAuth {
 			t.Fatalf("%s: Expected to see a call to the proxy with credentials %q, got %q", k, testCase.proxyAuth, proxyCalledWithAuthHeader)
 		}
+	}
+}
+
+func TestRoundTripRedirects(t *testing.T) {
+	tests := []struct {
+		redirects     int32
+		expectSuccess bool
+	}{
+		{0, true},
+		{1, true},
+		{10, true},
+		{11, false},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("with %d redirects", test.redirects), func(t *testing.T) {
+			var redirects int32 = 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if redirects < test.redirects {
+					redirects = atomic.AddInt32(&redirects, 1)
+					http.Redirect(w, req, "redirect", http.StatusFound)
+					return
+				}
+				streamCh := make(chan httpstream.Stream)
+
+				responseUpgrader := NewResponseUpgrader()
+				spdyConn := responseUpgrader.UpgradeResponse(w, req, func(s httpstream.Stream, replySent <-chan struct{}) error {
+					streamCh <- s
+					return nil
+				})
+				if spdyConn == nil {
+					t.Fatalf("unexpected nil spdyConn")
+				}
+				defer spdyConn.Close()
+
+				stream := <-streamCh
+				io.Copy(stream, stream)
+			}))
+			defer server.Close()
+
+			req, err := http.NewRequest("GET", server.URL, nil)
+			if err != nil {
+				t.Fatalf("Error creating request: %s", err)
+			}
+
+			spdyTransport := NewSpdyRoundTripper(nil)
+			client := &http.Client{Transport: spdyTransport}
+
+			resp, err := client.Do(req)
+			if test.expectSuccess {
+				if err != nil {
+					t.Fatalf("error calling Do: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Fatalf("expecting an error")
+				} else if !strings.Contains(err.Error(), "too many redirects") {
+					t.Fatalf("expecting too many redirects, got %v", err)
+				}
+				return
+			}
+
+			conn, err := spdyTransport.NewConnection(resp)
+			if err != nil {
+				t.Fatalf("error calling NewConnection: %v", err)
+			}
+			defer conn.Close()
+
+			if resp.StatusCode != http.StatusSwitchingProtocols {
+				t.Fatalf("expected http 101 switching protocols, got %d", resp.StatusCode)
+			}
+
+			stream, err := conn.CreateStream(http.Header{})
+			if err != nil {
+				t.Fatalf("error creating client stream: %s", err)
+			}
+
+			n, err := stream.Write([]byte("hello"))
+			if err != nil {
+				t.Fatalf("error writing to stream: %s", err)
+			}
+			if n != 5 {
+				t.Fatalf("Expected to write 5 bytes, but actually wrote %d", n)
+			}
+
+			b := make([]byte, 5)
+			n, err = stream.Read(b)
+			if err != nil {
+				t.Fatalf("error reading from stream: %s", err)
+			}
+			if n != 5 {
+				t.Fatalf("Expected to read 5 bytes, but actually read %d", n)
+			}
+			if e, a := "hello", string(b[0:n]); e != a {
+				t.Fatalf("expected '%s', got '%s'", e, a)
+			}
+		})
 	}
 }
 
