@@ -233,6 +233,7 @@ type CronJobSpec struct {
 	StartingDeadlineSeconds *int64
 
 	// ConcurrencyPolicy specifies how to treat concurrent executions of a Job.
+	// Defaults to Allow.
 	// +optional
 	ConcurrencyPolicy ConcurrencyPolicy
 

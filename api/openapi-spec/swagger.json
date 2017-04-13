@@ -43326,7 +43326,7 @@
     ],
     "properties": {
      "concurrencyPolicy": {
-      "description": "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
+      "description": "ConcurrencyPolicy specifies how to treat concurrent executions of a Job. Defaults to Allow.",
       "type": "string"
      },
      "failedJobsHistoryLimit": {
