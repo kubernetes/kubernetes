@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package editor
+package cmdtools
 
 import (
 	"fmt"
@@ -41,24 +41,32 @@ const (
 	defaultShell  = "/bin/bash"
 	windowsEditor = "notepad"
 	windowsShell  = "cmd"
+
+	//for diff command
+	gitDiff = "git diff --no-index"
+	defaultDiff = "diff"
 )
 
-type Editor struct {
+// CmdTools include
+// editor and difftools
+type CmdTool struct {
+	Name  string
 	Args  []string
 	Shell bool
 }
 
-// NewDefaultEditor creates a struct Editor that uses the OS environment to
+// NewDefaultCmdTool creates a struct Editor that uses the OS environment to
 // locate the editor program, looking at EDITOR environment variable to find
 // the proper command line. If the provided editor has no spaces, or no quotes,
 // it is treated as a bare command to be loaded. Otherwise, the string will
 // be passed to the user's shell for execution.
-func NewDefaultEditor(envs []string) Editor {
-	args, shell := defaultEnvEditor(envs)
-	return Editor{
-		Args:  args,
-		Shell: shell,
-	}
+func NewDefaultCmdTool(name string, envs []string) CmdTool {
+		args, shell := defaultEnv(name, envs)
+		return CmdTool{
+			Name:  name,
+			Args:  args,
+			Shell: shell,
+		}
 }
 
 func defaultEnvShell() []string {
@@ -73,34 +81,40 @@ func defaultEnvShell() []string {
 	return []string{shell, flag}
 }
 
-func defaultEnvEditor(envs []string) ([]string, bool) {
-	var editor string
+func defaultEnv(cmdName string, envs []string) ([]string, bool) {
+	var cmd string
 	for _, env := range envs {
 		if len(env) > 0 {
-			editor = os.Getenv(env)
+			cmd = os.Getenv(env)
 		}
-		if len(editor) > 0 {
+		if len(cmd) > 0 {
 			break
 		}
 	}
-	if len(editor) == 0 {
-		editor = platformize(defaultEditor, windowsEditor)
+	if len(cmd) == 0 {
+		switch cmdName {
+		case "editor":
+			cmd = platformize(defaultEditor, windowsEditor)
+		case "diff":
+			cmd = checkGitDiffInstalled(gitDiff, defaultDiff)
+		}
 	}
-	if !strings.Contains(editor, " ") {
-		return []string{editor}, false
+
+	if !strings.Contains(cmd, " ") {
+		return []string{cmd}, false
 	}
-	if !strings.ContainsAny(editor, "\"'\\") {
-		return strings.Split(editor, " "), false
+	if !strings.ContainsAny(cmd, "\"'\\") {
+		return strings.Split(cmd, " "), false
 	}
 	// rather than parse the shell arguments ourselves, punt to the shell
 	shell := defaultEnvShell()
-	return append(shell, editor), true
+	return append(shell, cmd), true
 }
 
-func (e Editor) args(path string) []string {
-	args := make([]string, len(e.Args))
-	copy(args, e.Args)
-	if e.Shell {
+func (t CmdTool) args(path string) []string {
+	args := make([]string, len(t.Args))
+	copy(args, t.Args)
+	if t.Shell {
 		last := args[len(args)-1]
 		args[len(args)-1] = fmt.Sprintf("%s %q", last, path)
 	} else {
@@ -111,15 +125,18 @@ func (e Editor) args(path string) []string {
 
 // Launch opens the described or returns an error. The TTY will be protected, and
 // SIGQUIT, SIGTERM, and SIGINT will all be trapped.
-func (e Editor) Launch(path string) error {
-	if len(e.Args) == 0 {
-		return fmt.Errorf("no editor defined, can't open %s", path)
+func (t CmdTool) Launch(paths []string) error {
+	var args []string
+	if len(t.Args) == 0 {
+		return fmt.Errorf("no %s defined, can't open %s",t.Name, paths[0])
 	}
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return err
+	for _, path := range paths {
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			return err
+		}
+		args = t.args(abs)
 	}
-	args := e.args(abs)
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -128,36 +145,59 @@ func (e Editor) Launch(path string) error {
 	if err := (term.TTY{In: os.Stdin, TryDev: true}).Safe(cmd.Run); err != nil {
 		if err, ok := err.(*exec.Error); ok {
 			if err.Err == exec.ErrNotFound {
-				return fmt.Errorf("unable to launch the editor %q", strings.Join(e.Args, " "))
+				return fmt.Errorf("unable to launch the editor %q", strings.Join(t.Args, " "))
 			}
 		}
-		return fmt.Errorf("there was a problem with the editor %q", strings.Join(e.Args, " "))
+		return fmt.Errorf("there was a problem with the editor %q", strings.Join(t.Args, " "))
 	}
 	return nil
 }
 
-// LaunchTempFile reads the provided stream into a temporary file in the given directory
+// LaunchTempFile reads the provided stream into one or two temporary file in the given directory
 // and file prefix, and then invokes Launch with the path of that file. It will return
-// the contents of the file after launch, any errors that occur, and the path of the
+// the contents of the first file after launch, any errors that occur, and the path of the
 // temporary file so the caller can clean it up as needed.
-func (e Editor) LaunchTempFile(prefix, suffix string, r io.Reader) ([]byte, string, error) {
-	f, err := tempFile(prefix, suffix)
+func (t CmdTool) LaunchTempFile(prefix, suffix string, r1, r2 io.Reader) ([]byte, string, error) {
+	var paths []string
+
+	path, err := prepareTempFile(prefix, suffix, r1)
 	if err != nil {
 		return nil, "", err
+	}
+	paths = append(paths, path)
+
+	//diff cmd should prepare two files
+	if t.Name == "diff" {
+		path, err = prepareTempFile(prefix+"diff", suffix, r2)
+		if err != nil {
+			return nil, "", err
+		}
+		paths = append(paths, path)
+	}
+
+	if err := t.Launch(paths); err != nil {
+		return nil, path, err
+	}
+
+	//edit cmd should return the first file's content
+	bytes, err := ioutil.ReadFile(paths[0])
+	return bytes, path, err
+}
+
+func prepareTempFile(prefix, suffix string, r io.Reader) (string, error) {
+	f, err := tempFile(prefix, suffix)
+	if err != nil {
+		return "", err
 	}
 	defer f.Close()
 	path := f.Name()
 	if _, err := io.Copy(f, r); err != nil {
 		os.Remove(path)
-		return nil, path, err
+		return "", err
 	}
 	// This file descriptor needs to close so the next process (Launch) can claim it.
 	f.Close()
-	if err := e.Launch(path); err != nil {
-		return nil, path, err
-	}
-	bytes, err := ioutil.ReadFile(path)
-	return bytes, path, err
+	return path, nil
 }
 
 func tempFile(prefix, suffix string) (f *os.File, err error) {
@@ -189,4 +229,13 @@ func platformize(linux, windows string) string {
 		return windows
 	}
 	return linux
+}
+
+func checkGitDiffInstalled(gitdiff, diff string) string {
+	cmd := exec.Command("git", "version")
+	err := cmd.Run()
+	if err != nil {
+		return diff
+	}
+	return gitdiff
 }
