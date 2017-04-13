@@ -94,18 +94,19 @@ type PersistentVolumeClaimConfig struct {
 // Note: delete errors are appended to []error so that we can attempt to delete both the pvc and pv.
 func PVPVCCleanup(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) []error {
 	var errs []error
-	var err error
 
 	if pvc != nil {
-		if err = DeletePersistentVolumeClaim(c, pvc.Name, ns); err != nil {
-			errs = append(errs, fmt.Errorf("Failed to delete PVC %q. Error: %v", pvc.Name, err))
+		err := DeletePersistentVolumeClaim(c, pvc.Name, ns)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to delete PVC %q: %v", pvc.Name, err))
 		}
 	} else {
 		Logf("pvc is nil")
 	}
 	if pv != nil {
-		if err = DeletePersistentVolume(c, pv.Name); err != nil {
-			errs = append(errs, fmt.Errorf("Failed to delete PV %q. Error: %v", pv.Name, err))
+		err := DeletePersistentVolume(c, pv.Name)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to delete PV %q: %v", pv.Name, err))
 		}
 	} else {
 		Logf("pv is nil")
@@ -118,19 +119,20 @@ func PVPVCCleanup(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc
 // Note: delete errors are appended to []error so that as many pvcs and pvs as possible are deleted.
 func PVPVCMapCleanup(c clientset.Interface, ns string, pvols PVMap, claims PVCMap) []error {
 	var errs []error
-	var err error
 
 	for pvcKey := range claims {
-		if err = DeletePersistentVolumeClaim(c, pvcKey.Name, ns); err != nil {
-			errs = append(errs, fmt.Errorf("Failed to delete PVC %q. Error: %v", pvcKey.Name, err))
+		err := DeletePersistentVolumeClaim(c, pvcKey.Name, ns)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to delete PVC %q: %v", pvcKey.Name, err))
 		} else {
 			delete(claims, pvcKey)
 		}
 	}
 
 	for pvKey := range pvols {
-		if err = DeletePersistentVolume(c, pvKey); err != nil {
-			errs = append(errs, fmt.Errorf("Failed to delete PV %q: %v", pvKey, err))
+		err := DeletePersistentVolume(c, pvKey)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to delete PV %q: %v", pvKey, err))
 		} else {
 			delete(pvols, pvKey)
 		}
@@ -166,22 +168,23 @@ func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns strin
 // has been reclaimed (assumption here about reclaimPolicy). Caller tells this func which
 // phase value to expect for the pv bound to the to-be-deleted claim.
 func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, expectPVPhase v1.PersistentVolumePhase) error {
-	var err error
-
 	pvname := pvc.Spec.VolumeName
 	Logf("Deleting PVC %v to trigger reclamation of PV %v", pvc.Name, pvname)
-	if err = DeletePersistentVolumeClaim(c, pvc.Name, ns); err != nil {
+	err := DeletePersistentVolumeClaim(c, pvc.Name, ns)
+	if err != nil {
 		return err
 	}
 
 	// Wait for the PV's phase to return to be `expectPVPhase`
 	Logf("Waiting for reclaim process to complete.")
-	if err = WaitForPersistentVolumePhase(expectPVPhase, c, pv.Name, 1*time.Second, 300*time.Second); err != nil {
+	err = WaitForPersistentVolumePhase(expectPVPhase, c, pv.Name, 1*time.Second, 300*time.Second)
+	if err != nil {
 		return fmt.Errorf("pv %q phase did not become %v: %v", pv.Name, expectPVPhase, err)
 	}
 
 	// examine the pv's ClaimRef and UID and compare to expected values
-	if pv, err = c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{}); err != nil {
+	pv, err = c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+	if err != nil {
 		return fmt.Errorf("PV Get API error: %v", err)
 	}
 	cr := pv.Spec.ClaimRef
@@ -241,7 +244,7 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, 
 		}
 	}
 	if boundPVs != deletedPVCs {
-		return fmt.Errorf("Expect number of bound PVs (%v) to equal number of deleted PVCs (%v)", boundPVs, deletedPVCs)
+		return fmt.Errorf("expect number of bound PVs (%v) to equal number of deleted PVCs (%v)", boundPVs, deletedPVCs)
 	}
 	return nil
 }
@@ -271,11 +274,9 @@ func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) 
 //   known until after the PVC is instantiated. This is why the pvc is created
 //   before the pv.
 func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
-	var preBindMsg string
-	var err error
-
-	// make the pvc definition first
+	// make the pvc spec
 	pvc := MakePersistentVolumeClaim(pvcConfig, ns)
+	preBindMsg := ""
 	if preBind {
 		preBindMsg = " pre-bound"
 		pvConfig.Prebind = pvc
@@ -284,8 +285,8 @@ func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 	pv := MakePersistentVolume(pvConfig)
 
 	By(fmt.Sprintf("Creating a PVC followed by a%s PV", preBindMsg))
-	// instantiate the pvc
-	if pvc, err = CreatePVC(c, ns, pvc); err != nil {
+	pvc, err := CreatePVC(c, ns, pvc)
+	if err != nil {
 		return nil, nil, err
 	}
 
@@ -293,7 +294,8 @@ func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 	if preBind {
 		pv.Spec.ClaimRef.Name = pvc.Name
 	}
-	if pv, err = createPV(c, pv); err != nil {
+	pv, err = createPV(c, pv)
+	if err != nil {
 		return nil, pvc, err
 	}
 	return pv, pvc, nil
@@ -341,15 +343,10 @@ func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 // Note: when the test suite deletes the namespace orphaned pvcs and pods are deleted. However,
 //   orphaned pvs are not deleted and will remain after the suite completes.
 func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig) (PVMap, PVCMap, error) {
-	var (
-		extraPVs, extraPVCs int
-		pv                  *v1.PersistentVolume
-		pvc                 *v1.PersistentVolumeClaim
-		err                 error
-	)
 	pvMap := make(PVMap, numpvs)
 	pvcMap := make(PVCMap, numpvcs)
-	extraPVs = numpvs - numpvcs
+	extraPVCs := 0
+	extraPVs := numpvs - numpvcs
 	if extraPVs < 0 {
 		extraPVCs = -extraPVs
 		extraPVs = 0
@@ -358,7 +355,8 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 
 	// create pvs and pvcs
 	for i := 0; i < pvsToCreate; i++ {
-		if pv, pvc, err = CreatePVPVC(c, pvConfig, pvcConfig, ns, false); err != nil {
+		pv, pvc, err := CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
+		if err != nil {
 			return pvMap, pvcMap, err
 		}
 		pvMap[pv.Name] = pvval{}
@@ -367,15 +365,17 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 
 	// create extra pvs or pvcs as needed
 	for i := 0; i < extraPVs; i++ {
-		pv = MakePersistentVolume(pvConfig)
-		if pv, err = createPV(c, pv); err != nil {
+		pv := MakePersistentVolume(pvConfig)
+		pv, err := createPV(c, pv)
+		if err != nil {
 			return pvMap, pvcMap, err
 		}
 		pvMap[pv.Name] = pvval{}
 	}
 	for i := 0; i < extraPVCs; i++ {
-		pvc = MakePersistentVolumeClaim(pvcConfig, ns)
-		if pvc, err = CreatePVC(c, ns, pvc); err != nil {
+		pvc := MakePersistentVolumeClaim(pvcConfig, ns)
+		pvc, err := CreatePVC(c, ns, pvc)
+		if err != nil {
 			return pvMap, pvcMap, err
 		}
 		pvcMap[makePvcKey(ns, pvc.Name)] = pvcval{}
@@ -385,25 +385,27 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 
 // Wait for the pv and pvc to bind to each other.
 func WaitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) error {
-	var err error
-
 	// Wait for newly created PVC to bind to the PV
 	Logf("Waiting for PV %v to bind to PVC %v", pv.Name, pvc.Name)
-	if err = WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 3*time.Second, 300*time.Second); err != nil {
+	err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 3*time.Second, 300*time.Second)
+	if err != nil {
 		return fmt.Errorf("PVC %q did not become Bound: %v", pvc.Name, err)
 	}
 
 	// Wait for PersistentVolume.Status.Phase to be Bound, which it should be
 	// since the PVC is already bound.
-	if err = WaitForPersistentVolumePhase(v1.VolumeBound, c, pv.Name, 3*time.Second, 300*time.Second); err != nil {
+	err = WaitForPersistentVolumePhase(v1.VolumeBound, c, pv.Name, 3*time.Second, 300*time.Second)
+	if err != nil {
 		return fmt.Errorf("PV %q did not become Bound: %v", pv.Name, err)
 	}
 
 	// Re-get the pv and pvc objects
-	if pv, err = c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{}); err != nil {
+	pv, err = c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+	if err != nil {
 		return fmt.Errorf("PV Get API error: %v", err)
 	}
-	if pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{}); err != nil {
+	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
+	if err != nil {
 		return fmt.Errorf("PVC Get API error: %v", err)
 	}
 
@@ -421,7 +423,6 @@ func WaitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, p
 	if pv.Spec.ClaimRef.UID != pvc.UID {
 		return fmt.Errorf("PV %q ClaimRef's UID (%q) should be %q", pv.Name, pv.Spec.ClaimRef.UID, pvc.UID)
 	}
-
 	return nil
 }
 
@@ -432,7 +433,6 @@ func WaitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, p
 //   extending test time. Thus, it is recommended to keep the delta between PVs and PVCs
 //   small.
 func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PVCMap, testExpected bool) error {
-	var err error
 	var actualBinds int
 	expectedBinds := len(pvols)
 	if expectedBinds > len(claims) { // want the min of # pvs or #pvcs
@@ -440,7 +440,7 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 	}
 
 	for pvName := range pvols {
-		err = WaitForPersistentVolumePhase(v1.VolumeBound, c, pvName, 3*time.Second, 180*time.Second)
+		err := WaitForPersistentVolumePhase(v1.VolumeBound, c, pvName, 3*time.Second, 180*time.Second)
 		if err != nil && len(pvols) > len(claims) {
 			Logf("WARN: pv %v is not bound after max wait", pvName)
 			Logf("      This may be ok since there are more pvs than pvcs")
@@ -463,7 +463,8 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 				return fmt.Errorf("internal: claims map is missing pvc %q", pvcKey)
 			}
 
-			if err = WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, cr.Name, 3*time.Second, 180*time.Second); err != nil {
+			err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, cr.Name, 3*time.Second, 180*time.Second)
+			if err != nil {
 				return fmt.Errorf("PVC %q did not become Bound: %v", cr.Name, err)
 			}
 			actualBinds++
@@ -471,7 +472,7 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 	}
 
 	if testExpected && actualBinds != expectedBinds {
-		return fmt.Errorf("Expect number of bound PVs (%v) to equal number of claims (%v)", actualBinds, expectedBinds)
+		return fmt.Errorf("expect number of bound PVs (%v) to equal number of claims (%v)", actualBinds, expectedBinds)
 	}
 	return nil
 }
@@ -498,7 +499,7 @@ func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) error {
 		if apierrs.IsNotFound(err) {
 			return nil // assume pod was deleted already
 		}
-		return fmt.Errorf("Pod Get API error: %v", err)
+		return fmt.Errorf("pod Get API error: %v", err)
 	}
 
 	// wait for pod to terminate
@@ -520,7 +521,7 @@ func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, pvc 
 	pod := MakeWritePod(ns, pvc)
 	runPod, err := c.CoreV1().Pods(ns).Create(pod)
 	if err != nil {
-		return fmt.Errorf("Pod Create API error: %v", err)
+		return fmt.Errorf("pod Create API error: %v", err)
 	}
 	defer func() {
 		delErr := DeletePodWithWait(f, c, runPod)
@@ -531,21 +532,20 @@ func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, pvc 
 
 	err = testPodSuccessOrFail(c, ns, runPod)
 	if err != nil {
-		return fmt.Errorf("Pod %q did not exit with Success: %v", runPod.Name, err)
+		return fmt.Errorf("pod %q did not exit with Success: %v", runPod.Name, err)
 	}
 	return // note: named return value
 }
 
 // Sanity check for GCE testing.  Verify the persistent disk attached to the node.
 func VerifyGCEDiskAttached(diskName string, nodeName types.NodeName) (bool, error) {
-	var err error
-	var isAttached bool
 	gceCloud, err := GetGCECloud()
 	if err != nil {
 		return false, fmt.Errorf("GetGCECloud error: %v", err)
 	}
-	if isAttached, err = gceCloud.DiskIsAttached(diskName, nodeName); err != nil {
-		return false, fmt.Errorf("Cannot verify if GCE disk is attached: %v", err)
+	isAttached, err := gceCloud.DiskIsAttached(diskName, nodeName)
+	if err != nil {
+		return false, fmt.Errorf("cannot verify if GCE disk is attached: %v", err)
 	}
 	return isAttached, nil
 }
@@ -558,14 +558,11 @@ func makePvcKey(ns, name string) types.NamespacedName {
 // Returns a PV definition based on the nfs server IP. If the PVC is not nil
 // then the PV is defined with a ClaimRef which includes the PVC's namespace.
 // If the PVC is nil then the PV is not defined with a ClaimRef.  If no reclaimPolicy
-// is assigned, assumes "Retain".
-// Note: the passed-in claim does not have a name until it is created
-//   (instantiated) and thus the PV's ClaimRef cannot be completely filled-in in
-//   this func. Therefore, the ClaimRef's name is added later in
-//   createPVCPV.
+// is assigned, assumes "Retain". Specs are expected to match the test's PVC.
+// Note: the passed-in claim does not have a name until it is created and thus the PV's
+//   ClaimRef cannot be completely filled-in in this func. Therefore, the ClaimRef's name
+//   is added later in createPVCPV.
 func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume {
-	// Specs are expected to match the test's PersistentVolumeClaim
-
 	var claimRef *v1.ObjectReference
 	// If the reclaimPolicy is not provided, assume Retain
 	if pvConfig.ReclaimPolicy == "" {
@@ -633,33 +630,31 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 }
 
 func CreatePDWithRetry() (string, error) {
-	newDiskName := ""
 	var err error
 	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
-		if newDiskName, err = createPD(); err != nil {
-			Logf("Couldn't create a new PD. Sleeping 5 seconds (%v)", err)
+		newDiskName, err := createPD()
+		if err != nil {
+			Logf("Couldn't create a new PD, sleeping 5 seconds: %v", err)
 			continue
 		}
 		Logf("Successfully created a new PD: %q.", newDiskName)
-		break
+		return newDiskName, nil
 	}
-	return newDiskName, err
+	return "", err
 }
 
 func DeletePDWithRetry(diskName string) error {
 	var err error
 	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
-		if err = deletePD(diskName); err != nil {
-			Logf("Couldn't delete PD %q. Sleeping %v: %v", diskName, PDRetryPollTime, err)
+		err = deletePD(diskName)
+		if err != nil {
+			Logf("Couldn't delete PD %q, sleeping %v: %v", diskName, PDRetryPollTime, err)
 			continue
 		}
 		Logf("Successfully deleted PD %q.", diskName)
-		break
+		return nil
 	}
-	if err != nil {
-		return fmt.Errorf("unable to delete PD %q: %v", diskName, err)
-	}
-	return nil
+	return fmt.Errorf("unable to delete PD %q: %v", diskName, err)
 }
 
 func createPD() (string, error) {
@@ -695,7 +690,7 @@ func createPD() (string, error) {
 		volumeName := "aws://" + az + "/" + awsID
 		return volumeName, nil
 	} else {
-		return "", fmt.Errorf("Provider does not support volume creation")
+		return "", fmt.Errorf("provider does not support volume creation")
 	}
 }
 
@@ -714,7 +709,7 @@ func deletePD(pdName string) error {
 				return nil
 			}
 
-			Logf("Error deleting PD %q: %v", pdName, err)
+			Logf("error deleting PD %q: %v", pdName, err)
 		}
 		return err
 	} else if TestContext.Provider == "aws" {
@@ -727,14 +722,14 @@ func deletePD(pdName string) error {
 		_, err := client.DeleteVolume(request)
 		if err != nil {
 			if awsError, ok := err.(awserr.Error); ok && awsError.Code() == "InvalidVolume.NotFound" {
-				Logf("Volume deletion implicitly succeeded because volume %q does not exist.", pdName)
+				Logf("volume deletion implicitly succeeded because volume %q does not exist.", pdName)
 			} else {
 				return fmt.Errorf("error deleting EBS volumes: %v", err)
 			}
 		}
 		return nil
 	} else {
-		return fmt.Errorf("Provider does not support volume deletion")
+		return fmt.Errorf("provider does not support volume deletion")
 	}
 }
 
@@ -788,18 +783,20 @@ func MakePod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool,
 
 // create pod with given claims
 func CreatePod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
-	var err error
 	pod := MakePod(namespace, pvclaims, isPrivileged, command)
-	if pod, err = client.CoreV1().Pods(namespace).Create(pod); err != nil {
-		return nil, fmt.Errorf("Pod Create API error: %v", err)
+	pod, err := client.CoreV1().Pods(namespace).Create(pod)
+	if err != nil {
+		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}
 	// Waiting for pod to be running
-	if err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace); err != nil {
+	err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
+	if err != nil {
 		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
 	}
 	// get fresh pod info
-	if pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
-		return pod, fmt.Errorf("Pod Get API error: %v", err)
+	pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+	if err != nil {
+		return pod, fmt.Errorf("pod Get API error: %v", err)
 	}
 	return pod, nil
 }
@@ -811,19 +808,21 @@ func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeC
 
 // wait until all pvcs phase set to bound
 func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim) ([]*v1.PersistentVolume, error) {
-	var err error
-	var persistentvolumes = make([]*v1.PersistentVolume, len(pvclaims))
+	persistentvolumes := make([]*v1.PersistentVolume, len(pvclaims))
 
 	for index, claim := range pvclaims {
-		if err = WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, Poll, ClaimProvisionTimeout); err != nil {
+		err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, Poll, ClaimProvisionTimeout)
+		if err != nil {
 			return persistentvolumes, err
 		}
 		// Get new copy of the claim
-		if claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{}); err != nil {
+		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		if err != nil {
 			return persistentvolumes, fmt.Errorf("PVC Get API error: %v", err)
 		}
 		// Get the bounded PV
-		if persistentvolumes[index], err = client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{}); err != nil {
+		persistentvolumes[index], err = client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+		if err != nil {
 			return persistentvolumes, fmt.Errorf("PV Get API error: %v", err)
 		}
 	}

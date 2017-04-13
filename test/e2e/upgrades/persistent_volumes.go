@@ -53,8 +53,7 @@ func (t *PersistentVolumeUpgradeTest) createGCEVolume() *v1.PersistentVolumeSour
 	}
 }
 func (t *PersistentVolumeUpgradeTest) deleteGCEVolume(pvSource *v1.PersistentVolumeSource) error {
-	err := framework.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
-	return err
+	return framework.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
 }
 
 // Setup creates a pv and then verifies that a pod can consume it.  The pod writes data to the volume.
