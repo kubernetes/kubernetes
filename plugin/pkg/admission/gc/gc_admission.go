@@ -76,13 +76,18 @@ func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (err e
 	// the _OWNER_
 	newBlockingRefs := newBlockingOwnerDeletionRefs(attributes.GetObject(), attributes.GetOldObject())
 	for _, ref := range newBlockingRefs {
-		attribute, err := a.ownerRefToDeleteAttribute(ref, attributes)
+		records, err := a.ownerRefToDeleteAttributeRecords(ref, attributes)
 		if err != nil {
 			return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion in this case because cannot find RESTMapping for APIVersion %s Kind %s: %v, %v", ref.APIVersion, ref.Kind, reason, err))
 		}
-		allowed, reason, err := a.authorizer.Authorize(attribute)
-		if !allowed {
-			return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't delete: %v, %v", reason, err))
+		// Multiple records are returned if ref.Kind could map to multiple
+		// resources. User needs to have delete permission on all the
+		// matched Resources.
+		for _, record := range records {
+			allowed, reason, err := a.authorizer.Authorize(record)
+			if !allowed {
+				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't delete: %v, %v", reason, err))
+			}
 		}
 	}
 
@@ -121,28 +126,34 @@ func isChangingOwnerReference(newObj, oldObj runtime.Object) bool {
 	return false
 }
 
-// translates ref to a DeleteAttribute deleting the object referred by the ref.
-func (a *gcPermissionsEnforcement) ownerRefToDeleteAttribute(ref metav1.OwnerReference, attributes admission.Attributes) (authorizer.AttributesRecord, error) {
+// Translates ref to a DeleteAttribute deleting the object referred by the ref.
+// OwnerReference only records the object kind, which might map to multiple
+// resources, so multiple DeleteAttribute might be returned.
+func (a *gcPermissionsEnforcement) ownerRefToDeleteAttributeRecords(ref metav1.OwnerReference, attributes admission.Attributes) ([]authorizer.AttributesRecord, error) {
+	var ret []authorizer.AttributesRecord
 	groupVersion, err := schema.ParseGroupVersion(ref.APIVersion)
 	if err != nil {
-		return authorizer.AttributesRecord{}, err
+		return ret, err
 	}
-	mapping, err := a.restMapper.RESTMapping(schema.GroupKind{Group: groupVersion.Group, Kind: ref.Kind}, groupVersion.Version)
+	mappings, err := a.restMapper.RESTMappings(schema.GroupKind{Group: groupVersion.Group, Kind: ref.Kind}, groupVersion.Version)
 	if err != nil {
-		return authorizer.AttributesRecord{}, err
+		return ret, err
 	}
-	return authorizer.AttributesRecord{
-		User: attributes.GetUserInfo(),
-		Verb: "delete",
-		// ownerReference can only refer to an object in the same namespace, so attributes.GetNamespace() equals to the owner's namespace
-		Namespace:       attributes.GetNamespace(),
-		APIGroup:        groupVersion.Group,
-		APIVersion:      groupVersion.Version,
-		Resource:        mapping.Resource,
-		Name:            ref.Name,
-		ResourceRequest: true,
-		Path:            "",
-	}, nil
+	for _, mapping := range mappings {
+		ret = append(ret, authorizer.AttributesRecord{
+			User: attributes.GetUserInfo(),
+			Verb: "delete",
+			// ownerReference can only refer to an object in the same namespace, so attributes.GetNamespace() equals to the owner's namespace
+			Namespace:       attributes.GetNamespace(),
+			APIGroup:        groupVersion.Group,
+			APIVersion:      groupVersion.Version,
+			Resource:        mapping.Resource,
+			Name:            ref.Name,
+			ResourceRequest: true,
+			Path:            "",
+		})
+	}
+	return ret, nil
 }
 
 // only keeps the blocking refs
