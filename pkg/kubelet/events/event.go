@@ -23,33 +23,33 @@ import (
 
 const (
 	// Container event reason list
-	CreatedContainer        = "Created"
-	StartedContainer        = "Started"
-	FailedToCreateContainer = "Failed"
-	FailedToStartContainer  = "Failed"
-	KillingContainer        = "Killing"
-	PreemptContainer        = "Preempting"
-	BackOffStartContainer   = "BackOff"
+	CreatedContainer        = "ContainerCreated"
+	StartedContainer        = "ContainerStarted"
+	FailedToCreateContainer = "CreateContainerFailed"
+	FailedToStartContainer  = "StartContainerFailed"
+	KillingContainer        = "ContainerKilling"
+	PreemptContainer        = "ContainerPreempting"
+	BackOffStartContainer   = "ContainerStartBackOff"
 	ExceededGracePeriod     = "ExceededGracePeriod"
 
 	// Image event reason list
-	PullingImage            = "Pulling"
-	PulledImage             = "Pulled"
-	FailedToPullImage       = "Failed"
-	FailedToInspectImage    = "InspectFailed"
+	PullingImage            = "ImagePulling"
+	PulledImage             = "ImagePulled"
+	FailedToPullImage       = "ImagePullFailed"
+	FailedToInspectImage    = "InspectImageFailed"
 	ErrImageNeverPullPolicy = "ErrImageNeverPull"
-	BackOffPullImage        = "BackOff"
+	BackOffPullImage        = "PullImageBackOff"
 
 	// kubelet event reason list
 	NodeReady                            = "NodeReady"
 	NodeNotReady                         = "NodeNotReady"
 	NodeSchedulable                      = "NodeSchedulable"
 	NodeNotSchedulable                   = "NodeNotSchedulable"
-	StartingKubelet                      = "Starting"
+	StartingKubelet                      = "KubeletStarting"
 	KubeletSetupFailed                   = "KubeletSetupFailed"
 	FailedDetachVolume                   = "FailedDetachVolume"
-	FailedMountVolume                    = "FailedMount"
-	FailedUnMountVolume                  = "FailedUnMount"
+	FailedMountVolume                    = "FailedMountVolume"
+	FailedUnMountVolume                  = "FailedUnMountVolume"
 	SuccessfulDetachVolume               = "SuccessfulDetachVolume"
 	SuccessfulMountVolume                = "SuccessfulMountVolume"
 	SuccessfulUnMountVolume              = "SuccessfulUnMountVolume"
@@ -60,7 +60,7 @@ const (
 	OutOfDisk                            = "OutOfDisk"
 	HostNetworkNotSupported              = "HostNetworkNotSupported"
 	UndefinedShaper                      = "NilShaper"
-	NodeRebooted                         = "Rebooted"
+	NodeRebooted                         = "NodeRebooted"
 	ContainerGCFailed                    = "ContainerGCFailed"
 	ImageGCFailed                        = "ImageGCFailed"
 	FailedNodeAllocatableEnforcement     = "FailedNodeAllocatableEnforcement"
@@ -72,7 +72,7 @@ const (
 	FreeDiskSpaceFailed = "FreeDiskSpaceFailed"
 
 	// Probe event reason list
-	ContainerUnhealthy = "Unhealthy"
+	ContainerUnhealthy = "ContainerUnhealthy"
 
 	// Pod worker event reason list
 	FailedSync = "FailedSync"
