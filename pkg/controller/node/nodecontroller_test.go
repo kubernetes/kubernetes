@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -1962,7 +1963,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 		return
 	}
 
-	if originalTaint != nil && !v1.TaintExists(node0.Spec.Taints, originalTaint) {
+	if originalTaint != nil && !v1helper.TaintExists(node0.Spec.Taints, originalTaint) {
 		t.Errorf("Can't find taint %v in %v", originalTaint, node0.Spec.Taints)
 	}
 
@@ -1995,7 +1996,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 		return
 	}
 	if updatedTaint != nil {
-		if !v1.TaintExists(node0.Spec.Taints, updatedTaint) {
+		if !v1helper.TaintExists(node0.Spec.Taints, updatedTaint) {
 			t.Errorf("Can't find taint %v in %v", updatedTaint, node0.Spec.Taints)
 		}
 	}

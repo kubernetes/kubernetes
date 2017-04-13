@@ -40,6 +40,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/api/validation"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -876,7 +877,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint *v1.Ta
 		if err != nil {
 			return err
 		}
-		newNode, ok, err := v1.AddOrUpdateTaint(oldNode, taint)
+		newNode, ok, err := v1helper.AddOrUpdateTaint(oldNode, taint)
 		if err != nil {
 			return fmt.Errorf("Failed to update taint annotation!")
 		}
@@ -920,7 +921,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint,
 		if err != nil {
 			return err
 		}
-		newNode, ok, err := v1.RemoveTaint(oldNode, taint)
+		newNode, ok, err := v1helper.RemoveTaint(oldNode, taint)
 		if err != nil {
 			return fmt.Errorf("Failed to update taint annotation!")
 		}

@@ -52,6 +52,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	dockersecurity "k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext"
@@ -748,7 +749,7 @@ func (dm *DockerManager) runContainer(
 
 	// Set sysctls if requested
 	if container.Name == PodInfraContainerName {
-		sysctls, unsafeSysctls, err := v1.SysctlsFromPodAnnotations(pod.Annotations)
+		sysctls, unsafeSysctls, err := v1helper.SysctlsFromPodAnnotations(pod.Annotations)
 		if err != nil {
 			dm.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToCreateContainer, "Failed to create docker container %q of pod %q with error: %v", container.Name, format.Pod(pod), err)
 			return kubecontainer.ContainerID{}, err

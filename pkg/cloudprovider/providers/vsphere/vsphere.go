@@ -46,6 +46,7 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	k8runtime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -443,7 +444,7 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 						} else {
 							addressType = v1.NodeInternalIP
 						}
-						v1.AddToNodeAddresses(&addrs,
+						v1helper.AddToNodeAddresses(&addrs,
 							v1.NodeAddress{
 								Type:    addressType,
 								Address: ipnet.IP.String(),
@@ -514,7 +515,7 @@ func (vs *VSphere) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 			addressType = v1.NodeInternalIP
 		}
 		for _, ip := range v.IpAddress {
-			v1.AddToNodeAddresses(&addrs,
+			v1helper.AddToNodeAddresses(&addrs,
 				v1.NodeAddress{
 					Type:    addressType,
 					Address: ip,
