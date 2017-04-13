@@ -64,7 +64,12 @@ type proxyHandlingInfo struct {
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	handlingInfo := r.handlingInfo.Load().(proxyHandlingInfo)
+	value := r.handlingInfo.Load()
+	if value == nil {
+		r.localDelegate.ServeHTTP(w, req)
+		return
+	}
+	handlingInfo := value.(proxyHandlingInfo)
 	if handlingInfo.local {
 		r.localDelegate.ServeHTTP(w, req)
 		return
@@ -196,8 +201,4 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
 	r.handlingInfo.Store(newInfo)
-}
-
-func (r *proxyHandler) removeAPIService() {
-	r.handlingInfo.Store(proxyHandlingInfo{})
 }
