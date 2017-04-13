@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
@@ -883,7 +884,7 @@ func waitForProvisionedVolumesDeleted(c clientset.Interface, scName string) ([]*
 			return true, err
 		}
 		for _, pv := range allPVs.Items {
-			if v1.GetPersistentVolumeClass(&pv) == scName {
+			if v1helper.GetPersistentVolumeClass(&pv) == scName {
 				remainingPVs = append(remainingPVs, &pv)
 			}
 		}

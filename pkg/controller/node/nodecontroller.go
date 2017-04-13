@@ -40,6 +40,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
@@ -638,7 +639,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if observedReadyCondition.Status == v1.ConditionFalse {
 				if nc.useTaintBasedEvictions {
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
-					if v1.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
+					if v1helper.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
 						taintToAdd := *NotReadyTaintTemplate
 						if !swapNodeControllerTaint(nc.kubeClient, &taintToAdd, UnreachableTaintTemplate, node) {
 							glog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
@@ -665,7 +666,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if observedReadyCondition.Status == v1.ConditionUnknown {
 				if nc.useTaintBasedEvictions {
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
-					if v1.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
+					if v1helper.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
 						taintToAdd := *UnreachableTaintTemplate
 						if !swapNodeControllerTaint(nc.kubeClient, &taintToAdd, NotReadyTaintTemplate, node) {
 							glog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")

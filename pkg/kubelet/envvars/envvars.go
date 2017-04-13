@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 )
 
 // FromServices builds environment variables that a container is started with,
@@ -35,7 +36,7 @@ func FromServices(services []*v1.Service) []v1.EnvVar {
 		// ignore services where ClusterIP is "None" or empty
 		// the services passed to this method should be pre-filtered
 		// only services that have the cluster IP set should be included here
-		if !v1.IsServiceIPSet(service) {
+		if !v1helper.IsServiceIPSet(service) {
 			continue
 		}
 

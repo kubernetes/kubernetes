@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -33,7 +34,7 @@ func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.
 			continue
 		}
 
-		if !v1.TolerationsTolerateTaint(tolerations, &taint) {
+		if !v1helper.TolerationsTolerateTaint(tolerations, &taint) {
 			intolerableTaints++
 		}
 	}

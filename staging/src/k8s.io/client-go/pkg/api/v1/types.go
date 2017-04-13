@@ -4421,3 +4421,18 @@ const (
 	// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
 	DefaultFailureDomains string = metav1.LabelHostname + "," + metav1.LabelZoneFailureDomain + "," + metav1.LabelZoneRegion
 )
+
+// Sysctl defines a kernel parameter to be set
+type Sysctl struct {
+	// Name of a property to set
+	Name string `protobuf:"bytes,1,opt,name=name"`
+	// Value of a property to set
+	Value string `protobuf:"bytes,2,opt,name=value"`
+}
+
+// NodeResources is an object for conveying resource information about a node.
+// see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
+type NodeResources struct {
+	// Capacity represents the available resources of a node
+	Capacity ResourceList `protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
+}
