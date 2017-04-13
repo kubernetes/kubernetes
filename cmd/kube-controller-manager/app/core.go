@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
@@ -102,9 +103,16 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 	// TODO: should use a dynamic RESTMapper built from the discovery results.
 	restMapper := api.Registry.RESTMapper()
 
+	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls
+	// the ratelimiter negatively affects its speed.  Deleting 100 total items in a namespace (that's only a few of each resource
+	// including events), takes ~10 seconds by default.
+	nsKubeconfig := ctx.ClientBuilder.ConfigOrDie("namespace-controller")
+	nsKubeconfig.QPS *= 10
+	nsKubeconfig.Burst *= 10
+	namespaceKubeClient := clientset.NewForConfigOrDie(nsKubeconfig)
+	namespaceClientPool := dynamic.NewClientPool(nsKubeconfig, restMapper, dynamic.LegacyAPIPathResolverFunc)
+
 	// Find the list of namespaced resources via discovery that the namespace controller must manage
-	namespaceKubeClient := ctx.ClientBuilder.ClientOrDie("namespace-controller")
-	namespaceClientPool := dynamic.NewClientPool(ctx.ClientBuilder.ConfigOrDie("namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
 	// TODO: consider using a list-watch + cache here rather than polling
 	resources, err := namespaceKubeClient.Discovery().ServerResources()
 	if err != nil {
