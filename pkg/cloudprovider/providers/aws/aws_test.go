@@ -17,8 +17,10 @@ limitations under the License.
 package aws
 
 import (
+	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -364,8 +366,12 @@ func (self *FakeMetadata) GetMetadata(key string) (string, error) {
 	}
 }
 
-func (ec2 *FakeEC2) AttachVolume(request *ec2.AttachVolumeInput) (resp *ec2.VolumeAttachment, err error) {
-	panic("Not implemented")
+func (fakeEc2 *FakeEC2) AttachVolume(request *ec2.AttachVolumeInput) (resp *ec2.VolumeAttachment, err error) {
+	match, _ := regexp.MatchString("^success.+", *(request.VolumeId))
+	if match {
+		return &ec2.VolumeAttachment{}, nil
+	}
+	return nil, fmt.Errorf("Error attaching volume %s", *request.VolumeId)
 }
 
 func (ec2 *FakeEC2) DetachVolume(request *ec2.DetachVolumeInput) (resp *ec2.VolumeAttachment, err error) {
@@ -1284,4 +1290,33 @@ func TestProxyProtocolEnabled(t *testing.T) {
 	}
 	result = proxyProtocolEnabled(fakeBackend)
 	assert.False(t, result, "did not expect to find %s in %s", ProxyProtocolPolicyName, policies)
+}
+
+func TestAttachNewDevice(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+	var instanceWithVolume ec2.Instance
+	var selfInstance ec2.Instance
+	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	selfAwsInstance := newAWSInstance(awsServices.ec2, &selfInstance)
+	chosen, err := c.attachNewDevice(selfAwsInstance, &instanceWithVolume, "success1")
+	assert.Nil(t, err, "attach should succeed")
+
+	daInterface := c.deviceAllocators[selfAwsInstance.nodeName]
+	var daImpl *deviceAllocator
+	daImpl, _ = daInterface.(*deviceAllocator)
+	assert.Equal(t, 1, daImpl.counter)
+	c.attaching = make(map[types.NodeName]map[mountDevice]awsVolumeID)
+
+	// on failure the device index should not advance
+	chosen2, err := c.attachNewDevice(selfAwsInstance, &instanceWithVolume, "fail")
+	assert.NotNil(t, err, "On attach error - it should return that error")
+	assert.NotEqual(t, chosen, chosen2)
+	assert.Equal(t, 1, daImpl.counter)
+	c.attaching = make(map[types.NodeName]map[mountDevice]awsVolumeID)
+
+	// on success device index should increase
+	chosen3, err := c.attachNewDevice(selfAwsInstance, &instanceWithVolume, "success2")
+	assert.Nil(t, err)
+	assert.NotEqual(t, chosen, chosen3)
+	assert.Equal(t, 2, daImpl.counter)
 }
