@@ -66,6 +66,7 @@ go_test(
         "critical_pod_test.go",
         "density_test.go",
         "disk_eviction_test.go",
+        "dockershim_checkpoint_test.go",
         "dynamic_kubelet_configuration_test.go",
         "e2e_node_suite_test.go",
         "garbage_collector_test.go",
