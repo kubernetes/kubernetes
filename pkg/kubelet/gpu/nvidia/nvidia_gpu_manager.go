@@ -23,6 +23,8 @@ import (
 	"path"
 	"regexp"
 	"sync"
+	"bufio"
+	"bytes"
 
 	"github.com/golang/glog"
 
@@ -41,7 +43,7 @@ const (
 	nvidiaUVMDevice string = "/dev/nvidia-uvm"
 	// Optional device.
 	nvidiaUVMToolsDevice string = "/dev/nvidia-uvm-tools"
-	devDirectory                = "/dev"
+	// devDirectory                = "/dev"
 	nvidiaDeviceRE              = `^nvidia[0-9]*$`
 	nvidiaFullpathRE            = `^/dev/nvidia[0-9]*$`
 )
@@ -97,8 +99,8 @@ func (ngm *nvidiaGPUManager) Start() error {
 	if !os.IsNotExist(err) {
 		ngm.defaultDevices = append(ngm.defaultDevices, nvidiaUVMToolsDevice)
 	}
-
-	if err := ngm.discoverGPUs(); err != nil {
+	
+	if err := ngm.discoverGPUs("/proc/bus/pci/devices", "/dev"); err != nil {
 		return err
 	}
 	// It's possible that the runtime isn't available now.
@@ -190,9 +192,14 @@ func (ngm *nvidiaGPUManager) updateAllocatedGPUs() {
 // family name. Need to support NVML in the future. But we do not need NVML until
 // we want more features, features like schedule containers according to GPU family
 // name.
-func (ngm *nvidiaGPUManager) discoverGPUs() error {
+func (ngm *nvidiaGPUManager) discoverGPUs(devicesFile string, devDirectory string) error {
+	expected, err := expectedGPUs(devicesFile);
+	if err != nil {
+		return err
+	}
 	reg := regexp.MustCompile(nvidiaDeviceRE)
 	files, err := ioutil.ReadDir(devDirectory)
+	foundGPUs := sets.NewString()
 	if err != nil {
 		return err
 	}
@@ -202,11 +209,42 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 		}
 		if reg.MatchString(f.Name()) {
 			glog.V(2).Infof("Found Nvidia GPU %q", f.Name())
-			ngm.allGPUs.Insert(path.Join(devDirectory, f.Name()))
+			foundGPUs.Insert(f.Name())
 		}
 	}
-
+	if foundGPUs.Len() != expected {
+		err := fmt.Errorf("expected %d GPUs, found %d", expected, foundGPUs.Len())
+		return err 
+	}
+	for _, gpuToAdd := range foundGPUs.List() {
+		ngm.allGPUs.Insert(path.Join(devDirectory, gpuToAdd))
+		
+	}		
 	return nil
+}
+
+// expectedGPUs reads the devices procfile and determines how many GPUs we should find
+// when discoverGPUs is called
+// TODO: This most likely will count dead GPUs and should be refactored if we
+// switch to NVML health-checking
+func expectedGPUs(procFile string) (int, error){
+	var expectedGpuCount = 0
+	contents, err := os.Open(procFile)
+	defer contents.Close()
+	if err != nil {
+		return 0, err
+	}
+	scanner := bufio.NewScanner(contents)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		s := scanner.Bytes()
+		fields := bytes.SplitN(s, []byte{'\t'}, 3)
+		if bytes.HasPrefix(fields[1], []byte("10de")) {
+			expectedGpuCount++
+		}
+
+	}
+	return expectedGpuCount, nil
 }
 
 // gpusInUse returns a list of GPUs in use along with the respective pods that are using it.
