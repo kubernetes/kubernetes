@@ -50,20 +50,21 @@ func (p ListedPathProviders) ListedPaths() []string {
 type Index struct{}
 
 // Install adds the Index webservice to the given mux.
-func (i Index) Install(pathProvider ListedPathProvider, mux *mux.PathRecorderMux, delegate http.Handler) {
-	mux.UnlistedHandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		status := http.StatusOK
-		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
-			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler api.Registry.
-			// if we have a delegate, we should call to it and simply return
-			if delegate != nil {
-				delegate.ServeHTTP(w, r)
-				return
-			}
-
-			// If we have no delegate, we want to return a 404 status with a list of all valid paths, incase of an invalid URL request.
-			status = http.StatusNotFound
-		}
-		responsewriters.WriteRawJSON(status, metav1.RootPaths{Paths: pathProvider.ListedPaths()}, w)
+func (i Index) Install(pathProvider ListedPathProvider, mux *mux.PathRecorderMux) {
+	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		responsewriters.WriteRawJSON(http.StatusOK, metav1.RootPaths{Paths: pathProvider.ListedPaths()}, w)
 	})
+
+	mux.UnlistedHandle("/", fn)
+	mux.UnlistedHandle("/index.html", fn)
+}
+
+// NotFoundIndex is like `Index`, but intended for use as a `NotFoundHandler`, so it returns a 404 status code.
+type NotFoundIndex struct {
+	PathProvider ListedPathProvider
+}
+
+// Install adds the Index webservice to the given mux.
+func (i NotFoundIndex) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	responsewriters.WriteRawJSON(http.StatusNotFound, metav1.RootPaths{Paths: i.PathProvider.ListedPaths()}, w)
 }
