@@ -20,6 +20,7 @@ package volumehelper
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
@@ -35,6 +36,10 @@ const (
 	// VolumeGidAnnotationKey is the of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
 	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
+
+	// VolumeDeletingSuffix is used by EmptyDir-based volume plugins to rename the volume directory during
+	// deletion so that the volume manager will not detect it as a valid volume
+	VolumeDeletingSuffix = ".deleting~"
 )
 
 // GetUniquePodName returns a unique identifier to reference a pod by
@@ -86,4 +91,10 @@ func GetUniqueVolumeNameFromSpec(
 			volumePlugin.GetPluginName(),
 			volumeName),
 		nil
+}
+
+// IsVolumeDeleting checks if the volume name matches the deletion format used
+// by EmptyDir-based volumes
+func IsVolumeDeleting(volumeName string) bool {
+	return strings.Contains(volumeName, VolumeDeletingSuffix)
 }

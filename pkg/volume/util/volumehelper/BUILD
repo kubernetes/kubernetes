@@ -5,6 +5,7 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -16,6 +17,13 @@ go_library(
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/types:go_default_library",
     ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["volumehelper_test.go"],
+    library = ":go_default_library",
+    tags = ["automanaged"],
 )
 
 filegroup(
