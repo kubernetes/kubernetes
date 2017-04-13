@@ -35,6 +35,7 @@ import (
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // Static pod definitions in golang form are included below so that `kubeadm init` can get going.
@@ -50,6 +51,10 @@ const (
 	kubeControllerManager = "kube-controller-manager"
 	kubeScheduler         = "kube-scheduler"
 	kubeProxy             = "kube-proxy"
+)
+
+var (
+	v170 = version.MustParseSemantic("v1.7.0-alpha.0")
 )
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
@@ -68,12 +73,17 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		volumeMounts = append(volumeMounts, pkiVolumeMount())
 	}
 
+	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
+	if err != nil {
+		return err
+	}
+
 	// Prepare static pod specs
 	staticPodSpecs := map[string]api.Pod{
 		kubeAPIServer: componentPod(api.Container{
 			Name:          kubeAPIServer,
 			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-			Command:       getAPIServerCommand(cfg, false),
+			Command:       getAPIServerCommand(cfg, false, k8sVersion),
 			VolumeMounts:  volumeMounts,
 			LivenessProbe: componentProbe(int(cfg.API.BindPort), "/healthz", api.URISchemeHTTPS),
 			Resources:     componentResources("250m"),
@@ -293,7 +303,7 @@ func getComponentBaseCommand(component string) []string {
 	return []string{"kube-" + component}
 }
 
-func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
+func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k8sVersion *version.Version) []string {
 	var command []string
 
 	// self-hosted apiserver needs to wait on a lock
@@ -323,9 +333,11 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"requestheader-extra-headers-prefix": "X-Remote-Extra-",
 		"requestheader-client-ca-file":       path.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName),
 		"requestheader-allowed-names":        "front-proxy-client",
+	}
+	if k8sVersion.AtLeast(v170) {
 		// add options which allow the kube-apiserver to act as a front-proxy to aggregated API servers
-		"proxy-client-cert-file": path.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientCertName),
-		"proxy-client-key-file":  path.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName),
+		defaultArguments["proxy-client-cert-file"] = path.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientCertName)
+		defaultArguments["proxy-client-key-file"] = path.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName)
 	}
 
 	command = getComponentBaseCommand(apiServer)
