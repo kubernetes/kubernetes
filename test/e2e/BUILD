@@ -161,7 +161,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/types",
         "//vendor:golang.org/x/crypto/ssh",
         "//vendor:golang.org/x/net/context",
-        "//vendor:golang.org/x/net/websocket",
         "//vendor:google.golang.org/api/googleapi",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",

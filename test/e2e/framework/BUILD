@@ -27,6 +27,7 @@ go_library(
         "nodes_util.go",
         "perf_util.go",
         "pods.go",
+        "portforward_util.go",
         "pv_util.go",
         "resource_usage_gatherer.go",
         "service_util.go",
@@ -130,6 +131,7 @@ go_library(
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor:k8s.io/client-go/tools/portforward",
     ],
 )
 
