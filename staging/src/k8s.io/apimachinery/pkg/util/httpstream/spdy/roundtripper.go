@@ -18,9 +18,11 @@ package spdy
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/third_party/forked/golang/netutil"
 )
 
@@ -61,6 +64,10 @@ type SpdyRoundTripper struct {
 	proxier func(req *http.Request) (*url.URL, error)
 }
 
+var _ utilnet.TLSClientConfigHolder = &SpdyRoundTripper{}
+var _ httpstream.UpgradeRoundTripper = &SpdyRoundTripper{}
+var _ utilnet.RequestSender = &SpdyRoundTripper{}
+
 // NewRoundTripper creates a new SpdyRoundTripper that will use
 // the specified tlsConfig.
 func NewRoundTripper(tlsConfig *tls.Config) httpstream.UpgradeRoundTripper {
@@ -73,9 +80,31 @@ func NewSpdyRoundTripper(tlsConfig *tls.Config) *SpdyRoundTripper {
 	return &SpdyRoundTripper{tlsConfig: tlsConfig}
 }
 
-// implements pkg/util/net.TLSClientConfigHolder for proper TLS checking during proxying with a spdy roundtripper
+// TLSClientConfig implements pkg/util/net.TLSClientConfigHolder for proper TLS checking during
+// proxying with a spdy roundtripper.
 func (s *SpdyRoundTripper) TLSClientConfig() *tls.Config {
 	return s.tlsConfig
+}
+
+// SendRequest implements k8s.io/apimachinery/pkg/util/net.RequestSender.
+func (s *SpdyRoundTripper) SendRequest(method string, location *url.URL, header http.Header, body io.Reader) (net.Conn, error) {
+	req, err := http.NewRequest(method, location.String(), body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = header
+
+	conn, err := s.dial(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := req.Write(conn); err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	return conn, nil
 }
 
 // dial dials the host specified by req, using TLS if appropriate, optionally
@@ -213,24 +242,27 @@ func (s *SpdyRoundTripper) proxyAuth(proxyURL *url.URL) string {
 // clients may call SpdyRoundTripper.Connection() to retrieve the upgraded
 // connection.
 func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	// TODO what's the best way to clone the request?
-	r := *req
-	req = &r
-	req.Header.Add(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
-	req.Header.Add(httpstream.HeaderUpgrade, HeaderSpdy31)
+	header := utilnet.CloneHeader(req.Header)
+	header.Add(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
+	header.Add(httpstream.HeaderUpgrade, HeaderSpdy31)
 
-	conn, err := s.dial(req)
+	conn, rawResponse, err := utilnet.ConnectWithRedirects(req.Method, req.URL, header, req.Body, s)
 	if err != nil {
 		return nil, err
 	}
 
-	err = req.Write(conn)
-	if err != nil {
-		return nil, err
-	}
+	responseReader := bufio.NewReader(
+		io.MultiReader(
+			bytes.NewBuffer(rawResponse),
+			conn,
+		),
+	)
 
-	resp, err := http.ReadResponse(bufio.NewReader(conn), req)
+	resp, err := http.ReadResponse(responseReader, nil)
 	if err != nil {
+		if conn != nil {
+			conn.Close()
+		}
 		return nil, err
 	}
 

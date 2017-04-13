@@ -17,6 +17,8 @@ limitations under the License.
 package net
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -266,4 +268,118 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 
 		return delegate(req)
 	}
+}
+
+// RequestSender creates and sends an http.Request.
+type RequestSender interface {
+	// SendRequest connects to the address specified by location, constructs a new http.Request,
+	// writes the request to the connection, and returns the opened net.Conn.
+	SendRequest(method string, location *url.URL, header http.Header, body io.Reader) (net.Conn, error)
+}
+
+// ConnectWithRedirects uses requestSender to send req, following up to 10 redirects (relative to
+// baseLocation). It returns the opened net.Conn and the raw response bytes.
+func ConnectWithRedirects(originalMethod string, baseLocation *url.URL, header http.Header, originalBody io.Reader, requestSender RequestSender) (net.Conn, []byte, error) {
+	const (
+		maxRedirects    = 10
+		maxResponseSize = 16384 // play it safe to allow the potential for lots of / large headers
+	)
+
+	var (
+		location         = baseLocation
+		method           = originalMethod
+		intermediateConn net.Conn
+		rawResponse      = bytes.NewBuffer(make([]byte, 0, 256))
+		body             = originalBody
+		err              error
+	)
+
+	defer func() {
+		if intermediateConn != nil {
+			intermediateConn.Close()
+		}
+	}()
+
+redirectLoop:
+	for redirects := 0; ; redirects++ {
+		if redirects > maxRedirects {
+			return nil, nil, fmt.Errorf("too many redirects (%d)", redirects)
+		}
+		if redirects != 0 {
+			// Redirected requests switch to "GET" according to the HTTP spec:
+			// https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3
+			method = "GET"
+			// don't send a body when following redirects
+			body = nil
+		}
+
+		intermediateConn, err = requestSender.SendRequest(method, location, header, body)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Peek at the backend response.
+		rawResponse.Reset()
+		respReader := bufio.NewReader(io.TeeReader(
+			io.LimitReader(intermediateConn, maxResponseSize), // Don't read more than maxResponseSize bytes.
+			rawResponse)) // Save the raw response.
+		resp, err := http.ReadResponse(respReader, nil)
+		if err != nil {
+			// Unable to read the backend response; let the client handle it.
+			glog.Warningf("Error reading backend response: %v", err)
+			break redirectLoop
+		}
+
+		switch resp.StatusCode {
+		case http.StatusFound:
+			// Redirect, continue.
+		default:
+			// Don't redirect.
+			break redirectLoop
+		}
+
+		resp.Body.Close() // not used
+
+		// Reset the connection.
+		intermediateConn.Close()
+		intermediateConn = nil
+
+		// Prepare to follow the redirect.
+		redirectStr := resp.Header.Get("Location")
+		if redirectStr == "" {
+			return nil, nil, fmt.Errorf("%d response missing Location header", resp.StatusCode)
+		}
+		location, err = location.Parse(redirectStr)
+		if err != nil {
+			return nil, nil, fmt.Errorf("malformed Location header: %v", err)
+		}
+	}
+
+	connToReturn := intermediateConn
+	intermediateConn = nil // Don't close the connection when we return it.
+	return connToReturn, rawResponse.Bytes(), nil
+}
+
+// CloneRequest creates a shallow copy of the request along with a deep copy of the Headers.
+func CloneRequest(req *http.Request) *http.Request {
+	r := new(http.Request)
+
+	// shallow clone
+	*r = *req
+
+	// deep copy headers
+	r.Header = CloneHeader(req.Header)
+
+	return r
+}
+
+// CloneHeader creates a deep copy of an http.Header.
+func CloneHeader(in http.Header) http.Header {
+	out := make(http.Header, len(in))
+	for key, values := range in {
+		newValues := make([]string, len(values))
+		copy(newValues, values)
+		out[key] = newValues
+	}
+	return out
 }
