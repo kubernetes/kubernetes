@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
@@ -331,11 +331,11 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 					return false, fmt.Errorf("Pod %v was deleted before enter running", pod.Name)
 				}
 				framework.Logf("Observed event %v for pod %v. Phase %v, Pod is ready %v",
-					event.Type, pod.Name, pod.Status.Phase, resource.IsPodReady(pod))
+					event.Type, pod.Name, pod.Status.Phase, podutil.IsPodReady(pod))
 				if pod.Name != expectedPodName {
 					return false, nil
 				}
-				if pod.Status.Phase == v1.PodRunning && resource.IsPodReady(pod) {
+				if pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod) {
 					return true, nil
 				}
 				return false, nil

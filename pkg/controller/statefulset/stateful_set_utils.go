@@ -23,7 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 
@@ -191,7 +191,7 @@ func isRunningAndReady(pod *v1.Pod) bool {
 	if pod.Status.Phase != v1.PodRunning {
 		return false
 	}
-	podReady := resource.IsPodReady(pod)
+	podReady := podutil.IsPodReady(pod)
 	// User may have specified a pod readiness override through a debug annotation.
 	initialized, ok := pod.Annotations[apps.StatefulSetInitAnnotation]
 	if ok {

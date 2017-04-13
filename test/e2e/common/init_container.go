@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -102,7 +101,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			}
 
 			Expect(endPod.Status.Phase).To(Equal(v1.PodSucceeded))
-			_, init := v1resource.GetPodCondition(&endPod.Status, v1.PodInitialized)
+			_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
 			Expect(init).NotTo(BeNil())
 			Expect(init.Status).To(Equal(v1.ConditionTrue))
 
@@ -179,7 +178,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			endPod := event.Object.(*v1.Pod)
 
 			Expect(endPod.Status.Phase).To(Equal(v1.PodRunning))
-			_, init := v1resource.GetPodCondition(&endPod.Status, v1.PodInitialized)
+			_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
 			Expect(init).NotTo(BeNil())
 			Expect(init.Status).To(Equal(v1.ConditionTrue))
 			if err := podutil.SetInitContainersAndStatuses(endPod); err != nil {
@@ -319,7 +318,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			}
 
 			Expect(endPod.Status.Phase).To(Equal(v1.PodPending))
-			_, init := v1resource.GetPodCondition(&endPod.Status, v1.PodInitialized)
+			_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
 			Expect(init).NotTo(BeNil())
 			Expect(init.Status).To(Equal(v1.ConditionFalse))
 			Expect(init.Reason).To(Equal("ContainersNotInitialized"))
@@ -439,7 +438,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			endPod := event.Object.(*v1.Pod)
 
 			Expect(endPod.Status.Phase).To(Equal(v1.PodFailed))
-			_, init := v1resource.GetPodCondition(&endPod.Status, v1.PodInitialized)
+			_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
 			Expect(init).NotTo(BeNil())
 			Expect(init.Status).To(Equal(v1.ConditionFalse))
 			Expect(init.Reason).To(Equal("ContainersNotInitialized"))

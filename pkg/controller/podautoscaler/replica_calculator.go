@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
 	v1coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -78,7 +78,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 
 		requests[pod.Name] = podSum
 
-		if pod.Status.Phase != v1.PodRunning || !v1resource.IsPodReady(&pod) {
+		if pod.Status.Phase != v1.PodRunning || !podutil.IsPodReady(&pod) {
 			// save this pod name for later, but pretend it doesn't exist for now
 			unreadyPods.Insert(pod.Name)
 			delete(metrics, pod.Name)
@@ -193,7 +193,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 	missingPods := sets.NewString()
 
 	for _, pod := range podList.Items {
-		if pod.Status.Phase != v1.PodRunning || !v1resource.IsPodReady(&pod) {
+		if pod.Status.Phase != v1.PodRunning || !podutil.IsPodReady(&pod) {
 			// save this pod name for later, but pretend it doesn't exist for now
 			unreadyPods.Insert(pod.Name)
 			delete(metrics, pod.Name)

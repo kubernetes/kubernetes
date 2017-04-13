@@ -73,6 +73,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
@@ -1186,7 +1187,7 @@ func initContainersInvariants(pod *v1.Pod) error {
 			}
 		}
 	}
-	_, c := resource.GetPodCondition(&pod.Status, v1.PodInitialized)
+	_, c := podutil.GetPodCondition(&pod.Status, v1.PodInitialized)
 	if c == nil {
 		return fmt.Errorf("pod does not have initialized condition")
 	}
@@ -1305,7 +1306,7 @@ func podRunningAndReady(c clientset.Interface, podName, namespace string) wait.C
 		case v1.PodFailed, v1.PodSucceeded:
 			return false, conditions.ErrPodCompleted
 		case v1.PodRunning:
-			return resource.IsPodReady(pod), nil
+			return podutil.IsPodReady(pod), nil
 		}
 		return false, nil
 	}
@@ -3143,7 +3144,7 @@ func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
 	for i := range podList.Items {
 		pod := podList.Items[i]
 
-		if resource.IsPodReady(&pod) {
+		if podutil.IsPodReady(&pod) {
 			readyPods++
 		} else {
 			unready.Insert(pod.Name)
@@ -3165,7 +3166,7 @@ func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
 			return false, nil
 		}
 		pod := event.Object.(*v1.Pod)
-		if resource.IsPodReady(pod) && unready.Has(pod.Name) {
+		if podutil.IsPodReady(pod) && unready.Has(pod.Name) {
 			unready.Delete(pod.Name)
 		}
 		return unready.Len() == 0, nil
@@ -3510,7 +3511,7 @@ func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds in
 			return false, nil
 		}
 		for _, pod := range pods.Items {
-			if !resource.IsPodAvailable(&pod, int32(minReadySeconds), metav1.Now()) {
+			if !podutil.IsPodAvailable(&pod, int32(minReadySeconds), metav1.Now()) {
 				return false, nil
 			}
 		}
@@ -3599,7 +3600,7 @@ func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deploymen
 	}
 	for _, pod := range podList.Items {
 		availability := "not available"
-		if resource.IsPodAvailable(&pod, minReadySeconds, metav1.Now()) {
+		if podutil.IsPodAvailable(&pod, minReadySeconds, metav1.Now()) {
 			availability = "available"
 		}
 		Logf("Pod %s is %s:\n%+v", pod.Name, availability, pod)
@@ -5166,12 +5167,12 @@ func GetPodsScheduled(masterNodes sets.String, pods *v1.PodList) (scheduledPods,
 	for _, pod := range pods.Items {
 		if !masterNodes.Has(pod.Spec.NodeName) {
 			if pod.Spec.NodeName != "" {
-				_, scheduledCondition := resource.GetPodCondition(&pod.Status, v1.PodScheduled)
+				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
 				Expect(scheduledCondition != nil).To(Equal(true))
 				Expect(scheduledCondition.Status).To(Equal(v1.ConditionTrue))
 				scheduledPods = append(scheduledPods, pod)
 			} else {
-				_, scheduledCondition := resource.GetPodCondition(&pod.Status, v1.PodScheduled)
+				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
 				Expect(scheduledCondition != nil).To(Equal(true))
 				Expect(scheduledCondition.Status).To(Equal(v1.ConditionFalse))
 				if scheduledCondition.Reason == "Unschedulable" {

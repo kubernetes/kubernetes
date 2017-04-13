@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/retry"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -431,7 +431,7 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController, minR
 			if v1Pod.DeletionTimestamp != nil {
 				continue
 			}
-			if !resource.IsPodAvailable(v1Pod, minReadySeconds, r.nowFn()) {
+			if !podutil.IsPodAvailable(v1Pod, minReadySeconds, r.nowFn()) {
 				continue
 			}
 			switch controller.Name {

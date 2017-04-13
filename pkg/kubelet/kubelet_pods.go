@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
@@ -941,10 +942,10 @@ func hasHostPortConflicts(pods []*v1.Pod) bool {
 func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *v1.PodStatus, containerName string, previous bool) (containerID kubecontainer.ContainerID, err error) {
 	var cID string
 
-	cStatus, found := resource.GetContainerStatus(podStatus.ContainerStatuses, containerName)
+	cStatus, found := podutil.GetContainerStatus(podStatus.ContainerStatuses, containerName)
 	// if not found, check the init containers
 	if !found {
-		cStatus, found = resource.GetContainerStatus(podStatus.InitContainerStatuses, containerName)
+		cStatus, found = podutil.GetContainerStatus(podStatus.InitContainerStatuses, containerName)
 	}
 	if !found {
 		return kubecontainer.ContainerID{}, fmt.Errorf("container %q in pod %q is not available", containerName, podName)
@@ -1048,7 +1049,7 @@ func GetPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	pendingInitialization := 0
 	failedInitialization := 0
 	for _, container := range spec.InitContainers {
-		containerStatus, ok := resource.GetContainerStatus(info, container.Name)
+		containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
 		if !ok {
 			pendingInitialization++
 			continue
@@ -1085,7 +1086,7 @@ func GetPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	failed := 0
 	succeeded := 0
 	for _, container := range spec.Containers {
-		containerStatus, ok := resource.GetContainerStatus(info, container.Name)
+		containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
 		if !ok {
 			unknown++
 			continue
@@ -1180,10 +1181,10 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	// s (the PodStatus we are creating) will not have a PodScheduled condition yet, because converStatusToAPIStatus()
 	// does not create one. If the existing PodStatus has a PodScheduled condition, then copy it into s and make sure
 	// it is set to true. If the existing PodStatus does not have a PodScheduled condition, then create one that is set to true.
-	if _, oldPodScheduled := resource.GetPodCondition(&pod.Status, v1.PodScheduled); oldPodScheduled != nil {
+	if _, oldPodScheduled := podutil.GetPodCondition(&pod.Status, v1.PodScheduled); oldPodScheduled != nil {
 		s.Conditions = append(s.Conditions, *oldPodScheduled)
 	}
-	resource.UpdatePodCondition(&pod.Status, &v1.PodCondition{
+	podutil.UpdatePodCondition(&pod.Status, &v1.PodCondition{
 		Type:   v1.PodScheduled,
 		Status: v1.ConditionTrue,
 	})

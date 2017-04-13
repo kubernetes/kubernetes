@@ -42,8 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/ref"
-	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/api/validation"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -676,13 +676,13 @@ func (s ByLogging) Less(i, j int) bool {
 		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
 	}
 	// 3. ready < not ready
-	if resource.IsPodReady(s[i]) != resource.IsPodReady(s[j]) {
-		return resource.IsPodReady(s[i])
+	if podutil.IsPodReady(s[i]) != podutil.IsPodReady(s[j]) {
+		return podutil.IsPodReady(s[i])
 	}
 	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
 	// 4. Been ready for more time < less time < empty time
-	if resource.IsPodReady(s[i]) && resource.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
+	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
 		return afterOrZero(podReadyTime(s[j]), podReadyTime(s[i]))
 	}
 	// 5. Pods with containers with higher restart counts < lower restart counts
@@ -715,14 +715,14 @@ func (s ActivePods) Less(i, j int) bool {
 	}
 	// 3. Not ready < ready
 	// If only one of the pods is not ready, the not ready one is smaller
-	if resource.IsPodReady(s[i]) != resource.IsPodReady(s[j]) {
-		return !resource.IsPodReady(s[i])
+	if podutil.IsPodReady(s[i]) != podutil.IsPodReady(s[j]) {
+		return !podutil.IsPodReady(s[i])
 	}
 	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
 	// 4. Been ready for empty time < less time < more time
 	// If both pods are ready, the latest ready one is smaller
-	if resource.IsPodReady(s[i]) && resource.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
+	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
 		return afterOrZero(podReadyTime(s[i]), podReadyTime(s[j]))
 	}
 	// 5. Pods with containers with higher restart counts < lower restart counts
@@ -746,7 +746,7 @@ func afterOrZero(t1, t2 metav1.Time) bool {
 }
 
 func podReadyTime(pod *v1.Pod) metav1.Time {
-	if resource.IsPodReady(pod) {
+	if podutil.IsPodReady(pod) {
 		for _, c := range pod.Status.Conditions {
 			// we only care about pod ready conditions
 			if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {

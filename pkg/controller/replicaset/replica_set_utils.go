@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 )
@@ -97,9 +97,9 @@ func calculateStatus(rs *extensions.ReplicaSet, filteredPods []*v1.Pod, manageRe
 		if templateLabel.Matches(labels.Set(pod.Labels)) {
 			fullyLabeledReplicasCount++
 		}
-		if resource.IsPodReady(pod) {
+		if podutil.IsPodReady(pod) {
 			readyReplicasCount++
-			if resource.IsPodAvailable(pod, rs.Spec.MinReadySeconds, metav1.Now()) {
+			if podutil.IsPodAvailable(pod, rs.Spec.MinReadySeconds, metav1.Now()) {
 				availableReplicasCount++
 			}
 		}
