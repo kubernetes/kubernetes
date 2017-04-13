@@ -50,20 +50,12 @@ const (
 
 // NamespaceController is responsible for performing actions dependent upon a namespace phase
 type NamespaceController struct {
-	// client that purges namespace content, must have list/delete privileges on all content
-	kubeClient clientset.Interface
-	// clientPool manages a pool of dynamic clients
-	clientPool dynamic.ClientPool
 	// lister that can list namespaces from a shared cache
 	lister corelisters.NamespaceLister
 	// returns true when the namespace cache is ready
 	listerSynced cache.InformerSynced
 	// namespaces that have been queued up for processing by workers
 	queue workqueue.RateLimitingInterface
-	// function to list of preferred resources for namespace deletion
-	discoverResourcesFn func() ([]*metav1.APIResourceList, error)
-	// finalizerToken is the finalizer token managed by this controller
-	finalizerToken v1.FinalizerName
 	// helper to delete all resources in the namespace when the namespace is deleted.
 	namespacedResourcesDeleter deletion.NamespacedResourcesDeleterInterface
 }
@@ -79,11 +71,7 @@ func NewNamespaceController(
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
-		kubeClient:                 kubeClient,
-		clientPool:                 clientPool,
-		queue:                      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
-		discoverResourcesFn:        discoverResourcesFn,
-		finalizerToken:             finalizerToken,
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
 		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.Core().Namespaces(), clientPool, kubeClient.Core(), discoverResourcesFn, finalizerToken, true),
 	}
 
