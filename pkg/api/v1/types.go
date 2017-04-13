@@ -3292,6 +3292,7 @@ const (
 	// NodeInodePressure means the kubelet is under pressure due to insufficient available inodes.
 	NodeInodePressure NodeConditionType = "InodePressure"
 	// NodeKernelDeadlock means the kernel of a node has a temporary or permanent deadlock.
+	// `NodeKernelDeadlock` is updated from node-problem-detector. In order to get this condition, users should deploy node-problem-detector.
 	NodeKernelDeadlock NodeConditionType = "KernelDeadlock"
 )
 
