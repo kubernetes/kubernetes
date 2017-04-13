@@ -30,11 +30,12 @@ var GlobalEnvParams = SetEnvParams()
 func SetEnvParams() *EnvParams {
 
 	envParams := map[string]string{
-		"kubernetes_dir":  "/etc/kubernetes",
-		"host_etcd_path":  "/var/lib/etcd",
-		"hyperkube_image": "",
-		"repo_prefix":     "gcr.io/google_containers",
-		"etcd_image":      "",
+		"kubernetes_dir":     "/etc/kubernetes",
+		"kubernetes_log_dir": "/var/log/kubernetes",
+		"host_etcd_path":     "/var/lib/etcd",
+		"hyperkube_image":    "",
+		"repo_prefix":        "gcr.io/google_containers",
+		"etcd_image":         "",
 	}
 
 	for k := range envParams {
@@ -45,6 +46,7 @@ func SetEnvParams() *EnvParams {
 
 	return &EnvParams{
 		KubernetesDir:    path.Clean(envParams["kubernetes_dir"]),
+		KubernetesLogDir: path.Clean(envParams["kubernetes_log_dir"]),
 		HostEtcdPath:     path.Clean(envParams["host_etcd_path"]),
 		HyperkubeImage:   envParams["hyperkube_image"],
 		RepositoryPrefix: envParams["repo_prefix"],

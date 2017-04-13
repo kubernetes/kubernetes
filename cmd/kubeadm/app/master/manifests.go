@@ -58,14 +58,19 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	volumes := []api.Volume{k8sVolume(cfg)}
 	volumeMounts := []api.VolumeMount{k8sVolumeMount()}
 
+	volumes = append(volumes, logVolume(cfg))
+	volumeMounts = append(volumeMounts, logVolumeMount())
+
+	extraVolumes := volumes
+	extraVolumeMounts := volumeMounts
 	if isCertsVolumeMountNeeded() {
-		volumes = append(volumes, certsVolume(cfg))
-		volumeMounts = append(volumeMounts, certsVolumeMount())
+		extraVolumes = append(extraVolumes, certsVolume(cfg))
+		extraVolumeMounts = append(extraVolumeMounts, certsVolumeMount())
 	}
 
 	if isPkiVolumeMountNeeded() {
-		volumes = append(volumes, pkiVolume(cfg))
-		volumeMounts = append(volumeMounts, pkiVolumeMount())
+		extraVolumes = append(extraVolumes, pkiVolume(cfg))
+		extraVolumeMounts = append(extraVolumeMounts, pkiVolumeMount())
 	}
 
 	// Prepare static pod specs
@@ -73,30 +78,30 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		kubeAPIServer: componentPod(api.Container{
 			Name:          kubeAPIServer,
 			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-			Command:       getAPIServerCommand(cfg, false),
-			VolumeMounts:  volumeMounts,
+			Command:       getRunCommand(getAPIServerCommand(cfg, false)),
+			VolumeMounts:  extraVolumeMounts,
 			LivenessProbe: componentProbe(int(cfg.API.BindPort), "/healthz", api.URISchemeHTTPS),
 			Resources:     componentResources("250m"),
 			Env:           getProxyEnvVars(),
-		}, volumes...),
+		}, extraVolumes...),
 		kubeControllerManager: componentPod(api.Container{
 			Name:          kubeControllerManager,
 			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-			Command:       getControllerManagerCommand(cfg, false),
-			VolumeMounts:  volumeMounts,
+			Command:       getRunCommand(getControllerManagerCommand(cfg, false)),
+			VolumeMounts:  extraVolumeMounts,
 			LivenessProbe: componentProbe(10252, "/healthz", api.URISchemeHTTP),
 			Resources:     componentResources("200m"),
 			Env:           getProxyEnvVars(),
-		}, volumes...),
+		}, extraVolumes...),
 		kubeScheduler: componentPod(api.Container{
 			Name:          kubeScheduler,
 			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-			Command:       getSchedulerCommand(cfg, false),
-			VolumeMounts:  []api.VolumeMount{k8sVolumeMount()},
+			Command:       getRunCommand(getSchedulerCommand(cfg, false)),
+			VolumeMounts:  volumeMounts,
 			LivenessProbe: componentProbe(10251, "/healthz", api.URISchemeHTTP),
 			Resources:     componentResources("100m"),
 			Env:           getProxyEnvVars(),
-		}, k8sVolume(cfg)),
+		}, volumes...),
 	}
 
 	// Add etcd static pod spec only if external etcd is not configured
@@ -242,6 +247,23 @@ func k8sVolumeMount() api.VolumeMount {
 	}
 }
 
+func logVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
+	return api.Volume{
+		Name: "log",
+		VolumeSource: api.VolumeSource{
+			HostPath: &api.HostPathVolumeSource{Path: kubeadmapi.GlobalEnvParams.KubernetesLogDir},
+		},
+	}
+}
+
+func logVolumeMount() api.VolumeMount {
+	return api.VolumeMount{
+		Name:      "log",
+		MountPath: kubeadmconstants.KubernetesLogDir,
+		ReadOnly:  false,
+	}
+}
+
 func componentResources(cpu string) api.ResourceRequirements {
 	return api.ResourceRequirements{
 		Requests: api.ResourceList{
@@ -291,6 +313,12 @@ func getComponentBaseCommand(component string) []string {
 	}
 
 	return []string{"kube-" + component}
+}
+
+func getRunCommand(actual []string) []string {
+	command := []string{"/bin/sh", "-c"}
+	command = append(command, strings.Join(actual, " "))
+	return command
 }
 
 func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
@@ -364,6 +392,8 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		}
 	}
 
+	command = append(command, "1>>"+path.Join(kubeadmconstants.KubernetesLogDir, kubeadmconstants.APIServerLogName))
+	command = append(command, "2>&1")
 	return command
 }
 
@@ -406,6 +436,8 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+cfg.Networking.PodSubnet)
 	}
 
+	command = append(command, "1>>"+path.Join(kubeadmconstants.KubernetesLogDir, kubeadmconstants.ControllerManagerLogName))
+	command = append(command, "2>&1")
 	return command
 }
 
@@ -426,6 +458,8 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 	command = getComponentBaseCommand(scheduler)
 	command = append(command, getExtraParameters(cfg.SchedulerExtraArgs, defaultArguments)...)
 
+	command = append(command, "1>>"+path.Join(kubeadmconstants.KubernetesLogDir, kubeadmconstants.SchedulerLogName))
+	command = append(command, "2>&1")
 	return command
 }
 
