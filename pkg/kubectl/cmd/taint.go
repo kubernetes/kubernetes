@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -140,9 +141,9 @@ func reorganizeTaints(obj runtime.Object, overwrite bool, taintsToAdd []v1.Taint
 	for _, taintToRemove := range taintsToRemove {
 		removed := false
 		if len(taintToRemove.Effect) > 0 {
-			newTaints, removed = v1.DeleteTaint(newTaints, &taintToRemove)
+			newTaints, removed = v1helper.DeleteTaint(newTaints, &taintToRemove)
 		} else {
-			newTaints, removed = v1.DeleteTaintsByKey(newTaints, taintToRemove.Key)
+			newTaints, removed = v1helper.DeleteTaintsByKey(newTaints, taintToRemove.Key)
 		}
 		if !removed {
 			allErrs = append(allErrs, fmt.Errorf("taint %q not found", taintToRemove.ToString()))
