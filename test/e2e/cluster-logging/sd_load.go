@@ -28,7 +28,7 @@ import (
 
 const (
 	// TODO(crassirostris): Once test is stable, decrease allowed loses
-	loadTestMaxAllowedLostFraction    = 0.1
+	loadTestMaxAllowedLostFraction    = 0.05
 	loadTestMaxAllowedFluentdRestarts = 1
 )
 
