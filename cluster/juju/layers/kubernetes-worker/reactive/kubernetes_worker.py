@@ -39,6 +39,11 @@ from charmhelpers.core.host import service_stop, service_restart
 from charmhelpers.contrib.charmsupport import nrpe
 
 
+# Override the default nagios shortname regex to allow periods, which we
+# need because our bin names contain them (e.g. 'snap.foo.daemon'). The
+# default regex in charmhelpers doesn't allow periods, but nagios itself does.
+nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
+
 kubeconfig_path = '/root/cdk/kubeconfig'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
