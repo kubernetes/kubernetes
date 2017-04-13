@@ -43,7 +43,6 @@ const (
 	nvidiaUVMDevice string = "/dev/nvidia-uvm"
 	// Optional device.
 	nvidiaUVMToolsDevice string = "/dev/nvidia-uvm-tools"
-	// devDirectory                = "/dev"
 	nvidiaDeviceRE              = `^nvidia[0-9]*$`
 	nvidiaFullpathRE            = `^/dev/nvidia[0-9]*$`
 )
