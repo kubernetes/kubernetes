@@ -209,7 +209,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 	}
 
 	if len(metrics) == 0 {
-		return 0, 0, fmt.Errorf("did not recieve metrics for any ready pods")
+		return 0, 0, fmt.Errorf("did not receive metrics for any ready pods")
 	}
 
 	usageRatio, utilization := metricsclient.GetMetricUtilizationRatio(metrics, targetUtilization)
