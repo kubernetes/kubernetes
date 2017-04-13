@@ -220,8 +220,8 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService, de
 	}
 	proxyHandler.updateAPIService(apiService, destinationHost)
 	s.proxyHandlers[apiService.Name] = proxyHandler
-	s.GenericAPIServer.HandlerContainer.ServeMux.Handle(proxyPath, proxyHandler)
-	s.GenericAPIServer.HandlerContainer.ServeMux.Handle(proxyPath+"/", proxyHandler)
+	s.GenericAPIServer.FallThroughHandler.Handle(proxyPath, proxyHandler)
+	s.GenericAPIServer.FallThroughHandler.UnlistedHandle(proxyPath+"/", proxyHandler)
 
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {
@@ -241,20 +241,28 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService, de
 		lister:          s.lister,
 		serviceLister:   s.serviceLister,
 		endpointsLister: s.endpointsLister,
-		delegate:        s.GenericAPIServer.FallThroughHandler,
+		delegate:        s.delegateHandler,
 	}
 	// aggregation is protected
-	s.GenericAPIServer.HandlerContainer.ServeMux.Handle(groupPath, groupDiscoveryHandler)
-	s.GenericAPIServer.HandlerContainer.ServeMux.Handle(groupPath+"/", groupDiscoveryHandler)
+	s.GenericAPIServer.FallThroughHandler.Handle(groupPath, groupDiscoveryHandler)
+	s.GenericAPIServer.FallThroughHandler.UnlistedHandle(groupPath+"/", groupDiscoveryHandler)
 	s.handledGroups.Insert(apiService.Spec.Group)
 }
 
-// RemoveAPIService removes the APIService from being handled.  Later on it will disable the proxy endpoint.
-// Right now it does nothing because our handler has to properly 404 itself since muxes don't unregister
+// RemoveAPIService removes the APIService from being handled.  It is not thread-safe, so only call it on one thread at a time please.
+// It's a slow moving API, so its ok to run the controller on a single thread.
 func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
-	proxyHandler, exists := s.proxyHandlers[apiServiceName]
-	if !exists {
-		return
+	version := apiregistration.APIServiceNameToGroupVersion(apiServiceName)
+
+	proxyPath := "/apis/" + version.Group + "/" + version.Version
+	// v1. is a special case for the legacy API.  It proxies to a wider set of endpoints.
+	if apiServiceName == legacyAPIServiceName {
+		proxyPath = "/api"
 	}
-	proxyHandler.removeAPIService()
+	s.GenericAPIServer.FallThroughHandler.Unregister(proxyPath)
+	s.GenericAPIServer.FallThroughHandler.Unregister(proxyPath + "/")
+	delete(s.proxyHandlers, apiServiceName)
+
+	// TODO unregister group level discovery when there are no more versions for the group
+	// We don't need this right away because the handler properly delegates when no versions are present
 }
