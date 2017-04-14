@@ -17,6 +17,11 @@ limitations under the License.
 package e2e_node
 
 import (
+	"context"
+	"time"
+
+	dockerapi "github.com/docker/engine-api/client"
+	dockertypes "github.com/docker/engine-api/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -35,11 +40,34 @@ const (
 	checkContName = "checker-container"
 )
 
+func isNotUsingJsonFileLogging() bool {
+	client, err := dockerapi.NewEnvClient()
+	if err != nil {
+		return false
+	}
+	getInfo := func() (dockertypes.Info, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		return client.Info(ctx)
+	}
+	info, err := getInfo()
+	if err != nil {
+		return false
+	}
+	if info.LoggingDriver == "json-file" {
+		return false
+	}
+	return true
+}
+
 var _ = framework.KubeDescribe("ContainerLogPath", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
 	Describe("Pod with a container", func() {
 		Context("printed log to stdout", func() {
 			It("should print log to correct log path", func() {
+				if isNotUsingJsonFileLogging() {
+					Skip("Docker is not using the json-file logging driver")
+				}
 				podClient := f.PodClient()
 				ns := f.Namespace.Name
 
