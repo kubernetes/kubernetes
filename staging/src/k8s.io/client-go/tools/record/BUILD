@@ -22,8 +22,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api/install:go_default_library",
         "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/api/v1/ref:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",

@@ -29,8 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/client-go/pkg/api"
-	_ "k8s.io/client-go/pkg/api/install" // To register api.Pod used in tests below
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/api/v1/ref"
 	restclient "k8s.io/client-go/rest"
@@ -105,6 +103,9 @@ func OnPatchFactory(testCache map[string]*v1.Event, patchEvent chan<- *v1.Event)
 
 func TestEventf(t *testing.T) {
 	testPod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Pod",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			SelfLink:  "/api/version/pods/foo",
 			Name:      "foo",
@@ -113,6 +114,9 @@ func TestEventf(t *testing.T) {
 		},
 	}
 	testPod2 := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Pod",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			SelfLink:  "/api/version/pods/foo",
 			Name:      "foo",
@@ -120,8 +124,8 @@ func TestEventf(t *testing.T) {
 			UID:       "differentUid",
 		},
 	}
-	testRef, err := ref.GetPartialReference(api.Scheme, testPod, "spec.containers[2]")
-	testRef2, err := ref.GetPartialReference(api.Scheme, testPod2, "spec.containers[3]")
+	testRef, err := ref.GetPartialReference(nil, testPod, "spec.containers[2]")
+	testRef2, err := ref.GetPartialReference(nil, testPod2, "spec.containers[3]")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +380,7 @@ func TestEventf(t *testing.T) {
 }
 
 func recorderWithFakeClock(eventSource v1.EventSource, eventBroadcaster EventBroadcaster, clock clock.Clock) EventRecorder {
-	return &recorderImpl{api.Scheme, eventSource, eventBroadcaster.(*eventBroadcasterImpl).Broadcaster, clock}
+	return &recorderImpl{nil, eventSource, eventBroadcaster.(*eventBroadcasterImpl).Broadcaster, clock}
 }
 
 func TestWriteEventError(t *testing.T) {
@@ -497,7 +501,7 @@ func TestLotsOfEvents(t *testing.T) {
 	logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 		loggerCalled <- struct{}{}
 	})
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "eventTest"})
+	recorder := eventBroadcaster.NewRecorder(nil, v1.EventSource{Component: "eventTest"})
 	ref := &v1.ObjectReference{
 		Kind:       "Pod",
 		Name:       "foo",
@@ -526,13 +530,16 @@ func TestLotsOfEvents(t *testing.T) {
 
 func TestEventfNoNamespace(t *testing.T) {
 	testPod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Pod",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			SelfLink: "/api/version/pods/foo",
 			Name:     "foo",
 			UID:      "bar",
 		},
 	}
-	testRef, err := ref.GetPartialReference(api.Scheme, testPod, "spec.containers[2]")
+	testRef, err := ref.GetPartialReference(nil, testPod, "spec.containers[2]")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -623,6 +630,9 @@ func TestEventfNoNamespace(t *testing.T) {
 
 func TestMultiSinkCache(t *testing.T) {
 	testPod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Pod",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			SelfLink:  "/api/version/pods/foo",
 			Name:      "foo",
@@ -631,6 +641,9 @@ func TestMultiSinkCache(t *testing.T) {
 		},
 	}
 	testPod2 := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Pod",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			SelfLink:  "/api/version/pods/foo",
 			Name:      "foo",
@@ -638,8 +651,8 @@ func TestMultiSinkCache(t *testing.T) {
 			UID:       "differentUid",
 		},
 	}
-	testRef, err := ref.GetPartialReference(api.Scheme, testPod, "spec.containers[2]")
-	testRef2, err := ref.GetPartialReference(api.Scheme, testPod2, "spec.containers[3]")
+	testRef, err := ref.GetPartialReference(nil, testPod, "spec.containers[2]")
+	testRef2, err := ref.GetPartialReference(nil, testPod2, "spec.containers[3]")
 	if err != nil {
 		t.Fatal(err)
 	}
