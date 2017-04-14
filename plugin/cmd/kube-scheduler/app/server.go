@@ -116,7 +116,7 @@ func Run(s *options.SchedulerServer) error {
 			Namespace: s.LockObjectNamespace,
 			Name:      s.LockObjectName,
 		},
-		Client: kubecli,
+		Client: kubecli.CoreV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,

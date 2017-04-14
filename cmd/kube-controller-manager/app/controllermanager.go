@@ -198,7 +198,7 @@ func Run(s *options.CMServer) error {
 			Namespace: "kube-system",
 			Name:      "kube-controller-manager",
 		},
-		Client: leaderElectionClient,
+		Client: leaderElectionClient.CoreV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
