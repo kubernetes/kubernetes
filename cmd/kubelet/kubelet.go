@@ -29,7 +29,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
-	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
+	"k8s.io/kubernetes/pkg/helpflag"
+	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -44,6 +45,7 @@ func main() {
 	defer logs.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
+	helpflag.PrintAndExitIfRequested()
 
 	if s.ExperimentalDockershim {
 		if err := app.RunDockershim(&s.KubeletConfiguration, s.DockershimRootDirectory); err != nil {
