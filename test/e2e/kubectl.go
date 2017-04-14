@@ -787,7 +787,6 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			})
 
 			// Rc
-			output := framework.RunKubectlOrDie("describe", "rc", "redis-master", nsFlag)
 			requiredStrings := [][]string{
 				{"Name:", "redis-master"},
 				{"Namespace:", ns},
@@ -800,10 +799,10 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				{"Pod Template:"},
 				{"Image:", redisImage},
 				{"Events:"}}
-			checkOutput(output, requiredStrings)
+			checkKubectlOutputWithRetry(requiredStrings, "describe", "rc", "redis-master", nsFlag)
 
 			// Service
-			output = framework.RunKubectlOrDie("describe", "service", "redis-master", nsFlag)
+			output := framework.RunKubectlOrDie("describe", "service", "redis-master", nsFlag)
 			requiredStrings = [][]string{
 				{"Name:", "redis-master"},
 				{"Namespace:", ns},
@@ -1630,7 +1629,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 })
 
 // Checks whether the output split by line contains the required elements.
-func checkOutput(output string, required [][]string) {
+func checkOutputReturnErrorString(output string, required [][]string) string {
 	outputLines := strings.Split(output, "\n")
 	currentLine := 0
 	for _, requirement := range required {
@@ -1638,14 +1637,35 @@ func checkOutput(output string, required [][]string) {
 			currentLine++
 		}
 		if currentLine == len(outputLines) {
-			framework.Failf("Failed to find %s in %s", requirement[0], output)
+			return fmt.Sprintf("Failed to find %s in %s", requirement[0], output)
 		}
 		for _, item := range requirement[1:] {
 			if !strings.Contains(outputLines[currentLine], item) {
-				framework.Failf("Failed to find %s in %s", item, outputLines[currentLine])
+				return fmt.Sprintf("Failed to find %s in %s", item, outputLines[currentLine])
 			}
 		}
 	}
+	return ""
+}
+
+func checkOutput(output string, required [][]string) {
+	errString := checkOutputReturnErrorString(output, required)
+	if len(errString) > 0 {
+		framework.Failf("%s", errString)
+	}
+}
+
+func checkKubectlOutputWithRetry(required [][]string, args ...string) {
+	var errString string
+	for i := 0; i < 5; i++ {
+		output := framework.RunKubectlOrDie(args...)
+		errString = checkOutputReturnErrorString(output, required)
+		if len(errString) == 0 {
+			return
+		}
+	}
+	framework.Failf("%s", errString)
+
 }
 
 func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {
