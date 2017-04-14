@@ -1886,7 +1886,11 @@ func LoadConfig() (*restclient.Config, error) {
 	}
 	c, err := RestclientConfig(TestContext.KubeContext)
 	if err != nil {
-		return nil, err
+		if TestContext.KubeConfig == "" {
+			return restclient.InClusterConfig()
+		} else {
+			return nil, err
+		}
 	}
 
 	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
