@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -2068,14 +2069,14 @@ func newRktExitError(e error) error {
 	return e
 }
 
-func (r *Runtime) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (r *Runtime) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	return fmt.Errorf("unimplemented")
 }
 
 // Note: In rkt, the container ID is in the form of "UUID:appName", where UUID is
 // the rkt UUID, and appName is the container name.
 // TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
-func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
+func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	glog.V(4).Infof("Rkt execing in container.")
 
 	id, err := parseContainerID(containerID)
@@ -2096,7 +2097,7 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 		// make sure to close the stdout stream
 		defer stdout.Close()
 
-		kubecontainer.HandleResizing(resize, func(size term.Size) {
+		kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
 			term.SetSize(p.Fd(), size)
 		})
 
