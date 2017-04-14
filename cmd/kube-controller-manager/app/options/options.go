@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates

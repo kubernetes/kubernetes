@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	// add the kubernetes feature gates

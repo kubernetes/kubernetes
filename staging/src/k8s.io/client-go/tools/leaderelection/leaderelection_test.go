@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
+	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 )
 
 func createLockObject(objectType string, objectMeta metav1.ObjectMeta) (obj runtime.Object) {

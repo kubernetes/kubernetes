@@ -28,7 +28,7 @@ import (
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/client-go/tools/leaderelection"
 )
 
 type ControllerManagerConfiguration struct {
