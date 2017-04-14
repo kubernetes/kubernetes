@@ -219,7 +219,10 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
 
 	var proxier proxy.ProxyProvider
-	var servicesHandler proxyconfig.ServiceConfigHandler
+	var serviceEventHandler proxyconfig.ServiceHandler
+	// TODO: Migrate all handlers to ServiceHandler types and
+	// get rid of this one.
+	var serviceHandler proxyconfig.ServiceConfigHandler
 	var endpointsEventHandler proxyconfig.EndpointsHandler
 
 	proxyMode := getProxyMode(string(config.Mode), client.Core().Nodes(), hostname, iptInterface, iptables.LinuxKernelCompatTester{})
@@ -246,7 +249,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
 		proxier = proxierIPTables
-		servicesHandler = proxierIPTables
+		serviceEventHandler = proxierIPTables
 		endpointsEventHandler = proxierIPTables
 		// No turning back. Remove artifacts that might still exist from the userspace Proxier.
 		glog.V(0).Info("Tearing down userspace rules.")
@@ -271,7 +274,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			if err != nil {
 				glog.Fatalf("Unable to create proxier: %v", err)
 			}
-			servicesHandler = proxierUserspace
+			serviceHandler = proxierUserspace
 			proxier = proxierUserspace
 		} else {
 			// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
@@ -292,7 +295,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			if err != nil {
 				glog.Fatalf("Unable to create proxier: %v", err)
 			}
-			servicesHandler = proxierUserspace
+			serviceHandler = proxierUserspace
 			proxier = proxierUserspace
 		}
 		// Remove artifacts from the pure-iptables Proxier, if not on Windows.
@@ -314,7 +317,12 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
 	serviceConfig := proxyconfig.NewServiceConfig(informerFactory.Core().InternalVersion().Services(), config.ConfigSyncPeriod)
-	serviceConfig.RegisterHandler(servicesHandler)
+	if serviceHandler != nil {
+		serviceConfig.RegisterHandler(serviceHandler)
+	}
+	if serviceEventHandler != nil {
+		serviceConfig.RegisterEventHandler(serviceEventHandler)
+	}
 	go serviceConfig.Run(wait.NeverStop)
 
 	endpointsConfig := proxyconfig.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), config.ConfigSyncPeriod)
