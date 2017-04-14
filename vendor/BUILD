@@ -372,3 +372,10 @@ filegroup(
     ],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "k8s.io/client-go/pkg/api/v1/node",
+    srcs = ["k8s.io/client-go/pkg/api/v1/node/util.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/client-go/pkg/api/v1"],
+)

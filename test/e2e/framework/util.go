@@ -73,8 +73,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/api/v1/resource"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
@@ -4211,7 +4211,7 @@ func WaitForNodeToBe(c clientset.Interface, name string, conditionType v1.NodeCo
 // TODO: we should extend it for other reasons.
 func allowedNotReadyReasons(nodes []*v1.Node) bool {
 	for _, node := range nodes {
-		index, condition := resource.GetNodeCondition(&node.Status, v1.NodeReady)
+		index, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 		if index == -1 ||
 			!strings.Contains(condition.Message, "could not locate kubenet required CNI plugins") {
 			return false
