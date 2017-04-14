@@ -1,6 +1,6 @@
 // Copyright ©2015 Steve Francia <spf@spf13.com>
 // Portions Copyright ©2015 The Hugo Authors
-// Portions Copyright 2016-present Bjørn Erik Pedersen <bjorn.erik.pedersen@gmail.com>
+// Portions Copyright 2017-present Bjørn Erik Pedersen <bjorn.erik.pedersen@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
