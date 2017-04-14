@@ -1284,30 +1284,47 @@ func TestRootSelfLink(t *testing.T) {
 		takesPath: "atAPath",
 	}
 	storage["simple"] = &simpleStorage
+	storage["simple/sub"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	testCases := []struct {
+		url      string
+		selfLink string
+	}{
+		{
+			url:      server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo",
+			selfLink: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo",
+		},
+		{
+			url:      server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo/sub",
+			selfLink: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo/sub",
+		},
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
-		body, err := ioutil.ReadAll(resp.Body)
+	for _, test := range testCases {
+		resp, err := http.Get(test.url)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		t.Logf("Data: %s", string(body))
-	}
-	var out genericapitesting.SimpleRoot
-	if _, err := extractBody(resp, &out); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
 
-	if out.SelfLink != "/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/simple/foo" {
-		t.Errorf("unexpected self link: %#v", out)
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			t.Logf("Data: %s", string(body))
+		}
+		var out genericapitesting.SimpleRoot
+		if _, err := extractBody(resp, &out); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if out.SelfLink != test.selfLink {
+			t.Errorf("unexpected self link: %#v", out.SelfLink)
+		}
 	}
 }
 
