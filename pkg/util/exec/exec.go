@@ -49,6 +49,7 @@ type Cmd interface {
 	SetDir(dir string)
 	SetStdin(in io.Reader)
 	SetStdout(out io.Writer)
+	SetStderr(err io.Writer)
 	// Stops the command by sending SIGTERM. It is not guaranteed the
 	// process will stop before this function returns. If the process is not
 	// responding, an internal timer function will send a SIGKILL to force
@@ -97,6 +98,10 @@ func (cmd *cmdWrapper) SetStdin(in io.Reader) {
 
 func (cmd *cmdWrapper) SetStdout(out io.Writer) {
 	cmd.Stdout = out
+}
+
+func (cmd *cmdWrapper) SetStderr(err io.Writer) {
+	cmd.Stderr = err
 }
 
 // CombinedOutput is part of the Cmd interface.
