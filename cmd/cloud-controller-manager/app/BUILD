@@ -16,8 +16,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions:go_default_library",
-        "//pkg/client/leaderelection:go_default_library",
-        "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/cloud:go_default_library",
@@ -35,6 +33,8 @@ go_library(
         "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//vendor/k8s.io/client-go/tools/leaderelection:go_default_library",
+        "//vendor/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ],
 )

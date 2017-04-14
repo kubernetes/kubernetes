@@ -13,12 +13,12 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/client/leaderelection:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/client-go/tools/leaderelection:go_default_library",
     ],
 )
 
