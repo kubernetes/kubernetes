@@ -28,7 +28,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
-	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	fakecorev1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1/fake"
 	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 )
 
@@ -219,7 +219,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			Identity:      "baz",
 			EventRecorder: &record.FakeRecorder{},
 		}
-		c := &fakeclientset.Clientset{Fake: core.Fake{}}
+		c := &fakecorev1.FakeCoreV1{Fake: &core.Fake{}}
 		for _, reactor := range test.reactors {
 			c.AddReactor(reactor.verb, objectType, reactor.reaction)
 		}
