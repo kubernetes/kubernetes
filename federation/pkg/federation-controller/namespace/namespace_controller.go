@@ -173,6 +173,7 @@ func NewNamespaceController(client federationclientset.Interface, dynamicClientP
 			err := client.Core().Namespaces().Delete(namespace.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
 			// IsNotFound error is fine since that means the object is deleted already.
 			if errors.IsNotFound(err) {
+				glog.V(4).Infof("Namespace %s no longer exists", namespace.Name)
 				return nil
 			}
 			return err

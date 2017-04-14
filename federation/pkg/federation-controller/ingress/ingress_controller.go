@@ -257,6 +257,11 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			glog.V(4).Infof("Attempting to delete Ingress: %v", ingress)
 			orphanDependents := false
 			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("Ingress %s/%s no longer exists", ingress.Namespace, ingress.Name)
+				return nil
+			}
 			return err
 		})
 
@@ -286,6 +291,11 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Internal error: Incorrectly attempting to delete ConfigMap: %q", configMapName)
 			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("ConfigMap %q no longer exists", configMapName)
+				return nil
+			}
 			return err
 		})
 

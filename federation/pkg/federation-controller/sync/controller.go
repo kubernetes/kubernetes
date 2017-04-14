@@ -176,9 +176,15 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
+			secret := obj.(*apiv1.Secret)
 			namespacedName := adapter.NamespacedName(obj)
 			orphanDependents := false
 			err := adapter.ClusterDelete(client, namespacedName, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("Secret %s/%s no longer exists", secret.Namespace, secret.Name)
+				return nil
+			}
 			return err
 		})
 

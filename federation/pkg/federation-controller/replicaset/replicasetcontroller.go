@@ -211,6 +211,11 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			rs := obj.(*extensionsv1.ReplicaSet)
 			orphanDependents := false
 			err := client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("ReplicaSet %s/%s no longer exists", rs.Namespace, rs.Name)
+				return nil
+			}
 			return err
 		})
 

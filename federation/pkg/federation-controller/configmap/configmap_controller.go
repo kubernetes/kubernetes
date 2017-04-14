@@ -171,6 +171,11 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 			configmap := obj.(*apiv1.ConfigMap)
 			orphanDependents := false
 			err := client.Core().ConfigMaps(configmap.Namespace).Delete(configmap.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("Configmap %s/%s no longer exists", configmap.Namespace, configmap.Name)
+				return nil
+			}
 			return err
 		})
 

@@ -291,8 +291,14 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			svc := obj.(*v1.Service)
+			glog.V(4).Infof("Attempting to delete service: %s/%s", svc.Namespace, svc.Name)
 			orphanDependents := false
 			err := client.Core().Services(svc.Namespace).Delete(svc.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("Service %s/%s no longer exists", svc.Namespace, svc.Name)
+				return nil
+			}
 			return err
 		})
 

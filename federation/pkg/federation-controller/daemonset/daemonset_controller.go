@@ -184,6 +184,11 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 			glog.V(4).Infof("Attempting to delete daemonset: %s/%s", daemonset.Namespace, daemonset.Name)
 			orphanDependents := false
 			err := client.Extensions().DaemonSets(daemonset.Namespace).Delete(daemonset.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("Daemonset %s/%s no longer exists", daemonset.Namespace, daemonset.Name)
+				return nil
+			}
 			if err != nil {
 				glog.Errorf("Error deleting daemonset %s/%s/: %v", daemonset.Namespace, daemonset.Name, err)
 			} else {
