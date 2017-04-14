@@ -94,9 +94,10 @@ func TestRequestSetsHeaders(t *testing.T) {
 }
 
 func TestRequestWithErrorWontChange(t *testing.T) {
+	gvCopy := v1.SchemeGroupVersion
 	original := Request{
 		err:     errors.New("test"),
-		content: ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion},
+		content: ContentConfig{GroupVersion: &gvCopy},
 	}
 	r := original
 	changed := r.Param("foo", "bar").
@@ -279,8 +280,9 @@ func (obj NotAnAPIObject) GroupVersionKind() *schema.GroupVersionKind       { re
 func (obj NotAnAPIObject) SetGroupVersionKind(gvk *schema.GroupVersionKind) {}
 
 func defaultContentConfig() ContentConfig {
+	gvCopy := v1.SchemeGroupVersion
 	return ContentConfig{
-		GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
+		GroupVersion:         &gvCopy,
 		NegotiatedSerializer: api.Codecs,
 	}
 }
@@ -1282,7 +1284,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := defaultResourcePathWithPrefix("foo", "bar", "", "baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?" + metav1.LabelSelectorQueryParam(v1.SchemeGroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
@@ -1322,7 +1324,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := defaultResourcePathWithPrefix("", "foo", "", "bar/baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?" + metav1.LabelSelectorQueryParam(v1.SchemeGroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
