@@ -32,9 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/pod"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler"
@@ -98,7 +97,7 @@ type VolumeManager interface {
 	// actual state of the world).
 	// An error is returned if all volumes are not attached and mounted within
 	// the duration defined in podAttachAndMountTimeout.
-	WaitForAttachAndMount(pod *v1.Pod) error
+	WaitForAttachAndMount(pod *kubepod.Pod) error
 
 	// GetMountedVolumesForPod returns a VolumeMap containing the volumes
 	// referenced by the specified pod that are successfully attached and
@@ -145,7 +144,7 @@ type VolumeManager interface {
 func NewVolumeManager(
 	controllerAttachDetachEnabled bool,
 	nodeName k8stypes.NodeName,
-	podManager pod.Manager,
+	podManager kubepod.Manager,
 	podStatusProvider status.PodStatusProvider,
 	kubeClient clientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,
@@ -328,15 +327,15 @@ func (vm *volumeManager) MarkVolumesAsReportedInUse(
 	vm.desiredStateOfWorld.MarkVolumesReportedInUse(volumesReportedAsInUse)
 }
 
-func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
+func (vm *volumeManager) WaitForAttachAndMount(pod *kubepod.Pod) error {
 	expectedVolumes := getExpectedVolumes(pod)
 	if len(expectedVolumes) == 0 {
 		// No volumes to verify
 		return nil
 	}
 
-	glog.V(3).Infof("Waiting for volumes to attach and mount for pod %q", format.Pod(pod))
-	uniquePodName := volumehelper.GetUniquePodName(pod)
+	glog.V(3).Infof("Waiting for volumes to attach and mount for pod %q", pod.String())
+	uniquePodName := volumehelper.GetUniquePodName(pod.GetAPIPod())
 
 	// Some pods expect to have Setup called over and over again to update.
 	// Remount plugins for which this is true. (Atomically updating volumes,
@@ -359,12 +358,12 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 
 		return fmt.Errorf(
 			"timeout expired waiting for volumes to attach/mount for pod %q/%q. list of unattached/unmounted volumes=%v",
-			pod.Namespace,
-			pod.Name,
+			pod.Namespace(),
+			pod.Name(),
 			unmountedVolumes)
 	}
 
-	glog.V(3).Infof("All volumes are attached and mounted for pod %q", format.Pod(pod))
+	glog.V(3).Infof("All volumes are attached and mounted for pod %q", pod.String())
 	return nil
 }
 
@@ -404,13 +403,13 @@ func filterUnmountedVolumes(
 
 // getExpectedVolumes returns a list of volumes that must be mounted in order to
 // consider the volume setup step for this pod satisfied.
-func getExpectedVolumes(pod *v1.Pod) []string {
+func getExpectedVolumes(pod *kubepod.Pod) []string {
 	expectedVolumes := []string{}
 	if pod == nil {
 		return expectedVolumes
 	}
 
-	for _, podVolume := range pod.Spec.Volumes {
+	for _, podVolume := range pod.GetSpec().Volumes {
 		expectedVolumes = append(expectedVolumes, podVolume.Name)
 	}
 

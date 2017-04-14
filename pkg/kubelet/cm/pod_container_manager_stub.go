@@ -19,6 +19,7 @@ package cm
 import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 type podContainerManagerStub struct {
@@ -26,15 +27,15 @@ type podContainerManagerStub struct {
 
 var _ PodContainerManager = &podContainerManagerStub{}
 
-func (m *podContainerManagerStub) Exists(_ *v1.Pod) bool {
+func (m *podContainerManagerStub) Exists(_ *kubepod.Pod) bool {
 	return true
 }
 
-func (m *podContainerManagerStub) EnsureExists(_ *v1.Pod) error {
+func (m *podContainerManagerStub) EnsureExists(_ *kubepod.Pod) error {
 	return nil
 }
 
-func (m *podContainerManagerStub) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
+func (m *podContainerManagerStub) GetPodContainerName(_ *v1.PodSpec, _ types.UID) (CgroupName, string) {
 	return "", ""
 }
 

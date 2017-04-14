@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 )
@@ -42,7 +43,7 @@ type fakePodWorkers struct {
 }
 
 func (f *fakePodWorkers) UpdatePod(options *UpdatePodOptions) {
-	status, err := f.cache.Get(options.Pod.UID)
+	status, err := f.cache.Get(options.Pod.UID())
 	if err != nil {
 		f.t.Errorf("Unexpected error: %v", err)
 	}
@@ -65,13 +66,13 @@ type TestingInterface interface {
 	Errorf(format string, args ...interface{})
 }
 
-func newPod(uid, name string) *v1.Pod {
-	return &v1.Pod{
+func newPod(uid, name string) *kubepod.Pod {
+	return kubepod.NewPod(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:  types.UID(uid),
 			Name: name,
 		},
-	}
+	})
 }
 
 // syncPodRecord is a record of a sync pod call
@@ -92,8 +93,8 @@ func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 				lock.Lock()
 				defer lock.Unlock()
 				pod := options.pod
-				processed[pod.UID] = append(processed[pod.UID], syncPodRecord{
-					name:       pod.Name,
+				processed[pod.UID()] = append(processed[pod.UID()], syncPodRecord{
+					name:       pod.Name(),
 					updateType: options.updateType,
 				})
 			}()
@@ -240,8 +241,8 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 }
 
 type simpleFakeKubelet struct {
-	pod       *v1.Pod
-	mirrorPod *v1.Pod
+	pod       *kubepod.Pod
+	mirrorPod *kubepod.Pod
 	podStatus *kubecontainer.PodStatus
 	wg        sync.WaitGroup
 }
@@ -284,20 +285,20 @@ func TestFakePodWorkers(t *testing.T) {
 	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeCache, t}
 
 	tests := []struct {
-		pod       *v1.Pod
-		mirrorPod *v1.Pod
+		pod       *kubepod.Pod
+		mirrorPod *kubepod.Pod
 	}{
 		{
-			&v1.Pod{},
-			&v1.Pod{},
+			kubepod.NewPod(&v1.Pod{}),
+			kubepod.NewPod(&v1.Pod{}),
 		},
 		{
-			podWithUidNameNs("12345678", "foo", "new"),
-			podWithUidNameNs("12345678", "fooMirror", "new"),
+			kubepod.NewPod(podWithUidNameNs("12345678", "foo", "new")),
+			kubepod.NewPod(podWithUidNameNs("12345678", "fooMirror", "new")),
 		},
 		{
-			podWithUidNameNs("98765", "bar", "new"),
-			podWithUidNameNs("98765", "barMirror", "new"),
+			kubepod.NewPod(podWithUidNameNs("98765", "bar", "new")),
+			kubepod.NewPod(podWithUidNameNs("98765", "barMirror", "new")),
 		},
 	}
 
@@ -345,7 +346,7 @@ func TestKillPodNowFunc(t *testing.T) {
 		t.Errorf("len(processed) expected: %v, actual: %v", 1, len(processed))
 		return
 	}
-	syncPodRecords := processed[pod.UID]
+	syncPodRecords := processed[pod.UID()]
 	if len(syncPodRecords) != 1 {
 		t.Errorf("Pod processed %v times, but expected %v", len(syncPodRecords), 1)
 	}

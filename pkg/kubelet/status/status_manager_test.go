@@ -62,11 +62,11 @@ func (m *manager) testSyncBatch() {
 	for uid, status := range m.podStatuses {
 		pod, ok := m.podManager.GetPodByUID(uid)
 		if ok {
-			pod.Status = status.status
+			pod.SetStatus(&status.status)
 		}
 		pod, ok = m.podManager.GetMirrorPodByPod(pod)
 		if ok {
-			pod.Status = status.status
+			pod.SetStatus(&status.status)
 		}
 	}
 	m.syncBatch()
@@ -128,7 +128,7 @@ func (m *manager) consumeUpdates() int {
 
 func TestNewStatus(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
-	testPod := getTestPod()
+	testPod := kubepod.NewPod(getTestPod())
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	verifyUpdates(t, syncer, 1)
 
@@ -140,7 +140,7 @@ func TestNewStatus(t *testing.T) {
 
 func TestNewStatusPreservesPodStartTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
-	pod := &v1.Pod{
+	apiPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
@@ -150,7 +150,8 @@ func TestNewStatusPreservesPodStartTime(t *testing.T) {
 	}
 	now := metav1.Now()
 	startTime := metav1.NewTime(now.Time.Add(-1 * time.Minute))
-	pod.Status.StartTime = &startTime
+	apiPod.Status.StartTime = &startTime
+	pod := kubepod.NewPod(apiPod)
 	syncer.SetPodStatus(pod, getRandomPodStatus())
 
 	status := expectPodStatus(t, syncer, pod)
@@ -173,14 +174,14 @@ func getReadyPodStatus() v1.PodStatus {
 func TestNewStatusSetsReadyTransitionTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	podStatus := getReadyPodStatus()
-	pod := &v1.Pod{
+	pod := kubepod.NewPod(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
 		},
 		Status: v1.PodStatus{},
-	}
+	})
 	syncer.SetPodStatus(pod, podStatus)
 	verifyUpdates(t, syncer, 1)
 	status := expectPodStatus(t, syncer, pod)
@@ -192,7 +193,7 @@ func TestNewStatusSetsReadyTransitionTime(t *testing.T) {
 
 func TestChangedStatus(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
-	testPod := getTestPod()
+	testPod := kubepod.NewPod(getTestPod())
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	verifyUpdates(t, syncer, 2)
@@ -200,7 +201,7 @@ func TestChangedStatus(t *testing.T) {
 
 func TestChangedStatusKeepsStartTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
-	testPod := getTestPod()
+	testPod := kubepod.NewPod(getTestPod())
 	now := metav1.Now()
 	firstStatus := getRandomPodStatus()
 	firstStatus.StartTime = &now
@@ -220,14 +221,14 @@ func TestChangedStatusKeepsStartTime(t *testing.T) {
 func TestChangedStatusUpdatesLastTransitionTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	podStatus := getReadyPodStatus()
-	pod := &v1.Pod{
+	pod := kubepod.NewPod(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
 		},
 		Status: v1.PodStatus{},
-	}
+	})
 	syncer.SetPodStatus(pod, podStatus)
 	verifyUpdates(t, syncer, 1)
 	oldStatus := expectPodStatus(t, syncer, pod)
@@ -249,7 +250,7 @@ func TestChangedStatusUpdatesLastTransitionTime(t *testing.T) {
 
 func TestUnchangedStatus(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
-	testPod := getTestPod()
+	testPod := kubepod.NewPod(getTestPod())
 	podStatus := getRandomPodStatus()
 	syncer.SetPodStatus(testPod, podStatus)
 	syncer.SetPodStatus(testPod, podStatus)
@@ -259,14 +260,14 @@ func TestUnchangedStatus(t *testing.T) {
 func TestUnchangedStatusPreservesLastTransitionTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	podStatus := getReadyPodStatus()
-	pod := &v1.Pod{
+	pod := kubepod.NewPod(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
 		},
 		Status: v1.PodStatus{},
-	}
+	})
 	syncer.SetPodStatus(pod, podStatus)
 	verifyUpdates(t, syncer, 1)
 	oldStatus := expectPodStatus(t, syncer, pod)
@@ -292,27 +293,27 @@ func TestSyncPodIgnoresNotFound(t *testing.T) {
 	client.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, errors.NewNotFound(api.Resource("pods"), "test-pod")
 	})
-	syncer.SetPodStatus(getTestPod(), getRandomPodStatus())
+	syncer.SetPodStatus(kubepod.NewPod(getTestPod()), getRandomPodStatus())
 	verifyActions(t, syncer, []core.Action{getAction()})
 }
 
 func TestSyncPod(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
-	testPod := getTestPod()
-	syncer.kubeClient = fake.NewSimpleClientset(testPod)
+	testPod := kubepod.NewPod(getTestPod())
+	syncer.kubeClient = fake.NewSimpleClientset(testPod.GetAPIPod())
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	verifyActions(t, syncer, []core.Action{getAction(), updateAction()})
 }
 
 func TestSyncPodChecksMismatchedUID(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
-	pod := getTestPod()
-	pod.UID = "first"
-	syncer.podManager.AddPod(pod)
-	differentPod := getTestPod()
-	differentPod.UID = "second"
-	syncer.podManager.AddPod(differentPod)
-	syncer.kubeClient = fake.NewSimpleClientset(pod)
+	p := getTestPod()
+	p.UID = "first"
+	pod := syncer.podManager.AddPod(p)
+	dPod := getTestPod()
+	dPod.UID = "second"
+	differentPod := syncer.podManager.AddPod(dPod)
+	syncer.kubeClient = fake.NewSimpleClientset(pod.GetAPIPod())
 	syncer.SetPodStatus(differentPod, getRandomPodStatus())
 	verifyActions(t, syncer, []core.Action{getAction()})
 }
@@ -320,7 +321,7 @@ func TestSyncPodChecksMismatchedUID(t *testing.T) {
 func TestSyncPodNoDeadlock(t *testing.T) {
 	client := &fake.Clientset{}
 	m := newTestManager(client)
-	pod := getTestPod()
+	apiPod := getTestPod()
 
 	// Setup fake client.
 	var ret v1.Pod
@@ -328,20 +329,21 @@ func TestSyncPodNoDeadlock(t *testing.T) {
 	client.AddReactor("*", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		switch action := action.(type) {
 		case core.GetAction:
-			assert.Equal(t, pod.Name, action.GetName(), "Unexpeted GetAction: %+v", action)
+			assert.Equal(t, apiPod.Name, action.GetName(), "Unexpeted GetAction: %+v", action)
 		case core.UpdateAction:
-			assert.Equal(t, pod.Name, action.GetObject().(*v1.Pod).Name, "Unexpeted UpdateAction: %+v", action)
+			assert.Equal(t, apiPod.Name, action.GetObject().(*v1.Pod).Name, "Unexpeted UpdateAction: %+v", action)
 		default:
 			assert.Fail(t, "Unexpected Action: %+v", action)
 		}
 		return true, &ret, err
 	})
 
-	pod.Status.ContainerStatuses = []v1.ContainerStatus{{State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}}}
+	apiPod.Status.ContainerStatuses = []v1.ContainerStatus{{State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}}}
+	pod := kubepod.NewPod(apiPod)
 
 	t.Logf("Pod not found.")
-	ret = *pod
-	err = errors.NewNotFound(api.Resource("pods"), pod.Name)
+	ret = *apiPod
+	err = errors.NewNotFound(api.Resource("pods"), pod.Name())
 	m.SetPodStatus(pod, getRandomPodStatus())
 	verifyActions(t, m, []core.Action{getAction()})
 
@@ -352,18 +354,21 @@ func TestSyncPodNoDeadlock(t *testing.T) {
 	verifyActions(t, m, []core.Action{getAction()})
 
 	t.Logf("Pod not deleted (success case).")
-	ret = *pod
+	ret = *apiPod
 	m.SetPodStatus(pod, getRandomPodStatus())
 	verifyActions(t, m, []core.Action{getAction(), updateAction()})
 
 	t.Logf("Pod is terminated, but still running.")
-	pod.DeletionTimestamp = new(metav1.Time)
+	apiPod.DeletionTimestamp = new(metav1.Time)
+	pod = kubepod.NewPod(apiPod)
 	m.SetPodStatus(pod, getRandomPodStatus())
 	verifyActions(t, m, []core.Action{getAction(), updateAction()})
 
 	t.Logf("Pod is terminated successfully.")
-	pod.Status.ContainerStatuses[0].State.Running = nil
-	pod.Status.ContainerStatuses[0].State.Terminated = &v1.ContainerStateTerminated{}
+	status := pod.GetStatus()
+	status.ContainerStatuses[0].State.Running = nil
+	status.ContainerStatuses[0].State.Terminated = &v1.ContainerStateTerminated{}
+	pod.SetStatus(status)
 	m.SetPodStatus(pod, getRandomPodStatus())
 	verifyActions(t, m, []core.Action{getAction(), updateAction()})
 
@@ -374,8 +379,8 @@ func TestSyncPodNoDeadlock(t *testing.T) {
 }
 
 func TestStaleUpdates(t *testing.T) {
-	pod := getTestPod()
-	client := fake.NewSimpleClientset(pod)
+	pod := kubepod.NewPod(getTestPod())
+	client := fake.NewSimpleClientset(pod.GetAPIPod())
 	m := newTestManager(client)
 
 	status := v1.PodStatus{Message: "initial status"}
@@ -397,7 +402,7 @@ func TestStaleUpdates(t *testing.T) {
 	verifyUpdates(t, m, 0)
 
 	t.Log("... unless it's stale.")
-	m.apiStatusVersions[pod.UID] = m.apiStatusVersions[pod.UID] - 1
+	m.apiStatusVersions[pod.UID()] = m.apiStatusVersions[pod.UID()] - 1
 
 	m.SetPodStatus(pod, status)
 	m.syncBatch()
@@ -419,9 +424,9 @@ func shuffle(statuses []v1.ContainerStatus) []v1.ContainerStatus {
 }
 
 func TestStatusEquality(t *testing.T) {
-	pod := v1.Pod{
+	pod := kubepod.NewPod(&v1.Pod{
 		Spec: v1.PodSpec{},
-	}
+	})
 	containerStatus := []v1.ContainerStatus{}
 	for i := 0; i < 10; i++ {
 		s := v1.ContainerStatus{
@@ -436,8 +441,8 @@ func TestStatusEquality(t *testing.T) {
 		oldPodStatus := v1.PodStatus{
 			ContainerStatuses: shuffle(podStatus.ContainerStatuses),
 		}
-		normalizeStatus(&pod, &oldPodStatus)
-		normalizeStatus(&pod, &podStatus)
+		normalizeStatus(pod, &oldPodStatus)
+		normalizeStatus(pod, &podStatus)
 		if !isStatusEqual(&oldPodStatus, &podStatus) {
 			t.Fatalf("Order of container statuses should not affect normalized equality.")
 		}
@@ -445,9 +450,9 @@ func TestStatusEquality(t *testing.T) {
 }
 
 func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
-	pod := v1.Pod{
+	pod := kubepod.NewPod(&v1.Pod{
 		Spec: v1.PodSpec{},
-	}
+	})
 	containerStatus := []v1.ContainerStatus{}
 	for i := 0; i < 48; i++ {
 		s := v1.ContainerStatus{
@@ -464,7 +469,7 @@ func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
 		InitContainerStatuses: containerStatus[:24],
 		ContainerStatuses:     containerStatus[24:],
 	}
-	result := normalizeStatus(&pod, &podStatus)
+	result := normalizeStatus(pod, &podStatus)
 	count := 0
 	for _, s := range result.InitContainerStatuses {
 		l := len(s.LastTerminationState.Terminated.Message)
@@ -479,20 +484,20 @@ func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
 }
 
 func TestStaticPod(t *testing.T) {
-	staticPod := getTestPod()
-	staticPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
-	mirrorPod := getTestPod()
-	mirrorPod.UID = "mirror-12345678"
-	mirrorPod.Annotations = map[string]string{
+	sPod := getTestPod()
+	sPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
+	mPod := getTestPod()
+	mPod.UID = "mirror-12345678"
+	mPod.Annotations = map[string]string{
 		kubetypes.ConfigSourceAnnotationKey: "api",
 		kubetypes.ConfigMirrorAnnotationKey: "mirror",
 	}
-	client := fake.NewSimpleClientset(mirrorPod)
+	client := fake.NewSimpleClientset(mPod)
 	m := newTestManager(client)
 
 	t.Logf("Create the static pod")
-	m.podManager.AddPod(staticPod)
-	assert.True(t, kubepod.IsStaticPod(staticPod), "SetUp error: staticPod")
+	staticPod := m.podManager.AddPod(sPod)
+	assert.True(t, staticPod.IsStatic(), "SetUp error: staticPod")
 
 	status := getRandomPodStatus()
 	now := metav1.Now()
@@ -509,12 +514,12 @@ func TestStaticPod(t *testing.T) {
 	assert.Equal(t, len(m.kubeClient.(*fake.Clientset).Actions()), 0, "Expected no updates after syncBatch, got %+v", m.kubeClient.(*fake.Clientset).Actions())
 
 	t.Logf("Create the mirror pod")
-	m.podManager.AddPod(mirrorPod)
-	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
-	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), staticPod.UID)
+	mirrorPod := m.podManager.AddPod(mPod)
+	assert.True(t, mirrorPod.IsMirror(), "SetUp error: mirrorPod")
+	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID()), staticPod.UID())
 
 	t.Logf("Should be able to get the mirror pod status from status manager")
-	retrievedStatus, _ = m.GetPodStatus(mirrorPod.UID)
+	retrievedStatus, _ = m.GetPodStatus(mirrorPod.UID())
 	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
 
 	t.Logf("Should sync pod because the corresponding mirror pod is created")
@@ -526,9 +531,10 @@ func TestStaticPod(t *testing.T) {
 
 	t.Logf("Change mirror pod identity.")
 	m.podManager.DeletePod(mirrorPod)
-	mirrorPod.UID = "new-mirror-pod"
-	mirrorPod.Status = v1.PodStatus{}
-	m.podManager.AddPod(mirrorPod)
+	mPod = mirrorPod.GetAPIPod()
+	mPod.UID = "new-mirror-pod"
+	mPod.Status = v1.PodStatus{}
+	m.podManager.AddPod(mPod)
 
 	t.Logf("Should not update to mirror pod, because UID has changed.")
 	m.syncBatch()
@@ -537,15 +543,16 @@ func TestStaticPod(t *testing.T) {
 
 func TestTerminatePod(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
-	testPod := getTestPod()
+	testPod := kubepod.NewPod(getTestPod())
 	t.Logf("update the pod's status to Failed.  TerminatePod should preserve this status update.")
 	firstStatus := getRandomPodStatus()
 	firstStatus.Phase = v1.PodFailed
 	syncer.SetPodStatus(testPod, firstStatus)
 
 	t.Logf("set the testPod to a pod with Phase running, to simulate a stale pod")
-	testPod.Status = getRandomPodStatus()
-	testPod.Status.Phase = v1.PodRunning
+	secondStatus := getRandomPodStatus()
+	secondStatus.Phase = v1.PodRunning
+	testPod.SetStatus(&secondStatus)
 
 	syncer.TerminatePod(testPod)
 
@@ -584,8 +591,8 @@ func TestSetContainerReadiness(t *testing.T) {
 			Status: v1.ConditionFalse,
 		}},
 	}
-	pod := getTestPod()
-	pod.Spec.Containers = []v1.Container{{Name: "c1"}, {Name: "c2"}}
+	p := getTestPod()
+	p.Spec.Containers = []v1.Container{{Name: "c1"}, {Name: "c2"}}
 
 	// Verify expected readiness of containers & pod.
 	verifyReadiness := func(step string, status *v1.PodStatus, c1Ready, c2Ready, podReady bool) {
@@ -612,12 +619,12 @@ func TestSetContainerReadiness(t *testing.T) {
 
 	m := newTestManager(&fake.Clientset{})
 	// Add test pod because the container spec has been changed.
-	m.podManager.AddPod(pod)
+	pod := m.podManager.AddPod(p)
 
 	t.Log("Setting readiness before status should fail.")
-	m.SetContainerReadiness(pod.UID, cID1, true)
+	m.SetContainerReadiness(pod.UID(), cID1, true)
 	verifyUpdates(t, m, 0)
-	if status, ok := m.GetPodStatus(pod.UID); ok {
+	if status, ok := m.GetPodStatus(pod.UID()); ok {
 		t.Errorf("Unexpected PodStatus: %+v", status)
 	}
 
@@ -628,25 +635,25 @@ func TestSetContainerReadiness(t *testing.T) {
 	verifyReadiness("initial", &status, false, false, false)
 
 	t.Log("Setting unchanged readiness should do nothing.")
-	m.SetContainerReadiness(pod.UID, cID1, false)
+	m.SetContainerReadiness(pod.UID(), cID1, false)
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("unchanged", &status, false, false, false)
 
 	t.Log("Setting container readiness should generate update but not pod readiness.")
-	m.SetContainerReadiness(pod.UID, cID1, true)
+	m.SetContainerReadiness(pod.UID(), cID1, true)
 	verifyUpdates(t, m, 1)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("c1 ready", &status, true, false, false)
 
 	t.Log("Setting both containers to ready should update pod readiness.")
-	m.SetContainerReadiness(pod.UID, cID2, true)
+	m.SetContainerReadiness(pod.UID(), cID2, true)
 	verifyUpdates(t, m, 1)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("all ready", &status, true, true, true)
 
 	t.Log("Setting non-existent container readiness should fail.")
-	m.SetContainerReadiness(pod.UID, kubecontainer.ContainerID{Type: "test", ID: "foo"}, true)
+	m.SetContainerReadiness(pod.UID(), kubecontainer.ContainerID{Type: "test", ID: "foo"}, true)
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("ignore non-existent", &status, true, true, true)
@@ -654,62 +661,63 @@ func TestSetContainerReadiness(t *testing.T) {
 
 func TestSyncBatchCleanupVersions(t *testing.T) {
 	m := newTestManager(&fake.Clientset{})
-	testPod := getTestPod()
-	mirrorPod := getTestPod()
-	mirrorPod.UID = "mirror-uid"
-	mirrorPod.Name = "mirror_pod"
-	mirrorPod.Annotations = map[string]string{
+	apiTestPod := getTestPod()
+	testPod := m.podManager.AddPod(apiTestPod)
+	apiMirrorPod := getTestPod()
+	apiMirrorPod.UID = "mirror-uid"
+	apiMirrorPod.Name = "mirror_pod"
+	apiMirrorPod.Annotations = map[string]string{
 		kubetypes.ConfigSourceAnnotationKey: "api",
 		kubetypes.ConfigMirrorAnnotationKey: "mirror",
 	}
 
 	t.Logf("Orphaned pods should be removed.")
-	m.apiStatusVersions[testPod.UID] = 100
-	m.apiStatusVersions[mirrorPod.UID] = 200
+	m.apiStatusVersions[apiTestPod.UID] = 100
+	m.apiStatusVersions[apiMirrorPod.UID] = 200
 	m.syncBatch()
-	if _, ok := m.apiStatusVersions[testPod.UID]; ok {
+	if _, ok := m.apiStatusVersions[apiTestPod.UID]; ok {
 		t.Errorf("Should have cleared status for testPod")
 	}
-	if _, ok := m.apiStatusVersions[mirrorPod.UID]; ok {
+	if _, ok := m.apiStatusVersions[apiMirrorPod.UID]; ok {
 		t.Errorf("Should have cleared status for mirrorPod")
 	}
 
 	t.Logf("Non-orphaned pods should not be removed.")
 	m.SetPodStatus(testPod, getRandomPodStatus())
-	m.podManager.AddPod(mirrorPod)
-	staticPod := mirrorPod
-	staticPod.UID = "static-uid"
-	staticPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
-	m.podManager.AddPod(staticPod)
-	m.apiStatusVersions[testPod.UID] = 100
-	m.apiStatusVersions[mirrorPod.UID] = 200
+	m.podManager.AddPod(apiMirrorPod)
+	apiStaticPod := apiMirrorPod
+	apiStaticPod.UID = "static-uid"
+	apiStaticPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
+	m.podManager.AddPod(apiStaticPod)
+	m.apiStatusVersions[apiTestPod.UID] = 100
+	m.apiStatusVersions[apiMirrorPod.UID] = 200
 	m.testSyncBatch()
-	if _, ok := m.apiStatusVersions[testPod.UID]; !ok {
+	if _, ok := m.apiStatusVersions[apiTestPod.UID]; !ok {
 		t.Errorf("Should not have cleared status for testPod")
 	}
-	if _, ok := m.apiStatusVersions[mirrorPod.UID]; !ok {
+	if _, ok := m.apiStatusVersions[apiMirrorPod.UID]; !ok {
 		t.Errorf("Should not have cleared status for mirrorPod")
 	}
 }
 
 func TestReconcilePodStatus(t *testing.T) {
-	testPod := getTestPod()
-	client := fake.NewSimpleClientset(testPod)
+	testPod := kubepod.NewPod(getTestPod())
+	client := fake.NewSimpleClientset(testPod.GetAPIPod())
 	syncer := newTestManager(client)
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	t.Logf("Call syncBatch directly to test reconcile")
 	syncer.syncBatch() // The apiStatusVersions should be set now
 	client.ClearActions()
 
-	podStatus, ok := syncer.GetPodStatus(testPod.UID)
+	podStatus, ok := syncer.GetPodStatus(testPod.UID())
 	if !ok {
-		t.Fatalf("Should find pod status for pod: %#v", testPod)
+		t.Fatalf("Should find pod status for pod: %#v", testPod.String())
 	}
-	testPod.Status = podStatus
+	testPod.SetStatus(&podStatus)
 
 	t.Logf("If the pod status is the same, a reconciliation is not needed and syncBatch should do nothing")
 	syncer.podManager.UpdatePod(testPod)
-	if syncer.needsReconcile(testPod.UID, podStatus) {
+	if syncer.needsReconcile(testPod.UID(), podStatus) {
 		t.Errorf("Pod status is the same, a reconciliation is not needed")
 	}
 	syncer.syncBatch()
@@ -720,40 +728,43 @@ func TestReconcilePodStatus(t *testing.T) {
 	// The StartTime should have been set in SetPodStatus().
 	// TODO(random-liu): Remove this later when api becomes consistent for timestamp.
 	t.Logf("Syncbatch should do nothing, as a reconciliation is not required")
-	normalizedStartTime := testPod.Status.StartTime.Rfc3339Copy()
-	testPod.Status.StartTime = &normalizedStartTime
+	normalizedStartTime := testPod.GetStatus().StartTime.Rfc3339Copy()
+	status := testPod.GetStatus()
+	status.StartTime = &normalizedStartTime
+	testPod.SetStatus(status)
 	syncer.podManager.UpdatePod(testPod)
-	if syncer.needsReconcile(testPod.UID, podStatus) {
+	if syncer.needsReconcile(testPod.UID(), podStatus) {
 		t.Errorf("Pod status only differs for timestamp format, a reconciliation is not needed")
 	}
 	syncer.syncBatch()
 	verifyActions(t, syncer, []core.Action{})
 
 	t.Logf("If the pod status is different, a reconciliation is needed, syncBatch should trigger an update")
-	testPod.Status = getRandomPodStatus()
+	randomStatus := getRandomPodStatus()
+	testPod.SetStatus(&randomStatus)
 	syncer.podManager.UpdatePod(testPod)
-	if !syncer.needsReconcile(testPod.UID, podStatus) {
+	if !syncer.needsReconcile(testPod.UID(), podStatus) {
 		t.Errorf("Pod status is different, a reconciliation is needed")
 	}
 	syncer.syncBatch()
 	verifyActions(t, syncer, []core.Action{getAction(), updateAction()})
 }
 
-func expectPodStatus(t *testing.T, m *manager, pod *v1.Pod) v1.PodStatus {
-	status, ok := m.GetPodStatus(pod.UID)
+func expectPodStatus(t *testing.T, m *manager, pod *kubepod.Pod) v1.PodStatus {
+	status, ok := m.GetPodStatus(pod.UID())
 	if !ok {
-		t.Fatalf("Expected PodStatus for %q not found", pod.UID)
+		t.Fatalf("Expected PodStatus for %q not found", pod.UID())
 	}
 	return status
 }
 
 func TestDeletePods(t *testing.T) {
-	pod := getTestPod()
+	p := getTestPod()
 	t.Logf("Set the deletion timestamp.")
-	pod.DeletionTimestamp = new(metav1.Time)
-	client := fake.NewSimpleClientset(pod)
+	p.DeletionTimestamp = new(metav1.Time)
+	client := fake.NewSimpleClientset(p)
 	m := newTestManager(client)
-	m.podManager.AddPod(pod)
+	pod := m.podManager.AddPod(p)
 
 	status := getRandomPodStatus()
 	now := metav1.Now()
@@ -765,24 +776,24 @@ func TestDeletePods(t *testing.T) {
 }
 
 func TestDoNotDeleteMirrorPods(t *testing.T) {
-	staticPod := getTestPod()
-	staticPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
-	mirrorPod := getTestPod()
-	mirrorPod.UID = "mirror-12345678"
-	mirrorPod.Annotations = map[string]string{
+	sPod := getTestPod()
+	sPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
+	mPod := getTestPod()
+	mPod.UID = "mirror-12345678"
+	mPod.Annotations = map[string]string{
 		kubetypes.ConfigSourceAnnotationKey: "api",
 		kubetypes.ConfigMirrorAnnotationKey: "mirror",
 	}
 	t.Logf("Set the deletion timestamp.")
-	mirrorPod.DeletionTimestamp = new(metav1.Time)
-	client := fake.NewSimpleClientset(mirrorPod)
+	mPod.DeletionTimestamp = new(metav1.Time)
+	client := fake.NewSimpleClientset(mPod)
 	m := newTestManager(client)
-	m.podManager.AddPod(staticPod)
-	m.podManager.AddPod(mirrorPod)
+	staticPod := m.podManager.AddPod(sPod)
+	mirrorPod := m.podManager.AddPod(mPod)
 	t.Logf("Verify setup.")
-	assert.True(t, kubepod.IsStaticPod(staticPod), "SetUp error: staticPod")
-	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
-	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), staticPod.UID)
+	assert.True(t, staticPod.IsStatic(), "SetUp error: staticPod")
+	assert.True(t, mirrorPod.IsMirror(), "SetUp error: mirrorPod")
+	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID()), staticPod.UID())
 
 	status := getRandomPodStatus()
 	now := metav1.Now()

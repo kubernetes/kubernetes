@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/util"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -144,13 +145,13 @@ func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror
 // pods.
 func (kl *Kubelet) GetPods() []*v1.Pod {
-	return kl.podManager.GetPods()
+	return kubepod.ToAPIPods(kl.podManager.GetPods())
 }
 
 // GetRunningPods returns all pods running on kubelet from looking at the
 // container runtime cache. This function converts kubecontainer.Pod to
-// v1.Pod, so only the fields that exist in both kubecontainer.Pod and
-// v1.Pod are considered meaningful.
+// kubepod.Pod, so only the fields that exist in both kubecontainer.Pod and
+// kubepod.Pod are considered meaningful.
 func (kl *Kubelet) GetRunningPods() ([]*v1.Pod, error) {
 	pods, err := kl.runtimeCache.GetPods()
 	if err != nil {
@@ -164,16 +165,13 @@ func (kl *Kubelet) GetRunningPods() ([]*v1.Pod, error) {
 	return apiPods, nil
 }
 
-// GetPodByFullName gets the pod with the given 'full' name, which
-// incorporates the namespace as well as whether the pod was found.
-func (kl *Kubelet) GetPodByFullName(podFullName string) (*v1.Pod, bool) {
-	return kl.podManager.GetPodByFullName(podFullName)
-}
-
 // GetPodByName provides the first pod that matches namespace and name, as well
 // as whether the pod was found.
 func (kl *Kubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
-	return kl.podManager.GetPodByName(namespace, name)
+	if kpod, found := kl.podManager.GetPodByName(namespace, name); found {
+		return kpod.GetAPIPod(), true
+	}
+	return nil, false
 }
 
 // GetHostname Returns the hostname as the kubelet sees it.

@@ -21,7 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -32,7 +32,7 @@ type getNodeAnyWayFuncType func() (*v1.Node, error)
 // AdmissionFailureHandler is an interface which defines how to deal with a failure to admit a pod.
 // This allows for the graceful handling of pod admission failure.
 type AdmissionFailureHandler interface {
-	HandleAdmissionFailure(pod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error)
+	HandleAdmissionFailure(pod *kubepod.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error)
 }
 
 type predicateAdmitHandler struct {
@@ -60,13 +60,13 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		}
 	}
 	pod := attrs.Pod
-	pods := attrs.OtherPods
+	pods := kubepod.ToAPIPods(attrs.OtherPods)
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
-	fit, reasons, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
+	fit, reasons, err := predicates.GeneralPredicates(pod.GetAPIPod(), nil, nodeInfo)
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
-		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+		glog.Warningf("Failed to admit pod %v - %s", pod.String(), message)
 		return PodAdmitResult{
 			Admit:   fit,
 			Reason:  "UnexpectedAdmissionError",
@@ -77,7 +77,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		fit, reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(pod, reasons)
 		if err != nil {
 			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
-			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+			glog.Warningf("Failed to admit pod %v - %s", pod.String(), message)
 			return PodAdmitResult{
 				Admit:   fit,
 				Reason:  "UnexpectedAdmissionError",
@@ -90,7 +90,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		var message string
 		if len(reasons) == 0 {
 			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
-			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+			glog.Warningf("Failed to admit pod %v - %s", pod.String(), message)
 			return PodAdmitResult{
 				Admit:   fit,
 				Reason:  "UnknownReason",
@@ -103,19 +103,19 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		case *predicates.PredicateFailureError:
 			reason = re.PredicateName
 			message = re.Error()
-			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", pod.String(), message)
 		case *predicates.InsufficientResourceError:
 			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
 			message = re.Error()
-			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", pod.String(), message)
 		case *predicates.FailureReason:
 			reason = re.GetReason()
 			message = fmt.Sprintf("Failure: %s", re.GetReason())
-			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", pod.String(), message)
 		default:
 			reason = "UnexpectedPredicateFailureType"
 			message = fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
-			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+			glog.Warningf("Failed to admit pod %v - %s", pod.String(), message)
 		}
 		return PodAdmitResult{
 			Admit:   fit,

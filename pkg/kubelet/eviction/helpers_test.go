@@ -30,6 +30,7 @@ import (
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/quota"
 )
 
@@ -437,13 +438,13 @@ func TestOrderedByQoS(t *testing.T) {
 		newContainer("guaranteed", newResourceList("200m", "200Mi"), newResourceList("200m", "200Mi")),
 	}, nil)
 
-	pods := []*v1.Pod{guaranteed, burstable, bestEffort}
+	pods := []*kubepod.Pod{guaranteed, burstable, bestEffort}
 	orderedBy(qosComparator).Sort(pods)
 
-	expected := []*v1.Pod{bestEffort, burstable, guaranteed}
+	expected := []*kubepod.Pod{bestEffort, burstable, guaranteed}
 	for i := range expected {
 		if pods[i] != expected[i] {
-			t.Errorf("Expected pod: %s, but got: %s", expected[i].Name, pods[i].Name)
+			t.Errorf("Expected pod: %s, but got: %s", expected[i].Name(), pods[i].Name())
 		}
 	}
 }
@@ -458,7 +459,7 @@ func TestOrderedbyInodes(t *testing.T) {
 
 // testOrderedByDisk ensures we order pods by greediest resource consumer
 func testOrderedByResource(t *testing.T, orderedByResource v1.ResourceName,
-	newPodStatsFunc func(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resource.Quantity) statsapi.PodStats) {
+	newPodStatsFunc func(pod *kubepod.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resource.Quantity) statsapi.PodStats) {
 	pod1 := newPod("best-effort-high", []v1.Container{
 		newContainer("best-effort-high", newResourceList("", ""), newResourceList("", "")),
 	}, []v1.Volume{
@@ -501,7 +502,7 @@ func testOrderedByResource(t *testing.T, orderedByResource v1.ResourceName,
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
-	stats := map[*v1.Pod]statsapi.PodStats{
+	stats := map[*kubepod.Pod]statsapi.PodStats{
 		pod1: newPodStatsFunc(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")),  // 200Mi
 		pod2: newPodStatsFunc(pod2, resource.MustParse("100Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 300Mi
 		pod3: newPodStatsFunc(pod3, resource.MustParse("200Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 400Mi
@@ -509,16 +510,16 @@ func testOrderedByResource(t *testing.T, orderedByResource v1.ResourceName,
 		pod5: newPodStatsFunc(pod5, resource.MustParse("400Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 550Mi
 		pod6: newPodStatsFunc(pod6, resource.MustParse("500Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 650Mi
 	}
-	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+	statsFn := func(pod *kubepod.Pod) (statsapi.PodStats, bool) {
 		result, found := stats[pod]
 		return result, found
 	}
-	pods := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
+	pods := []*kubepod.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
 	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, orderedByResource)).Sort(pods)
-	expected := []*v1.Pod{pod6, pod5, pod4, pod3, pod2, pod1}
+	expected := []*kubepod.Pod{pod6, pod5, pod4, pod3, pod2, pod1}
 	for i := range expected {
 		if pods[i] != expected[i] {
-			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
+			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name(), pods[i].Name())
 		}
 	}
 }
@@ -533,7 +534,7 @@ func TestOrderedbyQoSInodes(t *testing.T) {
 
 // testOrderedByQoSDisk ensures we order pods by qos and then greediest resource consumer
 func testOrderedByQoSResource(t *testing.T, orderedByResource v1.ResourceName,
-	newPodStatsFunc func(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resource.Quantity) statsapi.PodStats) {
+	newPodStatsFunc func(pod *kubepod.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resource.Quantity) statsapi.PodStats) {
 	pod1 := newPod("best-effort-high", []v1.Container{
 		newContainer("best-effort-high", newResourceList("", ""), newResourceList("", "")),
 	}, []v1.Volume{
@@ -576,7 +577,7 @@ func testOrderedByQoSResource(t *testing.T, orderedByResource v1.ResourceName,
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
-	stats := map[*v1.Pod]statsapi.PodStats{
+	stats := map[*kubepod.Pod]statsapi.PodStats{
 		pod1: newPodStatsFunc(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")),  // 200Mi
 		pod2: newPodStatsFunc(pod2, resource.MustParse("100Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 300Mi
 		pod3: newPodStatsFunc(pod3, resource.MustParse("200Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 400Mi
@@ -584,16 +585,16 @@ func testOrderedByQoSResource(t *testing.T, orderedByResource v1.ResourceName,
 		pod5: newPodStatsFunc(pod5, resource.MustParse("400Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 550Mi
 		pod6: newPodStatsFunc(pod6, resource.MustParse("500Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 650Mi
 	}
-	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+	statsFn := func(pod *kubepod.Pod) (statsapi.PodStats, bool) {
 		result, found := stats[pod]
 		return result, found
 	}
-	pods := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
+	pods := []*kubepod.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
 	orderedBy(qosComparator, disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, orderedByResource)).Sort(pods)
-	expected := []*v1.Pod{pod2, pod1, pod4, pod3, pod6, pod5}
+	expected := []*kubepod.Pod{pod2, pod1, pod4, pod3, pod6, pod5}
 	for i := range expected {
 		if pods[i] != expected[i] {
-			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
+			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name(), pods[i].Name())
 		}
 	}
 }
@@ -618,7 +619,7 @@ func TestOrderedByMemory(t *testing.T) {
 	pod6 := newPod("guaranteed-low", []v1.Container{
 		newContainer("guaranteed-low", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
 	}, nil)
-	stats := map[*v1.Pod]statsapi.PodStats{
+	stats := map[*kubepod.Pod]statsapi.PodStats{
 		pod1: newPodMemoryStats(pod1, resource.MustParse("500Mi")), // 500 relative to request
 		pod2: newPodMemoryStats(pod2, resource.MustParse("300Mi")), // 300 relative to request
 		pod3: newPodMemoryStats(pod3, resource.MustParse("800Mi")), // 700 relative to request
@@ -626,16 +627,16 @@ func TestOrderedByMemory(t *testing.T) {
 		pod5: newPodMemoryStats(pod5, resource.MustParse("800Mi")), // -200 relative to request
 		pod6: newPodMemoryStats(pod6, resource.MustParse("200Mi")), // -800 relative to request
 	}
-	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+	statsFn := func(pod *kubepod.Pod) (statsapi.PodStats, bool) {
 		result, found := stats[pod]
 		return result, found
 	}
-	pods := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
+	pods := []*kubepod.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
 	orderedBy(memory(statsFn)).Sort(pods)
-	expected := []*v1.Pod{pod3, pod1, pod2, pod4, pod5, pod6}
+	expected := []*kubepod.Pod{pod3, pod1, pod2, pod4, pod5, pod6}
 	for i := range expected {
 		if pods[i] != expected[i] {
-			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
+			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name(), pods[i].Name())
 		}
 	}
 }
@@ -660,7 +661,7 @@ func TestOrderedByQoSMemory(t *testing.T) {
 	pod6 := newPod("guaranteed-low", []v1.Container{
 		newContainer("guaranteed-low", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
 	}, nil)
-	stats := map[*v1.Pod]statsapi.PodStats{
+	stats := map[*kubepod.Pod]statsapi.PodStats{
 		pod1: newPodMemoryStats(pod1, resource.MustParse("500Mi")), // 500 relative to request
 		pod2: newPodMemoryStats(pod2, resource.MustParse("50Mi")),  // 50 relative to request
 		pod3: newPodMemoryStats(pod3, resource.MustParse("50Mi")),  // -50 relative to request
@@ -668,16 +669,16 @@ func TestOrderedByQoSMemory(t *testing.T) {
 		pod5: newPodMemoryStats(pod5, resource.MustParse("800Mi")), // -200 relative to request
 		pod6: newPodMemoryStats(pod6, resource.MustParse("200Mi")), // -800 relative to request
 	}
-	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+	statsFn := func(pod *kubepod.Pod) (statsapi.PodStats, bool) {
 		result, found := stats[pod]
 		return result, found
 	}
-	pods := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
-	expected := []*v1.Pod{pod1, pod2, pod4, pod3, pod5, pod6}
+	pods := []*kubepod.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
+	expected := []*kubepod.Pod{pod1, pod2, pod4, pod3, pod5, pod6}
 	orderedBy(qosComparator, memory(statsFn)).Sort(pods)
 	for i := range expected {
 		if pods[i] != expected[i] {
-			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
+			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name(), pods[i].Name())
 		}
 	}
 }
@@ -692,16 +693,16 @@ func (f *fakeSummaryProvider) Get() (*statsapi.Summary, error) {
 
 // newPodStats returns a pod stat where each container is using the specified working set
 // each pod must have a Name, UID, Namespace
-func newPodStats(pod *v1.Pod, containerWorkingSetBytes int64) statsapi.PodStats {
+func newPodStats(pod *kubepod.Pod, containerWorkingSetBytes int64) statsapi.PodStats {
 	result := statsapi.PodStats{
 		PodRef: statsapi.PodReference{
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
-			UID:       string(pod.UID),
+			Name:      pod.Name(),
+			Namespace: pod.Namespace(),
+			UID:       string(pod.UID()),
 		},
 	}
 	val := uint64(containerWorkingSetBytes)
-	for range pod.Spec.Containers {
+	for range pod.GetSpec().Containers {
 		result.Containers = append(result.Containers, statsapi.ContainerStats{
 			Memory: &statsapi.MemoryStats{
 				WorkingSetBytes: &val,
@@ -712,7 +713,7 @@ func newPodStats(pod *v1.Pod, containerWorkingSetBytes int64) statsapi.PodStats 
 }
 
 func TestMakeSignalObservations(t *testing.T) {
-	podMaker := func(name, namespace, uid string, numContainers int) *v1.Pod {
+	podMaker := func(name, namespace, uid string, numContainers int) *kubepod.Pod {
 		pod := &v1.Pod{}
 		pod.Name = name
 		pod.Namespace = namespace
@@ -723,7 +724,7 @@ func TestMakeSignalObservations(t *testing.T) {
 				Name: fmt.Sprintf("ctr%v", i),
 			})
 		}
-		return pod
+		return kubepod.NewPod(pod)
 	}
 	nodeAvailableBytes := uint64(1024 * 1024 * 1024)
 	nodeWorkingSetBytes := uint64(1024 * 1024 * 1024)
@@ -762,7 +763,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	provider := &fakeSummaryProvider{
 		result: fakeStats,
 	}
-	pods := []*v1.Pod{
+	pods := []*kubepod.Pod{
 		podMaker("pod1", "ns1", "uuid1", 1),
 		podMaker("pod1", "ns2", "uuid2", 1),
 		podMaker("pod3", "ns3", "uuid3", 1),
@@ -845,7 +846,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	for _, pod := range pods {
 		podStats, found := statsFunc(pod)
 		if !found {
-			t.Errorf("Pod stats were not found for pod %v", pod.UID)
+			t.Errorf("Pod stats were not found for pod %v", pod.UID())
 		}
 		for _, container := range podStats.Containers {
 			actual := int64(*container.Memory.WorkingSetBytes)
@@ -1502,15 +1503,15 @@ func testCompareThresholdValue(t *testing.T) {
 }
 
 // newPodInodeStats returns stats with specified usage amounts.
-func newPodInodeStats(pod *v1.Pod, rootFsInodesUsed, logsInodesUsed, perLocalVolumeInodesUsed resource.Quantity) statsapi.PodStats {
+func newPodInodeStats(pod *kubepod.Pod, rootFsInodesUsed, logsInodesUsed, perLocalVolumeInodesUsed resource.Quantity) statsapi.PodStats {
 	result := statsapi.PodStats{
 		PodRef: statsapi.PodReference{
-			Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+			Name: pod.Name(), Namespace: pod.Namespace(), UID: string(pod.UID()),
 		},
 	}
 	rootFsUsed := uint64(rootFsInodesUsed.Value())
 	logsUsed := uint64(logsInodesUsed.Value())
-	for range pod.Spec.Containers {
+	for range pod.GetSpec().Containers {
 		result.Containers = append(result.Containers, statsapi.ContainerStats{
 			Rootfs: &statsapi.FsStats{
 				InodesUsed: &rootFsUsed,
@@ -1534,16 +1535,16 @@ func newPodInodeStats(pod *v1.Pod, rootFsInodesUsed, logsInodesUsed, perLocalVol
 }
 
 // newPodDiskStats returns stats with specified usage amounts.
-func newPodDiskStats(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resource.Quantity) statsapi.PodStats {
+func newPodDiskStats(pod *kubepod.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resource.Quantity) statsapi.PodStats {
 	result := statsapi.PodStats{
 		PodRef: statsapi.PodReference{
-			Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+			Name: pod.Name(), Namespace: pod.Namespace(), UID: string(pod.UID()),
 		},
 	}
 
 	rootFsUsedBytes := uint64(rootFsUsed.Value())
 	logsUsedBytes := uint64(logsUsed.Value())
-	for range pod.Spec.Containers {
+	for range pod.GetSpec().Containers {
 		result.Containers = append(result.Containers, statsapi.ContainerStats{
 			Rootfs: &statsapi.FsStats{
 				UsedBytes: &rootFsUsedBytes,
@@ -1567,13 +1568,13 @@ func newPodDiskStats(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resou
 	return result
 }
 
-func newPodMemoryStats(pod *v1.Pod, workingSet resource.Quantity) statsapi.PodStats {
+func newPodMemoryStats(pod *kubepod.Pod, workingSet resource.Quantity) statsapi.PodStats {
 	result := statsapi.PodStats{
 		PodRef: statsapi.PodReference{
-			Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+			Name: pod.Name(), Namespace: pod.Namespace(), UID: string(pod.UID()),
 		},
 	}
-	for range pod.Spec.Containers {
+	for range pod.GetSpec().Containers {
 		workingSetBytes := uint64(workingSet.Value())
 		result.Containers = append(result.Containers, statsapi.ContainerStats{
 			Memory: &statsapi.MemoryStats{
@@ -1617,8 +1618,8 @@ func newVolume(name string, volumeSource v1.VolumeSource) v1.Volume {
 }
 
 // newPod uses the name as the uid.  Make names unique for testing.
-func newPod(name string, containers []v1.Container, volumes []v1.Volume) *v1.Pod {
-	return &v1.Pod{
+func newPod(name string, containers []v1.Container, volumes []v1.Volume) *kubepod.Pod {
+	return kubepod.NewPod(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			UID:  types.UID(name),
@@ -1627,7 +1628,7 @@ func newPod(name string, containers []v1.Container, volumes []v1.Volume) *v1.Pod
 			Containers: containers,
 			Volumes:    volumes,
 		},
-	}
+	})
 }
 
 // nodeConditionList is a simple alias to support equality checking independent of order

@@ -19,6 +19,7 @@ package gpu
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -32,7 +33,7 @@ func (gms *gpuManagerStub) Capacity() v1.ResourceList {
 	return nil
 }
 
-func (gms *gpuManagerStub) AllocateGPU(_ *v1.Pod, _ *v1.Container) ([]string, error) {
+func (gms *gpuManagerStub) AllocateGPU(_ types.UID, _ *v1.Container) ([]string, error) {
 	return nil, fmt.Errorf("GPUs are not supported")
 }
 

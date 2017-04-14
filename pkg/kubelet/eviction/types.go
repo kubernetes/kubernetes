@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 // fsStatsType defines the types of filesystem stats to collect.
@@ -87,16 +88,16 @@ type ImageGC interface {
 // pod - the pod to kill
 // status - the desired status to associate with the pod (i.e. why its killed)
 // gracePeriodOverride - the grace period override to use instead of what is on the pod spec
-type KillPodFunc func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error
+type KillPodFunc func(pod *kubepod.Pod, status v1.PodStatus, gracePeriodOverride *int64) error
 
 // ActivePodsFunc returns pods bound to the kubelet that are active (i.e. non-terminal state)
-type ActivePodsFunc func() []*v1.Pod
+type ActivePodsFunc func() []*kubepod.Pod
 
 // statsFunc returns the usage stats if known for an input pod.
-type statsFunc func(pod *v1.Pod) (statsapi.PodStats, bool)
+type statsFunc func(pod *kubepod.Pod) (statsapi.PodStats, bool)
 
 // rankFunc sorts the pods in eviction order
-type rankFunc func(pods []*v1.Pod, stats statsFunc)
+type rankFunc func(pods []*kubepod.Pod, stats statsFunc)
 
 // signalObservation is the observed resource usage
 type signalObservation struct {

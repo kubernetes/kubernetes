@@ -21,22 +21,22 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 func TestCacheOperations(t *testing.T) {
 	m := NewManager()
 
+	uid := uuid.NewUUID()
 	unsetID := kubecontainer.ContainerID{Type: "test", ID: "unset"}
 	setID := kubecontainer.ContainerID{Type: "test", ID: "set"}
 
 	_, found := m.Get(unsetID)
 	assert.False(t, found, "unset result found")
 
-	m.Set(setID, Success, &v1.Pod{})
+	m.Set(setID, Success, uid)
 	result, found := m.Get(setID)
 	assert.True(t, result == Success, "set result")
 	assert.True(t, found, "set result found")
@@ -49,7 +49,7 @@ func TestCacheOperations(t *testing.T) {
 func TestUpdates(t *testing.T) {
 	m := NewManager()
 
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod"}}
+	uid := uuid.NewUUID()
 	fooID := kubecontainer.ContainerID{Type: "test", ID: "foo"}
 	barID := kubecontainer.ContainerID{Type: "test", ID: "bar"}
 
@@ -77,23 +77,23 @@ func TestUpdates(t *testing.T) {
 	}
 
 	// New result should always push an update.
-	m.Set(fooID, Success, pod)
-	expectUpdate(Update{fooID, Success, pod.UID}, "new success")
+	m.Set(fooID, Success, uid)
+	expectUpdate(Update{fooID, Success, uid}, "new success")
 
-	m.Set(barID, Failure, pod)
-	expectUpdate(Update{barID, Failure, pod.UID}, "new failure")
+	m.Set(barID, Failure, uid)
+	expectUpdate(Update{barID, Failure, uid}, "new failure")
 
 	// Unchanged results should not send an update.
-	m.Set(fooID, Success, pod)
+	m.Set(fooID, Success, uid)
 	expectNoUpdate("unchanged foo")
 
-	m.Set(barID, Failure, pod)
+	m.Set(barID, Failure, uid)
 	expectNoUpdate("unchanged bar")
 
 	// Changed results should send an update.
-	m.Set(fooID, Failure, pod)
-	expectUpdate(Update{fooID, Failure, pod.UID}, "changed foo")
+	m.Set(fooID, Failure, uid)
+	expectUpdate(Update{fooID, Failure, uid}, "changed foo")
 
-	m.Set(barID, Success, pod)
-	expectUpdate(Update{barID, Success, pod.UID}, "changed bar")
+	m.Set(barID, Success, uid)
+	expectUpdate(Update{barID, Success, uid}, "changed bar")
 }

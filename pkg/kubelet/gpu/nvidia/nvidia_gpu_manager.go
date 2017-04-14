@@ -27,10 +27,12 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/gpu"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 // TODO: rework to use Nvidia's NVML, which is more complex, but also provides more fine-grained information and stats.
@@ -48,7 +50,7 @@ const (
 
 type activePodsLister interface {
 	// Returns a list of active pods on the node.
-	GetActivePods() []*v1.Pod
+	GetActivePods() []*kubepod.Pod
 }
 
 // nvidiaGPUManager manages nvidia gpu devices.
@@ -129,7 +131,7 @@ func (ngm *nvidiaGPUManager) Capacity() v1.ResourceList {
 // This is a sub-optimal solution and a better alternative would be that of using pod level cgroups instead.
 // GPUs allocated to containers should be reflected in pod level device cgroups before completing allocations.
 // The pod level cgroups will then serve as a checkpoint of GPUs in use.
-func (ngm *nvidiaGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) ([]string, error) {
+func (ngm *nvidiaGPUManager) AllocateGPU(podUID types.UID, container *v1.Container) ([]string, error) {
 	gpusNeeded := container.Resources.Limits.NvidiaGPU().Value()
 	if gpusNeeded == 0 {
 		return []string{}, nil
@@ -145,8 +147,8 @@ func (ngm *nvidiaGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) (
 	}
 	// Check if GPUs have already been allocated. If so return them right away.
 	// This can happen if a container restarts for example.
-	if devices := ngm.allocated.getGPUs(string(pod.UID), container.Name); devices != nil {
-		glog.V(2).Infof("Found pre-allocated GPUs for container %q in Pod %q: %v", container.Name, pod.UID, devices.List())
+	if devices := ngm.allocated.getGPUs(string(podUID), container.Name); devices != nil {
+		glog.V(2).Infof("Found pre-allocated GPUs for container %q in Pod %q: %v", container.Name, podUID, devices.List())
 		return append(devices.List(), ngm.defaultDevices...), nil
 	}
 	// Get GPU devices in use.
@@ -161,7 +163,7 @@ func (ngm *nvidiaGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) (
 	ret := available.UnsortedList()[:gpusNeeded]
 	for _, device := range ret {
 		// Update internal allocated GPU cache.
-		ngm.allocated.insert(string(pod.UID), container.Name, device)
+		ngm.allocated.insert(string(podUID), container.Name, device)
 	}
 	// Add standard devices files that needs to be exposed.
 	ret = append(ret, ngm.defaultDevices...)
@@ -176,7 +178,7 @@ func (ngm *nvidiaGPUManager) updateAllocatedGPUs() {
 	activePods := ngm.activePodsLister.GetActivePods()
 	activePodUids := sets.NewString()
 	for _, pod := range activePods {
-		activePodUids.Insert(string(pod.UID))
+		activePodUids.Insert(string(pod.UID()))
 	}
 	allocatedPodUids := ngm.allocated.pods()
 	podsToBeRemoved := allocatedPodUids.Difference(activePodUids)
@@ -224,7 +226,7 @@ func (ngm *nvidiaGPUManager) gpusInUse() *podGPUs {
 	podContainersToInspect := []podContainers{}
 	for _, pod := range pods {
 		containers := sets.NewString()
-		for _, container := range pod.Spec.Containers {
+		for _, container := range pod.GetSpec().Containers {
 			// GPUs are expected to be specified only in limits.
 			if !container.Resources.Limits.NvidiaGPU().IsZero() {
 				containers.Insert(container.Name)
@@ -237,13 +239,13 @@ func (ngm *nvidiaGPUManager) gpusInUse() *podGPUs {
 		// TODO: If kubelet restarts right after allocating a GPU to a pod, the container might not have started yet and so container status might not be available yet.
 		// Use an internal checkpoint instead or try using the CRI if its checkpoint is reliable.
 		var containersToInspect []containerIdentifier
-		for _, container := range pod.Status.ContainerStatuses {
+		for _, container := range pod.GetStatus().ContainerStatuses {
 			if containers.Has(container.Name) {
 				containersToInspect = append(containersToInspect, containerIdentifier{container.ContainerID, container.Name})
 			}
 		}
 		// add the pod and its containers that need to be inspected.
-		podContainersToInspect = append(podContainersToInspect, podContainers{string(pod.UID), containersToInspect})
+		podContainersToInspect = append(podContainersToInspect, podContainers{string(pod.UID()), containersToInspect})
 	}
 	ret := newPodGPUs()
 	for _, podContainer := range podContainersToInspect {

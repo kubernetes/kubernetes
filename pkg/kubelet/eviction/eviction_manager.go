@@ -26,21 +26,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 // managerImpl implements Manager
@@ -114,19 +109,19 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 	// Admit Critical pods even under resource pressure since they are required for system stability.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && kubelettypes.IsCriticalPod(attrs.Pod) {
+	if attrs.Pod.IsCritical() {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 	// the node has memory pressure, admit if not best-effort
 	if hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) {
-		notBestEffort := v1.PodQOSBestEffort != qos.GetPodQOS(attrs.Pod)
+		notBestEffort := v1.PodQOSBestEffort != attrs.Pod.GetQOS()
 		if notBestEffort {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
 	}
 
 	// reject pods when under memory pressure (if pod is best effort), or if under disk pressure.
-	glog.Warningf("Failed to admit pod %v - %s", format.Pod(attrs.Pod), "node has conditions: %v", m.nodeConditions)
+	glog.Warningf("Failed to admit pod %v - %s", attrs.Pod.String(), "node has conditions: %v", m.nodeConditions)
 	return lifecycle.PodAdmitResult{
 		Admit:   false,
 		Reason:  reason,
@@ -330,7 +325,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// rank the running pods for eviction for the specified resource
 	rank(activePods, statsFunc)
 
-	glog.Infof("eviction manager: pods ranked for eviction: %s", format.Pods(activePods))
+	glog.Infof("eviction manager: pods ranked for eviction: %s", kubepod.Format(activePods))
 
 	//record age of metrics for met thresholds that we are using for evictions.
 	for _, t := range thresholds {
@@ -346,8 +341,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 		// do not evict such pods. Static pods are not re-admitted after evictions.
 		// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-		if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-			kubelettypes.IsCriticalPod(pod) && kubepod.IsStaticPod(pod) {
+		if pod.IsCritical() && pod.IsStatic() {
 			continue
 		}
 		status := v1.PodStatus{
@@ -356,7 +350,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			Reason:  reason,
 		}
 		// record that we are evicting the pod
-		m.recorder.Eventf(pod, v1.EventTypeWarning, reason, fmt.Sprintf(message, resourceToReclaim))
+		m.recorder.Eventf(pod.GetAPIPod(), v1.EventTypeWarning, reason, fmt.Sprintf(message, resourceToReclaim))
 		gracePeriodOverride := int64(0)
 		if softEviction {
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
@@ -364,11 +358,11 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		// this is a blocking call and should only return when the pod and its containers are killed.
 		err := m.killPodFunc(pod, status, &gracePeriodOverride)
 		if err != nil {
-			glog.Infof("eviction manager: pod %s failed to evict %v", format.Pod(pod), err)
+			glog.Infof("eviction manager: pod %s failed to evict %v", pod.String(), err)
 			continue
 		}
 		// success, so we return until the next housekeeping interval
-		glog.Infof("eviction manager: pod %s evicted successfully", format.Pod(pod))
+		glog.Infof("eviction manager: pod %s evicted successfully", pod.String())
 		return
 	}
 	glog.Infof("eviction manager: unable to evict any pods from the node")

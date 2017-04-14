@@ -18,7 +18,7 @@ limitations under the License.
 
 package cm
 
-import "k8s.io/kubernetes/pkg/api/v1"
+import kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 
 const (
 	MinShares     = 0
@@ -40,7 +40,7 @@ func MilliCPUToShares(milliCPU int64) int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
+func ResourceConfigForPod(pod *kubepod.Pod) *ResourceConfig {
 	return nil
 }
 

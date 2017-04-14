@@ -186,9 +186,9 @@ func IsNodeReady(node *Node) bool {
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
 // containers of the pod.
-func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, limits map[ResourceName]resource.Quantity, err error) {
+func PodRequestsAndLimits(podSpec *PodSpec) (reqs map[ResourceName]resource.Quantity, limits map[ResourceName]resource.Quantity, err error) {
 	reqs, limits = map[ResourceName]resource.Quantity{}, map[ResourceName]resource.Quantity{}
-	for _, container := range pod.Spec.Containers {
+	for _, container := range podSpec.Containers {
 		for name, quantity := range container.Resources.Requests {
 			if value, ok := reqs[name]; !ok {
 				reqs[name] = *quantity.Copy()
@@ -207,7 +207,7 @@ func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, li
 		}
 	}
 	// init containers define the minimum of any resource
-	for _, container := range pod.Spec.InitContainers {
+	for _, container := range podSpec.InitContainers {
 		for name, quantity := range container.Resources.Requests {
 			value, ok := reqs[name]
 			if !ok {
@@ -232,13 +232,13 @@ func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, li
 	return
 }
 
-// finds and returns the request for a specific resource.
-func GetResourceRequest(pod *Pod, resource ResourceName) int64 {
+// GetResourceRequest finds and returns the request for a specific resource.
+func GetResourceRequest(podSpec *PodSpec, resource ResourceName) int64 {
 	if resource == ResourcePods {
 		return 1
 	}
 	totalResources := int64(0)
-	for _, container := range pod.Spec.Containers {
+	for _, container := range podSpec.Containers {
 		if rQuantity, ok := container.Resources.Requests[resource]; ok {
 			if resource == ResourceCPU {
 				totalResources += rQuantity.MilliValue()
@@ -248,7 +248,7 @@ func GetResourceRequest(pod *Pod, resource ResourceName) int64 {
 		}
 	}
 	// take max_resource(sum_pod, any_init_container)
-	for _, container := range pod.Spec.InitContainers {
+	for _, container := range podSpec.InitContainers {
 		if rQuantity, ok := container.Resources.Requests[resource]; ok {
 			if resource == ResourceCPU && rQuantity.MilliValue() > totalResources {
 				totalResources = rQuantity.MilliValue()

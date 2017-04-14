@@ -24,9 +24,7 @@ import (
 )
 
 func TestSortInitContainerStatuses(t *testing.T) {
-	pod := v1.Pod{
-		Spec: v1.PodSpec{},
-	}
+	podSpec := v1.PodSpec{}
 	var cases = []struct {
 		containers     []v1.Container
 		statuses       []v1.ContainerStatus
@@ -54,8 +52,8 @@ func TestSortInitContainerStatuses(t *testing.T) {
 		},
 	}
 	for _, data := range cases {
-		pod.Spec.InitContainers = data.containers
-		SortInitContainerStatuses(&pod, data.statuses)
+		podSpec.InitContainers = data.containers
+		SortInitContainerStatuses(&podSpec, data.statuses)
 		if !reflect.DeepEqual(data.statuses, data.sortedStatuses) {
 			t.Errorf("SortInitContainerStatuses result wrong:\nContainers order: %v\nExpected order: %v\nReturne order: %v",
 				data.containers, data.sortedStatuses, data.statuses)

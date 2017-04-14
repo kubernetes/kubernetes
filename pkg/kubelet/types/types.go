@@ -70,8 +70,8 @@ func (s SortedContainerStatuses) Less(i, j int) bool {
 
 // SortInitContainerStatuses ensures that statuses are in the order that their
 // init container appears in the pod spec
-func SortInitContainerStatuses(p *v1.Pod, statuses []v1.ContainerStatus) {
-	containers := p.Spec.InitContainers
+func SortInitContainerStatuses(podSpec *v1.PodSpec, statuses []v1.ContainerStatus) {
+	containers := podSpec.InitContainers
 	current := 0
 	for _, container := range containers {
 		for j := current; j < len(statuses); j++ {

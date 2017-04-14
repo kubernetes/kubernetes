@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
@@ -66,7 +67,7 @@ var (
 
 // A subset of the pod.Manager interface extracted for garbage collection purposes.
 type podGetter interface {
-	GetPodByUID(kubetypes.UID) (*v1.Pod, bool)
+	GetPodByUID(kubetypes.UID) (*kubepod.Pod, bool)
 }
 
 type kubeGenericRuntimeManager struct {
@@ -387,7 +388,7 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 
 	// Needs to create a new sandbox when network namespace changed.
 	if sandboxStatus.Linux != nil && sandboxStatus.Linux.Namespaces != nil && sandboxStatus.Linux.Namespaces.Options != nil &&
-		sandboxStatus.Linux.Namespaces.Options.HostNetwork != kubecontainer.IsHostNetworkPod(pod) {
+		sandboxStatus.Linux.Namespaces.Options.HostNetwork != kubecontainer.IsHostNetworkPod(&pod.Spec) {
 		glog.V(2).Infof("Sandbox for pod %q has changed. Need to start a new one", format.Pod(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, ""
 	}
@@ -453,7 +454,7 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *v1.Pod, podS
 	for index, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
+			if kubecontainer.ShouldContainerBeRestarted(&container, &pod.Spec, podStatus) {
 				message := fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
 				glog.Info(message)
 				changes.ContainersToStart[index] = message
@@ -630,7 +631,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 
 		// If we ever allow updating a pod from non-host-network to
 		// host-network, we may use a stale IP.
-		if !kubecontainer.IsHostNetworkPod(pod) {
+		if !kubecontainer.IsHostNetworkPod(&pod.Spec) {
 			// Overwrite the podIP passed in the pod status, since we just started the pod sandbox.
 			podIP = m.determinePodSandboxIP(pod.Namespace, pod.Name, podSandboxStatus)
 			glog.V(4).Infof("Determined the ip %q for pod %q after sandbox changed", podIP, format.Pod(pod))
@@ -791,7 +792,7 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *v1.Pod, runningPo
 // isHostNetwork checks whether the pod is running in host-network mode.
 func (m *kubeGenericRuntimeManager) isHostNetwork(podSandBoxID string, pod *v1.Pod) (bool, error) {
 	if pod != nil {
-		return kubecontainer.IsHostNetworkPod(pod), nil
+		return kubecontainer.IsHostNetworkPod(&pod.Spec), nil
 	}
 
 	podStatus, err := m.runtimeService.PodSandboxStatus(podSandBoxID)

@@ -47,12 +47,12 @@ func isResourceBestEffort(container *v1.Container, resource v1.ResourceName) boo
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
-func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
+func GetPodQOS(spec *v1.PodSpec) v1.PodQOSClass {
 	requests := v1.ResourceList{}
 	limits := v1.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
-	for _, container := range pod.Spec.Containers {
+	for _, container := range spec.Containers {
 		// process requests
 		for name, quantity := range container.Resources.Requests {
 			if !supportedQoSComputeResources.Has(string(name)) {

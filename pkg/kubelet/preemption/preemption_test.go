@@ -22,9 +22,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	kubeapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/features"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -40,39 +43,39 @@ const (
 )
 
 type fakePodKiller struct {
-	killedPods []*v1.Pod
+	killedPods []*kubepod.Pod
 }
 
 func newFakePodKiller() *fakePodKiller {
-	return &fakePodKiller{killedPods: []*v1.Pod{}}
+	return &fakePodKiller{killedPods: []*kubepod.Pod{}}
 }
 
 func (f *fakePodKiller) clear() {
-	f.killedPods = []*v1.Pod{}
+	f.killedPods = []*kubepod.Pod{}
 }
 
-func (f *fakePodKiller) getKilledPods() []*v1.Pod {
+func (f *fakePodKiller) getKilledPods() []*kubepod.Pod {
 	return f.killedPods
 }
 
-func (f *fakePodKiller) killPodNow(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+func (f *fakePodKiller) killPodNow(pod *kubepod.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
 	f.killedPods = append(f.killedPods, pod)
 	return nil
 }
 
 type fakePodProvider struct {
-	pods []*v1.Pod
+	pods []*kubepod.Pod
 }
 
 func newFakePodProvider() *fakePodProvider {
-	return &fakePodProvider{pods: []*v1.Pod{}}
+	return &fakePodProvider{pods: []*kubepod.Pod{}}
 }
 
-func (f *fakePodProvider) setPods(pods []*v1.Pod) {
+func (f *fakePodProvider) setPods(pods []*kubepod.Pod) {
 	f.pods = pods
 }
 
-func (f *fakePodProvider) getPods() []*v1.Pod {
+func (f *fakePodProvider) getPods() []*kubepod.Pod {
 	return f.pods
 }
 
@@ -87,10 +90,10 @@ func getTestCriticalPodAdmissionHandler(podProvider *fakePodProvider, podKiller 
 func TestEvictPodsToFreeRequests(t *testing.T) {
 	type testRun struct {
 		testName              string
-		inputPods             []*v1.Pod
+		inputPods             []*kubepod.Pod
 		insufficientResources admissionRequirementList
 		expectErr             bool
-		expectedOutput        []*v1.Pod
+		expectedOutput        []*kubepod.Pod
 	}
 	podProvider := newFakePodProvider()
 	podKiller := newFakePodKiller()
@@ -99,26 +102,26 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 	runs := []testRun{
 		{
 			testName:              "critical pods cannot be preempted",
-			inputPods:             []*v1.Pod{allPods[critical]},
+			inputPods:             []*kubepod.Pod{allPods[critical]},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             true,
 			expectedOutput:        nil,
 		},
 		{
 			testName:              "best effort pods are not preempted when attempting to free resources",
-			inputPods:             []*v1.Pod{allPods[bestEffort]},
+			inputPods:             []*kubepod.Pod{allPods[bestEffort]},
 			insufficientResources: getAdmissionRequirementList(0, 1, 0),
 			expectErr:             true,
 			expectedOutput:        nil,
 		},
 		{
 			testName: "multiple pods evicted",
-			inputPods: []*v1.Pod{
+			inputPods: []*kubepod.Pod{
 				allPods[critical], allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable],
 				allPods[guaranteed], allPods[highRequestGuaranteed]},
 			insufficientResources: getAdmissionRequirementList(0, 550, 0),
 			expectErr:             false,
-			expectedOutput:        []*v1.Pod{allPods[highRequestBurstable], allPods[highRequestGuaranteed]},
+			expectedOutput:        []*kubepod.Pod{allPods[highRequestBurstable], allPods[highRequestGuaranteed]},
 		},
 	}
 	for _, r := range runs {
@@ -138,7 +141,7 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 
 func BenchmarkGetPodsToPreempt(t *testing.B) {
 	allPods := getTestPods()
-	inputPods := []*v1.Pod{}
+	inputPods := []*kubepod.Pod{}
 	for i := 0; i < maxPods; i++ {
 		inputPods = append(inputPods, allPods[tinyBurstable])
 	}
@@ -154,82 +157,82 @@ func BenchmarkGetPodsToPreempt(t *testing.B) {
 func TestGetPodsToPreempt(t *testing.T) {
 	type testRun struct {
 		testName              string
-		inputPods             []*v1.Pod
+		inputPods             []*kubepod.Pod
 		insufficientResources admissionRequirementList
 		expectErr             bool
-		expectedOutput        []*v1.Pod
+		expectedOutput        []*kubepod.Pod
 	}
 	allPods := getTestPods()
 	runs := []testRun{
 		{
 			testName:              "no requirements",
-			inputPods:             []*v1.Pod{},
+			inputPods:             []*kubepod.Pod{},
 			insufficientResources: getAdmissionRequirementList(0, 0, 0),
 			expectErr:             false,
-			expectedOutput:        []*v1.Pod{},
+			expectedOutput:        []*kubepod.Pod{},
 		},
 		{
 			testName:              "no pods",
-			inputPods:             []*v1.Pod{},
+			inputPods:             []*kubepod.Pod{},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             true,
 			expectedOutput:        nil,
 		},
 		{
 			testName:              "equal pods and resources requirements",
-			inputPods:             []*v1.Pod{allPods[burstable]},
+			inputPods:             []*kubepod.Pod{allPods[burstable]},
 			insufficientResources: getAdmissionRequirementList(100, 100, 1),
 			expectErr:             false,
-			expectedOutput:        []*v1.Pod{allPods[burstable]},
+			expectedOutput:        []*kubepod.Pod{allPods[burstable]},
 		},
 		{
 			testName:              "higer requirements than pod requests",
-			inputPods:             []*v1.Pod{allPods[burstable]},
+			inputPods:             []*kubepod.Pod{allPods[burstable]},
 			insufficientResources: getAdmissionRequirementList(200, 200, 2),
 			expectErr:             true,
 			expectedOutput:        nil,
 		},
 		{
 			testName:              "choose between bestEffort and burstable",
-			inputPods:             []*v1.Pod{allPods[burstable], allPods[bestEffort]},
+			inputPods:             []*kubepod.Pod{allPods[burstable], allPods[bestEffort]},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             false,
-			expectedOutput:        []*v1.Pod{allPods[bestEffort]},
+			expectedOutput:        []*kubepod.Pod{allPods[bestEffort]},
 		},
 		{
 			testName:              "choose between burstable and guaranteed",
-			inputPods:             []*v1.Pod{allPods[burstable], allPods[guaranteed]},
+			inputPods:             []*kubepod.Pod{allPods[burstable], allPods[guaranteed]},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             false,
-			expectedOutput:        []*v1.Pod{allPods[burstable]},
+			expectedOutput:        []*kubepod.Pod{allPods[burstable]},
 		},
 		{
 			testName:              "choose lower request burstable if it meets requirements",
-			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[highRequestBurstable], allPods[burstable]},
+			inputPods:             []*kubepod.Pod{allPods[bestEffort], allPods[highRequestBurstable], allPods[burstable]},
 			insufficientResources: getAdmissionRequirementList(100, 100, 0),
 			expectErr:             false,
-			expectedOutput:        []*v1.Pod{allPods[burstable]},
+			expectedOutput:        []*kubepod.Pod{allPods[burstable]},
 		},
 		{
 			testName:              "choose higher request burstable if lower does not meet requirements",
-			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable]},
+			inputPods:             []*kubepod.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable]},
 			insufficientResources: getAdmissionRequirementList(150, 150, 0),
 			expectErr:             false,
-			expectedOutput:        []*v1.Pod{allPods[highRequestBurstable]},
+			expectedOutput:        []*kubepod.Pod{allPods[highRequestBurstable]},
 		},
 		{
 			testName:              "multiple pods required",
-			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable], allPods[guaranteed], allPods[highRequestGuaranteed]},
+			inputPods:             []*kubepod.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable], allPods[guaranteed], allPods[highRequestGuaranteed]},
 			insufficientResources: getAdmissionRequirementList(350, 350, 0),
 			expectErr:             false,
-			expectedOutput:        []*v1.Pod{allPods[burstable], allPods[highRequestBurstable]},
+			expectedOutput:        []*kubepod.Pod{allPods[burstable], allPods[highRequestBurstable]},
 		},
 		{
 			testName:              "evict guaranteed when we have to, and dont evict the extra burstable",
-			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable], allPods[guaranteed], allPods[highRequestGuaranteed]},
+			inputPods:             []*kubepod.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable], allPods[guaranteed], allPods[highRequestGuaranteed]},
 			insufficientResources: getAdmissionRequirementList(0, 550, 0),
 			expectErr:             false,
-			expectedOutput:        []*v1.Pod{allPods[highRequestBurstable], allPods[highRequestGuaranteed]},
+			expectedOutput:        []*kubepod.Pod{allPods[highRequestBurstable], allPods[highRequestGuaranteed]},
 		},
 	}
 	for _, r := range runs {
@@ -248,7 +251,7 @@ func TestAdmissionRequirementsDistance(t *testing.T) {
 	type testRun struct {
 		testName       string
 		requirements   admissionRequirementList
-		inputPod       *v1.Pod
+		inputPod       *kubepod.Pod
 		expectedOutput float64
 	}
 	allPods := getTestPods()
@@ -290,7 +293,7 @@ func TestAdmissionRequirementsSubtract(t *testing.T) {
 	type testRun struct {
 		testName       string
 		initial        admissionRequirementList
-		inputPod       *v1.Pod
+		inputPod       *kubepod.Pod
 		expectedOutput admissionRequirementList
 	}
 	allPods := getTestPods()
@@ -334,7 +337,7 @@ func TestAdmissionRequirementsSubtract(t *testing.T) {
 	}
 }
 
-func getTestPods() map[string]*v1.Pod {
+func getTestPods() map[string]*kubepod.Pod {
 	allPods := map[string]*v1.Pod{
 		tinyBurstable: getPodWithResources(tinyBurstable, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
@@ -382,9 +385,14 @@ func getTestPods() map[string]*v1.Pod {
 			},
 		}),
 	}
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.ExperimentalCriticalPodAnnotation))
 	allPods[critical].Namespace = kubeapi.NamespaceSystem
 	allPods[critical].Annotations[kubetypes.CriticalPodAnnotationKey] = ""
-	return allPods
+	kubepods := make(map[string]*kubepod.Pod)
+	for key, pod := range allPods {
+		kubepods[key] = kubepod.NewPod(pod)
+	}
+	return kubepods
 }
 
 func getPodWithResources(name string, requests v1.ResourceRequirements) *v1.Pod {
@@ -461,7 +469,7 @@ func admissionRequirementListEqual(list1 admissionRequirementList, list2 admissi
 // this checks if the lists contents contain all of the same elements.
 // this is not correct if there are duplicate pods in the list.
 // for example: podListEqual([a, a, b], [a, b, b]) will return true
-func podListEqual(list1 []*v1.Pod, list2 []*v1.Pod) bool {
+func podListEqual(list1 []*kubepod.Pod, list2 []*kubepod.Pod) bool {
 	if len(list1) != len(list2) {
 		return false
 	}

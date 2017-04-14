@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 )
@@ -73,13 +74,13 @@ func TestMakeMounts(t *testing.T) {
 		"disk5": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/var/lib/kubelet/podID/volumes/empty/disk5"}},
 	}
 
-	pod := v1.Pod{
+	pod := &v1.Pod{
 		Spec: v1.PodSpec{
 			HostNetwork: true,
 		},
 	}
 
-	mounts, _ := makeMounts(&pod, "/pod", &container, "fakepodname", "", "", podVolumes)
+	mounts, _ := makeMounts(pod, "/pod", &container, "fakepodname", "", "", podVolumes)
 
 	expectedMounts := []kubecontainer.Mount{
 		{
@@ -125,7 +126,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
-		kubecontainer.GetPodFullName(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace}}),
+		kubepod.NewPod(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace}}).GetFullName(),
 		"",
 		containerName,
 		[]string{"ls"})
@@ -1754,18 +1755,18 @@ func TestPortForward(t *testing.T) {
 
 // Tests that identify the host port conflicts are detected correctly.
 func TestGetHostPortConflicts(t *testing.T) {
-	pods := []*v1.Pod{
+	pods := kubepod.FromAPIPods([]*v1.Pod{
 		{Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}},
 		{Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 81}}}}}},
 		{Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 82}}}}}},
 		{Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 83}}}}}},
-	}
+	})
 	// Pods should not cause any conflict.
 	assert.False(t, hasHostPortConflicts(pods), "Should not have port conflicts")
 
-	expected := &v1.Pod{
+	expected := kubepod.NewPod(&v1.Pod{
 		Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 81}}}}},
-	}
+	})
 	// The new pod should cause conflict and be reported.
 	pods = append(pods, expected)
 	assert.True(t, hasHostPortConflicts(pods), "Should have port conflicts")
@@ -1805,7 +1806,7 @@ func TestHasHostMountPVC(t *testing.T) {
 	for k, v := range tests {
 		testKubelet := newTestKubelet(t, false)
 		defer testKubelet.Cleanup()
-		pod := &v1.Pod{
+		apiPod := &v1.Pod{
 			Spec: v1.PodSpec{},
 		}
 
@@ -1814,7 +1815,7 @@ func TestHasHostMountPVC(t *testing.T) {
 		}
 
 		if v.podHasPVC {
-			pod.Spec.Volumes = []v1.Volume{
+			apiPod.Spec.Volumes = []v1.Volume{
 				{
 					VolumeSource: v1.VolumeSource{
 						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{},
@@ -1829,6 +1830,7 @@ func TestHasHostMountPVC(t *testing.T) {
 			}
 
 		}
+		pod := kubepod.NewPod(apiPod)
 
 		testKubelet.fakeKubeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 			return true, &v1.PersistentVolumeClaim{
@@ -1841,7 +1843,7 @@ func TestHasHostMountPVC(t *testing.T) {
 			return true, volumeToReturn, v.pvError
 		})
 
-		actual := testKubelet.kubelet.hasHostMountPVC(pod)
+		actual := testKubelet.kubelet.hasHostMountPVC(pod.GetSpec(), pod.Namespace())
 		if actual != v.expected {
 			t.Errorf("%s expected %t but got %t", k, v.expected, actual)
 		}
@@ -1850,7 +1852,7 @@ func TestHasHostMountPVC(t *testing.T) {
 }
 
 func TestHasNonNamespacedCapability(t *testing.T) {
-	createPodWithCap := func(caps []v1.Capability) *v1.Pod {
+	createPodWithCap := func(caps []v1.Capability) *kubepod.Pod {
 		pod := &v1.Pod{
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{{}},
@@ -1864,14 +1866,16 @@ func TestHasNonNamespacedCapability(t *testing.T) {
 				},
 			}
 		}
-		return pod
+		return kubepod.NewPod(pod)
 	}
 
 	nilCaps := createPodWithCap([]v1.Capability{v1.Capability("foo")})
-	nilCaps.Spec.Containers[0].SecurityContext = nil
+	spec := nilCaps.GetSpec()
+	spec.Containers[0].SecurityContext = nil
+	nilCaps.SetSpec(spec)
 
 	tests := map[string]struct {
-		pod      *v1.Pod
+		pod      *kubepod.Pod
 		expected bool
 	}{
 		"nil security contxt":           {createPodWithCap(nil), false},
@@ -1883,7 +1887,7 @@ func TestHasNonNamespacedCapability(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		actual := hasNonNamespacedCapability(v.pod)
+		actual := hasNonNamespacedCapability(v.pod.GetSpec())
 		if actual != v.expected {
 			t.Errorf("%s failed, expected %t but got %t", k, v.expected, actual)
 		}
@@ -1891,7 +1895,7 @@ func TestHasNonNamespacedCapability(t *testing.T) {
 }
 
 func TestHasHostVolume(t *testing.T) {
-	pod := &v1.Pod{
+	pod := kubepod.NewPod(&v1.Pod{
 		Spec: v1.PodSpec{
 			Volumes: []v1.Volume{
 				{
@@ -1901,15 +1905,17 @@ func TestHasHostVolume(t *testing.T) {
 				},
 			},
 		},
-	}
+	})
 
-	result := hasHostVolume(pod)
+	result := hasHostVolume(pod.GetSpec())
 	if !result {
 		t.Errorf("expected host volume to enable host user namespace")
 	}
 
-	pod.Spec.Volumes[0].VolumeSource.HostPath = nil
-	result = hasHostVolume(pod)
+	spec := pod.GetSpec()
+	spec.Volumes[0].VolumeSource.HostPath = nil
+	pod.SetSpec(spec)
+	result = hasHostVolume(pod.GetSpec())
 	if result {
 		t.Errorf("expected nil host volume to not enable host user namespace")
 	}
@@ -1954,10 +1960,10 @@ func TestHasHostNamespace(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		pod := &v1.Pod{
+		pod := kubepod.NewPod(&v1.Pod{
 			Spec: v.ps,
-		}
-		actual := hasHostNamespace(pod)
+		})
+		actual := hasHostNamespace(pod.GetSpec())
 		if actual != v.expected {
 			t.Errorf("%s failed, expected %t but got %t", k, v.expected, actual)
 		}
