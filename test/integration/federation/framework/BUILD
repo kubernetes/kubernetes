@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "api.go",
+        "configmap.go",
         "controller.go",
         "crudtester.go",
         "federation.go",
@@ -24,6 +25,7 @@ go_library(
         "//federation/cmd/federation-apiserver/app:go_default_library",
         "//federation/cmd/federation-apiserver/app/options:go_default_library",
         "//federation/pkg/federation-controller/cluster:go_default_library",
+        "//federation/pkg/federation-controller/configmap:go_default_library",
         "//federation/pkg/federation-controller/secret:go_default_library",
         "//federation/pkg/typeadapters:go_default_library",
         "//federation/pkg/typeadapters/crudtester:go_default_library",
