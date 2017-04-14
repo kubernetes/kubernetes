@@ -13,14 +13,14 @@ go_test(
     srcs = ["pki_helpers_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/client-go/util/cert"],
+    deps = ["//vendor/k8s.io/client-go/util/cert:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["pki_helpers.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/client-go/util/cert"],
+    deps = ["//vendor/k8s.io/client-go/util/cert:go_default_library"],
 )
 
 filegroup(

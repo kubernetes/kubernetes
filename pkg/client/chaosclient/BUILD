@@ -12,7 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["chaosclient.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/util/net"],
+    deps = ["//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library"],
 )
 
 go_test(

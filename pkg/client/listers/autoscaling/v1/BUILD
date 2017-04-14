@@ -17,9 +17,9 @@ go_library(
     deps = [
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/autoscaling/v1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
-        "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 

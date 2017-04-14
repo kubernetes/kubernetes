@@ -15,7 +15,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
-        "//vendor:github.com/rancher/go-rancher/client",
+        "//vendor/github.com/rancher/go-rancher/client:go_default_library",
     ],
 )
 
@@ -28,8 +28,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/rancher/go-rancher/client",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/rancher/go-rancher/client:go_default_library",
     ],
 )
 
