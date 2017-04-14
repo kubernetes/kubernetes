@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 
 	"github.com/emicklei/go-restful/swagger"
+	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -346,4 +347,8 @@ func (c *fakeCachedDiscoveryInterface) ServerVersion() (*version.Info, error) {
 
 func (c *fakeCachedDiscoveryInterface) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
 	return &swagger.ApiDeclaration{}, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) OpenAPISchema() (*spec.Swagger, error) {
+	return &spec.Swagger{}, nil
 }
