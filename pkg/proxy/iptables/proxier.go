@@ -196,6 +196,7 @@ func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, se
 }
 
 type endpointsMap map[types.NamespacedName]*api.Endpoints
+type serviceMap map[types.NamespacedName]*api.Service
 type proxyServiceMap map[proxy.ServicePortName]*serviceInfo
 type proxyEndpointMap map[proxy.ServicePortName][]*endpointsInfo
 
@@ -211,13 +212,13 @@ type Proxier struct {
 	// to not be modified in the meantime, but also require to be not modified
 	// by Proxier.
 	allEndpoints endpointsMap
-	// allServices is nil until we have seen an OnServiceUpdate event.
-	allServices []*api.Service
+	allServices  serviceMap
 
-	// endpointsSynced is set to true when endpoints are synced after startup.
-	// This is used to avoid updating iptables with some partial data after
-	// kube-proxy restart.
+	// endpointsSynced and servicesSynced are set to true when corresponding
+	// objects are synced after startup. This is used to avoid updating iptables
+	// with some partial data after kube-proxy restart.
 	endpointsSynced bool
+	servicesSynced  bool
 
 	throttle flowcontrol.RateLimiter
 
@@ -333,6 +334,7 @@ func NewProxier(ipt utiliptables.Interface,
 		endpointsMap:   make(proxyEndpointMap),
 		portsMap:       make(map[localPort]closeable),
 		allEndpoints:   make(endpointsMap),
+		allServices:    make(serviceMap),
 		syncPeriod:     syncPeriod,
 		minSyncPeriod:  minSyncPeriod,
 		throttle:       throttle,
@@ -457,7 +459,7 @@ func (proxier *Proxier) SyncLoop() {
 // Accepts a list of Services and the existing service map.  Returns the new
 // service map, a map of healthcheck ports, and a set of stale UDP
 // services.
-func buildNewServiceMap(allServices []*api.Service, oldServiceMap proxyServiceMap) (proxyServiceMap, map[types.NamespacedName]uint16, sets.String) {
+func buildNewServiceMap(allServices serviceMap, oldServiceMap proxyServiceMap) (proxyServiceMap, map[types.NamespacedName]uint16, sets.String) {
 	newServiceMap := make(proxyServiceMap)
 	hcPorts := make(map[types.NamespacedName]uint16)
 
@@ -525,15 +527,37 @@ func buildNewServiceMap(allServices []*api.Service, oldServiceMap proxyServiceMa
 	return newServiceMap, hcPorts, staleUDPServices
 }
 
-// OnServiceUpdate tracks the active set of service proxies.
-// They will be synchronized using syncProxyRules()
-func (proxier *Proxier) OnServiceUpdate(allServices []*api.Service) {
+func (proxier *Proxier) OnServiceAdd(service *api.Service) {
+	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
-	if proxier.allServices == nil {
-		glog.V(2).Info("Received first Services update")
-	}
-	proxier.allServices = allServices
+	proxier.allServices[namespacedName] = service
+	proxier.syncProxyRules(syncReasonServices)
+}
+
+func (proxier *Proxier) OnServiceUpdate(_, service *api.Service) {
+	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	proxier.allServices[namespacedName] = service
+	proxier.syncProxyRules(syncReasonServices)
+}
+
+func (proxier *Proxier) OnServiceDelete(service *api.Service) {
+	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	delete(proxier.allServices, namespacedName)
+	proxier.syncProxyRules(syncReasonServices)
+}
+
+func (proxier *Proxier) OnServiceSynced() {
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	proxier.servicesSynced = true
 	proxier.syncProxyRules(syncReasonServices)
 }
 
