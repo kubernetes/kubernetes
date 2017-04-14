@@ -28,7 +28,6 @@ import (
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/core/internalversion"
 	listers "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/config"
 )
 
 // ServiceConfigHandler is an abstract interface of objects which receive update notifications for the set of services.
@@ -47,7 +46,7 @@ type ServiceConfigHandler interface {
 	OnServiceUpdate(services []*api.Service)
 }
 
-// ServiceHandler is an abstract interface of objects whic receive
+// ServiceHandler is an abstract interface of objects which receive
 // notifications about service object changes.
 type ServiceHandler interface {
 	// OnServiceAdd is called whenever creation of new service object
