@@ -2854,20 +2854,9 @@ type ServiceSpec struct {
 	// will also accept traffic for this service.  These IPs are not managed by
 	// Kubernetes.  The user is responsible for ensuring that traffic arrives
 	// at a node with this IP.  A common example is external load-balancers
-	// that are not part of the Kubernetes system.  A previous form of this
-	// functionality exists as the deprecatedPublicIPs field.  When using this
-	// field, callers should also clear the deprecatedPublicIPs field.
+	// that are not part of the Kubernetes system.
 	// +optional
 	ExternalIPs []string `json:"externalIPs,omitempty" protobuf:"bytes,5,rep,name=externalIPs"`
-
-	// deprecatedPublicIPs is deprecated and replaced by the externalIPs field
-	// with almost the exact same semantics.  This field is retained in the v1
-	// API for compatibility until at least 8/20/2016.  It will be removed from
-	// any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are
-	// set, deprecatedPublicIPs is used.
-	// +k8s:conversion-gen=false
-	// +optional
-	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty" protobuf:"bytes,6,rep,name=deprecatedPublicIPs"`
 
 	// Supports "ClientIP" and "None". Used to maintain session affinity.
 	// Enable client IP based session affinity.
