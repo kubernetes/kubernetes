@@ -46,16 +46,66 @@ func (s sortedServices) Less(i, j int) bool {
 }
 
 type ServiceHandlerMock struct {
+	lock sync.Mutex
+
+	state   map[types.NamespacedName]*api.Service
+	synced  bool
 	updated chan []*api.Service
+	process func([]*api.Service)
 }
 
 func NewServiceHandlerMock() *ServiceHandlerMock {
-	return &ServiceHandlerMock{updated: make(chan []*api.Service, 5)}
+	shm := &ServiceHandlerMock{
+		state:   make(map[types.NamespacedName]*api.Service),
+		updated: make(chan []*api.Service, 5),
+	}
+	shm.process = func(services []*api.Service) {
+		shm.updated <- services
+	}
+	return shm
 }
 
-func (h *ServiceHandlerMock) OnServiceUpdate(services []*api.Service) {
+func (h *ServiceHandlerMock) OnServiceAdd(service *api.Service) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+	h.state[namespacedName] = service
+	h.sendServices()
+}
+
+func (h *ServiceHandlerMock) OnServiceUpdate(oldService, service *api.Service) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+	h.state[namespacedName] = service
+	h.sendServices()
+}
+
+func (h *ServiceHandlerMock) OnServiceDelete(service *api.Service) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+	delete(h.state, namespacedName)
+	h.sendServices()
+}
+
+func (h *ServiceHandlerMock) OnServiceSynced() {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	h.synced = true
+	h.sendServices()
+}
+
+func (h *ServiceHandlerMock) sendServices() {
+	if !h.synced {
+		return
+	}
+	services := make([]*api.Service, 0, len(h.state))
+	for _, svc := range h.state {
+		services = append(services, svc)
+	}
 	sort.Sort(sortedServices(services))
-	h.updated <- services
+	h.process(services)
 }
 
 func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []*api.Service) {
@@ -185,7 +235,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 
 	config := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
-	config.RegisterHandler(handler)
+	config.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
@@ -209,7 +259,7 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 
 	config := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
-	config.RegisterHandler(handler)
+	config.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
@@ -246,8 +296,8 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 	config := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	handler2 := NewServiceHandlerMock()
-	config.RegisterHandler(handler)
-	config.RegisterHandler(handler2)
+	config.RegisterEventHandler(handler)
+	config.RegisterEventHandler(handler2)
 	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
