@@ -441,7 +441,7 @@ func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 
 // Merge requires JSON serialization
 // TODO: merge assumes JSON serialization, and does not properly abstract API retrieval
-func Merge(codec runtime.Codec, dst runtime.Object, fragment, kind string) (runtime.Object, error) {
+func Merge(codec runtime.Codec, dst runtime.Object, fragment string) (runtime.Object, error) {
 	// encode dst into versioned json and apply fragment directly too it
 	target, err := runtime.Encode(codec, dst)
 	if err != nil {
@@ -712,7 +712,7 @@ func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterO
 
 // PrintFilterCount displays informational messages based on the number of resources found, hidden, or
 // config flags shown.
-func PrintFilterCount(out io.Writer, found, hidden, errors int, resource string, options *printers.PrintOptions, ignoreNotFound bool) {
+func PrintFilterCount(out io.Writer, found, hidden, errors int, options *printers.PrintOptions, ignoreNotFound bool) {
 	switch {
 	case errors > 0 || ignoreNotFound:
 		// print nothing

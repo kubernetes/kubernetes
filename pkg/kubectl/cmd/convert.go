@@ -69,7 +69,7 @@ func NewCmdConvert(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    convert_long,
 		Example: convert_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := options.Complete(f, out, cmd, args)
+			err := options.Complete(f, out, cmd)
 			cmdutil.CheckErr(err)
 			err = options.RunConvert()
 			cmdutil.CheckErr(err)
@@ -117,7 +117,7 @@ func outputVersion(cmd *cobra.Command, defaultVersion *schema.GroupVersion) (sch
 }
 
 // Complete collects information required to run Convert command from command line.
-func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
+func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) (err error) {
 	o.outputVersion, err = outputVersion(cmd, &api.Registry.EnabledVersionsForGroup(api.GroupName)[0])
 	if err != nil {
 		return err

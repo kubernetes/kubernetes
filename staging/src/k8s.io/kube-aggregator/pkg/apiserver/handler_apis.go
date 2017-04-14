@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"net/http"
-	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,23 +29,8 @@ import (
 
 	apiregistrationapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	apiregistrationv1alpha1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
-	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 )
-
-// WithAPIs adds the handling for /apis and /apis/<group: -apiregistration.k8s.io>.
-func WithAPIs(handler http.Handler, codecs serializer.CodecFactory, informer informers.APIServiceInformer, serviceLister v1listers.ServiceLister, endpointsLister v1listers.EndpointsLister) http.Handler {
-	apisHandler := &apisHandler{
-		codecs:          codecs,
-		lister:          informer.Lister(),
-		delegate:        handler,
-		serviceLister:   serviceLister,
-		endpointsLister: endpointsLister,
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		apisHandler.ServeHTTP(w, req)
-	})
-}
 
 // apisHandler serves the `/apis` endpoint.
 // This is registered as a filter so that it never collides with any explictly registered endpoints
@@ -75,11 +59,6 @@ var discoveryGroup = metav1.APIGroup{
 }
 
 func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// if the URL is for OUR api group, serve it normally
-	if strings.HasPrefix(req.URL.Path+"/", "/apis/"+apiregistrationapi.GroupName+"/") {
-		r.delegate.ServeHTTP(w, req)
-		return
-	}
 	// don't handle URLs that aren't /apis
 	if req.URL.Path != "/apis" && req.URL.Path != "/apis/" {
 		r.delegate.ServeHTTP(w, req)
@@ -210,7 +189,7 @@ func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if len(apiServicesForGroup) == 0 {
-		http.Error(w, "", http.StatusNotFound)
+		r.delegate.ServeHTTP(w, req)
 		return
 	}
 

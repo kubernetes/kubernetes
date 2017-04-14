@@ -313,7 +313,7 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		if err != nil {
 			return err
 		}
-		err = handleAttachPod(f, clientset.Core(), attachablePod.Namespace, attachablePod.Name, opts, quiet)
+		err = handleAttachPod(f, clientset.Core(), attachablePod.Namespace, attachablePod.Name, opts)
 		if err != nil {
 			return err
 		}
@@ -322,7 +322,7 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		leaveStdinOpen := cmdutil.GetFlagBool(cmd, "leave-stdin-open")
 		waitForExitCode := !leaveStdinOpen && restartPolicy == api.RestartPolicyNever
 		if waitForExitCode {
-			pod, err = waitForPodTerminated(clientset.Core(), attachablePod.Namespace, attachablePod.Name, opts.Out, quiet)
+			pod, err = waitForPodTerminated(clientset.Core(), attachablePod.Namespace, attachablePod.Name)
 			if err != nil {
 				return err
 			}
@@ -413,13 +413,15 @@ func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition 
 		ev, err := watch.Until(0, w, func(ev watch.Event) (bool, error) {
 			return exitCondition(ev)
 		})
-		result = ev.Object.(*api.Pod)
+		if ev != nil {
+			result = ev.Object.(*api.Pod)
+		}
 		return err
 	})
 	return result, err
 }
 
-func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
+func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string) (*api.Pod, error) {
 	pod, err := waitForPod(podClient, ns, name, conditions.PodRunningAndReady)
 
 	// fix generic not found error with empty name in PodRunningAndReady
@@ -430,7 +432,7 @@ func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string, out io.
 	return pod, err
 }
 
-func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
+func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string) (*api.Pod, error) {
 	pod, err := waitForPod(podClient, ns, name, conditions.PodCompleted)
 
 	// fix generic not found error with empty name in PodCompleted
@@ -441,8 +443,8 @@ func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string, out 
 	return pod, err
 }
 
-func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions, quiet bool) error {
-	pod, err := waitForPodRunning(podClient, ns, name, opts.Out, quiet)
+func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions) error {
+	pod, err := waitForPodRunning(podClient, ns, name)
 	if err != nil && err != conditions.ErrPodCompleted {
 		return err
 	}
@@ -589,7 +591,7 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 
 	if len(overrides) > 0 {
 		codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
-		obj, err = cmdutil.Merge(codec, obj, overrides, groupVersionKind.Kind)
+		obj, err = cmdutil.Merge(codec, obj, overrides)
 		if err != nil {
 			return nil, "", nil, nil, err
 		}

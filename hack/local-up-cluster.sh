@@ -48,11 +48,11 @@ EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi"}
 EVICTION_SOFT=${EVICTION_SOFT:-""}
 EVICTION_PRESSURE_TRANSITION_PERIOD=${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}
 
-# We disable cluster DNS by default because this script uses docker0 (or whatever
-# container bridge docker is currently using) and we don't know the IP of the
-# DNS pod to pass in as --cluster-dns. To set this up by hand, set this flag
-# and change DNS_SERVER_IP to the appropriate IP.
-ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-false}
+# This script uses docker0 (or whatever container bridge docker is currently using)
+# and we don't know the IP of the DNS pod to pass in as --cluster-dns.
+# To set this up by hand, set this flag and change DNS_SERVER_IP.
+# Note also that you need API_HOST (defined above) for correct DNS.
+ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
 DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
 KUBECTL=${KUBECTL:-cluster/kubectl.sh}
@@ -182,9 +182,12 @@ set +e
 
 API_PORT=${API_PORT:-8080}
 API_SECURE_PORT=${API_SECURE_PORT:-6443}
+
+# WARNING: For DNS to work on most setups you should export API_HOST as the docker0 ip address,
 API_HOST=${API_HOST:-localhost}
 API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
+
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$}
@@ -309,7 +312,7 @@ cleanup()
 {
   echo "Cleaning up..."
   # delete running images
-  # if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+  # if [[ "${ENABLE_CLUSTER_DNS}" == true ]]; then
   # Still need to figure why this commands throw an error: Error from server: client: etcd cluster is unavailable or misconfigured
   #     ${KUBECTL} --namespace=kube-system delete service kube-dns
   # And this one hang forever:
@@ -858,5 +861,3 @@ print_success
 if [[ "${ENABLE_DAEMON}" = false ]]; then
   while true; do sleep 1; done
 fi
-
-
