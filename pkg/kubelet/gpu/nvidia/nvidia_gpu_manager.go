@@ -25,6 +25,7 @@ import (
 	"path"
 	"regexp"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -102,10 +103,17 @@ func (ngm *nvidiaGPUManager) Start() error {
 	if !os.IsNotExist(err) {
 		ngm.defaultDevices = append(ngm.defaultDevices, nvidiaUVMToolsDevice)
 	}
-
-	if err := ngm.discoverGPUs(devicesProcFile, devDirectory); err != nil {
-		return err
-	}
+	// retry discoverGPUs indefinitely in case drivers have not been installed
+	go func() {
+		var err error
+		for {
+			if err := ngm.discoverGPUs(devicesProcFile, devDirectory); err == nil {
+				return
+			}
+			glog.Errorf("failed to discover Nvidia GPUs: %v", err)
+			time.Sleep(time.Minute)
+		}
+	}()
 	// It's possible that the runtime isn't available now.
 	ngm.allocated = ngm.gpusInUse()
 	// We ignore errors when identifying allocated GPUs because it is possible that the runtime interfaces may be not be logically up.
