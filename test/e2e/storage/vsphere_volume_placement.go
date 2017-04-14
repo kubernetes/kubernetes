@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package storage
 
 import (
 	"fmt"
@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("Volume Placement [Volume]", func() {
 		1. Remove labels assigned to node 1 and node 2
 		2. Delete VMDK volume
 	*/
-	AddCleanupAction(func() {
+	framework.AddCleanupAction(func() {
 		if len(node1KeyValueLabel) > 0 {
 			framework.RemoveLabelOffNode(c, node1Name, "vsphere_e2e_label")
 		}
