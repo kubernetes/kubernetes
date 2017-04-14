@@ -21,12 +21,12 @@ go_library(
         "//pkg/capabilities:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/registry/core/pod:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
-        "//vendor:k8s.io/apiserver/pkg/registry/generic/registry",
-        "//vendor:k8s.io/apiserver/pkg/registry/generic/rest",
-        "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/registry/generic/rest:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
     ],
 )
 
@@ -38,10 +38,10 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
-        "//vendor:k8s.io/apiserver/pkg/registry/generic",
-        "//vendor:k8s.io/apiserver/pkg/registry/generic/registry",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
     ],
 )
 

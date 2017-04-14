@@ -12,13 +12,13 @@ go_library(
     srcs = ["insecure_handler.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apiserver/pkg/authentication/user",
-        "//vendor:k8s.io/apiserver/pkg/endpoints/filters",
-        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
-        "//vendor:k8s.io/apiserver/pkg/server",
-        "//vendor:k8s.io/apiserver/pkg/server/filters",
-        "//vendor:k8s.io/client-go/rest",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/filters:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/filters:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
 

@@ -21,8 +21,8 @@ go_test(
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/util/tolerations:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 
@@ -45,14 +45,14 @@ go_library(
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/install:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1alpha1:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/validation:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
-        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 

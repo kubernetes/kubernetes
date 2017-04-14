@@ -13,7 +13,7 @@ go_test(
     srcs = ["backoff_utils_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/types"],
+    deps = ["//vendor/k8s.io/apimachinery/pkg/types:go_default_library"],
 )
 
 go_library(
@@ -21,8 +21,8 @@ go_library(
     srcs = ["backoff_utils.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 

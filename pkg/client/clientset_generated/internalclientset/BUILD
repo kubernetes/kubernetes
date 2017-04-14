@@ -27,10 +27,10 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/settings/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/storage/internalversion:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/client-go/discovery",
-        "//vendor:k8s.io/client-go/rest",
-        "//vendor:k8s.io/client-go/util/flowcontrol",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/client-go/discovery:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )
 

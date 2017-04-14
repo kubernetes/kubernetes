@@ -13,12 +13,12 @@ go_library(
     srcs = ["openapi.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/openapi",
-        "//vendor:k8s.io/gengo/args",
-        "//vendor:k8s.io/gengo/generator",
-        "//vendor:k8s.io/gengo/namer",
-        "//vendor:k8s.io/gengo/types",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/openapi:go_default_library",
+        "//vendor/k8s.io/gengo/args:go_default_library",
+        "//vendor/k8s.io/gengo/generator:go_default_library",
+        "//vendor/k8s.io/gengo/namer:go_default_library",
+        "//vendor/k8s.io/gengo/types:go_default_library",
     ],
 )
 
@@ -28,11 +28,11 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:k8s.io/gengo/generator",
-        "//vendor:k8s.io/gengo/namer",
-        "//vendor:k8s.io/gengo/parser",
-        "//vendor:k8s.io/gengo/types",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/gengo/generator:go_default_library",
+        "//vendor/k8s.io/gengo/namer:go_default_library",
+        "//vendor/k8s.io/gengo/parser:go_default_library",
+        "//vendor/k8s.io/gengo/types:go_default_library",
     ],
 )
 

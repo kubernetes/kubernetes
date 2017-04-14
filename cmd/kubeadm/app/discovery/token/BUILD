@@ -18,11 +18,11 @@ go_library(
         "//cmd/kubeadm/app/util/token:go_default_library",
         "//pkg/bootstrap/api:go_default_library",
         "//pkg/controller/bootstrap:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/client-go/pkg/api/v1",
-        "//vendor:k8s.io/client-go/tools/clientcmd",
-        "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
+        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
     ],
 )
 
@@ -46,6 +46,6 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
-        "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
     ],
 )
