@@ -170,7 +170,6 @@ pkg/client/listers/storage/v1beta1
 pkg/client/metrics
 pkg/client/metrics/prometheus
 pkg/client/unversioned
-pkg/client/unversioned/remotecommand
 pkg/cloudprovider/providers
 pkg/cloudprovider/providers/azure
 pkg/cloudprovider/providers/cloudstack
