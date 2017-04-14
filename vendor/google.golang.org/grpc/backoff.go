@@ -58,7 +58,7 @@ func setDefaults(bc *BackoffConfig) {
 	}
 }
 
-func (bc BackoffConfig) backoff(retries int) (t time.Duration) {
+func (bc BackoffConfig) backoff(retries int) time.Duration {
 	if retries == 0 {
 		return bc.baseDelay
 	}

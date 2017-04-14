@@ -111,7 +111,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume]", func() {
 
 	// Testing configurations of a single a PV/PVC pair, multiple evenly paired PVs/PVCs,
 	// and multiple unevenly paired PV/PVCs
-	framework.KubeDescribe("PersistentVolumes:NFS[Flaky]", func() {
+	framework.KubeDescribe("PersistentVolumes:NFS", func() {
 
 		var (
 			nfsServerPod *v1.Pod
@@ -260,7 +260,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume]", func() {
 			// This It() tests a scenario where a PV is written to by a Pod, recycled, then the volume checked
 			// for files. If files are found, the checking Pod fails, failing the test.  Otherwise, the pod
 			// (and test) succeed.
-			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Volume] [Flaky]", func() {
+			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Volume]", func() {
 				By("Writing to the volume.")
 				pod := framework.MakeWritePod(ns, pvc)
 				pod, err := c.CoreV1().Pods(ns).Create(pod)

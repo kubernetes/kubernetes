@@ -46,6 +46,7 @@ go_library(
         "//vendor:golang.org/x/net/context",
         "//vendor:golang.org/x/oauth2",
         "//vendor:golang.org/x/oauth2/google",
+        "//vendor:google.golang.org/api/compute/v0.alpha",
         "//vendor:google.golang.org/api/compute/v1",
         "//vendor:google.golang.org/api/container/v1",
         "//vendor:google.golang.org/api/gensupport",

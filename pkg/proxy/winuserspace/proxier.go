@@ -30,6 +30,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/util/netsh"
 )
@@ -322,7 +323,7 @@ func (proxier *Proxier) OnServiceUpdate(services []*api.Service) {
 	activeServicePortPortals := make(map[ServicePortPortalName]bool) // use a map as a set
 	for _, service := range services {
 		// if ClusterIP is "None" or empty, skip proxying
-		if !api.IsServiceIPSet(service) {
+		if !helper.IsServiceIPSet(service) {
 			glog.V(3).Infof("Skipping service %s due to clusterIP = %q", types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, service.Spec.ClusterIP)
 			continue
 		}

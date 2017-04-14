@@ -1127,7 +1127,7 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 	plugins := []volume.VolumePlugin{plugin}
 	cloud := &fakecloud.FakeCloud{}
 	informers := informers.NewSharedInformerFactory(testClient, getSyncPeriod(syncPeriod))
-	ctrl := persistentvolumecontroller.NewController(
+	ctrl, err := persistentvolumecontroller.NewController(
 		persistentvolumecontroller.ControllerParameters{
 			KubeClient:                binderClient,
 			SyncPeriod:                getSyncPeriod(syncPeriod),
@@ -1138,6 +1138,9 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 			ClassInformer:             informers.Storage().V1beta1().StorageClasses(),
 			EnableDynamicProvisioning: true,
 		})
+	if err != nil {
+		t.Fatalf("Failed to construct PersistentVolumes: %v", err)
+	}
 
 	watchPV, err := testClient.PersistentVolumes().Watch(metav1.ListOptions{})
 	if err != nil {

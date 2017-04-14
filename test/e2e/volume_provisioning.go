@@ -499,25 +499,6 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		})
 	})
 
-	framework.KubeDescribe("DynamicProvisioner Alpha", func() {
-		It("should create and delete alpha persistent volumes [Slow] [Volume]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
-
-			By("creating a claim with an alpha dynamic provisioning annotation")
-			test := storageClassTest{
-				name:         "alpha test",
-				claimSize:    "2Gi",
-				expectedSize: "2Gi",
-			}
-
-			claim := newClaim(test, ns, "alpha")
-			claim.Annotations = map[string]string{
-				v1.AlphaStorageClassAnnotation: "true",
-			}
-			testDynamicProvisioning(test, c, claim, nil)
-		})
-	})
-
 	framework.KubeDescribe("DynamicProvisioner External", func() {
 		It("should let an external dynamic provisioner create and delete persistent volumes [Slow] [Volume]", func() {
 			// external dynamic provisioner pods need additional permissions provided by the

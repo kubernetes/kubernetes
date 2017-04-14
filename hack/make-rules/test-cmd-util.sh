@@ -66,6 +66,7 @@ static="static"
 storageclass="storageclass"
 subjectaccessreviews="subjectaccessreviews"
 thirdpartyresources="thirdpartyresources"
+daemonsets="daemonsets"
 
 
 # Stops the running kubectl proxy, if there is one.
@@ -287,7 +288,7 @@ run_pod_tests() {
   kube::test::get_object_jsonpath_assert 'pod/valid-pod' "{$id_field}" 'valid-pod'
   kube::test::get_object_jsonpath_assert 'pods/valid-pod' "{$id_field}" 'valid-pod'
   # Describe command should print detailed information
-  kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image:" "Node:" "Labels:" "Status:" "Controllers"
+  kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image:" "Node:" "Labels:" "Status:"
   # Describe command should print events information by default
   kube::test::describe_object_events_assert pods 'valid-pod'
   # Describe command should not print events information when show-events=false
@@ -295,7 +296,7 @@ run_pod_tests() {
   # Describe command should print events information when show-events=true
   kube::test::describe_object_events_assert pods 'valid-pod' true
   # Describe command (resource only) should print detailed information
-  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Controllers"
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:"
 
   # Describe command should print events information by default
   kube::test::describe_resource_events_assert pods
@@ -1083,6 +1084,8 @@ run_kubectl_run_tests() {
   kubectl run pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
   # Post-Condition: Job "pi" is created
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  # Describe command (resource only) should print detailed information
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Created By"
   # Clean up
   kubectl delete jobs pi "${kube_flags[@]}"
   # Post-condition: no pods exist.
@@ -2375,6 +2378,10 @@ run_deployment_tests() {
   kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
   output_message=$(kubectl get deployment.apps -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'apps/v1beta1'
+  # Describe command (resource only) should print detailed information
+  kube::test::describe_resource_assert rs "Name:" "Pod Template:" "Labels:" "Selector:" "Controlled By" "Replicas:" "Pods Status:" "Volumes:"
+  # Describe command (resource only) should print detailed information
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Created By" "Controlled By"
   # Clean up
   kubectl delete deployment test-nginx-apps "${kube_flags[@]}"
 
@@ -2555,6 +2562,8 @@ run_rs_tests() {
   kube::test::describe_resource_events_assert rs false
   # Describe command should print events information when show-events=true
   kube::test::describe_resource_events_assert rs true
+  # Describe command (resource only) should print detailed information
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Created By" "Controlled By"
 
   ### Scale replica set frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
@@ -2626,6 +2635,22 @@ run_rs_tests() {
     # Clean up
     kubectl delete rs frontend "${kube_flags[@]}"
   fi
+}
+
+run_daemonset_tests() {
+  kube::log::status "Testing kubectl(v1:daemonsets)"
+
+  ### Create a rolling update DaemonSet
+  # Pre-condition: no DaemonSet exists
+  kube::test::get_object_assert daemonsets "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl apply -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
+  # Template Generation should be 1
+  kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '1'
+  kubectl apply -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
+  # Template Generation should stay 1
+  kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '1'
+  kubectl delete -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
 }
 
 run_multi_resources_tests() {
@@ -2852,6 +2877,7 @@ runTests() {
   deployment_second_image_field="(index .spec.template.spec.containers 1).image"
   change_cause_annotation='.*kubernetes.io/change-cause.*'
   pdb_min_available=".spec.minAvailable"
+  template_generation_field=".spec.templateGeneration"
 
   # Make sure "default" namespace exists.
   if kube::test::if_supports_resource "${namespaces}" ; then
@@ -3238,6 +3264,14 @@ runTests() {
     run_service_tests
   fi
 
+
+  ##################
+  # DaemonSets     #
+  ##################
+
+  if kube::test::if_supports_resource "${daemonsets}" ; then
+    run_daemonset_tests
+  fi
 
   ###########################
   # Replication controllers #

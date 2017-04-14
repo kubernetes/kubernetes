@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -172,7 +173,7 @@ func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, se
 		protocol:  port.Protocol,
 		nodePort:  int(port.NodePort),
 		// Deep-copy in case the service instance changes
-		loadBalancerStatus:       *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
+		loadBalancerStatus:       *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
 		sessionAffinityType:      service.Spec.SessionAffinity,
 		stickyMaxAgeMinutes:      180, // TODO: paramaterize this in the API.
 		externalIPs:              make([]string, len(service.Spec.ExternalIPs)),
@@ -195,8 +196,8 @@ func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, se
 	return info
 }
 
+type endpointsMap map[types.NamespacedName]*api.Endpoints
 type proxyServiceMap map[proxy.ServicePortName]*serviceInfo
-
 type proxyEndpointMap map[proxy.ServicePortName][]*endpointsInfo
 
 // Proxier is an iptables based proxy for connections between a localhost:lport
@@ -210,9 +211,14 @@ type Proxier struct {
 	// pointers are shared with higher layers of kube-proxy. They are guaranteed
 	// to not be modified in the meantime, but also require to be not modified
 	// by Proxier.
-	// nil until we have seen an On*Update event.
-	allServices  []*api.Service
-	allEndpoints []*api.Endpoints
+	allEndpoints endpointsMap
+	// allServices is nil until we have seen an OnServiceUpdate event.
+	allServices []*api.Service
+
+	// endpointsSynced is set to true when endpoints are synced after startup.
+	// This is used to avoid updating iptables with some partial data after
+	// kube-proxy restart.
+	endpointsSynced bool
 
 	throttle flowcontrol.RateLimiter
 
@@ -327,6 +333,7 @@ func NewProxier(ipt utiliptables.Interface,
 		serviceMap:     make(proxyServiceMap),
 		endpointsMap:   make(proxyEndpointMap),
 		portsMap:       make(map[localPort]closeable),
+		allEndpoints:   make(endpointsMap),
 		syncPeriod:     syncPeriod,
 		minSyncPeriod:  minSyncPeriod,
 		throttle:       throttle,
@@ -462,7 +469,7 @@ func buildNewServiceMap(allServices []*api.Service, oldServiceMap proxyServiceMa
 		}
 
 		// if ClusterIP is "None" or empty, skip proxying
-		if !api.IsServiceIPSet(service) {
+		if !helper.IsServiceIPSet(service) {
 			glog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
 			continue
 		}
@@ -531,19 +538,42 @@ func (proxier *Proxier) OnServiceUpdate(allServices []*api.Service) {
 	proxier.syncProxyRules(syncReasonServices)
 }
 
-// OnEndpointsUpdate takes in a slice of updated endpoints.
-func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []*api.Endpoints) {
+func (proxier *Proxier) OnEndpointsAdd(endpoints *api.Endpoints) {
+	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
-	if proxier.allEndpoints == nil {
-		glog.V(2).Info("Received first Endpoints update")
-	}
-	proxier.allEndpoints = allEndpoints
+	proxier.allEndpoints[namespacedName] = endpoints
+	proxier.syncProxyRules(syncReasonEndpoints)
+}
+
+func (proxier *Proxier) OnEndpointsUpdate(_, endpoints *api.Endpoints) {
+	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	proxier.allEndpoints[namespacedName] = endpoints
+	proxier.syncProxyRules(syncReasonEndpoints)
+}
+
+func (proxier *Proxier) OnEndpointsDelete(endpoints *api.Endpoints) {
+	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	delete(proxier.allEndpoints, namespacedName)
+	proxier.syncProxyRules(syncReasonEndpoints)
+}
+
+func (proxier *Proxier) OnEndpointsSynced() {
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	proxier.endpointsSynced = true
 	proxier.syncProxyRules(syncReasonEndpoints)
 }
 
 // Convert a slice of api.Endpoints objects into a map of service-port -> endpoints.
-func buildNewEndpointsMap(allEndpoints []*api.Endpoints, curMap proxyEndpointMap, hostname string) (newMap proxyEndpointMap, hcEndpoints map[types.NamespacedName]int, staleSet map[endpointServicePair]bool) {
+func buildNewEndpointsMap(allEndpoints endpointsMap, curMap proxyEndpointMap, hostname string) (newMap proxyEndpointMap, hcEndpoints map[types.NamespacedName]int, staleSet map[endpointServicePair]bool) {
 
 	// return values
 	newMap = make(proxyEndpointMap)
@@ -551,8 +581,8 @@ func buildNewEndpointsMap(allEndpoints []*api.Endpoints, curMap proxyEndpointMap
 	staleSet = make(map[endpointServicePair]bool)
 
 	// Update endpoints for services.
-	for i := range allEndpoints {
-		accumulateEndpointsMap(allEndpoints[i], hostname, &newMap)
+	for _, endpoints := range allEndpoints {
+		accumulateEndpointsMap(endpoints, hostname, &newMap)
 	}
 	// Check stale connections against endpoints missing from the update.
 	// TODO: we should really only mark a connection stale if the proto was UDP
@@ -607,7 +637,6 @@ func buildNewEndpointsMap(allEndpoints []*api.Endpoints, curMap proxyEndpointMap
 // NOTE: endpoints object should NOT be modified.
 //
 // TODO: this could be simplified:
-// - hostPortInfo and endpointsInfo overlap too much
 // - the test for this is overlapped by the test for buildNewEndpointsMap
 // - naming is poor and responsibilities are muddled
 func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string, newEndpoints *proxyEndpointMap) {
@@ -732,7 +761,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 		glog.V(4).Infof("syncProxyRules(%s) took %v", reason, time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints
-	if proxier.allEndpoints == nil || proxier.allServices == nil {
+	if !proxier.endpointsSynced || proxier.allServices == nil {
 		glog.V(2).Info("Not syncing iptables until Services and Endpoints have been received from master")
 		return
 	}

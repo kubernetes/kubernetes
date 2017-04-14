@@ -339,7 +339,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				},
 			}
 			for _, info := range infos {
-				list.Items = append(list.Items, info.Object.(*unstructured.Unstructured))
+				list.Items = append(list.Items, *info.Object.(*unstructured.Unstructured))
 			}
 			obj = list
 		} else {
@@ -367,7 +367,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			}
 
 			for _, item := range items {
-				list.Items = append(list.Items, item.(*unstructured.Unstructured))
+				list.Items = append(list.Items, *item.(*unstructured.Unstructured))
 			}
 			if err := printer.PrintObj(list, out); err != nil {
 				errs = append(errs, err)
@@ -504,6 +504,6 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 	}
 	w.Flush()
-	cmdutil.PrintFilterCount(errOut, len(objs), filteredResourceCount, len(allErrs), "", filterOpts, options.IgnoreNotFound)
+	cmdutil.PrintFilterCount(errOut, len(objs), filteredResourceCount, len(allErrs), filterOpts, options.IgnoreNotFound)
 	return utilerrors.NewAggregate(allErrs)
 }

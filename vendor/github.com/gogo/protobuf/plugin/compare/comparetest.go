@@ -1,4 +1,6 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
 // http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
@@ -46,6 +48,7 @@ func (p *test) Generate(imports generator.PluginImports, file *generator.FileDes
 	timePkg := imports.NewImport("time")
 	testingPkg := imports.NewImport("testing")
 	protoPkg := imports.NewImport("github.com/gogo/protobuf/proto")
+	unsafePkg := imports.NewImport("unsafe")
 	if !gogoproto.ImportsGoGoProto(file.FileDescriptorProto) {
 		protoPkg = imports.NewImport("github.com/golang/protobuf/proto")
 	}
@@ -60,18 +63,28 @@ func (p *test) Generate(imports generator.PluginImports, file *generator.FileDes
 
 		if gogoproto.HasTestGen(file.FileDescriptorProto, message.DescriptorProto) {
 			used = true
+			hasUnsafe := gogoproto.IsUnsafeMarshaler(file.FileDescriptorProto, message.DescriptorProto) ||
+				gogoproto.IsUnsafeUnmarshaler(file.FileDescriptorProto, message.DescriptorProto)
 			p.P(`func Test`, ccTypeName, `Compare(t *`, testingPkg.Use(), `.T) {`)
 			p.In()
+			if hasUnsafe {
+				p.P(`var bigendian uint32 = 0x01020304`)
+				p.P(`if *(*byte)(`, unsafePkg.Use(), `.Pointer(&bigendian)) == 1 {`)
+				p.In()
+				p.P(`t.Skip("unsafe does not work on big endian architectures")`)
+				p.Out()
+				p.P(`}`)
+			}
 			p.P(`popr := `, randPkg.Use(), `.New(`, randPkg.Use(), `.NewSource(`, timePkg.Use(), `.Now().UnixNano()))`)
 			p.P(`p := NewPopulated`, ccTypeName, `(popr, false)`)
-			p.P(`data, err := `, protoPkg.Use(), `.Marshal(p)`)
+			p.P(`dAtA, err := `, protoPkg.Use(), `.Marshal(p)`)
 			p.P(`if err != nil {`)
 			p.In()
 			p.P(`panic(err)`)
 			p.Out()
 			p.P(`}`)
 			p.P(`msg := &`, ccTypeName, `{}`)
-			p.P(`if err := `, protoPkg.Use(), `.Unmarshal(data, msg); err != nil {`)
+			p.P(`if err := `, protoPkg.Use(), `.Unmarshal(dAtA, msg); err != nil {`)
 			p.In()
 			p.P(`panic(err)`)
 			p.Out()

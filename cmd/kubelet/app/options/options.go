@@ -73,6 +73,10 @@ type KubeletFlags struct {
 	// NodeIP is IP address of the node.
 	// If set, kubelet will use this IP address for the node.
 	NodeIP string
+
+	// DockershimRootDirectory is the path to the dockershim root directory. Defaults to
+	// /var/lib/dockershim if unset. Exposed for integration testing (e.g. in OpenShift).
+	DockershimRootDirectory string
 }
 
 // KubeletServer encapsulates all of the parameters necessary for starting up
@@ -90,8 +94,9 @@ func NewKubeletServer() *KubeletServer {
 	api.Scheme.Convert(versioned, &config, nil)
 	return &KubeletServer{
 		KubeletFlags: KubeletFlags{
-			KubeConfig:        flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
-			RequireKubeConfig: false,
+			KubeConfig:              flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
+			RequireKubeConfig:       false,
+			DockershimRootDirectory: "/var/lib/dockershim",
 		},
 		KubeletConfiguration: config,
 	}
@@ -129,6 +134,9 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&f.HostnameOverride, "hostname-override", f.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 
 	fs.StringVar(&f.NodeIP, "node-ip", f.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
+
+	fs.StringVar(&f.DockershimRootDirectory, "experimental-dockershim-root-directory", f.DockershimRootDirectory, "Path to the dockershim root directory.")
+	fs.MarkHidden("experimental-dockershim-root-directory")
 }
 
 // addFlags adds flags for a specific componentconfig.KubeletConfiguration to the specified FlagSet

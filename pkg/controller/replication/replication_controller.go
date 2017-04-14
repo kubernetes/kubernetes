@@ -202,9 +202,6 @@ func (rm *ReplicationManager) updateRC(old, cur interface{}) {
 	oldRC := old.(*v1.ReplicationController)
 	curRC := cur.(*v1.ReplicationController)
 
-	// TODO: Remove when #31981 is resolved!
-	glog.Infof("Observed updated replication controller %v. Desired pod count change: %d->%d", curRC.Name, *(oldRC.Spec.Replicas), *(curRC.Spec.Replicas))
-
 	// You might imagine that we only really need to enqueue the
 	// controller when Spec changes, but it is safer to sync any
 	// time this function is triggered. That way a full informer
@@ -217,9 +214,8 @@ func (rm *ReplicationManager) updateRC(old, cur interface{}) {
 	// this function), but in general extra resyncs shouldn't be
 	// that bad as rcs that haven't met expectations yet won't
 	// sync, and all the listing is done using local stores.
-	if oldRC.Status.Replicas != curRC.Status.Replicas {
-		// TODO: Should we log status or spec?
-		glog.V(4).Infof("Observed updated replica count for rc: %v, %d->%d", curRC.Name, oldRC.Status.Replicas, curRC.Status.Replicas)
+	if oldRC.Spec.Replicas != curRC.Spec.Replicas {
+		glog.V(4).Infof("Replication controller %v updated. Desired pod count change: %d->%d", curRC.Name, *(oldRC.Spec.Replicas), *(curRC.Spec.Replicas))
 	}
 	rm.enqueueController(cur)
 }

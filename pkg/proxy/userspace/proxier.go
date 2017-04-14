@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/proxy"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -405,7 +406,7 @@ func (proxier *Proxier) OnServiceUpdate(services []*api.Service) {
 	activeServices := make(map[proxy.ServicePortName]bool) // use a map as a set
 	for _, service := range services {
 		// if ClusterIP is "None" or empty, skip proxying
-		if !api.IsServiceIPSet(service) {
+		if !helper.IsServiceIPSet(service) {
 			glog.V(3).Infof("Skipping service %s due to clusterIP = %q", types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, service.Spec.ClusterIP)
 			continue
 		}
@@ -460,7 +461,7 @@ func (proxier *Proxier) OnServiceUpdate(services []*api.Service) {
 			info.portal.port = int(servicePort.Port)
 			info.externalIPs = service.Spec.ExternalIPs
 			// Deep-copy in case the service instance changes
-			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
+			info.loadBalancerStatus = *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 			info.nodePort = int(servicePort.NodePort)
 			info.sessionAffinityType = service.Spec.SessionAffinity
 			glog.V(4).Infof("info: %#v", info)
@@ -509,7 +510,7 @@ func sameConfig(info *ServiceInfo, service *api.Service, port *api.ServicePort) 
 	if !ipsEqual(info.externalIPs, service.Spec.ExternalIPs) {
 		return false
 	}
-	if !api.LoadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
+	if !helper.LoadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
 		return false
 	}
 	if info.sessionAffinityType != service.Spec.SessionAffinity {

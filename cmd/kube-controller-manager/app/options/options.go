@@ -188,7 +188,10 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.StringVar(&s.ClusterCIDR, "cluster-cidr", s.ClusterCIDR, "CIDR Range for Pods in cluster.")
 	fs.StringVar(&s.ServiceCIDR, "service-cluster-ip-range", s.ServiceCIDR, "CIDR Range for Services in cluster.")
 	fs.Int32Var(&s.NodeCIDRMaskSize, "node-cidr-mask-size", s.NodeCIDRMaskSize, "Mask size for node cidr in cluster.")
-	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
+	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false,
+		"Should CIDRs for Pods be allocated and set on the cloud provider.")
+	fs.StringVar(&s.CIDRAllocatorType, "cidr-allocator-type", "RangeAllocator",
+		"Type of CIDR allocator to use")
 	fs.BoolVar(&s.ConfigureCloudRoutes, "configure-cloud-routes", true, "Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")

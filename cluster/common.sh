@@ -723,6 +723,17 @@ EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
 EOF
   fi
+
+  if [ -n "${PROVIDER_VARS:-}" ]; then
+    local var_name
+    local var_value
+
+    for var_name in ${PROVIDER_VARS}; do
+      eval "local var_value=\$(yaml-quote \${${var_name}})"
+      echo "${var_name}: ${var_value}" >>$file
+    done
+  fi
+
   if [[ "${master}" == "true" ]]; then
     # Master-only env vars.
     cat >>$file <<EOF

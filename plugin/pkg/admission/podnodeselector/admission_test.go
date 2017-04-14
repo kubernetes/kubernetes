@@ -141,6 +141,14 @@ func TestPodAdmission(t *testing.T) {
 			admit:                 false,
 			testName:              "Merged pod node selectors conflict with the whitelist",
 		},
+		{
+			defaultNodeSelector:             "env=dev",
+			ignoreTestNamespaceNodeSelector: true,
+			whitelist:                       "env=prd",
+			podNodeSelector:                 map[string]string{},
+			admit:                           false,
+			testName:                        "Default node selector conflict with the whitelist",
+		},
 	}
 	for _, test := range tests {
 		if !test.ignoreTestNamespaceNodeSelector {

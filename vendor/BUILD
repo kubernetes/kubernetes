@@ -1108,6 +1108,35 @@ go_library(
 )
 
 go_library(
+    name = "github.com/codedellemc/goscaleio",
+    srcs = [
+        "github.com/codedellemc/goscaleio/api.go",
+        "github.com/codedellemc/goscaleio/certs.go",
+        "github.com/codedellemc/goscaleio/device.go",
+        "github.com/codedellemc/goscaleio/instance.go",
+        "github.com/codedellemc/goscaleio/protectiondomain.go",
+        "github.com/codedellemc/goscaleio/scsiinitiator.go",
+        "github.com/codedellemc/goscaleio/sdc.go",
+        "github.com/codedellemc/goscaleio/sds.go",
+        "github.com/codedellemc/goscaleio/storagepool.go",
+        "github.com/codedellemc/goscaleio/system.go",
+        "github.com/codedellemc/goscaleio/user.go",
+        "github.com/codedellemc/goscaleio/volume.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/Sirupsen/logrus",
+        "//vendor:github.com/codedellemc/goscaleio/types/v1",
+    ],
+)
+
+go_library(
+    name = "github.com/codedellemc/goscaleio/types/v1",
+    srcs = ["github.com/codedellemc/goscaleio/types/v1/types.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/codegangsta/negroni",
     srcs = [
         "github.com/codegangsta/negroni/doc.go",
@@ -1182,6 +1211,7 @@ go_library(
         "//vendor:github.com/coreos/pkg/capnslog",
         "//vendor:golang.org/x/crypto/bcrypt",
         "//vendor:golang.org/x/net/context",
+        "//vendor:google.golang.org/grpc/metadata",
     ],
 )
 
@@ -1247,8 +1277,10 @@ go_library(
         "//vendor:github.com/coreos/etcd/mvcc/mvccpb",
         "//vendor:github.com/coreos/etcd/pkg/tlsutil",
         "//vendor:github.com/ghodss/yaml",
+        "//vendor:github.com/grpc-ecosystem/go-grpc-prometheus",
         "//vendor:golang.org/x/net/context",
         "//vendor:google.golang.org/grpc",
+        "//vendor:google.golang.org/grpc/codes",
         "//vendor:google.golang.org/grpc/credentials",
         "//vendor:google.golang.org/grpc/grpclog",
         "//vendor:google.golang.org/grpc/metadata",
@@ -1355,7 +1387,6 @@ go_library(
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:golang.org/x/net/context",
-        "//vendor:google.golang.org/grpc/metadata",
     ],
 )
 
@@ -1458,6 +1489,7 @@ go_library(
         "//vendor:github.com/coreos/etcd/version",
         "//vendor:github.com/coreos/pkg/capnslog",
         "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/grpc-ecosystem/go-grpc-prometheus",
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:golang.org/x/net/context",
         "//vendor:google.golang.org/grpc",
@@ -1542,6 +1574,7 @@ go_library(
         "//vendor:github.com/coreos/etcd/version",
         "//vendor:github.com/coreos/go-semver/semver",
         "//vendor:github.com/coreos/pkg/capnslog",
+        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -1565,6 +1598,7 @@ go_library(
     srcs = [
         "github.com/coreos/etcd/integration/bridge.go",
         "github.com/coreos/etcd/integration/cluster.go",
+        "github.com/coreos/etcd/integration/cluster_direct.go",
         "github.com/coreos/etcd/integration/doc.go",
     ],
     tags = ["automanaged"],
@@ -1596,6 +1630,7 @@ go_library(
     deps = [
         "//vendor:github.com/coreos/etcd/lease/leasepb",
         "//vendor:github.com/coreos/etcd/mvcc/backend",
+        "//vendor:github.com/coreos/etcd/pkg/monotime",
     ],
 )
 
@@ -1609,6 +1644,8 @@ go_library(
     deps = [
         "//vendor:github.com/coreos/etcd/etcdserver/etcdserverpb",
         "//vendor:github.com/coreos/etcd/lease",
+        "//vendor:github.com/coreos/etcd/lease/leasepb",
+        "//vendor:github.com/coreos/etcd/pkg/httputil",
         "//vendor:golang.org/x/net/context",
     ],
 )
@@ -1617,7 +1654,10 @@ go_library(
     name = "github.com/coreos/etcd/lease/leasepb",
     srcs = ["github.com/coreos/etcd/lease/leasepb/lease.pb.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/protobuf/proto"],
+    deps = [
+        "//vendor:github.com/coreos/etcd/etcdserver/etcdserverpb",
+        "//vendor:github.com/golang/protobuf/proto",
+    ],
 )
 
 go_library(
@@ -1693,6 +1733,15 @@ go_library(
 )
 
 go_library(
+    name = "github.com/coreos/etcd/pkg/cpuutil",
+    srcs = [
+        "github.com/coreos/etcd/pkg/cpuutil/doc.go",
+        "github.com/coreos/etcd/pkg/cpuutil/endian.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/coreos/etcd/pkg/crc",
     srcs = ["github.com/coreos/etcd/pkg/crc/crc.go"],
     tags = ["automanaged"],
@@ -1747,15 +1796,28 @@ go_library(
 )
 
 go_library(
+    name = "github.com/coreos/etcd/pkg/monotime",
+    srcs = [
+        "github.com/coreos/etcd/pkg/monotime/issue15006.s",
+        "github.com/coreos/etcd/pkg/monotime/monotime.go",
+        "github.com/coreos/etcd/pkg/monotime/nanotime.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/coreos/etcd/pkg/netutil",
     srcs = [
         "github.com/coreos/etcd/pkg/netutil/isolate_linux.go",
         "github.com/coreos/etcd/pkg/netutil/netutil.go",
+        "github.com/coreos/etcd/pkg/netutil/routes_linux.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//vendor:github.com/coreos/etcd/pkg/cpuutil",
         "//vendor:github.com/coreos/etcd/pkg/types",
         "//vendor:github.com/coreos/pkg/capnslog",
+        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -1853,6 +1915,53 @@ go_library(
 )
 
 go_library(
+    name = "github.com/coreos/etcd/proxy/grpcproxy",
+    srcs = [
+        "github.com/coreos/etcd/proxy/grpcproxy/auth.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/cluster.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/doc.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/kv.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/kv_client_adapter.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/lease.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/maintenance.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/metrics.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/watch.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/watch_broadcast.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/watch_broadcasts.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/watch_client_adapter.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/watch_ranges.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/watcher.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/coreos/etcd/clientv3",
+        "//vendor:github.com/coreos/etcd/etcdserver/api/v3rpc",
+        "//vendor:github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
+        "//vendor:github.com/coreos/etcd/etcdserver/etcdserverpb",
+        "//vendor:github.com/coreos/etcd/mvcc",
+        "//vendor:github.com/coreos/etcd/mvcc/mvccpb",
+        "//vendor:github.com/coreos/etcd/proxy/grpcproxy/cache",
+        "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:golang.org/x/time/rate",
+        "//vendor:google.golang.org/grpc",
+        "//vendor:google.golang.org/grpc/metadata",
+    ],
+)
+
+go_library(
+    name = "github.com/coreos/etcd/proxy/grpcproxy/cache",
+    srcs = ["github.com/coreos/etcd/proxy/grpcproxy/cache/store.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
+        "//vendor:github.com/coreos/etcd/etcdserver/etcdserverpb",
+        "//vendor:github.com/coreos/etcd/pkg/adt",
+        "//vendor:github.com/karlseguin/ccache",
+    ],
+)
+
+go_library(
     name = "github.com/coreos/etcd/raft",
     srcs = [
         "github.com/coreos/etcd/raft/doc.go",
@@ -1863,6 +1972,7 @@ go_library(
         "github.com/coreos/etcd/raft/progress.go",
         "github.com/coreos/etcd/raft/raft.go",
         "github.com/coreos/etcd/raft/rawnode.go",
+        "github.com/coreos/etcd/raft/read_only.go",
         "github.com/coreos/etcd/raft/status.go",
         "github.com/coreos/etcd/raft/storage.go",
         "github.com/coreos/etcd/raft/util.go",
@@ -1979,10 +2089,7 @@ go_library(
     name = "github.com/coreos/etcd/version",
     srcs = ["github.com/coreos/etcd/version/version.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/coreos/etcd/pkg/fileutil",
-        "//vendor:github.com/coreos/etcd/pkg/types",
-    ],
+    deps = ["//vendor:github.com/coreos/go-semver/semver"],
 )
 
 go_library(
@@ -3284,6 +3391,8 @@ go_library(
         "github.com/gogo/protobuf/proto/clone.go",
         "github.com/gogo/protobuf/proto/decode.go",
         "github.com/gogo/protobuf/proto/decode_gogo.go",
+        "github.com/gogo/protobuf/proto/duration.go",
+        "github.com/gogo/protobuf/proto/duration_gogo.go",
         "github.com/gogo/protobuf/proto/encode.go",
         "github.com/gogo/protobuf/proto/encode_gogo.go",
         "github.com/gogo/protobuf/proto/equal.go",
@@ -3300,6 +3409,8 @@ go_library(
         "github.com/gogo/protobuf/proto/text.go",
         "github.com/gogo/protobuf/proto/text_gogo.go",
         "github.com/gogo/protobuf/proto/text_parser.go",
+        "github.com/gogo/protobuf/proto/timestamp.go",
+        "github.com/gogo/protobuf/proto/timestamp_gogo.go",
     ],
     tags = ["automanaged"],
 )
@@ -3307,8 +3418,9 @@ go_library(
 go_library(
     name = "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
     srcs = [
+        "github.com/gogo/protobuf/protoc-gen-gogo/descriptor/descriptor.go",
         "github.com/gogo/protobuf/protoc-gen-gogo/descriptor/descriptor.pb.go",
-        "github.com/gogo/protobuf/protoc-gen-gogo/descriptor/gostring.go",
+        "github.com/gogo/protobuf/protoc-gen-gogo/descriptor/descriptor_gostring.gen.go",
         "github.com/gogo/protobuf/protoc-gen-gogo/descriptor/helper.go",
     ],
     tags = ["automanaged"],
@@ -4551,6 +4663,37 @@ go_library(
 )
 
 go_library(
+    name = "github.com/gorilla/websocket",
+    srcs = [
+        "github.com/gorilla/websocket/client.go",
+        "github.com/gorilla/websocket/conn.go",
+        "github.com/gorilla/websocket/doc.go",
+        "github.com/gorilla/websocket/json.go",
+        "github.com/gorilla/websocket/server.go",
+        "github.com/gorilla/websocket/util.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/grpc-ecosystem/go-grpc-prometheus",
+    srcs = [
+        "github.com/grpc-ecosystem/go-grpc-prometheus/client.go",
+        "github.com/grpc-ecosystem/go-grpc-prometheus/client_reporter.go",
+        "github.com/grpc-ecosystem/go-grpc-prometheus/server.go",
+        "github.com/grpc-ecosystem/go-grpc-prometheus/server_reporter.go",
+        "github.com/grpc-ecosystem/go-grpc-prometheus/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:google.golang.org/grpc",
+        "//vendor:google.golang.org/grpc/codes",
+    ],
+)
+
+go_library(
     name = "github.com/grpc-ecosystem/grpc-gateway/runtime",
     srcs = [
         "github.com/grpc-ecosystem/grpc-gateway/runtime/context.go",
@@ -4898,6 +5041,20 @@ go_library(
     srcs = [
         "github.com/kardianos/osext/osext.go",
         "github.com/kardianos/osext/osext_procfs.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/karlseguin/ccache",
+    srcs = [
+        "github.com/karlseguin/ccache/bucket.go",
+        "github.com/karlseguin/ccache/cache.go",
+        "github.com/karlseguin/ccache/configuration.go",
+        "github.com/karlseguin/ccache/item.go",
+        "github.com/karlseguin/ccache/layeredbucket.go",
+        "github.com/karlseguin/ccache/layeredcache.go",
+        "github.com/karlseguin/ccache/secondarycache.go",
     ],
     tags = ["automanaged"],
 )
@@ -5431,6 +5588,19 @@ go_library(
         "//vendor:github.com/onsi/ginkgo/internal/leafnodes",
         "//vendor:github.com/onsi/ginkgo/types",
     ],
+)
+
+go_library(
+    name = "github.com/onsi/ginkgo/internal/spec_iterator",
+    srcs = [
+        "github.com/onsi/ginkgo/internal/spec_iterator/index_computer.go",
+        "github.com/onsi/ginkgo/internal/spec_iterator/parallel_spec_iterator.go",
+        "github.com/onsi/ginkgo/internal/spec_iterator/serial_spec_iterator.go",
+        "github.com/onsi/ginkgo/internal/spec_iterator/sharded_parallel_spec_iterator.go",
+        "github.com/onsi/ginkgo/internal/spec_iterator/spec_iterator.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/onsi/ginkgo/internal/spec"],
 )
 
 go_library(
@@ -6440,6 +6610,164 @@ go_library(
     deps = [
         "//vendor:github.com/rackspace/gophercloud",
         "//vendor:github.com/rackspace/gophercloud/testhelper",
+    ],
+)
+
+go_library(
+    name = "github.com/rancher/go-rancher/client",
+    srcs = [
+        "github.com/rancher/go-rancher/client/client.go",
+        "github.com/rancher/go-rancher/client/common.go",
+        "github.com/rancher/go-rancher/client/generated_account.go",
+        "github.com/rancher/go-rancher/client/generated_active_setting.go",
+        "github.com/rancher/go-rancher/client/generated_add_outputs_input.go",
+        "github.com/rancher/go-rancher/client/generated_add_remove_load_balancer_service_link_input.go",
+        "github.com/rancher/go-rancher/client/generated_add_remove_service_link_input.go",
+        "github.com/rancher/go-rancher/client/generated_agent.go",
+        "github.com/rancher/go-rancher/client/generated_amazonec2config.go",
+        "github.com/rancher/go-rancher/client/generated_api_key.go",
+        "github.com/rancher/go-rancher/client/generated_audit_log.go",
+        "github.com/rancher/go-rancher/client/generated_azure_config.go",
+        "github.com/rancher/go-rancher/client/generated_azureadconfig.go",
+        "github.com/rancher/go-rancher/client/generated_backup.go",
+        "github.com/rancher/go-rancher/client/generated_backup_target.go",
+        "github.com/rancher/go-rancher/client/generated_base_machine_config.go",
+        "github.com/rancher/go-rancher/client/generated_blkio_device_option.go",
+        "github.com/rancher/go-rancher/client/generated_certificate.go",
+        "github.com/rancher/go-rancher/client/generated_change_secret_input.go",
+        "github.com/rancher/go-rancher/client/generated_client.go",
+        "github.com/rancher/go-rancher/client/generated_compose_config.go",
+        "github.com/rancher/go-rancher/client/generated_compose_config_input.go",
+        "github.com/rancher/go-rancher/client/generated_compose_project.go",
+        "github.com/rancher/go-rancher/client/generated_compose_service.go",
+        "github.com/rancher/go-rancher/client/generated_config_item.go",
+        "github.com/rancher/go-rancher/client/generated_config_item_status.go",
+        "github.com/rancher/go-rancher/client/generated_container.go",
+        "github.com/rancher/go-rancher/client/generated_container_event.go",
+        "github.com/rancher/go-rancher/client/generated_container_exec.go",
+        "github.com/rancher/go-rancher/client/generated_container_logs.go",
+        "github.com/rancher/go-rancher/client/generated_container_proxy.go",
+        "github.com/rancher/go-rancher/client/generated_credential.go",
+        "github.com/rancher/go-rancher/client/generated_databasechangelog.go",
+        "github.com/rancher/go-rancher/client/generated_databasechangeloglock.go",
+        "github.com/rancher/go-rancher/client/generated_digitalocean_config.go",
+        "github.com/rancher/go-rancher/client/generated_dns_service.go",
+        "github.com/rancher/go-rancher/client/generated_docker_build.go",
+        "github.com/rancher/go-rancher/client/generated_dynamic_schema.go",
+        "github.com/rancher/go-rancher/client/generated_environment.go",
+        "github.com/rancher/go-rancher/client/generated_environment_upgrade.go",
+        "github.com/rancher/go-rancher/client/generated_extension_implementation.go",
+        "github.com/rancher/go-rancher/client/generated_extension_point.go",
+        "github.com/rancher/go-rancher/client/generated_external_dns_event.go",
+        "github.com/rancher/go-rancher/client/generated_external_event.go",
+        "github.com/rancher/go-rancher/client/generated_external_handler.go",
+        "github.com/rancher/go-rancher/client/generated_external_handler_external_handler_process_map.go",
+        "github.com/rancher/go-rancher/client/generated_external_handler_process.go",
+        "github.com/rancher/go-rancher/client/generated_external_handler_process_config.go",
+        "github.com/rancher/go-rancher/client/generated_external_host_event.go",
+        "github.com/rancher/go-rancher/client/generated_external_service.go",
+        "github.com/rancher/go-rancher/client/generated_external_service_event.go",
+        "github.com/rancher/go-rancher/client/generated_external_storage_pool_event.go",
+        "github.com/rancher/go-rancher/client/generated_external_volume_event.go",
+        "github.com/rancher/go-rancher/client/generated_field_documentation.go",
+        "github.com/rancher/go-rancher/client/generated_githubconfig.go",
+        "github.com/rancher/go-rancher/client/generated_ha_config.go",
+        "github.com/rancher/go-rancher/client/generated_ha_config_input.go",
+        "github.com/rancher/go-rancher/client/generated_haproxy_config.go",
+        "github.com/rancher/go-rancher/client/generated_healthcheck_instance_host_map.go",
+        "github.com/rancher/go-rancher/client/generated_host.go",
+        "github.com/rancher/go-rancher/client/generated_host_access.go",
+        "github.com/rancher/go-rancher/client/generated_host_api_proxy_token.go",
+        "github.com/rancher/go-rancher/client/generated_identity.go",
+        "github.com/rancher/go-rancher/client/generated_image.go",
+        "github.com/rancher/go-rancher/client/generated_in_service_upgrade_strategy.go",
+        "github.com/rancher/go-rancher/client/generated_instance.go",
+        "github.com/rancher/go-rancher/client/generated_instance_console.go",
+        "github.com/rancher/go-rancher/client/generated_instance_console_input.go",
+        "github.com/rancher/go-rancher/client/generated_instance_health_check.go",
+        "github.com/rancher/go-rancher/client/generated_instance_link.go",
+        "github.com/rancher/go-rancher/client/generated_instance_stop.go",
+        "github.com/rancher/go-rancher/client/generated_ip_address.go",
+        "github.com/rancher/go-rancher/client/generated_ip_address_associate_input.go",
+        "github.com/rancher/go-rancher/client/generated_kubernetes_service.go",
+        "github.com/rancher/go-rancher/client/generated_kubernetes_stack.go",
+        "github.com/rancher/go-rancher/client/generated_kubernetes_stack_upgrade.go",
+        "github.com/rancher/go-rancher/client/generated_label.go",
+        "github.com/rancher/go-rancher/client/generated_launch_config.go",
+        "github.com/rancher/go-rancher/client/generated_ldapconfig.go",
+        "github.com/rancher/go-rancher/client/generated_load_balancer_app_cookie_stickiness_policy.go",
+        "github.com/rancher/go-rancher/client/generated_load_balancer_config.go",
+        "github.com/rancher/go-rancher/client/generated_load_balancer_cookie_stickiness_policy.go",
+        "github.com/rancher/go-rancher/client/generated_load_balancer_service.go",
+        "github.com/rancher/go-rancher/client/generated_load_balancer_service_link.go",
+        "github.com/rancher/go-rancher/client/generated_local_auth_config.go",
+        "github.com/rancher/go-rancher/client/generated_log_config.go",
+        "github.com/rancher/go-rancher/client/generated_machine.go",
+        "github.com/rancher/go-rancher/client/generated_machine_driver.go",
+        "github.com/rancher/go-rancher/client/generated_mount.go",
+        "github.com/rancher/go-rancher/client/generated_network.go",
+        "github.com/rancher/go-rancher/client/generated_nfs_config.go",
+        "github.com/rancher/go-rancher/client/generated_openldapconfig.go",
+        "github.com/rancher/go-rancher/client/generated_packet_config.go",
+        "github.com/rancher/go-rancher/client/generated_password.go",
+        "github.com/rancher/go-rancher/client/generated_physical_host.go",
+        "github.com/rancher/go-rancher/client/generated_port.go",
+        "github.com/rancher/go-rancher/client/generated_process_definition.go",
+        "github.com/rancher/go-rancher/client/generated_process_execution.go",
+        "github.com/rancher/go-rancher/client/generated_process_instance.go",
+        "github.com/rancher/go-rancher/client/generated_project.go",
+        "github.com/rancher/go-rancher/client/generated_project_member.go",
+        "github.com/rancher/go-rancher/client/generated_public_endpoint.go",
+        "github.com/rancher/go-rancher/client/generated_publish.go",
+        "github.com/rancher/go-rancher/client/generated_pull_task.go",
+        "github.com/rancher/go-rancher/client/generated_recreate_on_quorum_strategy_config.go",
+        "github.com/rancher/go-rancher/client/generated_register.go",
+        "github.com/rancher/go-rancher/client/generated_registration_token.go",
+        "github.com/rancher/go-rancher/client/generated_registry.go",
+        "github.com/rancher/go-rancher/client/generated_registry_credential.go",
+        "github.com/rancher/go-rancher/client/generated_resource_definition.go",
+        "github.com/rancher/go-rancher/client/generated_restart_policy.go",
+        "github.com/rancher/go-rancher/client/generated_restore_from_backup_input.go",
+        "github.com/rancher/go-rancher/client/generated_revert_to_snapshot_input.go",
+        "github.com/rancher/go-rancher/client/generated_rolling_restart_strategy.go",
+        "github.com/rancher/go-rancher/client/generated_scale_policy.go",
+        "github.com/rancher/go-rancher/client/generated_secondary_launch_config.go",
+        "github.com/rancher/go-rancher/client/generated_service.go",
+        "github.com/rancher/go-rancher/client/generated_service_consume_map.go",
+        "github.com/rancher/go-rancher/client/generated_service_event.go",
+        "github.com/rancher/go-rancher/client/generated_service_expose_map.go",
+        "github.com/rancher/go-rancher/client/generated_service_link.go",
+        "github.com/rancher/go-rancher/client/generated_service_proxy.go",
+        "github.com/rancher/go-rancher/client/generated_service_restart.go",
+        "github.com/rancher/go-rancher/client/generated_service_upgrade.go",
+        "github.com/rancher/go-rancher/client/generated_service_upgrade_strategy.go",
+        "github.com/rancher/go-rancher/client/generated_services_port_range.go",
+        "github.com/rancher/go-rancher/client/generated_set_labels_input.go",
+        "github.com/rancher/go-rancher/client/generated_set_load_balancer_service_links_input.go",
+        "github.com/rancher/go-rancher/client/generated_set_project_members_input.go",
+        "github.com/rancher/go-rancher/client/generated_set_service_links_input.go",
+        "github.com/rancher/go-rancher/client/generated_setting.go",
+        "github.com/rancher/go-rancher/client/generated_snapshot.go",
+        "github.com/rancher/go-rancher/client/generated_snapshot_backup_input.go",
+        "github.com/rancher/go-rancher/client/generated_state_transition.go",
+        "github.com/rancher/go-rancher/client/generated_stats_access.go",
+        "github.com/rancher/go-rancher/client/generated_storage_pool.go",
+        "github.com/rancher/go-rancher/client/generated_subscribe.go",
+        "github.com/rancher/go-rancher/client/generated_task.go",
+        "github.com/rancher/go-rancher/client/generated_task_instance.go",
+        "github.com/rancher/go-rancher/client/generated_to_service_upgrade_strategy.go",
+        "github.com/rancher/go-rancher/client/generated_type_documentation.go",
+        "github.com/rancher/go-rancher/client/generated_virtual_machine.go",
+        "github.com/rancher/go-rancher/client/generated_virtual_machine_disk.go",
+        "github.com/rancher/go-rancher/client/generated_volume.go",
+        "github.com/rancher/go-rancher/client/generated_volume_snapshot_input.go",
+        "github.com/rancher/go-rancher/client/schemas.go",
+        "github.com/rancher/go-rancher/client/types.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gorilla/websocket",
+        "//vendor:github.com/pkg/errors",
     ],
 )
 
@@ -7482,18 +7810,23 @@ go_library(
         "golang.org/x/net/http2/frame.go",
         "golang.org/x/net/http2/go16.go",
         "golang.org/x/net/http2/go17.go",
+        "golang.org/x/net/http2/go17_not18.go",
         "golang.org/x/net/http2/gotrack.go",
         "golang.org/x/net/http2/headermap.go",
         "golang.org/x/net/http2/http2.go",
+        "golang.org/x/net/http2/not_go18.go",
         "golang.org/x/net/http2/pipe.go",
         "golang.org/x/net/http2/server.go",
         "golang.org/x/net/http2/transport.go",
         "golang.org/x/net/http2/write.go",
         "golang.org/x/net/http2/writesched.go",
+        "golang.org/x/net/http2/writesched_priority.go",
+        "golang.org/x/net/http2/writesched_random.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//vendor:golang.org/x/net/http2/hpack",
+        "//vendor:golang.org/x/net/idna",
         "//vendor:golang.org/x/net/lex/httplex",
     ],
 )
@@ -7528,6 +7861,7 @@ go_library(
     name = "golang.org/x/net/lex/httplex",
     srcs = ["golang.org/x/net/lex/httplex/httplex.go"],
     tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/net/idna"],
 )
 
 go_library(
@@ -7559,6 +7893,7 @@ go_library(
     name = "golang.org/x/net/websocket",
     srcs = [
         "golang.org/x/net/websocket/client.go",
+        "golang.org/x/net/websocket/dial.go",
         "golang.org/x/net/websocket/hybi.go",
         "golang.org/x/net/websocket/server.go",
         "golang.org/x/net/websocket/websocket.go",
@@ -7846,8 +8181,27 @@ go_library(
 )
 
 go_library(
+    name = "golang.org/x/time/rate",
+    srcs = ["golang.org/x/time/rate/rate.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/net/context"],
+)
+
+go_library(
     name = "google.golang.org/api/cloudmonitoring/v2beta2",
     srcs = ["google.golang.org/api/cloudmonitoring/v2beta2/cloudmonitoring-gen.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/net/context",
+        "//vendor:golang.org/x/net/context/ctxhttp",
+        "//vendor:google.golang.org/api/gensupport",
+        "//vendor:google.golang.org/api/googleapi",
+    ],
+)
+
+go_library(
+    name = "google.golang.org/api/compute/v0.alpha",
+    srcs = ["google.golang.org/api/compute/v0.alpha/compute-gen.go"],
     tags = ["automanaged"],
     deps = [
         "//vendor:golang.org/x/net/context",
@@ -7899,7 +8253,9 @@ go_library(
         "google.golang.org/api/gensupport/backoff.go",
         "google.golang.org/api/gensupport/buffer.go",
         "google.golang.org/api/gensupport/doc.go",
+        "google.golang.org/api/gensupport/header.go",
         "google.golang.org/api/gensupport/json.go",
+        "google.golang.org/api/gensupport/jsonfloat.go",
         "google.golang.org/api/gensupport/media.go",
         "google.golang.org/api/gensupport/params.go",
         "google.golang.org/api/gensupport/resumable.go",
@@ -9531,6 +9887,35 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/apis/apiserver/install",
         "//vendor:k8s.io/apiserver/pkg/apis/apiserver/v1alpha1",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/admission/initializer",
+    srcs = [
+        "k8s.io/apiserver/pkg/admission/initializer/initializer.go",
+        "k8s.io/apiserver/pkg/admission/initializer/interfaces.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/client-go/informers",
+        "//vendor:k8s.io/client-go/kubernetes",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/admission/initializer_xtest",
+    srcs = ["k8s.io/apiserver/pkg/admission/initializer/initializer_test.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/admission/initializer",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/client-go/informers",
+        "//vendor:k8s.io/client-go/kubernetes",
+        "//vendor:k8s.io/client-go/kubernetes/fake",
     ],
 )
 
@@ -11809,7 +12194,6 @@ go_library(
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/pkg/apis/extensions/v1beta1",
-        "//vendor:k8s.io/client-go/plugin/pkg/client/auth/gcp",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
     ],
@@ -13518,8 +13902,8 @@ go_library(
         "k8s.io/client-go/pkg/api/defaults.go",
         "k8s.io/client-go/pkg/api/doc.go",
         "k8s.io/client-go/pkg/api/field_constants.go",
-        "k8s.io/client-go/pkg/api/helpers.go",
         "k8s.io/client-go/pkg/api/json.go",
+        "k8s.io/client-go/pkg/api/methods.go",
         "k8s.io/client-go/pkg/api/ref.go",
         "k8s.io/client-go/pkg/api/register.go",
         "k8s.io/client-go/pkg/api/resource_helpers.go",
@@ -13528,7 +13912,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
@@ -13540,10 +13923,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
-        "//vendor:k8s.io/apimachinery/pkg/selection",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
@@ -13600,6 +13981,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/api/helper",
         "//vendor:k8s.io/client-go/pkg/apis/extensions",
         "//vendor:k8s.io/client-go/pkg/util",
         "//vendor:k8s.io/client-go/pkg/util/parsers",
@@ -15901,6 +16283,44 @@ go_library(
     ],
 )
 
+go_test(
+    name = "k8s.io/kube-aggregator/pkg/controllers/autoregister_test",
+    srcs = ["k8s.io/kube-aggregator/pkg/controllers/autoregister/autoregister_controller_test.go"],
+    library = ":k8s.io/kube-aggregator/pkg/controllers/autoregister",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/testing",
+        "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration",
+        "//vendor:k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset",
+        "//vendor:k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/fake",
+        "//vendor:k8s.io/kube-aggregator/pkg/client/informers/internalversion",
+    ],
+)
+
+go_library(
+    name = "k8s.io/kube-aggregator/pkg/controllers/autoregister",
+    srcs = ["k8s.io/kube-aggregator/pkg/controllers/autoregister/autoregister_controller.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor:k8s.io/client-go/util/workqueue",
+        "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration",
+        "//vendor:k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion",
+        "//vendor:k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion",
+        "//vendor:k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion",
+    ],
+)
+
 go_library(
     name = "k8s.io/kube-aggregator/pkg/registry/apiservice",
     srcs = ["k8s.io/kube-aggregator/pkg/registry/apiservice/strategy.go"],
@@ -16340,281 +16760,18 @@ filegroup(
 )
 
 go_library(
-    name = "github.com/gorilla/websocket",
-    srcs = [
-        "github.com/gorilla/websocket/client.go",
-        "github.com/gorilla/websocket/conn.go",
-        "github.com/gorilla/websocket/doc.go",
-        "github.com/gorilla/websocket/json.go",
-        "github.com/gorilla/websocket/server.go",
-        "github.com/gorilla/websocket/util.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "github.com/rancher/go-rancher/client",
-    srcs = [
-        "github.com/rancher/go-rancher/client/client.go",
-        "github.com/rancher/go-rancher/client/common.go",
-        "github.com/rancher/go-rancher/client/generated_account.go",
-        "github.com/rancher/go-rancher/client/generated_active_setting.go",
-        "github.com/rancher/go-rancher/client/generated_add_outputs_input.go",
-        "github.com/rancher/go-rancher/client/generated_add_remove_load_balancer_service_link_input.go",
-        "github.com/rancher/go-rancher/client/generated_add_remove_service_link_input.go",
-        "github.com/rancher/go-rancher/client/generated_agent.go",
-        "github.com/rancher/go-rancher/client/generated_amazonec2config.go",
-        "github.com/rancher/go-rancher/client/generated_api_key.go",
-        "github.com/rancher/go-rancher/client/generated_audit_log.go",
-        "github.com/rancher/go-rancher/client/generated_azure_config.go",
-        "github.com/rancher/go-rancher/client/generated_azureadconfig.go",
-        "github.com/rancher/go-rancher/client/generated_backup.go",
-        "github.com/rancher/go-rancher/client/generated_backup_target.go",
-        "github.com/rancher/go-rancher/client/generated_base_machine_config.go",
-        "github.com/rancher/go-rancher/client/generated_blkio_device_option.go",
-        "github.com/rancher/go-rancher/client/generated_certificate.go",
-        "github.com/rancher/go-rancher/client/generated_change_secret_input.go",
-        "github.com/rancher/go-rancher/client/generated_client.go",
-        "github.com/rancher/go-rancher/client/generated_compose_config.go",
-        "github.com/rancher/go-rancher/client/generated_compose_config_input.go",
-        "github.com/rancher/go-rancher/client/generated_compose_project.go",
-        "github.com/rancher/go-rancher/client/generated_compose_service.go",
-        "github.com/rancher/go-rancher/client/generated_config_item.go",
-        "github.com/rancher/go-rancher/client/generated_config_item_status.go",
-        "github.com/rancher/go-rancher/client/generated_container.go",
-        "github.com/rancher/go-rancher/client/generated_container_event.go",
-        "github.com/rancher/go-rancher/client/generated_container_exec.go",
-        "github.com/rancher/go-rancher/client/generated_container_logs.go",
-        "github.com/rancher/go-rancher/client/generated_container_proxy.go",
-        "github.com/rancher/go-rancher/client/generated_credential.go",
-        "github.com/rancher/go-rancher/client/generated_databasechangelog.go",
-        "github.com/rancher/go-rancher/client/generated_databasechangeloglock.go",
-        "github.com/rancher/go-rancher/client/generated_digitalocean_config.go",
-        "github.com/rancher/go-rancher/client/generated_dns_service.go",
-        "github.com/rancher/go-rancher/client/generated_docker_build.go",
-        "github.com/rancher/go-rancher/client/generated_dynamic_schema.go",
-        "github.com/rancher/go-rancher/client/generated_environment.go",
-        "github.com/rancher/go-rancher/client/generated_environment_upgrade.go",
-        "github.com/rancher/go-rancher/client/generated_extension_implementation.go",
-        "github.com/rancher/go-rancher/client/generated_extension_point.go",
-        "github.com/rancher/go-rancher/client/generated_external_dns_event.go",
-        "github.com/rancher/go-rancher/client/generated_external_event.go",
-        "github.com/rancher/go-rancher/client/generated_external_handler.go",
-        "github.com/rancher/go-rancher/client/generated_external_handler_external_handler_process_map.go",
-        "github.com/rancher/go-rancher/client/generated_external_handler_process.go",
-        "github.com/rancher/go-rancher/client/generated_external_handler_process_config.go",
-        "github.com/rancher/go-rancher/client/generated_external_host_event.go",
-        "github.com/rancher/go-rancher/client/generated_external_service.go",
-        "github.com/rancher/go-rancher/client/generated_external_service_event.go",
-        "github.com/rancher/go-rancher/client/generated_external_storage_pool_event.go",
-        "github.com/rancher/go-rancher/client/generated_external_volume_event.go",
-        "github.com/rancher/go-rancher/client/generated_field_documentation.go",
-        "github.com/rancher/go-rancher/client/generated_githubconfig.go",
-        "github.com/rancher/go-rancher/client/generated_ha_config.go",
-        "github.com/rancher/go-rancher/client/generated_ha_config_input.go",
-        "github.com/rancher/go-rancher/client/generated_haproxy_config.go",
-        "github.com/rancher/go-rancher/client/generated_healthcheck_instance_host_map.go",
-        "github.com/rancher/go-rancher/client/generated_host.go",
-        "github.com/rancher/go-rancher/client/generated_host_access.go",
-        "github.com/rancher/go-rancher/client/generated_host_api_proxy_token.go",
-        "github.com/rancher/go-rancher/client/generated_identity.go",
-        "github.com/rancher/go-rancher/client/generated_image.go",
-        "github.com/rancher/go-rancher/client/generated_in_service_upgrade_strategy.go",
-        "github.com/rancher/go-rancher/client/generated_instance.go",
-        "github.com/rancher/go-rancher/client/generated_instance_console.go",
-        "github.com/rancher/go-rancher/client/generated_instance_console_input.go",
-        "github.com/rancher/go-rancher/client/generated_instance_health_check.go",
-        "github.com/rancher/go-rancher/client/generated_instance_link.go",
-        "github.com/rancher/go-rancher/client/generated_instance_stop.go",
-        "github.com/rancher/go-rancher/client/generated_ip_address.go",
-        "github.com/rancher/go-rancher/client/generated_ip_address_associate_input.go",
-        "github.com/rancher/go-rancher/client/generated_kubernetes_service.go",
-        "github.com/rancher/go-rancher/client/generated_kubernetes_stack.go",
-        "github.com/rancher/go-rancher/client/generated_kubernetes_stack_upgrade.go",
-        "github.com/rancher/go-rancher/client/generated_label.go",
-        "github.com/rancher/go-rancher/client/generated_launch_config.go",
-        "github.com/rancher/go-rancher/client/generated_ldapconfig.go",
-        "github.com/rancher/go-rancher/client/generated_load_balancer_app_cookie_stickiness_policy.go",
-        "github.com/rancher/go-rancher/client/generated_load_balancer_config.go",
-        "github.com/rancher/go-rancher/client/generated_load_balancer_cookie_stickiness_policy.go",
-        "github.com/rancher/go-rancher/client/generated_load_balancer_service.go",
-        "github.com/rancher/go-rancher/client/generated_load_balancer_service_link.go",
-        "github.com/rancher/go-rancher/client/generated_local_auth_config.go",
-        "github.com/rancher/go-rancher/client/generated_log_config.go",
-        "github.com/rancher/go-rancher/client/generated_machine.go",
-        "github.com/rancher/go-rancher/client/generated_machine_driver.go",
-        "github.com/rancher/go-rancher/client/generated_mount.go",
-        "github.com/rancher/go-rancher/client/generated_network.go",
-        "github.com/rancher/go-rancher/client/generated_nfs_config.go",
-        "github.com/rancher/go-rancher/client/generated_openldapconfig.go",
-        "github.com/rancher/go-rancher/client/generated_packet_config.go",
-        "github.com/rancher/go-rancher/client/generated_password.go",
-        "github.com/rancher/go-rancher/client/generated_physical_host.go",
-        "github.com/rancher/go-rancher/client/generated_port.go",
-        "github.com/rancher/go-rancher/client/generated_process_definition.go",
-        "github.com/rancher/go-rancher/client/generated_process_execution.go",
-        "github.com/rancher/go-rancher/client/generated_process_instance.go",
-        "github.com/rancher/go-rancher/client/generated_project.go",
-        "github.com/rancher/go-rancher/client/generated_project_member.go",
-        "github.com/rancher/go-rancher/client/generated_public_endpoint.go",
-        "github.com/rancher/go-rancher/client/generated_publish.go",
-        "github.com/rancher/go-rancher/client/generated_pull_task.go",
-        "github.com/rancher/go-rancher/client/generated_recreate_on_quorum_strategy_config.go",
-        "github.com/rancher/go-rancher/client/generated_register.go",
-        "github.com/rancher/go-rancher/client/generated_registration_token.go",
-        "github.com/rancher/go-rancher/client/generated_registry.go",
-        "github.com/rancher/go-rancher/client/generated_registry_credential.go",
-        "github.com/rancher/go-rancher/client/generated_resource_definition.go",
-        "github.com/rancher/go-rancher/client/generated_restart_policy.go",
-        "github.com/rancher/go-rancher/client/generated_restore_from_backup_input.go",
-        "github.com/rancher/go-rancher/client/generated_revert_to_snapshot_input.go",
-        "github.com/rancher/go-rancher/client/generated_rolling_restart_strategy.go",
-        "github.com/rancher/go-rancher/client/generated_scale_policy.go",
-        "github.com/rancher/go-rancher/client/generated_secondary_launch_config.go",
-        "github.com/rancher/go-rancher/client/generated_service.go",
-        "github.com/rancher/go-rancher/client/generated_service_consume_map.go",
-        "github.com/rancher/go-rancher/client/generated_service_event.go",
-        "github.com/rancher/go-rancher/client/generated_service_expose_map.go",
-        "github.com/rancher/go-rancher/client/generated_service_link.go",
-        "github.com/rancher/go-rancher/client/generated_service_proxy.go",
-        "github.com/rancher/go-rancher/client/generated_service_restart.go",
-        "github.com/rancher/go-rancher/client/generated_service_upgrade.go",
-        "github.com/rancher/go-rancher/client/generated_service_upgrade_strategy.go",
-        "github.com/rancher/go-rancher/client/generated_services_port_range.go",
-        "github.com/rancher/go-rancher/client/generated_set_labels_input.go",
-        "github.com/rancher/go-rancher/client/generated_set_load_balancer_service_links_input.go",
-        "github.com/rancher/go-rancher/client/generated_set_project_members_input.go",
-        "github.com/rancher/go-rancher/client/generated_set_service_links_input.go",
-        "github.com/rancher/go-rancher/client/generated_setting.go",
-        "github.com/rancher/go-rancher/client/generated_snapshot.go",
-        "github.com/rancher/go-rancher/client/generated_snapshot_backup_input.go",
-        "github.com/rancher/go-rancher/client/generated_state_transition.go",
-        "github.com/rancher/go-rancher/client/generated_stats_access.go",
-        "github.com/rancher/go-rancher/client/generated_storage_pool.go",
-        "github.com/rancher/go-rancher/client/generated_subscribe.go",
-        "github.com/rancher/go-rancher/client/generated_task.go",
-        "github.com/rancher/go-rancher/client/generated_task_instance.go",
-        "github.com/rancher/go-rancher/client/generated_to_service_upgrade_strategy.go",
-        "github.com/rancher/go-rancher/client/generated_type_documentation.go",
-        "github.com/rancher/go-rancher/client/generated_virtual_machine.go",
-        "github.com/rancher/go-rancher/client/generated_virtual_machine_disk.go",
-        "github.com/rancher/go-rancher/client/generated_volume.go",
-        "github.com/rancher/go-rancher/client/generated_volume_snapshot_input.go",
-        "github.com/rancher/go-rancher/client/schemas.go",
-        "github.com/rancher/go-rancher/client/types.go",
-    ],
+    name = "k8s.io/client-go/pkg/api/helper",
+    srcs = ["k8s.io/client-go/pkg/api/helper/helpers.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/gorilla/websocket",
-        "//vendor:github.com/pkg/errors",
-    ],
-)
-
-go_library(
-    name = "github.com/codedellemc/goscaleio",
-    srcs = [
-        "github.com/codedellemc/goscaleio/api.go",
-        "github.com/codedellemc/goscaleio/certs.go",
-        "github.com/codedellemc/goscaleio/device.go",
-        "github.com/codedellemc/goscaleio/instance.go",
-        "github.com/codedellemc/goscaleio/protectiondomain.go",
-        "github.com/codedellemc/goscaleio/scsiinitiator.go",
-        "github.com/codedellemc/goscaleio/sdc.go",
-        "github.com/codedellemc/goscaleio/sds.go",
-        "github.com/codedellemc/goscaleio/storagepool.go",
-        "github.com/codedellemc/goscaleio/system.go",
-        "github.com/codedellemc/goscaleio/user.go",
-        "github.com/codedellemc/goscaleio/volume.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/Sirupsen/logrus",
-        "//vendor:github.com/codedellemc/goscaleio/types/v1",
-    ],
-)
-
-go_library(
-    name = "github.com/codedellemc/goscaleio/types/v1",
-    srcs = ["github.com/codedellemc/goscaleio/types/v1/types.go"],
-    tags = ["automanaged"],
-)
-
-go_test(
-    name = "k8s.io/kube-aggregator/pkg/controllers/autoregister_test",
-    srcs = ["k8s.io/kube-aggregator/pkg/controllers/autoregister/autoregister_controller_test.go"],
-    library = ":k8s.io/kube-aggregator/pkg/controllers/autoregister",
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/testing",
-        "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration",
-        "//vendor:k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset",
-        "//vendor:k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/fake",
-        "//vendor:k8s.io/kube-aggregator/pkg/client/informers/internalversion",
-    ],
-)
-
-go_library(
-    name = "k8s.io/kube-aggregator/pkg/controllers/autoregister",
-    srcs = ["k8s.io/kube-aggregator/pkg/controllers/autoregister/autoregister_controller.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
-        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/client-go/tools/cache",
-        "//vendor:k8s.io/client-go/util/workqueue",
-        "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration",
-        "//vendor:k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion",
-        "//vendor:k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion",
-        "//vendor:k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/selection",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/pkg/api",
     ],
-)
-
-go_library(
-    name = "k8s.io/apiserver/pkg/admission/initializer",
-    srcs = [
-        "k8s.io/apiserver/pkg/admission/initializer/initializer.go",
-        "k8s.io/apiserver/pkg/admission/initializer/interfaces.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/apiserver/pkg/admission",
-        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
-        "//vendor:k8s.io/client-go/informers",
-        "//vendor:k8s.io/client-go/kubernetes",
-    ],
-)
-
-go_test(
-    name = "k8s.io/apiserver/pkg/admission/initializer_xtest",
-    srcs = ["k8s.io/apiserver/pkg/admission/initializer/initializer_test.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/apiserver/pkg/admission",
-        "//vendor:k8s.io/apiserver/pkg/admission/initializer",
-        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
-        "//vendor:k8s.io/client-go/informers",
-        "//vendor:k8s.io/client-go/kubernetes",
-        "//vendor:k8s.io/client-go/kubernetes/fake",
-    ],
-)
-
-go_library(
-    name = "github.com/onsi/ginkgo/internal/spec_iterator",
-    srcs = [
-        "github.com/onsi/ginkgo/internal/spec_iterator/index_computer.go",
-        "github.com/onsi/ginkgo/internal/spec_iterator/parallel_spec_iterator.go",
-        "github.com/onsi/ginkgo/internal/spec_iterator/serial_spec_iterator.go",
-        "github.com/onsi/ginkgo/internal/spec_iterator/sharded_parallel_spec_iterator.go",
-        "github.com/onsi/ginkgo/internal/spec_iterator/spec_iterator.go",
-    ],
-    tags = ["automanaged"],
-    deps = ["//vendor:github.com/onsi/ginkgo/internal/spec"],
 )

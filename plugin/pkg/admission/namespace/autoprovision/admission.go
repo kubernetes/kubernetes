@@ -31,7 +31,7 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("NamespaceAutoProvision", func(config io.Reader) (admission.Interface, error) {
+	kubeapiserveradmission.Plugins.Register("NamespaceAutoProvision", func(config io.Reader) (admission.Interface, error) {
 		return NewProvision(), nil
 	})
 }

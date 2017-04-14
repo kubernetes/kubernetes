@@ -24,9 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -138,7 +136,7 @@ func RunDescribe(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, a
 	infos, err := r.Infos()
 	if err != nil {
 		if apierrors.IsNotFound(err) && len(args) == 2 {
-			return DescribeMatchingResources(mapper, typer, f, cmdNamespace, args[0], args[1], describerSettings, out, err)
+			return DescribeMatchingResources(f, cmdNamespace, args[0], args[1], describerSettings, out, err)
 		}
 		allErrs = append(allErrs, err)
 	}
@@ -176,7 +174,7 @@ func RunDescribe(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, a
 	return utilerrors.NewAggregate(allErrs)
 }
 
-func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper, f cmdutil.Factory, namespace, rsrc, prefix string, describerSettings *printers.DescriberSettings, out io.Writer, originalError error) error {
+func DescribeMatchingResources(f cmdutil.Factory, namespace, rsrc, prefix string, describerSettings *printers.DescriberSettings, out io.Writer, originalError error) error {
 	mapper, typer, err := f.UnstructuredObject()
 	if err != nil {
 		return err

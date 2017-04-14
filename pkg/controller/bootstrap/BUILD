@@ -27,6 +27,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/client-go/kubernetes/fake",
         "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/api/helper",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/testing",
     ],

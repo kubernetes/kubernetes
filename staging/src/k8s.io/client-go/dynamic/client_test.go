@@ -90,9 +90,9 @@ func TestList(t *testing.T) {
 					"apiVersion": "vTest",
 					"kind":       "rTestList",
 				},
-				Items: []*unstructured.Unstructured{
-					getObject("vTest", "rTest", "item1"),
-					getObject("vTest", "rTest", "item2"),
+				Items: []unstructured.Unstructured{
+					*getObject("vTest", "rTest", "item1"),
+					*getObject("vTest", "rTest", "item2"),
 				},
 			},
 		},
@@ -108,9 +108,9 @@ func TestList(t *testing.T) {
 					"apiVersion": "vTest",
 					"kind":       "rTestList",
 				},
-				Items: []*unstructured.Unstructured{
-					getObject("vTest", "rTest", "item1"),
-					getObject("vTest", "rTest", "item2"),
+				Items: []unstructured.Unstructured{
+					*getObject("vTest", "rTest", "item1"),
+					*getObject("vTest", "rTest", "item2"),
 				},
 			},
 		},

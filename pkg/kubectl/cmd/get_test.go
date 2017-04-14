@@ -590,7 +590,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	cmd.Run(cmd, []string{"pods,services"})
 
 	actual := tf.CommandPrinter.(*testPrinter).Objects
-	fn := func(obj runtime.Object) *unstructured.Unstructured {
+	fn := func(obj runtime.Object) unstructured.Unstructured {
 		data, err := runtime.Encode(api.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), obj)
 		if err != nil {
 			panic(err)
@@ -599,12 +599,12 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		if err := encjson.Unmarshal(data, &out.Object); err != nil {
 			panic(err)
 		}
-		return out
+		return *out
 	}
 
 	expected := &unstructured.UnstructuredList{
 		Object: map[string]interface{}{"kind": "List", "apiVersion": "v1", "metadata": map[string]interface{}{}, "selfLink": "", "resourceVersion": ""},
-		Items: []*unstructured.Unstructured{
+		Items: []unstructured.Unstructured{
 			fn(&pods.Items[0]),
 			fn(&pods.Items[1]),
 			fn(&svc.Items[0]),

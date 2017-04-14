@@ -68,6 +68,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/annotations:go_default_library",
+        "//pkg/api/helper:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
@@ -158,6 +159,7 @@ go_test(
         "create_namespace_test.go",
         "create_quota_test.go",
         "create_role_test.go",
+        "create_rolebinding_test.go",
         "create_secret_test.go",
         "create_service_test.go",
         "create_serviceaccount_test.go",

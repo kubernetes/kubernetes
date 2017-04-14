@@ -412,14 +412,13 @@ func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	// wait for pod to terminate. Expect apierr NotFound
+	// wait for pod to terminate
 	err = f.WaitForPodTerminated(pod.Name, "")
-	Expect(err).To(HaveOccurred())
-	if !apierrs.IsNotFound(err) {
-		Logf("Error! Expected IsNotFound error deleting pod %q, instead got: %v", pod.Name, err)
-		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+	if err != nil {
+		Expect(apierrs.IsNotFound(err)).To(BeTrue(), fmt.Sprintf("Expected 'IsNotFound' error deleting pod \"%v/%v\", instead got: %v", pod.Namespace, pod.Name, err))
+		Logf("Ignore \"not found\" error above")
 	}
-	Logf("Ignore \"not found\" error above. Pod %v successfully deleted", pod.Name)
+	Logf("Pod %q successfully deleted", pod.Name)
 }
 
 // Sanity check for GCE testing.  Verify the persistent disk attached to the node.
@@ -616,17 +615,13 @@ func deletePD(pdName string) error {
 	}
 }
 
-// Create the test pod, wait for (hopefully) success, and then delete the pod.
+// Create the test pod, wait for success, and then delete the pod.
 func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) {
 	Logf("Creating nfs test pod")
-	// Make pod spec
 	pod := MakeWritePod(ns, pvc)
-
-	// Instantiate pod (Create)
 	runPod, err := c.CoreV1().Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(runPod).NotTo(BeNil())
-
 	defer DeletePodWithWait(f, c, runPod)
 
 	// Wait for the test pod to complete its lifecycle

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	admission "k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -38,7 +39,7 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin(PluginName, func(config io.Reader) (admission.Interface, error) {
+	kubeapiserveradmission.Plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		plugin := newPlugin()
 		return plugin, nil
 	})
@@ -96,7 +97,7 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 		return nil
 	}
 
-	if api.PersistentVolumeClaimHasClass(pvc) {
+	if helper.PersistentVolumeClaimHasClass(pvc) {
 		// The user asked for a class.
 		return nil
 	}

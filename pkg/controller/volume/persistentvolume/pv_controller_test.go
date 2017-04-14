@@ -172,7 +172,10 @@ func TestControllerSync(t *testing.T) {
 		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(watch.NewFake(), nil))
 
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		ctrl := newTestController(client, informers, true)
+		ctrl, err := newTestController(client, informers, true)
+		if err != nil {
+			t.Fatalf("Test %q construct persistent volume failed: %v", test.name, err)
+		}
 
 		reactor := newVolumeReactor(client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
 		for _, claim := range test.initialClaims {
@@ -204,7 +207,7 @@ func TestControllerSync(t *testing.T) {
 		glog.V(4).Infof("controller synced, starting test")
 
 		// Call the tested function
-		err := test.test(ctrl, reactor, test)
+		err = test.test(ctrl, reactor, test)
 		if err != nil {
 			t.Errorf("Test %q initial test call failed: %v", test.name, err)
 		}
