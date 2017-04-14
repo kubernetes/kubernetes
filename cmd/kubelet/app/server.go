@@ -128,7 +128,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 // UnsecuredKubeletDeps returns a KubeletDeps suitable for being run, or an error if the server setup
 // is not valid.  It will not start any background processes, and does not include authentication/authorization
 func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error) {
-
 	// Initialize the TLS Options
 	tlsOptions, err := InitializeTLS(&s.KubeletFlags, &s.KubeletConfiguration)
 	if err != nil {
@@ -353,7 +352,6 @@ func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubele
 	} else {
 		glog.Warning("No api server defined - no events will be sent to API server.")
 	}
-
 }
 
 func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
