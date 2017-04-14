@@ -35,64 +35,6 @@ import (
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 )
 
-type delegationHTTPHandler struct {
-	called bool
-}
-
-func (d *delegationHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	d.called = true
-	w.WriteHeader(http.StatusOK)
-}
-
-func TestAPIsDelegation(t *testing.T) {
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	delegate := &delegationHTTPHandler{}
-	handler := &apisHandler{
-		codecs:   Codecs,
-		lister:   listers.NewAPIServiceLister(indexer),
-		delegate: delegate,
-	}
-
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	pathToDelegation := map[string]bool{
-		"/":      true,
-		"/apis":  false,
-		"/apis/": false,
-		"/apis/" + apiregistration.GroupName:                     true,
-		"/apis/" + apiregistration.GroupName + "/":               true,
-		"/apis/" + apiregistration.GroupName + "/anything":       true,
-		"/apis/" + apiregistration.GroupName + "/anything/again": true,
-		"/apis/something":                                        true,
-		"/apis/something/nested":                                 true,
-		"/apis/something/nested/deeper":                          true,
-		"/api":     true,
-		"/api/v1":  true,
-		"/version": true,
-	}
-
-	for path, expectedDelegation := range pathToDelegation {
-		delegate.called = false
-
-		resp, err := http.Get(server.URL + path)
-		if err != nil {
-			t.Errorf("%s: %v", path, err)
-			continue
-		}
-		if resp.StatusCode != http.StatusOK {
-			bytes, _ := httputil.DumpResponse(resp, true)
-			t.Log(string(bytes))
-			t.Errorf("%s: %v", path, err)
-			continue
-		}
-		if e, a := expectedDelegation, delegate.called; e != a {
-			t.Errorf("%s: expected %v, got %v", path, e, a)
-			continue
-		}
-	}
-}
-
 func TestAPIs(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -269,13 +211,11 @@ func TestAPIs(t *testing.T) {
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-		delegate := &delegationHTTPHandler{}
 		handler := &apisHandler{
 			codecs:          Codecs,
 			serviceLister:   v1listers.NewServiceLister(serviceIndexer),
 			endpointsLister: v1listers.NewEndpointsLister(endpointsIndexer),
 			lister:          listers.NewAPIServiceLister(indexer),
-			delegate:        delegate,
 		}
 		for _, o := range tc.apiservices {
 			indexer.Add(o)

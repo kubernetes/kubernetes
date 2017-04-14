@@ -71,6 +71,10 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	handlingInfo := value.(proxyHandlingInfo)
 	if handlingInfo.local {
+		if r.localDelegate == nil {
+			http.Error(w, "", http.StatusNotFound)
+			return
+		}
 		r.localDelegate.ServeHTTP(w, req)
 		return
 	}
