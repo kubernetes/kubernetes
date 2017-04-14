@@ -22,7 +22,6 @@ import (
 
 	"github.com/golang/glog"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -35,15 +34,6 @@ import (
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
-
-// nameIndexFunc is an index function that indexes based on an object's name
-func nameIndexFunc(obj interface{}) ([]string, error) {
-	meta, err := meta.Accessor(obj)
-	if err != nil {
-		return []string{""}, fmt.Errorf("object has no meta: %v", err)
-	}
-	return []string{meta.GetName()}, nil
-}
 
 // ServiceAccountsControllerOptions contains options for running a ServiceAccountsController
 type ServiceAccountsControllerOptions struct {
