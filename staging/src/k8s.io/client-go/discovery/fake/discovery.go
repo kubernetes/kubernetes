@@ -21,6 +21,7 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 
+	"github.com/go-openapi/spec"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
@@ -91,6 +92,8 @@ func (c *FakeDiscovery) SwaggerSchema(version schema.GroupVersion) (*swagger.Api
 	c.Invokes(action, nil)
 	return &swagger.ApiDeclaration{}, nil
 }
+
+func (c *FakeDiscovery) OpenAPISchema() (*spec.Swagger, error) { return &spec.Swagger{}, nil }
 
 func (c *FakeDiscovery) RESTClient() restclient.Interface {
 	return nil

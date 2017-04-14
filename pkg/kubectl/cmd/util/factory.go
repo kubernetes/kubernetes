@@ -33,6 +33,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -50,8 +51,10 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
+	"path/filepath"
 )
 
 const (
@@ -219,6 +222,8 @@ type ObjectMappingFactory interface {
 	Validator(validate bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
 	SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error)
+	// OpenAPISchema returns the schema openapi schema definiton
+	OpenAPISchema(cacheDir string) (*openapi.Resources, error)
 }
 
 // BuilderFactory holds the second level of factory methods.  These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
@@ -417,6 +422,7 @@ func writeSchemaFile(schemaData []byte, cacheDir, cacheFile, prefix, groupVersio
 	if _, err := io.Copy(tmpFile, bytes.NewBuffer(schemaData)); err != nil {
 		return err
 	}
+	glog.Infof("Wrinting swagger cache (dir %v) file %v (from %v)", cacheDir, cacheFile, tmpFile.Name())
 	if err := os.Link(tmpFile.Name(), cacheFile); err != nil {
 		// If we can't write due to file existing, or permission problems, keep going.
 		if os.IsExist(err) || os.IsPermission(err) {
@@ -436,7 +442,10 @@ func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cac
 	}
 	cacheFile := path.Join(fullDir, prefix, groupVersion, schemaFileName)
 
+	abs, _ := filepath.Abs(cacheDir)
+
 	if len(cacheDir) != 0 {
+		glog.Infof("Reading swagger cache dir %v (%v) - FYI %v", cacheDir, cacheFile, abs)
 		if schemaData, err = ioutil.ReadFile(cacheFile); err != nil && !os.IsNotExist(err) {
 			return err
 		}

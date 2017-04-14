@@ -25,6 +25,8 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 
+	"github.com/go-openapi/loads"
+	"github.com/go-openapi/spec"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,6 +49,7 @@ type DiscoveryInterface interface {
 	ServerResourcesInterface
 	ServerVersionInterface
 	SwaggerSchemaInterface
+	OpenAPISchemaInterface
 }
 
 // CachedDiscoveryInterface is a DiscoveryInterface with cache invalidation and freshness.
@@ -89,6 +92,11 @@ type ServerVersionInterface interface {
 type SwaggerSchemaInterface interface {
 	// SwaggerSchema retrieves and parses the swagger API schema the server supports.
 	SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error)
+}
+
+type OpenAPISchemaInterface interface {
+	// SwaggerSchema retrieves and parses the swagger API schema the server supports.
+	OpenAPISchema() (*spec.Swagger, error)
 }
 
 // DiscoveryClient implements the functions that discover server-supported API groups,
@@ -363,6 +371,25 @@ func (d *DiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.A
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &schema, nil
+}
+
+func (d *DiscoveryClient) OpenAPISchema() (*spec.Swagger, error) {
+	// Parse the raw data into a spec.Swagger struct.
+	// WARNING: We don't use the loads.Analyze because this is very expensive
+	// and loads.Analyze takes 2x as long (it Unmarshal's 2x)
+	// Warning: this is very expensive (~600ms)
+	data, err := d.restClient.Get().AbsPath("/swagger.json").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	msg := json.RawMessage(data)
+	doc, err := loads.Analyzed(msg, "")
+	if err != nil {
+		return nil, err
+	}
+	//sw := new(spec.Swagger)
+	//err = json.Unmarshal(data, sw)
+	return doc.Spec(), err
 }
 
 // withRetries retries the given recovery function in case the groups supported by the server change after ServerGroup() returns.
