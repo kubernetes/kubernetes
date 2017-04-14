@@ -35,11 +35,7 @@ const (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	RegisterDefaults(scheme)
-	return scheme.AddDefaultingFuncs(
-		SetDefaults_MasterConfiguration,
-		SetDefaults_NodeConfiguration,
-	)
+	return RegisterDefaults(scheme)
 }
 
 func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
