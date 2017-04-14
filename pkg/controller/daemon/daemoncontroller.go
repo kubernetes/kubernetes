@@ -908,7 +908,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		glog.V(4).Infof("DaemonSet Predicates failed on node %s for ds '%s/%s' for reason: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
 		switch reason := r.(type) {
 		case *predicates.InsufficientResourceError:
-			dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.Error())
+			dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.Error())
 			shouldSchedule = false
 		case *predicates.PredicateFailureError:
 			var emitEvent bool
@@ -949,7 +949,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				emitEvent = true
 			}
 			if emitEvent {
-				dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.GetReason())
+				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.GetReason())
 			}
 		}
 	}
