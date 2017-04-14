@@ -85,6 +85,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apimachinery/pkg/util/yaml",
+        "//vendor:k8s.io/apiserver/pkg/util/feature",
     ],
 )
 
