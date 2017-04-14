@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -103,11 +104,16 @@ func (ngm *nvidiaGPUManager) Start() error {
 	if !os.IsNotExist(err) {
 		ngm.defaultDevices = append(ngm.defaultDevices, nvidiaUVMToolsDevice)
 	}
-
-	if err := ngm.discoverGPUs(devicesProcFile, devDirectory); err != nil {
-		return err
-	}
-
+	// retry discoverGPUs indefinitely in case drivers have not been installed
+	go func() {
+		for {
+			if err := ngm.discoverGPUs(devicesProcFile, devDirectory); err == nil {
+				glog.V(4).Infof("Nvidia GPU discovery finished")
+				return
+			}
+			time.Sleep(time.Minute)
+		}
+	}()
 	// We ignore errors when identifying allocated GPUs because it is possible that the runtime interfaces may be not be logically up.
 	return nil
 }
@@ -200,6 +206,9 @@ func (ngm *nvidiaGPUManager) discoverGPUs(devicesFile string, devDir string) err
 	if err != nil {
 		return err
 	}
+	if !expected {
+		return nil
+	}
 	reg := regexp.MustCompile(nvidiaDeviceRE)
 	files, err := ioutil.ReadDir(devDir)
 	if err != nil {
@@ -215,9 +224,8 @@ func (ngm *nvidiaGPUManager) discoverGPUs(devicesFile string, devDir string) err
 			foundGPUs.Insert(f.Name())
 		}
 	}
-	if foundGPUs.Len() != expected {
-		err := fmt.Errorf("expected %d GPUs, found %d", expected, foundGPUs.Len())
-		return err
+	if foundGPUs.Len() == 0 {
+		return fmt.Errorf("expected GPUs, but did not find any under %q", devDir)
 	}
 	for _, gpuToAdd := range foundGPUs.List() {
 		ngm.allGPUs.Insert(path.Join(devDirectory, gpuToAdd))
@@ -226,29 +234,28 @@ func (ngm *nvidiaGPUManager) discoverGPUs(devicesFile string, devDir string) err
 	return nil
 }
 
-// expectedGPUs reads the devices procfile and determines how many GPUs we should find
+// expectedGPUs reads the devices procfile and determines if we shuold find GPUs
 // when discoverGPUs is called
 // TODO: This most likely will count dead GPUs and should be refactored if we
 // switch to NVML health-checking
 // related https://github.com/kubernetes/community/pull/414
-func expectedGPUs(procFile string) (int, error) {
-	var expectedGpuCount = 0
+func expectedGPUs(procFile string) (bool, error) {
 	contents, err := os.Open(procFile)
-	defer contents.Close()
 	if err != nil {
-		return 0, err
+		return false, err
 	}
+	defer contents.Close()
 	scanner := bufio.NewScanner(contents)
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		s := scanner.Bytes()
 		fields := bytes.SplitN(s, []byte{'\t'}, 3)
 		if bytes.HasPrefix(fields[1], []byte(nvidiaVendorID)) {
-			expectedGpuCount++
+			return true, nil
 		}
 
 	}
-	return expectedGpuCount, nil
+	return false, nil
 }
 
 // gpusInUse returns a list of GPUs in use along with the respective pods that are using it.
