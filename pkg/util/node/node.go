@@ -183,3 +183,48 @@ func PatchNodeStatus(c clientset.Interface, nodeName types.NodeName, oldNode *v1
 	}
 	return updatedNode, nil
 }
+
+func UpdateNodeStatus(c clientset.Interface, node *v1.Node, attachedVolumes []v1.AttachedVolume) (error, bool) {
+	nodeName := node.Name
+	oldData, err := json.Marshal(node)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to Marshal oldData for node %q. %v",
+			nodeName,
+			err), false
+	}
+
+	node.Status.VolumesAttached = attachedVolumes
+
+	newData, err := json.Marshal(node)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to Marshal newData for node %q. %v",
+			nodeName,
+			err), false
+	}
+
+	patchBytes, err :=
+		strategicpatch.CreateTwoWayMergePatch(oldData, newData, node)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to CreateTwoWayMergePatch for node %q. %v",
+			nodeName,
+			err), false
+	}
+
+	_, err = c.Core().Nodes().PatchStatus(string(nodeName), patchBytes)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to kubeClient.Core().Nodes().Patch for node %q. %v",
+			nodeName,
+			err), true
+	}
+	glog.V(2).Infof(
+		"Updating status for node %q succeeded. patchBytes: %q VolumesAttached: %v",
+		nodeName,
+		string(patchBytes),
+		node.Status.VolumesAttached)
+
+	return nil, false
+}
