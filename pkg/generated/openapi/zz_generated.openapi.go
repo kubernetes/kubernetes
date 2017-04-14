@@ -12062,13 +12062,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"spec": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Description: "Specification of the desired behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v1.JobSpec"),
 							},
 						},
 						"status": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Description: "Current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v1.JobStatus"),
 							},
 						},
@@ -12151,13 +12151,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
 							},
 						},
 						"items": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Items is the list of Job.",
+								Description: "items is the list of Jobs.",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -12182,14 +12182,14 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"parallelism": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs",
+								Description: "Specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
 						},
 						"completions": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs",
+								Description: "Specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
@@ -12203,20 +12203,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"selector": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+								Description: "A label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
 							},
 						},
 						"manualSelector": {
 							SchemaProps: spec.SchemaProps{
-								Description: "ManualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md",
+								Description: "manualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md",
 								Type:        []string{"boolean"},
 								Format:      "",
 							},
 						},
 						"template": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
+								Description: "Describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.PodTemplateSpec"),
 							},
 						},
@@ -12240,7 +12240,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 							SchemaProps: spec.SchemaProps{
-								Description: "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
+								Description: "The latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -12253,33 +12253,33 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"startTime": {
 							SchemaProps: spec.SchemaProps{
-								Description: "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+								Description: "Represents time when the job was acknowledged by the job controller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 							},
 						},
 						"completionTime": {
 							SchemaProps: spec.SchemaProps{
-								Description: "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+								Description: "Represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 							},
 						},
 						"active": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Active is the number of actively running pods.",
+								Description: "The number of actively running pods.",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
 						},
 						"succeeded": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Succeeded is the number of pods which reached Phase Succeeded.",
+								Description: "The number of pods which reached phase Succeeded.",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
 						},
 						"failed": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Failed is the number of pods which reached Phase Failed.",
+								Description: "The number of pods which reached phase Failed.",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
@@ -12317,13 +12317,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"spec": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Description: "Specification of the desired behavior of a cron job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v2alpha1.CronJobSpec"),
 							},
 						},
 						"status": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Description: "Current status of a cron job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v2alpha1.CronJobStatus"),
 							},
 						},
@@ -12354,13 +12354,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
 							},
 						},
 						"items": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Items is the list of CronJob.",
+								Description: "items is the list of CronJobs.",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -12385,7 +12385,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"schedule": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+								Description: "The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -12399,21 +12399,21 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"concurrencyPolicy": {
 							SchemaProps: spec.SchemaProps{
-								Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job. Defaults to Allow.",
+								Description: "Specifies how to treat concurrent executions of a Job. Defaults to Allow.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
 						"suspend": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+								Description: "This flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
 								Type:        []string{"boolean"},
 								Format:      "",
 							},
 						},
 						"jobTemplate": {
 							SchemaProps: spec.SchemaProps{
-								Description: "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
+								Description: "Specifies the job that will be created when executing a CronJob.",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v2alpha1.JobTemplateSpec"),
 							},
 						},
@@ -12445,7 +12445,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"active": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Active holds pointers to currently running jobs.",
+								Description: "A list of pointers to currently running jobs.",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -12458,7 +12458,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"lastScheduleTime": {
 							SchemaProps: spec.SchemaProps{
-								Description: "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
+								Description: "Information when was the last time the job was successfully scheduled.",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 							},
 						},
@@ -12495,7 +12495,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"template": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Template defines jobs that will be created from this template http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Description: "Defines jobs that will be created from this template. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v2alpha1.JobTemplateSpec"),
 							},
 						},

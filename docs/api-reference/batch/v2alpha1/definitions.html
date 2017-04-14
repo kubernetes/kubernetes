@@ -3353,14 +3353,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">active</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Active holds pointers to currently running jobs.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A list of pointers to currently running jobs.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectreference">v1.ObjectReference</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">lastScheduleTime</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">LastScheduleTime keeps information of when was the last time the job was successfully scheduled.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Information when was the last time the job was successfully scheduled.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3706,7 +3706,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">schedule</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Schedule contains the schedule in Cron format, see <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The schedule in Cron format, see <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a>.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3720,21 +3720,21 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">concurrencyPolicy</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ConcurrencyPolicy specifies how to treat concurrent executions of a Job. Defaults to Allow.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies how to treat concurrent executions of a Job. Defaults to Allow.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">suspend</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">This flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">jobTemplate</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">JobTemplate is the object that describes the job that will be created when executing a CronJob.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the job that will be created when executing a CronJob.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2alpha1_jobtemplatespec">v2alpha1.JobTemplateSpec</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4008,14 +4008,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">parallelism</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) &lt; .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) &lt; .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">completions</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4029,21 +4029,21 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">selector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: <a href="http://kubernetes.io/docs/user-guide/labels#label-selectors">http://kubernetes.io/docs/user-guide/labels#label-selectors</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A label query over pods that should match the pod count. Normally, the system sets this field for you. More info: <a href="http://kubernetes.io/docs/user-guide/labels#label-selectors">http://kubernetes.io/docs/user-guide/labels#label-selectors</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_labelselector">v1.LabelSelector</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">manualSelector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ManualSelector controls generation of pod labels and pod selectors. Leave <code>manualSelector</code> unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see <code>manualSelector=true</code> in jobs that were created with the old <code>extensions/v1beta1</code> API. More info: <a href="http://releases.k8s.io/HEAD/docs/design/selector-generation.md">http://releases.k8s.io/HEAD/docs/design/selector-generation.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">manualSelector controls generation of pod labels and pod selectors. Leave <code>manualSelector</code> unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see <code>manualSelector=true</code> in jobs that were created with the old <code>extensions/v1beta1</code> API. More info: <a href="http://releases.k8s.io/HEAD/docs/design/selector-generation.md">http://releases.k8s.io/HEAD/docs/design/selector-generation.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">template</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Template is the object that describes the pod that will be created when executing a job. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Describes the pod that will be created when executing a job. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_podtemplatespec">v1.PodTemplateSpec</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5243,14 +5243,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_listmeta">v1.ListMeta</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Items is the list of CronJob.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">items is the list of CronJobs.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2alpha1_cronjob">v2alpha1.CronJob</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5515,14 +5515,14 @@ Examples:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">spec</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Spec is a structure defining the expected behavior of a job, including the schedule. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specification of the desired behavior of a cron job, including the schedule. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2alpha1_cronjobspec">v2alpha1.CronJobSpec</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">status</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Status is a structure describing current status of a job. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Current status of a cron job. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2alpha1_cronjobstatus">v2alpha1.CronJobStatus</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5629,7 +5629,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-04-10 11:51:28 UTC
+Last updated 2017-04-13 12:05:18 UTC
 </div>
 </div>
 </body>

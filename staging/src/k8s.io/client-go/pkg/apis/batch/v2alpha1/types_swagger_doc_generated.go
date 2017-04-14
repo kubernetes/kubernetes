@@ -30,8 +30,8 @@ package v2alpha1
 var map_CronJob = map[string]string{
 	"":         "CronJob represents the configuration of a single cron job.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"spec":     "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-	"status":   "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"spec":     "Specification of the desired behavior of a cron job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"status":   "Current status of a cron job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 }
 
 func (CronJob) SwaggerDoc() map[string]string {
@@ -40,8 +40,8 @@ func (CronJob) SwaggerDoc() map[string]string {
 
 var map_CronJobList = map[string]string{
 	"":         "CronJobList is a collection of cron jobs.",
-	"metadata": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"items":    "Items is the list of CronJob.",
+	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"items":    "items is the list of CronJobs.",
 }
 
 func (CronJobList) SwaggerDoc() map[string]string {
@@ -50,11 +50,11 @@ func (CronJobList) SwaggerDoc() map[string]string {
 
 var map_CronJobSpec = map[string]string{
 	"":                           "CronJobSpec describes how the job execution will look like and when it will actually run.",
-	"schedule":                   "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+	"schedule":                   "The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
 	"startingDeadlineSeconds":    "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
-	"concurrencyPolicy":          "ConcurrencyPolicy specifies how to treat concurrent executions of a Job. Defaults to Allow.",
-	"suspend":                    "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
-	"jobTemplate":                "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
+	"concurrencyPolicy":          "Specifies how to treat concurrent executions of a Job. Defaults to Allow.",
+	"suspend":                    "This flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+	"jobTemplate":                "Specifies the job that will be created when executing a CronJob.",
 	"successfulJobsHistoryLimit": "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
 	"failedJobsHistoryLimit":     "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
 }
@@ -65,8 +65,8 @@ func (CronJobSpec) SwaggerDoc() map[string]string {
 
 var map_CronJobStatus = map[string]string{
 	"":                 "CronJobStatus represents the current state of a cron job.",
-	"active":           "Active holds pointers to currently running jobs.",
-	"lastScheduleTime": "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
+	"active":           "A list of pointers to currently running jobs.",
+	"lastScheduleTime": "Information when was the last time the job was successfully scheduled.",
 }
 
 func (CronJobStatus) SwaggerDoc() map[string]string {
@@ -76,7 +76,7 @@ func (CronJobStatus) SwaggerDoc() map[string]string {
 var map_JobTemplate = map[string]string{
 	"":         "JobTemplate describes a template for creating copies of a predefined pod.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"template": "Template defines jobs that will be created from this template http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"template": "Defines jobs that will be created from this template. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 }
 
 func (JobTemplate) SwaggerDoc() map[string]string {
