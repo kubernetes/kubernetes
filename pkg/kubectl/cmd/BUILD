@@ -195,6 +195,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/annotations:go_default_library",
+        "//pkg/api/ref:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/api/unversioned:go_default_library",
