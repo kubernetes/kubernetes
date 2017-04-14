@@ -351,12 +351,12 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			increasedSize += val + 2
 		}
 		setMigSizes(newSizes)
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size >= increasedSize }, scaleUpTimeout), unready)
+		framework.ExpectNoError(WaitForClusterSizeFuncWithUnready(f.ClientSet,
+			func(size int) bool { return size >= increasedSize }, scaleUpTimeout, unready))
 
 		By("Some node should be removed")
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size < increasedSize }, scaleDownTimeout), unready)
+		framework.ExpectNoError(WaitForClusterSizeFuncWithUnready(f.ClientSet,
+			func(size int) bool { return size < increasedSize }, scaleDownTimeout, unready))
 	}
 
 	It("should correctly scale down after a node is not needed [Feature:ClusterSizeAutoscalingScaleDown]",
