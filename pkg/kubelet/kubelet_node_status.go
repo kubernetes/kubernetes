@@ -81,7 +81,7 @@ func (kl *Kubelet) registerWithApiServer() {
 			kl.registrationCompleted = true
 			return
 		}　else {
-			glog.Infof("register node %s failed", node.Name)
+			glog.Infof("register node %s failed，but kubelet will retry", node.Name)
 		}
 	}
 }
