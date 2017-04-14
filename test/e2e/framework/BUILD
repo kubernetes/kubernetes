@@ -58,7 +58,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/client/retry:go_default_library",
-        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
@@ -130,6 +129,7 @@ go_library(
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor:k8s.io/client-go/tools/remotecommand",
     ],
 )
 

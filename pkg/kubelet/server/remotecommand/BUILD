@@ -19,7 +19,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -31,6 +30,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apiserver/pkg/server/httplog",
         "//vendor:k8s.io/apiserver/pkg/util/wsstream",
+        "//vendor:k8s.io/client-go/tools/remotecommand",
     ],
 )
 

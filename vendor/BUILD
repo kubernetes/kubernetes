@@ -16783,3 +16783,51 @@ go_library(
     tags = ["automanaged"],
     deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
 )
+
+go_library(
+    name = "k8s.io/client-go/pkg/util/exec",
+    srcs = ["k8s.io/client-go/pkg/util/exec/exec.go"],
+    tags = ["automanaged"],
+)
+
+go_test(
+    name = "k8s.io/client-go/tools/remotecommand_test",
+    srcs = [
+        "k8s.io/client-go/tools/remotecommand/v2_test.go",
+        "k8s.io/client-go/tools/remotecommand/v4_test.go",
+    ],
+    library = ":k8s.io/client-go/tools/remotecommand",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/pkg/api",
+    ],
+)
+
+go_library(
+    name = "k8s.io/client-go/tools/remotecommand",
+    srcs = [
+        "k8s.io/client-go/tools/remotecommand/doc.go",
+        "k8s.io/client-go/tools/remotecommand/errorstream.go",
+        "k8s.io/client-go/tools/remotecommand/remotecommand.go",
+        "k8s.io/client-go/tools/remotecommand/resize.go",
+        "k8s.io/client-go/tools/remotecommand/v1.go",
+        "k8s.io/client-go/tools/remotecommand/v2.go",
+        "k8s.io/client-go/tools/remotecommand/v3.go",
+        "k8s.io/client-go/tools/remotecommand/v4.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
+        "//vendor:k8s.io/apimachinery/pkg/util/httpstream/spdy",
+        "//vendor:k8s.io/apimachinery/pkg/util/remotecommand",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/util/exec",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/transport",
+    ],
+)

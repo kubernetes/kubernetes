@@ -33,7 +33,7 @@ import (
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/pkg/api"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubeletportforward "k8s.io/kubernetes/pkg/kubelet/server/portforward"
 )

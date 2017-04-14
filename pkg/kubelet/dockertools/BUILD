@@ -28,7 +28,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -78,6 +77,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/client-go/tools/record",
+        "//vendor:k8s.io/client-go/tools/remotecommand",
         "//vendor:k8s.io/client-go/util/clock",
         "//vendor:k8s.io/client-go/util/flowcontrol",
     ],

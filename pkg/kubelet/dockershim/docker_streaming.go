@@ -24,7 +24,7 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"

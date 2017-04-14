@@ -31,8 +31,8 @@ import (
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/wsstream"
+	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 
 	"github.com/golang/glog"
 )
