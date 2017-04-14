@@ -135,13 +135,11 @@ func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRem
 // Note: startVolumeServer() waits for the nfs-server pod to be Running and sleeps some
 //   so that the nfs server can start up.
 func createNfsServerPod(c clientset.Interface, config framework.VolumeTestConfig) (*v1.Pod, string) {
-
 	pod := framework.StartVolumeServer(c, config)
 	Expect(pod).NotTo(BeNil())
 	ip := pod.Status.PodIP
 	Expect(len(ip)).NotTo(BeZero())
 	framework.Logf("NFS server IP address: %v", ip)
-
 	return pod, ip
 }
 
@@ -149,7 +147,6 @@ func createNfsServerPod(c clientset.Interface, config framework.VolumeTestConfig
 // pod's (only) container. This command changes the number of nfs server threads from
 // (presumably) zero back to 1, and therefore allows nfs to open connections again.
 func restartNfsServer(serverPod *v1.Pod) {
-
 	const startcmd = "/usr/sbin/rpc.nfsd 1"
 	ns := fmt.Sprintf("--namespace=%v", serverPod.Namespace)
 	framework.RunKubectlOrDie("exec", ns, serverPod.Name, "--", "/bin/sh", "-c", startcmd)
@@ -159,7 +156,6 @@ func restartNfsServer(serverPod *v1.Pod) {
 // pod's (only) container. This command changes the number of nfs server threads to 0,
 // thus closing all open nfs connections.
 func stopNfsServer(serverPod *v1.Pod) {
-
 	const stopcmd = "/usr/sbin/rpc.nfsd 0"
 	ns := fmt.Sprintf("--namespace=%v", serverPod.Namespace)
 	framework.RunKubectlOrDie("exec", ns, serverPod.Name, "--", "/bin/sh", "-c", stopcmd)
@@ -169,7 +165,6 @@ func stopNfsServer(serverPod *v1.Pod) {
 // will execute the passed in shell cmd. Waits for the pod to start.
 // Note: the nfs plugin is defined inline, no PV or PVC.
 func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP, cmd string) *v1.Pod {
-
 	By("create pod using nfs volume")
 
 	isPrivileged := true
@@ -224,16 +219,14 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 
 	rtnPod, err = c.CoreV1().Pods(ns).Get(rtnPod.Name, metav1.GetOptions{}) // return fresh pod
 	Expect(err).NotTo(HaveOccurred())
-
 	return rtnPod
 }
 
 // move the passed-in pod's UID directory to /tmp.
 func movePodUidDir(c clientset.Interface, pod *v1.Pod) {
-
 	dest := "/tmp"
 	podDir := filepath.Join("/var/lib/kubelet/pods", string(pod.UID))
-	cmd := fmt.Sprintf("mv %v %v", podDir, dest)
+	cmd := fmt.Sprintf("sudo mv %v %v", podDir, dest)
 	// use ip rather than hostname in GCE
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
 	Expect(err).NotTo(HaveOccurred())
@@ -252,7 +245,6 @@ func movePodUidDir(c clientset.Interface, pod *v1.Pod) {
 // the node is not cleaned up, and thus cmds like `ls <uid-dir>` should succeed. We wait for the
 // kubelet to be cleaned up, afterwhich an error is reported.
 func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
-
 	timeout := 5 * time.Minute
 	poll := 20 * time.Second
 	podDir := filepath.Join("/var/lib/kubelet/pods", string(pod.UID))
