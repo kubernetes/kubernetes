@@ -419,7 +419,7 @@ func (ssc *StatefulSetController) sync(key string) error {
 func (ssc *StatefulSetController) syncStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error {
 	glog.V(2).Infof("Syncing StatefulSet %v/%v with %d pods", set.Namespace, set.Name, len(pods))
 	if err := ssc.control.UpdateStatefulSet(set, pods); err != nil {
-		glog.V(2).Infof("Error syncing StatefulSet %s/%s with %d pods : %s", set.Namespace, set.Name, err)
+		glog.V(2).Infof("Error syncing StatefulSet %s/%s with %d pods : %s", set.Namespace, set.Name, len(pods), err)
 		return err
 	}
 	glog.V(2).Infof("Successfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
