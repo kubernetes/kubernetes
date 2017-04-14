@@ -117,6 +117,7 @@ mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generat
 mkcp "pkg/client/informers/informers_generated/externalversions" "pkg/client/informers/informers_generated"
 mkcp "pkg/api/helper" "pkg/api"
 mkcp "pkg/api/v1/resource" "pkg/api/v1"
+mkcp "pkg/api/v1/node" "pkg/api/v1"
 
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
   echo "generating vendor/"
