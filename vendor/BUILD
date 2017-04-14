@@ -13899,7 +13899,6 @@ go_library(
     name = "k8s.io/client-go/pkg/api",
     srcs = [
         "k8s.io/client-go/pkg/api/annotation_key_constants.go",
-        "k8s.io/client-go/pkg/api/defaults.go",
         "k8s.io/client-go/pkg/api/doc.go",
         "k8s.io/client-go/pkg/api/field_constants.go",
         "k8s.io/client-go/pkg/api/json.go",
@@ -14312,6 +14311,7 @@ go_library(
         "k8s.io/client-go/pkg/apis/autoscaling/v2alpha1/types_swagger_doc_generated.go",
         "k8s.io/client-go/pkg/apis/autoscaling/v2alpha1/zz_generated.conversion.go",
         "k8s.io/client-go/pkg/apis/autoscaling/v2alpha1/zz_generated.deepcopy.go",
+        "k8s.io/client-go/pkg/apis/autoscaling/v2alpha1/zz_generated.defaults.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -14602,6 +14602,7 @@ go_library(
         "k8s.io/client-go/pkg/apis/policy/v1beta1/types_swagger_doc_generated.go",
         "k8s.io/client-go/pkg/apis/policy/v1beta1/zz_generated.conversion.go",
         "k8s.io/client-go/pkg/apis/policy/v1beta1/zz_generated.deepcopy.go",
+        "k8s.io/client-go/pkg/apis/policy/v1beta1/zz_generated.defaults.go",
     ],
     tags = ["automanaged"],
     deps = [
