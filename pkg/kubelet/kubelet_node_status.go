@@ -80,6 +80,10 @@ func (kl *Kubelet) registerWithApiServer() {
 			glog.Infof("Successfully registered node %s", node.Name)
 			kl.registrationCompleted = true
 			return
+		}　else {
+			glog.Infof("register node %s failed", node.Name)
+			kl.registrationCompleted = false
+			return
 		}
 	}
 }
