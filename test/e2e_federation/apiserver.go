@@ -34,15 +34,6 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 	Describe("Cluster objects [Serial]", func() {
 		AfterEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-
-			// Delete registered clusters.
-			// This is if a test failed, it should not affect other tests.
-			clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			for _, cluster := range clusterList.Items {
-				err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &metav1.DeleteOptions{})
-				Expect(err).NotTo(HaveOccurred())
-			}
 		})
 
 		It("should be created and deleted successfully", func() {
@@ -50,17 +41,9 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 
 			contexts := f.GetUnderlyingFederatedContexts()
 
-			framework.Logf("Creating %d cluster objects", len(contexts))
-			for _, context := range contexts {
-				createClusterObjectOrFail(f, &context)
-			}
-
-			framework.Logf("Checking that %d clusters are Ready", len(contexts))
-			for _, context := range contexts {
-				fedframework.ClusterIsReadyOrFail(f, &context)
-			}
-			framework.Logf("%d clusters are Ready", len(contexts))
-
+			// Clusters have already been registered to federation as part test-suit init.
+			// So unregister the cluster and register them back, so that this testcase can pass
+			// when tests are run sequentially and doing so also does not impact other testcases.
 			// Verify that deletion works.
 			framework.Logf("Deleting %d clusters", len(contexts))
 			for _, context := range contexts {
@@ -78,6 +61,17 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 				framework.Failf("there should not have been any remaining clusters. Found: %+v", clusterList)
 			}
 			framework.Logf("Verified that zero clusters remain")
+
+			framework.Logf("Creating %d cluster objects", len(contexts))
+			for _, context := range contexts {
+				createClusterObjectOrFail(f, &context)
+			}
+
+			framework.Logf("Checking that %d clusters are Ready", len(contexts))
+			for _, context := range contexts {
+				fedframework.ClusterIsReadyOrFail(f, &context)
+			}
+			framework.Logf("%d clusters are Ready", len(contexts))
 		})
 	})
 
