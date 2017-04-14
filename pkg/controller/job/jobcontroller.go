@@ -126,8 +126,10 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer jm.queue.ShutDown()
 
-	if !cache.WaitForCacheSync(stopCh, jm.podStoreSynced, jm.jobStoreSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	glog.Infof("Starting job controller")
+	defer glog.Infof("Shutting down job controller")
+
+	if !controller.WaitForCacheSync("job", stopCh, jm.podStoreSynced, jm.jobStoreSynced) {
 		return
 	}
 
@@ -136,7 +138,6 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
-	glog.Infof("Shutting down Job Manager")
 }
 
 // getPodJob returns the job managing the given pod.

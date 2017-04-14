@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 
 	"github.com/golang/glog"
@@ -131,14 +132,17 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer e.queue.ShutDown()
 
-	if !cache.WaitForCacheSync(stopCh, e.podsSynced, e.servicesSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	glog.Infof("Starting endpoint controller")
+	defer glog.Infof("Shutting down endpoint controller")
+
+	if !controller.WaitForCacheSync("endpoint", stopCh, e.podsSynced, e.servicesSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(e.worker, time.Second, stopCh)
 	}
+
 	go func() {
 		defer utilruntime.HandleCrash()
 		time.Sleep(5 * time.Minute) // give time for our cache to fill

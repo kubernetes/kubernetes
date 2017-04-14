@@ -32,8 +32,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	// install the prometheus plugin
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus"
@@ -104,25 +104,31 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 }
 
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
+	defer utilruntime.HandleCrash()
 	defer gc.attemptToDelete.ShutDown()
 	defer gc.attemptToOrphan.ShutDown()
 	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
 
-	glog.Infof("Garbage Collector: Initializing")
+	glog.Infof("Starting garbage collector controller")
+	defer glog.Infof("Shutting down garbage collector controller")
+
 	gc.dependencyGraphBuilder.Run(stopCh)
-	if !cache.WaitForCacheSync(stopCh, gc.dependencyGraphBuilder.HasSynced) {
+
+	if !controller.WaitForCacheSync("garbage collector", stopCh, gc.dependencyGraphBuilder.HasSynced) {
 		return
 	}
-	glog.Infof("Garbage Collector: All resource monitors have synced. Proceeding to collect garbage")
+
+	glog.Infof("Garbage collector: all resource monitors have synced. Proceeding to collect garbage")
 
 	// gc workers
 	for i := 0; i < workers; i++ {
 		go wait.Until(gc.runAttemptToDeleteWorker, 1*time.Second, stopCh)
 		go wait.Until(gc.runAttemptToOrphanWorker, 1*time.Second, stopCh)
 	}
+
 	Register()
+
 	<-stopCh
-	glog.Infof("Garbage Collector: Shutting down")
 }
 
 func (gc *GarbageCollector) HasSynced() bool {
