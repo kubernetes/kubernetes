@@ -76,7 +76,7 @@ env > {{.OutputEnv}}
 echo "%@" >> {{.OutputEnv}}
 export $(echo ${CNI_ARGS} | sed 's/;/ /g') &> /dev/null
 mkdir -p {{.OutputDir}} &> /dev/null
-echo -n "$CNI_COMMAND $CNI_NETNS $K8S_POD_NAMESPACE $K8S_POD_NAME $K8S_POD_INFRA_CONTAINER_ID" >& {{.OutputFile}}
+echo -n "$CNI_COMMAND $CNI_NETNS $K8S_POD_NAMESPACE $K8S_POD_NAME $K8S_POD_INFRA_CONTAINER_ID $K8S_POD_CIDR $K8S_POD_GW" >& {{.OutputFile}}
 echo -n "{ \"ip4\": { \"ip\": \"10.1.0.23/24\" } }"
 `
 	execTemplateData := &map[string]interface{}{
@@ -214,6 +214,10 @@ func TestCNIPlugin(t *testing.T) {
 		t.Fatalf("Failed to select the desired plugin: %v", err)
 	}
 
+	details := make(map[string]interface{})
+	details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = "10.0.0.1/24"
+	plug.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
+
 	// Set up the pod
 	err = plug.SetUpPod("podNamespace", "podName", containerID, map[string]string{})
 	if err != nil {
@@ -226,7 +230,7 @@ func TestCNIPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to read output file %s: %v (env %s err %v)", outputFile, err, eo, eerr)
 	}
-	expectedOutput := "ADD /proc/12345/ns/net podNamespace podName test_infra_container"
+	expectedOutput := "ADD /proc/12345/ns/net podNamespace podName test_infra_container 10.0.0.0/24 10.0.0.1"
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))
 	}
@@ -246,7 +250,7 @@ func TestCNIPlugin(t *testing.T) {
 		t.Errorf("Expected nil: %v", err)
 	}
 	output, err = ioutil.ReadFile(path.Join(testNetworkConfigPath, pluginName, pluginName+".out"))
-	expectedOutput = "DEL /proc/12345/ns/net podNamespace podName test_infra_container"
+	expectedOutput = "DEL /proc/12345/ns/net podNamespace podName test_infra_container 10.0.0.0/24 10.0.0.1"
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))
 	}
