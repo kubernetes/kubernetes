@@ -484,7 +484,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		if err != nil {
 			return fmt.Errorf("failed to initialize nodecontroller: %v", err)
 		}
-		nodeController.Run()
+		go nodeController.Run(stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	} else {
 		glog.Warningf("%q is disabled", nodeControllerName)

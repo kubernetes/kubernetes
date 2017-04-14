@@ -220,13 +220,14 @@ type attachDetachController struct {
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
-	glog.Infof("Starting Attach Detach Controller")
+
+	glog.Infof("Starting attach detach controller")
+	defer glog.Infof("Shutting down attach detach controller")
 
 	// TODO uncomment once we agree this is ok and we fix the attach/detach integration test that
 	// currently fails because it doesn't set pvcsSynced and pvsSynced to alwaysReady, so this
 	// controller never runs.
-	// if !kcache.WaitForCacheSync(stopCh, adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced) {
-	// 	runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	// if !controller.WaitForCacheSync("attach detach", stopCh, adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced) {
 	// 	return
 	// }
 
@@ -234,7 +235,6 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
 
 	<-stopCh
-	glog.Infof("Shutting down Attach Detach Controller")
 }
 
 func (adc *attachDetachController) podAdd(obj interface{}) {

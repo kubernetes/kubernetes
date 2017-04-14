@@ -15913,6 +15913,7 @@ go_library(
         "//vendor:k8s.io/kube-aggregator/pkg/client/informers/internalversion",
         "//vendor:k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion",
         "//vendor:k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion",
+        "//vendor:k8s.io/kube-aggregator/pkg/controllers",
         "//vendor:k8s.io/kube-aggregator/pkg/registry/apiservice/etcd",
     ],
 )
@@ -16319,6 +16320,7 @@ go_library(
         "//vendor:k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion",
         "//vendor:k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion",
         "//vendor:k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion",
+        "//vendor:k8s.io/kube-aggregator/pkg/controllers",
     ],
 )
 
@@ -16782,4 +16784,15 @@ go_library(
     srcs = ["k8s.io/apimachinery/pkg/util/remotecommand/constants.go"],
     tags = ["automanaged"],
     deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
+)
+
+go_library(
+    name = "k8s.io/kube-aggregator/pkg/controllers",
+    srcs = ["k8s.io/kube-aggregator/pkg/controllers/cache.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/client-go/tools/cache",
+    ],
 )

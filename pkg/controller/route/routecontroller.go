@@ -35,6 +35,7 @@ import (
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
@@ -77,10 +78,10 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
 	defer utilruntime.HandleCrash()
 
-	glog.Info("Starting the route controller")
+	glog.Info("Starting route controller")
+	defer glog.Info("Shutting down route controller")
 
-	if !cache.WaitForCacheSync(stopCh, rc.nodeListerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("route", stopCh, rc.nodeListerSynced) {
 		return
 	}
 
@@ -94,6 +95,8 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 			glog.Errorf("Couldn't reconcile node routes: %v", err)
 		}
 	}, syncPeriod, wait.NeverStop)
+
+	<-stopCh
 }
 
 func (rc *RouteController) reconcileNodeRoutes() error {

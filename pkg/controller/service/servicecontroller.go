@@ -174,9 +174,9 @@ func (s *ServiceController) Run(stopCh <-chan struct{}, workers int) {
 	defer s.workingQueue.ShutDown()
 
 	glog.Info("Starting service controller")
+	defer glog.Info("Shutting down service controller")
 
-	if !cache.WaitForCacheSync(stopCh, s.serviceListerSynced, s.nodeListerSynced) {
-		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced) {
 	}
 
 	for i := 0; i < workers; i++ {
@@ -186,7 +186,6 @@ func (s *ServiceController) Run(stopCh <-chan struct{}, workers int) {
 	go wait.Until(s.nodeSyncLoop, nodeSyncPeriod, stopCh)
 
 	<-stopCh
-	glog.Info("Stopping service controller")
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
