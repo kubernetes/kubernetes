@@ -245,7 +245,7 @@ func validate(testParam TestParam, t *testing.T, body []byte, fakeHandler *utilt
 			t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", testParam.expStatus, statusOut)
 		}
 	}
-	fakeHandler.ValidateRequest(t, "/"+api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()+"/test", "GET", nil)
+	fakeHandler.ValidateRequest(t, "/"+v1.SchemeGroupVersion.String()+"/test", "GET", nil)
 
 }
 
@@ -329,10 +329,11 @@ func testServerEnv(t *testing.T, statusCode int) (*httptest.Server, *utiltesting
 }
 
 func restClient(testServer *httptest.Server) (*RESTClient, error) {
+	gvCopy := v1.SchemeGroupVersion
 	c, err := RESTClientFor(&Config{
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
-			GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
+			GroupVersion:         &gvCopy,
 			NegotiatedSerializer: api.Codecs,
 		},
 		Username: "user",

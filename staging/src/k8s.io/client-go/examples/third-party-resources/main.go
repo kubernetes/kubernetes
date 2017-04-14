@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
@@ -150,7 +151,7 @@ func configureClient(config *rest.Config) {
 	config.GroupVersion = &groupversion
 	config.APIPath = "/apis"
 	config.ContentType = runtime.ContentTypeJSON
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 
 	schemeBuilder := runtime.NewSchemeBuilder(
 		func(scheme *runtime.Scheme) error {
@@ -161,6 +162,6 @@ func configureClient(config *rest.Config) {
 			)
 			return nil
 		})
-	metav1.AddToGroupVersion(api.Scheme, groupversion)
-	schemeBuilder.AddToScheme(api.Scheme)
+	metav1.AddToGroupVersion(scheme.Scheme, groupversion)
+	schemeBuilder.AddToScheme(scheme.Scheme)
 }
