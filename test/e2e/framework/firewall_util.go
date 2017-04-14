@@ -120,12 +120,11 @@ func GetClusterName(instancePrefix string) string {
 }
 
 // GetClusterIpRange returns the CLUSTER_IP_RANGE env we set for e2e cluster.
-// From cluster/gce/config-test.sh, cluster ip range is set up using below command:
-// CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.180.0.0/14}"
-// Warning: this need to be consistent with the CLUSTER_IP_RANGE in startup scripts,
-// which is hardcoded currently.
+//
+// Warning: this MUST be consistent with the CLUSTER_IP_RANGE set in
+// gce/config-test.sh.
 func GetClusterIpRange() string {
-	return "10.180.0.0/14"
+	return "10.100.0.0/14"
 }
 
 // GetE2eFirewalls returns all firewall rules we create for an e2e cluster.
