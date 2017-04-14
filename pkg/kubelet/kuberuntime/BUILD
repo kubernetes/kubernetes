@@ -29,6 +29,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/ref:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/api:go_default_library",

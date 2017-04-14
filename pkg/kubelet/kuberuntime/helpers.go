@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -235,4 +236,30 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 		})
 	}
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
+}
+
+// getSysctlsFromAnnotations gets sysctls and unsafeSysctls from annotations.
+func getSysctlsFromAnnotations(annotations map[string]string) (map[string]string, map[string]string, error) {
+	var sysctls, unsafeSysctls map[string]string
+
+	apiSysctls, apiUnsafeSysctls, err := v1helper.SysctlsFromPodAnnotations(annotations)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(apiSysctls) > 0 {
+		sysctls = make(map[string]string, len(apiSysctls))
+		for _, c := range apiSysctls {
+			sysctls[c.Name] = c.Value
+		}
+	}
+
+	if len(apiUnsafeSysctls) > 0 {
+		unsafeSysctls = make(map[string]string, len(apiUnsafeSysctls))
+		for _, c := range apiUnsafeSysctls {
+			unsafeSysctls[c.Name] = c.Value
+		}
+	}
+
+	return sysctls, unsafeSysctls, nil
 }

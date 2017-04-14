@@ -46,3 +46,48 @@ func TestStableKey(t *testing.T) {
 	newKey := getStableKey(pod, container)
 	assert.NotEqual(t, oldKey, newKey)
 }
+
+// TestGetSystclsFromAnnotations tests the logic of getting sysctls from annotations.
+func TestGetSystclsFromAnnotations(t *testing.T) {
+	tests := []struct {
+		annotations           map[string]string
+		expectedSysctls       map[string]string
+		expectedUnsafeSysctls map[string]string
+	}{{
+		annotations: map[string]string{
+			v1.SysctlsPodAnnotationKey:       "kernel.shmmni=32768,kernel.shmmax=1000000000",
+			v1.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
+		},
+		expectedSysctls: map[string]string{
+			"kernel.shmmni": "32768",
+			"kernel.shmmax": "1000000000",
+		},
+		expectedUnsafeSysctls: map[string]string{
+			"knet.ipv4.route.min_pmtu": "1000",
+		},
+	}, {
+		annotations: map[string]string{
+			v1.SysctlsPodAnnotationKey: "kernel.shmmni=32768,kernel.shmmax=1000000000",
+		},
+		expectedSysctls: map[string]string{
+			"kernel.shmmni": "32768",
+			"kernel.shmmax": "1000000000",
+		},
+	}, {
+		annotations: map[string]string{
+			v1.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
+		},
+		expectedUnsafeSysctls: map[string]string{
+			"knet.ipv4.route.min_pmtu": "1000",
+		},
+	}}
+
+	for i, test := range tests {
+		actualSysctls, actualUnsafeSysctls, err := getSysctlsFromAnnotations(test.annotations)
+		assert.NoError(t, err, "TestCase[%d]", i)
+		assert.Len(t, actualSysctls, len(test.expectedSysctls), "TestCase[%d]", i)
+		assert.Equal(t, test.expectedSysctls, actualSysctls, "TestCase[%d]", i)
+		assert.Len(t, actualUnsafeSysctls, len(test.expectedUnsafeSysctls), "TestCase[%d]", i)
+		assert.Equal(t, test.expectedUnsafeSysctls, actualUnsafeSysctls, "TestCase[%d]", i)
+	}
+}

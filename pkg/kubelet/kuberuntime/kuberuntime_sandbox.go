@@ -116,23 +116,36 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		}
 
 	}
-
-	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
-	podSandboxConfig.Linux = m.generatePodSandboxLinuxConfig(pod, cgroupParent)
 	if len(portMappings) > 0 {
 		podSandboxConfig.PortMappings = portMappings
 	}
+
+	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
+	lc, err := m.generatePodSandboxLinuxConfig(pod, cgroupParent)
+	if err != nil {
+		return nil, err
+	}
+	podSandboxConfig.Linux = lc
 
 	return podSandboxConfig, nil
 }
 
 // generatePodSandboxLinuxConfig generates LinuxPodSandboxConfig from v1.Pod.
-func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod, cgroupParent string) *runtimeapi.LinuxPodSandboxConfig {
+func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod, cgroupParent string) (*runtimeapi.LinuxPodSandboxConfig, error) {
 	lc := &runtimeapi.LinuxPodSandboxConfig{
 		CgroupParent: cgroupParent,
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
 			Privileged: kubecontainer.HasPrivilegedContainer(pod),
 		},
+	}
+
+	sysctls, unsafeSysctls, err := getSysctlsFromAnnotations(pod.Annotations)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sysctls from annotations %v for pod %q: %v", pod.Annotations, format.Pod(pod), err)
+	}
+	lc.Sysctls = &runtimeapi.Sysctls{
+		Sysctls:       sysctls,
+		UnsafeSysctls: unsafeSysctls,
 	}
 
 	if pod.Spec.SecurityContext != nil {
@@ -165,7 +178,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod, c
 		}
 	}
 
-	return lc
+	return lc, nil
 }
 
 // getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
