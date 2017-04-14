@@ -21,7 +21,6 @@ package network
 import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
@@ -54,24 +53,6 @@ func NewSubnetsClientWithBaseURI(baseURI string, subscriptionID string) SubnetsC
 // subnetParameters is parameters supplied to the create or update subnet
 // operation.
 func (client SubnetsClient) CreateOrUpdate(resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters Subnet, cancel <-chan struct{}) (result autorest.Response, err error) {
-	if err := validation.Validate([]validation.Validation{
-		{TargetValue: subnetParameters,
-			Constraints: []validation.Constraint{{Target: "subnetParameters.SubnetPropertiesFormat", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "subnetParameters.SubnetPropertiesFormat.NetworkSecurityGroup", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "subnetParameters.SubnetPropertiesFormat.NetworkSecurityGroup.SecurityGroupPropertiesFormat", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "subnetParameters.SubnetPropertiesFormat.NetworkSecurityGroup.SecurityGroupPropertiesFormat.NetworkInterfaces", Name: validation.ReadOnly, Rule: true, Chain: nil},
-							{Target: "subnetParameters.SubnetPropertiesFormat.NetworkSecurityGroup.SecurityGroupPropertiesFormat.Subnets", Name: validation.ReadOnly, Rule: true, Chain: nil},
-						}},
-					}},
-					{Target: "subnetParameters.SubnetPropertiesFormat.RouteTable", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "subnetParameters.SubnetPropertiesFormat.RouteTable.RouteTablePropertiesFormat", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "subnetParameters.SubnetPropertiesFormat.RouteTable.RouteTablePropertiesFormat.Subnets", Name: validation.ReadOnly, Rule: true, Chain: nil}}},
-						}},
-					{Target: "subnetParameters.SubnetPropertiesFormat.IPConfigurations", Name: validation.ReadOnly, Rule: true, Chain: nil},
-				}}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "network.SubnetsClient", "CreateOrUpdate")
-	}
-
 	req, err := client.CreateOrUpdatePreparer(resourceGroupName, virtualNetworkName, subnetName, subnetParameters, cancel)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.SubnetsClient", "CreateOrUpdate", nil, "Failure preparing request")

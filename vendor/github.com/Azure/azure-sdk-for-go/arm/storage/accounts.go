@@ -133,19 +133,13 @@ func (client AccountsClient) Create(resourceGroupName string, accountName string
 			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
 				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
 		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.Sku", Name: validation.Null, Rule: true,
-				Chain: []validation.Constraint{{Target: "parameters.Sku.Tier", Name: validation.ReadOnly, Rule: true, Chain: nil}}},
+			Constraints: []validation.Constraint{{Target: "parameters.Sku", Name: validation.Null, Rule: true, Chain: nil},
 				{Target: "parameters.Location", Name: validation.Null, Rule: true, Chain: nil},
 				{Target: "parameters.AccountPropertiesCreateParameters", Name: validation.Null, Rule: false,
 					Chain: []validation.Constraint{{Target: "parameters.AccountPropertiesCreateParameters.CustomDomain", Name: validation.Null, Rule: false,
 						Chain: []validation.Constraint{{Target: "parameters.AccountPropertiesCreateParameters.CustomDomain.Name", Name: validation.Null, Rule: true, Chain: nil}}},
 						{Target: "parameters.AccountPropertiesCreateParameters.Encryption", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "parameters.AccountPropertiesCreateParameters.Encryption.Services", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.AccountPropertiesCreateParameters.Encryption.Services.Blob", Name: validation.Null, Rule: false,
-									Chain: []validation.Constraint{{Target: "parameters.AccountPropertiesCreateParameters.Encryption.Services.Blob.LastEnabledTime", Name: validation.ReadOnly, Rule: true, Chain: nil}}},
-								}},
-								{Target: "parameters.AccountPropertiesCreateParameters.Encryption.KeySource", Name: validation.Null, Rule: true, Chain: nil},
-							}},
+							Chain: []validation.Constraint{{Target: "parameters.AccountPropertiesCreateParameters.Encryption.KeySource", Name: validation.Null, Rule: true, Chain: nil}}},
 					}}}}}); err != nil {
 		return result, validation.NewErrorWithValidationError(err, "storage.AccountsClient", "Create")
 	}

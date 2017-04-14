@@ -6,13 +6,18 @@ import (
 
 const (
 	major        = "7"
-	minor        = "0"
-	patch        = "0"
+	minor        = "2"
+	patch        = "4"
 	tag          = ""
 	semVerFormat = "%s.%s.%s%s"
 )
 
+var version string
+
 // Version returns the semantic version (see http://semver.org).
 func Version() string {
-	return fmt.Sprintf(semVerFormat, major, minor, patch, tag)
+	if version == "" {
+		version = fmt.Sprintf(semVerFormat, major, minor, patch, tag)
+	}
+	return version
 }
