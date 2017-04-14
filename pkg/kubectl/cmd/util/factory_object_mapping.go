@@ -46,13 +46,23 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	"sync"
 )
 
 type ring1Factory struct {
 	clientAccessFactory ClientAccessFactory
+
+	// openAPIGetter loads and caches openapi specs
+	openAPIGetter openAPIGetter
+}
+
+type openAPIGetter struct {
+	sync.Once
+	openapi.Getter
 }
 
 func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMappingFactory {
@@ -426,4 +436,37 @@ func (f *ring1Factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiD
 		return nil, err
 	}
 	return discovery.SwaggerSchema(version)
+}
+
+// openAPIData returns an openAPIData containing metadata and structural information about Kubernetes
+// models and operations.  Will try to cache the spec locally if possible.
+func (f *ring1Factory) OpenAPISchema(cacheDir string) (*openapi.Resources, error) {
+	discovery, err := f.clientAccessFactory.DiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// Lazily initialize the OpenAPIGetter once
+	f.openAPIGetter.Do(func() {
+		// Get the server version for caching the openapi spec
+		versionString := ""
+		version, err := discovery.ServerVersion()
+		if version != nil && err != nil {
+			// Cache the result under the server version
+			versionString = version.String()
+		}
+
+		// Get the cache directory for caching the openapi spec
+		cacheDir, err = substituteUserHome(cacheDir)
+		if err != nil {
+			// Don't cache the result if we couldn't subsistute the home directory
+			cacheDir = ""
+		}
+
+		// Create the caching OpenAPIGetter
+		f.openAPIGetter.Getter = openapi.NewOpenAPIGetter(cacheDir, versionString, discovery)
+	})
+
+	// Delegate to the OpenAPIGetter
+	return f.openAPIGetter.OpenAPIData()
 }
