@@ -1986,17 +1986,17 @@ func (m *PodSecurityPolicySpec) MarshalTo(dAtA []byte) (int, error) {
 	i++
 	if len(m.AllowedHostPaths) > 0 {
 		for _, s := range m.AllowedHostPaths {
-			data[i] = 0x7a
+			dAtA[i] = 0x7a
 			i++
 			l = len(s)
 			for l >= 1<<7 {
-				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
 				l >>= 7
 				i++
 			}
-			data[i] = uint8(l)
+			dAtA[i] = uint8(l)
 			i++
-			i += copy(data[i:], s)
+			i += copy(dAtA[i:], s)
 		}
 	}
 	return i, nil
@@ -9376,7 +9376,7 @@ func (m *PodSecurityPolicySpec) Unmarshal(dAtA []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -9391,7 +9391,7 @@ func (m *PodSecurityPolicySpec) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.AllowedHostPaths = append(m.AllowedHostPaths, string(data[iNdEx:postIndex]))
+			m.AllowedHostPaths = append(m.AllowedHostPaths, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
