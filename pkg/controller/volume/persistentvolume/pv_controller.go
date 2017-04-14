@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	vol "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/metrics"
 
 	"github.com/golang/glog"
 )
@@ -1211,12 +1212,13 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *v1.PersistentVolu
 		// Cannot create deleter
 		return false, fmt.Errorf("Failed to create deleter for volume %q: %v", volume.Name, err)
 	}
-
+	start := time.Now()
 	if err = deleter.Delete(); err != nil {
 		// Deleter failed
+		metrics.VolumeDeleteLatency.Observe(metrics.SinceInMilliseconds(start))
 		return false, err
 	}
-
+	metrics.VolumeDeleteLatency.Observe(metrics.SinceInMilliseconds(start))
 	glog.V(2).Infof("volume %q deleted", volume.Name)
 	return true, nil
 }
@@ -1327,8 +1329,9 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
 		return
 	}
-
+	start := time.Now()
 	volume, err = provisioner.Provision()
+	metrics.VolumeProvisionLatency.Observe(metrics.SinceInMilliseconds(start))
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
 		glog.V(2).Infof("failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), storageClass.Name, err)

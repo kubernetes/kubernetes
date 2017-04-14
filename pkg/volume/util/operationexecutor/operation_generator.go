@@ -30,6 +30,7 @@ import (
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/metrics"
 )
 
 var _ OperationGenerator = &operationGenerator{}
@@ -267,8 +268,10 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 
 	return func() error {
 		// Execute attach
+		start := time.Now()
 		devicePath, attachErr := volumeAttacher.Attach(
 			volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+		metrics.VolumeAttachLatency.Observe(metrics.SinceInMilliseconds(start))
 
 		if attachErr != nil {
 			// On failure, return error. Caller will log and retry.
@@ -353,7 +356,9 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			err = og.verifyVolumeIsSafeToDetach(volumeToDetach)
 		}
 		if err == nil {
+			start := time.Now()
 			err = volumeDetacher.Detach(volumeName, volumeToDetach.NodeName)
+			metrics.VolumeDetachLatency.Observe(metrics.SinceInMilliseconds(start))
 		}
 		if err != nil {
 			// On failure, add volume back to ReportAsAttached list

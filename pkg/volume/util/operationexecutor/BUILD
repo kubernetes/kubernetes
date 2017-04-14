@@ -21,6 +21,7 @@ go_library(
         "//pkg/kubelet/events:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/util/metrics:go_default_library",
         "//pkg/volume/util/nestedpendingoperations:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
