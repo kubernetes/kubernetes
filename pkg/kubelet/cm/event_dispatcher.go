@@ -45,7 +45,9 @@ type EventDispatcher interface {
 	// can register themselves to receive lifecycle events.
 	Start(socketAddress string)
 
-	// Retrieving information about isolation controls from replies
+	// Returns a pointer to an updated copy of the supplied resource config,
+	// based on the isolation controls in the event reply. The original resource
+	// config is not updated in-place.
 	ResourceConfigFromReplies(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig
 }
 
@@ -201,10 +203,18 @@ func (ed *eventDispatcher) Unregister(ctx context.Context, request *lifecycle.Un
 }
 
 func (ed *eventDispatcher) ResourceConfigFromReplies(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig {
-	updatedResources := resources
+	// This is a safe copy; ResourceConfig contains only pointers to primitives.
+	updatedResources := &ResourceConfig{}
+	*updatedResources = *resources
+
 	for _, control := range reply.IsolationControls {
-		if control.Kind == lifecycle.IsolationControl_CGROUP_CPUSET_CPUS {
+		switch control.Kind {
+		case lifecycle.IsolationControl_CGROUP_CPUSET_CPUS:
 			updatedResources.CpusetCpus = &control.Value
+		case lifecycle.IsolationControl_CGROUP_CPUSET_MEMS:
+			updatedResources.CpusetMems = &control.Value
+		default:
+			glog.Warningf("ignoring unknown isolation control kind [%s]", control.Kind)
 		}
 	}
 	return updatedResources

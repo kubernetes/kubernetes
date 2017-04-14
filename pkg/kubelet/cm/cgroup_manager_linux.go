@@ -335,6 +335,9 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	if resourceConfig.CpusetCpus != nil {
 		resources.CpusetCpus = *resourceConfig.CpusetCpus
 	}
+	if resourceConfig.CpusetMems != nil {
+		resources.CpusetMems = *resourceConfig.CpusetMems
+	}
 	return resources
 }
 

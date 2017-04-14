@@ -32,8 +32,11 @@ type ResourceConfig struct {
 	// CPU quota period.
 	CpuPeriod *int64
 	// CPU sets.
-	// Link to CpusetCpus format: http://man7.org/linux/man-pages/man7/cpuset.7.html#FORMATS
+	// List format: http://man7.org/linux/man-pages/man7/cpuset.7.html#FORMATS
 	CpusetCpus *string
+	// Memory node sets.
+	// List format: http://man7.org/linux/man-pages/man7/cpuset.7.html#FORMATS
+	CpusetMems *string
 }
 
 // CgroupName is the abstract name of a cgroup prior to any driver specific conversion.

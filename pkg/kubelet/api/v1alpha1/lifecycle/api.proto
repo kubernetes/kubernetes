@@ -68,6 +68,7 @@ message CgroupInfo {
 message IsolationControl {
   enum Kind {
     CGROUP_CPUSET_CPUS = 0;
+    CGROUP_CPUSET_MEMS = 1;
   };
   Kind kind = 1;
   string value = 2;
