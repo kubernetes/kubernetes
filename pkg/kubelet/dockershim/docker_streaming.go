@@ -26,8 +26,10 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
+
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+
+	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
