@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/helper"
+	"k8s.io/kubernetes/pkg/api/ref"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -521,7 +522,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings printe
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		if ref, err := api.GetReference(api.Scheme, pod); err != nil {
+		if ref, err := ref.GetReference(api.Scheme, pod); err != nil {
 			glog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
 		} else {
 			ref.Kind = ""
@@ -2033,7 +2034,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings print
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		if ref, err := api.GetReference(api.Scheme, node); err != nil {
+		if ref, err := ref.GetReference(api.Scheme, node); err != nil {
 			glog.Errorf("Unable to construct reference to '%#v': %v", node, err)
 		} else {
 			// TODO: We haven't decided the namespace for Node object yet.

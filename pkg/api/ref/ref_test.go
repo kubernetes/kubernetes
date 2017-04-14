@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package ref
 
 import (
 	"reflect"
@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 type FakeAPIObject struct{}
@@ -41,18 +42,18 @@ func TestGetReference(t *testing.T) {
 	// when vendoring kube, if you don't force the set of registered versions (like make test does)
 	// then you run into trouble because the types aren't registered in the scheme by anything.  This does the
 	// register manually to allow unit test execution
-	if _, _, err := Scheme.ObjectKinds(&Pod{}); err != nil {
-		AddToScheme(Scheme)
+	if _, _, err := api.Scheme.ObjectKinds(&api.Pod{}); err != nil {
+		api.AddToScheme(api.Scheme)
 	}
 
 	table := map[string]struct {
 		obj       runtime.Object
-		ref       *ObjectReference
+		ref       *api.ObjectReference
 		fieldPath string
 		shouldErr bool
 	}{
 		"pod": {
-			obj: &Pod{
+			obj: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "foo",
 					UID:             "bar",
@@ -61,7 +62,7 @@ func TestGetReference(t *testing.T) {
 				},
 			},
 			fieldPath: ".desiredState.containers[0]",
-			ref: &ObjectReference{
+			ref: &api.ObjectReference{
 				Kind:            "Pod",
 				APIVersion:      "version1",
 				Name:            "foo",
@@ -71,13 +72,13 @@ func TestGetReference(t *testing.T) {
 			},
 		},
 		"serviceList": {
-			obj: &ServiceList{
+			obj: &api.ServiceList{
 				ListMeta: metav1.ListMeta{
 					ResourceVersion: "42",
 					SelfLink:        "/api/version2/services",
 				},
 			},
-			ref: &ObjectReference{
+			ref: &api.ObjectReference{
 				Kind:            "ServiceList",
 				APIVersion:      "version2",
 				ResourceVersion: "42",
@@ -95,7 +96,7 @@ func TestGetReference(t *testing.T) {
 					SelfLink:        "/custom_prefix/version1/extensions/foo",
 				},
 			},
-			ref: &ObjectReference{
+			ref: &api.ObjectReference{
 				Kind:            "ExtensionAPIObject",
 				APIVersion:      "version1",
 				Name:            "foo",
@@ -104,7 +105,7 @@ func TestGetReference(t *testing.T) {
 			},
 		},
 		"badSelfLink": {
-			obj: &ServiceList{
+			obj: &api.ServiceList{
 				ListMeta: metav1.ListMeta{
 					ResourceVersion: "42",
 					SelfLink:        "version2/services",
@@ -125,7 +126,7 @@ func TestGetReference(t *testing.T) {
 	}
 
 	for name, item := range table {
-		ref, err := GetPartialReference(Scheme, item.obj, item.fieldPath)
+		ref, err := GetPartialReference(api.Scheme, item.obj, item.fieldPath)
 		if e, a := item.shouldErr, (err != nil); e != a {
 			t.Errorf("%v: expected %v, got %v, err %v", name, e, a, err)
 			continue
