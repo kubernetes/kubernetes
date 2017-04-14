@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -402,6 +403,10 @@ func (f *FakeFactory) Validator(validate bool, cacheDir string) (validation.Sche
 
 func (f *FakeFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {
 	return nil, nil
+}
+
+func (f *FakeFactory) OpenAPISchema(cacheDir string) (*openapi.Resources, error) {
+	return &openapi.Resources{}, nil
 }
 
 func (f *FakeFactory) DefaultNamespace() (string, bool, error) {
