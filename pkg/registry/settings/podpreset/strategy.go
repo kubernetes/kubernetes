@@ -103,7 +103,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 
 // Matcher is the filter used by the generic etcd backend to watch events
 // from etcd to clients of the apiserver only interested in specific labels/fields.
-func Matcher(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
+func Matcher(label labels.Selector, field fields.Selector) apistorage.SelectionMatcher {
 	return apistorage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

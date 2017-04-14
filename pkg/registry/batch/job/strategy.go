@@ -178,7 +178,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 // MatchJob is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
-func MatchJob(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+func MatchJob(label labels.Selector, field fields.Selector) storage.SelectionMatcher {
 	return storage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

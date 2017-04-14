@@ -26,6 +26,13 @@ import (
 // In any failure to parse given object, it returns error.
 type AttrFunc func(obj runtime.Object) (labels.Set, fields.Set, error)
 
+type SelectionMatcher interface {
+	Matches(obj runtime.Object) (bool, error)
+	MatchesLabelsAndFields(l labels.Set, f fields.Set) bool
+	MatchesSingle() (string, bool)
+	MatcherIndex() []MatchValue
+}
+
 // SelectionPredicate is used to represent the way to select objects from api storage.
 type SelectionPredicate struct {
 	Label       labels.Selector

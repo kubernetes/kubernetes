@@ -1526,7 +1526,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 			return path.Join(podPrefix, id), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*example.Pod).Name, nil },
-		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionMatcher {
 			return storage.SelectionPredicate{
 				Label: label,
 				Field: field,

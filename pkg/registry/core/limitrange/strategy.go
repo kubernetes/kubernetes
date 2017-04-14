@@ -96,7 +96,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	return labels.Set(lr.ObjectMeta.Labels), LimitRangeToSelectableFields(lr), nil
 }
 
-func MatchLimitRange(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+func MatchLimitRange(label labels.Selector, field fields.Selector) storage.SelectionMatcher {
 	return storage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

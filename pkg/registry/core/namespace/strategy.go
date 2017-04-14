@@ -147,7 +147,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 }
 
 // MatchNamespace returns a generic matcher for a given label and field selector.
-func MatchNamespace(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
+func MatchNamespace(label labels.Selector, field fields.Selector) apistorage.SelectionMatcher {
 	return apistorage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

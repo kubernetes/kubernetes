@@ -114,7 +114,7 @@ type Store struct {
 	// PredicateFunc returns a matcher corresponding to the provided labels
 	// and fields. The SelectionPredicate returned should return true if the
 	// object matches the given field and label selectors.
-	PredicateFunc func(label labels.Selector, field fields.Selector) storage.SelectionPredicate
+	PredicateFunc func(label labels.Selector, field fields.Selector) storage.SelectionMatcher
 
 	// EnableGarbageCollection affects the handling of Update and Delete
 	// requests. Enabling garbage collection allows finalizers to do work to
@@ -253,7 +253,7 @@ func (e *Store) List(ctx genericapirequest.Context, options *metainternalversion
 
 // ListPredicate returns a list of all the items matching the given
 // SelectionPredicate.
-func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.SelectionPredicate, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.SelectionMatcher, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	if options == nil {
 		// By default we should serve the request from etcd.
 		options = &metainternalversion.ListOptions{ResourceVersion: ""}
@@ -1019,7 +1019,7 @@ func (e *Store) Watch(ctx genericapirequest.Context, options *metainternalversio
 }
 
 // WatchPredicate starts a watch for the items that m matches.
-func (e *Store) WatchPredicate(ctx genericapirequest.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
+func (e *Store) WatchPredicate(ctx genericapirequest.Context, p storage.SelectionMatcher, resourceVersion string) (watch.Interface, error) {
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			w, err := e.Storage.Watch(ctx, key, resourceVersion, p)

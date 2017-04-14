@@ -48,6 +48,9 @@ type Selector interface {
 
 	// String returns a human readable string that represents this selector.
 	String() string
+
+	// Len returns how much item this seletor has
+	Len() int
 }
 
 // Everything returns a selector that matches all fields.
@@ -94,6 +97,10 @@ func (t *hasTerm) String() string {
 	return fmt.Sprintf("%v=%v", t.field, EscapeValue(t.value))
 }
 
+func (t *hasTerm) Len() int {
+	return 1
+}
+
 type notHasTerm struct {
 	field, value string
 }
@@ -128,6 +135,10 @@ func (t *notHasTerm) Requirements() Requirements {
 
 func (t *notHasTerm) String() string {
 	return fmt.Sprintf("%v!=%v", t.field, EscapeValue(t.value))
+}
+
+func (t *notHasTerm) Len() int {
+	return 1
 }
 
 type andTerm []Selector
@@ -195,6 +206,10 @@ func (t andTerm) String() string {
 		terms = append(terms, q.String())
 	}
 	return strings.Join(terms, ",")
+}
+
+func (t andTerm) Len() int {
+	return len([]Selector(t))
 }
 
 // SelectorFromSet returns a Selector which will match exactly the given Set. A

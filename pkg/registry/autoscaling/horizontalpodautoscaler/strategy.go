@@ -99,7 +99,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	return labels.Set(hpa.ObjectMeta.Labels), AutoscalerToSelectableFields(hpa), nil
 }
 
-func MatchAutoscaler(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+func MatchAutoscaler(label labels.Selector, field fields.Selector) storage.SelectionMatcher {
 	return storage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

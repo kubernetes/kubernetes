@@ -62,7 +62,7 @@ func testWatch(t *testing.T, recursive bool) {
 
 	tests := []struct {
 		key        string
-		pred       storage.SelectionPredicate
+		pred       storage.SelectionMatcher
 		watchTests []*testWatchStruct
 	}{{ // create a key
 		key:        "/somekey-1",
