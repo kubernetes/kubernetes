@@ -1,10 +1,11 @@
 repo: https://github.com/kubernetes/kubernetes.git
 includes:
   - 'layer:basic'
-  - 'layer:tls-client'
-  - 'layer:leadership'
   - 'layer:debug'
+  - 'layer:leadership'
+  - 'layer:metrics'
   - 'layer:nagios'
+  - 'layer:tls-client'
   - 'interface:ceph-admin'
   - 'interface:etcd'
   - 'interface:http'
