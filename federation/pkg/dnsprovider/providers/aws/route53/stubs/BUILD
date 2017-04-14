@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//vendor:github.com/aws/aws-sdk-go/aws",
         "//vendor:github.com/aws/aws-sdk-go/service/route53",
+        "//vendor:k8s.io/apimachinery/pkg/util/uuid",
     ],
 )
 

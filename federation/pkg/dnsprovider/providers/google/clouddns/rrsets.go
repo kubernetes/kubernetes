@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
+	"strings"
 )
 
 // Compile time check for interface adherence
@@ -43,18 +44,20 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 }
 
 func (rrsets ResourceRecordSets) Get(name string) (dnsprovider.ResourceRecordSet, error) {
-	var newRrset dnsprovider.ResourceRecordSet
-	rrsetList, err := rrsets.List()
+	response, err := rrsets.impl.List(rrsets.project(), rrsets.zone.impl.Name()).Name(name).Do()
 	if err != nil {
 		return nil, err
 	}
-	for _, rrset := range rrsetList {
-		if rrset.Name() == name {
-			newRrset = rrset
-			break
+	list := make([]dnsprovider.ResourceRecordSet, 0)
+	for _, rrset := range response.Rrsets() {
+		if strings.TrimSuffix(name, ".") == strings.TrimSuffix(rrset.Name(), ".") {
+			list = append(list, &ResourceRecordSet{rrset, &rrsets})
 		}
 	}
-	return newRrset, nil
+	if len(list) == 0 {
+		return nil, nil
+	}
+	return list[0], nil
 }
 
 func (r ResourceRecordSets) StartChangeset() dnsprovider.ResourceRecordChangeset {

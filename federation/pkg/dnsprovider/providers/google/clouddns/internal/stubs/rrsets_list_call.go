@@ -19,24 +19,40 @@ package stubs
 import (
 	"google.golang.org/api/googleapi"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
+	"strings"
 )
 
 // Compile time check for interface adherence
 var _ interfaces.ResourceRecordSetsListCall = &ResourceRecordSetsListCall{}
 
 type ResourceRecordSetsListCall struct {
-	Response_ *ResourceRecordSetsListResponse
-	Err_      error
-	Name_     string
-	Type_     string
+	Response_   *ResourceRecordSetsListResponse
+	Err_        error
+	Name_       string
+	Type_       string
+	MaxResults_ int64
 }
 
 func (call *ResourceRecordSetsListCall) Do(opts ...googleapi.CallOption) (interfaces.ResourceRecordSetsListResponse, error) {
+	if len(call.Name_) > 0 {
+		records := make([]interfaces.ResourceRecordSet, 0)
+		for _, record := range call.Response_.impl {
+			if strings.TrimSuffix(call.Name_, ".") == strings.TrimSuffix(record.Name(), ".") {
+				records = append(records, record)
+			}
+		}
+		call.Response_.impl = records
+	}
 	return call.Response_, call.Err_
 }
 
 func (call *ResourceRecordSetsListCall) Name(name string) interfaces.ResourceRecordSetsListCall {
 	call.Name_ = name
+	return call
+}
+
+func (call *ResourceRecordSetsListCall) MaxResults(maxResults int64) interfaces.ResourceRecordSetsListCall {
+	call.MaxResults_ = maxResults
 	return call
 }
 

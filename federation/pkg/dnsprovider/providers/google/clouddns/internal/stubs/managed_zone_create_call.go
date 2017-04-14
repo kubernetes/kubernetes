@@ -37,9 +37,9 @@ func (call ManagedZonesCreateCall) Do(opts ...googleapi.CallOption) (interfaces.
 	if call.Error != nil {
 		return nil, *call.Error
 	}
-	if call.Service.Impl[call.Project][call.ManagedZone.DnsName()] != nil {
+	if call.Service.Impl[call.Project][call.ManagedZone.Name()] != nil {
 		return nil, fmt.Errorf("Error - attempt to create duplicate zone %s in project %s.",
-			call.ManagedZone.DnsName(), call.Project)
+			call.ManagedZone.Name(), call.Project)
 	}
 	if call.Service.Impl == nil {
 		call.Service.Impl = map[string]map[string]interfaces.ManagedZone{}
@@ -47,6 +47,6 @@ func (call ManagedZonesCreateCall) Do(opts ...googleapi.CallOption) (interfaces.
 	if call.Service.Impl[call.Project] == nil {
 		call.Service.Impl[call.Project] = map[string]interfaces.ManagedZone{}
 	}
-	call.Service.Impl[call.Project][call.ManagedZone.DnsName()] = call.ManagedZone
+	call.Service.Impl[call.Project][call.ManagedZone.Name()] = call.ManagedZone
 	return call.ManagedZone, nil
 }

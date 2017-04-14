@@ -17,10 +17,12 @@ limitations under the License.
 package route53
 
 import (
+	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/route53"
-
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
+	"strings"
 )
 
 // Compile time check for interface adherence
@@ -44,6 +46,43 @@ func (zones Zones) List() ([]dnsprovider.Zone, error) {
 		return []dnsprovider.Zone{}, err
 	}
 	return zoneList, nil
+}
+
+func (zones Zones) Get(dnsZoneName string, dnsZoneID string) (dnsprovider.Zone, error) {
+	if len(dnsZoneID) > 0 {
+		input := route53.GetHostedZoneInput{
+			Id: aws.String(dnsZoneID),
+		}
+		output, err := zones.interface_.service.GetHostedZone(&input)
+		if err != nil {
+			return nil, err
+		}
+		return &Zone{output.HostedZone, &zones}, nil
+	} else {
+		input := route53.ListHostedZonesByNameInput{
+			DNSName:  aws.String(dnsZoneName),
+			MaxItems: aws.String("2"), // get 2 items to make sure there is no duplicate zones with same DNS name
+		}
+		output, err := zones.interface_.service.ListHostedZonesByName(&input)
+		if err != nil {
+			return nil, err
+		}
+
+		var matches []*route53.HostedZone
+		for _, hostedZone := range output.HostedZones {
+			if strings.TrimSuffix(dnsZoneName, ".") == strings.TrimSuffix(aws.StringValue(hostedZone.Name), ".") {
+				matches = append(matches, hostedZone)
+			}
+		}
+
+		if len(matches) == 0 {
+			return nil, nil
+		}
+		if len(matches) > 1 {
+			return nil, fmt.Errorf("DNS zone %s is ambiguous (please specify zoneID).", dnsZoneName)
+		}
+		return &Zone{matches[0], &zones}, nil
+	}
 }
 
 func (zones Zones) Add(zone dnsprovider.Zone) (dnsprovider.Zone, error) {

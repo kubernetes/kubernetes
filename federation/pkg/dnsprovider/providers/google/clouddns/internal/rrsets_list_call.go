@@ -39,6 +39,11 @@ func (call *ResourceRecordSetsListCall) Name(name string) interfaces.ResourceRec
 	return call
 }
 
+func (call *ResourceRecordSetsListCall) MaxResults(maxResults int64) interfaces.ResourceRecordSetsListCall {
+	call.impl.MaxResults(maxResults)
+	return call
+}
+
 func (call *ResourceRecordSetsListCall) Type(type_ string) interfaces.ResourceRecordSetsListCall {
 	call.impl.Type(type_)
 	return call

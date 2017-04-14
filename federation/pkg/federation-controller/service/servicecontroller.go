@@ -435,11 +435,12 @@ func (s *ServiceController) init() error {
 		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records")
 	}
 	s.dnsZones = zones
-	matchingZones, err := getDnsZones(s.zoneName, s.zoneID, s.dnsZones)
+
+	dnsZone, err := s.dnsZones.Get(s.zoneName, s.zoneID)
 	if err != nil {
 		return fmt.Errorf("error querying for DNS zones: %v", err)
 	}
-	if len(matchingZones) == 0 {
+	if dnsZone == nil {
 		if s.zoneName == "" {
 			return fmt.Errorf("ServiceController must be run with zoneName to create zone automatically.")
 		}
@@ -454,9 +455,6 @@ func (s *ServiceController) init() error {
 		}
 		glog.Infof("DNS zone %q successfully created.  Note that DNS resolution will not work until you have registered this name with "+
 			"a DNS registrar and they have changed the authoritative name servers for your domain to point to your DNS provider.", zone.Name())
-	}
-	if len(matchingZones) > 1 {
-		return fmt.Errorf("Multiple matching DNS zones found for %q; please specify zoneID", s.zoneName)
 	}
 	return nil
 }

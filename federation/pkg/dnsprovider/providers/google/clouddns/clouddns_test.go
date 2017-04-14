@@ -101,6 +101,14 @@ func listRrsOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets) []dnspro
 	return rrset
 }
 
+func getRrsWithNameOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, dnsName string) dnsprovider.ResourceRecordSet {
+	rrset, err := rrsets.Get(dnsName)
+	if err != nil {
+		t.Fatalf("Failed to get recordset with DNS Name: %s, %v", dnsName, err)
+	}
+	return rrset
+}
+
 func getExampleRrs(zone dnsprovider.Zone) dnsprovider.ResourceRecordSet {
 	rrsets, _ := zone.ResourceRecordSets()
 	return rrsets.New("www11."+zone.Name(), []string{"10.10.10.10", "169.20.20.20"}, 180, rrstype.A)
@@ -123,13 +131,32 @@ func TestZonesList(t *testing.T) {
 	firstZone(t)
 }
 
-/* TestZonesID verifies that the id of the zone is returned with the prefix removed */
-func TestZonesID(t *testing.T) {
+/* TestGetZoneByID verifies that getting zone by id succeeds */
+func TestGetZoneByID(t *testing.T) {
 	zone := firstZone(t)
+	z := zones(t)
+	zoneById, err := z.Get("", zone.Name())
+	if err != nil {
+		t.Error(err)
+	}
+	if zoneById.ID() != zone.ID() {
+		t.Fatalf("Unexpected zone id: %q, expect: %q", zone.ID(), zoneById.ID())
+	}
+	if zoneById.Name() != zone.Name() {
+		t.Fatalf("Unexpected zone name: %q, expect: %q", zone.Name(), zoneById.Name())
+	}
+}
 
-	zoneID := zone.ID()
-	if zoneID != "1" {
-		t.Fatalf("Unexpected zone id: %q", zoneID)
+/* TestGetZoneByName verifies that getting zone by name succeeds */
+func TestGetZoneByName(t *testing.T) {
+	zone := firstZone(t)
+	z := zones(t)
+	zoneByName, _ := z.Get(zone.Name(), "")
+	if zoneByName.ID() != zone.ID() {
+		t.Fatalf("Unexpected zone id: %q, expect: %q", zone.ID(), zoneByName.ID())
+	}
+	if zoneByName.Name() != zone.Name() {
+		t.Fatalf("Unexpected zone name: %q, expect: %q", zone.Name(), zoneByName.Name())
 	}
 }
 
@@ -160,6 +187,19 @@ func TestZoneAddSuccess(t *testing.T) {
 /* TestResourceRecordSetsList verifies that listing of RRS's succeeds */
 func TestResourceRecordSetsList(t *testing.T) {
 	listRrsOrFail(t, rrs(t, firstZone(t)))
+}
+
+/* TestResourceRecordSetsGet verifies that getting of RRS's succeeds */
+func TestResourceRecordSetsGet(t *testing.T) {
+	zone := firstZone(t)
+	sets := rrs(t, zone)
+	set := getExampleRrs(zone)
+	addRrsetOrFail(t, sets, set)
+	defer sets.StartChangeset().Remove(set).Apply()
+	rrsItem := getRrsWithNameOrFail(t, sets, set.Name())
+	if rrsItem.Name() != set.Name() {
+		t.Fatalf("Unexpected ResourceRecordSet name: %q", rrsItem.Name())
+	}
 }
 
 /* TestResourceRecordSetsAddSuccess verifies that addition of a valid RRS succeeds */
