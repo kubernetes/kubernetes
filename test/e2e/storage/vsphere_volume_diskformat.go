@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package storage
 
 import (
 	"os"
@@ -80,7 +80,7 @@ var _ = framework.KubeDescribe("Volume Disk Format [Volumes]", func() {
 			isNodeLabeled = true
 		}
 	})
-	AddCleanupAction(func() {
+	framework.AddCleanupAction(func() {
 		if len(nodeLabelValue) > 0 {
 			framework.RemoveLabelOffNode(client, nodeName, "vsphere_e2e_label")
 		}
