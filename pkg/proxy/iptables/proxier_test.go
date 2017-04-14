@@ -388,7 +388,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		iptables:        ipt,
 		clusterCIDR:     "10.0.0.0/24",
 		allEndpoints:    make(endpointsMap),
-		allServices:     []*api.Service{},
+		allServices:     make(serviceMap),
 		endpointsSynced: true,
 		hostname:        testHostname,
 		portsMap:        make(map[localPort]closeable),
@@ -567,7 +567,7 @@ func TestClusterIPReject(t *testing.T) {
 		Port:           "p80",
 	}
 
-	fp.allServices = []*api.Service{
+	fp.allServices = makeServiceMap(
 		makeTestService(svcPortName.Namespace, svcPortName.Namespace, func(svc *api.Service) {
 			svc.Spec.ClusterIP = svcIP
 			svc.Spec.Ports = []api.ServicePort{{
@@ -576,7 +576,7 @@ func TestClusterIPReject(t *testing.T) {
 				Protocol: api.ProtocolTCP,
 			}}
 		}),
-	}
+	)
 	fp.syncProxyRules(syncReasonForce)
 
 	svcChain := string(servicePortChainName(svcPortName.String(), strings.ToLower(string(api.ProtocolTCP))))
@@ -600,7 +600,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 		Port:           "p80",
 	}
 
-	fp.allServices = []*api.Service{
+	fp.allServices = makeServiceMap(
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
 			svc.Spec.ClusterIP = svcIP
 			svc.Spec.Ports = []api.ServicePort{{
@@ -609,7 +609,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 				Protocol: api.ProtocolTCP,
 			}}
 		}),
-	}
+	)
 
 	epIP := "10.180.0.1"
 	fp.allEndpoints = makeEndpointsMap(
@@ -659,7 +659,7 @@ func TestLoadBalancer(t *testing.T) {
 		Port:           "p80",
 	}
 
-	fp.allServices = []*api.Service{
+	fp.allServices = makeServiceMap(
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
 			svc.Spec.Type = "LoadBalancer"
 			svc.Spec.ClusterIP = svcIP
@@ -673,7 +673,7 @@ func TestLoadBalancer(t *testing.T) {
 				IP: svcLBIP,
 			}}
 		}),
-	}
+	)
 
 	epIP := "10.180.0.1"
 	fp.allEndpoints = makeEndpointsMap(
@@ -719,7 +719,7 @@ func TestNodePort(t *testing.T) {
 		Port:           "p80",
 	}
 
-	fp.allServices = []*api.Service{
+	fp.allServices = makeServiceMap(
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
 			svc.Spec.Type = "NodePort"
 			svc.Spec.ClusterIP = svcIP
@@ -730,7 +730,7 @@ func TestNodePort(t *testing.T) {
 				NodePort: int32(svcNodePort),
 			}}
 		}),
-	}
+	)
 
 	epIP := "10.180.0.1"
 	fp.allEndpoints = makeEndpointsMap(
@@ -769,7 +769,7 @@ func TestNodePortReject(t *testing.T) {
 		Port:           "p80",
 	}
 
-	fp.allServices = []*api.Service{
+	fp.allServices = makeServiceMap(
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
 			svc.Spec.Type = "NodePort"
 			svc.Spec.ClusterIP = svcIP
@@ -780,7 +780,7 @@ func TestNodePortReject(t *testing.T) {
 				NodePort: int32(svcNodePort),
 			}}
 		}),
-	}
+	)
 
 	fp.syncProxyRules(syncReasonForce)
 
@@ -806,7 +806,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 		Port:           "p80",
 	}
 
-	fp.allServices = []*api.Service{
+	fp.allServices = makeServiceMap(
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
 			svc.Spec.Type = "LoadBalancer"
 			svc.Spec.ClusterIP = svcIP
@@ -821,7 +821,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			}}
 			svc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
 		}),
-	}
+	)
 
 	epIP1 := "10.180.0.1"
 	epIP2 := "10.180.2.1"
@@ -900,7 +900,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 		Port:           "p80",
 	}
 
-	fp.allServices = []*api.Service{
+	fp.allServices = makeServiceMap(
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
 			svc.Spec.Type = "NodePort"
 			svc.Spec.ClusterIP = svcIP
@@ -912,7 +912,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 			}}
 			svc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
 		}),
-	}
+	)
 
 	epIP1 := "10.180.0.1"
 	epIP2 := "10.180.2.1"
@@ -992,7 +992,7 @@ func addTestPort(array []api.ServicePort, name string, protocol api.Protocol, po
 }
 
 func TestBuildServiceMapAddRemove(t *testing.T) {
-	services := []*api.Service{
+	services := makeServiceMap(
 		makeTestService("somewhere-else", "cluster-ip", func(svc *api.Service) {
 			svc.Spec.Type = api.ServiceTypeClusterIP
 			svc.Spec.ClusterIP = "172.16.55.4"
@@ -1033,7 +1033,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 				},
 			}
 		}),
-	}
+	)
 
 	serviceMap, hcPorts, staleUDPServices := buildNewServiceMap(services, make(proxyServiceMap))
 	if len(serviceMap) != 8 {
@@ -1056,8 +1056,9 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	}
 
 	// Remove some stuff
-	services = []*api.Service{services[0]}
-	services[0].Spec.Ports = []api.ServicePort{services[0].Spec.Ports[1]}
+	oneService := services[makeNSN("somewhere-else", "cluster-ip")]
+	oneService.Spec.Ports = []api.ServicePort{oneService.Spec.Ports[1]}
+	services = makeServiceMap(oneService)
 	serviceMap, hcPorts, staleUDPServices = buildNewServiceMap(services, serviceMap)
 	if len(serviceMap) != 1 {
 		t.Errorf("expected service map length 1, got %v", serviceMap)
@@ -1082,13 +1083,13 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceHeadless(t *testing.T) {
-	services := []*api.Service{
+	services := makeServiceMap(
 		makeTestService("somewhere-else", "headless", func(svc *api.Service) {
 			svc.Spec.Type = api.ServiceTypeClusterIP
 			svc.Spec.ClusterIP = api.ClusterIPNone
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "rpc", "UDP", 1234, 0, 0)
 		}),
-	}
+	)
 
 	// Headless service should be ignored
 	serviceMap, hcPorts, staleUDPServices := buildNewServiceMap(services, make(proxyServiceMap))
@@ -1107,14 +1108,14 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
-	services := []*api.Service{
+	services := makeServiceMap(
 		makeTestService("somewhere-else", "external-name", func(svc *api.Service) {
 			svc.Spec.Type = api.ServiceTypeExternalName
 			svc.Spec.ClusterIP = "172.16.55.4" // Should be ignored
 			svc.Spec.ExternalName = "foo2.bar.com"
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "blah", "UDP", 1235, 5321, 0)
 		}),
-	}
+	)
 
 	serviceMap, hcPorts, staleUDPServices := buildNewServiceMap(services, make(proxyServiceMap))
 	if len(serviceMap) != 0 {
@@ -1130,16 +1131,16 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceUpdate(t *testing.T) {
-	first := []*api.Service{
+	first := makeServiceMap(
 		makeTestService("somewhere", "some-service", func(svc *api.Service) {
 			svc.Spec.Type = api.ServiceTypeClusterIP
 			svc.Spec.ClusterIP = "172.16.55.4"
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "something", "UDP", 1234, 4321, 0)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "somethingelse", "TCP", 1235, 5321, 0)
 		}),
-	}
+	)
 
-	second := []*api.Service{
+	second := makeServiceMap(
 		makeTestService("somewhere", "some-service", func(svc *api.Service) {
 			svc.ObjectMeta.Annotations = map[string]string{
 				service.BetaAnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
@@ -1156,7 +1157,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 				},
 			}
 		}),
-	}
+	)
 
 	serviceMap, hcPorts, staleUDPServices := buildNewServiceMap(first, make(proxyServiceMap))
 	if len(serviceMap) != 2 {
@@ -1424,6 +1425,15 @@ func makeServicePortName(ns, name, port string) proxy.ServicePortName {
 		NamespacedName: makeNSN(ns, name),
 		Port:           port,
 	}
+}
+
+func makeServiceMap(allServices ...*api.Service) serviceMap {
+	result := make(serviceMap)
+	for _, service := range allServices {
+		namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+		result[namespacedName] = service
+	}
+	return result
 }
 
 func Test_buildNewEndpointsMap(t *testing.T) {
