@@ -170,7 +170,7 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 			Namespace: "kube-system",
 			Name:      "cloud-controller-manager",
 		},
-		Client: leaderElectionClient,
+		Client: leaderElectionClient.CoreV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
 			Identity:      id + "-external-cloud-controller",
 			EventRecorder: recorder,
