@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package remotecommand
+package tests
 
 import (
 	"bytes"
@@ -34,11 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	remoteclient "k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
-	"k8s.io/kubernetes/pkg/util/term"
 )
 
 type fakeExecutor struct {
@@ -55,11 +56,11 @@ type fakeExecutor struct {
 	exec          bool
 }
 
-func (ex *fakeExecutor) ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
+func (ex *fakeExecutor) ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remoteclient.TerminalSize, timeout time.Duration) error {
 	return ex.run(name, uid, container, cmd, in, out, err, tty)
 }
 
-func (ex *fakeExecutor) AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (ex *fakeExecutor) AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remoteclient.TerminalSize) error {
 	return ex.run(name, uid, container, nil, in, out, err, tty)
 }
 
@@ -151,8 +152,8 @@ func TestStream(t *testing.T) {
 			TestName:        "error",
 			Error:           "bail",
 			Stdout:          "a",
-			ClientProtocols: []string{remotecommand.StreamProtocolV2Name},
-			ServerProtocols: []string{remotecommand.StreamProtocolV2Name},
+			ClientProtocols: []string{remotecommandconsts.StreamProtocolV2Name},
+			ServerProtocols: []string{remotecommandconsts.StreamProtocolV2Name},
 		},
 		{
 			TestName:        "in/out/err",
@@ -160,8 +161,8 @@ func TestStream(t *testing.T) {
 			Stdout:          "b",
 			Stderr:          "c",
 			MessageCount:    100,
-			ClientProtocols: []string{remotecommand.StreamProtocolV2Name},
-			ServerProtocols: []string{remotecommand.StreamProtocolV2Name},
+			ClientProtocols: []string{remotecommandconsts.StreamProtocolV2Name},
+			ServerProtocols: []string{remotecommandconsts.StreamProtocolV2Name},
 		},
 		{
 			TestName:        "in/out/tty",
@@ -169,8 +170,8 @@ func TestStream(t *testing.T) {
 			Stdout:          "b",
 			Tty:             true,
 			MessageCount:    100,
-			ClientProtocols: []string{remotecommand.StreamProtocolV2Name},
-			ServerProtocols: []string{remotecommand.StreamProtocolV2Name},
+			ClientProtocols: []string{remotecommandconsts.StreamProtocolV2Name},
+			ServerProtocols: []string{remotecommandconsts.StreamProtocolV2Name},
 		},
 		{
 			// 1.0 kubectl, 1.0 kubelet
@@ -188,7 +189,7 @@ func TestStream(t *testing.T) {
 			Stderr:          "c",
 			MessageCount:    1,
 			ClientProtocols: []string{},
-			ServerProtocols: []string{remotecommand.StreamProtocolV2Name, remotecommand.StreamProtocolV1Name},
+			ServerProtocols: []string{remotecommandconsts.StreamProtocolV2Name, remotecommandconsts.StreamProtocolV1Name},
 		},
 		{
 			// 1.1+ kubectl, 1.0 kubelet
@@ -196,7 +197,7 @@ func TestStream(t *testing.T) {
 			Stdout:          "b",
 			Stderr:          "c",
 			MessageCount:    1,
-			ClientProtocols: []string{remotecommand.StreamProtocolV2Name, remotecommand.StreamProtocolV1Name},
+			ClientProtocols: []string{remotecommandconsts.StreamProtocolV2Name, remotecommandconsts.StreamProtocolV1Name},
 			ServerProtocols: []string{},
 		},
 	}
@@ -254,12 +255,12 @@ func TestStream(t *testing.T) {
 			conf := &restclient.Config{
 				Host: server.URL,
 			}
-			e, err := NewExecutor(conf, "POST", req.URL())
+			e, err := remoteclient.NewExecutor(conf, "POST", req.URL())
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", name, err)
 				continue
 			}
-			err = e.Stream(StreamOptions{
+			err = e.Stream(remoteclient.StreamOptions{
 				SupportedProtocols: testCase.ClientProtocols,
 				Stdin:              streamIn,
 				Stdout:             streamOut,
@@ -351,7 +352,7 @@ func TestDial(t *testing.T) {
 		called = true
 		return rt
 	}
-	exec, err := NewStreamExecutor(upgrader, testFn, "POST", &url.URL{Host: "something.com", Scheme: "https"})
+	exec, err := remoteclient.NewStreamExecutor(upgrader, testFn, "POST", &url.URL{Host: "something.com", Scheme: "https"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -28,12 +28,12 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/util/hash:go_default_library",
-        "//pkg/util/term:go_default_library",
         "//pkg/volume:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
         "//vendor:github.com/golang/glog",

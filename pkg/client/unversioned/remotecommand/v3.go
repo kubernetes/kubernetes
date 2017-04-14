@@ -66,7 +66,6 @@ func (p *streamProtocolV3) handleResizes() {
 	if p.resizeStream == nil || p.TerminalSizeQueue == nil {
 		return
 	}
-
 	go func() {
 		defer runtime.HandleCrash()
 
