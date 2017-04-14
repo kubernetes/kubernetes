@@ -21,7 +21,6 @@ package config
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,7 +45,7 @@ import (
 func TestExtractFromNonExistentFile(t *testing.T) {
 	ch := make(chan interface{}, 1)
 	c := new("/some/fake/file", "localhost", time.Millisecond, ch)
-	err := c.watch()
+	err := c.doWatch()
 	if err == nil {
 		t.Errorf("Expected error")
 	}
@@ -107,68 +106,42 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 }
 
 func TestReadPodsFromFileExistLater(t *testing.T) {
-	watchFileAdded(false, t)
+	watchFileAdded(false, false, t)
 }
 
 func TestReadPodsFromFileChanged(t *testing.T) {
-	watchFileChanged(false, t)
+	watchFileChanged(false, false, t)
 }
 
 func TestReadPodsFromFileInDirAdded(t *testing.T) {
-	watchFileAdded(true, t)
+	watchFileAdded(true, false, t)
 }
 
 func TestReadPodsFromFileInDirChanged(t *testing.T) {
-	watchFileChanged(true, t)
+	watchFileChanged(true, false, t)
 }
 
-func TestExtractFromBadDataFile(t *testing.T) {
-	dirName, err := utiltesting.MkTmpdir("file-test")
-	if err != nil {
-		t.Fatalf("unable to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(dirName)
-
-	fileName := filepath.Join(dirName, "test_pod_config")
-	err = ioutil.WriteFile(fileName, []byte{1, 2, 3}, 0555)
-	if err != nil {
-		t.Fatalf("unable to write test file %#v", err)
-	}
-
-	ch := make(chan interface{}, 1)
-	c := new(fileName, "localhost", time.Millisecond, ch)
-	err = c.resetStoreFromPath()
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	expectEmptyChannel(t, ch)
+func TestReadPodsFromSymbolicExistLater(t *testing.T) {
+	watchFileAdded(false, true, t)
 }
 
-func TestExtractFromEmptyDir(t *testing.T) {
-	dirName, err := utiltesting.MkTmpdir("file-test")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer os.RemoveAll(dirName)
+func TestReadPodsFromSymbolicInDirAdded(t *testing.T) {
+	watchFileAdded(true, true, t)
+}
 
-	ch := make(chan interface{}, 1)
-	c := new(dirName, "localhost", time.Millisecond, ch)
-	err = c.resetStoreFromPath()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+func TestReadPodsFromSymbolicChanged(t *testing.T) {
+	watchFileChanged(false, true, t)
+}
 
-	update := (<-ch).(kubetypes.PodUpdate)
-	expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
-	if !apiequality.Semantic.DeepEqual(expected, update) {
-		t.Fatalf("expected %#v, Got %#v", expected, update)
-	}
+func TestReadPodsFromSymbolicInDirChanged(t *testing.T) {
+	watchFileChanged(true, true, t)
 }
 
 type testCase struct {
-	desc     string
-	pod      runtime.Object
-	expected kubetypes.PodUpdate
+	desc       string
+	linkedFile string
+	pod        runtime.Object
+	expected   kubetypes.PodUpdate
 }
 
 func getTestCases(hostname types.NodeName) []*testCase {
@@ -249,7 +222,18 @@ func (tc *testCase) writeToFile(dir, name string, t *testing.T) string {
 	return fileName
 }
 
-func watchFileAdded(watchDir bool, t *testing.T) {
+func (tc *testCase) writeSymblicLink(dir, linkedDir, name string, t *testing.T) string {
+	linkName := filepath.Join(dir, name)
+	linkedFile := filepath.Join(linkedDir, name)
+
+	err := os.Symlink(linkedFile, linkName)
+	if err != nil {
+		t.Fatalf("unexpected error when create symbolic link: %v", err)
+	}
+	return linkName
+}
+
+func watchFileAdded(watchDir bool, isSymbol bool, t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
@@ -260,8 +244,18 @@ func watchFileAdded(watchDir bool, t *testing.T) {
 			if err != nil {
 				t.Fatalf("unable to create temp dir: %v", err)
 			}
-			defer os.RemoveAll(dirName)
+			//defer os.RemoveAll(dirName)
+
 			fileName := fmt.Sprintf("%s_%d", fileNamePre, index)
+			var linkedDirName string
+			if isSymbol {
+				linkedDirName, err = utiltesting.MkTmpdir("linked-dir-test")
+				if err != nil {
+					t.Fatalf("unable to create temp dir for linked files: %v", err)
+				}
+				defer os.RemoveAll(linkedDirName)
+				testCase.writeSymblicLink(dirName, linkedDirName, fileName, t)
+			}
 
 			ch := make(chan interface{})
 			if watchDir {
@@ -273,7 +267,11 @@ func watchFileAdded(watchDir bool, t *testing.T) {
 
 			addFile := func() {
 				// Add a file
-				testCase.writeToFile(dirName, fileName, t)
+				if !isSymbol {
+					testCase.writeToFile(dirName, fileName, t)
+				} else {
+					testCase.writeToFile(linkedDirName, fileName, t)
+				}
 			}
 
 			go addFile()
@@ -287,7 +285,7 @@ func watchFileAdded(watchDir bool, t *testing.T) {
 	}
 }
 
-func watchFileChanged(watchDir bool, t *testing.T) {
+func watchFileChanged(watchDir bool, isSymbol bool, t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
@@ -301,13 +299,27 @@ func watchFileChanged(watchDir bool, t *testing.T) {
 			}
 			defer os.RemoveAll(dirName)
 
+			var linkedDirName string
+			if isSymbol {
+				linkedDirName, err = utiltesting.MkTmpdir("linked-dir-test")
+				if err != nil {
+					t.Fatalf("unable to create temp dir for linked files: %v", err)
+				}
+				defer os.RemoveAll(linkedDirName)
+				testCase.writeSymblicLink(dirName, linkedDirName, fileName, t)
+			}
+
 			var file string
 			lock := &sync.Mutex{}
 			ch := make(chan interface{})
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
-				file = testCase.writeToFile(dirName, fileName, t)
+				if !isSymbol {
+					file = testCase.writeToFile(dirName, fileName, t)
+				} else {
+					file = testCase.writeToFile(linkedDirName, fileName, t)
+				}
 			}()
 
 			if watchDir {
@@ -331,7 +343,11 @@ func watchFileChanged(watchDir bool, t *testing.T) {
 				pod.Spec.Containers[0].Name = "image2"
 
 				testCase.expected.Pods[0].Spec.Containers[0].Name = "image2"
-				testCase.writeToFile(dirName, fileName, t)
+				if !isSymbol {
+					file = testCase.writeToFile(dirName, fileName, t)
+				} else {
+					file = testCase.writeToFile(linkedDirName, fileName, t)
+				}
 			}
 
 			go changeFile()
@@ -369,6 +385,10 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 		select {
 		case got := <-ch:
 			update := got.(kubetypes.PodUpdate)
+			if len(update.Pods) == 0 {
+				// filter out the empty updates from periodical polling
+				continue
+			}
 			for _, pod := range update.Pods {
 				// TODO: remove the conversion when validation is performed on versioned objects.
 				internalPod := &api.Pod{}

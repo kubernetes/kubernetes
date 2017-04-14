@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/exp/inotify"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -39,7 +40,15 @@ const (
 	podDelete
 )
 
-func (s *sourceFile) watch() error {
+func (s *sourceFile) watch() {
+	go wait.Forever(func() {
+		if err := s.doWatch(); err != nil {
+			glog.Errorf("unable to read config path %q: %v", s.path, err)
+		}
+	}, s.period)
+}
+
+func (s *sourceFile) doWatch() error {
 	_, err := os.Stat(s.path)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -59,11 +68,6 @@ func (s *sourceFile) watch() error {
 	err = w.AddWatch(s.path, inotify.IN_DELETE_SELF|inotify.IN_CREATE|inotify.IN_MOVED_TO|inotify.IN_MODIFY|inotify.IN_MOVED_FROM|inotify.IN_DELETE)
 	if err != nil {
 		return fmt.Errorf("unable to create inotify for path %q: %v", s.path, err)
-	}
-
-	// Reset store with config files already existing when starting
-	if err := s.resetStoreFromPath(); err != nil {
-		return fmt.Errorf("unable to read config path %q: %v", s.path, err)
 	}
 
 	for {

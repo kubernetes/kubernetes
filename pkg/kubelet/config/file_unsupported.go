@@ -19,8 +19,11 @@ limitations under the License.
 // Reads the pod configuration from file or a directory of files.
 package config
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
-func (s *sourceFile) watch() error {
-	return errors.New("source file is unsupported in this build")
+func (s *sourceFile) watch() {
+	// watching source file is unsupported in this build
 }

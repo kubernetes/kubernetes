@@ -38,6 +38,7 @@ import (
 type sourceFile struct {
 	path           string
 	nodeName       types.NodeName
+	period         time.Duration
 	store          cache.Store
 	fileKeyMapping map[string]string
 	updates        chan<- interface{}
@@ -46,7 +47,7 @@ type sourceFile struct {
 func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	config := new(path, nodeName, period, updates)
 	glog.V(1).Infof("Watching path %q", path)
-	go wait.Forever(config.run, period)
+	config.run()
 }
 
 func new(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) *sourceFile {
@@ -61,6 +62,7 @@ func new(path string, nodeName types.NodeName, period time.Duration, updates cha
 	return &sourceFile{
 		path:           path,
 		nodeName:       nodeName,
+		period:         period,
 		store:          store,
 		fileKeyMapping: map[string]string{},
 		updates:        updates,
@@ -68,16 +70,20 @@ func new(path string, nodeName types.NodeName, period time.Duration, updates cha
 }
 
 func (s *sourceFile) run() {
-	if err := s.watch(); err != nil {
-		glog.Errorf("unable to read config path %q: %v", s.path, err)
-	}
+	go wait.Forever(func() {
+		if err := s.fullScan(); err != nil {
+			glog.Errorf("unable to read config path %q: %v", s.path, err)
+		}
+	}, s.period)
+
+	s.watch()
 }
 
 func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
 	return applyDefaults(pod, source, true, s.nodeName)
 }
 
-func (s *sourceFile) resetStoreFromPath() error {
+func (s *sourceFile) fullScan() error {
 	path := s.path
 	statInfo, err := os.Stat(path)
 	if err != nil {
