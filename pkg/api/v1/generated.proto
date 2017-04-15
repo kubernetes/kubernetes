@@ -3700,9 +3700,12 @@ message ServiceStatus {
   optional LoadBalancerStatus loadBalancer = 1;
 }
 
+// Sysctl defines a kernel parameter to be set
 message Sysctl {
+  // Name of a property to set
   optional string name = 1;
 
+  // Value of a property to set
   optional string value = 2;
 }
 
