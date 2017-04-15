@@ -336,7 +336,6 @@ func equivalent(federationService, clusterService v1.Service) bool {
 	// TODO: I think that we need a DeepCopy here to avoid clobbering our parameters.
 	clusterService.Spec.ClusterIP = federationService.Spec.ClusterIP
 	clusterService.Spec.ExternalIPs = federationService.Spec.ExternalIPs
-	clusterService.Spec.DeprecatedPublicIPs = federationService.Spec.DeprecatedPublicIPs
 	clusterService.Spec.LoadBalancerIP = federationService.Spec.LoadBalancerIP
 	clusterService.Spec.LoadBalancerSourceRanges = federationService.Spec.LoadBalancerSourceRanges
 	// N.B. We cannot iterate over the port objects directly, as their values
