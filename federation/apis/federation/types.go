@@ -122,36 +122,40 @@ type ClusterList struct {
 	Items []Cluster
 }
 
-// Temporary/alpha structures to support custom replica assignments within FederatedReplicaSet.
+// Temporary/alpha structures to support custom replica assignments within Federated workloads.
 
-// A set of preferences that can be added to federated version of ReplicaSet as a json-serialized annotation.
-// The preferences allow the user to express in which clusters he wants to put his replicas within the
-// mentioned FederatedReplicaSet.
-type FederatedReplicaSetPreferences struct {
+// A set of preferences that can be added to federated version of workloads (deployments, replicasets, ..)
+// as a json-serialized annotation. The preferences allow the user to express in which clusters he/she
+// wants to put his/her replicas within the mentioned workload objects.
+type ReplicaAllocationPreferences struct {
 	// If set to true then already scheduled and running replicas may be moved to other clusters to
-	// in order to bring cluster replicasets towards a desired state. Otherwise, if set to false,
+	// in order to bring cluster replica workloads towards a desired state. Otherwise, if set to false,
 	// up and running replicas will not be moved.
 	// +optional
 	Rebalance bool
 
-	// A mapping between cluster names and preferences regarding local ReplicaSet in these clusters.
-	// "*" (if provided) applies to all clusters if an explicit mapping is not provided. If there is no
-	// "*" that clusters without explicit preferences should not have any replicas scheduled.
+	// A mapping between cluster names and preferences regarding a local workload object (dep, rs, .. ) in
+	// these clusters.
+	// "*" (if provided) applies to all clusters if an explicit mapping is not provided.
+	// If omitted, clusters without explicit preferences should not have any replicas scheduled.
 	// +optional
-	Clusters map[string]ClusterReplicaSetPreferences
+	Clusters map[string]PerClusterPreferences
 }
 
-// Preferences regarding number of replicas assigned to a cluster replicaset within a federated replicaset.
-type ClusterReplicaSetPreferences struct {
-	// Minimum number of replicas that should be assigned to this Local ReplicaSet. 0 by default.
+// Preferences regarding number of replicas assigned to a cluster workload object (dep, rs, ..) within
+// a federated workload object.
+type PerClusterPreferences struct {
+	// Minimum number of replicas that should be assigned to this cluster workload object. 0 by default.
 	// +optional
 	MinReplicas int64
 
-	// Maximum number of replicas that should be assigned to this Local ReplicaSet. Unbounded if no value provided (default).
+	// Maximum number of replicas that should be assigned to this cluster workload object.
+	// Unbounded if no value provided (default).
 	// +optional
 	MaxReplicas *int64
 
-	// A number expressing the preference to put an additional replica to this LocalReplicaSet. 0 by default.
+	// A number expressing the preference to put an additional replica to this cluster workload object.
+	// 0 by default.
 	Weight int64
 }
 

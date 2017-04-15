@@ -18,7 +18,6 @@ package replicaset
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
@@ -70,21 +69,6 @@ var (
 	updateTimeout            = 30 * time.Second
 )
 
-func parseFederationReplicaSetReference(frs *extensionsv1.ReplicaSet) (*fed.FederatedReplicaSetPreferences, error) {
-	if frs.Annotations == nil {
-		return nil, nil
-	}
-	frsPrefString, found := frs.Annotations[FedReplicaSetPreferencesAnnotation]
-	if !found {
-		return nil, nil
-	}
-	var frsPref fed.FederatedReplicaSetPreferences
-	if err := json.Unmarshal([]byte(frsPrefString), &frsPref); err != nil {
-		return nil, err
-	}
-	return &frsPref, nil
-}
-
 type ReplicaSetController struct {
 	fedClient fedclientset.Interface
 
@@ -121,8 +105,8 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		clusterDeliverer:    fedutil.NewDelayingDeliverer(),
 		replicasetWorkQueue: workqueue.New(),
 		replicaSetBackoff:   flowcontrol.NewBackOff(5*time.Second, time.Minute),
-		defaultPlanner: planner.NewPlanner(&fed.FederatedReplicaSetPreferences{
-			Clusters: map[string]fed.ClusterReplicaSetPreferences{
+		defaultPlanner: planner.NewPlanner(&fed.ReplicaAllocationPreferences{
+			Clusters: map[string]fed.PerClusterPreferences{
 				"*": {Weight: 1},
 			},
 		}),
@@ -383,7 +367,7 @@ func (frsc *ReplicaSetController) schedule(frs *extensionsv1.ReplicaSet, cluster
 	// TODO: integrate real scheduler
 
 	plnr := frsc.defaultPlanner
-	frsPref, err := parseFederationReplicaSetReference(frs)
+	frsPref, err := fedutil.GetAllocationPreferences(frs, FedReplicaSetPreferencesAnnotation)
 	if err != nil {
 		glog.Info("Invalid ReplicaSet specific preference, use default. rs: %v, err: %v", frs, err)
 	}
