@@ -411,7 +411,7 @@ func (proxier *Proxier) OnServiceUpdate(services []*api.Service) {
 			continue
 		}
 
-		// TODO: should this just be api.GetReference?
+		// TODO: should this just be ref.GetReference?
 		svcGVK := service.GetObjectKind().GroupVersionKind()
 		svcRef := api.ObjectReference{
 			Kind:            svcGVK.Kind,

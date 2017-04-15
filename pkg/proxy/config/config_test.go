@@ -19,10 +19,12 @@ package config
 import (
 	"reflect"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	ktesting "k8s.io/client-go/testing"
@@ -45,7 +47,6 @@ func (s sortedServices) Less(i, j int) bool {
 
 type ServiceHandlerMock struct {
 	updated chan []*api.Service
-	waits   int
 }
 
 func NewServiceHandlerMock() *ServiceHandlerMock {
@@ -90,17 +91,66 @@ func (s sortedEndpoints) Less(i, j int) bool {
 }
 
 type EndpointsHandlerMock struct {
+	lock sync.Mutex
+
+	state   map[types.NamespacedName]*api.Endpoints
+	synced  bool
 	updated chan []*api.Endpoints
-	waits   int
+	process func([]*api.Endpoints)
 }
 
 func NewEndpointsHandlerMock() *EndpointsHandlerMock {
-	return &EndpointsHandlerMock{updated: make(chan []*api.Endpoints, 5)}
+	ehm := &EndpointsHandlerMock{
+		state:   make(map[types.NamespacedName]*api.Endpoints),
+		updated: make(chan []*api.Endpoints, 5),
+	}
+	ehm.process = func(endpoints []*api.Endpoints) {
+		ehm.updated <- endpoints
+	}
+	return ehm
 }
 
-func (h *EndpointsHandlerMock) OnEndpointsUpdate(endpoints []*api.Endpoints) {
+func (h *EndpointsHandlerMock) OnEndpointsAdd(endpoints *api.Endpoints) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+	h.state[namespacedName] = endpoints
+	h.sendEndpoints()
+}
+
+func (h *EndpointsHandlerMock) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+	h.state[namespacedName] = endpoints
+	h.sendEndpoints()
+}
+
+func (h *EndpointsHandlerMock) OnEndpointsDelete(endpoints *api.Endpoints) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+	delete(h.state, namespacedName)
+	h.sendEndpoints()
+}
+
+func (h *EndpointsHandlerMock) OnEndpointsSynced() {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	h.synced = true
+	h.sendEndpoints()
+}
+
+func (h *EndpointsHandlerMock) sendEndpoints() {
+	if !h.synced {
+		return
+	}
+	endpoints := make([]*api.Endpoints, 0, len(h.state))
+	for _, eps := range h.state {
+		endpoints = append(endpoints, eps)
+	}
 	sort.Sort(sortedEndpoints(endpoints))
-	h.updated <- endpoints
+	h.process(endpoints)
 }
 
 func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints []*api.Endpoints) {
@@ -230,8 +280,8 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 	config := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), time.Minute)
 	handler := NewEndpointsHandlerMock()
 	handler2 := NewEndpointsHandlerMock()
-	config.RegisterHandler(handler)
-	config.RegisterHandler(handler2)
+	config.RegisterEventHandler(handler)
+	config.RegisterEventHandler(handler2)
 	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
@@ -270,8 +320,8 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 	config := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), time.Minute)
 	handler := NewEndpointsHandlerMock()
 	handler2 := NewEndpointsHandlerMock()
-	config.RegisterHandler(handler)
-	config.RegisterHandler(handler2)
+	config.RegisterEventHandler(handler)
+	config.RegisterEventHandler(handler2)
 	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 

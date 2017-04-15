@@ -13,8 +13,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/container:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ],
 )
 

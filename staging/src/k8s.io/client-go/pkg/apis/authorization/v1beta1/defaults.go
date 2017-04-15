@@ -21,5 +21,5 @@ import (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	return scheme.AddDefaultingFuncs()
+	return RegisterDefaults(scheme)
 }

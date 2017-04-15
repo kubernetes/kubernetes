@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -152,7 +153,7 @@ func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) 
 	if kubeClient == nil {
 		return nil, fmt.Errorf("Cannot get kube client")
 	}
-	className := v1.GetPersistentVolumeClass(pv)
+	className := v1helper.GetPersistentVolumeClass(pv)
 	if className == "" {
 		return nil, fmt.Errorf("Volume has no storage class")
 	}

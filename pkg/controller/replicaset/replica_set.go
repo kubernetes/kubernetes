@@ -152,10 +152,10 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer rsc.queue.ShutDown()
 
-	glog.Infof("Starting ReplicaSet controller")
+	glog.Infof("Starting replica set controller")
+	defer glog.Infof("Shutting down replica set Controller")
 
-	if !cache.WaitForCacheSync(stopCh, rsc.podListerSynced, rsc.rsListerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("replica set", stopCh, rsc.podListerSynced, rsc.rsListerSynced) {
 		return
 	}
 
@@ -164,7 +164,6 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
-	glog.Infof("Shutting down ReplicaSet Controller")
 }
 
 // getPodReplicaSets returns a list of ReplicaSets matching the given pod.

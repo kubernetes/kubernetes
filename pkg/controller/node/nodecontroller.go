@@ -40,6 +40,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
@@ -518,37 +519,39 @@ func (nc *NodeController) onNodeDelete(originalObj interface{}) {
 }
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
-func (nc *NodeController) Run() {
-	go func() {
-		defer utilruntime.HandleCrash()
+func (nc *NodeController) Run(stopCh <-chan struct{}) {
+	defer utilruntime.HandleCrash()
 
-		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
-			utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
-			return
+	glog.Infof("Starting node controller")
+	defer glog.Infof("Shutting down node controller")
+
+	if !controller.WaitForCacheSync("node", stopCh, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
+		return
+	}
+
+	// Incorporate the results of node status pushed from kubelet to master.
+	go wait.Until(func() {
+		if err := nc.monitorNodeStatus(); err != nil {
+			glog.Errorf("Error monitoring node status: %v", err)
 		}
+	}, nc.nodeMonitorPeriod, wait.NeverStop)
 
-		// Incorporate the results of node status pushed from kubelet to master.
-		go wait.Until(func() {
-			if err := nc.monitorNodeStatus(); err != nil {
-				glog.Errorf("Error monitoring node status: %v", err)
-			}
-		}, nc.nodeMonitorPeriod, wait.NeverStop)
+	if nc.runTaintManager {
+		go nc.taintManager.Run(wait.NeverStop)
+	}
 
-		if nc.runTaintManager {
-			go nc.taintManager.Run(wait.NeverStop)
-		}
+	if nc.useTaintBasedEvictions {
+		// Handling taint based evictions. Because we don't want a dedicated logic in TaintManager for NC-originated
+		// taints and we normally don't rate limit evictions caused by taints, we need to rate limit adding taints.
+		go wait.Until(nc.doTaintingPass, nodeEvictionPeriod, wait.NeverStop)
+	} else {
+		// Managing eviction of nodes:
+		// When we delete pods off a node, if the node was not empty at the time we then
+		// queue an eviction watcher. If we hit an error, retry deletion.
+		go wait.Until(nc.doEvictionPass, nodeEvictionPeriod, wait.NeverStop)
+	}
 
-		if nc.useTaintBasedEvictions {
-			// Handling taint based evictions. Because we don't want a dedicated logic in TaintManager for NC-originated
-			// taints and we normally don't rate limit evictions caused by taints, we need to rate limit adding taints.
-			go wait.Until(nc.doTaintingPass, nodeEvictionPeriod, wait.NeverStop)
-		} else {
-			// Managing eviction of nodes:
-			// When we delete pods off a node, if the node was not empty at the time we then
-			// queue an eviction watcher. If we hit an error, retry deletion.
-			go wait.Until(nc.doEvictionPass, nodeEvictionPeriod, wait.NeverStop)
-		}
-	}()
+	<-stopCh
 }
 
 // monitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
@@ -636,7 +639,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if observedReadyCondition.Status == v1.ConditionFalse {
 				if nc.useTaintBasedEvictions {
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
-					if v1.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
+					if v1helper.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
 						taintToAdd := *NotReadyTaintTemplate
 						if !swapNodeControllerTaint(nc.kubeClient, &taintToAdd, UnreachableTaintTemplate, node) {
 							glog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
@@ -663,7 +666,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if observedReadyCondition.Status == v1.ConditionUnknown {
 				if nc.useTaintBasedEvictions {
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
-					if v1.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
+					if v1helper.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
 						taintToAdd := *UnreachableTaintTemplate
 						if !swapNodeControllerTaint(nc.kubeClient, &taintToAdd, NotReadyTaintTemplate, node) {
 							glog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")

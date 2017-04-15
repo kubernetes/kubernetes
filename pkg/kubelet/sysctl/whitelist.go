@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/api/validation"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -140,7 +141,7 @@ func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.
 		}
 	}
 
-	sysctls, err := v1.SysctlsFromPodAnnotation(a)
+	sysctls, err := v1helper.SysctlsFromPodAnnotation(a)
 	if err != nil {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,

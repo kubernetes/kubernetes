@@ -115,6 +115,7 @@ find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT
 # need to copy clientsets, though later we should copy APIs and later generate clientsets
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "pkg/client/informers/informers_generated/externalversions" "pkg/client/informers/informers_generated"
+mkcp "pkg/api/helper" "pkg/api"
 
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
   echo "generating vendor/"
@@ -206,7 +207,6 @@ find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 gofmt -w
 
 echo "remove black listed files"
 find "${CLIENT_REPO_TEMP}" -type f \( \
-  -name "*BUILD" -o \
   -name "*.json" -not -name "Godeps.json" -o \
   -name "*.yaml" -o \
   -name "*.yml" -o \
@@ -217,7 +217,8 @@ if [ "${FAIL_ON_CHANGES}" = true ]; then
   echo "running FAIL_ON_CHANGES"
   # ignore base.go in diff
   cp "${CLIENT_REPO}/pkg/version/base.go" "${CLIENT_REPO_TEMP}/pkg/version/"
-  if diff -NauprB  -I '^\s*\"Comment\"' -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
+  # TODO(mikedanese): figure out what to do with BUILD files here
+  if diff -NauprB -x '*BUILD' -I '^\s*\"Comment\"' -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
     echo "${CLIENT_REPO} up to date."
     exit 0
   else

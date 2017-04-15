@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -174,9 +175,9 @@ func (s *ServiceController) Run(stopCh <-chan struct{}, workers int) {
 	defer s.workingQueue.ShutDown()
 
 	glog.Info("Starting service controller")
+	defer glog.Info("Shutting down service controller")
 
-	if !cache.WaitForCacheSync(stopCh, s.serviceListerSynced, s.nodeListerSynced) {
-		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced) {
 	}
 
 	for i := 0; i < workers; i++ {
@@ -186,7 +187,6 @@ func (s *ServiceController) Run(stopCh <-chan struct{}, workers int) {
 	go wait.Until(s.nodeSyncLoop, nodeSyncPeriod, stopCh)
 
 	<-stopCh
-	glog.Info("Stopping service controller")
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -267,7 +267,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 	// which may involve service interruption.  Also, we would like user-friendly events.
 
 	// Save the state so we can avoid a write if it doesn't change
-	previousState := v1.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
+	previousState := v1helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 	var newState *v1.LoadBalancerStatus
 	var err error
 
@@ -307,7 +307,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 
 	// Write the state if changed
 	// TODO: Be careful here ... what if there were other changes to the service?
-	if !v1.LoadBalancerStatusEqual(previousState, newState) {
+	if !v1helper.LoadBalancerStatusEqual(previousState, newState) {
 		// Make a copy so we don't mutate the shared informer cache
 		copy, err := api.Scheme.DeepCopy(service)
 		if err != nil {

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/kubernetes/pkg/api"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/validation"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -165,7 +166,7 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx genericapirequest.Context, po
 		for k, v := range annotations {
 			pod.Annotations[k] = v
 		}
-		api.UpdatePodCondition(&pod.Status, &api.PodCondition{
+		podutil.UpdatePodCondition(&pod.Status, &api.PodCondition{
 			Type:   api.PodScheduled,
 			Status: api.ConditionTrue,
 		})

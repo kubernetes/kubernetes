@@ -14,7 +14,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//plugin/pkg/scheduler/api:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],
 )
 

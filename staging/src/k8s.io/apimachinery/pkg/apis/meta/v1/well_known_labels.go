@@ -17,8 +17,6 @@ limitations under the License.
 package v1
 
 const (
-	// If you add a new topology domain here, also consider adding it to the set of default values
-	// for the scheduler's --failure-domain command-line argument.
 	LabelHostname          = "kubernetes.io/hostname"
 	LabelZoneFailureDomain = "failure-domain.beta.kubernetes.io/zone"
 	LabelZoneRegion        = "failure-domain.beta.kubernetes.io/region"

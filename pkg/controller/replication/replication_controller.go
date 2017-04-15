@@ -147,10 +147,10 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer rm.queue.ShutDown()
 
-	glog.Infof("Starting RC Manager")
+	glog.Infof("Starting RC controller")
+	defer glog.Infof("Shutting down RC controller")
 
-	if !cache.WaitForCacheSync(stopCh, rm.podListerSynced, rm.rcListerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("RC", stopCh, rm.podListerSynced, rm.rcListerSynced) {
 		return
 	}
 
@@ -159,7 +159,6 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
-	glog.Infof("Shutting down RC Manager")
 }
 
 // getPodControllers returns a list of ReplicationControllers matching the given pod.
