@@ -213,6 +213,12 @@ func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string) error {
 		glog.V(4).Infof("kubernetes-managed etc-hosts file exits. Will not be recreated: %q", fileName)
 		return nil
 	}
+	content := hostsFileContent(hostIP, hostName, hostDomainName)
+	return ioutil.WriteFile(fileName, content, 0644)
+}
+
+// hostsFileContent is the content of the managed etc hosts
+func hostsFileContent(hostIP, hostName, hostDomainName string) []byte {
 	var buffer bytes.Buffer
 	buffer.WriteString("# Kubernetes-managed hosts file.\n")
 	buffer.WriteString("127.0.0.1\tlocalhost\n")                      // ipv4 localhost
@@ -226,7 +232,7 @@ func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string) error {
 	} else {
 		buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostIP, hostName))
 	}
-	return ioutil.WriteFile(fileName, buffer.Bytes(), 0644)
+	return buffer.Bytes()
 }
 
 // truncatePodHostnameIfNeeded truncates the pod hostname if it's longer than 63 chars.
