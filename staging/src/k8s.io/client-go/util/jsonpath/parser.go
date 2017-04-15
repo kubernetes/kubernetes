@@ -159,8 +159,8 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 		p.consumeText()
 	case r == '[':
 		return p.parseArray(cur)
-	case r == '"':
-		return p.parseQuote(cur)
+	case r == '"' || r == '\'':
+		return p.parseQuote(cur, r)
 	case r == '.':
 		return p.parseField(cur)
 	case r == '+' || r == '-' || unicode.IsDigit(r):
@@ -330,17 +330,33 @@ Loop:
 	return p.parseInsideAction(cur)
 }
 
+// findFilterSuffixPosition find the suffix position of filter inside array selection
+func (p *Parser) findFilterSuffixPosition() (int, error) {
+	for i := len(p.input); i > p.pos; i-- {
+		if strings.HasSuffix(p.input[p.pos:i], ")]") {
+			return i - 1, nil
+		}
+	}
+	return -1, fmt.Errorf("unterminated filter")
+}
+
 // parseFilter scans filter inside array selection
 func (p *Parser) parseFilter(cur *ListNode) error {
 	p.pos += len("[?(")
 	p.consumeText()
+	suffix, err := p.findFilterSuffixPosition()
+	if err != nil {
+		return err
+	}
 Loop:
 	for {
 		switch p.next() {
 		case eof, '\n':
 			return fmt.Errorf("unterminated filter")
 		case ')':
-			break Loop
+			if p.pos == suffix {
+				break Loop
+			}
 		}
 	}
 	if p.next() != ']' {
@@ -371,14 +387,16 @@ Loop:
 }
 
 // parseQuote unquotes string inside double quote
-func (p *Parser) parseQuote(cur *ListNode) error {
+func (p *Parser) parseQuote(cur *ListNode, end rune) error {
 Loop:
 	for {
 		switch p.next() {
 		case eof, '\n':
 			return fmt.Errorf("unterminated quoted string")
-		case '"':
-			break Loop
+		case end:
+			if p.input[p.pos-2] != '\\' {
+				break Loop
+			}
 		}
 	}
 	value := p.consumeText()
