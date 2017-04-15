@@ -39,10 +39,10 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_Cluster, InType: reflect.TypeOf(&Cluster{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterCondition, InType: reflect.TypeOf(&ClusterCondition{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterList, InType: reflect.TypeOf(&ClusterList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterReplicaSetPreferences, InType: reflect.TypeOf(&ClusterReplicaSetPreferences{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterSpec, InType: reflect.TypeOf(&ClusterSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterStatus, InType: reflect.TypeOf(&ClusterStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_FederatedReplicaSetPreferences, InType: reflect.TypeOf(&FederatedReplicaSetPreferences{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_PerClusterPreferences, InType: reflect.TypeOf(&PerClusterPreferences{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ReplicaAllocationPreferences, InType: reflect.TypeOf(&ReplicaAllocationPreferences{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ServerAddressByClientCIDR, InType: reflect.TypeOf(&ServerAddressByClientCIDR{})},
 	)
 }
@@ -96,20 +96,6 @@ func DeepCopy_federation_ClusterList(in interface{}, out interface{}, c *convers
 	}
 }
 
-func DeepCopy_federation_ClusterReplicaSetPreferences(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ClusterReplicaSetPreferences)
-		out := out.(*ClusterReplicaSetPreferences)
-		*out = *in
-		if in.MaxReplicas != nil {
-			in, out := &in.MaxReplicas, &out.MaxReplicas
-			*out = new(int64)
-			**out = **in
-		}
-		return nil
-	}
-}
-
 func DeepCopy_federation_ClusterSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ClusterSpec)
@@ -152,17 +138,31 @@ func DeepCopy_federation_ClusterStatus(in interface{}, out interface{}, c *conve
 	}
 }
 
-func DeepCopy_federation_FederatedReplicaSetPreferences(in interface{}, out interface{}, c *conversion.Cloner) error {
+func DeepCopy_federation_PerClusterPreferences(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
-		in := in.(*FederatedReplicaSetPreferences)
-		out := out.(*FederatedReplicaSetPreferences)
+		in := in.(*PerClusterPreferences)
+		out := out.(*PerClusterPreferences)
+		*out = *in
+		if in.MaxReplicas != nil {
+			in, out := &in.MaxReplicas, &out.MaxReplicas
+			*out = new(int64)
+			**out = **in
+		}
+		return nil
+	}
+}
+
+func DeepCopy_federation_ReplicaAllocationPreferences(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ReplicaAllocationPreferences)
+		out := out.(*ReplicaAllocationPreferences)
 		*out = *in
 		if in.Clusters != nil {
 			in, out := &in.Clusters, &out.Clusters
-			*out = make(map[string]ClusterReplicaSetPreferences)
+			*out = make(map[string]PerClusterPreferences)
 			for key, val := range *in {
-				newVal := new(ClusterReplicaSetPreferences)
-				if err := DeepCopy_federation_ClusterReplicaSetPreferences(&val, newVal, c); err != nil {
+				newVal := new(PerClusterPreferences)
+				if err := DeepCopy_federation_PerClusterPreferences(&val, newVal, c); err != nil {
 					return err
 				}
 				(*out)[key] = *newVal

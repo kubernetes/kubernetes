@@ -11,6 +11,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "annotations.go",
         "backoff.go",
         "cluster_util.go",
         "configmap.go",
@@ -24,6 +25,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//pkg/api:go_default_library",
@@ -49,6 +51,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "annotations_test.go",
         "delaying_deliverer_test.go",
         "deployment_test.go",
         "federated_informer_test.go",
@@ -61,12 +64,14 @@ go_test(
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/fake:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
