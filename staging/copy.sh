@@ -115,6 +115,7 @@ find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT
 # need to copy clientsets, though later we should copy APIs and later generate clientsets
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "pkg/client/informers/informers_generated/externalversions" "pkg/client/informers/informers_generated"
+mkcp "pkg/api/helper" "pkg/api"
 
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
   echo "generating vendor/"

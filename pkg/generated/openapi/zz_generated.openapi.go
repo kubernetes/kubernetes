@@ -8705,17 +8705,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 		"k8s.io/kubernetes/pkg/api/v1.Sysctl": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
+					Description: "Sysctl defines a kernel parameter to be set",
 					Properties: map[string]spec.Schema{
 						"Name": {
 							SchemaProps: spec.SchemaProps{
-								Type:   []string{"string"},
-								Format: "",
+								Description: "Name of a property to set",
+								Type:        []string{"string"},
+								Format:      "",
 							},
 						},
 						"Value": {
 							SchemaProps: spec.SchemaProps{
-								Type:   []string{"string"},
-								Format: "",
+								Description: "Value of a property to set",
+								Type:        []string{"string"},
+								Format:      "",
 							},
 						},
 					},
