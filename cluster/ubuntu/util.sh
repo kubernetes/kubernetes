@@ -709,8 +709,8 @@ function kube-down() {
   export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
   source "${KUBE_CONFIG_FILE}"
 
-  tear_down_alive_resources
-  check-pods-torn-down
+  source "${KUBE_ROOT}/cluster/common.sh"
+  prepare-kube-down
 
   local ii=0
   for i in ${nodes}; do
@@ -767,6 +767,33 @@ function kube-down() {
   done
 }
 
+# Clean up the related resources before executing "kube-down"
+#     1) Clean up all resources if "master" will be removed
+#     2) Transfer pods and clean up node resources if only "node" will be removed
+function prepare-kube-down() {
+  local delete_master=false
+  for role in ${roles_array}; do
+    if [[ "${role}" == "ai" || "${role}" == "a" ]]; then
+      delete_master=true
+    fi
+  done
+  
+  if ${delete_master}; then
+    tear_down_alive_resources
+    check-pods-torn-down
+  else
+    # Just delete node-resources
+    local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+    for i in ${nodes}; do
+      to_be_deleted_node=${i#*@}
+      echo "Down node ${to_be_deleted_node} from cluster"
+      "${kubectl}" drain ${to_be_deleted_node}
+      "${kubectl}" delete node ${to_be_deleted_node}
+    done
+    echo "Nodes release resources, please wait 15 seconds ..."
+    sleep 15
+  fi
+}
 
 # Perform common upgrade setup tasks
 function prepare-push() {
