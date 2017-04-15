@@ -38,14 +38,17 @@ Two really important questions:
 1. How should one organize and represent configuration in a cluster?
 2. How should one orchestrate changes to that configuration?
 
+This doc primarily focuses on (1) and the downstream aspects of (2).
+
 ### Organization of the Kubelet's Configuration Type
 
-- We should remove the `HostNameOverride` and `NodeIP` fields from the KubeletConfiguration API object; these should just stay flags for now - They likely do not need to change after node provisioning and keeping them in the configuration struct complicates sharing config objects between nodes (because these values are always node-unique). IN PROGRESS: [#40117](https://github.com/kubernetes/kubernetes/pull/40117).
-- The Kubelet's configuration type will no longer align with it's flags; we should add a separate struct that contains the flag variables to prevent them from migrating all over the codebase (similar to work being done in [#32215](https://github.com/kubernetes/kubernetes/issues/32215)). IN PROGRESS: [#40117](https://github.com/kubernetes/kubernetes/pull/40117).
-- We should add more structure to the Kubelet configuration for readability.
-- We should expose Kubelet API groups via groups in `pkg/kubelet/apis` and move the location of the configuration type to this subtree - e.g. to `pkg/kubelet/apis/config`. IN PROGRESS: [#42759](https://github.com/kubernetes/kubernetes/pull/42759).
-- We need to be able to add and remove experimental fields from the `KubeletConfiguration` without having to rev the API version. A simple solution is to just have a string representation of the experimental fields as part of the KubeletConfiguration, that the Kubelet can parse as necessary. THIS OPTION: [#41082](https://github.com/kubernetes/kubernetes/pull/41082). That said, this option is essentially a hack, and it is likely better just to rely on the standard API versioning mechanism. The overhead of up-versioning `pkg/kubelet/apis/config` is low enough to do so, because the former only relates to one component. This is much easier than versioning `pkg/apis/componentconfig`. Eventually, fine-grain field versioning ([#34508](https://github.com/kubernetes/kubernetes/issues/34508)) will solve this entirely, but it may be a while before that work is complete.
+In general, components should expose their configuration types from their own source trees. The types are currently in the alpha `componentconfig` API group, and should be broken out into the trees of their individual components. PR [#42759](https://github.com/kubernetes/kubernetes/pull/42759) reorganizes the Kubelet's tree to facilitate this.
 
+Components with several same-configured instances, like the Kubelet, should be able to share configuration sources. A 1:N mapping of config-object:instances is much more efficient than requiring a config object per-instance. As one example, we removed the `HostNameOverride` and `NodeIP` fields from the configuration type because these cannot be shared between Nodes - [#40117](https://github.com/kubernetes/kubernetes/pull/40117).
+
+Components that currently take command line flags should not just map these flags directly into their configuration types. We should, in general, think about which parameters make sense to configure dynamically, which can be shared between instances, and which are so low-level that they shouldn't really be exposed on the component's interface in the first place. Thus, the Kubelet's flags should be kept separate from configuration - [#40117](https://github.com/kubernetes/kubernetes/pull/40117).
+
+The Kubelet's current configuration type is an unreadable monolith. We should decompose it into sub-objects for convenience of composition and management. An example grouping is in PR [#44252](https://github.com/kubernetes/kubernetes/pull/44252).
 
 ### Representing and Referencing Configuration
 
@@ -56,14 +59,16 @@ Two really important questions:
   + *Monolithic*, so that all Kubelet parameters roll out to a given `Node` in unison.
   + Note that this does not mean the type itself has to be monolithic, just that everything the Kubelet needs makes it to the `Node` in one piece.
 - The `ConfigMap` containing the desired configuration should be specified via the `Node` object corresponding to the Kubelet. The `Node` will have a new `spec` subfield, `config`, which is a new type, `NodeConfigSource` (described below).
-- The name of the `ConfigMap` containing the desired configuration should be of the form `blah-blah-blah-{hash}`, where `{hash}` is a SHA-1 hash of the `data` field of the `ConfigMap`. The hash will be produced by serializing the `data` to a `JSON` string, and then taking the hash of this string. Depending on ordering guarantees, we may also need to ensure that keys are sorted in the serialization to ensure consistent hashing.
+- The name of the `ConfigMap` containing the desired configuration should be of the form `([a-z\-.]*-){0,1}algo-[a-f0-9]+`, where `algo` is the name of one of the supported hash algorithms and `[a-f0-9]+` is the hexadecimal value of the hash.
+  + For now, the only supported hash algorithm is `sha256`.
+  + The hash will be produced by serializing the `data` to a `JSON` string, and then taking the hash of this string. Depending on ordering guarantees, we may also need to ensure that keys are sorted in the serialization to ensure consistent hashing.
   + The Kubelet will verify the downloaded `ConfigMap` by performing this same procedure and comparing the result to the hash in the name. This helps prevent the "shoot yourself in the foot" scenario detailed below in *Operational Considerations/Rollout workflow*.
 
 `ConfigMap` object containing just the Kubelet's configuration:
 ```
 kind: ConfigMap
 metadata:
-  name: node-config-{sha1 hash of ConfigMap, sans identifying information, for verification}
+  name: node-config-sha256-{hash of ConfigMap, sans identifying information, for verification}
 data:
   kubelet: "{JSON blob}"
 ```
@@ -87,8 +92,8 @@ To make config updates robust, the Kubelet should be able to locally and automat
 Recovery involves:
 - Checkpointing configuration on-disk, so prior versions are locally available for rollback.
 - Tracking a LKG (last-known-good) configuration, which will be the rollback target if the current configuration turns out to be bad.
-- Tracking the health of the Kubelet against a given configuration and remembering, at least for a time, if a certain configuration correlated with poor health.
-- Rolling back to LKG if the current configuration resulted in poor health.
+- Tracking the state of the Kubelet against a given configuration and remembering, at least for a time, if a certain configuration correlated with a crash loop.
+- Rolling back to LKG if the current configuration resulted in a crash loop.
 - Providing operators an escape hatch for exiting dead-end states.
 
 ##### Finding and checkpointing intended configuration
@@ -107,17 +112,17 @@ The `spec.configSource` field can be considered "correct," "empty," or "invalid.
 - All information contained in the non-`nil` subfield meets the requirements of that subfield.
 
 The requirements of the `ConfigMapRef` subfield are as follows:
-- `ConfigMapRef.Namespace` must be non-empty.
-- `ConfigMapRef.Name` or `ConfigMapRef.UID` must be non-empty.
+- Either `ConfigMapRef.UID` must be non-empty or both `ConfigMapRef.Namespace` and `ConfigMapRef.Name` must be non-empty. UIDs are globally unique across time and space, whereas names are only unique across space within a given namespace.
 - If both `ConfigMapRef.Name` and `ConfigMapRef.UID` are specified, they must refer to the same object.
 - The referent must exist.
 - The referent must be a `ConfigMap` object.
+- As noted above, the referent `ConfigMap`'s name must be of the form `([a-z\-.]*-){0,1}algo-[a-f0-9]+`, where `algo` is the name of one of the supported hash algorithms and `[a-f0-9]+` is the hexadecimal value of the hash.
 
 The Kubelet must have permission to read the namespace that contains the referenced `ConfigMap`. 
 
 If the `spec.configSource` is empty, the Kubelet will use its `config-dir/init` configuration, or built-in defaults if `config-dir/init` is also absent.
 
-If the `spec.configSource` is invalid, the Kubelet will defer to its last-known-good configuration and report the non-existence via a `NodeCondition` in `Node.status.conditions` (described later in this proposal).
+If the `spec.configSource` is invalid, the Kubelet will defer to its last-known-good configuration and report the error via a `NodeCondition` in `Node.status.conditions` (described later in this proposal).
 
 If the `spec.configSource` is correct and using `ConfigMapRef`, the Kubelet downloads this `ConfigMap` to `config-dir`, storing each `Data` key's contents in a file as described above in the *Representing and Referencing Configuration* section.
 
@@ -158,12 +163,10 @@ As the init configuration and the built-in defaults are automatically considered
 
 ##### Rolling back to the LKG config
 
-When a configuration correlates too strongly with poor health, the Kubelet will "roll-back" to its last-known-good configuration. This process involves three components:
+When a configuration correlates too strongly with a crash loop, the Kubelet will "roll-back" to its last-known-good configuration. This process involves three components:
 1. The Kubelet must begin using its LKG configuration instead of its intended current configuration.
 2. The Kubelet must remember which configuration was bad, so it doesn't just roll forward to that configuration again.
 3. The Kubelet must report that it rolled back to LKG due to the *belief* that it had a bad configuration.
-
-Regarding (1), the Kubelet will set `config-dir/_current` to point to the same location as `config-dir/_lkg`, and then call `os.Exit(0)`, as above.
 
 Regarding (2), when the Kubelet detects a bad configuration, it will add an entry to a file, `config-dir/bad-configs.json`, mapping the namespace and name of the `ConfigMap` to the time at which it was determined to be a bad config, and the reason. The Kubelet will not roll forward to any of these configurations again until their entries are removed from this file. For example, the contents of this file might look like (shown here with a `reason` matching what would be reported in the `Node`'s `status.conditions`):
 ```
@@ -174,6 +177,8 @@ Regarding (2), when the Kubelet detects a bad configuration, it will add an entr
   }
 }
 ```
+
+Regarding (1), the Kubelet will check the `config-dir/bad-configs.json` file on startup. It will use the config referenced by `config-dir/_lkg` if the config referenced on the `Node` is listed in `config-dir/bad-configs.json` and the timestamp is not outside the belief-decay period (noted below). If the api server is unavailable, `config-dir/_current` is compared against `config-dir/bad-configs.json` instead of the config referenced via the `Node`.
 
 Regarding (3), the Kubelet should report via the `Node`'s status:
 - That it is using LKG.
