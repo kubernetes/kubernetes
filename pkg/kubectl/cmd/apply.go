@@ -249,7 +249,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		}
 
 		if err := info.Get(); err != nil {
-			if !errors.IsNotFound(err) {
+			if !errors.IsNotFound(err) && len(info.Name) != 0 {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
 			}
 			// Create the resource if it doesn't exist
