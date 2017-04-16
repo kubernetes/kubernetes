@@ -47,7 +47,6 @@ func main() {
 		panic(err)
 	}
 
-	stop := make(chan struct{}, 1)
 	source := cache.NewListWatchFromClient(
 		clientset.Core().RESTClient(),
 		"pods",
@@ -79,6 +78,9 @@ func main() {
 			// Called on resource deletion.
 			DeleteFunc: delete,
 		})
+
+	stop := make(chan struct{})
+	defer close(stop)
 
 	// the controller run starts the event processing loop
 	go controller.Run(stop)
