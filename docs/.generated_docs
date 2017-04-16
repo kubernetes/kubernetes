@@ -45,6 +45,7 @@ docs/man/man1/kubectl-create-clusterrole.1
 docs/man/man1/kubectl-create-clusterrolebinding.1
 docs/man/man1/kubectl-create-configmap.1
 docs/man/man1/kubectl-create-deployment.1
+docs/man/man1/kubectl-create-ingress.1
 docs/man/man1/kubectl-create-namespace.1
 docs/man/man1/kubectl-create-poddisruptionbudget.1
 docs/man/man1/kubectl-create-quota.1
@@ -136,6 +137,7 @@ docs/user-guide/kubectl/kubectl_create_clusterrole.md
 docs/user-guide/kubectl/kubectl_create_clusterrolebinding.md
 docs/user-guide/kubectl/kubectl_create_configmap.md
 docs/user-guide/kubectl/kubectl_create_deployment.md
+docs/user-guide/kubectl/kubectl_create_ingress.md
 docs/user-guide/kubectl/kubectl_create_namespace.md
 docs/user-guide/kubectl/kubectl_create_poddisruptionbudget.md
 docs/user-guide/kubectl/kubectl_create_quota.md

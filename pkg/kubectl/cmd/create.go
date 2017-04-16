@@ -98,6 +98,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdCreateDeployment(f, out, errOut))
 	cmd.AddCommand(NewCmdCreateClusterRole(f, out))
 	cmd.AddCommand(NewCmdCreateClusterRoleBinding(f, out))
+	cmd.AddCommand(NewCmdCreateIngress(f, out))
 	cmd.AddCommand(NewCmdCreateRole(f, out))
 	cmd.AddCommand(NewCmdCreateRoleBinding(f, out))
 	cmd.AddCommand(NewCmdCreatePodDisruptionBudget(f, out))

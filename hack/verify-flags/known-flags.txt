@@ -634,9 +634,11 @@ service-cluster-ip-range
 service-dns-domain
 service-dns-suffix
 service-generator
+service-name
 service-node-port-range
 service-node-ports
 service-overrides
+service-port
 service-sync-period
 session-affinity
 show-all
@@ -681,6 +683,7 @@ tcp-services
 terminated-pod-gc-threshold
 test-flags
 test-timeout
+tls-acme
 tls-bootstrap-token
 tls-ca-file
 tls-cert-file
