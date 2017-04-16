@@ -24,12 +24,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
-
 	// Only required to authenticate against GKE clusters
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
@@ -53,7 +51,7 @@ func main() {
 	source := cache.NewListWatchFromClient(
 		clientset.Core().RESTClient(),
 		"pods",
-		api.NamespaceAll,
+		v1.NamespaceAll,
 		fields.Everything())
 
 	store, controller := cache.NewInformer(
