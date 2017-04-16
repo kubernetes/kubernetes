@@ -192,13 +192,18 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 
 		} else {
 			hasTransition := false
-			for i := 0; i < len(clusterStatusNew.Conditions); i++ {
-				if !(strings.EqualFold(string(clusterStatusNew.Conditions[i].Type), string(clusterStatusOld.Conditions[i].Type)) &&
-					strings.EqualFold(string(clusterStatusNew.Conditions[i].Status), string(clusterStatusOld.Conditions[i].Status))) {
-					hasTransition = true
-					break
+			if len(clusterStatusNew.Conditions) != len(clusterStatusOld.Conditions) {
+				hasTransition = true
+			} else {
+				for i := 0; i < len(clusterStatusNew.Conditions); i++ {
+					if !(strings.EqualFold(string(clusterStatusNew.Conditions[i].Type), string(clusterStatusOld.Conditions[i].Type)) &&
+						strings.EqualFold(string(clusterStatusNew.Conditions[i].Status), string(clusterStatusOld.Conditions[i].Status))) {
+						hasTransition = true
+						break
+					}
 				}
 			}
+
 			if !hasTransition {
 				for j := 0; j < len(clusterStatusNew.Conditions); j++ {
 					clusterStatusNew.Conditions[j].LastTransitionTime = clusterStatusOld.Conditions[j].LastTransitionTime
@@ -207,7 +212,7 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 		}
 		clusterClient, found := cc.clusterKubeClientMap[cluster.Name]
 		if !found {
-			glog.Warningf("Failed to client for cluster %s", cluster.Name)
+			glog.Warningf("Failed to get client for cluster %s", cluster.Name)
 			continue
 		}
 
