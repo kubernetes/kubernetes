@@ -486,6 +486,7 @@ const (
 	ClusterV1Beta1GeneratorName             = "cluster/v1beta1"
 	PodDisruptionBudgetV1GeneratorName      = "poddisruptionbudget/v1beta1"
 	PodDisruptionBudgetV2GeneratorName      = "poddisruptionbudget/v1beta1/v2"
+	IngressV1Beta1GeneratorName             = "ingress/v1beta1"
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
@@ -496,6 +497,10 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 		generator = map[string]kubectl.Generator{
 			ServiceV1GeneratorName: kubectl.ServiceGeneratorV1{},
 			ServiceV2GeneratorName: kubectl.ServiceGeneratorV2{},
+		}
+	case "ingress":
+		generator = map[string]kubectl.Generator{
+			IngressV1Beta1GeneratorName: kubectl.IngressV1Beta1{},
 		}
 	case "service-clusterip":
 		generator = map[string]kubectl.Generator{
