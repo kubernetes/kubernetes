@@ -20,9 +20,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -101,13 +98,7 @@ func main() {
 		fmt.Printf("%s\n", pod.ObjectMeta.Name)
 	}
 
-	// and now we block on a signal
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-	s := <-signals
-	fmt.Printf("received signal %#v, exiting...\n", s)
-	close(stop)
-	os.Exit(0)
+	select {}
 }
 
 // Handler functions as per the controller above.
