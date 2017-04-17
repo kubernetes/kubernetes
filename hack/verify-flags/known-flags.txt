@@ -645,6 +645,7 @@ since-time
 skip-generated-rewrite
 skip-munges
 skip-preflight-checks
+skip-token-print
 skip-unsafe
 sort-by
 source-file
