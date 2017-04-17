@@ -930,7 +930,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	}
 	glog.V(4).Infof("Calling federatedUpdater.Update() - operations: %v", operations)
 	err = ic.federatedIngressUpdater.UpdateWithOnError(operations, ic.updateTimeout, func(op util.FederatedOperation, operror error) {
-		ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "FailedClusterUpdate",
+		ic.eventRecorder.Eventf(baseIngress, api.EventTypeWarning, "FailedClusterUpdate",
 			"Ingress update in cluster %s failed: %v", op.ClusterName, operror)
 	})
 	if err != nil {
