@@ -103,7 +103,8 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 		time.Sleep(time.Second)
 		pod, err := podClient.Get(podName, metav1.GetOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
-		status, ok := v1.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
+		statusInfo := v1.GetContainerStatusInfo(pod.Status.ContainerStatuses)
+		status, ok := statusInfo[containerName]
 		if !ok {
 			framework.Logf("getRestartDelay: status missing")
 			continue

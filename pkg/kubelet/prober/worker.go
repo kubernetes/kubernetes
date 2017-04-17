@@ -155,7 +155,8 @@ func (w *worker) doProbe() (keepGoing bool) {
 		return false
 	}
 
-	c, ok := v1.GetContainerStatus(status.ContainerStatuses, w.container.Name)
+	statusInfo := v1.GetContainerStatusInfo(status.ContainerStatuses)
+	c, ok := statusInfo[w.container.Name]
 	if !ok || len(c.ContainerID) == 0 {
 		// Either the container has not been created yet, or it was deleted.
 		glog.V(3).Infof("Probe target container not found: %v - %v",

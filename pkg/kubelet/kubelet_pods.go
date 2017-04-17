@@ -940,10 +940,11 @@ func hasHostPortConflicts(pods []*v1.Pod) bool {
 func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *v1.PodStatus, containerName string, previous bool) (containerID kubecontainer.ContainerID, err error) {
 	var cID string
 
-	cStatus, found := v1.GetContainerStatus(podStatus.ContainerStatuses, containerName)
+	statusInfo := v1.GetContainerStatusInfo(podStatus.ContainerStatuses)
+	cStatus, found := statusInfo[containerName]
 	// if not found, check the init containers
 	if !found {
-		cStatus, found = v1.GetContainerStatus(podStatus.InitContainerStatuses, containerName)
+		cStatus, found = statusInfo[containerName]
 	}
 	if !found {
 		return kubecontainer.ContainerID{}, fmt.Errorf("container %q in pod %q is not available", containerName, podName)
@@ -1046,8 +1047,9 @@ func GetPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	initialized := 0
 	pendingInitialization := 0
 	failedInitialization := 0
+	statusInfo := v1.GetContainerStatusInfo(info)
 	for _, container := range spec.InitContainers {
-		containerStatus, ok := v1.GetContainerStatus(info, container.Name)
+		containerStatus, ok := statusInfo[container.Name]
 		if !ok {
 			pendingInitialization++
 			continue
@@ -1084,7 +1086,7 @@ func GetPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	failed := 0
 	succeeded := 0
 	for _, container := range spec.Containers {
-		containerStatus, ok := v1.GetContainerStatus(info, container.Name)
+		containerStatus, ok := statusInfo[container.Name]
 		if !ok {
 			unknown++
 			continue

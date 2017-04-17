@@ -369,7 +369,8 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	By("checking the pod's current state and verifying that restartCount is present")
 	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
-	initialRestartCount := v1.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
+	statusInfo := v1.GetContainerStatusInfo(pod.Status.ContainerStatuses)
+	initialRestartCount :=  statusInfo[containerName].RestartCount
 	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
 
 	// Wait for the restart state to be as desired.
@@ -379,7 +380,8 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
 		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
-		restartCount := v1.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
+		statusInfo := v1.GetContainerStatusInfo(pod.Status.ContainerStatuses)
+		restartCount :=  statusInfo[containerName].RestartCount
 		if restartCount != lastRestartCount {
 			framework.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
 				ns, pod.Name, restartCount, time.Since(start))
