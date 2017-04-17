@@ -174,7 +174,7 @@ func main() {
 		arguments.CustomArgs = clientgenargs.Args{
 			Groups: []types.GroupVersions{{Group: "testgroup", Versions: []types.Version{""}}},
 			GroupVersionToInputPath: map[types.GroupVersion]string{
-				types.GroupVersion{Group: "testgroup", Version: ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup",
+				{Group: "testgroup", Version: ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup",
 			},
 			ClientsetName:       "test_internalclientset",
 			ClientsetOutputPath: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",
