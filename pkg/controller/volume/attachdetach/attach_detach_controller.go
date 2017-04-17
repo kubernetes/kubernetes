@@ -222,13 +222,10 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	glog.Infof("Starting Attach Detach Controller")
 
-	// TODO uncomment once we agree this is ok and we fix the attach/detach integration test that
-	// currently fails because it doesn't set pvcsSynced and pvsSynced to alwaysReady, so this
-	// controller never runs.
-	// if !kcache.WaitForCacheSync(stopCh, adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced) {
-	// 	runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
-	// 	return
-	// }
+	if !kcache.WaitForCacheSync(stopCh, adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced) {
+		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		return
+	}
 
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)

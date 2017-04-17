@@ -100,6 +100,9 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
+	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(podStopCh)
+	go informers.Core().V1().PersistentVolumes().Informer().Run(podStopCh)
+
 	if _, err := testClient.Core().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
