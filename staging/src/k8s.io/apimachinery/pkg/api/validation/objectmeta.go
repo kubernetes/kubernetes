@@ -40,7 +40,7 @@ const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = map[schema.GroupVersionKind]struct{}{
-	schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Event"}: {},
+	{Group: "", Version: "v1", Kind: "Event"}: {},
 }
 
 // ValidateClusterName can be used to check whether the given cluster name is valid.
