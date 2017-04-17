@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"net"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -58,6 +59,7 @@ var (
 		},
 		[]string{"verb", "resource"},
 	)
+	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 )
 
 // Register all metrics.
@@ -109,9 +111,12 @@ func InstrumentRouteFunc(verb, resource string, routeFunc restful.RouteFunction)
 }
 
 func cleanUserAgent(ua string) string {
+	// We collapse all "web browser"-type user agents into one "browser" to reduce metric cardinality.
 	if strings.HasPrefix(ua, "Mozilla/") {
 		return "Browser"
 	}
+	// If an old "kubectl.exe" has passed us its full path, we discard the path portion.
+	ua = kubectlExeRegexp.ReplaceAllString(ua, "$1")
 	return ua
 }
 
