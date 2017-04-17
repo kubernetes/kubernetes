@@ -54,6 +54,7 @@ go_library(
         "//pkg/api/helper:go_default_library",
         "//pkg/api/util:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
