@@ -21,7 +21,7 @@ import (
 
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
-	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
+	synccontroller "k8s.io/kubernetes/federation/pkg/federation-controller/sync"
 )
 
 // ControllerFixture manages a federation controller for testing.
@@ -34,8 +34,7 @@ func NewControllerFixture(t *testing.T, kind string, adapterFactory federatedtyp
 	f := &ControllerFixture{
 		stopChan: make(chan struct{}),
 	}
-	// TODO the generic controller doesn't belong in the secretcontroller package
-	secretcontroller.StartFederationSyncController(kind, adapterFactory, config, f.stopChan, true)
+	synccontroller.StartFederationSyncController(kind, adapterFactory, config, f.stopChan, true)
 	return f
 }
 
