@@ -33,16 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
 	utiltesting "k8s.io/client-go/util/testing"
-
-	"k8s.io/client-go/pkg/api/install"
 )
-
-func init() {
-	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
-}
 
 type TestParam struct {
 	actualError           error

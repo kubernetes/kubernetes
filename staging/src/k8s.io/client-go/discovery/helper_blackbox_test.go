@@ -33,16 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/install"
 	"k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 )
-
-func init() {
-	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
-}
 
 func objBody(object interface{}) io.ReadCloser {
 	output, err := json.MarshalIndent(object, "", "")
