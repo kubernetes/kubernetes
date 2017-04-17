@@ -234,7 +234,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume]", func() {
 
 			// Create 4 PVs and 2 PVCs.
 			// Note: PVs are created before claims and no pre-binding.
-			It("should create 4 PVs and 2 PVCs: test write access", func() {
+			It("should create 4 PVs and 2 PVCs: test write access [Slow]", func() {
 				numPVs, numPVCs := 4, 2
 				pvols, claims = framework.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
 				framework.WaitAndVerifyBinds(c, ns, pvols, claims, true)
