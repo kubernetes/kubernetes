@@ -17,6 +17,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/node:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/core/v1:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
@@ -42,6 +43,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/node:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/cloudprovider:go_default_library",

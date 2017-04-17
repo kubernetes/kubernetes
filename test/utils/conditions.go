@@ -111,7 +111,7 @@ func PodNotReady(p *v1.Pod) (bool, error) {
 }
 
 // podReady returns whether pod has a condition of Ready with a status of true.
-// TODO: should be replaced with v1.IsPodReady
+// TODO: should be replaced with podutil.IsPodReady
 func PodReady(pod *v1.Pod) bool {
 	for _, cond := range pod.Status.Conditions {
 		if cond.Type == v1.PodReady && cond.Status == v1.ConditionTrue {

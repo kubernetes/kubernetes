@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 const (
@@ -44,7 +45,7 @@ func GeneratePodReadyCondition(spec *v1.PodSpec, containerStatuses []v1.Containe
 	unknownContainers := []string{}
 	unreadyContainers := []string{}
 	for _, container := range spec.Containers {
-		if containerStatus, ok := v1.GetContainerStatus(containerStatuses, container.Name); ok {
+		if containerStatus, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
 			if !containerStatus.Ready {
 				unreadyContainers = append(unreadyContainers, container.Name)
 			}
@@ -99,7 +100,7 @@ func GeneratePodInitializedCondition(spec *v1.PodSpec, containerStatuses []v1.Co
 	unknownContainers := []string{}
 	unreadyContainers := []string{}
 	for _, container := range spec.InitContainers {
-		if containerStatus, ok := v1.GetContainerStatus(containerStatuses, container.Name); ok {
+		if containerStatus, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
 			if !containerStatus.Ready {
 				unreadyContainers = append(unreadyContainers, container.Name)
 			}
