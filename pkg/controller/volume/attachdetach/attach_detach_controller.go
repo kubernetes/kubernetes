@@ -262,7 +262,7 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 				glog.Errorf("Error adding node to ActualStateOfWorld: %v", err)
 				continue
 			}
-			adc.processVolumesInUse(nodeName, node.Status.VolumesInUse, true)
+			adc.processVolumesInUse(nodeName, node.Status.VolumesInUse, true /* forceUnmount */)
 			adc.desiredStateOfWorld.AddNode(types.NodeName(node.Name)) // Needed for DesiredStateOfWorld population
 		}
 	}

@@ -256,10 +256,10 @@ func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(
 
 func (asw *actualStateOfWorld) AddVolumeNode(
 	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) (v1.UniqueVolumeName, error) {
-	var volumeName v1.UniqueVolumeName
 	asw.Lock()
 	defer asw.Unlock()
 
+	var volumeName v1.UniqueVolumeName
 	if volumeSpec != nil {
 		attachableVolumePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
 		if err != nil || attachableVolumePlugin == nil {
