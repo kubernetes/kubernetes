@@ -556,6 +556,63 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		verifyResult(cs, 3, 1, ns)
 	})
 
+	// test when the pod anti affinity rule is not satisfied, the pod would stay pending.
+	It("validates that InterPodAntiAffinity is respected with equivalence class cache.", func() {
+		rcId := "pod-anti-affinity"
+		k := fmt.Sprintf("kubernetes.io/e2e-%s", "node-topologyKey")
+		v := "topologyvalue"
+
+		By("Applying topologyKey to all nodes for anti-affinity")
+		nodes, err := cs.CoreV1().Nodes().List(metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		for _, n := range nodes.Items {
+			nodeName := n.Name
+			framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+			framework.ExpectNodeHasLabel(cs, nodeName, k, v)
+			defer framework.RemoveLabelOffNode(cs, nodeName, k)
+		}
+
+		By("Launching two pods on two distinct nodes by RC which inter pod anti-affinity")
+		affinity := &v1.Affinity{
+			PodAntiAffinity: &v1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "eq_class_key",
+									Operator: metav1.LabelSelectorOpExists,
+								},
+							},
+						},
+						TopologyKey: k,
+					},
+				},
+			},
+		}
+
+		config := &testutils.RCConfig{
+			Client:         f.ClientSet,
+			InternalClient: f.InternalClientset,
+			Name:           rcId,
+			Namespace:      f.Namespace.Name,
+			Timeout:        defaultTimeout,
+			Image:          framework.GetPauseImageName(f.ClientSet),
+			Replicas:       2,
+			Affinity:       affinity,
+			Labels:         map[string]string{"eq_class_key": "eq_class_val"},
+		}
+		framework.ExpectNoError(framework.RunRC(*config))
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, rcId)
+
+		By("Checking the two pods were dispatched to different node.")
+		podList, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		Expect(len(podList.Items)).To(Equal(2))
+		nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
+		Expect(nodeNames[0]).ToNot(Equal(nodeNames[1]))
+	})
+
 	// test the pod affinity successful matching scenario with multiple Label Operators.
 	It("validates that InterPodAffinity is respected if matching with multiple Affinities", func() {
 		nodeName, _ := runAndKeepPodWithLabelAndGetNodeName(f)
@@ -795,29 +852,6 @@ func runPodAndGetNodeName(f *framework.Framework, conf pausePodConfig) string {
 	return pod.Spec.NodeName
 }
 
-func createPodWithNodeAffinity(f *framework.Framework) *v1.Pod {
-	return createPausePod(f, pausePodConfig{
-		Name: "with-nodeaffinity-" + string(uuid.NewUUID()),
-		Affinity: &v1.Affinity{
-			NodeAffinity: &v1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{
-						{
-							MatchExpressions: []v1.NodeSelectorRequirement{
-								{
-									Key:      "kubernetes.io/e2e-az-name",
-									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{"e2e-az1", "e2e-az2"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	})
-}
-
 func createPodWithPodAffinity(f *framework.Framework, topologyKey string) *v1.Pod {
 	return createPausePod(f, pausePodConfig{
 		Name: "with-podantiaffinity-" + string(uuid.NewUUID()),
@@ -856,34 +890,6 @@ func createPodWithPodAffinity(f *framework.Framework, topologyKey string) *v1.Po
 			},
 		},
 	})
-}
-
-// Returns a number of currently scheduled and not scheduled Pods.
-func getPodsScheduled(pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
-	for _, pod := range pods.Items {
-		if !masterNodes.Has(pod.Spec.NodeName) {
-			if pod.Spec.NodeName != "" {
-				_, scheduledCondition := v1.GetPodCondition(&pod.Status, v1.PodScheduled)
-				// We can't assume that the scheduledCondition is always set if Pod is assigned to Node,
-				// as e.g. DaemonController doesn't set it when assigning Pod to a Node. Currently
-				// Kubelet sets this condition when it gets a Pod without it, but if we were expecting
-				// that it would always be not nil, this would cause a rare race condition.
-				if scheduledCondition != nil {
-					Expect(scheduledCondition.Status).To(Equal(v1.ConditionTrue))
-				}
-				scheduledPods = append(scheduledPods, pod)
-			} else {
-				_, scheduledCondition := v1.GetPodCondition(&pod.Status, v1.PodScheduled)
-				if scheduledCondition != nil {
-					Expect(scheduledCondition.Status).To(Equal(v1.ConditionFalse))
-				}
-				if scheduledCondition.Reason == "Unschedulable" {
-					notScheduledPods = append(notScheduledPods, pod)
-				}
-			}
-		}
-	}
-	return
 }
 
 func getRequestedCPU(pod v1.Pod) int64 {
@@ -967,7 +973,7 @@ func getNodeThatCanRunPodWithoutToleration(f *framework.Framework) string {
 }
 
 func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
-	By(fmt.Sprintf("Running RC which reserves host port"))
+	By("Running RC which reserves host port")
 	config := &testutils.RCConfig{
 		Client:         f.ClientSet,
 		InternalClient: f.InternalClientset,

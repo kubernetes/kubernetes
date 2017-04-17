@@ -127,6 +127,7 @@ type RCConfig struct {
 	MemLimit       int64 // bytes
 	ReadinessProbe *v1.Probe
 	DNSPolicy      *v1.DNSPolicy
+	Affinity       *v1.Affinity
 
 	// Env vars, set the same for every pod.
 	Env map[string]string
@@ -517,6 +518,7 @@ func (config *RCConfig) create() error {
 							ReadinessProbe: config.ReadinessProbe,
 						},
 					},
+					Affinity:     config.Affinity,
 					DNSPolicy:    *config.DNSPolicy,
 					NodeSelector: config.NodeSelector,
 				},
