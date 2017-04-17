@@ -66,7 +66,6 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 				v1.ResourceCPU:    resource.MustParse("4"),
 				v1.ResourceMemory: resource.MustParse("32Gi"),
 			},
-			Phase: v1.NodeRunning,
 			Conditions: []v1.NodeCondition{
 				{Type: v1.NodeReady, Status: v1.ConditionTrue},
 			},

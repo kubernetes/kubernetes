@@ -2779,9 +2779,6 @@ type NodeStatus struct {
 	// Allocatable represents the resources of a node that are available for scheduling.
 	// +optional
 	Allocatable ResourceList
-	// NodePhase is the current lifecycle phase of the node.
-	// +optional
-	Phase NodePhase
 	// Conditions is an array of current node conditions.
 	// +optional
 	Conditions []NodeCondition
@@ -2857,18 +2854,6 @@ type ContainerImage struct {
 	// +optional
 	SizeBytes int64
 }
-
-type NodePhase string
-
-// These are the valid phases of node.
-const (
-	// NodePending means the node has been created/added by the system, but not configured.
-	NodePending NodePhase = "Pending"
-	// NodeRunning means the node has been configured and has Kubernetes components running.
-	NodeRunning NodePhase = "Running"
-	// NodeTerminated means the node has been removed from the cluster.
-	NodeTerminated NodePhase = "Terminated"
-)
 
 type NodeConditionType string
 

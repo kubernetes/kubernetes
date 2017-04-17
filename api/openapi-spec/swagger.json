@@ -39336,10 +39336,6 @@
       "description": "Set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NodeSystemInfo"
      },
-     "phase": {
-      "description": "NodePhase is the recently observed lifecycle phase of the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase The field is never populated, and now is deprecated.",
-      "type": "string"
-     },
      "volumesAttached": {
       "description": "List of volumes that are attached to the node.",
       "type": "array",

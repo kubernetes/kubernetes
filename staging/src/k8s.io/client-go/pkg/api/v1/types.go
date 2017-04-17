@@ -3209,11 +3209,6 @@ type NodeStatus struct {
 	// Defaults to Capacity.
 	// +optional
 	Allocatable ResourceList `json:"allocatable,omitempty" protobuf:"bytes,2,rep,name=allocatable,casttype=ResourceList,castkey=ResourceName"`
-	// NodePhase is the recently observed lifecycle phase of the node.
-	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase
-	// The field is never populated, and now is deprecated.
-	// +optional
-	Phase NodePhase `json:"phase,omitempty" protobuf:"bytes,3,opt,name=phase,casttype=NodePhase"`
 	// Conditions is an array of current observed node conditions.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-condition
 	// +optional
@@ -3298,18 +3293,6 @@ type ContainerImage struct {
 	// +optional
 	SizeBytes int64 `json:"sizeBytes,omitempty" protobuf:"varint,2,opt,name=sizeBytes"`
 }
-
-type NodePhase string
-
-// These are the valid phases of node.
-const (
-	// NodePending means the node has been created/added by the system, but not configured.
-	NodePending NodePhase = "Pending"
-	// NodeRunning means the node has been configured and has Kubernetes components running.
-	NodeRunning NodePhase = "Running"
-	// NodeTerminated means the node has been removed from the cluster.
-	NodeTerminated NodePhase = "Terminated"
-)
 
 type NodeConditionType string
 
