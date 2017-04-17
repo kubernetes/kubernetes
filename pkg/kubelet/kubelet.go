@@ -111,7 +111,8 @@ const (
 	maxWaitForContainerRuntime = 30 * time.Second
 
 	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
-	nodeStatusUpdateRetry = 5
+	// we assume that the large number of retries will be done in an exponential backoff.
+	nodeStatusUpdateRetry = 10
 
 	// Location of container logs.
 	ContainerLogsDir = "/var/log/containers"

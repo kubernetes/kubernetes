@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -60,18 +61,14 @@ func (kl *Kubelet) registerWithApiServer() {
 	if kl.registrationCompleted {
 		return
 	}
-	step := 100 * time.Millisecond
 
+	retries := 0
+	backoff := flowcontrol.NewBackOff(100*time.Millisecond, 7*time.Second)
 	for {
-		time.Sleep(step)
-		step = step * 2
-		if step >= 7*time.Second {
-			step = 7 * time.Second
-		}
-
+		time.Sleep(backoff.Get("registerAPIServer"))
 		node, err := kl.initialNode()
 		if err != nil {
-			glog.Errorf("Unable to construct v1.Node object for kubelet: %v", err)
+			glog.Errorf("Unable to construct v1.Node object for kubelet: %v retries:", err, retries)
 			continue
 		}
 
@@ -82,6 +79,7 @@ func (kl *Kubelet) registerWithApiServer() {
 			kl.registrationCompleted = true
 			return
 		}
+		retries++
 	}
 }
 
@@ -321,9 +319,11 @@ func (kl *Kubelet) syncNodeStatus() {
 
 // updateNodeStatus updates node status to master with retries.
 func (kl *Kubelet) updateNodeStatus() error {
+	backoff := flowcontrol.NewBackOff(500*time.Millisecond, 10*time.Minute)
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
 		if err := kl.tryUpdateNodeStatus(i); err != nil {
-			glog.Errorf("Error updating node status, will retry: %v", err)
+			glog.Errorf("Error # %v updating node status, will retry: %v", i, err)
+			time.Sleep(backoff.Get("updateNodeStatus"))
 		} else {
 			return nil
 		}
@@ -820,8 +820,8 @@ func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
 			Status: v1.ConditionUnknown,
 		}
 		// nodeOODCondition cannot be appended to node.Status.Conditions here because it gets
-		// copied to the slice. So if we append nodeOODCondition to the slice here none of the
-		// updates we make to nodeOODCondition below are reflected in the slice.
+		// copied (rather then a being written as a pointer) to the slice.  The copy would be
+		// inaccurate since we may mutate later.
 		newOODCondition = true
 	}
 
