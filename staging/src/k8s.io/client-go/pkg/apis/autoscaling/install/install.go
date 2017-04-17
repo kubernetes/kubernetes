@@ -40,7 +40,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 			v1.SchemeGroupVersion.Version:       v1.AddToScheme,
 			v2alpha1.SchemeGroupVersion.Version: v2alpha1.AddToScheme,
 		},
-	).AnnounceIfNotAnnounced(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
+	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)
 	}
 }

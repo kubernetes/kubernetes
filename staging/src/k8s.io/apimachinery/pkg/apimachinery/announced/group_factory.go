@@ -92,16 +92,6 @@ func (gmf *GroupMetaFactory) Announce(groupFactoryRegistry APIGroupFactoryRegist
 
 }
 
-// AnnounceIfNotAnnounced is the same as Announce, except that it returns nil
-// if gmf.GroupArgs.GroupName is already registered in groupFactoryRegistry,
-// instead of panicing.
-func (gmf *GroupMetaFactory) AnnounceIfNotAnnounced(groupFactoryRegistry APIGroupFactoryRegistry) *GroupMetaFactory {
-	if _, ok := groupFactoryRegistry[gmf.GroupArgs.GroupName]; ok {
-		return nil
-	}
-	return gmf.Announce(groupFactoryRegistry)
-}
-
 // GroupMetaFactory has the logic for actually assembling and registering a group.
 //
 // There are two ways of obtaining one of these.
