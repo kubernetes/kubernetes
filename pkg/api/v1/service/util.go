@@ -18,10 +18,13 @@ package service
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -65,4 +68,58 @@ func GetLoadBalancerSourceRanges(service *v1.Service) (netsets.IPNet, error) {
 		}
 	}
 	return ipnets, nil
+}
+
+// NeedsHealthCheck Check service for health check annotations
+func NeedsHealthCheck(service *v1.Service) bool {
+	// First check the alpha annotation and then the beta. This is so existing
+	// Services continue to work till the user decides to transition to beta.
+	// If they transition to beta, there's no way to go back to alpha without
+	// rolling back the cluster.
+	for _, annotation := range []string{AlphaAnnotationExternalTraffic, BetaAnnotationExternalTraffic} {
+		if l, ok := service.Annotations[annotation]; ok {
+			if l == AnnotationValueExternalTrafficLocal {
+				return true
+			} else if l == AnnotationValueExternalTrafficGlobal {
+				return false
+			} else {
+				glog.Errorf("Invalid value for annotation %v: %v", annotation, l)
+			}
+		}
+	}
+	return false
+}
+
+// GetServiceHealthCheckNodePort Return health check node port annotation for service, if one exists
+func GetServiceHealthCheckNodePort(service *v1.Service) int32 {
+	if !NeedsHealthCheck(service) {
+		return 0
+	}
+	// First check the alpha annotation and then the beta. This is so existing
+	// Services continue to work till the user decides to transition to beta.
+	// If they transition to beta, there's no way to go back to alpha without
+	// rolling back the cluster.
+	for _, annotation := range []string{AlphaAnnotationHealthCheckNodePort, BetaAnnotationHealthCheckNodePort} {
+		if l, ok := service.Annotations[annotation]; ok {
+			p, err := strconv.Atoi(l)
+			if err != nil {
+				glog.Errorf("Failed to parse annotation %v: %v", annotation, err)
+				continue
+			}
+			return int32(p)
+		}
+	}
+	return 0
+}
+
+// GetServiceHealthCheckPathPort Return the path and nodePort programmed into the Cloud LB Health Check
+func GetServiceHealthCheckPathPort(service *v1.Service) (string, int32) {
+	if !NeedsHealthCheck(service) {
+		return "", 0
+	}
+	port := GetServiceHealthCheckNodePort(service)
+	if port == 0 {
+		return "", 0
+	}
+	return "/healthz", port
 }
