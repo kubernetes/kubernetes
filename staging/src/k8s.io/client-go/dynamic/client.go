@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
@@ -247,7 +248,7 @@ func ContentConfig() restclient.ContentConfig {
 	var jsonInfo runtime.SerializerInfo
 	// TODO: api.Codecs here should become "pkg/apis/server/scheme" which is the minimal core you need
 	// to talk to a kubernetes server
-	for _, info := range api.Codecs.SupportedMediaTypes() {
+	for _, info := range scheme.Codecs.SupportedMediaTypes() {
 		if info.MediaType == runtime.ContentTypeJSON {
 			jsonInfo = info
 			break

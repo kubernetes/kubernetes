@@ -43,13 +43,13 @@ func TestDecoder(t *testing.T) {
 
 	for _, eventType := range table {
 		out, in := io.Pipe()
-		codec := api.Codecs.LegacyCodec(v1.SchemeGroupVersion)
+		codec := scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 		decoder := restclientwatch.NewDecoder(streaming.NewDecoder(out, codec), codec)
 
 		expect := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 		encoder := json.NewEncoder(in)
 		go func() {
-			data, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), expect)
+			data, err := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expect)
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
@@ -96,7 +96,7 @@ func TestDecoder(t *testing.T) {
 
 func TestDecoder_SourceClose(t *testing.T) {
 	out, in := io.Pipe()
-	codec := api.Codecs.LegacyCodec(v1.SchemeGroupVersion)
+	codec := scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 	decoder := restclientwatch.NewDecoder(streaming.NewDecoder(out, codec), codec)
 
 	done := make(chan struct{})

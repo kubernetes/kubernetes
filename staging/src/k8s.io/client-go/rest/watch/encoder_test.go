@@ -45,17 +45,17 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 		{
 			watch.Added,
 			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+			scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 		},
 		{
 			watch.Modified,
 			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+			scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 		},
 		{
 			watch.Deleted,
 			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+			scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 		},
 	}
 	for i, testCase := range testCases {

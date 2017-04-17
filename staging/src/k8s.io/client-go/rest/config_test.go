@@ -145,13 +145,13 @@ func TestDefaultKubernetesUserAgent(t *testing.T) {
 
 func TestRESTClientRequires(t *testing.T) {
 	gvCopy := v1.SchemeGroupVersion
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{NegotiatedSerializer: api.Codecs}}); err == nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{NegotiatedSerializer: scheme.Codecs}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &gvCopy}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &gvCopy, NegotiatedSerializer: api.Codecs}}); err != nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &gvCopy, NegotiatedSerializer: scheme.Codecs}}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
