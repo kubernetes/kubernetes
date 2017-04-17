@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -161,7 +162,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 			}(nodeName, nameHint, route)
 		} else {
 			// Update condition only if it doesn't reflect the current state.
-			_, condition := v1.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+			_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
 			if condition == nil || condition.Status != v1.ConditionFalse {
 				rc.updateNetworkingCondition(types.NodeName(node.Name), true)
 			}

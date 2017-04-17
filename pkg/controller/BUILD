@@ -22,6 +22,8 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
+        "//pkg/api/v1/pod:go_default_library",
+        "//pkg/api/v1/ref:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/authentication/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",

@@ -112,6 +112,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/annotations:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/api/v1/service:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/apis/batch:go_default_library",
