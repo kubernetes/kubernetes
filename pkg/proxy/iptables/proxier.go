@@ -163,8 +163,7 @@ func (e *endpointsInfo) String() string {
 func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, service *api.Service) *serviceInfo {
 	onlyNodeLocalEndpoints := false
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) &&
-		(service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort) &&
-		apiservice.NeedsHealthCheck(service) {
+		apiservice.RequestsOnlyLocalTraffic(service) {
 		onlyNodeLocalEndpoints = true
 	}
 	info := &serviceInfo{
