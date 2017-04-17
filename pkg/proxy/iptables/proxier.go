@@ -1169,6 +1169,19 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 			// Allow traffic bound for external IPs that happen to be recognized as local IPs to stay local.
 			// This covers cases like GCE load-balancers which get added to the local routing table.
 			writeLine(natRules, append(dstLocalOnlyArgs, "-j", string(svcChain))...)
+
+			// If the service has no endpoints then reject packets coming via externalIP
+			// Install ICMP Reject rule in filter table for destination=externalIP and dport=svcport
+			if len(proxier.endpointsMap[svcName]) == 0 {
+				writeLine(filterRules,
+					"-A", string(kubeServicesChain),
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
+					"-m", protocol, "-p", protocol,
+					"-d", fmt.Sprintf("%s/32", externalIP),
+					"--dport", fmt.Sprintf("%d", svcInfo.port),
+					"-j", "REJECT",
+				)
+			}
 		}
 
 		// Capture load-balancer ingress.
