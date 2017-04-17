@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -96,12 +96,16 @@ func NewAttachDetachController(
 	// dropped pods so they are continuously processed until it is accepted or
 	// deleted (probably can't do this with sharedInformer), etc.
 	adc := &attachDetachController{
-		kubeClient: kubeClient,
-		pvcLister:  pvcInformer.Lister(),
-		pvcsSynced: pvcInformer.Informer().HasSynced,
-		pvLister:   pvInformer.Lister(),
-		pvsSynced:  pvInformer.Informer().HasSynced,
-		cloud:      cloud,
+		kubeClient:  kubeClient,
+		pvcLister:   pvcInformer.Lister(),
+		pvcsSynced:  pvcInformer.Informer().HasSynced,
+		pvLister:    pvInformer.Lister(),
+		pvsSynced:   pvInformer.Informer().HasSynced,
+		podLister:   podInformer.Lister(),
+		podsSynced:  podInformer.Informer().HasSynced,
+		nodeLister:  nodeInformer.Lister(),
+		nodesSynced: nodeInformer.Informer().HasSynced,
+		cloud:       cloud,
 	}
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, adc); err != nil {
@@ -145,14 +149,12 @@ func NewAttachDetachController(
 		UpdateFunc: adc.podUpdate,
 		DeleteFunc: adc.podDelete,
 	})
-	adc.podsSynced = podInformer.Informer().HasSynced
 
 	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc:    adc.nodeAdd,
 		UpdateFunc: adc.nodeUpdate,
 		DeleteFunc: adc.nodeDelete,
 	})
-	adc.nodesSynced = nodeInformer.Informer().HasSynced
 
 	return adc, nil
 }
@@ -174,7 +176,10 @@ type attachDetachController struct {
 	pvLister  corelisters.PersistentVolumeLister
 	pvsSynced kcache.InformerSynced
 
-	podsSynced  kcache.InformerSynced
+	podLister  corelisters.PodLister
+	podsSynced kcache.InformerSynced
+
+	nodeLister  corelisters.NodeLister
 	nodesSynced kcache.InformerSynced
 
 	// cloud provider used by volume host
@@ -248,12 +253,12 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 
 func (adc *attachDetachController) populateActualStateOfWorld() error {
 	glog.V(5).Infof("Populating ActualStateOfworld")
-	nodes, err := adc.kubeClient.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := adc.nodeLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
 
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			uniqueName := attachedVolume.Name
@@ -273,7 +278,7 @@ func (adc *attachDetachController) getNodeVolumeDevicePath(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) (string, error) {
 	var devicePath string
 	var found bool
-	node, err := adc.kubeClient.Core().Nodes().Get(string(nodeName), metav1.GetOptions{})
+	node, err := adc.nodeLister.Get(string(nodeName))
 	if err != nil {
 		return devicePath, err
 	}
@@ -294,11 +299,11 @@ func (adc *attachDetachController) getNodeVolumeDevicePath(
 func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 	glog.V(5).Infof("Populating DesiredStateOfworld")
 
-	pods, err := adc.kubeClient.Core().Pods(v1.NamespaceAll).List(metav1.ListOptions{})
+	pods, err := adc.podLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
-	for _, pod := range pods.Items {
+	for _, pod := range pods {
 		podToAdd := pod
 		adc.podAdd(&podToAdd)
 		for _, podVolume := range podToAdd.Spec.Volumes {
