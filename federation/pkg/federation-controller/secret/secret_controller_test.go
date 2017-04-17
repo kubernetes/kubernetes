@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
+	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
@@ -66,7 +67,7 @@ func TestSecretController(t *testing.T) {
 	RegisterFakeList(secrets, &cluster2Client.Fake, &apiv1.SecretList{Items: []apiv1.Secret{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate(secrets, &cluster2Client.Fake, cluster2Watch)
 
-	secretController := newSecretController(fakeClient)
+	secretController := newFederationSyncController(fakeClient, federatedtypes.NewSecretAdapter(fakeClient))
 	informerClientFactory := func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:

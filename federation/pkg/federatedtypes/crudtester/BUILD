@@ -9,20 +9,15 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "adapter.go",
-        "secret.go",
-    ],
+    srcs = ["crudtester.go"],
     tags = ["automanaged"],
     deps = [
-        "//federation/client/clientset_generated/federation_clientset:go_default_library",
-        "//federation/pkg/federation-controller/util:go_default_library",
-        "//pkg/api/v1:go_default_library",
+        "//federation/pkg/federatedtypes:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
     ],
 )
 
@@ -35,9 +30,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//federation/pkg/typeadapters/crudtester:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
