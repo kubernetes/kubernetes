@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"net"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -58,6 +59,7 @@ var (
 		},
 		[]string{"verb", "resource"},
 	)
+	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 )
 
 // Register all metrics.
@@ -114,9 +116,7 @@ func cleanUserAgent(ua string) string {
 		return "Browser"
 	}
 	// If an old "kubectl.exe" has passed us its full path, we discard the path portion.
-	if exeIdx := strings.LastIndex(strings.ToLower(ua), "kubectl.exe"); exeIdx != -1 {
-		return ua[exeIdx:]
-	}
+	ua = kubectlExeRegexp.ReplaceAllString(ua, "$1")
 	return ua
 }
 

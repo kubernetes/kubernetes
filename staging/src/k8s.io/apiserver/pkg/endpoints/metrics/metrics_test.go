@@ -19,6 +19,8 @@ package metrics
 import "testing"
 
 func TestCleanUserAgent(t *testing.T) {
+	panicBuf := []byte{198, 73, 129, 133, 90, 216, 104, 29, 13, 134, 209, 233, 30, 0, 22}
+
 	for _, tc := range []struct {
 		In  string
 		Out string
@@ -38,6 +40,11 @@ func TestCleanUserAgent(t *testing.T) {
 		{
 			In:  `C:\Program Files\kubectl.exe/v1.5.4`,
 			Out: "kubectl.exe/v1.5.4",
+		},
+		{
+			// This malicious input courtesy of enisoc.
+			In:  string(panicBuf) + "kubectl.exe",
+			Out: "kubectl.exe",
 		},
 	} {
 		if cleanUserAgent(tc.In) != tc.Out {
