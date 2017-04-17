@@ -36,6 +36,7 @@ import (
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
@@ -224,12 +225,9 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting attach detach controller")
 	defer glog.Infof("Shutting down attach detach controller")
 
-	// TODO uncomment once we agree this is ok and we fix the attach/detach integration test that
-	// currently fails because it doesn't set pvcsSynced and pvsSynced to alwaysReady, so this
-	// controller never runs.
-	// if !controller.WaitForCacheSync("attach detach", stopCh, adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced) {
-	// 	return
-	// }
+	if !controller.WaitForCacheSync("attach detach", stopCh, adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced) {
+		return
+	}
 
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
