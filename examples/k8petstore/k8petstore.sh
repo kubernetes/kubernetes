@@ -141,7 +141,7 @@ cat << EOF > fe-s.json
     "ports": [{
       "port": 3000
     }],
-    "deprecatedPublicIPs":["$PUBLIC_IP","10.1.4.89"],
+    "externalIPs":["$PUBLIC_IP","10.1.4.89"],
     "selector": {
       "name": "frontend"
     }

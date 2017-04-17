@@ -3203,11 +3203,6 @@ func DeepCopy_v1_ServiceSpec(in interface{}, out interface{}, c *conversion.Clon
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
-		if in.DeprecatedPublicIPs != nil {
-			in, out := &in.DeprecatedPublicIPs, &out.DeprecatedPublicIPs
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
 		if in.LoadBalancerSourceRanges != nil {
 			in, out := &in.LoadBalancerSourceRanges, &out.LoadBalancerSourceRanges
 			*out = make([]string, len(*in))
