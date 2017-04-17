@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/ref"
 )
 
 // The EventExpansion interface allows manually adding extra methods to the EventInterface.
@@ -99,7 +100,7 @@ func (e *events) PatchWithEventNamespace(incompleteEvent *v1.Event, data []byte)
 // object must match this event's client namespace unless the event client
 // was made with the "" namespace.
 func (e *events) Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*v1.EventList, error) {
-	ref, err := v1.GetReference(scheme, objOrRef)
+	ref, err := ref.GetReference(scheme, objOrRef)
 	if err != nil {
 		return nil, err
 	}
