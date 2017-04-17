@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cluster.go",
+        "crudtester.go",
         "framework.go",
         "util.go",
     ],
@@ -18,6 +19,8 @@ go_library(
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
+        "//federation/pkg/federatedtypes:go_default_library",
+        "//federation/pkg/federatedtypes/crudtester:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
