@@ -30,11 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
+	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	utiltesting "k8s.io/client-go/util/testing"
 )
 
@@ -48,12 +49,13 @@ type TestParam struct {
 	testBodyErrorIsNotNil bool
 }
 
-// TestSerializer makes sure that you're always able to decode an unversioned API object
+// TestSerializer makes sure that you're always able to decode metav1.Status
 func TestSerializer(t *testing.T) {
+	gv := v1beta1.SchemeGroupVersion
 	contentConfig := ContentConfig{
 		ContentType:          "application/json",
-		GroupVersion:         &schema.GroupVersion{Group: "other", Version: runtime.APIVersionInternal},
-		NegotiatedSerializer: scheme.Codecs,
+		GroupVersion:         &gv,
+		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 	}
 
 	serializer, err := createSerializers(contentConfig)
@@ -229,12 +231,13 @@ func validate(testParam TestParam, t *testing.T, body []byte, fakeHandler *utilt
 			t.Errorf("Expected object not to be created")
 		}
 	}
-	statusOut, err := runtime.Decode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), body)
+	statusOut, err := runtime.Decode(scheme.Codecs.UniversalDeserializer(), body)
 	if testParam.testBody {
-		if testParam.testBodyErrorIsNotNil {
-			if err == nil {
-				t.Errorf("Expected Error")
-			}
+		if testParam.testBodyErrorIsNotNil && err == nil {
+			t.Errorf("Expected Error")
+		}
+		if !testParam.testBodyErrorIsNotNil && err != nil {
+			t.Errorf("Unexpected Error: %v", err)
 		}
 	}
 
@@ -315,7 +318,7 @@ func TestCreateBackoffManager(t *testing.T) {
 }
 
 func testServerEnv(t *testing.T, statusCode int) (*httptest.Server, *utiltesting.FakeHandler, *metav1.Status) {
-	status := &metav1.Status{Status: fmt.Sprintf("%s", metav1.StatusSuccess)}
+	status := &metav1.Status{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: fmt.Sprintf("%s", metav1.StatusSuccess)}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), status)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   statusCode,
@@ -332,7 +335,7 @@ func restClient(testServer *httptest.Server) (*RESTClient, error) {
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
 			GroupVersion:         &gvCopy,
-			NegotiatedSerializer: scheme.Codecs,
+			NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 		},
 		Username: "user",
 		Password: "pass",
