@@ -1390,7 +1390,7 @@ func TestWasCreated(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
