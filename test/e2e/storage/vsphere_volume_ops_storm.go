@@ -99,21 +99,24 @@ var _ = framework.KubeDescribe("vsphere volume operations storm [Volume]", func(
 		By("Creating PVCs using the Storage Class")
 		count := 0
 		for count < volume_ops_scale {
-			pvclaims[count] = framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, storageclass))
+			pvclaims[count], err = framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, storageclass))
+			Expect(err).NotTo(HaveOccurred())
 			count++
 		}
 
 		By("Waiting for all claims to be in bound phase")
-		persistentvolumes = framework.WaitForPVClaimBoundPhase(client, pvclaims)
+		persistentvolumes, err = framework.WaitForPVClaimBoundPhase(client, pvclaims)
+		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating pod to attach PVs to the node")
-		pod := framework.CreatePod(client, namespace, pvclaims, false, "")
+		pod, err := framework.CreatePod(client, namespace, pvclaims, false, "")
+		Expect(err).NotTo(HaveOccurred())
 
 		By("Verify all volumes are accessible and available in the pod")
 		verifyVSphereVolumesAccessible(pod, persistentvolumes, vsp)
 
 		By("Deleting pod")
-		framework.DeletePodWithWait(f, client, pod)
+		framework.ExpectNoError(framework.DeletePodWithWait(f, client, pod))
 
 		By("Waiting for volumes to be detached from the node")
 		for _, pv := range persistentvolumes {
