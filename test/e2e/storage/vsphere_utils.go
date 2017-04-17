@@ -53,7 +53,7 @@ func verifyVSphereDiskAttached(vsp *vsphere.VSphere, volumePath string, nodeName
 }
 
 // Wait until vsphere vmdk is deteched from the given node or time out after 5 minutes
-func waitForVSphereDiskToDetach(vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) {
+func waitForVSphereDiskToDetach(vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) error {
 	var (
 		err            error
 		diskAttached   = true
@@ -62,7 +62,9 @@ func waitForVSphereDiskToDetach(vsp *vsphere.VSphere, volumePath string, nodeNam
 	)
 	if vsp == nil {
 		vsp, err = vsphere.GetVSphere()
-		Expect(err).NotTo(HaveOccurred())
+		if err != nil {
+			return err
+		}
 	}
 	err = wait.Poll(detachPollTime, detachTimeout, func() (bool, error) {
 		diskAttached, err = verifyVSphereDiskAttached(vsp, volumePath, nodeName)
@@ -77,11 +79,13 @@ func waitForVSphereDiskToDetach(vsp *vsphere.VSphere, volumePath string, nodeNam
 		framework.Logf("Waiting for Volume %q to detach from %q.", volumePath, nodeName)
 		return false, nil
 	})
-	Expect(err).NotTo(HaveOccurred())
-	if diskAttached {
-		Expect(fmt.Errorf("Gave up waiting for Volume %q to detach from %q after %v", volumePath, nodeName, detachTimeout)).NotTo(HaveOccurred())
+	if err != nil {
+		return err
 	}
-
+	if diskAttached {
+		return fmt.Errorf("Gave up waiting for Volume %q to detach from %q after %v", volumePath, nodeName, detachTimeout)
+	}
+	return nil
 }
 
 // function to create vsphere volume spec with given VMDK volume path, Reclaim Policy and labels
