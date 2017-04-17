@@ -189,10 +189,12 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 		var err error
 		gvr, err = mapper.ResourceFor(groupResource.WithVersion(""))
 		if err != nil {
-			if len(groupResource.Group) == 0 {
-				fmt.Fprintf(o.Err, "Warning: the server doesn't have a resource type '%s'\n", groupResource.Resource)
-			} else {
-				fmt.Fprintf(o.Err, "Warning: the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group)
+			if groupResource.Resource != "*" {
+				if len(groupResource.Group) == 0 {
+					fmt.Fprintf(o.Err, "Warning: the server doesn't have a resource type '%s'\n", groupResource.Resource)
+				} else {
+					fmt.Fprintf(o.Err, "Warning: the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group)
+				}
 			}
 			return schema.GroupVersionResource{Resource: resourceArg}
 		}
