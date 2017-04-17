@@ -25,11 +25,12 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	runtimejson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	restclientwatch "k8s.io/client-go/rest/watch"
 )
@@ -39,10 +40,13 @@ func TestDecoder(t *testing.T) {
 
 	for _, eventType := range table {
 		out, in := io.Pipe()
-		codec := scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
+
+		jsonSerializer := runtimejson.NewSerializer(runtimejson.DefaultMetaFactory, scheme.Scheme, scheme.Scheme, false)
+		directCodecFactory := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+		codec := directCodecFactory.DecoderToVersion(jsonSerializer, v1.SchemeGroupVersion)
 		decoder := restclientwatch.NewDecoder(streaming.NewDecoder(out, codec), codec)
 
-		expect := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+		expect := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 		encoder := json.NewEncoder(in)
 		go func() {
 			data, err := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expect)
@@ -92,7 +96,9 @@ func TestDecoder(t *testing.T) {
 
 func TestDecoder_SourceClose(t *testing.T) {
 	out, in := io.Pipe()
-	codec := scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
+	jsonSerializer := runtimejson.NewSerializer(runtimejson.DefaultMetaFactory, scheme.Scheme, scheme.Scheme, false)
+	directCodecFactory := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	codec := directCodecFactory.DecoderToVersion(jsonSerializer, v1.SchemeGroupVersion)
 	decoder := restclientwatch.NewDecoder(streaming.NewDecoder(out, codec), codec)
 
 	done := make(chan struct{})
