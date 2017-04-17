@@ -446,7 +446,7 @@ func (daemonsetcontroller *DaemonSetController) reconcileDaemonSet(namespace str
 	}
 	err = daemonsetcontroller.federatedUpdater.UpdateWithOnError(operations, daemonsetcontroller.updateTimeout,
 		func(op util.FederatedOperation, operror error) {
-			daemonsetcontroller.eventRecorder.Eventf(baseDaemonSet, api.EventTypeNormal, "UpdateInClusterFailed",
+			daemonsetcontroller.eventRecorder.Eventf(baseDaemonSet, api.EventTypeWarning, "UpdateInClusterFailed",
 				"DaemonSet update in cluster %s failed: %v", op.ClusterName, operror)
 		})
 

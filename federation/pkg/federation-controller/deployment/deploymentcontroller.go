@@ -615,7 +615,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		return statusAllOk, nil
 	}
 	err = fdc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
-		fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "FailedUpdateInCluster",
+		fdc.eventRecorder.Eventf(fd, api.EventTypeWarning, "FailedUpdateInCluster",
 			"Deployment update in cluster %s failed: %v", op.ClusterName, operror)
 	})
 	if err != nil {
