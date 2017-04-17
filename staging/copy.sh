@@ -232,4 +232,5 @@ echo "move to the client repo"
 if [ "${DRY_RUN}" = false ]; then
   ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
   mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
+  git checkout HEAD -- $(find "${KUBE_ROOT}/staging/src/" -name BUILD)
 fi
