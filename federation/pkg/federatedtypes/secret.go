@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package typeadapters
+package federatedtypes
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -27,20 +28,25 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
+const (
+	SecretKind           = "secret"
+	SecretControllerName = "secrets"
+)
+
+func init() {
+	RegisterFederatedType(SecretKind, SecretControllerName, []schema.GroupVersionResource{apiv1.SchemeGroupVersion.WithResource(SecretControllerName)}, NewSecretAdapter)
+}
+
 type SecretAdapter struct {
 	client federationclientset.Interface
 }
 
-func NewSecretAdapter(client federationclientset.Interface) *SecretAdapter {
+func NewSecretAdapter(client federationclientset.Interface) FederatedTypeAdapter {
 	return &SecretAdapter{client: client}
 }
 
-func (a *SecretAdapter) SetClient(client federationclientset.Interface) {
-	a.client = client
-}
-
 func (a *SecretAdapter) Kind() string {
-	return "secret"
+	return SecretKind
 }
 
 func (a *SecretAdapter) ObjectType() pkgruntime.Object {

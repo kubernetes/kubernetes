@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
@@ -34,12 +33,11 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
-	"k8s.io/kubernetes/federation/pkg/typeadapters"
 	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 
@@ -48,11 +46,6 @@ import (
 
 const (
 	allClustersKey = "ALL_CLUSTERS"
-	ControllerName = "secrets"
-)
-
-var (
-	RequiredResources = []schema.GroupVersionResource{apiv1.SchemeGroupVersion.WithResource("secrets")}
 )
 
 // FederationSyncController synchronizes the state of a federated type
@@ -90,34 +83,24 @@ type FederationSyncController struct {
 	smallDelay            time.Duration
 	updateTimeout         time.Duration
 
-	adapter typeadapters.FederatedTypeAdapter
+	adapter federatedtypes.FederatedTypeAdapter
 }
 
-// StartSecretController starts a new secret controller
-func StartSecretController(config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
-	startFederationSyncController(&typeadapters.SecretAdapter{}, config, stopChan, minimizeLatency)
-}
-
-// newSecretController returns a new secret controller
-func newSecretController(client federationclientset.Interface) *FederationSyncController {
-	return newFederationSyncController(client, typeadapters.NewSecretAdapter(client))
-}
-
-// startFederationSyncController starts a new sync controller for the given type adapter
-func startFederationSyncController(adapter typeadapters.FederatedTypeAdapter, config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
-	restclient.AddUserAgent(config, fmt.Sprintf("%s-controller", adapter.Kind()))
+// StartFederationSyncController starts a new sync controller for a type adapter
+func StartFederationSyncController(kind string, adapterFactory federatedtypes.AdapterFactory, config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
+	restclient.AddUserAgent(config, fmt.Sprintf("%s-controller", kind))
 	client := federationclientset.NewForConfigOrDie(config)
-	adapter.SetClient(client)
+	adapter := adapterFactory(client)
 	controller := newFederationSyncController(client, adapter)
 	if minimizeLatency {
 		controller.minimizeLatency()
 	}
-	glog.Infof(fmt.Sprintf("Starting federated sync controller for %s resources", adapter.Kind()))
+	glog.Infof(fmt.Sprintf("Starting federated sync controller for %s resources", kind))
 	controller.Run(stopChan)
 }
 
 // newFederationSyncController returns a new sync controller for the given client and type adapter
-func newFederationSyncController(client federationclientset.Interface, adapter typeadapters.FederatedTypeAdapter) *FederationSyncController {
+func newFederationSyncController(client federationclientset.Interface, adapter federatedtypes.FederatedTypeAdapter) *FederationSyncController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
 	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: fmt.Sprintf("federated-%v-controller", adapter.Kind())})

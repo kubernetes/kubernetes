@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package typeadapters
+package federatedtypes
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,8 +29,6 @@ import (
 // federated type.  Code written to this interface can then target any
 // type for which an implementation of this interface exists.
 type FederatedTypeAdapter interface {
-	SetClient(client federationclientset.Interface)
-
 	Kind() string
 	ObjectType() pkgruntime.Object
 	IsExpectedType(obj interface{}) bool
@@ -57,3 +55,9 @@ type FederatedTypeAdapter interface {
 
 	NewTestObject(namespace string) pkgruntime.Object
 }
+
+// AdapterFactory defines the function signature for factory methods
+// that create instances of FederatedTypeAdapter.  Such methods should
+// be registered with RegisterAdapterFactory to ensure the type
+// adapter is discoverable.
+type AdapterFactory func(client federationclientset.Interface) FederatedTypeAdapter
