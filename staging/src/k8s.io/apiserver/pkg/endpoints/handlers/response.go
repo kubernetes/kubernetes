@@ -72,7 +72,10 @@ func transformResponseObject(ctx request.Context, scope RequestScope, req *http.
 						scope.err(err, w, req)
 						return
 					}
-					item.Object.Object = meta.AsPartialObjectMetadata(m)
+					// TODO: turn this into an internal type and do conversion in order to get object kind automatically set?
+					partial := meta.AsPartialObjectMetadata(m)
+					partial.GetObjectKind().SetGroupVersionKind(metav1alpha1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
+					item.Object.Object = partial
 				}
 			}
 
