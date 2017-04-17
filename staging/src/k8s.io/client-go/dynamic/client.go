@@ -281,10 +281,10 @@ var defaultParameterEncoder runtime.ParameterCodec = parameterCodec{}
 type versionedParameterEncoderWithV1Fallback struct{}
 
 func (versionedParameterEncoderWithV1Fallback) EncodeParameters(obj runtime.Object, to schema.GroupVersion) (url.Values, error) {
-	ret, err := api.ParameterCodec.EncodeParameters(obj, to)
+	ret, err := scheme.ParameterCodec.EncodeParameters(obj, to)
 	if err != nil && runtime.IsNotRegisteredError(err) {
 		// fallback to v1
-		return api.ParameterCodec.EncodeParameters(obj, v1.SchemeGroupVersion)
+		return scheme.ParameterCodec.EncodeParameters(obj, v1.SchemeGroupVersion)
 	}
 	return ret, err
 }
