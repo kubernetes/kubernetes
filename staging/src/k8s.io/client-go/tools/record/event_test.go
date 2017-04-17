@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/pkg/api"
 	_ "k8s.io/client-go/pkg/api/install" // To register api.Pod used in tests below
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/v1/ref"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/clock"
 )
@@ -119,8 +120,8 @@ func TestEventf(t *testing.T) {
 			UID:       "differentUid",
 		},
 	}
-	testRef, err := v1.GetPartialReference(api.Scheme, testPod, "spec.containers[2]")
-	testRef2, err := v1.GetPartialReference(api.Scheme, testPod2, "spec.containers[3]")
+	testRef, err := ref.GetPartialReference(api.Scheme, testPod, "spec.containers[2]")
+	testRef2, err := ref.GetPartialReference(api.Scheme, testPod2, "spec.containers[3]")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -531,7 +532,7 @@ func TestEventfNoNamespace(t *testing.T) {
 			UID:      "bar",
 		},
 	}
-	testRef, err := v1.GetPartialReference(api.Scheme, testPod, "spec.containers[2]")
+	testRef, err := ref.GetPartialReference(api.Scheme, testPod, "spec.containers[2]")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -637,8 +638,8 @@ func TestMultiSinkCache(t *testing.T) {
 			UID:       "differentUid",
 		},
 	}
-	testRef, err := v1.GetPartialReference(api.Scheme, testPod, "spec.containers[2]")
-	testRef2, err := v1.GetPartialReference(api.Scheme, testPod2, "spec.containers[3]")
+	testRef, err := ref.GetPartialReference(api.Scheme, testPod, "spec.containers[2]")
+	testRef2, err := ref.GetPartialReference(api.Scheme, testPod2, "spec.containers[3]")
 	if err != nil {
 		t.Fatal(err)
 	}

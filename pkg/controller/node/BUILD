@@ -29,6 +29,7 @@ go_library(
         "//pkg/api/helper:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
+        "//pkg/api/v1/node:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/core/v1:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/extensions/v1beta1:go_default_library",

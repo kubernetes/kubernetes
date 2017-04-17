@@ -25,6 +25,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 )
@@ -112,7 +113,7 @@ func (dsc *DaemonSetsController) getUnavailableNumbers(ds *extensions.DaemonSet,
 		}
 		available := false
 		for _, pod := range daemonPods {
-			if v1.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+			if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
 				available = true
 				break
 			}
