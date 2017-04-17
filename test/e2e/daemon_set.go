@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -527,7 +528,7 @@ func checkDaemonPodOnNodes(f *framework.Framework, ds *extensions.DaemonSet, nod
 			if pod.DeletionTimestamp != nil {
 				continue
 			}
-			if v1.IsPodAvailable(&pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+			if podutil.IsPodAvailable(&pod, ds.Spec.MinReadySeconds, metav1.Now()) {
 				nodesToPodCount[pod.Spec.NodeName] += 1
 			}
 		}
@@ -613,7 +614,7 @@ func checkDaemonPodsImageAndAvailability(c clientset.Interface, ds *extensions.D
 				allImagesUpdated = false
 				framework.Logf("Wrong image for pod: %s. Expected: %s, got: %s.", pod.Name, image, podImage)
 			}
-			if !v1.IsPodAvailable(&pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+			if !podutil.IsPodAvailable(&pod, ds.Spec.MinReadySeconds, metav1.Now()) {
 				framework.Logf("Pod %s is not available", pod.Name)
 				unavailablePods++
 			}

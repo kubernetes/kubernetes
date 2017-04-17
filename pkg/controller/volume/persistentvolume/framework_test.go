@@ -739,7 +739,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 			Phase: phase,
 		},
 	}
-	// Make sure v1.GetReference(claim) works
+	// Make sure ref.GetReference(claim) works
 	claim.ObjectMeta.SelfLink = testapi.Default.SelfLink("pvc", name)
 
 	if len(annotations) > 0 {

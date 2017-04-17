@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/ref"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -393,5 +394,5 @@ func deleteJob(sj *batchv2alpha1.CronJob, job *batchv1.Job, jc jobControlInterfa
 }
 
 func getRef(object runtime.Object) (*v1.ObjectReference, error) {
-	return v1.GetReference(api.Scheme, object)
+	return ref.GetReference(api.Scheme, object)
 }
