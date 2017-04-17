@@ -80,7 +80,7 @@ ETCD_QUORUM_READ="${ENABLE_ETCD_QUORUM_READ:-false}"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 NODE_TAG="${INSTANCE_PREFIX}-minion"
 
-CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.180.0.0/14}"
+CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.100.0.0/14}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # NODE_IP_RANGE is used when ENABLE_IP_ALIASES=true. It is the primary range in
 # the subnet and is the range used for node instance IPs.
