@@ -16,7 +16,7 @@ limitations under the License.
 
 package remotecommand
 
-// TermimanlSize and TerminalSizeQueue was a part of k8s.io/kubernetes/pkg/util/term
+// TerminalSize and TerminalSizeQueue was a part of k8s.io/kubernetes/pkg/util/term
 // and were moved in order to decouple client from other term dependencies
 
 // TerminalSize represents the width and height of a terminal.
