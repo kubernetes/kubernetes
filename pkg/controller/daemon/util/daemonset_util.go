@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
@@ -52,7 +53,7 @@ func SplitByAvailablePods(minReadySeconds int32, pods []*v1.Pod) ([]*v1.Pod, []*
 	unavailablePods := []*v1.Pod{}
 	availablePods := []*v1.Pod{}
 	for _, pod := range pods {
-		if v1.IsPodAvailable(pod, minReadySeconds, metav1.Now()) {
+		if podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now()) {
 			availablePods = append(availablePods, pod)
 		} else {
 			unavailablePods = append(unavailablePods, pod)

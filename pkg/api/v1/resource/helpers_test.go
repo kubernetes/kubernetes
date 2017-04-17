@@ -14,23 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package resource
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestResourceHelpers(t *testing.T) {
 	cpuLimit := resource.MustParse("10")
 	memoryLimit := resource.MustParse("10G")
-	resourceSpec := ResourceRequirements{
-		Limits: ResourceList{
+	resourceSpec := v1.ResourceRequirements{
+		Limits: v1.ResourceList{
 			"cpu":             cpuLimit,
 			"memory":          memoryLimit,
 			"kube.io/storage": memoryLimit,
@@ -42,8 +41,8 @@ func TestResourceHelpers(t *testing.T) {
 	if res := resourceSpec.Limits.Memory(); res.Cmp(memoryLimit) != 0 {
 		t.Errorf("expected memorylimit %v, got %v", memoryLimit, res)
 	}
-	resourceSpec = ResourceRequirements{
-		Limits: ResourceList{
+	resourceSpec = v1.ResourceRequirements{
+		Limits: v1.ResourceList{
 			"memory":          memoryLimit,
 			"kube.io/storage": memoryLimit,
 		},
@@ -57,7 +56,7 @@ func TestResourceHelpers(t *testing.T) {
 }
 
 func TestDefaultResourceHelpers(t *testing.T) {
-	resourceList := ResourceList{}
+	resourceList := v1.ResourceList{}
 	if resourceList.Cpu().Format != resource.DecimalSI {
 		t.Errorf("expected %v, actual %v", resource.DecimalSI, resourceList.Cpu().Format)
 	}
@@ -66,71 +65,16 @@ func TestDefaultResourceHelpers(t *testing.T) {
 	}
 }
 
-func newPod(now metav1.Time, ready bool, beforeSec int) *Pod {
-	conditionStatus := ConditionFalse
-	if ready {
-		conditionStatus = ConditionTrue
-	}
-	return &Pod{
-		Status: PodStatus{
-			Conditions: []PodCondition{
-				{
-					Type:               PodReady,
-					LastTransitionTime: metav1.NewTime(now.Time.Add(-1 * time.Duration(beforeSec) * time.Second)),
-					Status:             conditionStatus,
-				},
-			},
-		},
-	}
-}
-
-func TestIsPodAvailable(t *testing.T) {
-	now := metav1.Now()
-	tests := []struct {
-		pod             *Pod
-		minReadySeconds int32
-		expected        bool
-	}{
-		{
-			pod:             newPod(now, false, 0),
-			minReadySeconds: 0,
-			expected:        false,
-		},
-		{
-			pod:             newPod(now, true, 0),
-			minReadySeconds: 1,
-			expected:        false,
-		},
-		{
-			pod:             newPod(now, true, 0),
-			minReadySeconds: 0,
-			expected:        true,
-		},
-		{
-			pod:             newPod(now, true, 51),
-			minReadySeconds: 50,
-			expected:        true,
-		},
-	}
-
-	for i, test := range tests {
-		isAvailable := IsPodAvailable(test.pod, test.minReadySeconds, now)
-		if isAvailable != test.expected {
-			t.Errorf("[tc #%d] expected available pod: %t, got: %t", i, test.expected, isAvailable)
-		}
-	}
-}
-
 func TestExtractResourceValue(t *testing.T) {
 	cases := []struct {
-		fs            *ResourceFieldSelector
-		pod           *Pod
+		fs            *v1.ResourceFieldSelector
+		pod           *v1.Pod
 		cName         string
 		expectedValue string
 		expectedError error
 	}{
 		{
-			fs: &ResourceFieldSelector{
+			fs: &v1.ResourceFieldSelector{
 				Resource: "limits.cpu",
 			},
 			cName:         "foo",
@@ -138,7 +82,7 @@ func TestExtractResourceValue(t *testing.T) {
 			expectedValue: "9",
 		},
 		{
-			fs: &ResourceFieldSelector{
+			fs: &v1.ResourceFieldSelector{
 				Resource: "requests.cpu",
 			},
 			cName:         "foo",
@@ -146,7 +90,7 @@ func TestExtractResourceValue(t *testing.T) {
 			expectedValue: "0",
 		},
 		{
-			fs: &ResourceFieldSelector{
+			fs: &v1.ResourceFieldSelector{
 				Resource: "requests.cpu",
 			},
 			cName:         "foo",
@@ -154,7 +98,7 @@ func TestExtractResourceValue(t *testing.T) {
 			expectedValue: "8",
 		},
 		{
-			fs: &ResourceFieldSelector{
+			fs: &v1.ResourceFieldSelector{
 				Resource: "requests.cpu",
 			},
 			cName:         "foo",
@@ -162,7 +106,7 @@ func TestExtractResourceValue(t *testing.T) {
 			expectedValue: "1",
 		},
 		{
-			fs: &ResourceFieldSelector{
+			fs: &v1.ResourceFieldSelector{
 				Resource: "requests.cpu",
 				Divisor:  resource.MustParse("100m"),
 			},
@@ -171,7 +115,7 @@ func TestExtractResourceValue(t *testing.T) {
 			expectedValue: "12",
 		},
 		{
-			fs: &ResourceFieldSelector{
+			fs: &v1.ResourceFieldSelector{
 				Resource: "requests.memory",
 			},
 			cName:         "foo",
@@ -179,7 +123,7 @@ func TestExtractResourceValue(t *testing.T) {
 			expectedValue: "104857600",
 		},
 		{
-			fs: &ResourceFieldSelector{
+			fs: &v1.ResourceFieldSelector{
 				Resource: "requests.memory",
 				Divisor:  resource.MustParse("1Mi"),
 			},
@@ -188,7 +132,7 @@ func TestExtractResourceValue(t *testing.T) {
 			expectedValue: "100",
 		},
 		{
-			fs: &ResourceFieldSelector{
+			fs: &v1.ResourceFieldSelector{
 				Resource: "limits.memory",
 			},
 			cName:         "foo",
@@ -208,26 +152,26 @@ func TestExtractResourceValue(t *testing.T) {
 	}
 }
 
-func getPod(cname, cpuRequest, cpuLimit, memoryRequest, memoryLimit string) *Pod {
-	resources := ResourceRequirements{
-		Limits:   make(ResourceList),
-		Requests: make(ResourceList),
+func getPod(cname, cpuRequest, cpuLimit, memoryRequest, memoryLimit string) *v1.Pod {
+	resources := v1.ResourceRequirements{
+		Limits:   make(v1.ResourceList),
+		Requests: make(v1.ResourceList),
 	}
 	if cpuLimit != "" {
-		resources.Limits[ResourceCPU] = resource.MustParse(cpuLimit)
+		resources.Limits[v1.ResourceCPU] = resource.MustParse(cpuLimit)
 	}
 	if memoryLimit != "" {
-		resources.Limits[ResourceMemory] = resource.MustParse(memoryLimit)
+		resources.Limits[v1.ResourceMemory] = resource.MustParse(memoryLimit)
 	}
 	if cpuRequest != "" {
-		resources.Requests[ResourceCPU] = resource.MustParse(cpuRequest)
+		resources.Requests[v1.ResourceCPU] = resource.MustParse(cpuRequest)
 	}
 	if memoryRequest != "" {
-		resources.Requests[ResourceMemory] = resource.MustParse(memoryRequest)
+		resources.Requests[v1.ResourceMemory] = resource.MustParse(memoryRequest)
 	}
-	return &Pod{
-		Spec: PodSpec{
-			Containers: []Container{
+	return &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:      cname,
 					Resources: resources,
