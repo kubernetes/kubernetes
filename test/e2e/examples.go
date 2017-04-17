@@ -414,7 +414,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
 					pod, err := c.Core().Pods(ns).Get(podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
-					stat := v1.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
+					statusInfo := v1.GetContainerStatusInfo(pod.Status.ContainerStatuses)
+					stat := statusInfo[podName]
 					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
 					if stat.RestartCount > 0 {
 						framework.Logf("Saw %v restart, succeeded...", podName)

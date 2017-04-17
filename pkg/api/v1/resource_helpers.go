@@ -62,22 +62,13 @@ func (self *ResourceList) NvidiaGPU() *resource.Quantity {
 	return &resource.Quantity{}
 }
 
-func GetContainerStatus(statuses []ContainerStatus, name string) (ContainerStatus, bool) {
+func GetContainerStatusInfo(statuses []ContainerStatus) map[string]ContainerStatus {
+	info := make(map[string]ContainerStatus)
 	for i := range statuses {
-		if statuses[i].Name == name {
-			return statuses[i], true
-		}
+		name := statuses[i].Name
+		info[name] = statuses[i]
 	}
-	return ContainerStatus{}, false
-}
-
-func GetExistingContainerStatus(statuses []ContainerStatus, name string) ContainerStatus {
-	for i := range statuses {
-		if statuses[i].Name == name {
-			return statuses[i]
-		}
-	}
-	return ContainerStatus{}
+	return info
 }
 
 // IsPodAvailable returns true if a pod is available; false otherwise.
