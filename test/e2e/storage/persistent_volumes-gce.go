@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -41,11 +42,13 @@ func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
 // initializeGCETestSpec creates a PV, PVC, and ClientPod that will run until killed by test or clean up.
 func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig framework.PersistentVolumeConfig, pvcConfig framework.PersistentVolumeClaimConfig, isPrebound bool) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	By("Creating the PV and PVC")
-	pv, pvc := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, isPrebound)
-	framework.WaitOnPVandPVC(c, ns, pv, pvc)
+	pv, pvc, err := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, isPrebound)
+	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 
 	By("Creating the Client Pod")
-	clientPod := framework.CreateClientPod(c, ns, pvc)
+	clientPod, err := framework.CreateClientPod(c, ns, pvc)
+	Expect(err).NotTo(HaveOccurred())
 	return clientPod, pv, pvc
 }
 
@@ -104,11 +107,13 @@ var _ = framework.KubeDescribe("PersistentVolumes:GCEPD [Volume]", func() {
 	AfterEach(func() {
 		framework.Logf("AfterEach: Cleaning up test resources")
 		if c != nil {
-			framework.DeletePodWithWait(f, c, clientPod)
-			framework.PVPVCCleanup(c, ns, pv, pvc)
+			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod))
+			if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
+				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+			}
 			clientPod, pv, pvc, node = nil, nil, nil, ""
 			if diskName != "" {
-				framework.DeletePDWithRetry(diskName)
+				framework.ExpectNoError(framework.DeletePDWithRetry(diskName))
 			}
 		}
 	})
@@ -118,15 +123,14 @@ var _ = framework.KubeDescribe("PersistentVolumes:GCEPD [Volume]", func() {
 	It("should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach", func() {
 
 		By("Deleting the Claim")
-		framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
-		verifyGCEDiskAttached(diskName, node)
+		framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Unable to delete PVC ", pvc.Name)
+		Expect(verifyGCEDiskAttached(diskName, node)).To(BeTrue())
 
 		By("Deleting the Pod")
-		framework.DeletePodWithWait(f, c, clientPod)
+		framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "Failed to delete pod ", clientPod.Name)
 
 		By("Verifying Persistent Disk detach")
-		err = waitForPDDetach(diskName, node)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(waitForPDDetach(diskName, node), "PD ", diskName, " did not detach")
 	})
 
 	// Attach a persistent disk to a pod using a PVC.
@@ -134,15 +138,14 @@ var _ = framework.KubeDescribe("PersistentVolumes:GCEPD [Volume]", func() {
 	It("should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach", func() {
 
 		By("Deleting the Persistent Volume")
-		framework.DeletePersistentVolume(c, pv.Name)
-		verifyGCEDiskAttached(diskName, node)
+		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
+		Expect(verifyGCEDiskAttached(diskName, node)).To(BeTrue())
 
 		By("Deleting the client pod")
-		framework.DeletePodWithWait(f, c, clientPod)
+		framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "Failed to delete pod ", clientPod.Name)
 
 		By("Verifying Persistent Disk detaches")
-		err = waitForPDDetach(diskName, node)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(waitForPDDetach(diskName, node), "PD ", diskName, " did not detach")
 	})
 
 	// Test that a Pod and PVC attached to a GCEPD successfully unmounts and detaches when the encompassing Namespace is deleted.
@@ -156,7 +159,6 @@ var _ = framework.KubeDescribe("PersistentVolumes:GCEPD [Volume]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Verifying Persistent Disk detaches")
-		err = waitForPDDetach(diskName, node)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(waitForPDDetach(diskName, node), "PD ", diskName, " did not detach")
 	})
 })
