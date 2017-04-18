@@ -2143,7 +2143,7 @@ func TestPrintService(t *testing.T) {
 		printService(&test.service, buf, printers.PrintOptions{})
 		// We ignore time
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s %d", test.expect, buf.String(), strings.Compare(test.expect, buf.String()))
+			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
