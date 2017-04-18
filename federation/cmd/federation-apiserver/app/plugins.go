@@ -24,6 +24,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Admission policies
+	_ "k8s.io/kubernetes/federation/plugin/pkg/admission/schedulingpolicy"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/admit"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/deny"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/gc"
