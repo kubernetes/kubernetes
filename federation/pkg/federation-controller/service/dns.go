@@ -154,9 +154,20 @@ func getDnsZone(dnsZoneName string, dnsZoneID string, dnsZonesInterface dnsprovi
 	}
 }
 
-//   Note that if the named resource record set does not exist, but no error occurred, the returned set, and error, are both nil
-func getRrset(dnsName string, rrsetsInterface dnsprovider.ResourceRecordSets) (dnsprovider.ResourceRecordSet, error) {
+// NOTE: that if the named resource record set does not exist, but no
+// error occurred, the returned list will be empty, and the error will
+// be nil
+func getRrset(dnsName string, rrsetsInterface dnsprovider.ResourceRecordSets) ([]dnsprovider.ResourceRecordSet, error) {
 	return rrsetsInterface.Get(dnsName)
+}
+
+func findRrset(list []dnsprovider.ResourceRecordSet, rrset dnsprovider.ResourceRecordSet) dnsprovider.ResourceRecordSet {
+	for i, elem := range list {
+		if dnsprovider.ResourceRecordSetsEquivalent(rrset, elem) {
+			return list[i]
+		}
+	}
+	return nil
 }
 
 /* getResolvedEndpoints performs DNS resolution on the provided slice of endpoints (which might be DNS names or IPv4 addresses)
@@ -190,11 +201,11 @@ func (s *ServiceController) ensureDnsRrsets(dnsZone dnsprovider.Zone, dnsName st
 	if !supported {
 		return fmt.Errorf("Failed to ensure DNS records for %s. DNS provider does not support the ResourceRecordSets interface.", dnsName)
 	}
-	rrset, err := getRrset(dnsName, rrsets) // TODO: rrsets.Get(dnsName)
+	rrsetList, err := getRrset(dnsName, rrsets) // TODO: rrsets.Get(dnsName)
 	if err != nil {
 		return err
 	}
-	if rrset == nil {
+	if len(rrsetList) == 0 {
 		glog.V(4).Infof("No recordsets found for DNS name %q.  Need to add either A records (if we have healthy endpoints), or a CNAME record to %q", dnsName, uplevelCname)
 		if len(endpoints) < 1 {
 			glog.V(4).Infof("There are no healthy endpoint addresses at level %q, so CNAME to %q, if provided", dnsName, uplevelCname)
@@ -228,57 +239,59 @@ func (s *ServiceController) ensureDnsRrsets(dnsZone dnsprovider.Zone, dnsName st
 			glog.V(4).Infof("Successfully added recordset %v", newRrset)
 		}
 	} else {
-		// the rrset already exists, so make it right.
-		glog.V(4).Infof("Recordset %v already exists.  Ensuring that it is correct.", rrset)
+		// the rrsets already exists, so make it right.
+		glog.V(4).Infof("Recordset %v already exists. Ensuring that it is correct.", rrsetList)
 		if len(endpoints) < 1 {
 			// Need an appropriate CNAME record.  Check that we have it.
 			newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
-			glog.V(4).Infof("No healthy endpoints for %s.  Have recordset %v. Need recordset %v", dnsName, rrset, newRrset)
-			if dnsprovider.ResourceRecordSetsEquivalent(rrset, newRrset) {
+			glog.V(4).Infof("No healthy endpoints for %s. Have recordsets %v. Need recordset %v", dnsName, rrsetList, newRrset)
+			found := findRrset(rrsetList, newRrset)
+			if found != nil {
 				// The existing rrset is equivalent to the required one - our work is done here
-				glog.V(4).Infof("Existing recordset %v is equivalent to needed recordset %v, our work is done here.", rrset, newRrset)
+				glog.V(4).Infof("Existing recordset %v is equivalent to needed recordset %v, our work is done here.", rrsetList, newRrset)
 				return nil
 			} else {
 				// Need to replace the existing one with a better one (or just remove it if we have no healthy endpoints).
-				glog.V(4).Infof("Existing recordset %v not equivalent to needed recordset %v removing existing and adding needed.", rrset, newRrset)
+				glog.V(4).Infof("Existing recordset %v not equivalent to needed recordset %v removing existing and adding needed.", rrsetList, newRrset)
 				changeSet := rrsets.StartChangeset()
-				changeSet.Remove(rrset)
+				changeSet.Remove(found)
 				if uplevelCname != "" {
 					changeSet.Add(newRrset)
 					if err := changeSet.Apply(); err != nil {
 						return err
 					}
-					glog.V(4).Infof("Successfully replaced needed recordset %v -> %v", rrset, newRrset)
+					glog.V(4).Infof("Successfully replaced needed recordset %v -> %v", found, newRrset)
 				} else {
 					if err := changeSet.Apply(); err != nil {
 						return err
 					}
-					glog.V(4).Infof("Successfully removed existing recordset %v", rrset)
+					glog.V(4).Infof("Successfully removed existing recordset %v", found)
 					glog.V(4).Infof("Uplevel CNAME is empty string. Not adding recordset %v", newRrset)
 				}
 			}
 		} else {
 			// We have an rrset in DNS, possibly with some missing addresses and some unwanted addresses.
 			// And we have healthy endpoints.  Just replace what's there with the healthy endpoints, if it's not already correct.
-			glog.V(4).Infof("%s: Healthy endpoints %v exist.  Recordset %v exists.  Reconciling.", dnsName, endpoints, rrset)
+			glog.V(4).Infof("%s: Healthy endpoints %v exist. Recordset %v exists.  Reconciling.", dnsName, endpoints, rrsetList)
 			resolvedEndpoints, err := getResolvedEndpoints(endpoints)
 			if err != nil { // Some invalid addresses or otherwise unresolvable DNS names.
 				return err // TODO: We could potentially add the ones we did get back, even if some of them failed to resolve.
 			}
 			newRrset := rrsets.New(dnsName, resolvedEndpoints, minDnsTtl, rrstype.A)
-			glog.V(4).Infof("Have recordset %v. Need recordset %v", rrset, newRrset)
-			if dnsprovider.ResourceRecordSetsEquivalent(rrset, newRrset) {
-				glog.V(4).Infof("Existing recordset %v is equivalent to needed recordset %v, our work is done here.", rrset, newRrset)
+			glog.V(4).Infof("Have recordset %v. Need recordset %v", rrsetList, newRrset)
+			found := findRrset(rrsetList, newRrset)
+			if found != nil {
+				glog.V(4).Infof("Existing recordset %v is equivalent to needed recordset %v, our work is done here.", found, newRrset)
 				// TODO: We could be more thorough about checking for equivalence to avoid unnecessary updates, but in the
 				//       worst case we'll just replace what's there with an equivalent, if not exactly identical record set.
 				return nil
 			} else {
 				// Need to replace the existing one with a better one
-				glog.V(4).Infof("Existing recordset %v is not equivalent to needed recordset %v, removing existing and adding needed.", rrset, newRrset)
-				if err = rrsets.StartChangeset().Remove(rrset).Add(newRrset).Apply(); err != nil {
+				glog.V(4).Infof("Existing recordset %v is not equivalent to needed recordset %v, removing existing and adding needed.", found, newRrset)
+				if err = rrsets.StartChangeset().Remove(found).Add(newRrset).Apply(); err != nil {
 					return err
 				}
-				glog.V(4).Infof("Successfully replaced recordset %v -> %v", rrset, newRrset)
+				glog.V(4).Infof("Successfully replaced recordset %v -> %v", found, newRrset)
 			}
 		}
 	}

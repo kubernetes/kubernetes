@@ -48,19 +48,30 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 	return list, nil
 }
 
-func (rrsets ResourceRecordSets) Get(name string) (dnsprovider.ResourceRecordSet, error) {
-	var newRrset dnsprovider.ResourceRecordSet
-	rrsetList, err := rrsets.List()
+func (rrsets ResourceRecordSets) Get(name string) ([]dnsprovider.ResourceRecordSet, error) {
+	// This list implementation is very similar to the one implemented in
+	// the List() method above, but it restricts the retrieved list to
+	// the records whose name match the given `name`.
+	input := route53.ListResourceRecordSetsInput{
+		HostedZoneId:    rrsets.zone.impl.Id,
+		StartRecordName: aws.String(name),
+	}
+
+	var list []dnsprovider.ResourceRecordSet
+	err := rrsets.zone.zones.interface_.service.ListResourceRecordSetsPages(&input, func(page *route53.ListResourceRecordSetsOutput, lastPage bool) bool {
+		for _, rrset := range page.ResourceRecordSets {
+			if aws.StringValue(rrset.Name) != name {
+				return false
+			}
+			list = append(list, &ResourceRecordSet{rrset, &rrsets})
+		}
+		return true
+	})
 	if err != nil {
 		return nil, err
 	}
-	for _, rrset := range rrsetList {
-		if rrset.Name() == name {
-			newRrset = rrset
-			break
-		}
-	}
-	return newRrset, nil
+
+	return list, nil
 }
 
 func (r ResourceRecordSets) StartChangeset() dnsprovider.ResourceRecordChangeset {
