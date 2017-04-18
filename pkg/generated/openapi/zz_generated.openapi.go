@@ -3942,6 +3942,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 		"k8s.io/kubernetes/pkg/api/v1.HostMapping": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
+					Description: "HostMapping holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
 					Properties: map[string]spec.Schema{
 						"IP": {
 							SchemaProps: spec.SchemaProps{
@@ -6782,7 +6783,8 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 							SchemaProps: spec.SchemaProps{
-								Type: []string{"array"},
+								Description: "HostMappings is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods.",
+								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
