@@ -1,5 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
+load("@io_kubernetes_build//defs:build.bzl", "md5sum")
 load("@io_bazel//tools/build_defs/docker:docker.bzl", "docker_build")
 
 filegroup(
@@ -69,13 +70,9 @@ DOCKERIZED_BINARIES = {
     },
 }
 
-[genrule(
-    name = binary + "_docker_tag",
-    srcs = [meta["target"]],
-    outs = [binary + ".docker_tag"],
-    # Currently each target has two outputs, the binary and its library, so hash only the first item (the binary).
-    # This can be made less hacky when we have static linking working.
-    cmd = "md5sum $(locations " + meta["target"] + ") | grep '" + binary + "'$$ | cut -f1 -d' ' | tr -d '\n' > $@",
+[md5sum(
+    name = binary + ".docker_tag",
+    src = meta["target"],
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
 
 [docker_build(
@@ -101,4 +98,74 @@ filegroup(
     name = "docker-artifacts",
     srcs = [":%s.tar" % binary for binary in DOCKERIZED_BINARIES.keys()] +
            [":%s.docker_tag" % binary for binary in DOCKERIZED_BINARIES.keys()],
+)
+
+# KUBE_CLIENT_TARGETS
+filegroup(
+    name = "client-targets",
+    srcs = [
+        "//cmd/kubectl",
+        "//federation/cmd/kubefed",
+    ],
+)
+
+# KUBE_NODE_TARGETS
+filegroup(
+    name = "node-targets",
+    srcs = [
+        "//cmd/kube-proxy",
+        "//cmd/kubelet",
+    ],
+)
+
+# KUBE_SERVER_TARGETS
+# No need to duplicate CLIENT_TARGETS or NODE_TARGETS here,
+# since we include them in the actual build rule.
+filegroup(
+    name = "server-targets",
+    srcs = [
+        "//cmd/cloud-controller-manager",
+        "//cmd/hyperkube",
+        "//cmd/kube-apiserver",
+        "//cmd/kube-controller-manager",
+        "//cmd/kubeadm",
+        "//plugin/cmd/kube-scheduler",
+        "//vendor/k8s.io/kube-aggregator",
+    ],
+)
+
+# kube::golang::test_targets
+filegroup(
+    name = "test-targets",
+    srcs = [
+        "//cmd/gendocs",
+        "//cmd/genkubedocs",
+        "//cmd/genman",
+        "//cmd/genswaggertypedocs",
+        "//cmd/genyaml",
+        "//cmd/kubemark",  # TODO: server platforms only
+        "//cmd/linkcheck",
+        "//cmd/mungedocs",
+        "//examples/k8petstore/web-server/src",
+        "//federation/cmd/genfeddocs",
+        "//test/e2e:e2e.test",
+        "//test/e2e_node:e2e_node.test",  # TODO: server platforms only
+        "//vendor/github.com/onsi/ginkgo/ginkgo",
+    ],
+)
+
+# KUBE_TEST_PORTABLE
+filegroup(
+    name = "test-portable-targets",
+    srcs = [
+        "//federation/develop:all-srcs",
+        "//hack:e2e.go",
+        "//hack:federated-ginkgo-e2e.sh",
+        "//hack:get-build.sh",
+        "//hack:ginkgo-e2e.sh",
+        "//hack/e2e-internal:all-srcs",
+        "//hack/lib:all-srcs",
+        "//test/e2e/testing-manifests:all-srcs",
+        "//test/kubemark:all-srcs",
+    ],
 )

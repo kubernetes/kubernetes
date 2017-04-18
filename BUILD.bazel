@@ -11,9 +11,25 @@ go_prefix("k8s.io/kubernetes")
 gcs_upload(
     name = "ci-artifacts",
     data = [
-        "//build/debs",
+        "//build:client-targets",
+        "//build:docker-artifacts",
+        "//build:node-targets",
+        "//build:server-targets",
         "//build/release-tars",
+        "//cluster/gce:gcs-release-artifacts",
     ],
+    hash_algorithms = [
+        "md5",
+        "sha1",
+    ],
+    upload_paths = {
+        "//build:client-targets": "bin/linux/amd64",
+        "//build:docker-artifacts": "bin/linux/amd64",
+        "//build:node-targets": "bin/linux/amd64",
+        "//build:server-targets": "bin/linux/amd64",
+        "//build/release-tars:release-tars": "",
+        "//cluster/gce:gcs-release-artifacts": "extra/gce",
+    },
 )
 
 filegroup(
