@@ -79,11 +79,7 @@ func Convert_v1_StorageClassList_To_storage_StorageClassList(in *StorageClassLis
 
 func autoConvert_storage_StorageClassList_To_v1_StorageClassList(in *storage.StorageClassList, out *StorageClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]StorageClass, 0)
-	} else {
-		out.Items = *(*[]StorageClass)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]StorageClass)(unsafe.Pointer(&in.Items))
 	return nil
 }
 

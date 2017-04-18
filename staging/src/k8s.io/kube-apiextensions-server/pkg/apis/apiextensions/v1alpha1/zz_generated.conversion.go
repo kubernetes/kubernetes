@@ -123,11 +123,7 @@ func Convert_v1alpha1_CustomResourceList_To_apiextensions_CustomResourceList(in 
 
 func autoConvert_apiextensions_CustomResourceList_To_v1alpha1_CustomResourceList(in *apiextensions.CustomResourceList, out *CustomResourceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]CustomResource, 0)
-	} else {
-		out.Items = *(*[]CustomResource)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]CustomResource)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -208,11 +204,7 @@ func Convert_v1alpha1_CustomResourceStatus_To_apiextensions_CustomResourceStatus
 }
 
 func autoConvert_apiextensions_CustomResourceStatus_To_v1alpha1_CustomResourceStatus(in *apiextensions.CustomResourceStatus, out *CustomResourceStatus, s conversion.Scope) error {
-	if in.Conditions == nil {
-		out.Conditions = make([]CustomResourceCondition, 0)
-	} else {
-		out.Conditions = *(*[]CustomResourceCondition)(unsafe.Pointer(&in.Conditions))
-	}
+	out.Conditions = *(*[]CustomResourceCondition)(unsafe.Pointer(&in.Conditions))
 	if err := Convert_apiextensions_CustomResourceNames_To_v1alpha1_CustomResourceNames(&in.AcceptedNames, &out.AcceptedNames, s); err != nil {
 		return err
 	}

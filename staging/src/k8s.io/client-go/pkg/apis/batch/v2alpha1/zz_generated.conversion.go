@@ -118,7 +118,7 @@ func autoConvert_batch_CronJobList_To_v2alpha1_CronJobList(in *batch.CronJobList
 			}
 		}
 	} else {
-		out.Items = make([]CronJob, 0)
+		out.Items = nil
 	}
 	return nil
 }

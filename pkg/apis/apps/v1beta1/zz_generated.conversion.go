@@ -113,7 +113,7 @@ func autoConvert_apps_StatefulSetList_To_v1beta1_StatefulSetList(in *apps.Statef
 			}
 		}
 	} else {
-		out.Items = make([]StatefulSet, 0)
+		out.Items = nil
 	}
 	return nil
 }

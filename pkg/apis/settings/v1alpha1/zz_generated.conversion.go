@@ -104,7 +104,7 @@ func autoConvert_settings_PodPresetList_To_v1alpha1_PodPresetList(in *settings.P
 			}
 		}
 	} else {
-		out.Items = make([]PodPreset, 0)
+		out.Items = nil
 	}
 	return nil
 }

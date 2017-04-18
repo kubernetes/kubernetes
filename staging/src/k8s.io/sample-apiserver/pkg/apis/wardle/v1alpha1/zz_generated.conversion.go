@@ -91,11 +91,7 @@ func Convert_v1alpha1_FlunderList_To_wardle_FlunderList(in *FlunderList, out *wa
 
 func autoConvert_wardle_FlunderList_To_v1alpha1_FlunderList(in *wardle.FlunderList, out *FlunderList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]Flunder, 0)
-	} else {
-		out.Items = *(*[]Flunder)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]Flunder)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
