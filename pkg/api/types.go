@@ -2096,10 +2096,14 @@ type PodSpec struct {
 	// If specified, the pod's tolerations.
 	// +optional
 	Tolerations []Toleration
+	// HostMappings is an optional list of hosts and IPs that will be injected into the pod's hosts
+	// file if specified. This is only valid for non-hostNetwork pods.
 	// +optional
 	HostMappings []HostMapping
 }
 
+// HostMapping holds the mapping between IP and hostnames that will be injected as an entry in the
+// pod's hosts file.
 type HostMapping struct {
 	IP string
   Names []string
