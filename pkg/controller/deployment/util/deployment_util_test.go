@@ -25,8 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -668,7 +666,7 @@ func TestResolveFenceposts(t *testing.T) {
 		desired           int32
 		expectSurge       int32
 		expectUnavailable int32
-		expectError       string
+		expectError       bool
 	}{
 		{
 			maxSurge:          "0%",
@@ -676,7 +674,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           0,
 			expectSurge:       0,
 			expectUnavailable: 1,
-			expectError:       "",
+			expectError:       false,
 		},
 		{
 			maxSurge:          "39%",
@@ -684,7 +682,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           10,
 			expectSurge:       4,
 			expectUnavailable: 3,
-			expectError:       "",
+			expectError:       false,
 		},
 		{
 			maxSurge:          "oops",
@@ -692,7 +690,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 0,
-			expectError:       "invalid value for IntOrString: invalid value \"oops\": strconv.ParseInt: parsing \"oops\": invalid syntax",
+			expectError:       true,
 		},
 		{
 			maxSurge:          "55%",
@@ -700,7 +698,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 0,
-			expectError:       "invalid value for IntOrString: invalid value \"urg\": strconv.ParseInt: parsing \"urg\": invalid syntax",
+			expectError:       true,
 		},
 	}
 
@@ -708,16 +706,11 @@ func TestResolveFenceposts(t *testing.T) {
 		maxSurge := intstr.FromString(test.maxSurge)
 		maxUnavail := intstr.FromString(test.maxUnavailable)
 		surge, unavail, err := ResolveFenceposts(&maxSurge, &maxUnavail, test.desired)
-		if err != nil {
-			if test.expectError == "" {
-				t.Errorf("unexpected error %v", err)
-			} else {
-				assert := assert.New(t)
-				assert.EqualError(err, test.expectError)
-			}
+		if err != nil && !test.expectError {
+			t.Errorf("unexpected error %v", err)
 		}
-		if err == nil && test.expectError != "" {
-			t.Errorf("missing error %v", test.expectError)
+		if err == nil && test.expectError {
+			t.Error("expected error")
 		}
 		if surge != test.expectSurge || unavail != test.expectUnavailable {
 			t.Errorf("#%v got %v:%v, want %v:%v", num, surge, unavail, test.expectSurge, test.expectUnavailable)
