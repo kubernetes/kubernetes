@@ -17,10 +17,12 @@ limitations under the License.
 package openapi
 
 import (
+	"fmt"
+
+	"github.com/go-openapi/spec"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"fmt"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -66,56 +68,39 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 	})
 
 	It("should find the definition GroupVersionKind extensions", func() {
-		_, found := definition.Extensions["x-kubernetes-group-version-kind"]
-		Expect(found).To(BeTrue())
+		Expect(definition.Extensions).To(HaveKey("x-kubernetes-group-version-kind"))
 	})
 
 	It("should find the definition fields", func() {
 		By("for 'kind'")
-		kindField, found := definition.Fields["kind"]
-		Expect(found).To(BeTrue())
-
-		Expect(kindField.TypeName).To(Equal("string"))
-		Expect(kindField.IsKind).To(BeFalse())
-		Expect(kindField.IsPrimitive).To(BeTrue())
-		Expect(kindField.IsArray).To(BeFalse())
-		Expect(kindField.ElementType).To(BeNil())
+		Expect(definition.Fields).To(HaveKeyWithValue("kind", Type{
+			TypeName:    "string",
+			IsPrimitive: true,
+		}))
 
 		By("for 'apiVersion'")
-		versionField, found := definition.Fields["apiVersion"]
-		Expect(found).To(BeTrue())
-		Expect(versionField.TypeName).To(Equal("string"))
-		Expect(versionField.IsKind).To(BeFalse())
-		Expect(versionField.IsPrimitive).To(BeTrue())
-		Expect(versionField.IsArray).To(BeFalse())
-		Expect(versionField.ElementType).To(BeNil())
+		Expect(definition.Fields).To(HaveKeyWithValue("apiVersion", Type{
+			TypeName:    "string",
+			IsPrimitive: true,
+		}))
 
 		By("for 'metadata'")
-		metadataField, found := definition.Fields["metadata"]
-		Expect(found).To(BeTrue())
-		Expect(metadataField.TypeName).To(Equal("io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"))
-		Expect(metadataField.IsKind).To(BeTrue())
-		Expect(metadataField.IsPrimitive).To(BeFalse())
-		Expect(metadataField.IsArray).To(BeFalse())
-		Expect(metadataField.ElementType).To(BeNil())
+		Expect(definition.Fields).To(HaveKeyWithValue("metadata", Type{
+			TypeName: "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+			IsKind:   true,
+		}))
 
 		By("for 'spec'")
-		specField, found := definition.Fields["spec"]
-		Expect(found).To(BeTrue())
-		Expect(specField.TypeName).To(Equal("io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentSpec"))
-		Expect(specField.IsKind).To(BeTrue())
-		Expect(specField.IsPrimitive).To(BeFalse())
-		Expect(specField.IsArray).To(BeFalse())
-		Expect(specField.ElementType).To(BeNil())
+		Expect(definition.Fields).To(HaveKeyWithValue("spec", Type{
+			TypeName: "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentSpec",
+			IsKind:   true,
+		}))
 
 		By("for 'status'")
-		statusField, found := definition.Fields["status"]
-		Expect(found).To(BeTrue())
-		Expect(statusField.TypeName).To(Equal("io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentStatus"))
-		Expect(statusField.IsKind).To(BeTrue())
-		Expect(statusField.IsPrimitive).To(BeFalse())
-		Expect(statusField.IsArray).To(BeFalse())
-		Expect(statusField.ElementType).To(BeNil())
+		Expect(definition.Fields).To(HaveKeyWithValue("status", Type{
+			TypeName: "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentStatus",
+			IsKind:   true,
+		}))
 	})
 })
 
@@ -150,36 +135,24 @@ var _ = Describe("Reading apps/v1beta1/DeploymentStatus from openAPIData", func(
 
 	It("should find the definition fields", func() {
 		By("for 'availableReplicas'")
-		availableReplicas, found := definition.Fields["availableReplicas"]
-		Expect(found).To(BeTrue())
-		Expect(availableReplicas.TypeName).To(Equal("integer"))
-		Expect(availableReplicas.IsKind).To(BeFalse())
-		Expect(availableReplicas.IsPrimitive).To(BeTrue())
-		Expect(availableReplicas.IsArray).To(BeFalse())
-		Expect(availableReplicas.ElementType).To(BeNil())
+		Expect(definition.Fields).To(HaveKeyWithValue("availableReplicas", Type{
+			TypeName:    "integer",
+			IsPrimitive: true,
+		}))
 
 		By("for 'conditions'")
-		conditionsField, found := definition.Fields["conditions"]
-		Expect(found).To(BeTrue())
-		Expect(conditionsField.TypeName).To(Equal("io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentCondition array"))
-		Expect(conditionsField.IsKind).To(BeFalse())
-		Expect(conditionsField.IsPrimitive).To(BeFalse())
-		Expect(conditionsField.IsArray).To(BeTrue())
-		Expect(conditionsField.ElementType).ToNot(BeNil())
-		Expect(conditionsField.ElementType.TypeName).
-			To(Equal("io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentCondition"))
-		Expect(conditionsField.ElementType.IsKind).To(BeTrue())
-		Expect(conditionsField.ElementType.IsPrimitive).To(BeFalse())
-		Expect(conditionsField.ElementType.IsMap).To(BeFalse())
-		Expect(conditionsField.ElementType.IsArray).To(BeFalse())
-
-		patchMergeKey, found := conditionsField.Extensions.GetString("x-kubernetes-patch-merge-key")
-		Expect(found).To(BeTrue())
-		Expect(patchMergeKey).To(Equal("type"))
-
-		patchStrategy, found := conditionsField.Extensions.GetString("x-kubernetes-patch-strategy")
-		Expect(found).To(BeTrue())
-		Expect(patchStrategy).To(Equal("merge"))
+		Expect(definition.Fields).To(HaveKeyWithValue("conditions", Type{
+			TypeName: "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentCondition array",
+			IsArray:  true,
+			ElementType: &Type{
+				TypeName: "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentCondition",
+				IsKind:   true,
+			},
+			Extensions: spec.Extensions{
+				"x-kubernetes-patch-merge-key": "type",
+				"x-kubernetes-patch-strategy":  "merge",
+			},
+		}))
 	})
 })
 
@@ -214,13 +187,10 @@ var _ = Describe("Reading apps/v1beta1/DeploymentSpec from openAPIData", func() 
 
 	It("should find the definition fields", func() {
 		By("for 'template'")
-		templateField, found := definition.Fields["template"]
-		Expect(found).To(BeTrue())
-		Expect(templateField.TypeName).To(Equal("io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec"))
-		Expect(templateField.IsKind).To(BeTrue())
-		Expect(templateField.IsPrimitive).To(BeFalse())
-		Expect(templateField.IsArray).To(BeFalse())
-		Expect(templateField.IsMap).To(BeFalse())
+		Expect(definition.Fields).To(HaveKeyWithValue("template", Type{
+			TypeName: "io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec",
+			IsKind:   true,
+		}))
 	})
 })
 
@@ -255,49 +225,41 @@ var _ = Describe("Reading v1/ObjectMeta from openAPIData", func() {
 
 	It("should find the definition fields", func() {
 		By("for 'finalizers'")
-		finalizersField, found := definition.Fields["finalizers"]
-		Expect(found).To(BeTrue())
-		Expect(finalizersField.TypeName).To(Equal("string array"))
-		Expect(finalizersField.IsKind).To(BeFalse())
-		Expect(finalizersField.IsPrimitive).To(BeFalse())
-		Expect(finalizersField.IsArray).To(BeTrue())
-
-		Expect(finalizersField.ElementType).ToNot(BeNil())
-		Expect(finalizersField.ElementType.TypeName).To(Equal("string"))
-		Expect(finalizersField.ElementType.IsKind).To(BeFalse())
-		Expect(finalizersField.ElementType.IsPrimitive).To(BeTrue())
-		Expect(finalizersField.IsMap).To(BeFalse())
+		Expect(definition.Fields).To(HaveKeyWithValue("finalizers", Type{
+			TypeName: "string array",
+			IsArray:  true,
+			ElementType: &Type{
+				TypeName:    "string",
+				IsPrimitive: true,
+			},
+			Extensions: spec.Extensions{
+				"x-kubernetes-patch-strategy": "merge",
+			},
+		}))
 
 		By("for 'ownerReferences'")
-		ownerReferencesField, found := definition.Fields["ownerReferences"]
-		Expect(found).To(BeTrue())
-		Expect(ownerReferencesField.TypeName).
-			To(Equal("io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference array"))
-		Expect(ownerReferencesField.IsKind).To(BeFalse())
-		Expect(ownerReferencesField.IsPrimitive).To(BeFalse())
-		Expect(ownerReferencesField.IsArray).To(BeTrue())
-		Expect(ownerReferencesField.IsMap).To(BeFalse())
-		Expect(ownerReferencesField.ElementType).ToNot(BeNil())
-		Expect(ownerReferencesField.ElementType.TypeName).
-			To(Equal("io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"))
-		Expect(ownerReferencesField.ElementType.ElementType).To(BeNil())
-		Expect(ownerReferencesField.ElementType.IsPrimitive).To(BeFalse())
-		Expect(ownerReferencesField.ElementType.IsArray).To(BeFalse())
-		Expect(ownerReferencesField.ElementType.IsMap).To(BeFalse())
-		Expect(ownerReferencesField.ElementType.IsKind).To(BeTrue())
+		Expect(definition.Fields).To(HaveKeyWithValue("ownerReferences", Type{
+			TypeName: "io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference array",
+			IsArray:  true,
+			ElementType: &Type{
+				TypeName: "io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference",
+				IsKind:   true,
+			},
+			Extensions: spec.Extensions{
+				"x-kubernetes-patch-merge-key": "uid",
+				"x-kubernetes-patch-strategy":  "merge",
+			},
+		}))
 
 		By("for 'labels'")
-		labelsField, found := definition.Fields["labels"]
-		Expect(found).To(BeTrue())
-		Expect(labelsField.TypeName).To(Equal("string map"))
-		Expect(labelsField.IsKind).To(BeFalse())
-		Expect(labelsField.IsPrimitive).To(BeFalse())
-		Expect(labelsField.IsArray).To(BeFalse())
-		Expect(labelsField.IsMap).To(BeTrue())
-		Expect(labelsField.ElementType).ToNot(BeNil())
-		Expect(labelsField.ElementType.TypeName).To(Equal("string"))
-		Expect(labelsField.ElementType.IsKind).To(BeFalse())
-		Expect(labelsField.ElementType.IsPrimitive).To(BeTrue())
+		Expect(definition.Fields).To(HaveKeyWithValue("labels", Type{
+			TypeName: "string map",
+			IsMap:    true,
+			ElementType: &Type{
+				TypeName:    "string",
+				IsPrimitive: true,
+			},
+		}))
 	})
 })
 
@@ -332,19 +294,14 @@ var _ = Describe("Reading v1/NodeStatus from openAPIData", func() {
 
 	It("should find the definition fields", func() {
 		By("for 'allocatable'")
-		allocatableField, found := definition.Fields["allocatable"]
-		Expect(found).To(BeTrue())
-		Expect(allocatableField.TypeName).
-			To(Equal("io.k8s.apimachinery.pkg.api.resource.Quantity map"))
-		Expect(allocatableField.IsKind).To(BeFalse())
-		Expect(allocatableField.IsPrimitive).To(BeFalse())
-		Expect(allocatableField.IsArray).To(BeFalse())
-		Expect(allocatableField.IsMap).To(BeTrue())
-		Expect(allocatableField.ElementType).ToNot(BeNil())
-		Expect(allocatableField.ElementType.TypeName).
-			To(Equal("io.k8s.apimachinery.pkg.api.resource.Quantity"))
-		Expect(allocatableField.ElementType.IsKind).To(BeTrue())
-		Expect(allocatableField.ElementType.IsPrimitive).To(BeFalse())
+		Expect(definition.Fields).To(HaveKeyWithValue("allocatable", Type{
+			TypeName: "io.k8s.apimachinery.pkg.api.resource.Quantity map",
+			IsMap:    true,
+			ElementType: &Type{
+				TypeName: "io.k8s.apimachinery.pkg.api.resource.Quantity",
+				IsKind:   true,
+			},
+		}))
 	})
 })
 
@@ -433,31 +390,18 @@ var _ = Describe("Reading authorization/v1/SubjectAccessReviewSpec from openAPID
 
 	It("should find the definition fields", func() {
 		By("for 'allocatable'")
-		exraField, found := definition.Fields["extra"]
-		Expect(found).To(BeTrue())
-		Expect(exraField.TypeName).
-			To(Equal("string array map"))
-		Expect(exraField.IsKind).To(BeFalse())
-		Expect(exraField.IsPrimitive).To(BeFalse())
-		Expect(exraField.IsArray).To(BeFalse())
-		Expect(exraField.IsMap).To(BeTrue())
-		Expect(exraField.ElementType).NotTo(BeNil())
-
-		Expect(exraField.ElementType.TypeName).
-			To(Equal("string array"))
-		Expect(exraField.ElementType.IsKind).To(BeFalse())
-		Expect(exraField.ElementType.IsPrimitive).To(BeFalse())
-		Expect(exraField.ElementType.IsArray).To(BeTrue())
-		Expect(exraField.ElementType.IsMap).To(BeFalse())
-		Expect(exraField.ElementType.ElementType).NotTo(BeNil())
-
-		Expect(exraField.ElementType.ElementType.TypeName).
-			To(Equal("string"))
-		Expect(exraField.ElementType.ElementType.IsKind).To(BeFalse())
-		Expect(exraField.ElementType.ElementType.IsPrimitive).To(BeTrue())
-		Expect(exraField.ElementType.ElementType.IsArray).To(BeFalse())
-		Expect(exraField.ElementType.ElementType.IsMap).To(BeFalse())
-		Expect(exraField.ElementType.ElementType.ElementType).To(BeNil())
+		Expect(definition.Fields).To(HaveKeyWithValue("extra", Type{
+			TypeName: "string array map",
+			IsMap:    true,
+			ElementType: &Type{
+				TypeName: "string array",
+				IsArray:  true,
+				ElementType: &Type{
+					TypeName:    "string",
+					IsPrimitive: true,
+				},
+			},
+		}))
 	})
 })
 

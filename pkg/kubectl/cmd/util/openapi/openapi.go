@@ -101,7 +101,7 @@ type Kind struct {
 	Extensions spec.Extensions
 
 	// Fields are the fields defined for this Kind
-	Fields map[string]Field
+	Fields map[string]Type
 }
 
 // Type defines a field type and are expected to be one of:
@@ -126,11 +126,6 @@ type Type struct {
 	// if IsMap == true, then ElementType is the type of the value (key is always string)
 	// if IsArray == true, then ElementType is the type of the element
 	ElementType *Type
-}
-
-// Field defines a field of a Kind
-type Field struct {
-	Type
 
 	// Extensions are extensions for this field and may contain
 	// metadata from the types.go struct field tags.
@@ -165,7 +160,7 @@ func (o *Resources) validate() error {
 	types := sets.String{}
 	for _, d := range o.NameToDefinition {
 		for _, f := range d.Fields {
-			for _, t := range o.getTypeNames(f.Type) {
+			for _, t := range o.getTypeNames(f) {
 				types.Insert(t)
 			}
 		}
@@ -196,7 +191,7 @@ func (o *Resources) parseDefinition(name string, s spec.Schema) Kind {
 		Name:             name,
 		GroupVersionKind: gvk,
 		Extensions:       s.Extensions,
-		Fields:           map[string]Field{},
+		Fields:           map[string]Type{},
 	}
 	if err != nil {
 		glog.Warning(err)
@@ -208,12 +203,12 @@ func (o *Resources) parseDefinition(name string, s spec.Schema) Kind {
 		value.PrimitiveType = o.getTypeNameForField(s)
 	}
 	for fieldname, property := range s.Properties {
-		value.Fields[fieldname] = o.parseField(fieldname, property)
+		value.Fields[fieldname] = o.parseField(property)
 	}
 	return value
 }
 
-func (o *Resources) buildElementFromSchema(s spec.Schema) Type {
+func (o *Resources) parseField(s spec.Schema) Type {
 	def := Type{
 		TypeName:    o.getTypeNameForField(s),
 		IsPrimitive: o.isPrimitive(s),
@@ -223,22 +218,16 @@ func (o *Resources) buildElementFromSchema(s spec.Schema) Type {
 	}
 
 	if elementType, arrayErr := o.getElementType(s); arrayErr == nil {
-		d := o.buildElementFromSchema(elementType)
+		d := o.parseField(elementType)
 		def.ElementType = &d
 	} else if valueType, mapErr := o.getValueType(s); mapErr == nil {
-		d := o.buildElementFromSchema(valueType)
+		d := o.parseField(valueType)
 		def.ElementType = &d
 	}
 
-	return def
-}
+	def.Extensions = s.Extensions
 
-func (o *Resources) parseField(name string, s spec.Schema) Field {
-	fieldDef := Field{
-		Extensions: s.Extensions,
-		Type:       o.buildElementFromSchema(s),
-	}
-	return fieldDef
+	return def
 }
 
 // isArray returns true if s is an array type.
