@@ -32,7 +32,7 @@ const (
 // Alpha implementation.
 // Returns a path to a cAdvisor-specific custom metrics configuration.
 func GetCAdvisorCustomMetricsDefinitionPath(container *v1.Container) (*string, error) {
-	// Assuemes that the container has Custom Metrics enabled if it has "/etc/custom-metrics" directory
+	// Assumes that the container has Custom Metrics enabled if it has "/etc/custom-metrics" directory
 	// mounted as a volume. Custom Metrics definition is expected to be in "definition.json".
 	if container.VolumeMounts != nil {
 		for _, volumeMount := range container.VolumeMounts {
