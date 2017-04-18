@@ -111,7 +111,7 @@ func (e Editor) args(path string) []string {
 
 // Launch opens the described or returns an error. The TTY will be protected, and
 // SIGQUIT, SIGTERM, and SIGINT will all be trapped.
-func (e Editor) Launch(path string) error {
+func (e Editor) Launch(path string, readOnly bool) error {
 	if len(e.Args) == 0 {
 		return fmt.Errorf("no editor defined, can't open %s", path)
 	}
@@ -120,6 +120,13 @@ func (e Editor) Launch(path string) error {
 		return err
 	}
 	args := e.args(abs)
+	switch e.Args[0] {
+	case "vi":
+		args = append(args, "-R")
+	case "nano":
+		args = append(args, "-v")
+	default:
+	}
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -140,7 +147,7 @@ func (e Editor) Launch(path string) error {
 // and file prefix, and then invokes Launch with the path of that file. It will return
 // the contents of the file after launch, any errors that occur, and the path of the
 // temporary file so the caller can clean it up as needed.
-func (e Editor) LaunchTempFile(prefix, suffix string, r io.Reader) ([]byte, string, error) {
+func (e Editor) LaunchTempFile(prefix, suffix string, r io.Reader, readOnly bool) ([]byte, string, error) {
 	f, err := tempFile(prefix, suffix)
 	if err != nil {
 		return nil, "", err
@@ -153,7 +160,7 @@ func (e Editor) LaunchTempFile(prefix, suffix string, r io.Reader) ([]byte, stri
 	}
 	// This file descriptor needs to close so the next process (Launch) can claim it.
 	f.Close()
-	if err := e.Launch(path); err != nil {
+	if err := e.Launch(path, readOnly); err != nil {
 		return nil, path, err
 	}
 	bytes, err := ioutil.ReadFile(path)

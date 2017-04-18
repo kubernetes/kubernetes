@@ -43,7 +43,7 @@ func TestArgs(t *testing.T) {
 func TestEditor(t *testing.T) {
 	edit := Editor{Args: []string{"cat"}}
 	testStr := "test something\n"
-	contents, path, err := edit.LaunchTempFile("", "someprefix", bytes.NewBufferString(testStr))
+	contents, path, err := edit.LaunchTempFile("", "someprefix", bytes.NewBufferString(testStr), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
