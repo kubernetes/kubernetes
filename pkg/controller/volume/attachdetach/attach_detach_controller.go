@@ -110,7 +110,7 @@ func NewAttachDetachController(
 		cloud:      cloud,
 	}
 
-	if err := adc.volumePluginMgr.InitPlugins(plugins, adc); err != nil {
+	if err := adc.volumePluginMgr.InitPlugins(plugins, adc, kubeClient, cloud); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
 	}
 
@@ -368,20 +368,12 @@ func (adc *attachDetachController) GetPodPluginDir(podUID types.UID, pluginName 
 	return ""
 }
 
-func (adc *attachDetachController) GetKubeClient() clientset.Interface {
-	return adc.kubeClient
-}
-
 func (adc *attachDetachController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return nil, fmt.Errorf("NewWrapperMounter not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
 func (adc *attachDetachController) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by Attach/Detach controller's VolumeHost implementation")
-}
-
-func (adc *attachDetachController) GetCloudProvider() cloudprovider.Interface {
-	return adc.cloud
 }
 
 func (adc *attachDetachController) GetMounter() mount.Interface {

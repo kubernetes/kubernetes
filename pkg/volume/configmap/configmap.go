@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -42,13 +44,15 @@ const (
 
 // configMapPlugin implements the VolumePlugin interface.
 type configMapPlugin struct {
-	host volume.VolumeHost
+	host       volume.VolumeHost
+	kubeClient clientset.Interface
 }
 
 var _ volume.VolumePlugin = &configMapPlugin{}
 
-func (plugin *configMapPlugin) Init(host volume.VolumeHost) error {
+func (plugin *configMapPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
+	plugin.kubeClient = client
 	return nil
 }
 
@@ -174,7 +178,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	kubeClient := b.plugin.host.GetKubeClient()
+	kubeClient := b.plugin.kubeClient
 	if kubeClient == nil {
 		return fmt.Errorf("Cannot setup configMap volume %v because kube client is not configured", b.volName)
 	}

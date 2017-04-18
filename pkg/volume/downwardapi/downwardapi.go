@@ -26,6 +26,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -56,7 +58,7 @@ func wrappedVolumeSpec() volume.Spec {
 	}
 }
 
-func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) error {
+func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
 	return nil
 }

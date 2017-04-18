@@ -44,7 +44,7 @@ var _ volume.Attacher = &gcePersistentDiskAttacher{}
 var _ volume.AttachableVolumePlugin = &gcePersistentDiskPlugin{}
 
 func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
-	gceCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	gceCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ type gcePersistentDiskDetacher struct {
 var _ volume.Detacher = &gcePersistentDiskDetacher{}
 
 func (plugin *gcePersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
-	gceCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	gceCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}

@@ -45,7 +45,7 @@ const (
 )
 
 func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
-	cinder, err := getCloudProvider(plugin.host.GetCloudProvider())
+	cinder, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ type cinderDiskDetacher struct {
 var _ volume.Detacher = &cinderDiskDetacher{}
 
 func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
-	cinder, err := getCloudProvider(plugin.host.GetCloudProvider())
+	cinder, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}

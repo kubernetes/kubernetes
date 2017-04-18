@@ -54,7 +54,7 @@ var getLunMutex = keymutex.NewKeyMutex()
 
 // NewAttacher initializes an Attacher
 func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, err := getAzureCloudProvider(plugin.cloud)
 	if err != nil {
 		glog.V(4).Infof("failed to get azure provider")
 		return nil, err
@@ -238,7 +238,7 @@ var _ volume.Detacher = &azureDiskDetacher{}
 
 // NewDetacher initializes a volume Detacher
 func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, err := getAzureCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}

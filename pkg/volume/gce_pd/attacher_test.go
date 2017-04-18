@@ -199,13 +199,10 @@ func TestAttachDetach(t *testing.T) {
 // newPlugin creates a new gcePersistentDiskPlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
 func newPlugin() *gcePersistentDiskPlugin {
-	host := volumetest.NewFakeVolumeHost(
-		"/tmp", /* rootDir */
-		nil,    /* kubeClient */
-		nil /* plugins */)
+	host := volumetest.NewFakeVolumeHost("/tmp")
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
-	plugin.Init(host)
+	plugin.Init(host, nil, nil)
 	return plugin.(*gcePersistentDiskPlugin)
 }
 

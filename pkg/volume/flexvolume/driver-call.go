@@ -92,8 +92,8 @@ func (dc *DriverCall) Append(arg string) {
 	dc.args = append(dc.args, arg)
 }
 
-func (dc *DriverCall) AppendSpec(spec *volume.Spec, host volume.VolumeHost, extraOptions map[string]string) error {
-	optionsForDriver, err := NewOptionsForDriver(spec, host, extraOptions)
+func (dc *DriverCall) AppendSpec(spec *volume.Spec, extraOptions map[string]string) error {
+	optionsForDriver, err := NewOptionsForDriver(spec, extraOptions)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 // OptionsForDriver represents the spec given to the driver.
 type OptionsForDriver map[string]string
 
-func NewOptionsForDriver(spec *volume.Spec, host volume.VolumeHost, extraOptions map[string]string) (OptionsForDriver, error) {
+func NewOptionsForDriver(spec *volume.Spec, extraOptions map[string]string) (OptionsForDriver, error) {
 	volSource, readOnly := getVolumeSource(spec)
 	options := map[string]string{}
 

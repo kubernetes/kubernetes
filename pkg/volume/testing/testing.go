@@ -44,19 +44,28 @@ import (
 // fakeVolumeHost is useful for testing volume plugins.
 type fakeVolumeHost struct {
 	rootDir    string
-	kubeClient clientset.Interface
 	pluginMgr  VolumePluginMgr
-	cloud      cloudprovider.Interface
 	mounter    mount.Interface
 	writer     io.Writer
+	secretFunc func(namespace, name string) (*v1.Secret, error)
 }
 
-func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
-	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: nil}
+// NewFakeVolumeHost retuns a new fake volume host. The volume host does not
+// implement GetSecretFunc until SetSecretFunc is called.
+func NewFakeVolumeHost(rootDir string) *fakeVolumeHost {
+	host := &fakeVolumeHost{rootDir: rootDir}
 	host.mounter = &mount.FakeMounter{}
 	host.writer = &io.StdWriter{}
-	host.pluginMgr.InitPlugins(plugins, host)
 	return host
+}
+
+// SetSecretFunc injects a SecretFunc into the fake volume host.
+func (f *fakeVolumeHost) SetSecretFunc(secretFunc func(namespace, name string) (*v1.Secret, error)) {
+	f.secretFunc = secretFunc
+}
+
+func (f *fakeVolumeHost) GetPluginMgr() *VolumePluginMgr {
+	return &f.pluginMgr
 }
 
 func (f *fakeVolumeHost) GetPluginDir(podUID string) string {
@@ -69,14 +78,6 @@ func (f *fakeVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeNam
 
 func (f *fakeVolumeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {
 	return path.Join(f.rootDir, "pods", string(podUID), "plugins", pluginName)
-}
-
-func (f *fakeVolumeHost) GetKubeClient() clientset.Interface {
-	return f.kubeClient
-}
-
-func (f *fakeVolumeHost) GetCloudProvider() cloudprovider.Interface {
-	return f.cloud
 }
 
 func (f *fakeVolumeHost) GetMounter() mount.Interface {
@@ -128,9 +129,7 @@ func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 }
 
 func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(namespace, name string) (*v1.Secret, error) {
-		return f.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
-	}
+	return f.secretFunc
 }
 
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
@@ -177,7 +176,7 @@ func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 	return volume
 }
 
-func (plugin *FakeVolumePlugin) Init(host VolumeHost) error {
+func (plugin *FakeVolumePlugin) Init(host VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.Lock()
 	defer plugin.Unlock()
 	plugin.Host = host
@@ -723,13 +722,9 @@ func VerifyZeroDetachCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
 // manager and fake volume plugin using a fake volume host.
 func GetTestVolumePluginMgr(
 	t *testing.T) (*VolumePluginMgr, *FakeVolumePlugin) {
-	v := NewFakeVolumeHost(
-		"",  /* rootDir */
-		nil, /* kubeClient */
-		nil, /* plugins */
-	)
+	v := NewFakeVolumeHost("")
 	plugins := ProbeVolumePlugins(VolumeConfig{})
-	if err := v.pluginMgr.InitPlugins(plugins, v); err != nil {
+	if err := v.pluginMgr.InitPlugins(plugins, v, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 

@@ -23,23 +23,23 @@ import (
 
 	"github.com/golang/glog"
 	api "k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace string, driverName string, host volume.VolumeHost) error {
+func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace string, driverName string, kubeClient clientset.Interface) error {
 	fv, _ := getVolumeSource(spec)
 	if fv.SecretRef == nil {
 		return nil
 	}
 
-	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
 		return fmt.Errorf("Cannot get kube client")
 	}
 
-	secrets, err := util.GetSecretForPV(namespace, fv.SecretRef.Name, driverName, host.GetKubeClient())
+	secrets, err := util.GetSecretForPV(namespace, fv.SecretRef.Name, driverName, kubeClient)
 	if err != nil {
 		err = fmt.Errorf("Couldn't get secret %v/%v err: %v", namespace, fv.SecretRef.Name, err)
 		return err

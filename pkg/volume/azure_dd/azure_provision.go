@@ -37,7 +37,7 @@ type azureDiskDeleter struct {
 }
 
 func (plugin *azureDataDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, err := getAzureCloudProvider(plugin.cloud)
 	if err != nil {
 		glog.V(4).Infof("failed to get azure provider")
 		return nil, err
@@ -64,7 +64,7 @@ func (plugin *azureDataDiskPlugin) newDeleterInternal(spec *volume.Spec, azure a
 }
 
 func (plugin *azureDataDiskPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, err := getAzureCloudProvider(plugin.cloud)
 	if err != nil {
 		glog.V(4).Infof("failed to get azure provider")
 		return nil, err

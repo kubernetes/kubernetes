@@ -28,6 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -37,11 +39,12 @@ import (
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&quobytePlugin{nil}}
+	return []volume.VolumePlugin{&quobytePlugin{}}
 }
 
 type quobytePlugin struct {
-	host volume.VolumeHost
+	host       volume.VolumeHost
+	kubeClient clientset.Interface
 }
 
 // This user is used to authenticate against the
@@ -67,8 +70,9 @@ const (
 	annotationQuobyteAPISecretNamespace = "quobyte.kubernetes.io/apipassword"
 )
 
-func (plugin *quobytePlugin) Init(host volume.VolumeHost) error {
+func (plugin *quobytePlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
+	plugin.kubeClient = client
 	return nil
 }
 
@@ -423,7 +427,7 @@ func (deleter *quobyteVolumeDeleter) GetPath() string {
 }
 
 func (deleter *quobyteVolumeDeleter) Delete() error {
-	class, err := util.GetClassForVolume(deleter.plugin.host.GetKubeClient(), deleter.pv)
+	class, err := util.GetClassForVolume(deleter.plugin.kubeClient, deleter.pv)
 	if err != nil {
 		return err
 	}
@@ -463,7 +467,7 @@ func parseAPIConfig(plugin *quobytePlugin, params map[string]string) (*quobyteAP
 		return nil, fmt.Errorf("Quoybte API server missing or malformed: must be a http(s)://host:port pair or multiple pairs separated by commas")
 	}
 
-	secretMap, err := util.GetSecretForPV(secretNamespace, secretName, quobytePluginName, plugin.host.GetKubeClient())
+	secretMap, err := util.GetSecretForPV(secretNamespace, secretName, quobytePluginName, plugin.kubeClient)
 	if err != nil {
 		return nil, err
 	}

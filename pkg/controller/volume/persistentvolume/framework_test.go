@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/v1beta1"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
@@ -827,7 +828,7 @@ func wrapTestWithPluginCalls(expectedRecycleCalls, expectedDeleteCalls []error, 
 			deleteCalls:    expectedDeleteCalls,
 			provisionCalls: expectedProvisionCalls,
 		}
-		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, ctrl)
+		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, ctrl, nil, nil)
 		return toWrap(ctrl, reactor, test)
 	}
 }
@@ -1100,7 +1101,7 @@ var _ vol.RecyclableVolumePlugin = &mockVolumePlugin{}
 var _ vol.DeletableVolumePlugin = &mockVolumePlugin{}
 var _ vol.ProvisionableVolumePlugin = &mockVolumePlugin{}
 
-func (plugin *mockVolumePlugin) Init(host vol.VolumeHost) error {
+func (plugin *mockVolumePlugin) Init(host vol.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	return nil
 }
 

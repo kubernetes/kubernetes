@@ -25,6 +25,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -36,7 +38,7 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&flockerPlugin{nil}}
+	return []volume.VolumePlugin{&flockerPlugin{}}
 }
 
 type flockerPlugin struct {
@@ -85,7 +87,7 @@ func makeGlobalFlockerPath(datasetUUID string) string {
 	return path.Join(defaultMountPath, datasetUUID)
 }
 
-func (p *flockerPlugin) Init(host volume.VolumeHost) error {
+func (p *flockerPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	p.host = host
 	return nil
 }

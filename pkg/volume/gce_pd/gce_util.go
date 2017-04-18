@@ -54,7 +54,7 @@ var (
 type GCEDiskUtil struct{}
 
 func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
-	cloud, err := getCloudProvider(d.gcePersistentDisk.plugin.host.GetCloudProvider())
+	cloud, err := getCloudProvider(d.gcePersistentDisk.plugin.cloud)
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
 // CreateVolume creates a GCE PD.
 // Returns: volumeID, volumeSizeGB, labels, error
 func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (string, int, map[string]string, error) {
-	cloud, err := getCloudProvider(c.gcePersistentDisk.plugin.host.GetCloudProvider())
+	cloud, err := getCloudProvider(c.gcePersistentDisk.plugin.cloud)
 	if err != nil {
 		return "", 0, nil, err
 	}

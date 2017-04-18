@@ -22,20 +22,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/volume"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 // Abstract interface to azure file operations.
 type azureUtil interface {
-	GetAzureCredentials(host volume.VolumeHost, nameSpace, secretName string) (string, string, error)
-	SetAzureCredentials(host volume.VolumeHost, nameSpace, accountName, accountKey string) (string, error)
+	GetAzureCredentials(kubeClient clientset.Interface, nameSpace, secretName string) (string, string, error)
+	SetAzureCredentials(kubeClient clientset.Interface, nameSpace, accountName, accountKey string) (string, error)
 }
 
 type azureSvc struct{}
 
-func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secretName string) (string, string, error) {
+func (s *azureSvc) GetAzureCredentials(kubeClient clientset.Interface, nameSpace, secretName string) (string, string, error) {
 	var accountKey, accountName string
-	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
 		return "", "", fmt.Errorf("Cannot get kube client")
 	}
@@ -58,8 +57,7 @@ func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secret
 	return accountName, accountKey, nil
 }
 
-func (s *azureSvc) SetAzureCredentials(host volume.VolumeHost, nameSpace, accountName, accountKey string) (string, error) {
-	kubeClient := host.GetKubeClient()
+func (s *azureSvc) SetAzureCredentials(kubeClient clientset.Interface, nameSpace, accountName, accountKey string) (string, error) {
 	if kubeClient == nil {
 		return "", fmt.Errorf("Cannot get kube client")
 	}
