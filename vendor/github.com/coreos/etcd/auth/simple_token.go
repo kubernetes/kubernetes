@@ -134,7 +134,7 @@ func (as *authStore) invalidateUser(username string) {
 	as.simpleTokenKeeper.tokensMu.Lock()
 	as.simpleTokensMu.Lock()
 	for token, name := range as.simpleTokens {
-		if strings.Compare(name, username) == 0 {
+		if name == username {
 			delete(as.simpleTokens, token)
 			as.simpleTokenKeeper.deleteSimpleToken(token)
 		}
