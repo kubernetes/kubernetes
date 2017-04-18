@@ -18,9 +18,9 @@ package v1
 
 import (
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 
 // The PodExpansion interface allows manually adding extra methods to the PodInterface.
@@ -41,5 +41,5 @@ func (c *pods) Evict(eviction *policy.Eviction) error {
 
 // Get constructs a request for getting the logs for a pod
 func (c *pods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request {
-	return c.client.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.ParameterCodec)
+	return c.client.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, scheme.ParameterCodec)
 }
