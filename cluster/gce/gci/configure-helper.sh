@@ -287,9 +287,7 @@ function create-master-auth {
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
     if [[ -e "${basic_auth_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
-      sed -i "/,${KUBE_USER},admin,system:masters$/d" "${basic_auth_csv}"
-      # The following is for the legacy form of the password line.
-      sed -i "/,${KUBE_USER},admin$/d" "${basic_auth_csv}"
+      rm "${basic_auth_csv}"
     fi
     replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER}," "admin,system:masters"
   fi
