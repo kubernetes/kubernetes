@@ -21,11 +21,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"syscall"
 	"testing"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -186,7 +186,7 @@ func TestMerge(t *testing.T) {
 		if !test.expectErr {
 			if err != nil {
 				t.Errorf("testcase[%d], unexpected error: %v", i, err)
-			} else if !apiequality.Semantic.DeepEqual(out, test.expected) {
+			} else if !reflect.DeepEqual(out, test.expected) {
 				t.Errorf("\n\ntestcase[%d]\nexpected:\n%+v\nsaw:\n%+v", i, test.expected, out)
 			}
 		}
@@ -366,7 +366,7 @@ func TestMaybeConvert(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if !apiequality.Semantic.DeepEqual(test.expected, obj) {
+		if !reflect.DeepEqual(test.expected, obj) {
 			t.Errorf("expected:\n%#v\nsaw:\n%#v\n", test.expected, obj)
 		}
 	}
