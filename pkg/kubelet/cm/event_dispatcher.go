@@ -30,6 +30,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 type EventDispatcherEventType int
@@ -53,6 +54,14 @@ type EventDispatcher interface {
 	// PostStopPod is invoked after all of a pod's containers have permanently
 	// stopped running, but before the pod sandbox is destroyed.
 	PostStopPod(cgroupPath string) error
+
+	// PreStartContainer is invoked before the container is created.
+	PreStartContainer(podName, containerName string) (*lifecycle.EventReply, error)
+
+	// PostStopContainer is invoked after a container has terminated. The
+	// container sandbox may or may not exist.
+	PostStopContainer(podName, containerName string) error
+
 	// Start starts the dispatcher. After the dispatcher is started, isolators
 	// can register themselves to receive lifecycle events.
 	Start(socketAddress string)
@@ -60,7 +69,11 @@ type EventDispatcher interface {
 	// Returns a pointer to an updated copy of the supplied resource config,
 	// based on the isolation controls in the event reply. The original resource
 	// config is not updated in-place.
-	ResourceConfigFromReplies(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig
+	ResourceConfigFromReply(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig
+
+	// Updates the supplied container config in-place based on the isolation
+	// controls in the event reply.
+	UpdateContainerConfigWithReply(reply *lifecycle.EventReply, config *runtime.ContainerConfig)
 
 	// Get communication channel.
 	GetEventChannel() chan EventDispatcherEvent
@@ -84,7 +97,7 @@ type eventDispatcher struct {
 var dispatcher *eventDispatcher
 var once sync.Once
 
-func newEventDispatcher() *eventDispatcher {
+func GetEventDispatcherSingleton() *eventDispatcher {
 	once.Do(func() {
 		dispatcher = &eventDispatcher{
 			isolators:    map[string]*registeredIsolator{},
@@ -147,19 +160,21 @@ func (ed *eventDispatcher) PreStartPod(pod *v1.Pod, cgroupPath string) (*lifecyc
 	if err != nil {
 		return nil, err
 	}
-	// construct an event
+	// construct and send an event
 	return ed.dispatchEvent(
 		&lifecycle.Event{
-			Kind: lifecycle.Event_POD_PRE_START,
+			Kind:    lifecycle.Event_POD_PRE_START,
+			PodName: pod.Name,
+			Pod:     jsonPod,
 			CgroupInfo: &lifecycle.CgroupInfo{
 				Kind: lifecycle.CgroupInfo_POD,
 				Path: cgroupPath,
 			},
-			Pod: jsonPod,
 		})
 }
 
 func (ed *eventDispatcher) PostStopPod(cgroupPath string) error {
+	// construct and send an event
 	_, err := ed.dispatchEvent(
 		&lifecycle.Event{
 			Kind: lifecycle.Event_POD_POST_STOP,
@@ -167,6 +182,27 @@ func (ed *eventDispatcher) PostStopPod(cgroupPath string) error {
 				Kind: lifecycle.CgroupInfo_POD,
 				Path: cgroupPath,
 			},
+		})
+	return err
+}
+
+func (ed *eventDispatcher) PreStartContainer(podName, containerName string) (*lifecycle.EventReply, error) {
+	// construct and send an event
+	return ed.dispatchEvent(
+		&lifecycle.Event{
+			Kind:          lifecycle.Event_CONTAINER_PRE_START,
+			PodName:       podName,
+			ContainerName: containerName,
+		})
+}
+
+func (ed *eventDispatcher) PostStopContainer(podName, containerName string) error {
+	// construct and send an event
+	_, err := ed.dispatchEvent(
+		&lifecycle.Event{
+			Kind:          lifecycle.Event_CONTAINER_POST_STOP,
+			PodName:       podName,
+			ContainerName: containerName,
 		})
 	return err
 }
@@ -237,7 +273,7 @@ func (ed *eventDispatcher) Unregister(ctx context.Context, request *lifecycle.Un
 	return &lifecycle.UnregisterReply{}, nil
 }
 
-func (ed *eventDispatcher) ResourceConfigFromReplies(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig {
+func (ed *eventDispatcher) ResourceConfigFromReply(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig {
 	// This is a safe copy; ResourceConfig contains only pointers to primitives.
 	updatedResources := &ResourceConfig{}
 	*updatedResources = *resources
@@ -253,6 +289,27 @@ func (ed *eventDispatcher) ResourceConfigFromReplies(reply *lifecycle.EventReply
 		}
 	}
 	return updatedResources
+}
+
+func (ed *eventDispatcher) UpdateContainerConfigWithReply(reply *lifecycle.EventReply, config *runtime.ContainerConfig) {
+	// TODO(CD): Append environment variables to container config.
+
+	if config.Linux == nil {
+		glog.Infof("container config has no Linux config, skipping cgroup settings")
+		return
+	}
+
+	for _, control := range reply.IsolationControls {
+		switch control.Kind {
+		case lifecycle.IsolationControl_CGROUP_CPUSET_CPUS:
+			config.Linux.Resources.CpusetCpus = control.Value
+		case lifecycle.IsolationControl_CGROUP_CPUSET_MEMS:
+			config.Linux.Resources.CpusetMems = control.Value
+		default:
+			glog.Infof("encountered unknown isolation control kind: [%d]", control.Kind)
+			continue
+		}
+	}
 }
 
 func (ed *eventDispatcher) isolator(name string) *registeredIsolator {

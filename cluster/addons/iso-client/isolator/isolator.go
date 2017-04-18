@@ -17,15 +17,32 @@ import (
 )
 
 type Isolator interface {
-	// preStart Hook to be implemented by custom isolators
-	PreStartPod(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*lifecycle.IsolationControl, error)
-	// postStop Hook to be implemented by custom isolators
-	PostStopPod(cgroupInfo *lifecycle.CgroupInfo) error
-	// cleanUp after isolator is turned off
+	// PreStartPod is invoked before any of the pod's containers start.
+	PreStartPod(podName string,
+		containerName string,
+		pod *v1.Pod,
+		resource *lifecycle.CgroupInfo) ([]*lifecycle.IsolationControl, error)
+
+	// PostStopPod is invoked after all of the pod's containers are terminated.
+	PostStopPod(podName string, containerName string, cgroupInfo *lifecycle.CgroupInfo) error
+
+	// PreStartContainer is invoked before there are any processes running inside
+	// the container.
+	PreStartContainer(podName string,
+		containerName string) ([]*lifecycle.IsolationControl, error)
+
+	// PostStopContainer is invoked after all of the processes in the container
+	// are terminated.
+	PostStopContainer(podName string,
+		containerName string) error
+
+	// ShutDown is invoked after the isolator is unregistered.
 	ShutDown()
-	// Initialize resources when connection to eventDispatcher is possible, before registering the isolator in kubelet
+
+	// Perform any necessary pre-isolation initializations.
 	Init() error
-	// get Name of isolator
+
+	// Returns the name of this isolator.
 	Name() string
 }
 
@@ -44,7 +61,6 @@ func getPod(bytePod []byte) (*v1.Pod, error) {
 	return pod, nil
 }
 
-// wrapper for preStart method
 func (n NotifyHandler) preStartPod(event *lifecycle.Event) (*lifecycle.EventReply, error) {
 	pod, err := getPod(event.Pod)
 	if err != nil {
@@ -53,7 +69,7 @@ func (n NotifyHandler) preStartPod(event *lifecycle.Event) (*lifecycle.EventRepl
 			IsolationControls: []*lifecycle.IsolationControl{},
 		}, err
 	}
-	resources, err := n.isolator.PreStartPod(pod, event.CgroupInfo)
+	resources, err := n.isolator.PreStartPod(event.PodName, event.ContainerName, pod, event.CgroupInfo)
 	if err != nil {
 		return &lifecycle.EventReply{
 			Error:             err.Error(),
@@ -66,9 +82,35 @@ func (n NotifyHandler) preStartPod(event *lifecycle.Event) (*lifecycle.EventRepl
 	}, nil
 }
 
-// wrapper for postStop method
 func (n NotifyHandler) postStopPod(event *lifecycle.Event) (*lifecycle.EventReply, error) {
-	if err := n.isolator.PostStopPod(event.CgroupInfo); err != nil {
+	if err := n.isolator.PostStopPod(event.PodName, event.ContainerName, event.CgroupInfo); err != nil {
+		return &lifecycle.EventReply{
+			Error:             err.Error(),
+			IsolationControls: []*lifecycle.IsolationControl{},
+		}, err
+	}
+	return &lifecycle.EventReply{
+		Error:             "",
+		IsolationControls: []*lifecycle.IsolationControl{},
+	}, nil
+}
+
+func (n NotifyHandler) preStartContainer(event *lifecycle.Event) (*lifecycle.EventReply, error) {
+	resources, err := n.isolator.PreStartContainer(event.PodName, event.ContainerName)
+	if err != nil {
+		return &lifecycle.EventReply{
+			Error:             err.Error(),
+			IsolationControls: []*lifecycle.IsolationControl{},
+		}, err
+	}
+	return &lifecycle.EventReply{
+		Error:             "",
+		IsolationControls: resources,
+	}, nil
+}
+
+func (n NotifyHandler) postStopContainer(event *lifecycle.Event) (*lifecycle.EventReply, error) {
+	if err := n.isolator.PostStopContainer(event.PodName, event.ContainerName); err != nil {
 		return &lifecycle.EventReply{
 			Error:             err.Error(),
 			IsolationControls: []*lifecycle.IsolationControl{},
@@ -86,6 +128,10 @@ func (n NotifyHandler) Notify(context context.Context, event *lifecycle.Event) (
 		return n.preStartPod(event)
 	case lifecycle.Event_POD_POST_STOP:
 		return n.postStopPod(event)
+	case lifecycle.Event_CONTAINER_PRE_START:
+		return n.preStartContainer(event)
+	case lifecycle.Event_CONTAINER_POST_STOP:
+		return n.postStopContainer(event)
 	default:
 		glog.Infof("Unknown event type: %v", event.Kind)
 		return nil, nil

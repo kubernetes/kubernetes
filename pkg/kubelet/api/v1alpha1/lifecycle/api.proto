@@ -44,10 +44,14 @@ message Event {
   enum Kind {
     POD_PRE_START = 0;
     POD_POST_STOP = 1;
+    CONTAINER_PRE_START = 2;
+    CONTAINER_POST_STOP = 3;
   };
   Kind kind = 1;
-  CgroupInfo cgroup_info = 2;
-  bytes Pod = 3;
+  string pod_name = 2;
+  string container_name = 3;
+  bytes Pod = 4;
+  CgroupInfo cgroup_info = 5;
 }
 
 message EventReply {

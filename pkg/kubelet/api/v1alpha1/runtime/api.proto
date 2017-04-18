@@ -461,6 +461,10 @@ message LinuxContainerResources {
     int64 memory_limit_in_bytes = 4;
     // OOMScoreAdj adjusts the oom-killer score. Default: 0 (not specified).
     int64 oom_score_adj = 5;
+    // CpusetCpus constrains the allowed set of logical CPUs. Default: "" (not specified).
+    string cpuset_cpus = 6;
+    // CpusetMems constrains the allowed set of memory nodes. Default: "" (not specified).
+    string cpuset_mems = 7;
 }
 
 // SELinuxOption are the labels to be applied to the container.

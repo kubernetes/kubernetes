@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	containermanager "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -77,6 +78,19 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToCreateContainer, "Failed to create container with error: %v", err)
 		return "Generate Container Config Failed", err
 	}
+
+	// Delegate to registered isolators.
+	eventDispatcher := containermanager.GetEventDispatcherSingleton()
+	eventReply, err := eventDispatcher.PreStartContainer(podSandboxConfig.Metadata.Name, containerConfig.Metadata.Name)
+	if err != nil {
+		return "", fmt.Errorf("failed to collect isolator responses for container %q: %v", containerConfig.Metadata.Name, err)
+	}
+	if eventReply.Error != "" {
+		return "", fmt.Errorf("isolator returned error: %s", eventReply.Error)
+	}
+	// Apply aggregated isolator responses to the container create config.
+	eventDispatcher.UpdateContainerConfigWithReply(eventReply, containerConfig)
+
 	containerID, err := m.runtimeService.CreateContainer(podSandboxID, containerConfig, podSandboxConfig)
 	if err != nil {
 		m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToCreateContainer, "Failed to create container with error: %v", err)
@@ -559,6 +573,12 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		message = fmt.Sprint(message, ":", reason)
 	}
 	m.generateContainerEvent(containerID, v1.EventTypeNormal, events.KillingContainer, message)
+
+	// Delegate to registered isolators.
+	if err = containermanager.GetEventDispatcherSingleton().PostStopContainer(pod.Name, containerSpec.Name); err != nil {
+		glog.Warningf("failed to send post stop to isolators for container %s of pod %s: %v", containerSpec.Name, pod.Name, err)
+	}
+
 	m.containerRefManager.ClearRef(containerID)
 
 	return err
@@ -622,6 +642,11 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *v1.Pod, 
 			if err := m.runtimeService.RemoveContainer(status.ID.ID); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
 				continue
+			}
+
+			// Delegate to registered isolators.
+			if err := containermanager.GetEventDispatcherSingleton().PostStopContainer(pod.Name, status.Name); err != nil {
+				utilruntime.HandleError(fmt.Errorf("failed to send post stop to isolators for init container %s of pod %s: %v", status.Name, pod.Name, err))
 			}
 
 			// remove any references to this container

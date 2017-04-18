@@ -114,6 +114,17 @@ func (c *coreAffinityIsolator) PostStopPod(cgroupInfo *lifecycle.CgroupInfo) err
 	delete(c.cpuAssignmentMap, cgroupInfo.Path)
 	return nil
 }
+
+func (c *coreAffinityIsolator) PreStartContainer(podName, containerName string) ([]*lifecycle.IsolationControl, error) {
+	glog.Infof("coreAffinityIsolator[PreStartContainer]:\npodName: %s\ncontainerName: %v", podName, containerName)
+	return []*lifecycle.IsolationControl{}, nil
+}
+
+func (c *coreAffinityIsolator) PostStopContainer(podName, containerName string) error {
+	glog.Infof("coreAffinityIsolator[PostStopContainer]:\npodName: %s\ncontainerName: %v", podName, containerName)
+	return nil
+}
+
 func (c *coreAffinityIsolator) ShutDown() {
 	opaque.RemoveOpaqueResource(c.name)
 }
