@@ -61,6 +61,16 @@ var parserTests = []parserTest{
 		newList(), newIdentifier("end"),
 	}, false},
 	{"malformat input", `{\\\}`, []Node{}, true},
+	{"paired parentheses in quotes", `{[?(@.status.nodeInfo.osImage == "Debian GNU/Linux 7 (wheezy)")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("Debian GNU/Linux 7 (wheezy)")}, false},
+	{"paired parentheses in double quotes and with double quotes escape", `{[?(@.status.nodeInfo.osImage == "Debian GNU/Linux 7 \"test\" (wheezy)")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("Debian GNU/Linux 7 \"test\" (wheezy)")}, false},
+	{"unregular parentheses in double quotes", `{[?(@.test == "())(")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("test"), newList(), newText("())(")}, false},
+	{"unregular parentheses in single quotes", `{[?(@.status.nodeInfo.osImage == 'Linux')]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("Linux")}, false},
+	{"test filter suffix", `{[?(@.status.nodeInfo.osImage == "Debian GNU/Linux 7 {[(wheezy)]}")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("Debian GNU/Linux 7 {[(wheezy)]}")}, false},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {

@@ -109,7 +109,6 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 // Requires that printer flags have been added to cmd (see AddPrinterFlags).
 func PrinterForCommand(cmd *cobra.Command, mapper meta.RESTMapper, typer runtime.ObjectTyper, decoders []runtime.Decoder) (printers.ResourcePrinter, bool, error) {
 	outputFormat := GetFlagString(cmd, "output")
-
 	// templates are logically optional for specifying a format.
 	// TODO once https://github.com/kubernetes/kubernetes/issues/12668 is fixed, this should fall back to GetFlagString
 	templateFile, _ := cmd.Flags().GetString("template")
