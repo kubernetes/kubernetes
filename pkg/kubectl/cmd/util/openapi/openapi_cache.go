@@ -45,7 +45,7 @@ type cachingOpenAPIClient struct {
 
 // newCachingOpenAPIClient returns a new discovery.OpenAPISchemaInterface
 // that will read the openapi spec from a local cache if it exists, and
-// if not fetch an openapi spec using client
+// if not will then fetch an openapi spec using a client.
 // client: used to fetch a new openapi spec if a local cache is not found
 // version: the server version and used as part of the cache file location
 // cacheDir: the directory under which the cache file will be written

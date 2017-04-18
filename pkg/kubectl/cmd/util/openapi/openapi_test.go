@@ -46,13 +46,19 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 		Expect(name).To(Equal(deploymentName))
 	})
 
-	var definition KindDefinition
+	var definition Kind
 	It("should find the definition by name", func() {
 		var found bool
 		definition, found = instance.NameToDefinition[deploymentName]
 		Expect(found).To(BeTrue())
 		Expect(definition.Name).To(Equal(deploymentName))
 		Expect(definition.PrimitiveType).To(BeEmpty())
+	})
+
+	It("should lookup the Kind by its GroupVersionKind", func() {
+		d, found := instance.LookupResource(gvk)
+		Expect(found).To(BeTrue())
+		Expect(d).To(Equal(definition))
 	})
 
 	It("should find the definition GroupVersionKind", func() {
@@ -124,7 +130,7 @@ var _ = Describe("Reading apps/v1beta1/DeploymentStatus from openAPIData", func(
 
 	deploymentStatusName := "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentStatus"
 
-	var definition KindDefinition
+	var definition Kind
 	It("should find the definition by name", func() {
 		var found bool
 		definition, found = instance.NameToDefinition[deploymentStatusName]
@@ -188,7 +194,7 @@ var _ = Describe("Reading apps/v1beta1/DeploymentSpec from openAPIData", func() 
 
 	deploymentSpecName := "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentSpec"
 
-	var definition KindDefinition
+	var definition Kind
 	It("should find the definition by name", func() {
 		var found bool
 		definition, found = instance.NameToDefinition[deploymentSpecName]
@@ -229,7 +235,7 @@ var _ = Describe("Reading v1/ObjectMeta from openAPIData", func() {
 
 	objectMetaName := "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
 
-	var definition KindDefinition
+	var definition Kind
 	It("should find the definition by name", func() {
 		var found bool
 		definition, found = instance.NameToDefinition[objectMetaName]
@@ -306,7 +312,7 @@ var _ = Describe("Reading v1/NodeStatus from openAPIData", func() {
 
 	nodeStatusName := "io.k8s.kubernetes.pkg.api.v1.NodeStatus"
 
-	var definition KindDefinition
+	var definition Kind
 	It("should find the definition by name", func() {
 		var found bool
 		definition, found = instance.NameToDefinition[nodeStatusName]
@@ -352,7 +358,7 @@ var _ = Describe("Reading Utility Definitions from openAPIData", func() {
 	})
 
 	Context("for util.intstr.IntOrString", func() {
-		var definition KindDefinition
+		var definition Kind
 		It("should find the definition by name", func() {
 			intOrStringName := "io.k8s.apimachinery.pkg.util.intstr.IntOrString"
 			var found bool
@@ -364,7 +370,7 @@ var _ = Describe("Reading Utility Definitions from openAPIData", func() {
 	})
 
 	Context("for apis.meta.v1.Time", func() {
-		var definition KindDefinition
+		var definition Kind
 		It("should find the definition by name", func() {
 			intOrStringName := "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
 			var found bool
@@ -416,7 +422,7 @@ var _ = Describe("Reading authorization/v1/SubjectAccessReviewSpec from openAPID
 
 	subjectAccessReviewSpecName := "io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewSpec"
 
-	var definition KindDefinition
+	var definition Kind
 	It("should find the definition by name", func() {
 		var found bool
 		definition, found = instance.NameToDefinition[subjectAccessReviewSpecName]

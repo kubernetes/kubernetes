@@ -27,7 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-const gvkOpenAPIKey = "x-kubernetes-group-version-kind"
+// groupVersionKindExtensionKey is the key used to lookup the GroupVersionKind value
+// for an object definition from the definition's "extensions" map.
+const groupVersionKindExtensionKey = "x-kubernetes-group-version-kind"
 
 // Integer is the name for integer types
 const Integer = "integer"
@@ -38,60 +40,101 @@ const String = "string"
 // Bool is the name for boolean types
 const Boolean = "boolean"
 
+// Map is the name for map types
+// types.go struct fields that are maps will have an open API type "object"
+// types.go struct fields that are actual objects appearing as a struct
+// in a types.go file will have no type defined
+// and have a json pointer reference to the type definition
+const Map = "object"
+
+// Array is the name for array types
+const Array = "array"
+
 // Resources contains the object definitions for Kubernetes resource apis
+// Fields are public for binary serialization (private fields don't get serialized)
 type Resources struct {
-	// GroupVersionKindToName maps GroupVersionKinds to TypeDefinition names
+	// GroupVersionKindToName maps GroupVersionKinds to Type names
 	GroupVersionKindToName map[schema.GroupVersionKind]string
-	// NameToDefinition maps TypeDefinition names to TypeDefinitions
-	NameToDefinition map[string]KindDefinition
+	// NameToDefinition maps Type names to TypeDefinitions
+	NameToDefinition map[string]Kind
 }
 
-// KindDefinition defines a Kubernetes object Kind
-type KindDefinition struct {
-	// Name is the name of the type
+// LookupResource returns the Kind for the specified groupVersionKind
+func (r Resources) LookupResource(groupVersionKind schema.GroupVersionKind) (Kind, bool) {
+	name, found := r.GroupVersionKindToName[groupVersionKind]
+	if !found {
+		return Kind{}, false
+	}
+	def, found := r.NameToDefinition[name]
+	if !found {
+		return Kind{}, false
+	}
+	return def, true
+}
+
+// Kind defines a Kubernetes object Kind
+type Kind struct {
+	// Name is the lookup key given to this Kind by the open API spec.
+	// May not contain any semantic meaning or relation to the API definition,
+	// simply must be unique for each object definition in the Open API spec.
+	// e.g. io.k8s.kubernetes.pkg.apis.apps.v1beta1.Deployment
 	Name string
 
-	// IsResource is true if the Kind is a Resource (has API endpoints)
+	// IsResource is true if the Kind is a Resource (it has API endpoints)
+	// e.g. Deployment is a Resource, DeploymentStatus is NOT a Resource
 	IsResource bool
 
-	// GroupVersionKind is the group version kind of a resource.
+	// GroupVersionKind uniquely defines a resource type in the Kubernetes API
+	// and is present for all resources.
 	// Empty for non-resource Kinds (e.g. those without APIs).
+	// e.g. "Group": "apps", "Version": "v1beta1", "Kind": "Deployment"
 	GroupVersionKind schema.GroupVersionKind
 
-	// Present for definitions that are primitives - e.g.
+	// Present only for definitions that represent primitive types with additional
+	// semantic meaning beyond just string, integer, boolean - e.g.
+	// Fields with a PrimitiveType should follow the validation of the primitive type.
 	// io.k8s.apimachinery.pkg.apis.meta.v1.Time
 	// io.k8s.apimachinery.pkg.util.intstr.IntOrString
 	PrimitiveType string
 
-	// Extensions are the openapi extensions for the object definition.
+	// Extensions are openapi extensions for the object definition.
 	Extensions spec.Extensions
 
-	// Fields is the list of fields for definitions that are Kinds
-	Fields map[string]FieldDefinition
+	// Fields are the fields defined for this Kind
+	Fields map[string]Field
 }
 
-// TypeDefinition defines a field definition
-type TypeDefinition struct {
+// Type defines a field type and are expected to be one of:
+// - IsKind
+// - IsMap
+// - IsArray
+// - IsPrimitive
+type Type struct {
 	// Name is the name of the type
 	TypeName string
 
 	// IsKind is true if the definition represents a Kind
 	IsKind bool
-	// isPrimitive is true if the definition represents a primitive type
+	// IsPrimitive is true if the definition represents a primitive type - e.g. string, boolean, integer
 	IsPrimitive bool
-	// isArray is true if the definition represents an array type
+	// IsArray is true if the definition represents an array type
 	IsArray bool
-	// isArray is true if the definition represents an array type
+	// IsMap is true if the definition represents a map type
 	IsMap bool
 
-	ElementType *TypeDefinition
+	// ElementType will be specified for arrays and maps
+	// if IsMap == true, then ElementType is the type of the value (key is always string)
+	// if IsArray == true, then ElementType is the type of the element
+	ElementType *Type
 }
 
-// FieldDefinition defines a field
-type FieldDefinition struct {
-	TypeDefinition
+// Field defines a field of a Kind
+type Field struct {
+	Type
 
-	// Extensions are extensions for this field
+	// Extensions are extensions for this field and may contain
+	// metadata from the types.go struct field tags.
+	// e.g. contains patchStrategy, patchMergeKey, etc
 	Extensions spec.Extensions
 }
 
@@ -99,7 +142,7 @@ type FieldDefinition struct {
 func newOpenAPIData(s *spec.Swagger) (*Resources, error) {
 	o := &Resources{
 		GroupVersionKindToName: map[schema.GroupVersionKind]string{},
-		NameToDefinition:       map[string]KindDefinition{},
+		NameToDefinition:       map[string]Kind{},
 	}
 	// Parse and index definitions by name
 	for name, d := range s.Definitions {
@@ -122,7 +165,7 @@ func (o *Resources) validate() error {
 	types := sets.String{}
 	for _, d := range o.NameToDefinition {
 		for _, f := range d.Fields {
-			for _, t := range o.getTypeNames(f.TypeDefinition) {
+			for _, t := range o.getTypeNames(f.Type) {
 				types.Insert(t)
 			}
 		}
@@ -136,7 +179,7 @@ func (o *Resources) validate() error {
 	return nil
 }
 
-func (o *Resources) getTypeNames(elem TypeDefinition) []string {
+func (o *Resources) getTypeNames(elem Type) []string {
 	t := []string{}
 	if elem.IsKind {
 		t = append(t, elem.TypeName)
@@ -147,13 +190,13 @@ func (o *Resources) getTypeNames(elem TypeDefinition) []string {
 	return t
 }
 
-func (o *Resources) parseDefinition(name string, s spec.Schema) KindDefinition {
+func (o *Resources) parseDefinition(name string, s spec.Schema) Kind {
 	gvk, err := o.getGroupVersionKind(s)
-	value := KindDefinition{
+	value := Kind{
 		Name:             name,
 		GroupVersionKind: gvk,
 		Extensions:       s.Extensions,
-		Fields:           map[string]FieldDefinition{},
+		Fields:           map[string]Field{},
 	}
 	if err != nil {
 		glog.Warning(err)
@@ -170,8 +213,8 @@ func (o *Resources) parseDefinition(name string, s spec.Schema) KindDefinition {
 	return value
 }
 
-func (o *Resources) buildElementFromSchema(s spec.Schema) TypeDefinition {
-	def := TypeDefinition{
+func (o *Resources) buildElementFromSchema(s spec.Schema) Type {
+	def := Type{
 		TypeName:    o.getTypeNameForField(s),
 		IsPrimitive: o.isPrimitive(s),
 		IsArray:     o.isArray(s),
@@ -190,10 +233,10 @@ func (o *Resources) buildElementFromSchema(s spec.Schema) TypeDefinition {
 	return def
 }
 
-func (o *Resources) parseField(name string, s spec.Schema) FieldDefinition {
-	fieldDef := FieldDefinition{
-		Extensions:     s.Extensions,
-		TypeDefinition: o.buildElementFromSchema(s),
+func (o *Resources) parseField(name string, s spec.Schema) Field {
+	fieldDef := Field{
+		Extensions: s.Extensions,
+		Type:       o.buildElementFromSchema(s),
 	}
 	return fieldDef
 }
@@ -205,7 +248,7 @@ func (o *Resources) isArray(s spec.Schema) bool {
 		// This should just be a sanity check against changing the format.
 		return false
 	}
-	return len(s.Type) > 0 && s.Type[0] == "array"
+	return o.getType(s) == Array
 }
 
 // isMap returns true if s is a map type.
@@ -215,7 +258,7 @@ func (o *Resources) isMap(s spec.Schema) bool {
 		// This should just be a sanity check against changing the format.
 		return false
 	}
-	return len(s.Type) > 0 && s.Type[0] == "object"
+	return o.getType(s) == Map
 }
 
 // isPrimitive returns true if s is a primitive type
@@ -227,19 +270,18 @@ func (o *Resources) isPrimitive(s spec.Schema) bool {
 		// This should just be a sanity check against changing the format.
 		return false
 	}
-	if len(s.Type) == 1 {
-		switch s.Type[0] {
-		case "integer":
-			return true
-		case "boolean":
-			return true
-		case "string":
-			return true
-		default:
-			return false
-		}
+	t := o.getType(s)
+	if t == Integer || t == Boolean || t == String {
+		return true
 	}
 	return false
+}
+
+func (*Resources) getType(s spec.Schema) string {
+	if len(s.Type) != 1 {
+		return ""
+	}
+	return strings.ToLower(s.Type[0])
 }
 
 func (o *Resources) getTypeNameForField(s spec.Schema) string {
@@ -262,7 +304,7 @@ func (o *Resources) getTypeNameForField(s spec.Schema) string {
 	return ""
 }
 
-// isDefinitionReference returns true s is a complex type that should have a KindDefinition.
+// isDefinitionReference returns true s is a complex type that should have a Kind.
 func (o *Resources) isDefinitionReference(s spec.Schema) bool {
 	if len(s.Properties) > 0 {
 		// Open API can have embedded type definitions, but Kubernetes doesn't generate these.
@@ -278,7 +320,8 @@ func (o *Resources) isDefinitionReference(s spec.Schema) bool {
 	return len(p) > 0 && strings.HasPrefix(p, "/definitions/")
 }
 
-// getElementType returns the type of an element for arrays and maps
+// getElementType returns the type of an element for arrays
+// returns an error if s is not an array.
 func (o *Resources) getElementType(s spec.Schema) (spec.Schema, error) {
 	if !o.isArray(s) {
 		return spec.Schema{}, fmt.Errorf("%v is not an array type", s.Type)
@@ -286,6 +329,8 @@ func (o *Resources) getElementType(s spec.Schema) (spec.Schema, error) {
 	return *s.Items.Schema, nil
 }
 
+// getElementType returns the type of an element for maps
+// returns an error if s is not a map.
 func (o *Resources) getValueType(s spec.Schema) (spec.Schema, error) {
 	if !o.isMap(s) {
 		return spec.Schema{}, fmt.Errorf("%v is not an map type", s.Type)
@@ -313,15 +358,15 @@ func (o *Resources) getGroupVersionKind(s spec.Schema) (schema.GroupVersionKind,
 	empty := schema.GroupVersionKind{}
 
 	// Get the extensions
-	extList, f := s.Extensions[gvkOpenAPIKey]
+	extList, f := s.Extensions[groupVersionKindExtensionKey]
 	if !f {
-		return empty, fmt.Errorf("No %s extension present in %v", gvkOpenAPIKey, s.Extensions)
+		return empty, fmt.Errorf("No %s extension present in %v", groupVersionKindExtensionKey, s.Extensions)
 	}
 
 	// Expect a empty of a list with 1 element
 	extListCasted, ok := extList.([]interface{})
 	if !ok {
-		return empty, fmt.Errorf("%s extension has unexpected type %T in %s", gvkOpenAPIKey, extListCasted, s.Extensions)
+		return empty, fmt.Errorf("%s extension has unexpected type %T in %s", groupVersionKindExtensionKey, extListCasted, s.Extensions)
 	}
 	if len(extListCasted) == 0 {
 		return empty, fmt.Errorf("No Group Version Kind found in %v", extListCasted)
@@ -334,19 +379,19 @@ func (o *Resources) getGroupVersionKind(s spec.Schema) (schema.GroupVersionKind,
 	// Expect a empty of a map with 3 entries
 	gvkMap, ok := gvk.(map[string]interface{})
 	if !ok {
-		return empty, fmt.Errorf("%s extension has unexpected type %T in %s", gvkOpenAPIKey, gvk, s.Extensions)
+		return empty, fmt.Errorf("%s extension has unexpected type %T in %s", groupVersionKindExtensionKey, gvk, s.Extensions)
 	}
 	group, ok := gvkMap["Group"].(string)
 	if !ok {
-		return empty, fmt.Errorf("%s extension missing Group: %v", gvkOpenAPIKey, gvkMap)
+		return empty, fmt.Errorf("%s extension missing Group: %v", groupVersionKindExtensionKey, gvkMap)
 	}
 	version, ok := gvkMap["Version"].(string)
 	if !ok {
-		return empty, fmt.Errorf("%s extension missing Version: %v", gvkOpenAPIKey, gvkMap)
+		return empty, fmt.Errorf("%s extension missing Version: %v", groupVersionKindExtensionKey, gvkMap)
 	}
 	kind, ok := gvkMap["Kind"].(string)
 	if !ok {
-		return empty, fmt.Errorf("%s extension missing Kind: %v", gvkOpenAPIKey, gvkMap)
+		return empty, fmt.Errorf("%s extension missing Kind: %v", groupVersionKindExtensionKey, gvkMap)
 	}
 
 	return schema.GroupVersionKind{

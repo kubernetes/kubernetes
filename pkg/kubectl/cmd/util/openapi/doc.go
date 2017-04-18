@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
-
-// The openapi package is a collection of libraries for fetching the openapi spec
+// Package openapi is a collection of libraries for fetching the openapi spec
 // from a Kubernetes server and then indexing the type definitions.
+// The openapi spec contains the object model definitions and extensions metadata
+// such as the patchStrategy and patchMergeKey for creating patches.
+package openapi

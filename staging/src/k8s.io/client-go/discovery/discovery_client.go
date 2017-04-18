@@ -340,6 +340,7 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 }
 
 // SwaggerSchema retrieves and parses the swagger API schema the server supports.
+// TODO: Replace usages with Open API.  Tracked in https://github.com/kubernetes/kubernetes/issues/44589
 func (d *DiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
 	if version.Empty() {
 		return nil, fmt.Errorf("groupVersion cannot be empty")
@@ -373,11 +374,9 @@ func (d *DiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.A
 	return &schema, nil
 }
 
+// OpenAPISchema fetches the open api schema using a rest client and parses the json.
+// Warning: this is very expensive (~1.2s)
 func (d *DiscoveryClient) OpenAPISchema() (*spec.Swagger, error) {
-	// Parse the raw data into a spec.Swagger struct.
-	// WARNING: We don't use the loads.Analyze because this is very expensive
-	// and loads.Analyze takes 2x as long (it Unmarshal's 2x)
-	// Warning: this is very expensive (~600ms)
 	data, err := d.restClient.Get().AbsPath("/swagger.json").Do().Raw()
 	if err != nil {
 		return nil, err
@@ -387,8 +386,6 @@ func (d *DiscoveryClient) OpenAPISchema() (*spec.Swagger, error) {
 	if err != nil {
 		return nil, err
 	}
-	//sw := new(spec.Swagger)
-	//err = json.Unmarshal(data, sw)
 	return doc.Spec(), err
 }
 

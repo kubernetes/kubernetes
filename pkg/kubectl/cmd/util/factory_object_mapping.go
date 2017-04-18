@@ -28,6 +28,8 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 
+	"sync"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -50,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
-	"sync"
 )
 
 type ring1Factory struct {
@@ -438,8 +439,13 @@ func (f *ring1Factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiD
 	return discovery.SwaggerSchema(version)
 }
 
-// openAPIData returns an openAPIData containing metadata and structural information about Kubernetes
-// models and operations.  Will try to cache the spec locally if possible.
+// OpenAPISchema returns metadata and structural information about Kubernetes object definitions.
+// Will try to cache the data to a local file.  Cache is written and read from a
+// file created with ioutil.TempFile and obeys the expiration semantics of that file.
+// The cache location is a function of the client and server versions so that the open API
+// schema will be cached separately for different client / server combinations.
+// Note, the cache will not be invalidated if the server changes its open API schema without
+// changing the server version.
 func (f *ring1Factory) OpenAPISchema(cacheDir string) (*openapi.Resources, error) {
 	discovery, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {

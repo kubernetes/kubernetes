@@ -402,7 +402,11 @@ func AddValidateFlags(cmd *cobra.Command) {
 }
 
 func AddOpenAPIFlags(cmd *cobra.Command) {
-	cmd.Flags().String("schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
+	cmd.Flags().String("schema-cache-dir",
+		fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName),
+		fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'",
+			clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName),
+	)
 	cmd.MarkFlagFilename("schema-cache-dir")
 }
 

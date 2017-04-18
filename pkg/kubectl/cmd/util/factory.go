@@ -54,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
-	"path/filepath"
 )
 
 const (
@@ -442,10 +441,7 @@ func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cac
 	}
 	cacheFile := path.Join(fullDir, prefix, groupVersion, schemaFileName)
 
-	abs, _ := filepath.Abs(cacheDir)
-
 	if len(cacheDir) != 0 {
-		glog.Infof("Reading swagger cache dir %v (%v) - FYI %v", cacheDir, cacheFile, abs)
 		if schemaData, err = ioutil.ReadFile(cacheFile); err != nil && !os.IsNotExist(err) {
 			return err
 		}
