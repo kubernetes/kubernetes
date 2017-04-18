@@ -781,6 +781,13 @@ func IsPodActive(p *v1.Pod) bool {
 		p.DeletionTimestamp == nil
 }
 
+func IsPodRejected(p *v1.Pod) bool {
+	// Only check if pod is rejected by kubelet admit for predicate MatchNodeSelector now.
+	// TODO: check if pod is rejected by kubelet for other reasons.
+	return v1.PodFailed == p.Status.Phase &&
+		p.Status.Reason == "MatchNodeSelector"
+}
+
 // FilterActiveReplicaSets returns replica sets that have (or at least ought to have) pods.
 func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions.ReplicaSet {
 	activeFilter := func(rs *extensions.ReplicaSet) bool {

@@ -579,13 +579,26 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	if err != nil {
 		return err
 	}
-	// Ignore inactive pods.
-	var filteredPods []*v1.Pod
+	// Filter out active and rejected pods.
+	var filteredActivePods, filteredRejectedPods []*v1.Pod
 	for _, pod := range allPods {
+		if controller.IsPodRejected(pod) {
+			filteredRejectedPods = append(filteredRejectedPods, pod)
+		}
 		if controller.IsPodActive(pod) {
-			filteredPods = append(filteredPods, pod)
+			filteredActivePods = append(filteredActivePods, pod)
 		}
 	}
+
+	// If there are pods rejected by kubelet admit, delete them and return an error to ensure rate limit.
+	if len(filteredRejectedPods) > 0 {
+		for _, pod := range filteredRejectedPods {
+			// Ignore deletion error here.
+			rm.podControl.DeletePod(pod.Namespace, pod.Name, rc)
+		}
+		return fmt.Errorf("rejected pods exist, delete them and exit sync!")
+	}
+
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
@@ -601,14 +614,14 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	cm := controller.NewPodControllerRefManager(rm.podControl, rc, labels.Set(rc.Spec.Selector).AsSelectorPreValidated(), controllerKind, canAdoptFunc)
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
-	filteredPods, err = cm.ClaimPods(filteredPods)
+	filteredActivePods, err = cm.ClaimPods(filteredActivePods)
 	if err != nil {
 		return err
 	}
 
 	var manageReplicasErr error
 	if rcNeedsSync && rc.DeletionTimestamp == nil {
-		manageReplicasErr = rm.manageReplicas(filteredPods, rc)
+		manageReplicasErr = rm.manageReplicas(filteredActivePods, rc)
 	}
 	trace.Step("manageReplicas done")
 
@@ -618,7 +631,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	}
 	rc = copy.(*v1.ReplicationController)
 
-	newStatus := calculateStatus(rc, filteredPods, manageReplicasErr)
+	newStatus := calculateStatus(rc, filteredActivePods, manageReplicasErr)
 
 	// Always updates status as pods come up or die.
 	updatedRC, err := updateReplicationControllerStatus(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), *rc, newStatus)
