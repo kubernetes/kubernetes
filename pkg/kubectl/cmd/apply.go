@@ -73,7 +73,7 @@ const (
 
 var (
 	apply_long = templates.LongDesc(i18n.T(`
-		Apply a configuration to a resource by filename or stdin.
+		Apply a configuration to the specified resource by filename or stdin with the resource name.
 		This resource will be created if it doesn't exist yet.
 		To use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.
 
