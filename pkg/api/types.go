@@ -2096,6 +2096,13 @@ type PodSpec struct {
 	// If specified, the pod's tolerations.
 	// +optional
 	Tolerations []Toleration
+	// +optional
+	HostMappings []HostMapping
+}
+
+type HostMapping struct {
+	IP string
+  Names []string
 }
 
 // Sysctl defines a kernel parameter to be set

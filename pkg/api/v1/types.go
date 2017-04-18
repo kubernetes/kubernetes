@@ -2403,6 +2403,16 @@ type PodSpec struct {
 	// If specified, the pod's tolerations.
 	// +optional
 	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
+
+	// +optional
+	// +patchMergeKey=IP
+	// +patchStrategy=merge
+	HostMappings []HostMapping `json:"hostMappings,omitempty" patchStrategy:"merge" patchMergeKey:"IP" protobuf:"bytes,23,rep,name=hostMappings"`
+}
+
+type HostMapping struct {
+	IP    string   `json:"IP,omitempty" protobuf:"bytes,1,opt,name=IP"`
+	Names []string `json:"names,omitempty" protobuf:"bytes,2,rep,name=names"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
