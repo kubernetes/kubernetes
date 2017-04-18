@@ -782,6 +782,24 @@ func (LocalObjectReference) SwaggerDoc() map[string]string {
 	return map_LocalObjectReference
 }
 
+var map_LocalStorageFsVolume = map[string]string{
+	"":     "LocalStorageFsVolume represents a filesystem-based local volume",
+	"path": "The full path to the volume on the node",
+}
+
+func (LocalStorageFsVolume) SwaggerDoc() map[string]string {
+	return map_LocalStorageFsVolume
+}
+
+var map_LocalStorageVolumeSource = map[string]string{
+	"":         "LocalStorage represents a local volume accessible only from one node In the PersistentVolume, the `kubernetes.io/hostname` label should be set with the node that this local volume is located at. LocalStorage PersistentVolumes also are required to be part of a StorageClass, and that StorageClass should set the AlphaStorageTopologyAnnotation = \"kubernetes.io/hostame\"",
+	"fsVolume": "FsVolume represents a filesystem-based local volume",
+}
+
+func (LocalStorageVolumeSource) SwaggerDoc() map[string]string {
+	return map_LocalStorageVolumeSource
+}
+
 var map_NFSVolumeSource = map[string]string{
 	"":         "Represents an NFS mount that lasts the lifetime of a pod. NFS volumes do not support ownership management or SELinux relabeling.",
 	"server":   "Server is the hostname or IP address of the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs",
@@ -1137,6 +1155,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+	"localStorage":         "LocalStorage represents a local volume accessible only from one node",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1953,6 +1972,7 @@ var map_VolumeSource = map[string]string{
 	"projected":            "Items for all in one resources secrets, configmaps, and downward API",
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+	"localStorage":         "LocalStorage represents a local volume accessible only from one node This volume type cannot be used as a direct volume source and is only required here to support the volume plugin interface.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

@@ -337,6 +337,11 @@ type VolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,25,opt,name=scaleIO"`
+	// LocalStorage represents a local volume accessible only from one node
+	// This volume type cannot be used as a direct volume source and is only required here
+	// to support the volume plugin interface.
+	// +optional
+	LocalStorage *LocalStorageVolumeSource `json:"localStorage,omitempty" protobuf:"bytes,27,opt,name=localStorage"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -428,12 +433,18 @@ type PersistentVolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,19,opt,name=scaleIO"`
+	// LocalStorage represents a local volume accessible only from one node
+	// +optional
+	LocalStorage *LocalStorageVolumeSource `json:"localStorage,omitempty" protobuf:"bytes,20,opt,name=localStorage"`
 }
 
 const (
 	// BetaStorageClassAnnotation represents the beta/previous StorageClass annotation.
 	// It's currently still used and will be held for backwards compatibility
 	BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
+	// AlphaStorageTopologyAnnotation is set in the StorageClass and gives the scheduler
+	// a hint that the volumes in this StorageClass have a topology constraint
+	AlphaStorageTopologyAnnotation = "storage.alpha.kubernetes.io/topology-key"
 )
 
 // +genclient=true
@@ -1287,6 +1298,23 @@ type KeyToPath struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	Mode *int32 `json:"mode,omitempty" protobuf:"varint,3,opt,name=mode"`
+}
+
+// LocalStorage represents a local volume accessible only from one node
+// In the PersistentVolume, the `kubernetes.io/hostname` label should be set
+// with the node that this local volume is located at.
+// LocalStorage PersistentVolumes also are required to be part of a StorageClass, and that
+// StorageClass should set the AlphaStorageTopologyAnnotation = "kubernetes.io/hostame"
+type LocalStorageVolumeSource struct {
+	// FsVolume represents a filesystem-based local volume
+	// +optional
+	Fs *LocalStorageFsVolume `json:"fsVolume,omitempty" protobuf:"bytes,1,opt,name=fsVolume"`
+}
+
+// LocalStorageFsVolume represents a filesystem-based local volume
+type LocalStorageFsVolume struct {
+	// The full path to the volume on the node
+	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 }
 
 // ContainerPort represents a network port in a single container.
