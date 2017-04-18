@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -383,18 +384,17 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
 	return &Proxier{
-		exec:           &exec.FakeExec{},
-		serviceMap:     make(proxyServiceMap),
-		endpointsMap:   make(proxyEndpointsMap),
-		hcEndpoints:    make(map[types.NamespacedName]int),
-		staleEndpoints: make(map[endpointServicePair]bool),
-		iptables:       ipt,
-		clusterCIDR:    "10.0.0.0/24",
-		allServices:    []*api.Service{},
-		hostname:       testHostname,
-		portsMap:       make(map[localPort]closeable),
-		portMapper:     &fakePortOpener{[]*localPort{}},
-		healthChecker:  newFakeHealthChecker(),
+		exec:          &exec.FakeExec{},
+		serviceMap:    make(proxyServiceMap),
+		endpointsMap:  make(proxyEndpointsMap),
+		newEndpoints:  make(endpointsChangeMap),
+		iptables:      ipt,
+		clusterCIDR:   "10.0.0.0/24",
+		allServices:   []*api.Service{},
+		hostname:      testHostname,
+		portsMap:      make(map[localPort]closeable),
+		portMapper:    &fakePortOpener{[]*localPort{}},
+		healthChecker: newFakeHealthChecker(),
 	}
 }
 
@@ -1212,6 +1212,84 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	}
 }
 
+func Test_getLocalIPs(t *testing.T) {
+	testCases := []struct {
+		endpointsMap map[proxy.ServicePortName][]*endpointsInfo
+		expected     map[types.NamespacedName]sets.String
+	}{{
+		// Case[0]: nothing
+		endpointsMap: map[proxy.ServicePortName][]*endpointsInfo{},
+		expected:     map[types.NamespacedName]sets.String{},
+	}, {
+		// Case[1]: unnamed port
+		endpointsMap: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", ""): {
+				{"1.1.1.1:11", false},
+			},
+		},
+		expected: map[types.NamespacedName]sets.String{},
+	}, {
+		// Case[2]: unnamed port local
+		endpointsMap: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", ""): {
+				{"1.1.1.1:11", true},
+			},
+		},
+		expected: map[types.NamespacedName]sets.String{
+			types.NamespacedName{Namespace: "ns1", Name: "ep1"}: sets.NewString("1.1.1.1"),
+		},
+	}, {
+		// Case[3]: named local and non-local ports for the same IP.
+		endpointsMap: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p11"): {
+				{"1.1.1.1:11", false},
+				{"1.1.1.2:11", true},
+			},
+			makeServicePortName("ns1", "ep1", "p12"): {
+				{"1.1.1.1:12", false},
+				{"1.1.1.2:12", true},
+			},
+		},
+		expected: map[types.NamespacedName]sets.String{
+			types.NamespacedName{Namespace: "ns1", Name: "ep1"}: sets.NewString("1.1.1.2"),
+		},
+	}, {
+		// Case[4]: named local and non-local ports for different IPs.
+		endpointsMap: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p11"): {
+				{"1.1.1.1:11", false},
+			},
+			makeServicePortName("ns2", "ep2", "p22"): {
+				{"2.2.2.2:22", true},
+				{"2.2.2.22:22", true},
+			},
+			makeServicePortName("ns2", "ep2", "p23"): {
+				{"2.2.2.3:23", true},
+			},
+			makeServicePortName("ns4", "ep4", "p44"): {
+				{"4.4.4.4:44", true},
+				{"4.4.4.5:44", false},
+			},
+			makeServicePortName("ns4", "ep4", "p45"): {
+				{"4.4.4.6:45", true},
+			},
+		},
+		expected: map[types.NamespacedName]sets.String{
+			types.NamespacedName{Namespace: "ns2", Name: "ep2"}: sets.NewString("2.2.2.2", "2.2.2.22", "2.2.2.3"),
+			types.NamespacedName{Namespace: "ns4", Name: "ep4"}: sets.NewString("4.4.4.4", "4.4.4.6"),
+		},
+	}}
+
+	for tci, tc := range testCases {
+		// outputs
+		localIPs := getLocalIPs(tc.endpointsMap)
+
+		if !reflect.DeepEqual(localIPs, tc.expected) {
+			t.Errorf("[%d] expected %#v, got %#v", tci, tc.expected, localIPs)
+		}
+	}
+}
+
 // This is a coarse test, but it offers some modicum of confidence as the code is evolved.
 func Test_endpointsToEndpointsMap(t *testing.T) {
 	testCases := []struct {
@@ -1446,7 +1524,7 @@ func compareEndpointsMaps(t *testing.T, tci int, newMap, expected map[proxy.Serv
 	}
 }
 
-func Test_buildNewEndpointsMap(t *testing.T) {
+func Test_updateEndpointsMap(t *testing.T) {
 	var nodeName = "host"
 
 	unnamedPort := func(ept *api.Endpoints) {
@@ -1752,7 +1830,7 @@ func Test_buildNewEndpointsMap(t *testing.T) {
 	testCases := []struct {
 		// previousEndpoints and currentEndpoints are used to call appropriate
 		// handlers OnEndpoints* (based on whether corresponding values are nil
-		// or non-nil)  and are supposed to be of equal length.
+		// or non-nil) and must be of equal length.
 		previousEndpoints    []*api.Endpoints
 		currentEndpoints     []*api.Endpoints
 		oldEndpoints         map[proxy.ServicePortName][]*endpointsInfo
@@ -2213,13 +2291,15 @@ func Test_buildNewEndpointsMap(t *testing.T) {
 				fp.OnEndpointsAdd(tc.previousEndpoints[i])
 			}
 		}
+		updateEndpointsMap(fp.endpointsMap, &fp.newEndpoints, fp.hostname)
 		compareEndpointsMaps(t, tci, fp.endpointsMap, tc.oldEndpoints)
 
 		// Now let's call appropriate handlers to get to state we want to be.
 		if len(tc.previousEndpoints) != len(tc.currentEndpoints) {
-			t.Errorf("[%d] different lengths of previous and current endpoints", tci)
+			t.Fatalf("[%d] different lengths of previous and current endpoints", tci)
 			continue
 		}
+
 		for i := range tc.previousEndpoints {
 			prev, curr := tc.previousEndpoints[i], tc.currentEndpoints[i]
 			switch {
@@ -2231,7 +2311,8 @@ func Test_buildNewEndpointsMap(t *testing.T) {
 				fp.OnEndpointsUpdate(prev, curr)
 			}
 		}
-		newMap, hcEndpoints, stale := fp.endpointsMap, fp.hcEndpoints, fp.staleEndpoints
+		_, hcEndpoints, stale := updateEndpointsMap(fp.endpointsMap, &fp.newEndpoints, fp.hostname)
+		newMap := fp.endpointsMap
 		compareEndpointsMaps(t, tci, newMap, tc.expectedResult)
 		if len(stale) != len(tc.expectedStale) {
 			t.Errorf("[%d] expected %d stale, got %d: %v", tci, len(tc.expectedStale), len(stale), stale)
