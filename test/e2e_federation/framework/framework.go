@@ -228,11 +228,11 @@ func (f *Framework) GetUnderlyingFederatedContexts() []E2EContext {
 }
 
 func (f *Framework) GetRegisteredClusters() ClusterSlice {
-	return getRegisteredClusters(f)
+	return registeredClustersFromConfig(f)
 }
 
 func (f *Framework) GetClusterClients() []kubeclientset.Interface {
-	clusters := getRegisteredClusters(f)
+	clusters := f.GetRegisteredClusters()
 	var clusterClients []kubeclientset.Interface
 	for _, c := range clusters {
 		clusterClients = append(clusterClients, c.Clientset)
