@@ -65,6 +65,7 @@ func GetAllFSTypesAsSet() sets.String {
 		string(extensions.Projected),
 		string(extensions.PortworxVolume),
 		string(extensions.ScaleIO),
+		string(extensions.LocalStorage),
 	)
 	return fstypes
 }
