@@ -32,6 +32,7 @@ const (
 	DefaultAuthorizationMode = "RBAC"
 	DefaultCACertPath        = "/etc/kubernetes/pki/ca.crt"
 	DefaultCertificatesDir   = "/etc/kubernetes/pki"
+	DefaultEtcdDataDir       = "/var/lib/etcd"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -65,6 +66,10 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	if obj.TokenTTL == 0 {
 		obj.TokenTTL = constants.DefaultTokenDuration
+	}
+
+	if obj.Etcd.DataDir == "" {
+		obj.Etcd.DataDir = DefaultEtcdDataDir
 	}
 }
 
