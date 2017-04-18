@@ -202,7 +202,6 @@ type Volume struct {
 	Name string
 	// The VolumeSource represents the location and type of a volume to mount.
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
-	// This implied behavior is deprecated and will be removed in a future version.
 	// +optional
 	VolumeSource
 }
