@@ -5516,37 +5516,6 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "valid LoadBalancer source range annotation",
-			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypeLoadBalancer
-				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/8,  5.6.7.8/16"
-			},
-			numErrs: 0,
-		},
-		{
-			name: "empty LoadBalancer source range annotation",
-			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypeLoadBalancer
-				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = ""
-			},
-			numErrs: 0,
-		},
-		{
-			name: "invalid LoadBalancer source range annotation (hostname)",
-			tweakSvc: func(s *api.Service) {
-				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = "foo.bar"
-			},
-			numErrs: 2,
-		},
-		{
-			name: "invalid LoadBalancer source range annotation (invalid CIDR)",
-			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypeLoadBalancer
-				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/33"
-			},
-			numErrs: 1,
-		},
-		{
 			name: "invalid source range for non LoadBalancer type service",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.4/8", "5.6.7.8/16"}

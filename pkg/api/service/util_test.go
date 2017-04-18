@@ -27,15 +27,7 @@ import (
 
 func TestGetLoadBalancerSourceRanges(t *testing.T) {
 	checkError := func(v string) {
-		annotations := make(map[string]string)
-		annotations[AnnotationLoadBalancerSourceRangesKey] = v
 		svc := api.Service{}
-		svc.Annotations = annotations
-		_, err := GetLoadBalancerSourceRanges(&svc)
-		if err == nil {
-			t.Errorf("Expected error parsing: %q", v)
-		}
-		svc = api.Service{}
 		svc.Spec.LoadBalancerSourceRanges = strings.Split(v, ",")
 		_, err = GetLoadBalancerSourceRanges(&svc)
 		if err == nil {
@@ -50,15 +42,7 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 	checkError("10.0.0.1")
 
 	checkOK := func(v string) netsets.IPNet {
-		annotations := make(map[string]string)
-		annotations[AnnotationLoadBalancerSourceRangesKey] = v
 		svc := api.Service{}
-		svc.Annotations = annotations
-		cidrs, err := GetLoadBalancerSourceRanges(&svc)
-		if err != nil {
-			t.Errorf("Unexpected error parsing: %q", v)
-		}
-		svc = api.Service{}
 		svc.Spec.LoadBalancerSourceRanges = strings.Split(v, ",")
 		cidrs, err = GetLoadBalancerSourceRanges(&svc)
 		if err != nil {
@@ -85,21 +69,6 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 	// check LoadBalancerSourceRanges not specified
 	svc := api.Service{}
 	cidrs, err := GetLoadBalancerSourceRanges(&svc)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if len(cidrs) != 1 {
-		t.Errorf("Expected exactly one CIDR: %v", cidrs.StringSlice())
-	}
-	if !IsAllowAll(cidrs) {
-		t.Errorf("Expected default to be allow-all: %v", cidrs.StringSlice())
-	}
-	// check SourceRanges annotation is empty
-	annotations := make(map[string]string)
-	annotations[AnnotationLoadBalancerSourceRangesKey] = ""
-	svc = api.Service{}
-	svc.Annotations = annotations
-	cidrs, err = GetLoadBalancerSourceRanges(&svc)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
