@@ -331,40 +331,6 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		return err
 	}
 
-	sa := &api.ServiceAccount{}
-	sa.Name = ""
-	// 7. Create deployment for federation controller manager
-	// The below code either creates the SA and the related roles or skips
-	// creating the same if the RBAC support is not found in the base cluster
-	// TODO: We must evaluate creating a separate service account even when RBAC support is missing
-	if rbacAvailable {
-		// 7a. Create a service account in the host cluster for federation
-		// controller manager.
-		sa, err = createControllerManagerSA(rbacVersionedClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, i.options.dryRun)
-		if err != nil {
-			return err
-		}
-
-		// 7b. Create RBAC role and role binding for federation controller
-		// manager service account.
-		_, _, err = createRoleBindings(rbacVersionedClientset, i.commonOptions.FederationSystemNamespace, sa.Name, i.commonOptions.Name, i.options.dryRun)
-		if err != nil {
-			return err
-		}
-	}
-
-	// 7c. Create a dns-provider config secret
-	dnsProviderSecret, err := createDNSProviderConfigSecret(hostClientset, i.commonOptions.FederationSystemNamespace, dnsProviderSecretName, i.commonOptions.Name, dnsProviderConfigBytes, i.options.dryRun)
-	if err != nil {
-		return err
-	}
-
-	// 7d. Create federation controller manager deployment.
-	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.image, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, sa.Name, dnsProviderSecret, i.options.controllerManagerOverrides, i.options.dryRun)
-	if err != nil {
-		return err
-	}
-
 	// Pick the first ip/hostname to update the api server endpoint in kubeconfig and also to give information to user
 	// In case of NodePort Service for api server, ips are node external ips.
 	endpoint := ""
@@ -378,27 +344,62 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		endpoint = endpoint + ":" + strconv.Itoa(int(svc.Spec.Ports[0].NodePort))
 	}
 
-	// 8. Write the federation API server endpoint info, credentials
+	// 7. Write the federation API server endpoint info, credentials
 	// and context to kubeconfig
 	err = updateKubeconfig(config, i.commonOptions.Name, endpoint, i.commonOptions.Kubeconfig, credentials, i.options.dryRun)
 	if err != nil {
 		return err
 	}
 
-	if !i.options.dryRun {
-		fedPods := []string{serverName, cmName}
-		err = waitForPods(hostClientset, fedPods, i.commonOptions.FederationSystemNamespace)
-		if err != nil {
-			return err
-		}
-		err = waitSrvHealthy(config, i.commonOptions.Name, i.commonOptions.Kubeconfig)
-		if err != nil {
-			return err
-		}
-		return printSuccess(cmdOut, ips, hostnames, svc)
+	err = waitForPods(hostClientset, []string{serverName}, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+	if err != nil {
+		return err
 	}
-	_, err = fmt.Fprintf(cmdOut, "Federation control plane runs (dry run)\n")
-	return err
+	err = waitSrvHealthy(config, i.commonOptions.Name, i.commonOptions.Kubeconfig, i.options.dryRun)
+	if err != nil {
+		return err
+	}
+
+	sa := &api.ServiceAccount{}
+	sa.Name = ""
+	// 8. Create deployment for federation controller manager
+	// The below code either creates the SA and the related roles or skips
+	// creating the same if the RBAC support is not found in the base cluster
+	// TODO: We must evaluate creating a separate service account even when RBAC support is missing
+	if rbacAvailable {
+		// 8a. Create a service account in the host cluster for federation
+		// controller manager.
+		sa, err = createControllerManagerSA(rbacVersionedClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, i.options.dryRun)
+		if err != nil {
+			return err
+		}
+
+		// 8b. Create RBAC role and role binding for federation controller
+		// manager service account.
+		_, _, err = createRoleBindings(rbacVersionedClientset, i.commonOptions.FederationSystemNamespace, sa.Name, i.commonOptions.Name, i.options.dryRun)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 8c. Create a dns-provider config secret
+	dnsProviderSecret, err := createDNSProviderConfigSecret(hostClientset, i.commonOptions.FederationSystemNamespace, dnsProviderSecretName, i.commonOptions.Name, dnsProviderConfigBytes, i.options.dryRun)
+	if err != nil {
+		return err
+	}
+
+	// 8d. Create federation controller manager deployment.
+	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.image, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, sa.Name, dnsProviderSecret, i.options.controllerManagerOverrides, i.options.dryRun)
+	if err != nil {
+		return err
+	}
+
+	err = waitForPods(hostClientset, []string{cmName}, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+	if err != nil {
+		return err
+	}
+
+	return printSuccess(cmdOut, ips, hostnames, svc, i.options.dryRun)
 }
 
 func createNamespace(clientset client.Interface, federationName, namespace string, dryRun bool) (*api.Namespace, error) {
@@ -951,7 +952,11 @@ func argMapsToArgStrings(argsMap, overrides map[string]string) []string {
 	return args
 }
 
-func waitForPods(clientset client.Interface, fedPods []string, namespace string) error {
+func waitForPods(clientset client.Interface, fedPods []string, namespace string, dryRun bool) error {
+	if dryRun {
+		return nil
+	}
+
 	err := wait.PollInfinite(podWaitInterval, func() (bool, error) {
 		podCheck := len(fedPods)
 		podList, err := clientset.Core().Pods(namespace).List(metav1.ListOptions{})
@@ -974,7 +979,11 @@ func waitForPods(clientset client.Interface, fedPods []string, namespace string)
 	return err
 }
 
-func waitSrvHealthy(config util.AdminConfig, context, kubeconfig string) error {
+func waitSrvHealthy(config util.AdminConfig, context, kubeconfig string, dryRun bool) error {
+	if dryRun {
+		return nil
+	}
+
 	fedClientSet, err := config.FederationClientset(context, kubeconfig)
 	if err != nil {
 		return err
@@ -993,7 +1002,13 @@ func waitSrvHealthy(config util.AdminConfig, context, kubeconfig string) error {
 	return err
 }
 
-func printSuccess(cmdOut io.Writer, ips, hostnames []string, svc *api.Service) error {
+func printSuccess(cmdOut io.Writer, ips, hostnames []string, svc *api.Service, dryRun bool) error {
+	if dryRun {
+		var err error
+		_, err = fmt.Fprintf(cmdOut, "Federation control plane runs (dry run)\n")
+		return err
+	}
+
 	svcEndpoints := append(ips, hostnames...)
 	endpoints := strings.Join(svcEndpoints, ", ")
 	if svc.Spec.Type == api.ServiceTypeNodePort {
