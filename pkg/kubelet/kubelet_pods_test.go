@@ -116,9 +116,9 @@ func TestMakeMounts(t *testing.T) {
 
 func TestHostsFileContent(t *testing.T) {
 	testCases := []struct {
-		hostIP         string
-		hostName   string
-		hostDomainName        string
+		hostIP          string
+		hostName        string
+		hostDomainName  string
 		expectedContent string
 	}{
 		{
@@ -149,7 +149,7 @@ fe00::2	ip6-allrouters
 203.0.113.1	podFoo.domainFoo	podFoo
 `,
 		},
-}
+	}
 
 	for _, testCase := range testCases {
 		actualContent := string(hostsFileContent(testCase.hostIP, testCase.hostName, testCase.hostDomainName))
