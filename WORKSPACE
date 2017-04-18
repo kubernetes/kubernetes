@@ -6,13 +6,13 @@ git_repository(
 
 git_repository(
     name = "io_kubernetes_build",
-    commit = "685f15b90b454af3086ab071fdea1b6db213d1fb",
-    remote = "https://github.com/kubernetes/repo-infra.git",
+    commit = "cbed6ceeb4d4ddda0a3de42ed89649b9e41baad7",
+    remote = "https://github.com/ixdy/kubernetes-repo-infra.git",
 )
 
 git_repository(
     name = "io_bazel",
-    commit = "3b29803eb528ff525c7024190ffbf4b08c598cf2",
+    commit = "1fe52dd4b2d77a740648bc1509b68acae49deffc",
     remote = "https://github.com/ixdy/bazel.git",
 )
 
