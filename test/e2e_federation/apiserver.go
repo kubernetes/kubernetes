@@ -57,7 +57,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 
 			framework.Logf("Checking that %d clusters are Ready", len(contexts))
 			for _, context := range contexts {
-				fedframework.ClusterIsReadyOrFail(f, &context)
+				fedframework.ClusterIsReadyOrFail(f, context.Name)
 			}
 			framework.Logf("%d clusters are Ready", len(contexts))
 
