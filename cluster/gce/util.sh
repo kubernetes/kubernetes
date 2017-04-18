@@ -23,14 +23,14 @@ source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
-if [[ "${NODE_OS_DISTRIBUTION}" == "debian" || "${NODE_OS_DISTRIBUTION}" == "container-linux" || "${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
+if [[ "${NODE_OS_DISTRIBUTION}" == "debian" || "${NODE_OS_DISTRIBUTION}" == "container-linux" || "${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
 else
   echo "Cannot operate on cluster using node os distro: ${NODE_OS_DISTRIBUTION}" >&2
   exit 1
 fi
 
-if [[ "${MASTER_OS_DISTRIBUTION}" == "container-linux" || "${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
+if [[ "${MASTER_OS_DISTRIBUTION}" == "container-linux" || "${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${MASTER_OS_DISTRIBUTION}/master-helper.sh"
 else
   echo "Cannot operate on cluster using master os distro: ${MASTER_OS_DISTRIBUTION}" >&2
@@ -45,10 +45,13 @@ if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
 elif [[ "${MASTER_OS_DISTRIBUTION}" == "debian" ]]; then
   MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${CVM_VERSION}}
   MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
+elif [[ "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+  MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE}
+  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT}
 fi
 
 # Sets node image based on the specified os distro. Currently this function only
-# supports gci and debian.
+# supports gci, debian, and ubuntu.
 function set-node-image() {
   if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
     # If the node image is not set, we use the latest GCI image.
@@ -58,6 +61,9 @@ function set-node-image() {
   elif [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
     NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
     NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
+  elif [[ "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+    NODE_IMAGE=${KUBE_GCE_NODE_IMAGE}
+    NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT}
   fi
 }
 
@@ -592,8 +598,8 @@ function kube-up() {
     parse-master-env
     create-nodes
   elif [[ ${KUBE_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
-    if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" && "${MASTER_OS_DISTRIBUTION}" != "debian" ]]; then
-      echo "Master replication supported only for gci and debian"
+    if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" && "${MASTER_OS_DISTRIBUTION}" != "debian" && "${MASTER_OS_DISTRIBUTION}" != "ubuntu" ]]; then
+      echo "Master replication supported only for gci, debian, and ubuntu"
       return 1
     fi
     create-loadbalancer
