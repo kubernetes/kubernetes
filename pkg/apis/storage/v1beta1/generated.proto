@@ -38,7 +38,7 @@ option go_package = "v1beta1";
 // according to etcd is in ObjectMeta.Name.
 message StorageClass {
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -54,7 +54,7 @@ message StorageClass {
 // StorageClassList is a collection of storage classes.
 message StorageClassList {
   // Standard list metadata
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

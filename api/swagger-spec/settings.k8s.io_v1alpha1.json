@@ -863,7 +863,7 @@
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -1188,7 +1188,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
      },
      "key": {
       "type": "string",
@@ -1209,7 +1209,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
      },
      "key": {
       "type": "string",
@@ -1245,7 +1245,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
      },
      "optional": {
       "type": "boolean",
@@ -1259,7 +1259,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
      },
      "optional": {
       "type": "boolean",
@@ -1276,23 +1276,23 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+      "description": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
      },
      "hostPath": {
       "$ref": "v1.HostPathVolumeSource",
-      "description": "HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath"
+      "description": "HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath"
      },
      "emptyDir": {
       "$ref": "v1.EmptyDirVolumeSource",
-      "description": "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir"
+      "description": "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir"
      },
      "gcePersistentDisk": {
       "$ref": "v1.GCEPersistentDiskVolumeSource",
-      "description": "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
+      "description": "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk"
      },
      "awsElasticBlockStore": {
       "$ref": "v1.AWSElasticBlockStoreVolumeSource",
-      "description": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore"
+      "description": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore"
      },
      "gitRepo": {
       "$ref": "v1.GitRepoVolumeSource",
@@ -1300,27 +1300,27 @@
      },
      "secret": {
       "$ref": "v1.SecretVolumeSource",
-      "description": "Secret represents a secret that should populate this volume. More info: http://kubernetes.io/docs/user-guide/volumes#secrets"
+      "description": "Secret represents a secret that should populate this volume. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret"
      },
      "nfs": {
       "$ref": "v1.NFSVolumeSource",
-      "description": "NFS represents an NFS mount on the host that shares a pod's lifetime More info: http://kubernetes.io/docs/user-guide/volumes#nfs"
+      "description": "NFS represents an NFS mount on the host that shares a pod's lifetime More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs"
      },
      "iscsi": {
       "$ref": "v1.ISCSIVolumeSource",
-      "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md"
+      "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md"
      },
      "glusterfs": {
       "$ref": "v1.GlusterfsVolumeSource",
-      "description": "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md"
+      "description": "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md"
      },
      "persistentVolumeClaim": {
       "$ref": "v1.PersistentVolumeClaimVolumeSource",
-      "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims"
+      "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims"
      },
      "rbd": {
       "$ref": "v1.RBDVolumeSource",
-      "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md"
+      "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md"
      },
      "flexVolume": {
       "$ref": "v1.FlexVolumeSource",
@@ -1328,7 +1328,7 @@
      },
      "cinder": {
       "$ref": "v1.CinderVolumeSource",
-      "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+      "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
      },
      "cephfs": {
       "$ref": "v1.CephFSVolumeSource",
@@ -1393,7 +1393,7 @@
     "properties": {
      "path": {
       "type": "string",
-      "description": "Path of the directory on the host. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath"
+      "description": "Path of the directory on the host. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath"
      }
     }
    },
@@ -1403,7 +1403,7 @@
     "properties": {
      "medium": {
       "type": "string",
-      "description": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir"
+      "description": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir"
      }
     }
    },
@@ -1416,20 +1416,20 @@
     "properties": {
      "pdName": {
       "type": "string",
-      "description": "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
+      "description": "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk"
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk"
      },
      "partition": {
       "type": "integer",
       "format": "int32",
-      "description": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
+      "description": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk"
      }
     }
    },
@@ -1442,11 +1442,11 @@
     "properties": {
      "volumeID": {
       "type": "string",
-      "description": "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore"
+      "description": "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore"
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore"
      },
      "partition": {
       "type": "integer",
@@ -1455,7 +1455,7 @@
      },
      "readOnly": {
       "type": "boolean",
-      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore"
+      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore"
      }
     }
    },
@@ -1486,7 +1486,7 @@
     "properties": {
      "secretName": {
       "type": "string",
-      "description": "Name of the secret in the pod's namespace to use. More info: http://kubernetes.io/docs/user-guide/volumes#secrets"
+      "description": "Name of the secret in the pod's namespace to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret"
      },
      "items": {
       "type": "array",
@@ -1539,15 +1539,15 @@
     "properties": {
      "server": {
       "type": "string",
-      "description": "Server is the hostname or IP address of the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs"
+      "description": "Server is the hostname or IP address of the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs"
      },
      "path": {
       "type": "string",
-      "description": "Path that is exported by the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs"
+      "description": "Path that is exported by the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: http://kubernetes.io/docs/user-guide/volumes#nfs"
+      "description": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs"
      }
     }
    },
@@ -1579,7 +1579,7 @@
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#iscsi"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi"
      },
      "readOnly": {
       "type": "boolean",
@@ -1612,7 +1612,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
      }
     }
    },
@@ -1626,15 +1626,15 @@
     "properties": {
      "endpoints": {
       "type": "string",
-      "description": "EndpointsName is the endpoint name that details Glusterfs topology. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
+      "description": "EndpointsName is the endpoint name that details Glusterfs topology. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
      },
      "path": {
       "type": "string",
-      "description": "Path is the Glusterfs volume path. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
+      "description": "Path is the Glusterfs volume path. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
+      "description": "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
      }
     }
    },
@@ -1647,7 +1647,7 @@
     "properties": {
      "claimName": {
       "type": "string",
-      "description": "ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims"
+      "description": "ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims"
      },
      "readOnly": {
       "type": "boolean",
@@ -1668,35 +1668,35 @@
       "items": {
        "type": "string"
       },
-      "description": "A collection of Ceph monitors. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+      "description": "A collection of Ceph monitors. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "image": {
       "type": "string",
-      "description": "The rados image name. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+      "description": "The rados image name. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#rbd"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd"
      },
      "pool": {
       "type": "string",
-      "description": "The rados pool name. Default is rbd. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it."
+      "description": "The rados pool name. Default is rbd. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "user": {
       "type": "string",
-      "description": "The rados user name. Default is admin. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+      "description": "The rados user name. Default is admin. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "keyring": {
       "type": "string",
-      "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+      "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "secretRef": {
       "$ref": "v1.LocalObjectReference",
-      "description": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+      "description": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      }
     }
    },
@@ -1738,15 +1738,15 @@
     "properties": {
      "volumeID": {
       "type": "string",
-      "description": "volume id used to identify the volume in cinder More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+      "description": "volume id used to identify the volume in cinder More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
      }
     }
    },
@@ -1762,7 +1762,7 @@
       "items": {
        "type": "string"
       },
-      "description": "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
+      "description": "Required: Monitors is a collection of Ceph monitors More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
      },
      "path": {
       "type": "string",
@@ -1770,19 +1770,19 @@
      },
      "user": {
       "type": "string",
-      "description": "Optional: User is the rados user name, default is admin More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
+      "description": "Optional: User is the rados user name, default is admin More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
      },
      "secretFile": {
       "type": "string",
-      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
+      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
      },
      "secretRef": {
       "$ref": "v1.LocalObjectReference",
-      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
+      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
      }
     }
    },
@@ -1902,7 +1902,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
      },
      "items": {
       "type": "array",
@@ -2065,7 +2065,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
      },
      "items": {
       "type": "array",
@@ -2099,7 +2099,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
      },
      "items": {
       "type": "array",

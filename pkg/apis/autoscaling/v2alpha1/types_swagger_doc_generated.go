@@ -40,8 +40,8 @@ func (CrossVersionObjectReference) SwaggerDoc() map[string]string {
 
 var map_HorizontalPodAutoscaler = map[string]string{
 	"":         "HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.",
-	"metadata": "metadata is the standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"spec":     "spec is the specification for the behaviour of the autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+	"metadata": "metadata is the standard object metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+	"spec":     "spec is the specification for the behaviour of the autoscaler. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status.",
 	"status":   "status is the current information about the autoscaler.",
 }
 
