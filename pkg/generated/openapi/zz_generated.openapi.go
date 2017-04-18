@@ -6639,13 +6639,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"serviceAccount": {
-							SchemaProps: spec.SchemaProps{
-								Description: "DeprecatedServiceAccount is a depreciated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
 						"automountServiceAccountToken": {
 							SchemaProps: spec.SchemaProps{
 								Description: "AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.",

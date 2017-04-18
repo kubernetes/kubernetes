@@ -3447,7 +3447,6 @@ func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 	out.DNSPolicy = api.DNSPolicy(in.DNSPolicy)
 	out.NodeSelector = *(*map[string]string)(unsafe.Pointer(&in.NodeSelector))
 	out.ServiceAccountName = in.ServiceAccountName
-	// INFO: in.DeprecatedServiceAccount opted out of conversion generation
 	out.AutomountServiceAccountToken = (*bool)(unsafe.Pointer(in.AutomountServiceAccountToken))
 	out.NodeName = in.NodeName
 	// INFO: in.HostNetwork opted out of conversion generation
