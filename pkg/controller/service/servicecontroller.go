@@ -46,9 +46,9 @@ import (
 )
 
 const (
-	// Interval of synchoronizing service status from apiserver
+	// Interval of synchronizing service status from apiserver
 	serviceSyncPeriod = 30 * time.Second
-	// Interval of synchoronizing node status from apiserver
+	// Interval of synchronizing node status from apiserver
 	nodeSyncPeriod = 100 * time.Second
 
 	// How long to wait before retrying the processing of a service change.
