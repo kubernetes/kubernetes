@@ -360,7 +360,7 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 	}
 
 	genericConfig.AdmissionControl, err = BuildAdmission(s,
-		s.GenericServerRunOptions.AdmissionPlugins,
+		s.Admission.Plugins,
 		client,
 		sharedInformers,
 		genericConfig.Authorizer,
@@ -374,7 +374,7 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 
 // BuildAdmission constructs the admission chain
 func BuildAdmission(s *options.ServerRunOptions, plugins *admission.Plugins, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, apiAuthorizer authorizer.Authorizer) (admission.Interface, error) {
-	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
+	admissionControlPluginNames := strings.Split(s.Admission.Control, ",")
 	var cloudConfig []byte
 	var err error
 
@@ -387,7 +387,7 @@ func BuildAdmission(s *options.ServerRunOptions, plugins *admission.Plugins, cli
 	// TODO: use a dynamic restmapper. See https://github.com/kubernetes/kubernetes/pull/42615.
 	restMapper := api.Registry.RESTMapper()
 	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig, restMapper)
-	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
+	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.Admission.ControlConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read plugin config: %v", err)
 	}
