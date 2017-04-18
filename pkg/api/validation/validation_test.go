@@ -3203,7 +3203,7 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		{ // Populate HostMappings.
-			HostMappings: []api.HostMapping{{IP: "12.34.56.78", Names: []string{"host1", "host2"}}},
+			HostMappings:  []api.HostMapping{{IP: "12.34.56.78", Names: []string{"host1", "host2"}}},
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy: api.RestartPolicyAlways,

@@ -2105,8 +2105,8 @@ type PodSpec struct {
 // HostMapping holds the mapping between IP and hostnames that will be injected as an entry in the
 // pod's hosts file.
 type HostMapping struct {
-	IP string
-  Names []string
+	IP    string
+	Names []string
 }
 
 // Sysctl defines a kernel parameter to be set
