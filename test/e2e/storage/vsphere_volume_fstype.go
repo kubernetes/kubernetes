@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stype "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -44,34 +45,48 @@ import (
 	9. Delete PVC, PV and Storage Class.
 */
 
-var _ = framework.KubeDescribe("Volume fstype [Volume]", func() {
+var _ = framework.KubeDescribe("vsphere Volume fstype [Volume]", func() {
 	f := framework.NewDefaultFramework("volume-fstype")
 	var (
-		client    clientset.Interface
-		namespace string
+		client       clientset.Interface
+		namespace    string
+		storageclass *storage.StorageClass
+		pvclaim      *v1.PersistentVolumeClaim
 	)
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if len(nodeList.Items) == 0 {
-			framework.Failf("Unable to find ready and schedulable Node")
+		Expect(len(nodeList.Items)).NotTo(BeZero(), "Unable to find ready and schedulable Node")
+	})
+	AfterEach(func() {
+		var scDeleteError error
+		var pvDeleteError error
+		if storageclass != nil {
+			scDeleteError = client.StorageV1beta1().StorageClasses().Delete(storageclass.Name, nil)
 		}
+		if pvclaim != nil {
+			pvDeleteError = client.CoreV1().PersistentVolumeClaims(namespace).Delete(pvclaim.Name, nil)
+		}
+		framework.ExpectNoError(scDeleteError)
+		framework.ExpectNoError(pvDeleteError)
+		storageclass = nil
+		pvclaim = nil
 	})
 
 	It("verify fstype - ext3 formatted volume", func() {
 		By("Invoking Test for fstype: ext3")
-		invokeTestForFstype(f, client, namespace, "ext3", "ext3")
+		storageclass, pvclaim = invokeTestForFstype(f, client, namespace, "ext3", "ext3")
 	})
 
 	It("verify disk format type - default value should be ext4", func() {
 		By("Invoking Test for fstype: Default Value")
-		invokeTestForFstype(f, client, namespace, "", "ext4")
+		storageclass, pvclaim = invokeTestForFstype(f, client, namespace, "", "ext4")
 	})
 })
 
-func invokeTestForFstype(f *framework.Framework, client clientset.Interface, namespace string, fstype string, expectedContent string) {
+func invokeTestForFstype(f *framework.Framework, client clientset.Interface, namespace string, fstype string, expectedContent string) (*storage.StorageClass, *v1.PersistentVolumeClaim) {
 
 	framework.Logf("Invoking Test for fstype: %s", fstype)
 	scParameters := make(map[string]string)
@@ -82,16 +97,10 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 	storageclass, err := client.StorageV1beta1().StorageClasses().Create(storageClassSpec)
 	Expect(err).NotTo(HaveOccurred())
 
-	defer client.StorageV1beta1().StorageClasses().Delete(storageclass.Name, nil)
-
 	By("Creating PVC using the Storage Class")
 	pvclaimSpec := getVSphereClaimSpecWithStorageClassAnnotation(namespace, storageclass)
 	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(pvclaimSpec)
 	Expect(err).NotTo(HaveOccurred())
-
-	defer func() {
-		client.CoreV1().PersistentVolumeClaims(namespace).Delete(pvclaimSpec.Name, nil)
-	}()
 
 	By("Waiting for claim to be in bound phase")
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, framework.ClaimProvisionTimeout)
@@ -120,9 +129,12 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 	// Asserts: Right disk is attached to the pod
 	vsp, err := vsphere.GetVSphere()
 	Expect(err).NotTo(HaveOccurred())
-	verifyVSphereDiskAttached(vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(pod.Spec.NodeName))
+	isAttached, err := verifyVSphereDiskAttached(vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(pod.Spec.NodeName))
+	Expect(err).NotTo(HaveOccurred())
+	Expect(isAttached).To(BeTrue(), "disk is not attached with the node")
 
 	_, err = framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/cat", "/mnt/test/fstype"}, expectedContent, time.Minute)
+	Expect(err).NotTo(HaveOccurred())
 
 	var volumePaths []string
 	volumePaths = append(volumePaths, pv.Spec.VsphereVolume.VolumePath)
@@ -130,4 +142,5 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 	By("Delete pod and wait for volume to be detached from node")
 	deletePodAndWaitForVolumeToDetach(f, client, pod, vsp, pod.Spec.NodeName, volumePaths)
 
+	return storageclass, pvclaim
 }
