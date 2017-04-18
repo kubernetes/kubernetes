@@ -98,7 +98,7 @@ func GetUniqueVolumeNameFromSpec(
 func SplitUniqueName(uniqueName v1.UniqueVolumeName) (string, string, error) {
 	components := strings.SplitN(string(uniqueName), "/", 3)
 	if len(components) != 3 {
-		return "", "", fmt.Errorf("Cannot split volume unique name %s to plugin/volume components", uniqueName)
+		return "", "", fmt.Errorf("cannot split volume unique name %s to plugin/volume components", uniqueName)
 	}
 	pluginName := fmt.Sprintf("%s/%s", components[0], components[1])
 	return pluginName, components[2], nil

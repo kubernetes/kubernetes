@@ -235,6 +235,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
+	defer close(stopCh)
 
 	time.Sleep(time.Second * 1) // Wait so the reconciler calls sync at least once
 
@@ -259,7 +260,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		if i == 10 { // 10 seconds time out
 			t.Fatalf("Waiting for the volumes to attach/detach timed out: attached %d (expected %d); detached %d (%d)",
 				attachedVolumesNum, 1+extraPodsNum, detachedVolumesNum, nodesNum)
-			break
 		}
 	}
 
@@ -267,5 +267,4 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		t.Fatalf("Fatal error encountered in the testing volume plugin")
 	}
 
-	close(stopCh)
 }
