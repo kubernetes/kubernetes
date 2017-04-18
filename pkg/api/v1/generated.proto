@@ -1192,6 +1192,12 @@ message Handler {
   optional TCPSocketAction tcpSocket = 3;
 }
 
+message HostMapping {
+  optional string IP = 1;
+
+  repeated string names = 2;
+}
+
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.
 message HostPathVolumeSource {
@@ -2733,6 +2739,11 @@ message PodSpec {
   // If specified, the pod's tolerations.
   // +optional
   repeated Toleration tolerations = 22;
+
+  // +optional
+  // +patchMergeKey=IP
+  // +patchStrategy=merge
+  repeated HostMapping hostMappings = 23;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
