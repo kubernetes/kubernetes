@@ -117,52 +117,6 @@ func TestPodLogOptions(t *testing.T) {
 	}
 }
 
-// TestPodSpecConversion tests that ServiceAccount is an alias for
-// ServiceAccountName.
-func TestPodSpecConversion(t *testing.T) {
-	name, other := "foo", "bar"
-
-	// Test internal -> v1. Should have both alias (DeprecatedServiceAccount)
-	// and new field (ServiceAccountName).
-	i := &api.PodSpec{
-		ServiceAccountName: name,
-	}
-	v := v1.PodSpec{}
-	if err := api.Scheme.Convert(i, &v, nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if v.ServiceAccountName != name {
-		t.Fatalf("want v1.ServiceAccountName %q, got %q", name, v.ServiceAccountName)
-	}
-	if v.DeprecatedServiceAccount != name {
-		t.Fatalf("want v1.DeprecatedServiceAccount %q, got %q", name, v.DeprecatedServiceAccount)
-	}
-
-	// Test v1 -> internal. Either DeprecatedServiceAccount, ServiceAccountName,
-	// or both should translate to ServiceAccountName. ServiceAccountName wins
-	// if both are set.
-	testCases := []*v1.PodSpec{
-		// New
-		{ServiceAccountName: name},
-		// Alias
-		{DeprecatedServiceAccount: name},
-		// Both: same
-		{ServiceAccountName: name, DeprecatedServiceAccount: name},
-		// Both: different
-		{ServiceAccountName: name, DeprecatedServiceAccount: other},
-	}
-	for k, v := range testCases {
-		got := api.PodSpec{}
-		err := api.Scheme.Convert(v, &got, nil)
-		if err != nil {
-			t.Fatalf("unexpected error for case %d: %v", k, err)
-		}
-		if got.ServiceAccountName != name {
-			t.Fatalf("want api.ServiceAccountName %q, got %q", name, got.ServiceAccountName)
-		}
-	}
-}
-
 func TestResourceListConversion(t *testing.T) {
 	bigMilliQuantity := resource.NewQuantity(resource.MaxMilliValue, resource.DecimalSI)
 	bigMilliQuantity.Add(resource.MustParse("12345m"))
