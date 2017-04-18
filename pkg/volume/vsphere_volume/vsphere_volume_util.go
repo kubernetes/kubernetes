@@ -90,7 +90,7 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPa
 		volSizeKB = int(volume.RoundUpSize(volSizeBytes, 1024))
 	} else {
 		// if no unit is specified, convert to GiB
-		volSizeKB = int(volSizeBytes) * 1048576
+		volSizeKB = int(volSizeBytes) * 1024 * 1024
 	}
 
 	name := volume.GenerateVolumeName(v.options.ClusterName, v.options.PVName, 255)
