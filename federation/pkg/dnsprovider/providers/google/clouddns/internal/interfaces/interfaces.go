@@ -191,8 +191,10 @@ type (
 	}
 
 	ResourceRecordSetsService interface {
-		// NewResourceRecordSetsService(s *Service) *ResourceRecordSetsService // TODO: add to service as needed
 		List(project string, managedZone string) ResourceRecordSetsListCall
+		// Get returns a list of resources records with the matching name
+		Get(project, managedZone, name string) ResourceRecordSetsListCall
+		// NewResourceRecordSetsService(s *Service) *ResourceRecordSetsService // TODO: add to service as needed
 		NewResourceRecordSet(name string, rrdatas []string, ttl int64, type_ rrstype.RrsType) ResourceRecordSet
 	}
 
