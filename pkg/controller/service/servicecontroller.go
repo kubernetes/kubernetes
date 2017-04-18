@@ -573,24 +573,6 @@ func nodeSlicesEqualForLB(x, y []*v1.Node) bool {
 	return stringSlicesEqual(nodeNames(x), nodeNames(y))
 }
 
-func intSlicesEqual(x, y []int) bool {
-	if len(x) != len(y) {
-		return false
-	}
-	if !sort.IntsAreSorted(x) {
-		sort.Ints(x)
-	}
-	if !sort.IntsAreSorted(y) {
-		sort.Ints(y)
-	}
-	for i := range x {
-		if x[i] != y[i] {
-			return false
-		}
-	}
-	return true
-}
-
 func stringSlicesEqual(x, y []string) bool {
 	if len(x) != len(y) {
 		return false
