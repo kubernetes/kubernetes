@@ -213,6 +213,24 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				StorageClassName: "-invalid-",
 			}),
 		},
+		// LocalVolume alpha feature disabled
+		// TODO: remove when no longer alpha
+		"alpha disabled valid local volume": {
+			isExpectedFailure: true,
+			volume: testVolume("valid-local-volume", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					LocalVolume: &api.LocalVolumeSource{
+						NodeName: "node-foo",
+						Fs:       &api.LocalFsVolume{Path: "/foo"},
+					},
+				},
+				StorageClassName: "test-storage-class",
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -225,6 +243,102 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		}
 	}
 
+}
+
+func TestValidateLocalVolumes(t *testing.T) {
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		volume            *api.PersistentVolume
+	}{
+		"valid local volume": {
+			isExpectedFailure: false,
+			volume: testVolume("valid-local-volume", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					LocalVolume: &api.LocalVolumeSource{
+						NodeName: "node-foo",
+						Fs:       &api.LocalFsVolume{Path: "/foo"},
+					},
+				},
+				StorageClassName: "test-storage-class",
+			}),
+		},
+		"invalid local volume empty node": {
+			isExpectedFailure: true,
+			volume: testVolume("valid-local-volume", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					LocalVolume: &api.LocalVolumeSource{
+						Fs: &api.LocalFsVolume{Path: "/foo"},
+					},
+				},
+				StorageClassName: "test-storage-class",
+			}),
+		},
+		"invalid local volume nil fs volume": {
+			isExpectedFailure: true,
+			volume: testVolume("invalid-local-volume-nil-fs-volume", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					LocalVolume: &api.LocalVolumeSource{},
+				},
+				StorageClassName: "test-storage-class",
+			}),
+		},
+		"invalid local volume empty path": {
+			isExpectedFailure: true,
+			volume: testVolume("invalid-local-volume-empty-path", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					LocalVolume: &api.LocalVolumeSource{
+						Fs: &api.LocalFsVolume{},
+					},
+				},
+				StorageClassName: "test-storage-class",
+			}),
+		},
+		"invalid local volume empty storageclass": {
+			isExpectedFailure: true,
+			volume: testVolume("invalid-local-volume-empty-storageclass", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					LocalVolume: &api.LocalVolumeSource{
+						Fs: &api.LocalFsVolume{Path: "/foo"},
+					},
+				},
+			}),
+		},
+	}
+
+	err := utilfeature.DefaultFeatureGate.Set("PersistentLocalVolumes=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalPersistentVolumes: %v", err)
+		return
+	}
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolume(scenario.volume)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
 }
 
 func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {

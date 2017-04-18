@@ -428,6 +428,9 @@ type PersistentVolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,19,opt,name=scaleIO"`
+	// LocalVolume represents a local volume accessible only from one node
+	// +optional
+	LocalVolume *LocalVolumeSource `json:"localVolume,omitempty" protobuf:"bytes,20,opt,name=localVolume"`
 }
 
 const (
@@ -1290,6 +1293,21 @@ type KeyToPath struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	Mode *int32 `json:"mode,omitempty" protobuf:"varint,3,opt,name=mode"`
+}
+
+// LocalVolume represents a local volume accessible only from one node
+type LocalVolumeSource struct {
+	// NodeName represents the node that the volume is located at
+	NodeName string `json:"nodeName" protobuf:"bytes,1,opt,name=nodeName"`
+	// Fs represents a filesystem-based local volume
+	// +optional
+	Fs *LocalFsVolume `json:"fs,omitempty" protobuf:"bytes,2,opt,name=fs"`
+}
+
+// LocalFsVolume represents a filesystem-based local volume
+type LocalFsVolume struct {
+	// The full path to the volume on the node
+	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 }
 
 // ContainerPort represents a network port in a single container.

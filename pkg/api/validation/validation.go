@@ -1059,6 +1059,25 @@ func validateScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, fldPath *field.Pa
 	return allErrs
 }
 
+func validateLocalVolumeSource(ls *api.LocalVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if ls.NodeName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("nodeName"), ""))
+	}
+
+	// For now, only Fs is supported
+	// Later, when block is supported, we need to validate that only one of fs or block is specified.
+	if ls.Fs == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("fs"), ""))
+		return allErrs
+	}
+
+	if ls.Fs.Path == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("fs", "path"), ""))
+	}
+	return allErrs
+}
+
 // ValidatePersistentVolumeName checks that a name is appropriate for a
 // PersistentVolumeName object.
 var ValidatePersistentVolumeName = NameIsDNSSubdomain
@@ -1236,6 +1255,21 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateScaleIOVolumeSource(pv.Spec.ScaleIO, specPath.Child("scaleIO"))...)
+		}
+	}
+	if pv.Spec.LocalVolume != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("localVolume"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
+				allErrs = append(allErrs, field.Forbidden(specPath.Child("localVolume"), "LocalVolumes are disabled by feature-gate"))
+			}
+			allErrs = append(allErrs, validateLocalVolumeSource(pv.Spec.LocalVolume, specPath.Child("localVolume"))...)
+			// StorageClass is required
+			if len(pv.Spec.StorageClassName) == 0 {
+				allErrs = append(allErrs, field.Required(specPath.Child("storageClassName"), "LocalVolumes require a StorageClass"))
+			}
 		}
 	}
 
