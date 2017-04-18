@@ -124,16 +124,16 @@ func listRrsOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets) []dnspro
 	return rrset
 }
 
-func getRrOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, name string) dnsprovider.ResourceRecordSet {
-	rrset, err := rrsets.Get(name)
+func getRrOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, name string) []dnsprovider.ResourceRecordSet {
+	rrsetList, err := rrsets.Get(name)
 	if err != nil {
 		t.Fatalf("Failed to get recordset: %v", err)
-	} else if rrset == nil {
+	} else if len(rrsetList) == 0 {
 		t.Logf("Did not Get recordset: %v", name)
 	} else {
-		t.Logf("Got recordset: %v", rrset.Name())
+		t.Logf("Got recordsets: %v", rrsetList)
 	}
-	return rrset
+	return rrsetList
 }
 
 func getExampleRrs(zone dnsprovider.Zone) dnsprovider.ResourceRecordSet {

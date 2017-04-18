@@ -42,19 +42,23 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 	return list, nil
 }
 
-func (rrsets ResourceRecordSets) Get(name string) (dnsprovider.ResourceRecordSet, error) {
-	var newRrset dnsprovider.ResourceRecordSet
-	rrsetList, err := rrsets.List()
+func (rrsets ResourceRecordSets) Get(name string) ([]dnsprovider.ResourceRecordSet, error) {
+	var list []dnsprovider.ResourceRecordSet
+
+	ctx := context.Background()
+
+	call := rrsets.impl.Get(rrsets.project(), rrsets.zone.impl.Name(), name)
+	err := call.Pages(ctx, func(page interfaces.ResourceRecordSetsListResponse) error {
+		for _, rrset := range page.Rrsets() {
+			list = append(list, ResourceRecordSet{rrset, &rrsets})
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	for _, rrset := range rrsetList {
-		if rrset.Name() == name {
-			newRrset = rrset
-			break
-		}
-	}
-	return newRrset, nil
+
+	return list, nil
 }
 
 func (r ResourceRecordSets) StartChangeset() dnsprovider.ResourceRecordChangeset {

@@ -108,16 +108,16 @@ func rrs(t *testing.T, zone dnsprovider.Zone) (r dnsprovider.ResourceRecordSets)
 	return rrsets
 }
 
-func getRrOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, name string) dnsprovider.ResourceRecordSet {
-	rrset, err := rrsets.Get(name)
+func getRrOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, name string) []dnsprovider.ResourceRecordSet {
+	rrsetList, err := rrsets.Get(name)
 	if err != nil {
 		t.Fatalf("Failed to get recordset: %v", err)
-	} else if rrset == nil {
+	} else if len(rrsetList) == 0 {
 		t.Logf("Did not Get recordset: %v", name)
 	} else {
-		t.Logf("Got recordset: %v", rrset.Name())
+		t.Logf("Got recordset: %v", rrsetList[0].Name())
 	}
-	return rrset
+	return rrsetList
 }
 
 // assertHasRecord tests that rrsets has a record equivalent to rrset
@@ -127,7 +127,13 @@ func assertHasRecord(t *testing.T, rrsets dnsprovider.ResourceRecordSets, rrset 
 	rrs, err := rrsets.List()
 	if err != nil {
 		if err.Error() == "OperationNotSupported" {
-			found = getRrOrFail(t, rrsets, rrset.Name())
+			foundList := getRrOrFail(t, rrsets, rrset.Name())
+			for i, elem := range foundList {
+				if elem.Name() == rrset.Name() && elem.Type() == rrset.Type() {
+					found = foundList[i]
+					break
+				}
+			}
 		} else {
 			t.Fatalf("Failed to list recordsets: %v", err)
 		}
