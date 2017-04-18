@@ -380,7 +380,7 @@ func (e *EndpointController) syncService(key string) error {
 				epa.Hostname = hostname
 			}
 
-			if tolerateUnreadyEndpoints || v1.IsPodReady(pod) {
+			if tolerateUnreadyEndpoints || podutil.IsPodReady(pod) {
 				subsets = append(subsets, v1.EndpointSubset{
 					Addresses: []v1.EndpointAddress{epa},
 					Ports:     []v1.EndpointPort{epp},

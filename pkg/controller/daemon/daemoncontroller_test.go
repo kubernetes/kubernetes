@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
@@ -333,7 +334,7 @@ func markPodsReady(store cache.Store) {
 	for _, obj := range store.List() {
 		pod := obj.(*v1.Pod)
 		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-		v1.UpdatePodCondition(&pod.Status, &condition)
+		podutil.UpdatePodCondition(&pod.Status, &condition)
 	}
 }
 

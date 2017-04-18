@@ -14,6 +14,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/resource:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/eviction:go_default_library",

@@ -38,6 +38,8 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
+        "//pkg/api/v1/pod:go_default_library",
+        "//pkg/api/v1/resource:go_default_library",
         "//pkg/api/v1/validation:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",

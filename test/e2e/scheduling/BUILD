@@ -20,6 +20,7 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/util/system:go_default_library",
         "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",

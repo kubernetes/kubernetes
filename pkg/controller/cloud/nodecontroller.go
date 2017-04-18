@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -102,7 +103,7 @@ func (cnc *CloudNodeController) Run() {
 				// Try to get the current node status
 				// If node status is empty, then kubelet has not posted ready status yet. In this case, process next node
 				for rep := 0; rep < nodeStatusUpdateRetry; rep++ {
-					_, currentReadyCondition = v1.GetNodeCondition(&node.Status, v1.NodeReady)
+					_, currentReadyCondition = nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 					if currentReadyCondition != nil {
 						break
 					}

@@ -16,6 +16,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
+        "//federation/pkg/federatedtypes:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",

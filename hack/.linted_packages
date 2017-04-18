@@ -61,6 +61,7 @@ pkg/api/pod
 pkg/api/resource
 pkg/api/service
 pkg/api/v1
+pkg/api/v1/node
 pkg/api/v1/service
 pkg/apis/abac/v0
 pkg/apis/abac/v1beta1

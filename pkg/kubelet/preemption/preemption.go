@@ -24,6 +24,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -190,7 +191,7 @@ type admissionRequirementList []*admissionRequirement
 func (a admissionRequirementList) distance(pod *v1.Pod) float64 {
 	dist := float64(0)
 	for _, req := range a {
-		remainingRequest := float64(req.quantity - v1.GetResourceRequest(pod, req.resourceName))
+		remainingRequest := float64(req.quantity - resource.GetResourceRequest(pod, req.resourceName))
 		if remainingRequest < 0 {
 			remainingRequest = 0
 		}
@@ -206,7 +207,7 @@ func (a admissionRequirementList) subtract(pods ...*v1.Pod) admissionRequirement
 	for _, req := range a {
 		newQuantity := req.quantity
 		for _, pod := range pods {
-			newQuantity -= v1.GetResourceRequest(pod, req.resourceName)
+			newQuantity -= resource.GetResourceRequest(pod, req.resourceName)
 		}
 		if newQuantity > 0 {
 			newList = append(newList, &admissionRequirement{
@@ -252,8 +253,8 @@ func smallerResourceRequest(pod1 *v1.Pod, pod2 *v1.Pod) bool {
 		v1.ResourceCPU,
 	}
 	for _, res := range priorityList {
-		req1 := v1.GetResourceRequest(pod1, res)
-		req2 := v1.GetResourceRequest(pod2, res)
+		req1 := resource.GetResourceRequest(pod1, res)
+		req2 := resource.GetResourceRequest(pod2, res)
 		if req1 < req2 {
 			return true
 		} else if req1 > req2 {
