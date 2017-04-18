@@ -3269,6 +3269,12 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		"with hostNetwork and hostMappings": {
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
+			HostMappings: []api.HostMapping{{IP: "12.34.56.78", Names: []string{"host1", "host2"}}},
+		},
 		"with hostMappings with invalid IP": {
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
