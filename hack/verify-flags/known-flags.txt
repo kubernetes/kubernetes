@@ -139,6 +139,7 @@ container-runtime-endpoint
 contain-pod-resources
 contention-profiling
 controllermanager-arg-overrides
+controllermanager-pod-replicas
 controller-start-interval
 core-kubeconfig
 cors-allowed-origins

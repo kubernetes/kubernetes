@@ -103,6 +103,7 @@ func TestInitFederation(t *testing.T) {
 		apiserverEnableHTTPBasicAuth bool
 		apiserverEnableTokenAuth     bool
 		isRBACAPIAvailable           bool
+		cmPodReplicas                string
 	}{
 		{
 			federation:            "union",
@@ -170,6 +171,7 @@ func TestInitFederation(t *testing.T) {
 			etcdPersistence:      "true",
 			expectedErr:          "",
 			dryRun:               "",
+			cmPodReplicas:        "2",
 		},
 		{
 			federation:           "union",
@@ -226,7 +228,7 @@ func TestInitFederation(t *testing.T) {
 		}
 		defer os.Remove(tmpDirPath)
 
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.cmPodReplicas, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -267,6 +269,9 @@ func TestInitFederation(t *testing.T) {
 		}
 		if tc.apiserverEnableTokenAuth {
 			cmd.Flags().Set("apiserver-enable-token-auth", "true")
+		}
+		if tc.cmPodReplicas != "" {
+			cmd.Flags().Set("controllermanager-pod-replicas", tc.cmPodReplicas)
 		}
 
 		cmd.Run(cmd, []string{tc.federation})
@@ -597,7 +602,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, controllerManagerReplicas, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -613,6 +618,14 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	}
 	pvcName := svcName + "-etcd-claim"
 	replicas := int32(1)
+	controllerManagerReplicasInt32 := int32(1)
+	if controllerManagerReplicas != "" {
+		controllerManagerReplicasInt64, err := strconv.ParseInt(controllerManagerReplicas, 10, 32)
+		if err != nil {
+			return nil, err
+		}
+		controllerManagerReplicasInt32 = int32(controllerManagerReplicasInt64)
+	}
 
 	namespace := v1.Namespace{
 		TypeMeta: metav1.TypeMeta{
@@ -988,7 +1001,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 			},
 		},
 		Spec: v1beta1.DeploymentSpec{
-			Replicas: &replicas,
+			Replicas: &controllerManagerReplicasInt32,
 			Selector: nil,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

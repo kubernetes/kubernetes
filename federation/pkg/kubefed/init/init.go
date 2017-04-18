@@ -142,6 +142,7 @@ type initFederationOptions struct {
 	apiServerAdvertiseAddress        string
 	apiServerEnableHTTPBasicAuth     bool
 	apiServerEnableTokenAuth         bool
+	controllerManagerPodReplicas     string
 }
 
 func (o *initFederationOptions) Bind(flags *pflag.FlagSet) {
@@ -160,6 +161,7 @@ func (o *initFederationOptions) Bind(flags *pflag.FlagSet) {
 	flags.StringVar(&o.apiServerAdvertiseAddress, apiserverAdvertiseAddressFlag, "", "Preferred address to advertise api server nodeport service. Valid only if '"+apiserverServiceTypeFlag+"=NodePort'.")
 	flags.BoolVar(&o.apiServerEnableHTTPBasicAuth, "apiserver-enable-basic-auth", false, "Enables HTTP Basic authentication for the federation-apiserver. Defaults to false.")
 	flags.BoolVar(&o.apiServerEnableTokenAuth, "apiserver-enable-token-auth", false, "Enables token authentication for the federation-apiserver. Defaults to false.")
+	flags.StringVar(&o.controllerManagerPodReplicas, "controllermanager-pod-replicas", "1", "Number of pods to create for controller manager")
 }
 
 // NewCmdInit defines the `init` command that bootstraps a federation
@@ -360,7 +362,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	}
 
 	// 7d. Create federation controller manager deployment.
-	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.image, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, sa.Name, dnsProviderSecret, i.options.controllerManagerOverrides, i.options.dryRun)
+	_, err = createControllerManager(hostClientset, i.options.controllerManagerPodReplicas, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.image, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, sa.Name, dnsProviderSecret, i.options.controllerManagerOverrides, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -817,7 +819,7 @@ func createRoleBindings(clientset client.Interface, namespace, saName, federatio
 	return newRole, newRolebinding, err
 }
 
-func createControllerManager(clientset client.Interface, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, saName string, dnsProviderSecret *api.Secret, argOverrides map[string]string, dryRun bool) (*extensions.Deployment, error) {
+func createControllerManager(clientset client.Interface, replicas, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, saName string, dnsProviderSecret *api.Secret, argOverrides map[string]string, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-controller-manager",
@@ -833,6 +835,11 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 
 	args := argMapsToArgStrings(argsMap, argOverrides)
 	command = append(command, args...)
+
+	replicasInt, err := strconv.ParseInt(replicas, 10, 32)
+	if err != nil {
+		return nil, err
+	}
 
 	dep := &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -854,7 +861,7 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 			},
 		},
 		Spec: extensions.DeploymentSpec{
-			Replicas: 1,
+			Replicas: int32(replicasInt),
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        cmName,
