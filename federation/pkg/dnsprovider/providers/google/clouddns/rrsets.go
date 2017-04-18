@@ -17,6 +17,8 @@ limitations under the License.
 package clouddns
 
 import (
+	"context"
+
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
@@ -30,15 +32,26 @@ type ResourceRecordSets struct {
 	impl interfaces.ResourceRecordSetsService
 }
 
+// List returns a list of resource records in the given project and
+// managed zone.
+// !!CAUTION!! Your memory might explode if you have a huge number of
+// records in your managed zone.
 func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error) {
-	response, err := rrsets.impl.List(rrsets.project(), rrsets.zone.impl.Name()).Do()
+	var list []dnsprovider.ResourceRecordSet
+
+	ctx := context.Background()
+
+	call := rrsets.impl.List(rrsets.project(), rrsets.zone.impl.Name())
+	err := call.Pages(ctx, func(page interfaces.ResourceRecordSetsListResponse) error {
+		for _, rrset := range page.Rrsets() {
+			list = append(list, ResourceRecordSet{rrset, &rrsets})
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	list := make([]dnsprovider.ResourceRecordSet, len(response.Rrsets()))
-	for i, rrset := range response.Rrsets() {
-		list[i] = ResourceRecordSet{rrset, &rrsets}
-	}
+
 	return list, nil
 }
 

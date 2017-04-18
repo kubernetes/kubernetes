@@ -17,6 +17,8 @@ limitations under the License.
 package interfaces
 
 import (
+	"context"
+
 	"google.golang.org/api/googleapi"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 )
@@ -172,8 +174,8 @@ type (
 
 	ResourceRecordSetsListCall interface {
 		// Context(ctx context.Context) *ResourceRecordSetsListCall  // TODO: Add as needed
-		// Do(opts ...googleapi.CallOption) (*ResourceRecordSetsListResponse, error)  // TODO: Add as needed
 		Do(opts ...googleapi.CallOption) (ResourceRecordSetsListResponse, error)
+		Pages(ctx context.Context, f func(ResourceRecordSetsListResponse) error) error
 		// Fields(s ...googleapi.Field) *ResourceRecordSetsListCall  // TODO: Add as needed
 		// IfNoneMatch(entityTag string) *ResourceRecordSetsListCall  // TODO: Add as needed
 		// MaxResults(maxResults int64) *ResourceRecordSetsListCall  // TODO: Add as needed
