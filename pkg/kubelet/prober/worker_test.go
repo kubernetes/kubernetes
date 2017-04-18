@@ -148,6 +148,27 @@ func TestInitialDelay(t *testing.T) {
 	}
 }
 
+func TestLivenessWithReadiness(t *testing.T) {
+	m := newTestManager()
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+
+	pod := getTestPod()
+	setTestProbe(pod, readiness, v1.Probe{})
+	setTestProbe(pod, liveness, v1.Probe{})
+	w := newWorker(m, liveness, pod, pod.Spec.Containers[0])
+
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+
+	expectContinue(t, w, w.doProbe(), "not ready")
+	expectResult(t, w, results.Success, "not ready")
+
+	m.readinessManager.Set(w.containerID, results.Success, pod)
+
+	// Second call should succeed (ready).
+	expectContinue(t, w, w.doProbe(), "ready")
+	expectResult(t, w, results.Failure, "ready")
+}
+
 func TestFailureThreshold(t *testing.T) {
 	m := newTestManager()
 	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
