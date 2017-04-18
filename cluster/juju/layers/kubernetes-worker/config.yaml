@@ -20,3 +20,14 @@ options:
       mode by default. If "false", kubelet will never run in privileged mode.
       If "auto", kubelet will not run in privileged mode by default, but will
       switch to privileged mode if gpu hardware is detected.
+  channel:
+    type: string
+    default: "stable"
+    description: |
+      Snap channel to install Kubernetes worker services from
+  require-manual-upgrade:
+    type: boolean
+    default: true
+    description: |
+      When true, worker services will not be upgraded until the user triggers
+      it manually by running the upgrade action.
