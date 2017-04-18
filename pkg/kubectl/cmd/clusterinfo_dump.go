@@ -192,21 +192,34 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error
 			return err
 		}
 
-		for ix := range pods.Items {
-			pod := &pods.Items[ix]
-			writer := setupOutputWriter(cmd, out, path.Join(namespace, pod.Name, "logs.txt"))
-			writer.Write([]byte(fmt.Sprintf("==== START logs for %s/%s ====\n", pod.Namespace, pod.Name)))
-			request, err := f.LogsForObject(pod, &api.PodLogOptions{}, timeout)
+		printContainer := func(writer io.Writer, container api.Container, pod *api.Pod) {
+			writer.Write([]byte(fmt.Sprintf("==== START logs for container %s of pod %s/%s ====\n", container.Name, pod.Namespace, pod.Name)))
+			defer writer.Write([]byte(fmt.Sprintf("==== END logs for container %s of pod %s/%s ====\n", container.Name, pod.Namespace, pod.Name)))
+
+			request, err := f.LogsForObject(pod, &api.PodLogOptions{Container: container.Name}, timeout)
 			if err != nil {
-				return err
+				// Print error and return.
+				writer.Write([]byte(fmt.Sprintf("Create log request error: %s\n", err.Error())))
+				return
 			}
 
 			data, err := request.DoRaw()
 			if err != nil {
-				return err
+				// Print error and return.
+				writer.Write([]byte(fmt.Sprintf("Request log error: %s\n", err.Error())))
+				return
 			}
 			writer.Write(data)
-			writer.Write([]byte(fmt.Sprintf("==== END logs for %s/%s ====\n", pod.Namespace, pod.Name)))
+		}
+
+		for ix := range pods.Items {
+			pod := &pods.Items[ix]
+			containers := pod.Spec.Containers
+			writer := setupOutputWriter(cmd, out, path.Join(namespace, pod.Name, "logs.txt"))
+
+			for i := range containers {
+				printContainer(writer, containers[i], pod)
+			}
 		}
 	}
 	dir := cmdutil.GetFlagString(cmd, "output-directory")
