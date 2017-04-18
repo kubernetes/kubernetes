@@ -1059,6 +1059,14 @@ func validateScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, fldPath *field.Pa
 	return allErrs
 }
 
+func validateLocalVolumeSource(ls *api.LocalVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if ls.Path == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+	}
+	return allErrs
+}
+
 // ValidatePersistentVolumeName checks that a name is appropriate for a
 // PersistentVolumeName object.
 var ValidatePersistentVolumeName = NameIsDNSSubdomain
@@ -1068,7 +1076,8 @@ var supportedAccessModes = sets.NewString(string(api.ReadWriteOnce), string(api.
 var supportedReclaimPolicy = sets.NewString(string(api.PersistentVolumeReclaimDelete), string(api.PersistentVolumeReclaimRecycle), string(api.PersistentVolumeReclaimRetain))
 
 func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
-	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, field.NewPath("metadata"))
+	metaPath := field.NewPath("metadata")
+	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, metaPath)
 
 	specPath := field.NewPath("spec")
 	if len(pv.Spec.AccessModes) == 0 {
@@ -1096,6 +1105,9 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.NotSupported(specPath.Child("persistentVolumeReclaimPolicy"), pv.Spec.PersistentVolumeReclaimPolicy, supportedReclaimPolicy.List()))
 		}
 	}
+
+	topologyExists, errs := validateStorageTopologyConstraintsAnnotation(pv.ObjectMeta.Annotations, metaPath.Child("annotations"))
+	allErrs = append(allErrs, errs...)
 
 	numVolumes := 0
 	if pv.Spec.HostPath != nil {
@@ -1236,6 +1248,22 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateScaleIOVolumeSource(pv.Spec.ScaleIO, specPath.Child("scaleIO"))...)
+		}
+	}
+	if pv.Spec.Local != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("local"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
+				allErrs = append(allErrs, field.Forbidden(specPath.Child("local"), "Local volumes are disabled by feature-gate"))
+			}
+			allErrs = append(allErrs, validateLocalVolumeSource(pv.Spec.Local, specPath.Child("local"))...)
+
+			// TopologyConstraints is required
+			if !topologyExists {
+				allErrs = append(allErrs, field.Required(metaPath.Child("annotations"), "Local volume requires at least one topology constraint"))
+			}
 		}
 	}
 
@@ -3959,4 +3987,50 @@ func sysctlIntersection(a []api.Sysctl, b []api.Sysctl) []string {
 		}
 	}
 	return result
+}
+
+// validateStorageTopologyConstraintsInAnnotation tests that the serialized TopologyConstraints in PersistentVolume.Annotations has valid data
+func validateStorageTopologyConstraintsAnnotation(annotations map[string]string, fldPath *field.Path) (bool, field.ErrorList) {
+	allErrs := field.ErrorList{}
+
+	constraints, err := helper.GetStorageTopologyConstraintsFromAnnotations(annotations)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, api.AlphaStorageTopologyConstraintsAnnotation, err.Error()))
+		return false, allErrs
+	}
+	if constraints == nil {
+		return false, allErrs
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "Storage topology is disabled by feature-gate"))
+	}
+
+	if len(constraints) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, api.AlphaStorageTopologyConstraintsAnnotation, "At least one constraint must be specified"))
+		return false, allErrs
+	}
+
+	for _, c := range constraints {
+		allErrs = append(allErrs, validateTopologyConstraint(c, fldPath.Child("topologyConstraint"))...)
+	}
+	return true, allErrs
+}
+
+func validateTopologyConstraint(constraint api.TopologyConstraint, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(constraint.Key) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), constraint.Key, "topology key cannot be empty"))
+	}
+	if len(constraint.Values) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("values"), constraint.Values, "topology values cannot be empty"))
+	}
+
+	for _, v := range constraint.Values {
+		if len(v) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("value"), v, "topology value cannot be empty"))
+		}
+	}
+	return allErrs
 }

@@ -266,3 +266,65 @@ func TestSysctlsFromPodAnnotation(t *testing.T) {
 		}
 	}
 }
+
+// TODO: remove when alpha support for topology constraints is removed
+func TestGetTopologyConstraintsFromAnnotations(t *testing.T) {
+	testCases := []struct {
+		annotations map[string]string
+		expectErr   bool
+	}{
+		{
+			annotations: nil,
+			expectErr:   false,
+		},
+		{
+			annotations: map[string]string{},
+			expectErr:   false,
+		},
+		{
+			annotations: map[string]string{
+				api.AlphaStorageTopologyConstraintsAnnotation: `
+				[{ "key": "test-key",
+				   "values": ["test-value1", "test-value2"]
+				 },
+				 { "key": "test-key2",
+				   "values": ["test-value1", "test-value2"]
+				 }
+				]`,
+			},
+			expectErr: false,
+		},
+		{
+			annotations: map[string]string{
+				api.AlphaStorageTopologyConstraintsAnnotation: `
+				 { "key": "test-key",
+				   "values": ["test-value1", "test-value2"]
+				 }`,
+			},
+			expectErr: true,
+		},
+		{
+			annotations: map[string]string{
+				api.AlphaStorageTopologyConstraintsAnnotation: `
+				[{ "key": "test-key",
+				   "values": "test-value1"
+				 },
+				 { "key": "test-key2",
+				   "values": ["test-value1", "test-value2"]
+				 }
+				]`,
+			},
+			expectErr: true,
+		},
+	}
+
+	for i, tc := range testCases {
+		_, err := GetStorageTopologyConstraintsFromAnnotations(tc.annotations)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+	}
+}

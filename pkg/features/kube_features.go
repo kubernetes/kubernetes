@@ -88,6 +88,12 @@ const (
 	// Changes the logic behind evicting Pods from not ready Nodes
 	// to take advantage of NoExecute Taints and Tolerations.
 	TaintBasedEvictions utilfeature.Feature = "TaintBasedEvictions"
+
+	// owner: @msau
+	// alpha: v1.7
+	//
+	// A new volume type that supports local disks on a node.
+	PersistentLocalVolumes utilfeature.Feature = "PersistentLocalVolumes"
 )
 
 func init() {
@@ -107,6 +113,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	AffinityInAnnotations:                       {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
+	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
