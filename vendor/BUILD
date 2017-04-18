@@ -14565,6 +14565,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/google/gofuzz",
+        "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
