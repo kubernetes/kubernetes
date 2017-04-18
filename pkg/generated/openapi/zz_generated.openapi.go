@@ -4475,6 +4475,23 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/api/v1.NamespaceSpec", "k8s.io/kubernetes/pkg/api/v1.NamespaceStatus"},
 		},
+		"k8s.io/kubernetes/pkg/api/v1.NamespaceIngressPolicy": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "NamespaceIngressPolicy describes the base policy for incoming traffic to a Namespace",
+					Properties: map[string]spec.Schema{
+						"isolation": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The base policy for network isolation for incoming traffic to the Namespace, which may be modified by NetworkPolicy objects. If not specified, a default policy is applied (allow all)",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.NamespaceList": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -4520,6 +4537,23 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/api/v1.Namespace"},
 		},
+		"k8s.io/kubernetes/pkg/api/v1.NamespaceNetworkPolicy": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "NamespaceNetworkPolicy describes the use of NetworkPolicy objects in a namespace",
+					Properties: map[string]spec.Schema{
+						"ingress": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The base policy for incoming traffic to pods in this namespace, which may be modified by NetworkPolicy objects. If not specified, default policies are applied",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.NamespaceIngressPolicy"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.NamespaceIngressPolicy"},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.NamespaceSpec": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -4539,10 +4573,17 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"networkPolicy": {
+							SchemaProps: spec.SchemaProps{
+								Description: "NetworkPolicy describes the use of NetworkPolicy objects in this namespace. If not specified, then default policies will be applied and NetworkPolicy objects in the Namespace will be ignored",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.NamespaceNetworkPolicy"),
+							},
+						},
 					},
 				},
 			},
-			Dependencies: []string{},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.NamespaceNetworkPolicy"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.NamespaceStatus": {
 			Schema: spec.Schema{
