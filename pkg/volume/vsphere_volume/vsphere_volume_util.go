@@ -19,6 +19,7 @@ package vsphere_volume
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -74,17 +75,24 @@ func verifyDevicePath(path string) (string, error) {
 }
 
 // CreateVolume creates a vSphere volume.
-func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeKB int, fstype string, err error) {
+func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volSizeKB int, fstype string, err error) {
 
 	cloud, err := getCloudProvider(v.plugin.host.GetCloudProvider())
 	if err != nil {
 		return "", 0, "", err
 	}
-
 	capacity := v.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
-	// vSphere works with kilobytes, convert to KiB with rounding up
-	volSizeKB := int(volume.RoundUpSize(volSizeBytes, 1024))
+
+	capacityContainsNonDigit, _ := regexp.MatchString("\\D", capacity.String())
+	if capacityContainsNonDigit {
+		// vSphere works with kilobytes, convert to KiB with rounding up
+		volSizeKB = int(volume.RoundUpSize(volSizeBytes, 1024))
+	} else {
+		// if no unit is specified, convert to GiB
+		volSizeKB = int(volSizeBytes) * 1024 * 1024
+	}
+
 	name := volume.GenerateVolumeName(v.options.ClusterName, v.options.PVName, 255)
 	volumeOptions := &vsphere.VolumeOptions{
 		CapacityKB: volSizeKB,
