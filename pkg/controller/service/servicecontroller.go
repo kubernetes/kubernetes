@@ -46,9 +46,9 @@ import (
 )
 
 const (
-	// Interval of synchoronizing service status from apiserver
+	// Interval of synchronizing service status from apiserver
 	serviceSyncPeriod = 30 * time.Second
-	// Interval of synchoronizing node status from apiserver
+	// Interval of synchronizing node status from apiserver
 	nodeSyncPeriod = 100 * time.Second
 
 	// How long to wait before retrying the processing of a service change.
@@ -571,24 +571,6 @@ func nodeSlicesEqualForLB(x, y []*v1.Node) bool {
 		return false
 	}
 	return stringSlicesEqual(nodeNames(x), nodeNames(y))
-}
-
-func intSlicesEqual(x, y []int) bool {
-	if len(x) != len(y) {
-		return false
-	}
-	if !sort.IntsAreSorted(x) {
-		sort.Ints(x)
-	}
-	if !sort.IntsAreSorted(y) {
-		sort.Ints(y)
-	}
-	for i := range x {
-		if x[i] != y[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func stringSlicesEqual(x, y []string) bool {
