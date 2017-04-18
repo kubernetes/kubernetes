@@ -228,7 +228,11 @@ func (f *Framework) GetUnderlyingFederatedContexts() []E2EContext {
 }
 
 func (f *Framework) GetRegisteredClusters() ClusterSlice {
-	return registeredClustersFromConfig(f)
+	if framework.TestContext.FederationConfigFromCluster {
+		return registeredClustersFromSecrets(f)
+	} else {
+		return registeredClustersFromConfig(f)
+	}
 }
 
 func (f *Framework) GetClusterClients() []kubeclientset.Interface {

@@ -92,6 +92,8 @@ type TestContextType struct {
 	FederatedKubeContext string
 	// Federation control plane version to upgrade to while doing upgrade tests
 	FederationUpgradeTarget string
+	// Whether configuration for accessing federation member clusters should be sourced from the host cluster
+	FederationConfigFromCluster bool
 
 	// Viper-only parameters.  These will in time replace all flags.
 
@@ -179,6 +181,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
 	flag.StringVar(&TestContext.KubeAPIContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType used to communicate with apiserver")
 	flag.StringVar(&TestContext.FederatedKubeContext, "federated-kube-context", "e2e-federation", "kubeconfig context for federation.")
+	flag.BoolVar(&TestContext.FederationConfigFromCluster, "federation-config-from-cluster", false, "whether to source configuration for member clusters from the hosting cluster.")
 
 	flag.StringVar(&TestContext.KubeVolumeDir, "volume-dir", "/var/lib/kubelet", "Path to the directory containing the kubelet volumes.")
 	flag.StringVar(&TestContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
