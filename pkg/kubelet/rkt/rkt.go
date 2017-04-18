@@ -1320,11 +1320,14 @@ func (r *Runtime) setupPodNetwork(pod *v1.Pod) (string, string, error) {
 func createHostPathVolumes(pod *v1.Pod) (err error) {
 	for _, v := range pod.Spec.Volumes {
 		if v.VolumeSource.HostPath != nil {
-			err = os.MkdirAll(v.HostPath.Path, os.ModePerm)
-			if err != nil && !os.IsExist(err) {
-				return err
+			_, err = os.Stat(v.HostPath.Path)
+			if os.IsNotExist(err) {
+				if err = os.MkdirAll(v.HostPath.Path, os.ModePerm); err != nil {
+					glog.Errorf("Create volume HostPath %q for Pod %q failed: %q", v.HostPath.Path, format.Pod(pod), err.Error())
+					return err
+				}
+				glog.V(4).Infof("Created volume HostPath %q for Pod %q", v.HostPath.Path, format.Pod(pod))
 			}
-			glog.V(4).Infof("Created volume HostPath %q for Pod %q", v.HostPath.Path, format.Pod(pod))
 		}
 	}
 	return nil
