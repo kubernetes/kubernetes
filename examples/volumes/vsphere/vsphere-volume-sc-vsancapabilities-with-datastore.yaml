@@ -5,4 +5,6 @@ metadata:
 provisioner: kubernetes.io/vsphere-volume
 parameters:
     diskformat: zeroedthick
-    fstype:     ext3
+    datastore: vsanDatastore
+    hostFailuresToTolerate: "2"
+    cachereservation: "20"
