@@ -26,6 +26,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -149,4 +150,84 @@ func ClusterIsReadyOrFail(f *Framework, clusterName string) {
 	})
 	framework.ExpectNoError(err, fmt.Sprintf("Unexpected error in verifying if cluster %q is ready: %+v", clusterName, err))
 	framework.Logf("Cluster %s is Ready", clusterName)
+}
+
+// Cache the cluster config to avoid having to retrieve it for each test
+type clusterConfig struct {
+	name   string
+	host   string
+	config []byte
+}
+
+var cachedClusterConfigs []*clusterConfig
+
+// registeredClustersFromSecrets configures clientsets for cluster access from secrets in the host cluster
+func registeredClustersFromSecrets(f *Framework) ClusterSlice {
+	if cachedClusterConfigs == nil {
+		cachedClusterConfigs = clusterConfigFromSecrets(f)
+	}
+
+	clusters := ClusterSlice{}
+	for _, clusterConf := range cachedClusterConfigs {
+		restConfig := restConfigForCluster(clusterConf)
+		clientset := clientsetFromConfig(f, restConfig, clusterConf.host)
+		clusters = append(clusters, &Cluster{
+			Name:      clusterConf.name,
+			Clientset: clientset,
+		})
+	}
+
+	waitForNamespaceInFederatedClusters(clusters, f.FederationNamespace.Name)
+
+	return clusters
+}
+
+// clusterConfigFromSecrets retrieves cluster configuration from
+// secrets in the host cluster
+func clusterConfigFromSecrets(f *Framework) []*clusterConfig {
+	By("Obtaining a list of registered clusters")
+	clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
+	framework.ExpectNoError(err, fmt.Sprintf("Error retrieving list of federated clusters: %+v", err))
+	if len(clusterList.Items) == 0 {
+		framework.Failf("No registered clusters found")
+	}
+
+	clusterConfigs := []*clusterConfig{}
+	for _, c := range clusterList.Items {
+		ClusterIsReadyOrFail(f, c.Name)
+		config := clusterConfigFromSecret(f, c.Name, c.Spec.SecretRef.Name)
+		clusterConfigs = append(clusterConfigs, &clusterConfig{
+			name:   c.Name,
+			host:   c.Spec.ServerAddressByClientCIDRs[0].ServerAddress,
+			config: config,
+		})
+	}
+
+	return clusterConfigs
+}
+
+// clusterConfigFromSecret retrieves configuration for a accessing a
+// cluster from a secret in the host cluster
+func clusterConfigFromSecret(f *Framework, clusterName string, secretName string) []byte {
+	By(fmt.Sprintf("Loading configuration for cluster %q", clusterName))
+	namespace := framework.FederationSystemNamespace()
+	secret, err := f.Framework.ClientSet.Core().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+	framework.ExpectNoError(err, fmt.Sprintf("Error loading config secret \"%s/%s\" for cluster %q: %+v", namespace, secretName, clusterName, err))
+
+	config, ok := secret.Data[util.KubeconfigSecretDataKey]
+	if !ok || len(config) == 0 {
+		framework.Failf("Secret \"%s/%s\" for cluster %q has no value for key %q", namespace, secretName, clusterName, util.KubeconfigSecretDataKey)
+	}
+
+	return config
+}
+
+// restConfigForCluster creates a rest client config for the given cluster config
+func restConfigForCluster(clusterConf *clusterConfig) *restclient.Config {
+	cfg, err := clientcmd.Load(clusterConf.config)
+	framework.ExpectNoError(err, fmt.Sprintf("Error loading configuration for cluster %q: %+v", clusterConf.name, err))
+
+	restConfig, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
+	framework.ExpectNoError(err, fmt.Sprintf("Error creating client for cluster %q: %+v", clusterConf.name, err))
+	return restConfig
 }
