@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
@@ -107,6 +108,7 @@ func NewAttachDetachController(
 		pvcsSynced: pvcInformer.Informer().HasSynced,
 		pvLister:   pvInformer.Lister(),
 		pvsSynced:  pvInformer.Informer().HasSynced,
+		podLister:  podInformer.Lister(),
 		cloud:      cloud,
 	}
 
@@ -187,6 +189,9 @@ type attachDetachController struct {
 	podsSynced  kcache.InformerSynced
 	nodesSynced kcache.InformerSynced
 
+	// podLister used to list all pods for newly added nodes
+	podLister corelisters.PodLister
+
 	// cloud provider used by volume host
 	cloud cloudprovider.Interface
 
@@ -250,10 +255,6 @@ func (adc *attachDetachController) podAdd(obj interface{}) {
 	if pod == nil || !ok {
 		return
 	}
-	if pod.Spec.NodeName == "" {
-		// Ignore pods without NodeName, indicating they are not scheduled.
-		return
-	}
 
 	util.ProcessPodVolumes(pod, true, /* addVolumes */
 		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
@@ -293,6 +294,23 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 	// the attached volumes field. This function ensures that we sync with
 	// the actual status.
 	adc.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
+
+	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
+		// Newly added node is managed by controller, ensure all pods are up to date.
+		adc.processPodsForNode(nodeName)
+	}
+}
+
+func (adc *attachDetachController) processPodsForNode(nodeName types.NodeName) {
+	pods, err := adc.podLister.List(labels.Everything())
+	if err != nil {
+		glog.Errorf("podLister list failed: %v", err)
+	}
+	for _, pod := range pods {
+		if pod.Spec.NodeName == string(nodeName) {
+			adc.podAdd(pod)
+		}
+	}
 }
 
 func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
@@ -309,6 +327,16 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 		adc.desiredStateOfWorld.AddNode(nodeName)
 	}
 	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
+
+	oldNode, ok := oldObj.(*v1.Node)
+	if ok && oldNode != nil {
+		_, oldManaged := oldNode.Annotations[volumehelper.ControllerManagedAttachAnnotation]
+		_, newManaged := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]
+		if !oldManaged && newManaged {
+			// Node is newly managed by controller, ensure all pods are up to date.
+			adc.processPodsForNode(nodeName)
+		}
+	}
 }
 
 func (adc *attachDetachController) nodeDelete(obj interface{}) {
