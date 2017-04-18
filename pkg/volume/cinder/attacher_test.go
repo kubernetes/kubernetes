@@ -88,6 +88,7 @@ type testcase struct {
 	// For fake GCE:
 	attach           attachCall
 	detach           detachCall
+	operateHasDone   operateHasDoneCall
 	diskIsAttached   diskIsAttachedCall
 	disksAreAttached disksAreAttachedCall
 	diskPath         diskPathCall
@@ -104,6 +105,8 @@ type testcase struct {
 func TestAttachDetach(t *testing.T) {
 	diskName := "disk"
 	instanceID := "instance"
+	Done := "Done"
+	Doing := "Doing"
 	nodeName := types.NodeName("nodeName")
 	readOnly := false
 	spec := createVolSpec(diskName, readOnly)
@@ -117,6 +120,7 @@ func TestAttachDetach(t *testing.T) {
 		{
 			name:           "Attach_Positive",
 			instanceID:     instanceID,
+			operateHasDone: operateHasDoneCall{diskName, true, Done, nil},
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, nil},
 			attach:         attachCall{diskName, instanceID, "", nil},
 			diskPath:       diskPathCall{diskName, instanceID, "/dev/sda", nil},
@@ -131,6 +135,7 @@ func TestAttachDetach(t *testing.T) {
 		{
 			name:           "Attach_Positive_AlreadyAttached",
 			instanceID:     instanceID,
+			operateHasDone: operateHasDoneCall{diskName, true, Done, nil},
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, true, nil},
 			diskPath:       diskPathCall{diskName, instanceID, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
@@ -140,10 +145,24 @@ func TestAttachDetach(t *testing.T) {
 			expectedResult: "/dev/sda",
 		},
 
+		// Disk is attaching
+		{
+			name:           "Attach_is_attaching",
+			instanceID:     instanceID,
+			operateHasDone: operateHasDoneCall{diskName, false, Doing, nil},
+			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, diskCheckError},
+			test: func(testcase *testcase) (string, error) {
+				attacher := newAttacher(testcase)
+				return attacher.Attach(spec, nodeName)
+			},
+			expectedResult: "",
+		},
+
 		// DiskIsAttached fails and Attach succeeds
 		{
 			name:           "Attach_Positive_CheckFails",
 			instanceID:     instanceID,
+			operateHasDone: operateHasDoneCall{diskName, true, Done, nil},
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, diskCheckError},
 			attach:         attachCall{diskName, instanceID, "", nil},
 			diskPath:       diskPathCall{diskName, instanceID, "/dev/sda", nil},
@@ -158,6 +177,7 @@ func TestAttachDetach(t *testing.T) {
 		{
 			name:           "Attach_Negative",
 			instanceID:     instanceID,
+			operateHasDone: operateHasDoneCall{diskName, true, Done, nil},
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, diskCheckError},
 			attach:         attachCall{diskName, instanceID, "/dev/sda", attachError},
 			test: func(testcase *testcase) (string, error) {
@@ -171,6 +191,7 @@ func TestAttachDetach(t *testing.T) {
 		{
 			name:           "Attach_Negative_DiskPatchFails",
 			instanceID:     instanceID,
+			operateHasDone: operateHasDoneCall{diskName, true, Done, nil},
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, diskCheckError},
 			attach:         attachCall{diskName, instanceID, "", nil},
 			diskPath:       diskPathCall{diskName, instanceID, "", diskPathError},
@@ -384,6 +405,13 @@ type detachCall struct {
 	ret        error
 }
 
+type operateHasDoneCall struct {
+	diskName             string
+	HasDone              bool
+	VolumeStatus         string
+	ret                  error
+}
+
 type diskIsAttachedCall struct {
 	diskName, instanceID string
 	isAttached           bool
@@ -451,6 +479,19 @@ func (testcase *testcase) DetachDisk(instanceID string, partialDiskId string) er
 	glog.V(4).Infof("DetachDisk call: %s, %s, returning %v", partialDiskId, instanceID, expected.ret)
 
 	return expected.ret
+}
+
+func (testcase *testcase) OperateHasDone(diskName string) (bool, string, error) {
+	expected := &testcase.operateHasDone
+
+	if expected.VolumeStatus == "Done" {
+		glog.V(4).Infof("OperateHasDone call: %s, returning %v, %v, %v", diskName, expected.HasDone, expected.VolumeStatus, expected.ret)
+		return true, expected.VolumeStatus, expected.ret
+	}
+
+	glog.V(4).Infof("OperateHasDone call: %s, returning %v, %v, %v", diskName, expected.HasDone, expected.VolumeStatus, expected.ret)
+
+	return false, expected.VolumeStatus, expected.ret
 }
 
 func (testcase *testcase) DiskIsAttached(diskName, instanceID string) (bool, error) {
