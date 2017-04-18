@@ -102,7 +102,9 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ListOptions, InType: reflect.TypeOf(&ListOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LoadBalancerIngress, InType: reflect.TypeOf(&LoadBalancerIngress{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LoadBalancerStatus, InType: reflect.TypeOf(&LoadBalancerStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalFsVolume, InType: reflect.TypeOf(&LocalFsVolume{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalObjectReference, InType: reflect.TypeOf(&LocalObjectReference{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalVolumeSource, InType: reflect.TypeOf(&LocalVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NFSVolumeSource, InType: reflect.TypeOf(&NFSVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Namespace, InType: reflect.TypeOf(&Namespace{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NamespaceList, InType: reflect.TypeOf(&NamespaceList{})},
@@ -1398,11 +1400,34 @@ func DeepCopy_v1_LoadBalancerStatus(in interface{}, out interface{}, c *conversi
 	}
 }
 
+func DeepCopy_v1_LocalFsVolume(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LocalFsVolume)
+		out := out.(*LocalFsVolume)
+		*out = *in
+		return nil
+	}
+}
+
 func DeepCopy_v1_LocalObjectReference(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*LocalObjectReference)
 		out := out.(*LocalObjectReference)
 		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_LocalVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LocalVolumeSource)
+		out := out.(*LocalVolumeSource)
+		*out = *in
+		if in.Fs != nil {
+			in, out := &in.Fs, &out.Fs
+			*out = new(LocalFsVolume)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -2036,6 +2061,13 @@ func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conv
 			in, out := &in.ScaleIO, &out.ScaleIO
 			*out = new(ScaleIOVolumeSource)
 			if err := DeepCopy_v1_ScaleIOVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		if in.LocalVolume != nil {
+			in, out := &in.LocalVolume, &out.LocalVolume
+			*out = new(LocalVolumeSource)
+			if err := DeepCopy_v1_LocalVolumeSource(*in, *out, c); err != nil {
 				return err
 			}
 		}
