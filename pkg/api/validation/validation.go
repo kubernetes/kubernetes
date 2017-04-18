@@ -577,6 +577,14 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 			allErrs = append(allErrs, validateScaleIOVolumeSource(source.ScaleIO, fldPath.Child("scaleIO"))...)
 		}
 	}
+	if source.LocalStorage != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("localStorage"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("localStorage"), "LocalStorage is not allowed as a VolumeSource"))
+		}
+	}
 
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
@@ -1058,6 +1066,21 @@ func validateScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, fldPath *field.Pa
 	return allErrs
 }
 
+func validateLocalStorageVolumeSource(ls *api.LocalStorageVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// For now, only Fs is supported
+	// Later, when block is supported, we need to validate that only one of fs or block is specified.
+	if ls.Fs == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("fs"), ""))
+		return allErrs
+	}
+
+	if ls.Fs.Path == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("fs", "path"), ""))
+	}
+	return allErrs
+}
+
 // ValidatePersistentVolumeName checks that a name is appropriate for a
 // PersistentVolumeName object.
 var ValidatePersistentVolumeName = NameIsDNSSubdomain
@@ -1067,7 +1090,8 @@ var supportedAccessModes = sets.NewString(string(api.ReadWriteOnce), string(api.
 var supportedReclaimPolicy = sets.NewString(string(api.PersistentVolumeReclaimDelete), string(api.PersistentVolumeReclaimRecycle), string(api.PersistentVolumeReclaimRetain))
 
 func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
-	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, field.NewPath("metadata"))
+	metaPath := field.NewPath("metadata")
+	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, metaPath)
 
 	specPath := field.NewPath("spec")
 	if len(pv.Spec.AccessModes) == 0 {
@@ -1235,6 +1259,23 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateScaleIOVolumeSource(pv.Spec.ScaleIO, specPath.Child("scaleIO"))...)
+		}
+	}
+	if pv.Spec.LocalStorage != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("localStorage"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateLocalStorageVolumeSource(pv.Spec.LocalStorage, specPath.Child("localStorage"))...)
+			// StorageClass is required
+			if len(pv.Spec.StorageClassName) == 0 {
+				allErrs = append(allErrs, field.Required(specPath.Child("storageClassName"), "LocalStorage volumes require a StorageClass"))
+			}
+			// hostname label is required
+			hostname, found := pv.Labels[metav1.LabelHostname]
+			if !found || len(hostname) == 0 {
+				allErrs = append(allErrs, field.Required(metaPath.Child("labels"), fmt.Sprintf("LocalStorage volumes require the %q label", metav1.LabelHostname)))
+			}
 		}
 	}
 

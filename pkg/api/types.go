@@ -302,6 +302,11 @@ type VolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource
+	// LocalStorage represents a local volume accessible only from one node
+	// This volume type cannot be used as a direct volume source and is only required here
+	// to support the volume plugin interface.
+	// +optional
+	LocalStorage *LocalStorageVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -370,6 +375,9 @@ type PersistentVolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource
+	// LocalStorage represents a local volume accessible only from one node
+	// +optional
+	LocalStorage *LocalStorageVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -385,6 +393,9 @@ const (
 	// BetaStorageClassAnnotation represents the beta/previous StorageClass annotation.
 	// It's currently still used and will be held for backwards compatibility
 	BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
+	// AlphaStorageTopologyAnnotation is set in the StorageClass and gives the scheduler
+	// a hint that the volumes in this StorageClass have a topology constraint
+	AlphaStorageTopologyAnnotation = "storage.alpha.kubernetes.io/topology-key"
 )
 
 // +genclient=true
@@ -1200,6 +1211,23 @@ type KeyToPath struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	Mode *int32
+}
+
+// LocalStorage represents a local volume accessible only from one node
+// In the PersistentVolume, the `kubernetes.io/hostname` label should be set
+// with the node that this local volume is located at.
+// LocalStorage PersistentVolumes also are required to be part of a StorageClass, and that
+// StorageClass should set the AlphaStorageTopologyAnnotation = "kubernetes.io/hostame"
+type LocalStorageVolumeSource struct {
+	// Fs represents a filesystem-based local volume
+	// +optional
+	Fs *LocalStorageFsVolume
+}
+
+// LocalStorageFsVolume represents a filesystem-based local volume
+type LocalStorageFsVolume struct {
+	// The full path to the volume on the node
+	Path string
 }
 
 // ContainerPort represents a network port in a single container
