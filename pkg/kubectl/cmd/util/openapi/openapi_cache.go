@@ -73,13 +73,13 @@ func (c *cachingOpenAPIClient) openAPIData() (*Resources, error) {
 	// No cached version found, download from server
 	s, err := c.client.OpenAPISchema()
 	if err != nil {
-		glog.Warningf("Failed to download openapi data %v", err)
+		glog.V(2).Infof("Failed to download openapi data %v", err)
 		return nil, err
 	}
 
 	oa, err := newOpenAPIData(s)
 	if err != nil {
-		glog.Warningf("Failed to parse openapi data %v", err)
+		glog.V(2).Infof("Failed to parse openapi data %v", err)
 		return nil, err
 	}
 
@@ -87,8 +87,8 @@ func (c *cachingOpenAPIClient) openAPIData() (*Resources, error) {
 	if c.useCache() {
 		err = c.writeToCache(oa)
 		if err != nil {
-			// Just log an warning, no need to fail the command since we got the data we need
-			glog.Warningf("Unable to cache openapi spec %v", err)
+			// Just log an message, no need to fail the command since we got the data we need
+			glog.V(2).Infof("Unable to cache openapi spec %v", err)
 		}
 	}
 

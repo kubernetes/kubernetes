@@ -95,7 +95,7 @@ type SwaggerSchemaInterface interface {
 }
 
 type OpenAPISchemaInterface interface {
-	// SwaggerSchema retrieves and parses the swagger API schema the server supports.
+	// OpenAPISchema retrieves and parses the swagger API schema the server supports.
 	OpenAPISchema() (*spec.Swagger, error)
 }
 

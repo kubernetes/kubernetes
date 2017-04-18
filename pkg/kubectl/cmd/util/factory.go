@@ -421,7 +421,7 @@ func writeSchemaFile(schemaData []byte, cacheDir, cacheFile, prefix, groupVersio
 	if _, err := io.Copy(tmpFile, bytes.NewBuffer(schemaData)); err != nil {
 		return err
 	}
-	glog.Infof("Wrinting swagger cache (dir %v) file %v (from %v)", cacheDir, cacheFile, tmpFile.Name())
+	glog.V(4).Infof("Writing swagger cache (dir %v) file %v (from %v)", cacheDir, cacheFile, tmpFile.Name())
 	if err := os.Link(tmpFile.Name(), cacheFile); err != nil {
 		// If we can't write due to file existing, or permission problems, keep going.
 		if os.IsExist(err) || os.IsPermission(err) {

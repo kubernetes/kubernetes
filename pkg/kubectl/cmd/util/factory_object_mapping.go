@@ -457,7 +457,7 @@ func (f *ring1Factory) OpenAPISchema(cacheDir string) (*openapi.Resources, error
 		// Get the server version for caching the openapi spec
 		versionString := ""
 		version, err := discovery.ServerVersion()
-		if version != nil && err != nil {
+		if err != nil {
 			// Cache the result under the server version
 			versionString = version.String()
 		}
@@ -465,7 +465,7 @@ func (f *ring1Factory) OpenAPISchema(cacheDir string) (*openapi.Resources, error
 		// Get the cache directory for caching the openapi spec
 		cacheDir, err = substituteUserHome(cacheDir)
 		if err != nil {
-			// Don't cache the result if we couldn't subsistute the home directory
+			// Don't cache the result if we couldn't substitute the home directory
 			cacheDir = ""
 		}
 
