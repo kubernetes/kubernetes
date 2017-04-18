@@ -253,9 +253,12 @@ func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.ContainerGCPolicy
 	return nil
 }
 
-// evictSandboxes evicts all sandboxes that are evictable. Evictable sandboxes are:
-// containing no containers at all and not the latest sandbox if it is belonging to
-// an existing pod.
+// evictSandboxes remove all evictable sandboes. An evictable sandbox must
+// meet the following requirements:
+//   1. not in ready state
+//   2. contains no containers.
+//   3. belong to a non-existent (i.e., already removed) pod, or is not the
+//      most recently created sandbox for the pod.
 func (cgc *containerGC) evictSandboxes() error {
 	containers, err := cgc.manager.getKubeletContainers(true)
 	if err != nil {
@@ -268,7 +271,19 @@ func (cgc *containerGC) evictSandboxes() error {
 	}
 
 	evictSandboxes := make(sandboxesByPodUID)
+	activeSandboxes := make(sandboxesByPodUID)
 	for _, sandbox := range sandboxes {
+		podUID := types.UID(sandbox.Metadata.Uid)
+
+		// Prune out ready sandboxes.
+		if sandbox.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+			activeSandboxes[podUID] = append(activeSandboxes[podUID], sandboxGCInfo{
+				id:         sandbox.Id,
+				createTime: time.Unix(0, sandbox.CreatedAt),
+			})
+			continue
+		}
+
 		// Prune out sandboxes that still have containers.
 		hasContainers := false
 		sandboxID := sandbox.Id
@@ -279,10 +294,13 @@ func (cgc *containerGC) evictSandboxes() error {
 			}
 		}
 		if hasContainers {
+			activeSandboxes[podUID] = append(activeSandboxes[podUID], sandboxGCInfo{
+				id:         sandbox.Id,
+				createTime: time.Unix(0, sandbox.CreatedAt),
+			})
 			continue
 		}
 
-		podUID := types.UID(sandbox.Metadata.Uid)
 		evictSandboxes[podUID] = append(evictSandboxes[podUID], sandboxGCInfo{
 			id:         sandbox.Id,
 			createTime: time.Unix(0, sandbox.CreatedAt),
@@ -295,15 +313,15 @@ func (cgc *containerGC) evictSandboxes() error {
 	}
 
 	for podUID, sandboxes := range evictSandboxes {
-		if cgc.isPodDeleted(podUID) {
-			// Remove all sandboxes if pod has been deleted.
+		if cgc.isPodDeleted(podUID) || len(activeSandboxes[podUID]) > 0 {
+			// Remove all evictable sandboxes if the pod has been removed, or
+			// there are active sandbox found.
 			cgc.removeOldestNSandboxes(sandboxes, len(sandboxes))
 		} else {
-			// Keep latest one if pod is still exist.
+			// Keep latest one if the pod still exists.
 			cgc.removeOldestNSandboxes(sandboxes, len(sandboxes)-1)
 		}
 	}
-
 	return nil
 }
 
