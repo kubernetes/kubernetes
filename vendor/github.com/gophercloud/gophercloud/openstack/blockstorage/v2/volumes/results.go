@@ -1,18 +1,38 @@
 package volumes
 
 import (
+	"encoding/json"
+	"time"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/pagination"
 )
 
 type Attachment struct {
-	AttachedAt   gophercloud.JSONRFC3339MilliNoZ `json:"attached_at"`
-	AttachmentID string                          `json:"attachment_id"`
-	Device       string                          `json:"device"`
-	HostName     string                          `json:"host_name"`
-	ID           string                          `json:"id"`
-	ServerID     string                          `json:"server_id"`
-	VolumeID     string                          `json:"volume_id"`
+	AttachedAt   time.Time `json:"-"`
+	AttachmentID string    `json:"attachment_id"`
+	Device       string    `json:"device"`
+	HostName     string    `json:"host_name"`
+	ID           string    `json:"id"`
+	ServerID     string    `json:"server_id"`
+	VolumeID     string    `json:"volume_id"`
+}
+
+func (r *Attachment) UnmarshalJSON(b []byte) error {
+	type tmp Attachment
+	var s struct {
+		tmp
+		AttachedAt gophercloud.JSONRFC3339MilliNoZ `json:"attached_at"`
+	}
+	err := json.Unmarshal(b, &s)
+	if err != nil {
+		return err
+	}
+	*r = Attachment(s.tmp)
+
+	r.AttachedAt = time.Time(s.AttachedAt)
+
+	return err
 }
 
 // Volume contains all the information associated with an OpenStack Volume.
@@ -26,9 +46,9 @@ type Volume struct {
 	// AvailabilityZone is which availability zone the volume is in.
 	AvailabilityZone string `json:"availability_zone"`
 	// The date when this volume was created.
-	CreatedAt gophercloud.JSONRFC3339MilliNoZ `json:"created_at"`
+	CreatedAt time.Time `json:"-"`
 	// The date when this volume was last updated
-	UpdatedAt gophercloud.JSONRFC3339MilliNoZ `json:"updated_at"`
+	UpdatedAt time.Time `json:"-"`
 	// Instances onto which the volume is attached.
 	Attachments []Attachment `json:"attachments"`
 	// Human-readable display name for the volume.
@@ -57,15 +77,24 @@ type Volume struct {
 	Multiattach bool `json:"multiattach"`
 }
 
-/*
-THESE BELONG IN EXTENSIONS:
-// ReplicationDriverData contains data about the replication driver.
-ReplicationDriverData string `json:"os-volume-replication:driver_data"`
-// ReplicationExtendedStatus contains extended status about replication.
-ReplicationExtendedStatus string `json:"os-volume-replication:extended_status"`
-// TenantID is the id of the project that owns the volume.
-TenantID string `json:"os-vol-tenant-attr:tenant_id"`
-*/
+func (r *Volume) UnmarshalJSON(b []byte) error {
+	type tmp Volume
+	var s struct {
+		tmp
+		CreatedAt gophercloud.JSONRFC3339MilliNoZ `json:"created_at"`
+		UpdatedAt gophercloud.JSONRFC3339MilliNoZ `json:"updated_at"`
+	}
+	err := json.Unmarshal(b, &s)
+	if err != nil {
+		return err
+	}
+	*r = Volume(s.tmp)
+
+	r.CreatedAt = time.Time(s.CreatedAt)
+	r.UpdatedAt = time.Time(s.UpdatedAt)
+
+	return err
+}
 
 // VolumePage is a pagination.pager that is returned from a call to the List function.
 type VolumePage struct {
@@ -80,11 +109,9 @@ func (r VolumePage) IsEmpty() (bool, error) {
 
 // ExtractVolumes extracts and returns Volumes. It is used while iterating over a volumes.List call.
 func ExtractVolumes(r pagination.Page) ([]Volume, error) {
-	var s struct {
-		Volumes []Volume `json:"volumes"`
-	}
-	err := (r.(VolumePage)).ExtractInto(&s)
-	return s.Volumes, err
+	var s []Volume
+	err := ExtractVolumesInto(r, &s)
+	return s, err
 }
 
 type commonResult struct {
@@ -93,11 +120,17 @@ type commonResult struct {
 
 // Extract will get the Volume object out of the commonResult object.
 func (r commonResult) Extract() (*Volume, error) {
-	var s struct {
-		Volume *Volume `json:"volume"`
-	}
+	var s Volume
 	err := r.ExtractInto(&s)
-	return s.Volume, err
+	return &s, err
+}
+
+func (r commonResult) ExtractInto(v interface{}) error {
+	return r.Result.ExtractIntoStructPtr(v, "volume")
+}
+
+func ExtractVolumesInto(r pagination.Page, v interface{}) error {
+	return r.(VolumePage).Result.ExtractIntoSlicePtr(v, "volumes")
 }
 
 // CreateResult contains the response body and error from a Create request.
