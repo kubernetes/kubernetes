@@ -328,8 +328,7 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 	}
 	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
 
-	oldNode, ok := oldObj.(*v1.Node)
-	if ok && oldNode != nil {
+	if oldNode, ok := oldObj.(*v1.Node); ok {
 		_, oldManaged := oldNode.Annotations[volumehelper.ControllerManagedAttachAnnotation]
 		_, newManaged := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]
 		if !oldManaged && newManaged {
