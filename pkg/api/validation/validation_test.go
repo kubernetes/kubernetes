@@ -66,13 +66,6 @@ func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *a
 	}
 }
 
-func testVolumeWithLabels(name string, namespace string, labels map[string]string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
-
-	pv := testVolume(name, namespace, spec)
-	pv.ObjectMeta.Labels = labels
-	return pv
-}
-
 func TestValidatePersistentVolumes(t *testing.T) {
 	scenarios := map[string]struct {
 		isExpectedFailure bool
@@ -231,133 +224,76 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		// LocalStorage
 		"valid local storage": {
 			isExpectedFailure: false,
-			volume: testVolumeWithLabels("valid-local-storage",
-				"",
-				map[string]string{metav1.LabelHostname: "test-node"},
-				api.PersistentVolumeSpec{
-					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						LocalStorage: &api.LocalStorageVolumeSource{
-							Fs: &api.LocalStorageFsVolume{Path: "/foo"},
-						},
-					},
-					StorageClassName: "test-storage-class",
+			volume: testVolume("valid-local-storage", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
-			),
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					LocalStorage: &api.LocalStorageVolumeSource{
+						NodeName: "node-foo",
+						Fs:       &api.LocalStorageFsVolume{Path: "/foo"},
+					},
+				},
+				StorageClassName: "test-storage-class",
+			}),
+		},
+		"invvalid local storage empty node": {
+			isExpectedFailure: true,
+			volume: testVolume("valid-local-storage", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					LocalStorage: &api.LocalStorageVolumeSource{
+						Fs: &api.LocalStorageFsVolume{Path: "/foo"},
+					},
+				},
+				StorageClassName: "test-storage-class",
+			}),
 		},
 		"invalid local storage nil fs volume": {
 			isExpectedFailure: true,
-			volume: testVolumeWithLabels("invalid-local-storage-nil-fs-volume",
-				"",
-				map[string]string{metav1.LabelHostname: "test-node"},
-				api.PersistentVolumeSpec{
-					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						LocalStorage: &api.LocalStorageVolumeSource{},
-					},
-					StorageClassName: "test-storage-class",
+			volume: testVolume("invalid-local-storage-nil-fs-volume", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
-			),
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					LocalStorage: &api.LocalStorageVolumeSource{},
+				},
+				StorageClassName: "test-storage-class",
+			}),
 		},
 		"invalid local storage empty path": {
 			isExpectedFailure: true,
-			volume: testVolumeWithLabels("invalid-local-storage-empty-path",
-				"",
-				map[string]string{metav1.LabelHostname: "test-node"},
-				api.PersistentVolumeSpec{
-					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						LocalStorage: &api.LocalStorageVolumeSource{
-							Fs: &api.LocalStorageFsVolume{},
-						},
-					},
-					StorageClassName: "test-storage-class",
+			volume: testVolume("invalid-local-storage-empty-path", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
-			),
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					LocalStorage: &api.LocalStorageVolumeSource{
+						Fs: &api.LocalStorageFsVolume{},
+					},
+				},
+				StorageClassName: "test-storage-class",
+			}),
 		},
 		"invalid local storage empty storageclass": {
 			isExpectedFailure: true,
-			volume: testVolumeWithLabels("invalid-local-storage-empty-storageclass",
-				"",
-				map[string]string{metav1.LabelHostname: "test-node"},
-				api.PersistentVolumeSpec{
-					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						LocalStorage: &api.LocalStorageVolumeSource{
-							Fs: &api.LocalStorageFsVolume{Path: "/foo"},
-						},
+			volume: testVolume("invalid-local-storage-empty-storageclass", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					LocalStorage: &api.LocalStorageVolumeSource{
+						Fs: &api.LocalStorageFsVolume{Path: "/foo"},
 					},
 				},
-			),
-		},
-		"invalid local storage no labels": {
-			isExpectedFailure: true,
-			volume: testVolumeWithLabels("invalid-local-storage-no-labels",
-				"",
-				map[string]string{},
-				api.PersistentVolumeSpec{
-					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						LocalStorage: &api.LocalStorageVolumeSource{
-							Fs: &api.LocalStorageFsVolume{Path: "/foo"},
-						},
-					},
-					StorageClassName: "test-storage-class",
-				},
-			),
-		},
-		"invalid local storage missing label": {
-			isExpectedFailure: true,
-			volume: testVolumeWithLabels("invalid-local-storage-missing-labels",
-				"",
-				map[string]string{"foo-label": "foo"},
-				api.PersistentVolumeSpec{
-					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						LocalStorage: &api.LocalStorageVolumeSource{
-							Fs: &api.LocalStorageFsVolume{Path: "/foo"},
-						},
-					},
-					StorageClassName: "test-storage-class",
-				},
-			),
-		},
-		"invalid local storage empty label": {
-			isExpectedFailure: true,
-			volume: testVolumeWithLabels("invalid-local-storage-empty-label",
-				"",
-				map[string]string{metav1.LabelHostname: ""},
-				api.PersistentVolumeSpec{
-					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						LocalStorage: &api.LocalStorageVolumeSource{
-							Fs: &api.LocalStorageFsVolume{Path: "/foo"},
-						},
-					},
-					StorageClassName: "test-storage-class",
-				},
-			),
+			}),
 		},
 	}
 
@@ -2158,20 +2094,6 @@ func TestValidateVolumes(t *testing.T) {
 			},
 			errtype:  field.ErrorTypeRequired,
 			errfield: "scaleIO.system",
-		},
-		// LocalStorage
-		{
-			name: "LocalStorage as VolumeSource",
-			vol: api.Volume{
-				Name: "localstorage-volume",
-				VolumeSource: api.VolumeSource{
-					LocalStorage: &api.LocalStorageVolumeSource{
-						Fs: &api.LocalStorageFsVolume{Path: "/tmp"},
-					},
-				},
-			},
-			errtype:  field.ErrorTypeForbidden,
-			errfield: "localStorage",
 		},
 	}
 

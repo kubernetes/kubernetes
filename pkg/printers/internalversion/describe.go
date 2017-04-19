@@ -664,8 +664,6 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printPortworxVolumeSource(volume.VolumeSource.PortworxVolume, w)
 		case volume.VolumeSource.ScaleIO != nil:
 			printScaleIOVolumeSource(volume.VolumeSource.ScaleIO, w)
-		case volume.VolumeSource.LocalStorage != nil:
-			printLocalStorageVolumeSource(volume.VolumeSource.LocalStorage, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}

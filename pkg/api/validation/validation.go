@@ -577,14 +577,6 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 			allErrs = append(allErrs, validateScaleIOVolumeSource(source.ScaleIO, fldPath.Child("scaleIO"))...)
 		}
 	}
-	if source.LocalStorage != nil {
-		if numVolumes > 0 {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("localStorage"), "may not specify more than 1 volume type"))
-		} else {
-			numVolumes++
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("localStorage"), "LocalStorage is not allowed as a VolumeSource"))
-		}
-	}
 
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
@@ -1068,6 +1060,10 @@ func validateScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, fldPath *field.Pa
 
 func validateLocalStorageVolumeSource(ls *api.LocalStorageVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if ls.NodeName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("nodeName"), ""))
+	}
+
 	// For now, only Fs is supported
 	// Later, when block is supported, we need to validate that only one of fs or block is specified.
 	if ls.Fs == nil {
@@ -1270,11 +1266,6 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			// StorageClass is required
 			if len(pv.Spec.StorageClassName) == 0 {
 				allErrs = append(allErrs, field.Required(specPath.Child("storageClassName"), "LocalStorage volumes require a StorageClass"))
-			}
-			// hostname label is required
-			hostname, found := pv.Labels[metav1.LabelHostname]
-			if !found || len(hostname) == 0 {
-				allErrs = append(allErrs, field.Required(metaPath.Child("labels"), fmt.Sprintf("LocalStorage volumes require the %q label", metav1.LabelHostname)))
 			}
 		}
 	}

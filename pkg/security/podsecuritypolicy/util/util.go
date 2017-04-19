@@ -125,8 +125,6 @@ func GetVolumeFSType(v api.Volume) (extensions.FSType, error) {
 		return extensions.PortworxVolume, nil
 	case v.ScaleIO != nil:
 		return extensions.ScaleIO, nil
-	case v.LocalStorage != nil:
-		return extensions.LocalStorage, nil
 	}
 
 	return "", fmt.Errorf("unknown volume type for volume: %#v", v)

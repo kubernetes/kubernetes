@@ -302,11 +302,6 @@ type VolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource
-	// LocalStorage represents a local volume accessible only from one node
-	// This volume type cannot be used as a direct volume source and is only required here
-	// to support the volume plugin interface.
-	// +optional
-	LocalStorage *LocalStorageVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -1219,6 +1214,8 @@ type KeyToPath struct {
 // LocalStorage PersistentVolumes also are required to be part of a StorageClass, and that
 // StorageClass should set the AlphaStorageTopologyAnnotation = "kubernetes.io/hostame"
 type LocalStorageVolumeSource struct {
+	// NodeName represents the node that the volume is located at
+	NodeName string
 	// Fs represents a filesystem-based local volume
 	// +optional
 	Fs *LocalStorageFsVolume
