@@ -358,6 +358,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			informerFactory.Extensions().V1beta1().ReplicaSets(),
 			informerFactory.Apps().V1beta1().StatefulSets(),
 			informerFactory.Core().V1().Services(),
+			informerFactory.Core().V1().Namespaces(),
 			v1.DefaultHardPodAffinitySymmetricWeight,
 		).CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)

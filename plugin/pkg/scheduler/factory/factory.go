@@ -79,7 +79,8 @@ type ConfigFactory struct {
 	replicaSetLister extensionslisters.ReplicaSetLister
 	// a means to list all statefulsets
 	statefulSetLister appslisters.StatefulSetLister
-
+	// a means to list all namespaces
+	namespaceLister corelisters.NamespaceLister
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
 
@@ -112,6 +113,7 @@ func NewConfigFactory(
 	replicaSetInformer extensionsinformers.ReplicaSetInformer,
 	statefulSetInformer appsinformers.StatefulSetInformer,
 	serviceInformer coreinformers.ServiceInformer,
+	namespaceInformer coreinformers.NamespaceInformer,
 	hardPodAffinitySymmetricWeight int,
 ) scheduler.Configurator {
 	stopEverything := make(chan struct{})
@@ -127,6 +129,7 @@ func NewConfigFactory(
 		controllerLister:               replicationControllerInformer.Lister(),
 		replicaSetLister:               replicaSetInformer.Lister(),
 		statefulSetLister:              statefulSetInformer.Lister(),
+		namespaceLister:                namespaceInformer.Lister(),
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		schedulerName:                  schedulerName,
@@ -439,6 +442,7 @@ func (f *ConfigFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		ControllerLister:  f.controllerLister,
 		ReplicaSetLister:  f.replicaSetLister,
 		StatefulSetLister: f.statefulSetLister,
+		NamespaceLister:   f.namespaceLister,
 		// All fit predicates only need to consider schedulable nodes.
 		NodeLister: &nodePredicateLister{f.nodeLister},
 		NodeInfo:   &predicates.CachedNodeInfo{NodeLister: f.nodeLister},

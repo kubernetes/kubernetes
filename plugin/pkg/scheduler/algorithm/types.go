@@ -144,3 +144,9 @@ type EmptyStatefulSetLister struct{}
 func (f EmptyStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.StatefulSet, err error) {
 	return nil, nil
 }
+
+// NamespaceLister helps list Namespaces.
+type NamespaceLister interface {
+	// List lists all Namespaces in the indexer.
+	List(selector labels.Selector) (ret []*v1.Namespace, err error)
+}
