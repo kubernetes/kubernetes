@@ -92,10 +92,10 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		} else if numNodes <= 100 {
 			apiserverCPU = 1.5
 			apiserverMem = 1500 * (1024 * 1024)
-			controllerCPU = 0.75
-			controllerMem = 750 * (1024 * 1024)
-			schedulerCPU = 0.75
-			schedulerMem = 500 * (1024 * 1024)
+			controllerCPU = 0.5
+			controllerMem = 500 * (1024 * 1024)
+			schedulerCPU = 0.4
+			schedulerMem = 180 * (1024 * 1024)
 		} else if numNodes <= 500 {
 			apiserverCPU = 3.5
 			apiserverMem = 3400 * (1024 * 1024)
@@ -113,14 +113,12 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		}
 	} else {
 		if numNodes <= 100 {
-			// TODO: Investigate higher apiserver consumption and
-			// potentially revert to 1.5cpu and 1.3GB - see #30871
 			apiserverCPU = 1.8
-			apiserverMem = 2200 * (1024 * 1024)
+			apiserverMem = 1500 * (1024 * 1024)
 			controllerCPU = 0.5
-			controllerMem = 300 * (1024 * 1024)
+			controllerMem = 500 * (1024 * 1024)
 			schedulerCPU = 0.4
-			schedulerMem = 150 * (1024 * 1024)
+			schedulerMem = 180 * (1024 * 1024)
 		}
 	}
 
@@ -143,13 +141,8 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		MemoryConstraint: 100 * (1024 * 1024),
 	}
 	constraints["kube-proxy"] = framework.ResourceConstraint{
-		CPUConstraint: 0.15,
-		// When we are running purely density test, 30MB seems to be enough.
-		// However, we are usually running Density together with Load test.
-		// Thus, if Density is running after Load (which is creating and
-		// propagating a bunch of services), kubeproxy is using much more
-		// memory and not releasing it afterwards.
-		MemoryConstraint: 60 * (1024 * 1024),
+		CPUConstraint:    0.15,
+		MemoryConstraint: 100 * (1024 * 1024),
 	}
 	constraints["l7-lb-controller"] = framework.ResourceConstraint{
 		CPUConstraint:    0.15,
