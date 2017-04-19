@@ -960,19 +960,19 @@ func TestDeploymentComplete(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "complete",
+			name: "not complete #0",
 
 			d:        deployment(5, 5, 5, 4, 1, 0),
-			expected: true,
+			expected: false,
 		},
 		{
-			name: "not complete",
+			name: "not complete #1",
 
 			d:        deployment(5, 5, 5, 3, 1, 0),
 			expected: false,
 		},
 		{
-			name: "complete #2",
+			name: "complete #0",
 
 			d:        deployment(5, 5, 5, 5, 0, 0),
 			expected: true,
