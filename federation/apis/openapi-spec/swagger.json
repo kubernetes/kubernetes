@@ -10336,27 +10336,6 @@
      }
     }
    },
-   "io.k8s.kubernetes.pkg.api.v1.LocalStorageFsVolume": {
-    "description": "LocalStorageFsVolume represents a filesystem-based local volume",
-    "required": [
-     "path"
-    ],
-    "properties": {
-     "path": {
-      "description": "The full path to the volume on the node",
-      "type": "string"
-     }
-    }
-   },
-   "io.k8s.kubernetes.pkg.api.v1.LocalStorageVolumeSource": {
-    "description": "LocalStorage represents a local volume accessible only from one node In the PersistentVolume, the `kubernetes.io/hostname` label should be set with the node that this local volume is located at. LocalStorage PersistentVolumes also are required to be part of a StorageClass, and that StorageClass should set the AlphaStorageTopologyAnnotation = \"kubernetes.io/hostame\"",
-    "properties": {
-     "fsVolume": {
-      "description": "FsVolume represents a filesystem-based local volume",
-      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalStorageFsVolume"
-     }
-    }
-   },
    "io.k8s.kubernetes.pkg.api.v1.NFSVolumeSource": {
     "description": "Represents an NFS mount that lasts the lifetime of a pod. NFS volumes do not support ownership management or SELinux relabeling.",
     "required": [
@@ -11585,10 +11564,6 @@
      "iscsi": {
       "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ISCSIVolumeSource"
-     },
-     "localStorage": {
-      "description": "LocalStorage represents a local volume accessible only from one node This volume type cannot be used as a direct volume source and is only required here to support the volume plugin interface.",
-      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalStorageVolumeSource"
      },
      "name": {
       "description": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: http://kubernetes.io/docs/user-guide/identifiers#names",

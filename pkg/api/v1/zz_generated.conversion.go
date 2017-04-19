@@ -2163,6 +2163,7 @@ func Convert_api_LocalStorageFsVolume_To_v1_LocalStorageFsVolume(in *api.LocalSt
 }
 
 func autoConvert_v1_LocalStorageVolumeSource_To_api_LocalStorageVolumeSource(in *LocalStorageVolumeSource, out *api.LocalStorageVolumeSource, s conversion.Scope) error {
+	out.NodeName = in.NodeName
 	out.Fs = (*api.LocalStorageFsVolume)(unsafe.Pointer(in.Fs))
 	return nil
 }
@@ -2173,6 +2174,7 @@ func Convert_v1_LocalStorageVolumeSource_To_api_LocalStorageVolumeSource(in *Loc
 }
 
 func autoConvert_api_LocalStorageVolumeSource_To_v1_LocalStorageVolumeSource(in *api.LocalStorageVolumeSource, out *LocalStorageVolumeSource, s conversion.Scope) error {
+	out.NodeName = in.NodeName
 	out.Fs = (*LocalStorageFsVolume)(unsafe.Pointer(in.Fs))
 	return nil
 }
@@ -4992,7 +4994,6 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	out.Projected = (*api.ProjectedVolumeSource)(unsafe.Pointer(in.Projected))
 	out.PortworxVolume = (*api.PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	out.ScaleIO = (*api.ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
-	out.LocalStorage = (*api.LocalStorageVolumeSource)(unsafe.Pointer(in.LocalStorage))
 	return nil
 }
 
@@ -5028,7 +5029,6 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	out.Projected = (*ProjectedVolumeSource)(unsafe.Pointer(in.Projected))
 	out.PortworxVolume = (*PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	out.ScaleIO = (*ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
-	out.LocalStorage = (*LocalStorageVolumeSource)(unsafe.Pointer(in.LocalStorage))
 	return nil
 }
 

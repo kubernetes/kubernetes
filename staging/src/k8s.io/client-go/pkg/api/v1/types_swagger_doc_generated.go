@@ -793,6 +793,7 @@ func (LocalStorageFsVolume) SwaggerDoc() map[string]string {
 
 var map_LocalStorageVolumeSource = map[string]string{
 	"":         "LocalStorage represents a local volume accessible only from one node In the PersistentVolume, the `kubernetes.io/hostname` label should be set with the node that this local volume is located at. LocalStorage PersistentVolumes also are required to be part of a StorageClass, and that StorageClass should set the AlphaStorageTopologyAnnotation = \"kubernetes.io/hostame\"",
+	"nodeName": "NodeName represents the node that the volume is located at",
 	"fsVolume": "FsVolume represents a filesystem-based local volume",
 }
 
@@ -1972,7 +1973,6 @@ var map_VolumeSource = map[string]string{
 	"projected":            "Items for all in one resources secrets, configmaps, and downward API",
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
-	"localStorage":         "LocalStorage represents a local volume accessible only from one node This volume type cannot be used as a direct volume source and is only required here to support the volume plugin interface.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

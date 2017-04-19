@@ -2222,40 +2222,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
-<h3 id="_v1_localstoragevolumesource">v1.LocalStorageVolumeSource</h3>
-<div class="paragraph">
-<p>LocalStorage represents a local volume accessible only from one node In the PersistentVolume, the <code>kubernetes.io/hostname</code> label should be set with the node that this local volume is located at. LocalStorage PersistentVolumes also are required to be part of a StorageClass, and that StorageClass should set the AlphaStorageTopologyAnnotation = "kubernetes.io/hostame"</p>
-</div>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">fsVolume</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">FsVolume represents a filesystem-based local volume</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_localstoragefsvolume">v1.LocalStorageFsVolume</a></p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect2">
 <h3 id="_v1_objectmeta">v1.ObjectMeta</h3>
 <div class="paragraph">
 <p>ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.</p>
@@ -4074,40 +4040,6 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 
 </div>
 <div class="sect2">
-<h3 id="_v1_localstoragefsvolume">v1.LocalStorageFsVolume</h3>
-<div class="paragraph">
-<p>LocalStorageFsVolume represents a filesystem-based local volume</p>
-</div>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The full path to the volume on the node</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect2">
 <h3 id="_v1_vspherevirtualdiskvolumesource">v1.VsphereVirtualDiskVolumeSource</h3>
 <div class="paragraph">
 <p>Represents a vSphere volume resource.</p>
@@ -4502,13 +4434,6 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_scaleiovolumesource">v1.ScaleIOVolumeSource</a></p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">localStorage</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">LocalStorage represents a local volume accessible only from one node This volume type cannot be used as a direct volume source and is only required here to support the volume plugin interface.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_localstoragevolumesource">v1.LocalStorageVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -5608,7 +5533,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-04-18 21:36:18 UTC
+Last updated 2017-04-19 00:47:35 UTC
 </div>
 </div>
 </body>

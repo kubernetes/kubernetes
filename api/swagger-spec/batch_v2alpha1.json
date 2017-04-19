@@ -2542,10 +2542,6 @@
      "scaleIO": {
       "$ref": "v1.ScaleIOVolumeSource",
       "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
-     },
-     "localStorage": {
-      "$ref": "v1.LocalStorageVolumeSource",
-      "description": "LocalStorage represents a local volume accessible only from one node This volume type cannot be used as a direct volume source and is only required here to support the volume plugin interface."
      }
     }
    },
@@ -3386,29 +3382,6 @@
      "readOnly": {
       "type": "boolean",
       "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
-     }
-    }
-   },
-   "v1.LocalStorageVolumeSource": {
-    "id": "v1.LocalStorageVolumeSource",
-    "description": "LocalStorage represents a local volume accessible only from one node In the PersistentVolume, the `kubernetes.io/hostname` label should be set with the node that this local volume is located at. LocalStorage PersistentVolumes also are required to be part of a StorageClass, and that StorageClass should set the AlphaStorageTopologyAnnotation = \"kubernetes.io/hostame\"",
-    "properties": {
-     "fsVolume": {
-      "$ref": "v1.LocalStorageFsVolume",
-      "description": "FsVolume represents a filesystem-based local volume"
-     }
-    }
-   },
-   "v1.LocalStorageFsVolume": {
-    "id": "v1.LocalStorageFsVolume",
-    "description": "LocalStorageFsVolume represents a filesystem-based local volume",
-    "required": [
-     "path"
-    ],
-    "properties": {
-     "path": {
-      "type": "string",
-      "description": "The full path to the volume on the node"
      }
     }
    },

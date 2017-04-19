@@ -3506,13 +3506,6 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 				return err
 			}
 		}
-		if in.LocalStorage != nil {
-			in, out := &in.LocalStorage, &out.LocalStorage
-			*out = new(LocalStorageVolumeSource)
-			if err := DeepCopy_v1_LocalStorageVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		}
 		return nil
 	}
 }

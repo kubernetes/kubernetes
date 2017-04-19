@@ -1435,9 +1435,12 @@ message LocalStorageFsVolume {
 // LocalStorage PersistentVolumes also are required to be part of a StorageClass, and that
 // StorageClass should set the AlphaStorageTopologyAnnotation = "kubernetes.io/hostame"
 message LocalStorageVolumeSource {
+  // NodeName represents the node that the volume is located at
+  optional string nodeName = 1;
+
   // FsVolume represents a filesystem-based local volume
   // +optional
-  optional LocalStorageFsVolume fsVolume = 1;
+  optional LocalStorageFsVolume fsVolume = 2;
 }
 
 // Represents an NFS mount that lasts the lifetime of a pod.
@@ -3961,12 +3964,6 @@ message VolumeSource {
   // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
   // +optional
   optional ScaleIOVolumeSource scaleIO = 25;
-
-  // LocalStorage represents a local volume accessible only from one node
-  // This volume type cannot be used as a direct volume source and is only required here
-  // to support the volume plugin interface.
-  // +optional
-  optional LocalStorageVolumeSource localStorage = 27;
 }
 
 // Represents a vSphere volume resource.
