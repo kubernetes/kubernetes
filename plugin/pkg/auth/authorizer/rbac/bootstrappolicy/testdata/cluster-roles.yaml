@@ -460,6 +460,7 @@ items:
     resources:
     - endpoints
     - namespaces
+    - secrets
     - serviceaccounts
     verbs:
     - get
@@ -467,6 +468,7 @@ items:
     - ""
     resources:
     - endpoints
+    - secrets
     - serviceaccounts
     verbs:
     - update
