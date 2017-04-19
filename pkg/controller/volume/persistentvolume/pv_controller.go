@@ -1347,14 +1347,11 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	// Bind it to the claim
 	volume.Spec.ClaimRef = claimRef
 	volume.Status.Phase = v1.VolumeBound
+	volume.Spec.StorageClassName = claimClass
 
 	// Add annBoundByController (used in deleting the volume)
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annBoundByController, "yes")
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, plugin.GetPluginName())
-	// TODO: remove this check in 1.5, storage.StorageClassAnnotation will be always non-empty there.
-	if claimClass != "" {
-		volume.Spec.StorageClassName = claimClass
-	}
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
