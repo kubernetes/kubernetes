@@ -41,7 +41,7 @@ if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
   # If the master image is not set, we use the latest GCI image.
   # Otherwise, we respect whatever is set by the user.
   MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}
-  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
+  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 elif [[ "${MASTER_OS_DISTRIBUTION}" == "debian" ]]; then
   MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${CVM_VERSION}}
   MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
@@ -54,7 +54,7 @@ function set-node-image() {
     # If the node image is not set, we use the latest GCI image.
     # Otherwise, we respect whatever is set by the user.
     NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
-    NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
+    NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
   elif [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
     NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
     NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
