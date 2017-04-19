@@ -104,6 +104,10 @@ func (s *LogsSizeDataSummary) PrintJSON() string {
 	return PrettyPrintJSON(*s)
 }
 
+func (s *LogsSizeDataSummary) SummaryKind() string {
+	return "LogSizeSummary"
+}
+
 type LogsSizeData struct {
 	data LogSizeDataTimeseries
 	lock sync.Mutex
