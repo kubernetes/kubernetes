@@ -399,7 +399,6 @@ staging/src/k8s.io/kube-aggregator/pkg/controllers
 staging/src/k8s.io/sample-apiserver
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/install
 test/e2e/perftype
-test/e2e_federation/upgrades
 test/e2e_node/runner/local
 test/images/clusterapi-tester
 test/images/entrypoint-tester
