@@ -112,7 +112,7 @@ var _ = framework.KubeDescribe("Proxy", func() {
 			cfg := testutils.RCConfig{
 				Client:         f.ClientSet,
 				InternalClient: f.InternalClientset,
-				Image:          "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
+				Image:          "gcr.io/google_containers/porter:4524579c0eb935c056c8e75563b4e1eda31587e0",
 				Name:           service.Name,
 				Namespace:      f.Namespace.Name,
 				Replicas:       1,
