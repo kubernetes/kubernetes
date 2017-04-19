@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/golang/glog"
@@ -85,13 +87,78 @@ func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("address", "", "127.0.0.1", "The IP address on which to serve on.")
 	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
 	cmd.Flags().StringP("unix-socket", "u", "", "Unix socket on which to run the proxy.")
+	cmd.Flags().StringP("exec", "e", "", "Command to be executed with the proxy address. {} will be replaced by the proxy URL.")
 	return cmd
+}
+
+type executorInterface interface {
+	Exec(argv0 string, argv []string) error
+	LookPath(argv []string) (string, error)
+}
+
+type syscallExecutor struct {
+	out io.Writer
+}
+
+func (e *syscallExecutor) Exec(argv0 string, argv []string) error {
+	cmd := exec.Command(argv0, argv...)
+
+	pipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	go io.Copy(e.out, pipe)
+
+	if err := cmd.Wait(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (*syscallExecutor) LookPath(argv []string) (string, error) {
+	return exec.LookPath(argv[0])
+}
+
+type proxyExec struct {
+	executor executorInterface
+}
+
+func (p proxyExec) Run(execCommand, address string, port int) error {
+	r, err := regexp.Compile("{}")
+	if err != nil {
+		return err
+	}
+	execCommand = r.ReplaceAllString(execCommand, fmt.Sprintf("http://%s:%d", address, port))
+
+	argv := strings.Split(execCommand, " ")
+	argv0, err := p.executor.LookPath(argv)
+	if err != nil {
+		return err
+	}
+
+	if err := p.executor.Exec(argv0, argv); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	path := cmdutil.GetFlagString(cmd, "unix-socket")
 	port := cmdutil.GetFlagInt(cmd, "port")
 	address := cmdutil.GetFlagString(cmd, "address")
+
+	execCommand := cmdutil.GetFlagString(cmd, "exec")
+
+	if execCommand != "" && path != "" {
+		return errors.New("Don't specify both --exec and --path, --exec doesn't work with unix sockets.")
+	}
 
 	if port != default_port && path != "" {
 		return errors.New("Don't specify both --unix-socket and --port")
@@ -136,7 +203,15 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	fmt.Fprintf(out, "Starting to serve on %s", l.Addr().String())
-	glog.Fatal(server.ServeOnListener(l))
+
+	if execCommand == "" {
+		fmt.Fprintf(out, "Starting to serve on %s", l.Addr().String())
+		glog.Fatal(server.ServeOnListener(l))
+	} else {
+		go server.ServeOnListener(l)
+		p := proxyExec{executor: &syscallExecutor{out: out}}
+		return p.Run(execCommand, address, port)
+	}
+
 	return nil
 }
