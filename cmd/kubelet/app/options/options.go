@@ -309,6 +309,7 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&c.RemoteRuntimeEndpoint, "container-runtime-endpoint", c.RemoteRuntimeEndpoint, "[Experimental] The unix socket endpoint of remote runtime service. The endpoint is used only when CRI integration is enabled (--enable-cri)")
 	fs.StringVar(&c.RemoteImageEndpoint, "image-service-endpoint", c.RemoteImageEndpoint, "[Experimental] The unix socket endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. The endpoint is used only when CRI integration is enabled (--enable-cri)")
+	fs.BoolVar(&c.DockerEnableSharedPID, "experimental-docker-enable-shared-pid", c.DockerEnableSharedPID, "[Experimental] The Container Runtime Interface (CRI) will eventually default to using a shared PID namespace for containers in a pod. Setting this flag allows previewing this behavior when running with the CRI enabled and Docker version 1.13.1 or higher.")
 
 	fs.BoolVar(&c.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", c.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required componenets (binaries, etc.) before performing the mount")
 
