@@ -322,63 +322,8 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 	return loadBalancer, nil
 }
 
-// Makes sure that the health check for an ELB matches the configured listeners
-func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDescription, listeners []*elb.Listener) error {
-	name := aws.StringValue(loadBalancer.LoadBalancerName)
-
-	actual := loadBalancer.HealthCheck
-
-	// Default AWS settings
-	expectedHealthyThreshold := int64(2)
-	expectedUnhealthyThreshold := int64(6)
-	expectedTimeout := int64(5)
-	expectedInterval := int64(10)
-
-	// We only configure a TCP health-check on the first port
-	expectedTarget := ""
-	for _, listener := range listeners {
-		if listener.InstancePort == nil {
-			continue
-		}
-		expectedTarget = "TCP:" + strconv.FormatInt(*listener.InstancePort, 10)
-		break
-	}
-
-	if expectedTarget == "" {
-		return fmt.Errorf("unable to determine health check port for %q (no valid listeners)", name)
-	}
-
-	if expectedTarget == orEmpty(actual.Target) &&
-		expectedHealthyThreshold == orZero(actual.HealthyThreshold) &&
-		expectedUnhealthyThreshold == orZero(actual.UnhealthyThreshold) &&
-		expectedTimeout == orZero(actual.Timeout) &&
-		expectedInterval == orZero(actual.Interval) {
-		return nil
-	}
-
-	glog.V(2).Infof("Updating load-balancer health-check for %q", name)
-
-	healthCheck := &elb.HealthCheck{}
-	healthCheck.HealthyThreshold = &expectedHealthyThreshold
-	healthCheck.UnhealthyThreshold = &expectedUnhealthyThreshold
-	healthCheck.Timeout = &expectedTimeout
-	healthCheck.Interval = &expectedInterval
-	healthCheck.Target = &expectedTarget
-
-	request := &elb.ConfigureHealthCheckInput{}
-	request.HealthCheck = healthCheck
-	request.LoadBalancerName = loadBalancer.LoadBalancerName
-
-	_, err := c.elb.ConfigureHealthCheck(request)
-	if err != nil {
-		return fmt.Errorf("error configuring load-balancer health-check for %q: %v", name, err)
-	}
-
-	return nil
-}
-
 // Makes sure that the health check for an ELB matches the configured health check node port
-func (c *Cloud) ensureHttpHealthCheck(loadBalancer *elb.LoadBalancerDescription, path string, port int32) error {
+func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDescription, protocol string, port int32, path string) error {
 	name := aws.StringValue(loadBalancer.LoadBalancerName)
 
 	actual := loadBalancer.HealthCheck
@@ -389,7 +334,7 @@ func (c *Cloud) ensureHttpHealthCheck(loadBalancer *elb.LoadBalancerDescription,
 	expectedTimeout := int64(5)
 	expectedInterval := int64(10)
 
-	expectedTarget := "HTTP:" + strconv.FormatInt(int64(port), 10) + path
+	expectedTarget := protocol + ":" + strconv.FormatInt(int64(port), 10) + path
 
 	if expectedTarget == orEmpty(actual.Target) &&
 		expectedHealthyThreshold == orZero(actual.HealthyThreshold) &&
