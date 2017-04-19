@@ -33,6 +33,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
@@ -84,6 +85,12 @@ const (
 	apiserverAdvertiseAddressFlag = "api-server-advertise-address"
 
 	dnsProviderSecretName = "federation-dns-provider.conf"
+
+	apiServerSecurePortName = "https"
+	// Set the secure port to 8443 to avoid requiring root privileges
+	// to bind to port < 1000.  The apiserver's service will still
+	// expose on port 443.
+	apiServerSecurePort = 8443
 )
 
 var (
@@ -439,9 +446,10 @@ func createService(clientset client.Interface, namespace, svcName, federationNam
 			Selector: apiserverSvcSelector,
 			Ports: []api.ServicePort{
 				{
-					Name:     "https",
-					Protocol: "TCP",
-					Port:     443,
+					Name:       "https",
+					Protocol:   "TCP",
+					Port:       443,
+					TargetPort: intstr.FromString(apiServerSecurePortName),
 				},
 			},
 		},
@@ -661,7 +669,7 @@ func createAPIServer(clientset client.Interface, namespace, name, federationName
 	argsMap := map[string]string{
 		"--bind-address":         "0.0.0.0",
 		"--etcd-servers":         "http://localhost:2379",
-		"--secure-port":          "443",
+		"--secure-port":          fmt.Sprintf("%d", apiServerSecurePort),
 		"--client-ca-file":       "/etc/federation/apiserver/ca.crt",
 		"--tls-cert-file":        "/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file": "/etc/federation/apiserver/server.key",
@@ -704,8 +712,8 @@ func createAPIServer(clientset client.Interface, namespace, name, federationName
 							Command: command,
 							Ports: []api.ContainerPort{
 								{
-									Name:          "https",
-									ContainerPort: 443,
+									Name:          apiServerSecurePortName,
+									ContainerPort: apiServerSecurePort,
 								},
 								{
 									Name:          "local",
