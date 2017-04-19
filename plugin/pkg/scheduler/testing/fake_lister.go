@@ -166,3 +166,18 @@ func (f FakeStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.Stat
 	}
 	return
 }
+
+var _ NamespaceLister = &FakeNamespaceLister{}
+
+// FakeNamespaceLister implements NamespaceLister on an []v1.Namespace for test purposes.
+type FakeNamespaceLister []*v1.Namespace
+
+// List returns []*v1.Namespace matching a query.
+func (f FakeNamespaceLister) List(s labels.Selector) (selected []*v1.Namespace, err error) {
+	for _, ns := range f {
+		if s.Matches(labels.Set(ns.Labels)) {
+			selected = append(selected, ns)
+		}
+	}
+	return selected, nil
+}

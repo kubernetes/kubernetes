@@ -118,7 +118,10 @@ func newResourceInitPod(pod *v1.Pod, usage ...schedulercache.Resource) *v1.Pod {
 }
 
 func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) interface{} {
-	pm := PredicateMetadataFactory{schedulertesting.FakePodLister{p}}
+	pm := PredicateMetadataFactory{
+		podLister:       schedulertesting.FakePodLister{p},
+		namespaceLister: schedulertesting.FakeNamespaceLister{},
+	}
 	return pm.GetMetadata(p, nodeInfo)
 }
 
@@ -2573,8 +2576,9 @@ func TestInterPodAffinity(t *testing.T) {
 		}
 
 		fit := PodAffinityChecker{
-			info:      FakeNodeInfo(*node),
-			podLister: schedulertesting.FakePodLister(test.pods),
+			info:            FakeNodeInfo(*node),
+			podLister:       schedulertesting.FakePodLister(test.pods),
+			namespaceLister: schedulertesting.FakeNamespaceLister{},
 		}
 		nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 		nodeInfo.SetNode(test.node)
@@ -2974,8 +2978,9 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			}
 
 			testFit := PodAffinityChecker{
-				info:      nodeListInfo,
-				podLister: schedulertesting.FakePodLister(test.pods),
+				info:            nodeListInfo,
+				podLister:       schedulertesting.FakePodLister(test.pods),
+				namespaceLister: schedulertesting.FakeNamespaceLister{},
 			}
 			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(&node)
@@ -4500,8 +4505,9 @@ func TestInterPodAffinityAnnotations(t *testing.T) {
 		}
 
 		fit := PodAffinityChecker{
-			info:      FakeNodeInfo(*node),
-			podLister: schedulertesting.FakePodLister(test.pods),
+			info:            FakeNodeInfo(*node),
+			podLister:       schedulertesting.FakePodLister(test.pods),
+			namespaceLister: schedulertesting.FakeNamespaceLister{},
 		}
 		nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 		nodeInfo.SetNode(test.node)
@@ -4746,8 +4752,9 @@ func TestInterPodAffinityAnnotationsWithMultipleNodes(t *testing.T) {
 			}
 
 			testFit := PodAffinityChecker{
-				info:      nodeListInfo,
-				podLister: schedulertesting.FakePodLister(test.pods),
+				info:            nodeListInfo,
+				podLister:       schedulertesting.FakePodLister(test.pods),
+				namespaceLister: schedulertesting.FakeNamespaceLister{},
 			}
 			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(&node)

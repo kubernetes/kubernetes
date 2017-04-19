@@ -61,6 +61,7 @@ func TestCreate(t *testing.T) {
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
+		informerFactory.Core().V1().Namespaces(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
 	factory.Create()
@@ -91,6 +92,7 @@ func TestCreateFromConfig(t *testing.T) {
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
+		informerFactory.Core().V1().Namespaces(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
 
@@ -144,6 +146,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
+		informerFactory.Core().V1().Namespaces(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
 
@@ -199,6 +202,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
+		informerFactory.Core().V1().Namespaces(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
@@ -310,6 +314,7 @@ func TestResponsibleForPod(t *testing.T) {
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
+		informerFactory.Core().V1().Namespaces(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
 	// factory of "foo-scheduler"
@@ -323,6 +328,7 @@ func TestResponsibleForPod(t *testing.T) {
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
+		informerFactory.Core().V1().Namespaces(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
 	// scheduler annotations to be tested
@@ -391,6 +397,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
+		informerFactory.Core().V1().Namespaces(),
 		-1,
 	)
 	_, err := factory.Create()
@@ -435,6 +442,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 			informerFactory.Extensions().V1beta1().ReplicaSets(),
 			informerFactory.Apps().V1beta1().StatefulSets(),
 			informerFactory.Core().V1().Services(),
+			informerFactory.Core().V1().Namespaces(),
 			test.hardPodAffinitySymmetricWeight,
 		)
 		_, err := factory.Create()
