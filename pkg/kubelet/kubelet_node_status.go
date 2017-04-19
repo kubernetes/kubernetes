@@ -820,8 +820,8 @@ func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
 			Status: v1.ConditionUnknown,
 		}
 		// nodeOODCondition cannot be appended to node.Status.Conditions here because it gets
-		// copied to the slice. So if we append nodeOODCondition to the slice here none of the
-		// updates we make to nodeOODCondition below are reflected in the slice.
+		// copied (rather then a being written as a pointer) to the slice.  The copy would be
+		// inaccurate since we may mutate later.
 		newOODCondition = true
 	}
 
