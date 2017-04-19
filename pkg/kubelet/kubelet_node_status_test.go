@@ -863,11 +863,23 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 func TestUpdateNodeStatusError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
+	// Note that by default this is a fake clock.
 	kubelet := testKubelet.kubelet
 	// No matching node for the kubelet
 	testKubelet.fakeKubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{}}).ReactionChain
+
+	// Now start a timer on the fake clock and wait for it to trip.
+	start := testKubelet.fakeClock.Now()
+
 	assert.Error(t, kubelet.updateNodeStatus())
-	assert.Len(t, testKubelet.fakeKubeClient.Actions(), nodeStatusUpdateRetry)
+	fmt.Println("time so far:", testKubelet.fakeClock.Since(start))
+
+	retriedOverTime := kubelet.clock.Since(start).Minutes() > 15
+	stoppedSoonEnough := kubelet.clock.Since(start).Minutes() < 21
+
+	assert.Len(t, testKubelet.fakeKubeClient.Actions(), 10, "retries are logartihmic WRT to the max time.")
+	assert.True(t, retriedOverTime, "retried until %v minutes", nodeStatusUpdateRetryMaximumTime.Minutes())
+	assert.True(t, stoppedSoonEnough, "stopped before %v minutes", nodeStatusUpdateRetryMaximumTime.Minutes())
 }
 
 func TestRegisterWithApiServer(t *testing.T) {

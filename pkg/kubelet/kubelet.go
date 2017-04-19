@@ -110,8 +110,8 @@ const (
 	// Max amount of time to wait for the container runtime to come up.
 	maxWaitForContainerRuntime = 30 * time.Second
 
-	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
-	nodeStatusUpdateRetry = 5
+	// nodeStatusUpdateRetryBackoff is the amount of time that we are willing to spend retrying to connect to the apiserver.
+	nodeStatusUpdateRetryMaximumTime = 20 * time.Minute
 
 	// Location of container logs.
 	ContainerLogsDir = "/var/log/containers"
@@ -1124,7 +1124,8 @@ type Kubelet struct {
 
 	// dockerLegacyService contains some legacy methods for backward compatibility.
 	// It should be set only when docker is using non json-file logging driver.
-	dockerLegacyService dockershim.DockerLegacyService
+	dockerLegacyService    dockershim.DockerLegacyService
+	backoffNotifierRunning bool
 }
 
 // setupDataDirs creates:
