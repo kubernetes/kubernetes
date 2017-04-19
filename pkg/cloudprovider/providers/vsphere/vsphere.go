@@ -262,6 +262,10 @@ func getVMName(client *govmomi.Client, cfg *VSphereConfig) (string, error) {
 		return "", err
 	}
 
+	if svm == nil {
+		return "", fmt.Errorf("unable to find machine reference by UUID")
+	}
+
 	var vm mo.VirtualMachine
 	err = s.Properties(ctx, svm.Reference(), []string{"name"}, &vm)
 	if err != nil {
