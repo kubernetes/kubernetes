@@ -295,15 +295,21 @@ func (o byJobStartTime) Less(i, j int) bool {
 // objects.
 func adoptJobs(sj *batchv2alpha1.CronJob, js []batchv1.Job, jc jobControlInterface) error {
 	var errs []error
-	sjControllerRef := *newControllerRef(sj)
+	controllerRef := newControllerRef(sj)
+	controllerRefJSON, err := json.Marshal(controllerRef)
+	if err != nil {
+		return fmt.Errorf("can't adopt Jobs: failed to marshal ControllerRef %#v: %v", controllerRef, err)
+	}
+
 	for i := range js {
 		job := &js[i]
 		controllerRef := controller.GetControllerOf(job)
 		if controllerRef != nil {
 			continue
 		}
-		job.OwnerReferences = append(job.OwnerReferences, sjControllerRef)
-		updatedJob, err := jc.UpdateJob(job.Namespace, job)
+		controllerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[%s],"uid":"%s"}}`,
+			controllerRefJSON, job.UID)
+		updatedJob, err := jc.PatchJob(job.Namespace, job.Name, types.StrategicMergePatchType, []byte(controllerRefPatch))
 		if err != nil {
 			// If there's a ResourceVersion or other error, don't bother retrying.
 			// We will just try again on a subsequent CronJob sync.
