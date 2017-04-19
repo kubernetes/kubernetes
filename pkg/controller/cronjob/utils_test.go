@@ -17,6 +17,8 @@ limitations under the License.
 package cronjob
 
 import (
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -371,26 +373,31 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 
 func TestAdoptJobs(t *testing.T) {
 	sj := cronJob()
+	controllerRef := newControllerRef(&sj)
 	jc := &fakeJobControl{}
 	jobs := []batchv1.Job{newJob("uid0"), newJob("uid1")}
 	jobs[0].OwnerReferences = nil
 	jobs[0].Name = "job0"
-	jobs[1].OwnerReferences = []metav1.OwnerReference{*newControllerRef(&sj)}
+	jobs[1].OwnerReferences = []metav1.OwnerReference{*controllerRef}
 	jobs[1].Name = "job1"
 
 	if err := adoptJobs(&sj, jobs, jc); err != nil {
 		t.Errorf("adoptJobs() error: %v", err)
 	}
-	for i := range jobs {
-		controllerRef := controller.GetControllerOf(&jobs[i])
-		if controllerRef == nil {
-			t.Errorf("Job should have ControllerRef: %#v", jobs[i])
-		}
+	if got, want := len(jc.PatchJobName), 1; got != want {
+		t.Fatalf("len(PatchJobName) = %v, want %v", got, want)
 	}
-	if got, want := len(jc.UpdateJobName), 1; got != want {
-		t.Errorf("len(UpdateJobName) = %v, want %v", got, want)
+	if got, want := jc.PatchJobName[0], "job0"; got != want {
+		t.Errorf("PatchJobName = %v, want %v", got, want)
 	}
-	if got, want := jc.UpdateJobName[0], "job0"; got != want {
-		t.Errorf("UpdateJobName = %v, want %v", got, want)
+	if got, want := len(jc.Patches), 1; got != want {
+		t.Fatalf("len(Patches) = %v, want %v", got, want)
+	}
+	patch := &batchv1.Job{}
+	if err := json.Unmarshal(jc.Patches[0], patch); err != nil {
+		t.Fatalf("Unmarshal error: %v", err)
+	}
+	if got, want := controller.GetControllerOf(patch), controllerRef; !reflect.DeepEqual(got, want) {
+		t.Errorf("ControllerRef = %#v, want %#v", got, want)
 	}
 }

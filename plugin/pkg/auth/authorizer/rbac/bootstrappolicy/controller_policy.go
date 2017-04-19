@@ -72,7 +72,7 @@ func init() {
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "cronjob-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch", "update").Groups(batchGroup).Resources("cronjobs").RuleOrDie(),
-			rbac.NewRule("get", "list", "watch", "create", "update", "delete").Groups(batchGroup).Resources("jobs").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch", "create", "update", "delete", "patch").Groups(batchGroup).Resources("jobs").RuleOrDie(),
 			rbac.NewRule("update").Groups(batchGroup).Resources("cronjobs/status").RuleOrDie(),
 			rbac.NewRule("list", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
