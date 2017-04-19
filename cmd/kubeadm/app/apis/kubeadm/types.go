@@ -55,7 +55,14 @@ type MasterConfiguration struct {
 	APIServerCertSANs []string
 	// CertificatesDir specifies where to store or look for all required certificates
 	CertificatesDir string
+
+	MasterCertificates *MasterCertificates
+	// Public Addr or DNS
+	PublicAddress string
+	//Masters Count
+	Count int
 }
+
 
 type API struct {
 	// AdvertiseAddress sets the address for the API server to advertise.
@@ -83,6 +90,8 @@ type Etcd struct {
 	KeyFile   string
 	DataDir   string
 	ExtraArgs map[string]string
+	//Discovery URL for etcd cluster
+	Discovery string
 }
 
 type NodeConfiguration struct {
@@ -95,4 +104,21 @@ type NodeConfiguration struct {
 	DiscoveryTokenAPIServers []string
 	TLSBootstrapToken        string
 	Token                    string
+}
+
+type MasterCertificates struct {
+	CAKeyPem         string
+	CACertPem        string
+	APIServerKeyPem  string
+	APIServerCertPem string
+	SAKeyPem         string
+	FrontProxyKeyPem  string
+	FrontProxyCertPem string
+
+	ClientConf       map[string]ClientKeyCert
+	Password         string
+}
+type ClientKeyCert struct {
+	Key  string
+	Cert string
 }
