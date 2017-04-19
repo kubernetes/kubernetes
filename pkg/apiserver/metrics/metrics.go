@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"net"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -57,6 +58,7 @@ var (
 		},
 		[]string{"verb", "resource"},
 	)
+	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 )
 
 // Register all metrics.
@@ -99,8 +101,14 @@ func InstrumentRouteFunc(verb, resource string, routeFunc restful.RouteFunction)
 		response.ResponseWriter = rw
 
 		routeFunc(request, response)
-		Monitor(&verb, &resource, utilnet.GetHTTPClient(request.Request), rw.Header().Get("Content-Type"), delegate.status, now)
+		Monitor(&verb, &resource, cleanUserAgent(utilnet.GetHTTPClient(request.Request)), rw.Header().Get("Content-Type"), delegate.status, now)
 	})
+}
+
+func cleanUserAgent(ua string) string {
+	// If an old "kubectl.exe" has passed us its full path, we discard the path portion.
+	ua = kubectlExeRegexp.ReplaceAllString(ua, "$1")
+	return ua
 }
 
 type responseWriterDelegator struct {
