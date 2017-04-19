@@ -70,6 +70,10 @@ func (s *ResourceUsageSummary) PrintJSON() string {
 	return PrettyPrintJSON(*s)
 }
 
+func (s *ResourceUsageSummary) SummaryKind() string {
+	return "ResourceUsageSummary"
+}
+
 func computePercentiles(timeSeries []ResourceUsagePerContainer, percentilesToCompute []int) map[int]ResourceUsagePerContainer {
 	if len(timeSeries) == 0 {
 		return make(map[int]ResourceUsagePerContainer)

@@ -105,6 +105,10 @@ func (m *MetricsForE2E) PrintJSON() string {
 	return PrettyPrintJSON(*m)
 }
 
+func (m *MetricsForE2E) SummaryKind() string {
+	return "MetricsForE2E"
+}
+
 var InterestingApiServerMetrics = []string{
 	"apiserver_request_count",
 	"apiserver_request_latencies_summary",
