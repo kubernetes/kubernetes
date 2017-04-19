@@ -49,7 +49,7 @@ go_test(
         "//pkg/kubelet/types:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/metrics:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
     ],
 )
 
