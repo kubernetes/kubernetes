@@ -333,9 +333,13 @@ func markPodsReady(store cache.Store) {
 	// mark pods as ready
 	for _, obj := range store.List() {
 		pod := obj.(*v1.Pod)
-		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-		podutil.UpdatePodCondition(&pod.Status, &condition)
+		markPodReady(pod)
 	}
+}
+
+func markPodReady(pod *v1.Pod) {
+	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
+	podutil.UpdatePodCondition(&pod.Status, &condition)
 }
 
 // DaemonSets without node selectors should launch pods on every node.
@@ -1263,6 +1267,12 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 		newPod("non-matching-owned-0-", "node-0", simpleDaemonSetLabel2, ds),
 		newPod("non-matching-orphan-1-", "node-1", simpleDaemonSetLabel2, nil),
 		newPod("matching-owned-by-other-0-", "node-0", simpleDaemonSetLabel, ds2),
+		func() *v1.Pod {
+			pod := newPod("matching-owned-2-but-set-for-deletion", "node-2", simpleDaemonSetLabel, ds)
+			now := metav1.Now()
+			pod.DeletionTimestamp = &now
+			return pod
+		}(),
 	}
 	for _, pod := range ignoredPods {
 		manager.podStore.Add(pod)

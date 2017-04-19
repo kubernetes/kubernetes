@@ -787,7 +787,6 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			})
 
 			// Rc
-			output := framework.RunKubectlOrDie("describe", "rc", "redis-master", nsFlag)
 			requiredStrings := [][]string{
 				{"Name:", "redis-master"},
 				{"Namespace:", ns},
@@ -800,10 +799,10 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				{"Pod Template:"},
 				{"Image:", redisImage},
 				{"Events:"}}
-			checkOutput(output, requiredStrings)
+			checkKubectlOutputWithRetry(requiredStrings, "describe", "rc", "redis-master", nsFlag)
 
 			// Service
-			output = framework.RunKubectlOrDie("describe", "service", "redis-master", nsFlag)
+			output := framework.RunKubectlOrDie("describe", "service", "redis-master", nsFlag)
 			requiredStrings = [][]string{
 				{"Name:", "redis-master"},
 				{"Namespace:", ns},
@@ -1630,7 +1629,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 })
 
 // Checks whether the output split by line contains the required elements.
-func checkOutput(output string, required [][]string) {
+func checkOutputReturnError(output string, required [][]string) error {
 	outputLines := strings.Split(output, "\n")
 	currentLine := 0
 	for _, requirement := range required {
@@ -1638,14 +1637,40 @@ func checkOutput(output string, required [][]string) {
 			currentLine++
 		}
 		if currentLine == len(outputLines) {
-			framework.Failf("Failed to find %s in %s", requirement[0], output)
+			return fmt.Errorf("failed to find %s in %s", requirement[0], output)
 		}
 		for _, item := range requirement[1:] {
 			if !strings.Contains(outputLines[currentLine], item) {
-				framework.Failf("Failed to find %s in %s", item, outputLines[currentLine])
+				return fmt.Errorf("failed to find %s in %s", item, outputLines[currentLine])
 			}
 		}
 	}
+	return nil
+}
+
+func checkOutput(output string, required [][]string) {
+	err := checkOutputReturnError(output, required)
+	if err != nil {
+		framework.Failf("%v", err)
+	}
+}
+
+func checkKubectlOutputWithRetry(required [][]string, args ...string) {
+	var pollErr error
+	wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+		output := framework.RunKubectlOrDie(args...)
+		err := checkOutputReturnError(output, required)
+		if err != nil {
+			pollErr = err
+			return false, nil
+		}
+		pollErr = nil
+		return true, nil
+	})
+	if pollErr != nil {
+		framework.Failf("%v", pollErr)
+	}
+	return
 }
 
 func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {

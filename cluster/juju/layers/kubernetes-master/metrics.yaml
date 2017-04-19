@@ -1,0 +1,34 @@
+metrics:
+  juju-units: {}
+  pods:
+    type: gauge
+    description: number of pods
+    command: /snap/bin/kubectl get po --all-namespaces | tail -n+2 | wc -l
+  services:
+    type: gauge
+    description: number of services
+    command: /snap/bin/kubectl get svc --all-namespaces | tail -n+2 | wc -l
+  replicasets:
+    type: gauge
+    description: number of replicasets
+    command: /snap/bin/kubectl get rs --all-namespaces | tail -n+2 | wc -l
+  replicationcontrollers:
+    type: gauge
+    description: number of replicationcontrollers
+    command: /snap/bin/kubectl get rc --all-namespaces | tail -n+2 | wc -l
+  nodes:
+    type: gauge
+    description: number of kubernetes nodes
+    command: /snap/bin/kubectl get nodes | tail -n+2 | wc -l
+  persistentvolume:
+    type: gauge
+    description: number of pv
+    command: /snap/bin/kubectl get pv --all-namespaces | tail -n+2 | wc -l
+  persistentvolumeclaims:
+    type: gauge
+    description: number of claims
+    command: /snap/bin/kubectl get pvc --all-namespaces | tail -n+2 | wc -l
+  serviceaccounts:
+    type: gauge
+    description: number of sa
+    command: /snap/bin/kubectl get sa --all-namespaces | tail -n+2 | wc -l

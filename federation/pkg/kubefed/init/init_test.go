@@ -276,13 +276,13 @@ func TestInitFederation(t *testing.T) {
 			// Actual data passed are tested in the fake secret and cluster
 			// REST clients.
 			endpoint := getEndpoint(tc.apiserverServiceType, tc.lbIP, tc.advertiseAddress)
-			want := fmt.Sprintf("Federation API server is running at: %s\n", endpoint)
+			wantedSuffix := fmt.Sprintf("Federation API server is running at: %s\n", endpoint)
 			if tc.dryRun != "" {
-				want = fmt.Sprintf("Federation control plane runs (dry run)\n")
+				wantedSuffix = fmt.Sprintf("Federation control plane runs (dry run)\n")
 			}
 
-			if got := buf.String(); got != want {
-				t.Errorf("[%d] unexpected output: got: %s, want: %s", i, got, want)
+			if got := buf.String(); !strings.HasSuffix(got, wantedSuffix) {
+				t.Errorf("[%d] unexpected output: got: %s, wanted suffix: %s", i, got, wantedSuffix)
 				if cmdErrMsg != "" {
 					t.Errorf("[%d] unexpected error message: %s", i, cmdErrMsg)
 				}
