@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -38,18 +39,32 @@ const (
 	SignalImageFsInodesFree Signal = "imagefs.inodesFree"
 	// SignalAllocatableMemoryAvailable is amount of memory available for pod allocation (i.e. allocatable - workingSet (of pods), in bytes.
 	SignalAllocatableMemoryAvailable Signal = "allocatableMemory.available"
-	// SignalAllocatableRootFsAvailable
+	// SignalAllocatableStorageRootFsAvailable
 	SignalAllocatableStorageOverlayAvailable Signal = "allocatableStorageOverlay.available"
 	// SignalAllocatableStorageScratchAvailable
 	SignalAllocatableStorageScratchAvailable Signal = "allocatableStorageScratch.available"
+	// SignalAllocatableStorageAvailable
+	SignalAllocatableStorageAvailable Signal = "allocatableStorage.available"
+	//
+	SignalContainerStorageLogs    = "pod_%v_container_%v_StorageLogs.used"
+	SignalContainerStorageOverlay = "pod_%v_container_%v_StorageOverlay.used"
 )
+
+func GetSignalContainerStorageOverlay(podUID, containerName string) Signal {
+	return Signal(fmt.Sprintf(SignalContainerStorageOverlay, podUID, containerName))
+}
+
+func GetSignalContainerStorageLogs(podUID, containerName string) Signal {
+	return Signal(fmt.Sprintf(SignalContainerStorageLogs, podUID, containerName))
+}
 
 // ThresholdOperator is the operator used to express a Threshold.
 type ThresholdOperator string
 
 const (
 	// OpLessThan is the operator that expresses a less than operator.
-	OpLessThan ThresholdOperator = "LessThan"
+	OpLessThan    ThresholdOperator = "LessThan"
+	OpGreaterThan ThresholdOperator = "GreaterThan"
 )
 
 // ThresholdValue is a value holder that abstracts literal versus percentage based quantity

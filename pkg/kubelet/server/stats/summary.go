@@ -212,7 +212,6 @@ func (sb *summaryBuilder) containerInfoV2FsStats(
 		Inodes:         sb.imageFsInfo.Inodes,
 	}
 	cfs := lcs.Filesystem
-
 	if cfs != nil {
 		if cfs.BaseUsageBytes != nil {
 			rootfsUsage := *cfs.BaseUsageBytes

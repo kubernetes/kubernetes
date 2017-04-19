@@ -183,6 +183,7 @@ func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*C
 	for _, pod := range pods {
 		podMemoryRequest := int64(0)
 		qosClass := qos.GetPodQOS(pod)
+
 		if qosClass == v1.PodQOSBestEffort {
 			// limits are not set for Best Effort pods
 			continue

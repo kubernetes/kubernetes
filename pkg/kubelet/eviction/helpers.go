@@ -54,6 +54,8 @@ const (
 	resourceNodeFs v1.ResourceName = "nodefs"
 	// nodefs inodes, number.  internal to this module, used to account for local node root filesystem inodes.
 	resourceNodeFsInodes v1.ResourceName = "nodefsInodes"
+	resourceOverlay      v1.ResourceName = "overlay"
+	resourceScratch      v1.ResourceName = "scratch"
 )
 
 var (
@@ -141,6 +143,48 @@ func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft
 		}
 	}
 	return results, nil
+}
+
+func getStorageLimitThreshold(pods []*v1.Pod) []evictionapi.Threshold {
+	results := []evictionapi.Threshold{}
+	for _, pod := range pods {
+		for _, container := range pod.Spec.Containers {
+			logsLimit := container.Resources.Limits.StorageLogs()
+			if logsLimit == nil || logsLimit.Value() == 0 {
+				continue
+			}
+
+			logsThreshold := evictionapi.Threshold{
+				Signal:   evictionapi.GetSignalContainerStorageLogs(string(pod.UID), container.Name),
+				Operator: evictionapi.OpGreaterThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: logsLimit,
+				},
+				MinReclaim: &evictionapi.ThresholdValue{
+					Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+				},
+			}
+			results = append(results, logsThreshold)
+
+			overlayLimit := container.Resources.Limits.StorageOverlay()
+			if overlayLimit == nil || overlayLimit.Value() == 0 {
+				continue
+			}
+			overlayThreshold := evictionapi.Threshold{
+				Signal:   evictionapi.GetSignalContainerStorageOverlay(string(pod.UID), container.Name),
+				Operator: evictionapi.OpGreaterThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: overlayLimit,
+				},
+				MinReclaim: &evictionapi.ThresholdValue{
+					Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+				},
+			}
+			results = append(results, overlayThreshold)
+		}
+	}
+	return results
+
 }
 
 // parseThresholdStatements parses the input statements into a list of Threshold objects.
@@ -405,13 +449,17 @@ func localVolumeNames(pod *v1.Pod) []string {
 // podDiskUsage aggregates pod disk usage and inode consumption for the specified stats to measure.
 func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
 	disk := resource.Quantity{Format: resource.BinarySI}
+	overlay := resource.Quantity{Format: resource.BinarySI}
+	scratch := resource.Quantity{Format: resource.BinarySI}
 	inodes := resource.Quantity{Format: resource.BinarySI}
 	for _, container := range podStats.Containers {
 		if hasFsStatsType(statsToMeasure, fsStatsRoot) {
+			overlay.Add(*diskUsage(container.Rootfs))
 			disk.Add(*diskUsage(container.Rootfs))
 			inodes.Add(*inodeUsage(container.Rootfs))
 		}
 		if hasFsStatsType(statsToMeasure, fsStatsLogs) {
+			scratch.Add(*diskUsage(container.Logs))
 			disk.Add(*diskUsage(container.Logs))
 			inodes.Add(*inodeUsage(container.Logs))
 		}
@@ -429,8 +477,10 @@ func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsSt
 		}
 	}
 	return v1.ResourceList{
-		resourceDisk:   disk,
-		resourceInodes: inodes,
+		resourceDisk:    disk,
+		resourceInodes:  inodes,
+		resourceOverlay: overlay,
+		resourceScratch: scratch,
 	}, nil
 }
 
@@ -661,7 +711,7 @@ func (a byEvictionPriority) Less(i, j int) bool {
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
-func makeSignalObservations(summaryProvider stats.SummaryProvider, nodeProvider NodeProvider) (signalObservations, statsFunc, error) {
+func makeSignalObservations(summaryProvider stats.SummaryProvider, nodeProvider NodeProvider, pods []*v1.Pod, withImageFs bool) (signalObservations, statsFunc, error) {
 	summary, err := summaryProvider.Get()
 	if err != nil {
 		return nil, nil, err
@@ -730,6 +780,64 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, nodeProvider 
 			capacity:  memoryAllocatableCapacity.Copy(),
 		}
 	}
+
+	var storageOverlayAllocatableCapacity resource.Quantity
+	var storageScratchAllocatable, storageOverlayAllocatable *resource.Quantity
+	storageScratchAllocatableCapacity, ok := node.Status.Allocatable[v1.ResourceStorageScratch]
+
+	if ok {
+		storageScratchAllocatable = storageScratchAllocatableCapacity.Copy()
+	}
+
+	if withImageFs {
+		if storageOverlayAllocatableCapacity, ok := node.Status.Allocatable[v1.ResourceStorageOverlay]; ok {
+			storageOverlayAllocatable = storageOverlayAllocatableCapacity.Copy()
+		} else {
+			//return result, statsFunc, nil
+		}
+	}
+	for _, pod := range pods {
+		podStat, ok := statsFunc(pod)
+		if !ok {
+			continue
+		}
+		usage, err := podDiskUsage(podStat, pod, []fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource, fsStatsRoot})
+		if err != nil {
+			glog.Warningf("eviction manager: error getting pod disk usage %v", err)
+			continue
+		}
+		if withImageFs {
+			diskUsage := usage[resourceDisk]
+			diskUsagep := &diskUsage
+			diskUsagep.Sub(usage[resourceOverlay])
+			if storageScratchAllocatable != nil {
+				storageScratchAllocatable.Sub(*diskUsagep)
+			}
+			if storageOverlayAllocatable != nil {
+				storageOverlayAllocatable.Sub(usage[resourceOverlay])
+			}
+		} else {
+			if storageScratchAllocatable != nil {
+				storageScratchAllocatable.Sub(usage[resourceDisk])
+			}
+		}
+
+	}
+	if withImageFs {
+		if storageOverlayAllocatable != nil {
+			result[evictionapi.SignalAllocatableStorageOverlayAvailable] = signalObservation{
+				available: storageOverlayAllocatable,
+				capacity:  storageOverlayAllocatableCapacity.Copy(),
+			}
+		}
+	}
+	if storageScratchAllocatable != nil {
+		result[evictionapi.SignalAllocatableStorageScratchAvailable] = signalObservation{
+			available: storageScratchAllocatable,
+			capacity:  storageScratchAllocatableCapacity.Copy(),
+		}
+	}
+
 	return result, statsFunc, nil
 }
 
@@ -754,7 +862,10 @@ func thresholdsMet(thresholds []evictionapi.Threshold, observations signalObserv
 		switch threshold.Operator {
 		case evictionapi.OpLessThan:
 			thresholdMet = thresholdResult > 0
+		case evictionapi.OpGreaterThan:
+			thresholdMet = thresholdResult < 0
 		}
+
 		if thresholdMet {
 			results = append(results, threshold)
 		}

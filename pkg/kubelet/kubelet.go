@@ -129,7 +129,7 @@ const (
 
 	// Period for performing eviction monitoring.
 	// TODO ensure this is in sync with internal cadvisor housekeeping.
-	evictionMonitoringPeriod = time.Second * 10
+	evictionMonitoringPeriod = time.Second * 3
 
 	// The path in containers' filesystems where the hosts file is mounted.
 	etcHostsPath = "/etc/hosts"

@@ -541,7 +541,7 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 				if gpu := rQuantity.Value(); gpu > result.NvidiaGPU {
 					result.NvidiaGPU = gpu
 				}
-			case v1.ResourceStorageLogs:
+			case v1.ResourceStorageScratch:
 				if scratch := rQuantity.Value(); scratch > result.StorageScratch {
 					result.StorageScratch = scratch
 				}

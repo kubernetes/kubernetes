@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
@@ -173,6 +174,25 @@ func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
 func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList {
 	evictionReservation := hardEvictionReservation(cm.HardEvictionThresholds, cm.capacity)
 	result := make(v1.ResourceList)
+	if rootfs, err := cm.cadvisorInterface.RootFsInfo(); err == nil {
+		for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
+			cm.capacity[rName] = rCap
+		}
+	} else {
+		glog.Warning("Error getting rootfs info: %v", err)
+		//return nil, err
+	}
+
+	imagesfs, err := cm.cadvisorInterface.ImagesFsInfo()
+	if err != nil {
+		glog.Warning("Error getting image fs: %v", err)
+		//return nil, err
+	} else {
+		for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(imagesfs) {
+			cm.capacity[rName] = rCap
+		}
+	}
+
 	for k := range cm.capacity {
 		value := resource.NewQuantity(0, resource.DecimalSI)
 		if cm.NodeConfig.SystemReserved != nil {

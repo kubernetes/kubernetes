@@ -529,19 +529,21 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 
 	rootfs, err := kl.RootFsInfo()
 	if err != nil {
-		node.Status.Capacity[v1.ResourceStorageOverlay] = resource.MustParse("0Gi")
+		node.Status.Capacity[v1.ResourceStorageScratch] = resource.MustParse("0Gi")
 	} else {
-		for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(rootfs) {
+		for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
 			node.Status.Capacity[rName] = rCap
 		}
 	}
 
-	imagesfs, err := kl.ImagesFsInfo()
-	if err != nil {
-		node.Status.Capacity[v1.ResourceStorageOverlay] = resource.MustParse("0Gi")
-	} else {
-		for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(imagesfs) {
-			node.Status.Capacity[rName] = rCap
+	if hasDedicatedImageFs, err := kl.HasDedicatedImageFs(); err != nil && hasDedicatedImageFs {
+		imagesfs, err := kl.ImagesFsInfo()
+		if err != nil {
+			node.Status.Capacity[v1.ResourceStorageOverlay] = resource.MustParse("0Gi")
+		} else {
+			for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(imagesfs) {
+				node.Status.Capacity[rName] = rCap
+			}
 		}
 	}
 

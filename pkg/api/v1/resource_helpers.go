@@ -44,6 +44,20 @@ func (self *ResourceList) Memory() *resource.Quantity {
 	return &resource.Quantity{Format: resource.BinarySI}
 }
 
+func (self *ResourceList) StorageLogs() *resource.Quantity {
+	if val, ok := (*self)[ResourceStorageLogs]; ok {
+		return &val
+	}
+	return &resource.Quantity{Format: resource.BinarySI}
+}
+
+func (self *ResourceList) StorageOverlay() *resource.Quantity {
+	if val, ok := (*self)[ResourceStorageOverlay]; ok {
+		return &val
+	}
+	return &resource.Quantity{Format: resource.BinarySI}
+}
+
 func (self *ResourceList) Pods() *resource.Quantity {
 	if val, ok := (*self)[ResourcePods]; ok {
 		return &val

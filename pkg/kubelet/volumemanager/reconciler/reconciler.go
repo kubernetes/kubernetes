@@ -525,7 +525,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		volumepkg.VolumeOptions{})
 	if newMounterErr != nil {
 		return nil, fmt.Errorf(
-			"MountVolume.NewMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+			"reconstructVolume MountVolume.NewMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
 			uniqueVolumeName,
 			volumeSpec.Name(),
 			volume.podName,
@@ -659,6 +659,6 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 
 		}
 	}
-	glog.V(10).Infof("Get volumes from pod directory %q %+v", podDir, volumes)
+	glog.V(1).Infof("Get volumes from pod directory %q %+v", podDir, volumes)
 	return volumes, nil
 }
