@@ -139,11 +139,10 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 
 func TestDaemonSetStatusViewerStatus(t *testing.T) {
 	tests := []struct {
-		generation     int64
-		maxUnavailable *intstrutil.IntOrString
-		status         extensions.DaemonSetStatus
-		msg            string
-		done           bool
+		generation int64
+		status     extensions.DaemonSetStatus
+		msg        string
+		done       bool
 	}{
 		{
 			generation: 0,
@@ -158,8 +157,7 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 			done: false,
 		},
 		{
-			generation:     1,
-			maxUnavailable: intOrStringP(0),
+			generation: 1,
 			status: extensions.DaemonSetStatus{
 				ObservedGeneration:     1,
 				UpdatedNumberScheduled: 2,
@@ -167,7 +165,7 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 				NumberAvailable:        1,
 			},
 
-			msg:  "Waiting for rollout to finish: 1 of 2 updated pods are available (minimum required: 2)...\n",
+			msg:  "Waiting for rollout to finish: 1 of 2 updated pods are available...\n",
 			done: false,
 		},
 		{
@@ -194,19 +192,6 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 			msg:  "Waiting for daemon set spec update to be observed...\n",
 			done: false,
 		},
-		{
-			generation:     1,
-			maxUnavailable: intOrStringP(1),
-			status: extensions.DaemonSetStatus{
-				ObservedGeneration:     1,
-				UpdatedNumberScheduled: 2,
-				DesiredNumberScheduled: 2,
-				NumberAvailable:        1,
-			},
-
-			msg:  "daemon set \"foo\" successfully rolled out\n",
-			done: true,
-		},
 	}
 
 	for i := range tests {
@@ -221,14 +206,10 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 			},
 			Spec: extensions.DaemonSetSpec{
 				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type:          extensions.RollingUpdateDaemonSetStrategyType,
-					RollingUpdate: &extensions.RollingUpdateDaemonSet{},
+					Type: extensions.RollingUpdateDaemonSetStrategyType,
 				},
 			},
 			Status: test.status,
-		}
-		if test.maxUnavailable != nil {
-			d.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = *test.maxUnavailable
 		}
 		client := fake.NewSimpleClientset(d).Extensions()
 		dsv := &DaemonSetStatusViewer{c: client}
