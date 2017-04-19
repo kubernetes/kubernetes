@@ -147,7 +147,7 @@ var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPat
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler, dockershimRootDir string) (DockerService, error) {
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler, dockershimRootDir string, disableSharedPID bool) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
 	checkpointHandler, err := NewPersistentCheckpointHandler(dockershimRootDir)
 	if err != nil {
@@ -164,6 +164,7 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 		},
 		containerManager:  cm.NewContainerManager(cgroupsName, client),
 		checkpointHandler: checkpointHandler,
+		disableSharedPID:  disableSharedPID,
 	}
 
 	// check docker version compatibility.
@@ -249,6 +250,11 @@ type dockerService struct {
 	// version checking for some operations. Use this cache to avoid querying
 	// the docker daemon every time we need to do such checks.
 	versionCache *cache.ObjectCache
+	// This option provides an escape hatch to override the new default behavior for Docker under
+	// the CRI to use a shared PID namespace for all pods. It is temporary and will be removed.
+	// See proposals/pod-pid-namespace.md for details.
+	// TODO: Remove once the escape hatch is no longer used (https://issues.k8s.io/41938)
+	disableSharedPID bool
 }
 
 // Version returns the runtime name, runtime version and runtime API version

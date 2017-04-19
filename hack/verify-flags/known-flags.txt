@@ -244,6 +244,7 @@ experimental-check-node-capabilities-before-mount
 experimental-cri
 experimental-dockershim
 experimental-dockershim-root-directory
+experimental-docker-enable-shared-pid
 experimental-fail-swap-on
 experimental-kernel-memcg-notification
 experimental-keystone-ca-file
