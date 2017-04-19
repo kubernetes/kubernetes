@@ -144,6 +144,7 @@ filegroup(
         "//vendor/github.com/emicklei/go-restful:all-srcs",
         "//vendor/github.com/evanphx/json-patch:all-srcs",
         "//vendor/github.com/exponent-io/jsonpath:all-srcs",
+        "//vendor/github.com/fatih/camelcase:all-srcs",
         "//vendor/github.com/fsnotify/fsnotify:all-srcs",
         "//vendor/github.com/garyburd/redigo/internal:all-srcs",
         "//vendor/github.com/garyburd/redigo/redis:all-srcs",
