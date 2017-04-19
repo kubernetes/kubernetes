@@ -63,9 +63,10 @@ func (kl *Kubelet) registerWithApiServer() {
 	}
 
 	retries := 0
-	backoff := flowcontrol.NewBackOff(100*time.Millisecond, 7*time.Second)
+	backoff := flowcontrol.NewBackOff(100*time.Millisecond, 10*time.Second)
 	for {
-		time.Sleep(backoff.Get("registerAPIServer"))
+		backoff.Next("registerAPIServer", kl.clock.Now())
+		kl.clock.Sleep(backoff.Get("registerAPIServer"))
 		node, err := kl.initialNode()
 		if err != nil {
 			glog.Errorf("Unable to construct v1.Node object for kubelet: %v retries:", err, retries)
@@ -319,16 +320,29 @@ func (kl *Kubelet) syncNodeStatus() {
 
 // updateNodeStatus updates node status to master with retries.
 func (kl *Kubelet) updateNodeStatus() error {
-	backoff := flowcontrol.NewBackOff(500*time.Millisecond, 10*time.Minute)
-	for i := 0; i < nodeStatusUpdateRetry; i++ {
-		if err := kl.tryUpdateNodeStatus(i); err != nil {
-			glog.Errorf("Error # %v updating node status, will retry: %v", i, err)
-			time.Sleep(backoff.Get("updateNodeStatus"))
-		} else {
-			return nil
+	attempts := 0
+	backoff := flowcontrol.NewBackOff(1*time.Second, nodeStatusUpdateRetryMaximumTime)
+	// continue retrying until we exceed the maximum time allowed.
+	start := kl.clock.Now()
+	for {
+		nextEstimatedBackoff := kl.clock.Since(start).Minutes() + backoff.Get("uns").Minutes()
+		// Termination condition: before we breach the maximum cumulative time
+		if nextEstimatedBackoff >= nodeStatusUpdateRetryMaximumTime.Minutes() {
+			return fmt.Errorf("Couldn't reach the apiserver after backoff attempts %v.  The next backoff will be longer then max allowed time of %v", attempts, nodeStatusUpdateRetryMaximumTime)
 		}
+		err := kl.tryUpdateNodeStatus(attempts)
+		attempts += 1
+		// Termination condition: succeeded in updating the node status.
+		if err != nil {
+			glog.Info("Error # %v updating node status.", err)
+		}
+		// If we get here, then we failed at updating the node.  Bump the backoff and iterate.
+		backoff.Next("uns", kl.clock.Now())
+		kl.clock.Sleep(backoff.Get("uns"))
 	}
-	return fmt.Errorf("update node status exceeds retry count")
+
+	// If we get this far, then we eventually updated status within the allowed timeframe, so the kubelet status is up to date.
+	return nil
 }
 
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0

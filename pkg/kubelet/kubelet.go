@@ -110,9 +110,9 @@ const (
 	// Max amount of time to wait for the container runtime to come up.
 	maxWaitForContainerRuntime = 30 * time.Second
 
-	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
+	// nodeStatusUpdateRetryBackoff specifies how many times kubelet retries when posting node status failed.
 	// we assume that the large number of retries will be done in an exponential backoff.
-	nodeStatusUpdateRetry = 10
+	nodeStatusUpdateRetryMaximumTime = 20 * time.Minute
 
 	// Location of container logs.
 	ContainerLogsDir = "/var/log/containers"
