@@ -100,7 +100,7 @@ def cleanup_pre_snap_services():
     # cleanup old files
     files = [
         "/lib/systemd/system/kubelet.service",
-        "/lib/systemd/system/kube-proxy.service"
+        "/lib/systemd/system/kube-proxy.service",
         "/etc/default/kube-default",
         "/etc/default/kubelet",
         "/etc/default/kube-proxy",
