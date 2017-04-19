@@ -81,7 +81,7 @@ KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(be
 #   KUBE_VERSION
 function set_binary_version() {
   if [[ "${1}" =~ "/" ]]; then
-    export KUBE_VERSION=$(curl -fsSL "https://dl.k8s.io/${1}.txt")
+    export KUBE_VERSION=$(curl -fsSL --retry 5 "https://dl.k8s.io/${1}.txt")
   else
     export KUBE_VERSION=${1}
   fi
@@ -227,7 +227,7 @@ fi
 
 if "${need_download}"; then
   if [[ $(which curl) ]]; then
-    curl -fL --retry 3 --keepalive-time 2 "${kubernetes_tar_url}" -o "${file}"
+    curl -fL --retry 5 --keepalive-time 2 "${kubernetes_tar_url}" -o "${file}"
   elif [[ $(which wget) ]]; then
     wget "${kubernetes_tar_url}"
   else
