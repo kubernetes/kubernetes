@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest/fake"
@@ -645,9 +646,10 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 			Selector: apiserverSvcSelector,
 			Ports: []v1.ServicePort{
 				{
-					Name:     "https",
-					Protocol: "TCP",
-					Port:     443,
+					Name:       "https",
+					Protocol:   "TCP",
+					Port:       443,
+					TargetPort: intstr.FromString(apiServerSecurePortName),
 				},
 			},
 		},
@@ -836,7 +838,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	apiserverArgs := []string{
 		"--bind-address=0.0.0.0",
 		"--etcd-servers=http://localhost:2379",
-		"--secure-port=443",
+		fmt.Sprintf("--secure-port=%d", apiServerSecurePort),
 		"--tls-cert-file=/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file=/etc/federation/apiserver/server.key",
 		"--admission-control=NamespaceLifecycle",
@@ -887,8 +889,8 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 							Command: apiserverCommand,
 							Ports: []v1.ContainerPort{
 								{
-									Name:          "https",
-									ContainerPort: 443,
+									Name:          apiServerSecurePortName,
+									ContainerPort: apiServerSecurePort,
 								},
 								{
 									Name:          "local",
