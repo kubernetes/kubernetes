@@ -828,12 +828,12 @@ func IsRollingUpdate(deployment *extensions.Deployment) bool {
 	return deployment.Spec.Strategy.Type == extensions.RollingUpdateDeploymentStrategyType
 }
 
-// DeploymentComplete considers a deployment to be complete once its desired replicas equals its
-// updatedReplicas, no old pods are running, and it doesn't violate minimum availability.
+// DeploymentComplete considers a deployment to be complete once all of its desired replicas
+// are updated and available, and no old pods are running.
 func DeploymentComplete(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	return newStatus.UpdatedReplicas == *(deployment.Spec.Replicas) &&
 		newStatus.Replicas == *(deployment.Spec.Replicas) &&
-		newStatus.AvailableReplicas >= *(deployment.Spec.Replicas)-MaxUnavailable(*deployment) &&
+		newStatus.AvailableReplicas == *(deployment.Spec.Replicas) &&
 		newStatus.ObservedGeneration >= deployment.Generation
 }
 

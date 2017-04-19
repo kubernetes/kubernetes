@@ -960,35 +960,41 @@ func TestDeploymentComplete(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "complete",
+			name: "not complete: min but not all pods become available",
 
 			d:        deployment(5, 5, 5, 4, 1, 0),
-			expected: true,
+			expected: false,
 		},
 		{
-			name: "not complete",
+			name: "not complete: min availability is not honored",
 
 			d:        deployment(5, 5, 5, 3, 1, 0),
 			expected: false,
 		},
 		{
-			name: "complete #2",
+			name: "complete",
 
 			d:        deployment(5, 5, 5, 5, 0, 0),
 			expected: true,
 		},
 		{
-			name: "not complete #2",
+			name: "not complete: all pods are available but not updated",
 
 			d:        deployment(5, 5, 4, 5, 0, 0),
 			expected: false,
 		},
 		{
-			name: "not complete #3",
+			name: "not complete: still running old pods",
 
 			// old replica set: spec.replicas=1, status.replicas=1, status.availableReplicas=1
 			// new replica set: spec.replicas=1, status.replicas=1, status.availableReplicas=0
 			d:        deployment(1, 2, 1, 1, 0, 1),
+			expected: false,
+		},
+		{
+			name: "not complete: one replica deployment never comes up",
+
+			d:        deployment(1, 1, 1, 0, 1, 1),
 			expected: false,
 		},
 	}
