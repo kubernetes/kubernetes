@@ -96,6 +96,9 @@ func validatePolicyRule(rule rbac.PolicyRule, isNamespaced bool, fldPath *field.
 	if len(rule.Resources) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("resources"), "resource rules must supply at least one resource"))
 	}
+	if len(rule.ResourceNames) > 0 && len(rule.Resources) > 1 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("resourceNames"), "resource names cannot apply to multiple resources"))
+	}
 	return allErrs
 }
 
