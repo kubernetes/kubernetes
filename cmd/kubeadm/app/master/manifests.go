@@ -381,11 +381,29 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 
 func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	var command []string
-
-	defaultArguments := map[string]string{
-		"listen-client-urls":    "http://127.0.0.1:2379",
-		"advertise-client-urls": "http://127.0.0.1:2379",
-		"data-dir":              cfg.Etcd.DataDir,
+	var defaultArguments map[string]string
+	if len(cfg.Etcd.Discovery) > 1 {
+		//Use etcd discovery for multi master
+		name := node.GetHostname(cfg.HostnameOverride)
+		ip, err := net.ChooseHostInterface()
+		if err != nil {
+			return fmt.Errorf("failed to get host interface address for etcd [%v]", err)
+		}
+		defaultArguments = map[string]string{
+			"name":name,
+			"initial-advertise-peer-urls":fmt.Sprintf("http://%v:2380", ip.String()),
+			"listen-peer-urls":fmt.Sprintf("http://%v:2380", ip.String()),
+			"listen-client-urls":fmt.Sprintf("http://%v:2379,http://127.0.0.1:2379", ip.String()),
+			"advertise-client-urls":fmt.Sprintf("http://%v:2379", ip.String()),
+			"discovery":cfg.Etcd.Discovery,
+			"data-dir":cfg.Etcd.DataDir,
+		}
+	} else {
+		defaultArguments = map[string]string{
+			"listen-client-urls":    "http://127.0.0.1:2379",
+			"advertise-client-urls": "http://127.0.0.1:2379",
+			"data-dir":              cfg.Etcd.DataDir,
+		}
 	}
 
 	command = append(command, "etcd")
