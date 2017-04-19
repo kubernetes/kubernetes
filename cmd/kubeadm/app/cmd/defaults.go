@@ -27,6 +27,9 @@ import (
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 
 	"github.com/blang/semver"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	"k8s.io/kubernetes/pkg/util/node"
 )
 
 var minK8sVersion = semver.MustParse(kubeadmconstants.MinimumControlPlaneVersion)
@@ -40,6 +43,24 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		return err
 	}
 	cfg.API.AdvertiseAddress = ip.String()
+
+	if cfg.PublicAddress == "" {
+		cfg.PublicAddress = cfg.API.AdvertiseAddress
+	}
+	if cfg.HostnameOverride == "" && cfg.CloudProvider != "" && cloudprovider.IsCloudProvider(cfg.CloudProvider) {
+		cloudSupport, err := cloudprovider.GetCloudProvider(cfg.CloudProvider, nil)
+		if err != nil {
+			fmt.Printf("[init] WARNING: Failed to get support for cloudprovider '%s'", cfg.CloudProvider)
+		} else {
+			if instances, ok := cloudSupport.Instances(); ok {
+				if name, err := instances.CurrentNodeName(node.GetHostname("")); err != nil {
+					fmt.Printf("[init] WARNING: Failed to get node name for cloud provider '%s'", cfg.CloudProvider)
+				} else {
+					cfg.HostnameOverride = string(name)
+				}
+			}
+		}
+	}
 
 	// Validate version argument
 	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)

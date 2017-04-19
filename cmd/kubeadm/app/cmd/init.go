@@ -91,6 +91,18 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. 0.0.0.0 means the default network interface's address.",
 	)
+	cmd.PersistentFlags().StringVar(
+		&cfg.PublicAddress, "public-address", cfg.PublicAddress,
+		"The PublicAddress address e.g. LoadBalancer",
+	)
+	cmd.PersistentFlags().StringVar(
+		&cfg.HostnameOverride, "hostname-override", cfg.HostnameOverride,
+		"Override node name.",
+	)
+	cmd.PersistentFlags().IntVar(
+		&cfg.Count, "master-count", cfg.Count,
+		"Master count",
+	)
 	cmd.PersistentFlags().Int32Var(
 		&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort,
 		"Port for the API Server to bind to",
@@ -200,7 +212,7 @@ func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
 
-	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddress, i.cfg.API.BindPort)
+	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.PublicAddress, i.cfg.API.BindPort)
 	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, i.cfg.CertificatesDir, kubeadmapi.GlobalEnvParams.KubernetesDir)
 	if err != nil {
 		return err
@@ -217,7 +229,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	if err := apiconfigphase.UpdateMasterRoleLabelsAndTaints(client); err != nil {
+	if err := apiconfigphase.UpdateMasterRoleLabelsAndTaints(i.cfg, client); err != nil {
 		return err
 	}
 
@@ -264,7 +276,7 @@ func (i *Init) Run(out io.Writer) error {
 		"KubeConfigPath": path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName),
 		"KubeConfigName": kubeadmconstants.AdminKubeConfigFileName,
 		"Token":          i.cfg.Token,
-		"MasterIP":       i.cfg.API.AdvertiseAddress,
+		"MasterIP":       i.cfg.PublicAddress,
 		"MasterPort":     strconv.Itoa(int(i.cfg.API.BindPort)),
 	}
 

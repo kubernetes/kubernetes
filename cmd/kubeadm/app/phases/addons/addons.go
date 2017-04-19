@@ -32,13 +32,14 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"strings"
 )
 
 // CreateEssentialAddons creates the kube-proxy and kube-dns addons
 func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
 	proxyConfigMapBytes, err := kubeadmutil.ParseTemplate(KubeProxyConfigMap, struct{ MasterEndpoint string }{
 		// Fetch this value from the kubeconfig file
-		MasterEndpoint: fmt.Sprintf("https://%s:%d", cfg.API.AdvertiseAddress, cfg.API.BindPort),
+		MasterEndpoint: fmt.Sprintf("https://%s:%d", cfg.PublicAddress, cfg.API.BindPort),
 	})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
@@ -107,7 +108,9 @@ func CreateKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client *clients
 	kubeproxyDaemonSet.Spec.Template.Spec.Tolerations = []v1.Toleration{kubeadmconstants.MasterToleration}
 
 	if _, err := client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Create(kubeproxyDaemonSet); err != nil {
-		return fmt.Errorf("unable to create a new kube-proxy daemonset: %v", err)
+		if !alreadyExistsError(err) {
+			return fmt.Errorf("unable to create a new kube-proxy daemonset: %v", err)
+		}
 	}
 	return nil
 }
@@ -127,7 +130,9 @@ func CreateKubeDNSAddon(deploymentBytes, serviceBytes []byte, client *clientset.
 
 	// TODO: All these .Create(foo) calls should instead be more like "kubectl apply -f" commands; they should not fail if there are existing objects with the same name
 	if _, err := client.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).Create(kubednsDeployment); err != nil {
-		return fmt.Errorf("unable to create a new kube-dns deployment: %v", err)
+		if !alreadyExistsError(err) {
+			return fmt.Errorf("unable to create a new kube-dns deployment: %v", err)
+		}
 	}
 
 	kubednsService := &v1.Service{}
@@ -136,7 +141,9 @@ func CreateKubeDNSAddon(deploymentBytes, serviceBytes []byte, client *clientset.
 	}
 
 	if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(kubednsService); err != nil {
-		return fmt.Errorf("unable to create a new kube-dns service: %v", err)
+		if !alreadyExistsError(err) {
+			return fmt.Errorf("unable to create a new kube-dns service: %v", err)
+		}
 	}
 	return nil
 }
@@ -165,4 +172,8 @@ func getClusterCIDR(podsubnet string) string {
 		return ""
 	}
 	return "- --cluster-cidr=" + podsubnet
+}
+
+func alreadyExistsError(err error) bool {
+	return strings.Contains(err.Error(), "already exists")
 }
