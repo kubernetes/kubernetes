@@ -108,6 +108,7 @@ filegroup(
         "//pkg/volume/glusterfs:all-srcs",
         "//pkg/volume/host_path:all-srcs",
         "//pkg/volume/iscsi:all-srcs",
+        "//pkg/volume/local_volume:all-srcs",
         "//pkg/volume/nfs:all-srcs",
         "//pkg/volume/photon_pd:all-srcs",
         "//pkg/volume/portworx:all-srcs",
