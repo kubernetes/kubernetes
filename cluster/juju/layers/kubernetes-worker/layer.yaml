@@ -12,6 +12,9 @@ includes:
   - 'interface:kubernetes-cni'
   - 'interface:kube-dns'
   - 'interface:kube-control'
+config:
+  deletes:
+    - install_from_upstream
 options:
   basic:
     packages:
