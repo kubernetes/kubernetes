@@ -29,7 +29,14 @@ func (i *noopIsolator) PostStopPod(podName string, containerName string, cgroupI
 
 func (i *noopIsolator) PreStartContainer(podName, containerName string) ([]*lifecycle.IsolationControl, error) {
 	glog.Infof("noopIsolator[PreStartContainer]:\npodName: %s\ncontainerName: %v", podName, containerName)
-	return []*lifecycle.IsolationControl{}, nil
+	return []*lifecycle.IsolationControl{
+		&lifecycle.IsolationControl{
+			Kind: lifecycle.IsolationControl_CONTAINER_ENV_VAR,
+			MapValue: map[string]string{
+				"ISOLATOR": i.Name(),
+			},
+		},
+	}, nil
 }
 
 func (i *noopIsolator) PostStopContainer(podName, containerName string) error {

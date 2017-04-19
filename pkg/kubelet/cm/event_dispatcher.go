@@ -292,13 +292,25 @@ func (ed *eventDispatcher) ResourceConfigFromReply(reply *lifecycle.EventReply, 
 }
 
 func (ed *eventDispatcher) UpdateContainerConfigWithReply(reply *lifecycle.EventReply, config *runtime.ContainerConfig) {
-	// TODO(CD): Append environment variables to container config.
+	// Append environment variables to container config.
+	for _, control := range reply.IsolationControls {
+		switch control.Kind {
+		case lifecycle.IsolationControl_CONTAINER_ENV_VAR:
+			for k, v := range control.MapValue {
+				entry := &runtime.KeyValue{Key: k, Value: v}
+				config.Envs = append(config.Envs, entry)
+			}
+		default:
+			continue
+		}
+	}
 
 	if config.Linux == nil {
-		glog.Infof("container config has no Linux config, skipping cgroup settings")
+		glog.Infof("skipping Linux-only isolation settings")
 		return
 	}
 
+	// Apply linux-specific settings to container config.
 	for _, control := range reply.IsolationControls {
 		switch control.Kind {
 		case lifecycle.IsolationControl_CGROUP_CPUSET_CPUS:

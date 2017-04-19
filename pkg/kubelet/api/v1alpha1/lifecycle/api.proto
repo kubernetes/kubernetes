@@ -73,7 +73,9 @@ message IsolationControl {
   enum Kind {
     CGROUP_CPUSET_CPUS = 0;
     CGROUP_CPUSET_MEMS = 1;
+    CONTAINER_ENV_VAR = 2;
   };
   Kind kind = 1;
   string value = 2;
+  map<string, string> map_value = 3;
 }
