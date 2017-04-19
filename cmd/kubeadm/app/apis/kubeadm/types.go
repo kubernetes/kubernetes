@@ -63,7 +63,6 @@ type MasterConfiguration struct {
 	Count int
 }
 
-
 type API struct {
 	// AdvertiseAddress sets the address for the API server to advertise.
 	AdvertiseAddress string
@@ -107,16 +106,18 @@ type NodeConfiguration struct {
 }
 
 type MasterCertificates struct {
-	CAKeyPem         string
-	CACertPem        string
-	APIServerKeyPem  string
-	APIServerCertPem string
-	SAKeyPem         string
-	FrontProxyKeyPem  string
-	FrontProxyCertPem string
+	CAKeyPem                string
+	CACertPem               string
+	APIServerKeyPem         string
+	APIServerCertPem        string
+	SAKeyPem                string
+	FrontProxyKeyPem        string
+	FrontProxyCertPem       string
+	FrontProxyClientKeyPem  string
+	FrontProxyClientCertPem string
 
-	ClientConf       map[string]ClientKeyCert
-	Password         string
+	ClientConf map[string]ClientKeyCert
+	Password   string
 }
 type ClientKeyCert struct {
 	Key  string
