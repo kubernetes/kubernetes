@@ -46,7 +46,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 	It("should provide Internet connection for containers [Conformance]", func() {
 		By("Running container which tries to ping 8.8.8.8")
 		framework.ExpectNoError(
-			framework.CheckConnectivityToHost(f, "", "ping-test", "8.8.8.8", 30))
+			framework.CheckConnectivityToHost(f, "", "ping-test", "8.8.8.8", 30, 53))
 	})
 
 	// First test because it has no dependencies on variables created later on.
