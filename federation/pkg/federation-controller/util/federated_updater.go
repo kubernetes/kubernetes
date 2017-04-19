@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
@@ -95,6 +96,10 @@ func (fu *federatedUpdaterImpl) UpdateWithOnError(ops []FederatedOperation, time
 				err = fu.updateFunction(clientset, op.Obj)
 			case OperationTypeDelete:
 				err = fu.deleteFunction(clientset, op.Obj)
+				// IsNotFound error is fine since that means the object is deleted already.
+				if errors.IsNotFound(err) {
+					err = nil
+				}
 			}
 			if err != nil && onError != nil {
 				onError(op, err)

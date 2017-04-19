@@ -115,7 +115,7 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 		adapter:               adapter,
 	}
 
-	// Build delivereres for triggering reconciliations.
+	// Build deliverers for triggering reconciliations.
 	s.deliverer = util.NewDelayingDeliverer()
 	s.clusterDeliverer = util.NewDelayingDeliverer()
 
@@ -165,7 +165,7 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 		},
 	)
 
-	// Federated updeater along with Create/Update/Delete operations.
+	// Federated updater along with Create/Update/Delete operations.
 	s.updater = util.NewFederatedUpdater(s.informer,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			_, err := adapter.ClusterCreate(client, obj)
@@ -435,7 +435,7 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		return
 	}
 
-	// Evertyhing is in order but lets be double sure
+	// Everything is in order but lets be double sure
 	s.deliver(namespacedName, s.reviewDelay, false)
 }
 
