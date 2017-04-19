@@ -248,22 +248,6 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				}
 			})
 
-			PIt("should be able to discover a federated ingress service via DNS", func() {
-				// we are about the ingress name
-				svcDNSNames := []string{
-					fmt.Sprintf("%s.%s", FederatedIngressServiceName, ns),
-					fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedIngressServiceName, ns),
-					// TODO these two entries are not set yet
-					//fmt.Sprintf("%s.%s.%s", FederatedIngressServiceName, ns, federationName),
-					//fmt.Sprintf("%s.%s.%s.svc.cluster.local.", FederatedIngressServiceName, ns, federationName),
-				}
-				// check dns records in underlying cluster
-				for i, DNSName := range svcDNSNames {
-					discoverService(f, DNSName, true, "federated-ingress-e2e-discovery-pod-"+strconv.Itoa(i))
-				}
-				// TODO check dns record in global dns server
-			})
-
 			PIt("should be able to connect to a federated ingress via its load balancer", func() {
 				By(fmt.Sprintf("Waiting for Federated Ingress on %v", jig.ing.Name))
 				// check the traffic on federation ingress
