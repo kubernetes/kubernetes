@@ -1413,6 +1413,12 @@ message LoadBalancerStatus {
   repeated LoadBalancerIngress ingress = 1;
 }
 
+// LocalFsVolume represents a filesystem-based local volume
+message LocalFsVolume {
+  // The full path to the volume on the node
+  optional string path = 1;
+}
+
 // LocalObjectReference contains enough information to let you locate the
 // referenced object inside the same namespace.
 message LocalObjectReference {
@@ -1421,6 +1427,16 @@ message LocalObjectReference {
   // TODO: Add other useful fields. apiVersion, kind, uid?
   // +optional
   optional string name = 1;
+}
+
+// LocalVolume represents a local volume accessible only from one node
+message LocalVolumeSource {
+  // NodeName represents the node that the volume is located at
+  optional string nodeName = 1;
+
+  // Fs represents a filesystem-based local volume
+  // +optional
+  optional LocalFsVolume fs = 2;
 }
 
 // Represents an NFS mount that lasts the lifetime of a pod.
@@ -2174,6 +2190,10 @@ message PersistentVolumeSource {
   // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
   // +optional
   optional ScaleIOVolumeSource scaleIO = 19;
+
+  // LocalVolume represents a local volume accessible only from one node
+  // +optional
+  optional LocalVolumeSource localVolume = 20;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
