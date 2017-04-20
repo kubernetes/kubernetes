@@ -2455,8 +2455,8 @@ type LoadBalancerStatus struct {
 	Ingress []LoadBalancerIngress
 
 	// LoadBalancer Name.
-        // +optional
-        Name string
+	// +optional
+	Name string
 }
 
 // LoadBalancerIngress represents the status of a load-balancer ingress point:

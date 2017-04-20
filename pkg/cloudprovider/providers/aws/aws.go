@@ -2792,9 +2792,9 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 
 // GetLoadBalancerName returns the name of the load balancer based on the service UID.
 func (c *Cloud) GetLoadBalancerName(service *v1.Service) string {
-        ret := string(service.UID)
-        ret = strings.Replace(ret, "-", "", -1)
-        return ret
+	ret := string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	return ret
 }
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
