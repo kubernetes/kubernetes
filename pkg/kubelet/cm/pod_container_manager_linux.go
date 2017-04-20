@@ -159,7 +159,7 @@ func (m *podContainerManagerImpl) Destroy(podCgroup CgroupName) error {
 		return fmt.Errorf("failed to kill all the processes attached to the %v cgroups : %v", podCgroup, err)
 	}
 
-	// Now its safe to remove the pod's cgroup
+	// Now it's safe to remove the pod's cgroup
 	containerConfig := &CgroupConfig{
 		Name:               podCgroup,
 		ResourceParameters: &ResourceConfig{},
@@ -198,7 +198,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 				return nil, fmt.Errorf("failed to read the cgroup directory %v : %v", qc, err)
 			}
 			for i := range dirInfo {
-				// its not a directory, so continue on...
+				// it's not a directory, so continue on...
 				if !dirInfo[i].IsDir() {
 					continue
 				}
