@@ -256,7 +256,7 @@ func TestValidate(t *testing.T) {
 				},
 				ResourceNames: []string{"foo"},
 			},
-			expectErr: true,
+			expectErr: false,
 		},
 		"test-valid-case": {
 			roleOptions: &CreateRoleOptions{
