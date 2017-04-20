@@ -71,8 +71,6 @@ const (
 	doNotRetry = time.Duration(0)
 
 	UserAgentName = "federation-service-controller"
-	KubeAPIQPS    = 20.0
-	KubeAPIBurst  = 30
 
 	maxNoOfClusters = 100
 
