@@ -9323,6 +9323,10 @@
        "$ref": "v1.LoadBalancerIngress"
       },
       "description": "Ingress is a list containing ingress points for the load-balancer. Traffic intended for the service should be sent to these ingress points."
+     },
+     "name": {
+      "type": "string",
+      "description": "LoadBalancer Name.This field is added to point the load-balancer name which is required for cloud-provider specific changes. See #43173"
      }
     }
    },

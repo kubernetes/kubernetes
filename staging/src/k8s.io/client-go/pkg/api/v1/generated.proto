@@ -1411,6 +1411,12 @@ message LoadBalancerStatus {
   // Traffic intended for the service should be sent to these ingress points.
   // +optional
   repeated LoadBalancerIngress ingress = 1;
+
+  // LoadBalancer Name.This field is added to point the load-balancer
+  // name which is required for cloud-provider specific changes.
+  // See #43173
+  // +optional
+  optional string name = 2;
 }
 
 // LocalObjectReference contains enough information to let you locate the

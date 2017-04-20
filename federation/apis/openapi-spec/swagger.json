@@ -10324,6 +10324,10 @@
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LoadBalancerIngress"
       }
+     },
+     "name": {
+      "description": "LoadBalancer Name.This field is added to point the load-balancer name which is required for cloud-provider specific changes. See #43173",
+      "type": "string"
      }
     }
    },

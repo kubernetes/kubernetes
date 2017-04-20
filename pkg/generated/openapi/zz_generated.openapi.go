@@ -4379,7 +4379,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"name": {
 							SchemaProps: spec.SchemaProps{
-								Description: "LoadBalancer Name.",
+								Description: "LoadBalancer Name.This field is added to point the load-balancer name which is required for cloud-provider specific changes. See #43173",
 								Type:        []string{"string"},
 								Format:      "",
 							},

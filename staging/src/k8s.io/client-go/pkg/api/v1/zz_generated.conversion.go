@@ -2100,6 +2100,7 @@ func Convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress(in *api.LoadBalan
 
 func autoConvert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus(in *LoadBalancerStatus, out *api.LoadBalancerStatus, s conversion.Scope) error {
 	out.Ingress = *(*[]api.LoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
+	out.Name = in.Name
 	return nil
 }
 
@@ -2110,6 +2111,7 @@ func Convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus(in *LoadBalancerSta
 
 func autoConvert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus(in *api.LoadBalancerStatus, out *LoadBalancerStatus, s conversion.Scope) error {
 	out.Ingress = *(*[]LoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
+	out.Name = in.Name
 	return nil
 }
 

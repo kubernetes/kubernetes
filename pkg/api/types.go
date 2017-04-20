@@ -2456,6 +2456,18 @@ type LoadBalancerStatus struct {
 	// traffic intended for the service should be sent to these ingress points.
 	// +optional
 	Ingress []LoadBalancerIngress
+
+<<<<<<< Updated upstream
+	// LoadBalancer Name.
+        // +optional
+        Name string
+=======
+	// LoadBalancer Name.This field is added to point the load-balancer
+	// name which is required for cloud-provider specific changes.
+	// See #43173
+	// +optional
+	Name string
+>>>>>>> Stashed changes
 }
 
 // LoadBalancerIngress represents the status of a load-balancer ingress point:
