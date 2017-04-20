@@ -30,6 +30,8 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/httpstream/spdy:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/remotecommand:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/features:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/transport:go_default_library",
     ],
