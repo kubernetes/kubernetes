@@ -19,6 +19,7 @@ package securitycontext
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -84,13 +85,13 @@ func compareContexts(name string, ex, ac *v1.SELinuxOptions, t *testing.T) {
 	}
 }
 
-func containerWithUser(ptr *int64) *v1.Container {
+func containerWithUser(ptr *types.UnixUserID) *v1.Container {
 	return &v1.Container{SecurityContext: &v1.SecurityContext{RunAsUser: ptr}}
 }
 
 func TestHaRootUID(t *testing.T) {
-	var nonRoot int64 = 1
-	var root int64 = 0
+	nonRoot := types.UnixUserID(1)
+	root := types.UnixUserID(0)
 
 	tests := map[string]struct {
 		container *v1.Container
@@ -120,7 +121,7 @@ func TestHaRootUID(t *testing.T) {
 }
 
 func TestHasRunAsUser(t *testing.T) {
-	var runAsUser int64 = 0
+	runAsUser := types.UnixUserID(0)
 
 	tests := map[string]struct {
 		container *v1.Container
@@ -147,8 +148,8 @@ func TestHasRunAsUser(t *testing.T) {
 }
 
 func TestHasRootRunAsUser(t *testing.T) {
-	var nonRoot int64 = 1
-	var root int64 = 0
+	nonRoot := types.UnixUserID(1)
+	root := types.UnixUserID(0)
 
 	tests := map[string]struct {
 		container *v1.Container

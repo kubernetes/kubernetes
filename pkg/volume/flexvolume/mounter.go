@@ -19,6 +19,7 @@ package flexvolume
 import (
 	"strconv"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -43,12 +44,12 @@ var _ volume.Mounter = &flexVolumeMounter{}
 // Mounter interface
 
 // SetUp creates new directory.
-func (f *flexVolumeMounter) SetUp(fsGroup *int64) error {
+func (f *flexVolumeMounter) SetUp(fsGroup *types.UnixGroupID) error {
 	return f.SetUpAt(f.GetPath(), fsGroup)
 }
 
 // SetUpAt creates new directory.
-func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	// Mount only once.
 	alreadyMounted, err := prepareForMount(f.mounter, dir)
 	if err != nil {
@@ -72,7 +73,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	// Implicit parameters
 	if fsGroup != nil {
-		extraOptions[optionFSGroup] = strconv.FormatInt(*fsGroup, 10)
+		extraOptions[optionFSGroup] = strconv.FormatInt(int64(*fsGroup), 10)
 	}
 
 	call.AppendSpec(f.spec, f.plugin.host, extraOptions)

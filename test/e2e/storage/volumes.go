@@ -264,7 +264,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 					ExpectedContent: "Hello from iSCSI",
 				},
 			}
-			fsGroup := int64(1234)
+			fsGroup := types.UnixGroupID(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
@@ -343,7 +343,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 					ExpectedContent: "Hello from RBD",
 				},
 			}
-			fsGroup := int64(1234)
+			fsGroup := types.UnixGroupID(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
@@ -496,7 +496,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 
 			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
-			fsGroup := int64(1234)
+			fsGroup := types.UnixGroupID(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
@@ -550,7 +550,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 
 			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
-			fsGroup := int64(1234)
+			fsGroup := types.UnixGroupID(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
@@ -682,7 +682,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 
 			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
-			fsGroup := int64(1234)
+			fsGroup := types.UnixGroupID(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
@@ -732,7 +732,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 
 			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
-			fsGroup := int64(1234)
+			fsGroup := types.UnixGroupID(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
