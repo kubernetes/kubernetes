@@ -143,6 +143,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.Token, "token", cfg.Token,
 		"The token to use for establishing bidirectional trust between nodes and masters.")
 
+	cmd.PersistentFlags().StringVar(
+		&cfg.ClusterName, "cluster-name", cfg.ClusterName,
+		"Cluster name. Used for tagging cloud provider resources")
+
 	cmd.PersistentFlags().DurationVar(
 		&cfg.TokenTTL, "token-ttl", cfg.TokenTTL,
 		"The duration before the bootstrap token is automatically deleted. 0 means 'never expires'.")

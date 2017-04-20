@@ -55,6 +55,8 @@ type MasterConfiguration struct {
 	//Masters Count
 	Count int `json:"count"`
 
+	//required for cloud providers. To make right tag for resources
+	ClusterName      string
 	HostnameOverride string `json:"hostNameOverride"`
 }
 

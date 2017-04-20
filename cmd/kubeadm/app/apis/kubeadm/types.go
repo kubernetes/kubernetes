@@ -62,6 +62,8 @@ type MasterConfiguration struct {
 	//Masters Count
 	Count int
 
+	//required for cloud providers. To make right tag for resources
+	ClusterName      string
 	HostnameOverride string
 }
 

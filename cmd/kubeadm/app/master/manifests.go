@@ -414,7 +414,9 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		"use-service-account-credentials":                          "true",
 		"controllers":                                              "*,bootstrapsigner,tokencleaner",
 	}
-
+	if cfg.ClusterName != "" {
+		defaultArguments["cluster-name"] = cfg.ClusterName
+	}
 	command = getComponentBaseCommand(controllerManager)
 	command = append(command, getExtraParameters(cfg.ControllerManagerExtraArgs, defaultArguments)...)
 

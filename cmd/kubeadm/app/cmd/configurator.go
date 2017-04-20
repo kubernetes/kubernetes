@@ -118,6 +118,9 @@ func NewConfigurator(out io.Writer) *cobra.Command {
 		&outFile, "out", "",
 		`May be save configureation to this file?`,
 	)
+	cmd.PersistentFlags().StringVar(
+		&cfg.ClusterName, "cluster-name", cfg.ClusterName,
+		"Cluster name. Used for tagging cloud provider resources")
 	return cmd
 }
 func getDiscoveryToken(url string, size int) (string, error) {
