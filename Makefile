@@ -85,7 +85,8 @@ ifeq ($(PRINT_HELP),y)
 all:
 	@echo "$$ALL_HELP_INFO"
 else
-all: generated_files
+#all: generated_files
+all:
 	hack/make-rules/build.sh $(WHAT)
 endif
 
