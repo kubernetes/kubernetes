@@ -48,6 +48,9 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Job",
+		},
 		Spec: batch.JobSpec{
 			Parallelism:    &parallelism,
 			Completions:    &completions,
@@ -151,13 +154,18 @@ func DeleteJob(c clientset.Interface, ns, name string) error {
 	return c.Batch().Jobs(ns).Delete(name, nil)
 }
 
+// GetJobPods returns a list of Pods belonging to a Job.
+func GetJobPods(c clientset.Interface, ns, jobName string) (*v1.PodList, error) {
+	label := labels.SelectorFromSet(labels.Set(map[string]string{JobSelectorKey: jobName}))
+	options := metav1.ListOptions{LabelSelector: label.String()}
+	return c.CoreV1().Pods(ns).List(options)
+}
+
 // WaitForAllJobPodsRunning wait for all pods for the Job named JobName in namespace ns to become Running.  Only use
 // when pods will run for a long time, or it will be racy.
 func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) error {
-	label := labels.SelectorFromSet(labels.Set(map[string]string{JobSelectorKey: jobName}))
 	return wait.Poll(Poll, JobTimeout, func() (bool, error) {
-		options := metav1.ListOptions{LabelSelector: label.String()}
-		pods, err := c.Core().Pods(ns).List(options)
+		pods, err := GetJobPods(c, ns, jobName)
 		if err != nil {
 			return false, err
 		}

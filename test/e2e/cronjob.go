@@ -125,7 +125,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cronJob.Status.Active).Should(HaveLen(1))
 
-		By("Ensuring exaclty one running job exists by listing jobs explicitly")
+		By("Ensuring exactly one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs, _ := filterActiveJobs(jobs)
@@ -157,7 +157,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cronJob.Status.Active).Should(HaveLen(1))
 
-		By("Ensuring exaclty one running job exists by listing jobs explicitly")
+		By("Ensuring exactly one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs, _ := filterActiveJobs(jobs)
@@ -445,13 +445,15 @@ func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error
 		if err != nil {
 			return false, err
 		}
-		if len(jobs.Items) > 1 {
+		// Ignore Jobs pending deletion, since deletion of Jobs is now asynchronous.
+		aliveJobs := filterNotDeletedJobs(jobs)
+		if len(aliveJobs) > 1 {
 			return false, fmt.Errorf("More than one job is running %+v", jobs.Items)
-		} else if len(jobs.Items) == 0 {
+		} else if len(aliveJobs) == 0 {
 			framework.Logf("Warning: Found 0 jobs in namespace %v", ns)
 			return false, nil
 		}
-		return jobs.Items[0].Name != previousJobName, nil
+		return aliveJobs[0].Name != previousJobName, nil
 	})
 }
 
@@ -500,6 +502,19 @@ func checkNoEventWithReason(c clientset.Interface, ns, cronJobName string, reaso
 		}
 	}
 	return nil
+}
+
+// filterNotDeletedJobs returns the job list without any jobs that are pending
+// deletion.
+func filterNotDeletedJobs(jobs *batchv1.JobList) []*batchv1.Job {
+	var alive []*batchv1.Job
+	for i := range jobs.Items {
+		job := &jobs.Items[i]
+		if job.DeletionTimestamp == nil {
+			alive = append(alive, job)
+		}
+	}
+	return alive
 }
 
 func filterActiveJobs(jobs *batchv1.JobList) (active []*batchv1.Job, finished []*batchv1.Job) {
