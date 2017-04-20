@@ -32,7 +32,7 @@ type FakeRoles struct {
 	ns   string
 }
 
-var rolesResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "roles"}
+var rolesResource = schema.GroupVersionResource{Group: v1beta1.GroupName, Version: "v1beta1", Resource: "roles"}
 
 func (c *FakeRoles) Create(role *v1beta1.Role) (result *v1beta1.Role, err error) {
 	obj, err := c.Fake.

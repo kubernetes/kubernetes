@@ -77,7 +77,7 @@ func BindClusterRole(c v1beta1rbac.ClusterRoleBindingsGetter, clusterRole, ns st
 			Name: ns + "--" + clusterRole,
 		},
 		RoleRef: rbacv1beta1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
+			APIGroup: rbacv1beta1.GroupName,
 			Kind:     "ClusterRole",
 			Name:     clusterRole,
 		},
@@ -98,7 +98,7 @@ func BindClusterRoleInNamespace(c v1beta1rbac.RoleBindingsGetter, clusterRole, n
 			Name: ns + "--" + clusterRole,
 		},
 		RoleRef: rbacv1beta1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
+			APIGroup: rbacv1beta1.GroupName,
 			Kind:     "ClusterRole",
 			Name:     clusterRole,
 		},

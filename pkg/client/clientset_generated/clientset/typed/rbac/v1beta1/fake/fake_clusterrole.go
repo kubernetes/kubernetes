@@ -31,7 +31,7 @@ type FakeClusterRoles struct {
 	Fake *FakeRbacV1beta1
 }
 
-var clusterrolesResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "clusterroles"}
+var clusterrolesResource = schema.GroupVersionResource{Group: v1beta1.GroupName, Version: "v1beta1", Resource: "clusterroles"}
 
 func (c *FakeClusterRoles) Create(clusterRole *v1beta1.ClusterRole) (result *v1beta1.ClusterRole, err error) {
 	obj, err := c.Fake.

@@ -94,12 +94,12 @@ func TestRoleBindingGenerate(t *testing.T) {
 				Subjects: []rbac.Subject{
 					{
 						Kind:     rbac.UserKind,
-						APIGroup: "rbac.authorization.k8s.io",
+						APIGroup: rbac.GroupName,
 						Name:     "fake-user",
 					},
 					{
 						Kind:     rbac.GroupKind,
-						APIGroup: "rbac.authorization.k8s.io",
+						APIGroup: rbac.GroupName,
 						Name:     "fake-group",
 					},
 					{
