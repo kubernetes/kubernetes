@@ -17,10 +17,12 @@ limitations under the License.
 package framework
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"reflect"
 	"strings"
@@ -284,8 +286,25 @@ func (f *Framework) AfterEach() {
 		if !f.SkipNamespaceCreation {
 			DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
 		}
-		By(fmt.Sprintf("Dumping a list of prepulled images on each node"))
-		LogContainersInPodsWithLabels(f.ClientSet, metav1.NamespaceSystem, ImagePullerLabels, "image-puller", Logf)
+
+		logFunc := Logf
+		if TestContext.ReportDir != "" {
+			filePath := path.Join(TestContext.ReportDir, "image-puller.txt")
+			file, err := os.Create(filePath)
+			if err != nil {
+				By(fmt.Sprintf("Failed to create a file with image-puller data %v: %v\nPrinting to stdout", filePath, err))
+			} else {
+				By(fmt.Sprintf("Dumping a list of prepulled images on each node to file %v", filePath))
+				defer file.Close()
+				if err = file.Chmod(0644); err != nil {
+					Logf("Failed to chmod to 644 of %v: %v", filePath, err)
+				}
+				logFunc = GetLogToFileFunc(file)
+			}
+		} else {
+			By("Dumping a list of prepulled images on each node...")
+		}
+		LogContainersInPodsWithLabels(f.ClientSet, metav1.NamespaceSystem, ImagePullerLabels, "image-puller", logFunc)
 	}
 
 	summaries := make([]TestDataSummary, 0)
@@ -847,4 +866,16 @@ func (cl *ClusterVerification) ForEach(podFunc func(v1.Pod)) error {
 	}
 
 	return err
+}
+
+// GetLogToFileFunc is a convenience function that returns a function that have the same interface as
+// Logf, but writes to a specified file.
+func GetLogToFileFunc(file *os.File) func(format string, args ...interface{}) {
+	return func(format string, args ...interface{}) {
+		writer := bufio.NewWriter(file)
+		if _, err := fmt.Fprintf(writer, format, args...); err != nil {
+			Logf("Failed to write file %v with test performance data: %v", file.Name(), err)
+		}
+		writer.Flush()
+	}
 }
