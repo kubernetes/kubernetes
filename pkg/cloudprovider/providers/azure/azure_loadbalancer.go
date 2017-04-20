@@ -34,11 +34,12 @@ import (
 
 // ServiceAnnotationLoadBalancerInternal is the annotation used on the service
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/azure-load-balancer-internal"
+
 // GetLoadBalancerName returns the name of the load balancer based on the service UID.
 func (az *Cloud) GetLoadBalancerName(service *v1.Service) string {
-        ret := string(service.UID)
-        ret = strings.Replace(ret, "-", "", -1)
-        return ret
+	ret := string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	return ret
 }
 
 // GetLoadBalancer returns whether the specified load balancer exists, and

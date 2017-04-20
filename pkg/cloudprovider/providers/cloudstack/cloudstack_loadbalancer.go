@@ -18,8 +18,8 @@ package cloudstack
 
 import (
 	"fmt"
-	"strings"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/xanzy/go-cloudstack/cloudstack"
@@ -42,9 +42,9 @@ type loadBalancer struct {
 
 // GetLoadBalancerName returns the name of the load balancer based on the service UID.
 func (cs *CSCloud) GetLoadBalancerName(service *v1.Service) string {
-        ret := string(service.UID)
-        ret = strings.Replace(ret, "-", "", -1)
-        return ret
+	ret := string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	return ret
 }
 
 // GetLoadBalancer returns whether the specified load balancer exists, and if so, what its status is.

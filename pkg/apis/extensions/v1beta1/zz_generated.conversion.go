@@ -854,17 +854,7 @@ func Convert_extensions_IngressBackend_To_v1beta1_IngressBackend(in *extensions.
 
 func autoConvert_v1beta1_IngressList_To_extensions_IngressList(in *IngressList, out *extensions.IngressList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]extensions.Ingress, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_Ingress_To_extensions_Ingress(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]extensions.Ingress)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -875,16 +865,10 @@ func Convert_v1beta1_IngressList_To_extensions_IngressList(in *IngressList, out 
 
 func autoConvert_extensions_IngressList_To_v1beta1_IngressList(in *extensions.IngressList, out *IngressList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]Ingress, len(*in))
-		for i := range *in {
-			if err := Convert_extensions_Ingress_To_v1beta1_Ingress(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
+	if in.Items == nil {
 		out.Items = make([]Ingress, 0)
+	} else {
+		out.Items = *(*[]Ingress)(unsafe.Pointer(&in.Items))
 	}
 	return nil
 }

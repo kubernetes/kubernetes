@@ -410,10 +410,10 @@ func (gce *GCECloud) UpdateLoadBalancer(clusterName string, service *v1.Service,
 		return err
 	}
 
-        // For backword compatibility we had to fetch the loadBalancerName this way or else a simple assignment for service.Status.LoadBalancer.Name would be enough.
-        var loadBalancerName string
-        if len(service.Status.LoadBalancer.Name) > 0 {
-                loadBalancerName = service.Status.LoadBalancer.Name
+	// For backword compatibility we had to fetch the loadBalancerName this way or else a simple assignment for service.Status.LoadBalancer.Name would be enough.
+	var loadBalancerName string
+	if len(service.Status.LoadBalancer.Name) > 0 {
+		loadBalancerName = service.Status.LoadBalancer.Name
 	} else {
 		loadBalancerName = cloudprovider.DeprecatedGetLoadBalancerName(service)
 	}
@@ -432,10 +432,10 @@ func (gce *GCECloud) UpdateLoadBalancer(clusterName string, service *v1.Service,
 
 // EnsureLoadBalancerDeleted is an implementation of LoadBalancer.EnsureLoadBalancerDeleted.
 func (gce *GCECloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
-        // For backword compatibility we had to fetch the loadBalancerName this way or else a simple assignment for service.Status.LoadBalancer.Name would be enough.
-        var loadBalancerName string
-        if len(service.Status.LoadBalancer.Name) > 0 {
-                loadBalancerName = service.Status.LoadBalancer.Name
+	// For backword compatibility we had to fetch the loadBalancerName this way or else a simple assignment for service.Status.LoadBalancer.Name would be enough.
+	var loadBalancerName string
+	if len(service.Status.LoadBalancer.Name) > 0 {
+		loadBalancerName = service.Status.LoadBalancer.Name
 	} else {
 		loadBalancerName = cloudprovider.DeprecatedGetLoadBalancerName(service)
 	}

@@ -561,9 +561,9 @@ func stringInArray(x string, list []string) bool {
 }
 
 func (lbaas *LbaasV2) GetLoadBalancerName(service *v1.Service) string {
-        ret := string(service.UID)
-        ret = strings.Replace(ret, "-", "", -1)
-        return ret
+	ret := string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	return ret
 }
 
 func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
@@ -1276,9 +1276,9 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 }
 
 func (lb *LbaasV1) GetLoadBalancerName(service *v1.Service) string {
-        ret := string(service.UID)
-        ret = strings.Replace(ret, "-", "", -1)
-        return ret
+	ret := string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	return ret
 }
 
 func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {

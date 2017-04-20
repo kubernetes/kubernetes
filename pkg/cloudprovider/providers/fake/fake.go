@@ -123,8 +123,8 @@ func (f *FakeCloud) Routes() (cloudprovider.Routes, bool) {
 
 // GetLoadBalancerName is a stub implementation of LoadBalancer.GetLoadBalancerName
 func (f *FakeCloud) GetLoadBalancerName(service *v1.Service) string {
-        ret := string(service.UID)
-        return ret
+	ret := string(service.UID)
+	return ret
 }
 
 // GetLoadBalancer is a stub implementation of LoadBalancer.GetLoadBalancer.
@@ -139,7 +139,7 @@ func (f *FakeCloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v
 // EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
 func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-        loadBalancerName := f.GetLoadBalancerName(service)
+	loadBalancerName := f.GetLoadBalancerName(service)
 
 	f.addCall("create")
 	if f.Balancers == nil {
