@@ -20,7 +20,9 @@ import (
 	"errors"
 	"testing"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 )
@@ -354,6 +356,36 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-18", "uid11-18", "1Gi", "", v1.ClaimPending, &classUnknownInternal),
 			[]string{"Warning ProvisioningFailed"},
 			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+		},
+		{
+			// Provision success - first save of a PV to API server fails (API
+			// server has written the object to etcd, but crashed before sending
+			// 200 OK response to the controller). Controller retries and the
+			// second save of the PV returns "AlreadyExists" because the PV
+			// object already is in the API server.
+			//
+			"11-19 - provisioned volume saved but API server crashed",
+			novolumes,
+			// We don't actually simulate API server saving the object and
+			// crashing afterwards, Create() just returns error without saving
+			// the volume in this test. So the set of expected volumes at the
+			// end of the test is empty.
+			novolumes,
+			newClaimArray("claim11-19", "uid11-19", "1Gi", "", v1.ClaimPending, &classGold),
+			newClaimArray("claim11-19", "uid11-19", "1Gi", "", v1.ClaimPending, &classGold, annStorageProvisioner),
+			noevents,
+			[]reactorError{
+				// Inject errors to simulate crashed API server during
+				// kubeclient.PersistentVolumes.Create()
+				{"create", "persistentvolumes", errors.New("Mock creation error1")},
+				{"create", "persistentvolumes", apierrs.NewAlreadyExists(api.Resource("persistentvolumes"), "")},
+			},
+			wrapTestWithPluginCalls(
+				nil, // recycle calls
+				nil, // delete calls - if Delete was called the test would fail
+				[]provisionCall{provision1Success},
+				testSyncClaim,
+			),
 		},
 	}
 	runSyncTests(t, tests, storageClasses)
