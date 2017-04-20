@@ -133,6 +133,10 @@ func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secre
 	}
 }
 
+func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
+	return map[string]string{"test-label": "test-value"}, nil
+}
+
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 	if _, ok := config.OtherAttributes["fake-property"]; ok {
 		return []VolumePlugin{
