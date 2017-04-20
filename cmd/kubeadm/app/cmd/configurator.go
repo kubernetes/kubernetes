@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/blang/semver"
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"io"
@@ -9,8 +10,10 @@ import (
 	"k8s.io/client-go/pkg/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	"net/http"
 	"os"
 	"regexp"
@@ -28,17 +31,8 @@ func NewConfigurator(out io.Writer) *cobra.Command {
 			api.Scheme.Default(cfg)
 			internalcfg := kubeadmapi.MasterConfiguration{}
 			api.Scheme.Convert(cfg, &internalcfg, nil)
-			skipAdvertiseAddress := internalcfg.API.AdvertiseAddress == "skip"
-			if skipAdvertiseAddress {
-				//don't lookup address
-				internalcfg.API.AdvertiseAddress = "127.0.0.1"
-			}
-			err := setInitDynamicDefaults(&internalcfg)
+			err := setDefaultConfiguration(&internalcfg)
 			kubeadmutil.CheckErr(err)
-			if skipAdvertiseAddress {
-				//prevent include to certificate
-				internalcfg.API.AdvertiseAddress = ""
-			}
 			internalcfg.MasterCertificates = &kubeadmapi.MasterCertificates{}
 			err = certs.GeneratePKIAssets(&internalcfg)
 			kubeadmutil.CheckErr(err)
@@ -53,7 +47,6 @@ func NewConfigurator(out io.Writer) *cobra.Command {
 			confData, err := yaml.Marshal(&internalcfg)
 			kubeadmutil.CheckErr(err)
 			if outFile == "" {
-				fmt.Fprintf(out, "****** Master Configurations Data *********\n")
 				out.Write(confData)
 				fmt.Fprintf(out, "\n")
 			} else {
@@ -143,4 +136,30 @@ func getDiscoveryToken(url string, size int) (string, error) {
 		return string(token), nil
 	}
 	return "", fmt.Errorf("Failed get discovery token, got %q", token)
+}
+
+func setDefaultConfiguration(cfg *kubeadmapi.MasterConfiguration) error {
+	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
+	if err != nil {
+		return err
+	}
+	cfg.KubernetesVersion = ver
+	// Omit the "v" in the beginning, otherwise semver will fail
+	k8sVersion, err := semver.Parse(cfg.KubernetesVersion[1:])
+	if err != nil {
+		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
+	}
+	if k8sVersion.LT(minK8sVersion) {
+		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= v%s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion, cfg.KubernetesVersion)
+	}
+
+	if cfg.Token == "" {
+		var err error
+		cfg.Token, err = tokenutil.GenerateToken()
+		if err != nil {
+			return fmt.Errorf("couldn't generate random token: %v", err)
+		}
+	}
+
+	return nil
 }
