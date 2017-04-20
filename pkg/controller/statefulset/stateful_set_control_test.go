@@ -404,6 +404,72 @@ func TestDefaultStatefulSetControlUpdatePodFailure(t *testing.T) {
 	}
 }
 
+func TestDefaultStatefulSetControlBlocksOnTerminating(t *testing.T) {
+	set := newStatefulSet(3)
+	client := fake.NewSimpleClientset(set)
+
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
+	ssc := NewDefaultStatefulSetControl(spc)
+	spc.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
+
+	stop := make(chan struct{})
+	defer close(stop)
+	informerFactory.Start(stop)
+	cache.WaitForCacheSync(
+		stop,
+		informerFactory.Apps().V1beta1().StatefulSets().Informer().HasSynced,
+		informerFactory.Core().V1().Pods().Informer().HasSynced,
+	)
+
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	var err error
+	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+	if set.Status.Replicas != 3 {
+		t.Error("Failed to scale StatefulSet to 3 replicas")
+	}
+	// scale the set and add a terminated pod
+	*set.Spec.Replicas = 4
+	pods, err := spc.addTerminatedPod(set, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Error(err)
+	}
+	pods, err = spc.podsLister.List(labels.Everything())
+	if err != nil {
+		t.Fatalf("Error listing pods: %v", err)
+	}
+	if len(pods) != 3 {
+		t.Fatalf("Expected 3 pods, got %d", len(pods))
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	spc.DeleteStatefulPod(set, pods[2])
+	pods, err = spc.podsLister.List(labels.Everything())
+	if err != nil {
+		t.Fatalf("Error listing pods: %v", err)
+	}
+	if len(pods) != 2 {
+		t.Fatalf("Expected 3 pods, got %d", len(pods))
+	}
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+	if set.Status.Replicas != 4 {
+		t.Error("Failed to scale StatefulSet to 3 replicas")
+	}
+}
+
 func TestDefaultStatefulSetControlUpdateSetStatusFailure(t *testing.T) {
 	set := newStatefulSet(3)
 	client := fake.NewSimpleClientset(set)
