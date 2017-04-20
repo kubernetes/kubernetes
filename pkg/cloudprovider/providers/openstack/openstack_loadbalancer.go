@@ -560,8 +560,14 @@ func stringInArray(x string, list []string) bool {
 	return false
 }
 
+func (lbaas *LbaasV2) GetLoadBalancerName(service *v1.Service) string {
+        ret := string(service.UID)
+        ret = strings.Replace(ret, "-", "", -1)
+        return ret
+}
+
 func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := cloudprovider.DeprecatedGetLoadBalancerName(service)
 	loadbalancer, err := getLoadbalancerByName(lbaas.network, loadBalancerName)
 	if err == ErrNotFound {
 		return nil, false, nil
@@ -636,7 +642,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
 
-	name := cloudprovider.GetLoadBalancerName(apiService)
+	name := cloudprovider.DeprecatedGetLoadBalancerName(apiService)
 	loadbalancer, err := getLoadbalancerByName(lbaas.network, name)
 	if err != nil {
 		if err != ErrNotFound {
@@ -970,7 +976,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 }
 
 func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := cloudprovider.DeprecatedGetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
 	ports := service.Spec.Ports
@@ -1117,7 +1123,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 }
 
 func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := cloudprovider.DeprecatedGetLoadBalancerName(service)
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v)", clusterName, loadBalancerName)
 
 	loadbalancer, err := getLoadbalancerByName(lbaas.network, loadBalancerName)
@@ -1286,8 +1292,14 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	return nil
 }
 
+func (lb *LbaasV1) GetLoadBalancerName(service *v1.Service) string {
+        ret := string(service.UID)
+        ret = strings.Replace(ret, "-", "", -1)
+        return ret
+}
+
 func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := cloudprovider.DeprecatedGetLoadBalancerName(service)
 	vip, err := getVipByName(lb.network, loadBalancerName)
 	if err == ErrNotFound {
 		return nil, false, nil
@@ -1343,7 +1355,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 		return nil, fmt.Errorf("Source range restrictions are not supported for openstack load balancers")
 	}
 
-	glog.V(2).Infof("Checking if openstack load balancer already exists: %s", cloudprovider.GetLoadBalancerName(apiService))
+	glog.V(2).Infof("Checking if openstack load balancer already exists: %s", cloudprovider.DeprecatedGetLoadBalancerName(apiService))
 	_, exists, err := lb.GetLoadBalancer(clusterName, apiService)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if openstack load balancer already exists: %v", err)
@@ -1362,7 +1374,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 	if lbmethod == "" {
 		lbmethod = pools.LBMethodRoundRobin
 	}
-	name := cloudprovider.GetLoadBalancerName(apiService)
+	name := cloudprovider.DeprecatedGetLoadBalancerName(apiService)
 	pool, err := pools.Create(lb.network, pools.CreateOpts{
 		Name:     name,
 		Protocol: pools.ProtocolTCP,
@@ -1457,7 +1469,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 }
 
 func (lb *LbaasV1) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := cloudprovider.DeprecatedGetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
 	vip, err := getVipByName(lb.network, loadBalancerName)
@@ -1519,7 +1531,7 @@ func (lb *LbaasV1) UpdateLoadBalancer(clusterName string, service *v1.Service, n
 }
 
 func (lb *LbaasV1) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := cloudprovider.DeprecatedGetLoadBalancerName(service)
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v)", clusterName, loadBalancerName)
 
 	vip, err := getVipByName(lb.network, loadBalancerName)
