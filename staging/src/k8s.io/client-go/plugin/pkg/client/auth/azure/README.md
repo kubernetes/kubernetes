@@ -5,33 +5,39 @@ This plugin provides an integration with Azure Active Directory device flow. If 
 
 ## Usage
 
-1. Create an Azure native application following these [instructions](https://docs.microsoft.com/en-us/azure/active-directory/active-directory-app-registration)
+1. Create an Azure Active Directory native application for `apiserver` following these [instructions](https://docs.microsoft.com/en-us/azure/active-directory/active-directory-app-registration)
 
-  Assign permissions to this application to access the `https://management.core.windows.net/"` audience.
+2. Create a second Azure Active Directory native application for `kubectl` 
 
-2. Configure the `apiserver` to use the Azure Active Directory as an OIDC provider with following options
+3. On `kubectl` application's configuration page in Azure portal grant permissions to `apiserver` application by clicking on *Required Permissions* then click the *Grant Permissions* button and introduce the ID of `apiserver` application
+
+4. Configure the `apiserver` to use the Azure Active Directory as an OIDC provider with following options
 
    ```
-   --oidc-client-id="spn:APPLICATION_ID" \
+   --oidc-client-id="spn:APISERVER_APPLICATION_ID" \
    --oidc-issuer-url="https://sts.windows.net/TENANT_ID/"
    --oidc-username-claim="sub"
    ```
 
-   * Replace `TENANT_ID` and `APPLICATION_ID` with your tenant ID.
+   * Replace the `APISERVER_APPLICATION_ID` with the application ID of `apiserver` application
+   * Replace `TENANT_ID` with your tenant ID.
 
-3. Configure the `kubectl` to use the `azure` authentication provider with using the registered application
+5. Configure the `kubectl` to use the `azure` authentication provider 
 
    ```
    kubectl config set-credentials "USER_NAME" --auth-provider=azure \
      --auth-provider-arg=environment=AzurePublicCloud \
      --auth-provider-arg=client-id=APPLICATION_ID \
-     --auth-provider-arg=tenant-id=TENANT_ID 
+     --auth-provider-arg=tenant-id=TENANT_ID \
+     --auth-provider-arg=apiserver-id=APISERVER_APPLICATION_ID
    ```
 
    * Supported environments: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
-   * Replace `USER_NAME`, `APPLICATION_ID` and `TENANT_ID` with the values of the registered application.
+   * Replace `USER_NAME` and `TENANT_ID` with your user name and tenant ID
+   * Replace `APPLICATION_ID` with the application ID of your`kubectl` application ID
+   * Replace `APISERVER_APPLICATION_ID` with the application ID of your `apiserver` application ID 
 
- 4. The access token is acquired when first `kubectl` command is executed
+ 6. The access token is acquired when first `kubectl` command is executed
 
    ```
    kubeclt get pods
@@ -39,5 +45,4 @@ This plugin provides an integration with Azure Active Directory device flow. If 
    To sign in, use a web browser to open the page https://aka.ms/devicelogin and enter the code DEC7D48GA to authenticate.
    ```
 
-   * After signing in a web browser, the tokens are stored in the configuration, which will be used when executing next commands.
- 
+   * After signing in a web browser, the token is stored in the configuration, and it will be reused when executing next commands.
