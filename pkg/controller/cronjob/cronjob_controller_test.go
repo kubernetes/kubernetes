@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 // schedule is hourly on the hour
@@ -288,6 +289,29 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		}
 		if len(jc.Jobs) != expectedCreates {
 			t.Errorf("%s: expected %d job started, actually %v", name, expectedCreates, len(jc.Jobs))
+		}
+		for i := range jc.Jobs {
+			job := &jc.Jobs[i]
+			controllerRef := controller.GetControllerOf(job)
+			if controllerRef == nil {
+				t.Errorf("%s: expected job to have ControllerRef: %#v", name, job)
+			} else {
+				if got, want := controllerRef.APIVersion, "batch/v2alpha1"; got != want {
+					t.Errorf("%s: controllerRef.APIVersion = %q, want %q", name, got, want)
+				}
+				if got, want := controllerRef.Kind, "CronJob"; got != want {
+					t.Errorf("%s: controllerRef.Kind = %q, want %q", name, got, want)
+				}
+				if got, want := controllerRef.Name, sj.Name; got != want {
+					t.Errorf("%s: controllerRef.Name = %q, want %q", name, got, want)
+				}
+				if got, want := controllerRef.UID, sj.UID; got != want {
+					t.Errorf("%s: controllerRef.UID = %q, want %q", name, got, want)
+				}
+				if controllerRef.Controller == nil || *controllerRef.Controller != true {
+					t.Errorf("%s: controllerRef.Controller is not set to true", name)
+				}
+			}
 		}
 
 		expectedDeletes := 0
@@ -583,58 +607,61 @@ func TestSyncOne_Status(t *testing.T) {
 		now              time.Time
 		hasUnexpectedJob bool
 		hasMissingJob    bool
+		beingDeleted     bool
 
 		// expectations
 		expectCreate bool
 		expectDelete bool
 	}{
-		"never ran, not time, A":                {A, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F, F, F},
-		"never ran, not time, F":                {f, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F, F, F},
-		"never ran, not time, R":                {R, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F, F, F},
-		"never ran, is time, A":                 {A, F, onTheHour, noDead, F, F, justAfterTheHour(), F, F, T, F},
-		"never ran, is time, F":                 {f, F, onTheHour, noDead, F, F, justAfterTheHour(), F, F, T, F},
-		"never ran, is time, R":                 {R, F, onTheHour, noDead, F, F, justAfterTheHour(), F, F, T, F},
-		"never ran, is time, suspended":         {A, T, onTheHour, noDead, F, F, justAfterTheHour(), F, F, F, F},
-		"never ran, is time, past deadline":     {A, F, onTheHour, shortDead, F, F, justAfterTheHour(), F, F, F, F},
-		"never ran, is time, not past deadline": {A, F, onTheHour, longDead, F, F, justAfterTheHour(), F, F, T, F},
+		"never ran, not time, A":                {A, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F, F, F, F},
+		"never ran, not time, F":                {f, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F, F, F, F},
+		"never ran, not time, R":                {R, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F, F, F, F},
+		"never ran, is time, A":                 {A, F, onTheHour, noDead, F, F, justAfterTheHour(), F, F, F, T, F},
+		"never ran, is time, F":                 {f, F, onTheHour, noDead, F, F, justAfterTheHour(), F, F, F, T, F},
+		"never ran, is time, R":                 {R, F, onTheHour, noDead, F, F, justAfterTheHour(), F, F, F, T, F},
+		"never ran, is time, deleting":          {A, F, onTheHour, noDead, F, F, justAfterTheHour(), F, F, T, F, F},
+		"never ran, is time, suspended":         {A, T, onTheHour, noDead, F, F, justAfterTheHour(), F, F, F, F, F},
+		"never ran, is time, past deadline":     {A, F, onTheHour, shortDead, F, F, justAfterTheHour(), F, F, F, F, F},
+		"never ran, is time, not past deadline": {A, F, onTheHour, longDead, F, F, justAfterTheHour(), F, F, F, T, F},
 
-		"prev ran but done, not time, A":                                            {A, F, onTheHour, noDead, T, F, justBeforeTheHour(), F, F, F, F},
-		"prev ran but done, not time, finished job, A":                              {A, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, F, F, F},
-		"prev ran but done, not time, unexpected job, A":                            {A, F, onTheHour, noDead, T, F, justBeforeTheHour(), T, F, F, F},
-		"prev ran but done, not time, missing job, A":                               {A, F, onTheHour, noDead, T, F, justBeforeTheHour(), F, T, F, F},
-		"prev ran but done, not time, missing job, unexpected job, A":               {A, F, onTheHour, noDead, T, F, justBeforeTheHour(), T, T, F, F},
-		"prev ran but done, not time, finished job, unexpected job, A":              {A, F, onTheHour, noDead, T, T, justBeforeTheHour(), T, F, F, F},
-		"prev ran but done, not time, finished job, missing job, A":                 {A, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, T, F, F},
-		"prev ran but done, not time, finished job, missing job, unexpected job, A": {A, F, onTheHour, noDead, T, T, justBeforeTheHour(), T, T, F, F},
-		"prev ran but done, not time, finished job, F":                              {f, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, F, F, F},
-		"prev ran but done, not time, missing job, F":                               {f, F, onTheHour, noDead, T, F, justBeforeTheHour(), F, T, F, F},
-		"prev ran but done, not time, finished job, missing job, F":                 {f, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, T, F, F},
-		"prev ran but done, not time, unexpected job, R":                            {R, F, onTheHour, noDead, T, F, justBeforeTheHour(), T, F, F, F},
+		"prev ran but done, not time, A":                                            {A, F, onTheHour, noDead, T, F, justBeforeTheHour(), F, F, F, F, F},
+		"prev ran but done, not time, finished job, A":                              {A, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, F, F, F, F},
+		"prev ran but done, not time, unexpected job, A":                            {A, F, onTheHour, noDead, T, F, justBeforeTheHour(), T, F, F, F, F},
+		"prev ran but done, not time, missing job, A":                               {A, F, onTheHour, noDead, T, F, justBeforeTheHour(), F, T, F, F, F},
+		"prev ran but done, not time, missing job, unexpected job, A":               {A, F, onTheHour, noDead, T, F, justBeforeTheHour(), T, T, F, F, F},
+		"prev ran but done, not time, finished job, unexpected job, A":              {A, F, onTheHour, noDead, T, T, justBeforeTheHour(), T, F, F, F, F},
+		"prev ran but done, not time, finished job, missing job, A":                 {A, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, T, F, F, F},
+		"prev ran but done, not time, finished job, missing job, unexpected job, A": {A, F, onTheHour, noDead, T, T, justBeforeTheHour(), T, T, F, F, F},
+		"prev ran but done, not time, finished job, F":                              {f, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, F, F, F, F},
+		"prev ran but done, not time, missing job, F":                               {f, F, onTheHour, noDead, T, F, justBeforeTheHour(), F, T, F, F, F},
+		"prev ran but done, not time, finished job, missing job, F":                 {f, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, T, F, F, F},
+		"prev ran but done, not time, unexpected job, R":                            {R, F, onTheHour, noDead, T, F, justBeforeTheHour(), T, F, F, F, F},
 
-		"prev ran but done, is time, A":                                               {A, F, onTheHour, noDead, T, F, justAfterTheHour(), F, F, T, F},
-		"prev ran but done, is time, finished job, A":                                 {A, F, onTheHour, noDead, T, T, justAfterTheHour(), F, F, T, F},
-		"prev ran but done, is time, unexpected job, A":                               {A, F, onTheHour, noDead, T, F, justAfterTheHour(), T, F, T, F},
-		"prev ran but done, is time, finished job, unexpected job, A":                 {A, F, onTheHour, noDead, T, T, justAfterTheHour(), T, F, T, F},
-		"prev ran but done, is time, F":                                               {f, F, onTheHour, noDead, T, F, justAfterTheHour(), F, F, T, F},
-		"prev ran but done, is time, finished job, F":                                 {f, F, onTheHour, noDead, T, T, justAfterTheHour(), F, F, T, F},
-		"prev ran but done, is time, unexpected job, F":                               {f, F, onTheHour, noDead, T, F, justAfterTheHour(), T, F, T, F},
-		"prev ran but done, is time, finished job, unexpected job, F":                 {f, F, onTheHour, noDead, T, T, justAfterTheHour(), T, F, T, F},
-		"prev ran but done, is time, R":                                               {R, F, onTheHour, noDead, T, F, justAfterTheHour(), F, F, T, F},
-		"prev ran but done, is time, finished job, R":                                 {R, F, onTheHour, noDead, T, T, justAfterTheHour(), F, F, T, F},
-		"prev ran but done, is time, unexpected job, R":                               {R, F, onTheHour, noDead, T, F, justAfterTheHour(), T, F, T, F},
-		"prev ran but done, is time, finished job, unexpected job, R":                 {R, F, onTheHour, noDead, T, T, justAfterTheHour(), T, F, T, F},
-		"prev ran but done, is time, suspended":                                       {A, T, onTheHour, noDead, T, F, justAfterTheHour(), F, F, F, F},
-		"prev ran but done, is time, finished job, suspended":                         {A, T, onTheHour, noDead, T, T, justAfterTheHour(), F, F, F, F},
-		"prev ran but done, is time, unexpected job, suspended":                       {A, T, onTheHour, noDead, T, F, justAfterTheHour(), T, F, F, F},
-		"prev ran but done, is time, finished job, unexpected job, suspended":         {A, T, onTheHour, noDead, T, T, justAfterTheHour(), T, F, F, F},
-		"prev ran but done, is time, past deadline":                                   {A, F, onTheHour, shortDead, T, F, justAfterTheHour(), F, F, F, F},
-		"prev ran but done, is time, finished job, past deadline":                     {A, F, onTheHour, shortDead, T, T, justAfterTheHour(), F, F, F, F},
-		"prev ran but done, is time, unexpected job, past deadline":                   {A, F, onTheHour, shortDead, T, F, justAfterTheHour(), T, F, F, F},
-		"prev ran but done, is time, finished job, unexpected job, past deadline":     {A, F, onTheHour, shortDead, T, T, justAfterTheHour(), T, F, F, F},
-		"prev ran but done, is time, not past deadline":                               {A, F, onTheHour, longDead, T, F, justAfterTheHour(), F, F, T, F},
-		"prev ran but done, is time, finished job, not past deadline":                 {A, F, onTheHour, longDead, T, T, justAfterTheHour(), F, F, T, F},
-		"prev ran but done, is time, unexpected job, not past deadline":               {A, F, onTheHour, longDead, T, F, justAfterTheHour(), T, F, T, F},
-		"prev ran but done, is time, finished job, unexpected job, not past deadline": {A, F, onTheHour, longDead, T, T, justAfterTheHour(), T, F, T, F},
+		"prev ran but done, is time, A":                                               {A, F, onTheHour, noDead, T, F, justAfterTheHour(), F, F, F, T, F},
+		"prev ran but done, is time, finished job, A":                                 {A, F, onTheHour, noDead, T, T, justAfterTheHour(), F, F, F, T, F},
+		"prev ran but done, is time, unexpected job, A":                               {A, F, onTheHour, noDead, T, F, justAfterTheHour(), T, F, F, T, F},
+		"prev ran but done, is time, finished job, unexpected job, A":                 {A, F, onTheHour, noDead, T, T, justAfterTheHour(), T, F, F, T, F},
+		"prev ran but done, is time, F":                                               {f, F, onTheHour, noDead, T, F, justAfterTheHour(), F, F, F, T, F},
+		"prev ran but done, is time, finished job, F":                                 {f, F, onTheHour, noDead, T, T, justAfterTheHour(), F, F, F, T, F},
+		"prev ran but done, is time, unexpected job, F":                               {f, F, onTheHour, noDead, T, F, justAfterTheHour(), T, F, F, T, F},
+		"prev ran but done, is time, finished job, unexpected job, F":                 {f, F, onTheHour, noDead, T, T, justAfterTheHour(), T, F, F, T, F},
+		"prev ran but done, is time, R":                                               {R, F, onTheHour, noDead, T, F, justAfterTheHour(), F, F, F, T, F},
+		"prev ran but done, is time, finished job, R":                                 {R, F, onTheHour, noDead, T, T, justAfterTheHour(), F, F, F, T, F},
+		"prev ran but done, is time, unexpected job, R":                               {R, F, onTheHour, noDead, T, F, justAfterTheHour(), T, F, F, T, F},
+		"prev ran but done, is time, finished job, unexpected job, R":                 {R, F, onTheHour, noDead, T, T, justAfterTheHour(), T, F, F, T, F},
+		"prev ran but done, is time, deleting":                                        {A, F, onTheHour, noDead, T, F, justAfterTheHour(), F, F, T, F, F},
+		"prev ran but done, is time, suspended":                                       {A, T, onTheHour, noDead, T, F, justAfterTheHour(), F, F, F, F, F},
+		"prev ran but done, is time, finished job, suspended":                         {A, T, onTheHour, noDead, T, T, justAfterTheHour(), F, F, F, F, F},
+		"prev ran but done, is time, unexpected job, suspended":                       {A, T, onTheHour, noDead, T, F, justAfterTheHour(), T, F, F, F, F},
+		"prev ran but done, is time, finished job, unexpected job, suspended":         {A, T, onTheHour, noDead, T, T, justAfterTheHour(), T, F, F, F, F},
+		"prev ran but done, is time, past deadline":                                   {A, F, onTheHour, shortDead, T, F, justAfterTheHour(), F, F, F, F, F},
+		"prev ran but done, is time, finished job, past deadline":                     {A, F, onTheHour, shortDead, T, T, justAfterTheHour(), F, F, F, F, F},
+		"prev ran but done, is time, unexpected job, past deadline":                   {A, F, onTheHour, shortDead, T, F, justAfterTheHour(), T, F, F, F, F},
+		"prev ran but done, is time, finished job, unexpected job, past deadline":     {A, F, onTheHour, shortDead, T, T, justAfterTheHour(), T, F, F, F, F},
+		"prev ran but done, is time, not past deadline":                               {A, F, onTheHour, longDead, T, F, justAfterTheHour(), F, F, F, T, F},
+		"prev ran but done, is time, finished job, not past deadline":                 {A, F, onTheHour, longDead, T, T, justAfterTheHour(), F, F, F, T, F},
+		"prev ran but done, is time, unexpected job, not past deadline":               {A, F, onTheHour, longDead, T, F, justAfterTheHour(), T, F, F, T, F},
+		"prev ran but done, is time, finished job, unexpected job, not past deadline": {A, F, onTheHour, longDead, T, T, justAfterTheHour(), T, F, F, T, F},
 	}
 
 	for name, tc := range testCases {
@@ -673,6 +700,10 @@ func TestSyncOne_Status(t *testing.T) {
 				t.Errorf("%s: test setup error: failed to get job's ref: %v.", name, err)
 			}
 			sj.Status.Active = append(sj.Status.Active, *ref)
+		}
+		if tc.beingDeleted {
+			timestamp := metav1.NewTime(tc.now)
+			sj.DeletionTimestamp = &timestamp
 		}
 
 		jc := &fakeJobControl{}

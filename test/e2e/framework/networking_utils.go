@@ -594,9 +594,9 @@ func (config *NetworkingTestConfig) getNamespacesClient() coreclientset.Namespac
 	return config.f.ClientSet.Core().Namespaces()
 }
 
-func CheckReachabilityFromPod(expectToBeReachable bool, namespace, pod, target string) {
+func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
 	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
-	err := wait.PollImmediate(Poll, 2*time.Minute, func() (bool, error) {
+	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		_, err := RunHostCmd(namespace, pod, cmd)
 		if expectToBeReachable && err != nil {
 			Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)

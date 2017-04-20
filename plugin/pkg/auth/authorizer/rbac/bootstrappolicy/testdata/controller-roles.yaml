@@ -109,6 +109,7 @@ items:
     - delete
     - get
     - list
+    - patch
     - update
     - watch
   - apiGroups:
@@ -492,6 +493,7 @@ items:
     - create
     - delete
     - list
+    - patch
     - watch
   - apiGroups:
     - ""

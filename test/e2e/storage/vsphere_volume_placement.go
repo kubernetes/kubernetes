@@ -281,7 +281,7 @@ var _ = framework.KubeDescribe("Volume Placement [Volume]", func() {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podB), "defer: Failed to delete pod ", podB.Name)
 			By(fmt.Sprintf("wait for volumes to be detached from the node: %v", node1Name))
 			for _, volumePath := range volumePaths {
-				waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(node1Name))
+				framework.ExpectNoError(waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(node1Name)))
 			}
 		}()
 
@@ -381,6 +381,6 @@ func deletePodAndWaitForVolumeToDetach(f *framework.Framework, c clientset.Inter
 
 	By("Waiting for volume to be detached from the node")
 	for _, volumePath := range volumePaths {
-		waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(nodeName))
+		framework.ExpectNoError(waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(nodeName)))
 	}
 }
