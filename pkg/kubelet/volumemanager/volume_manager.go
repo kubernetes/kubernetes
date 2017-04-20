@@ -434,7 +434,7 @@ func getExtraSupplementalGid(volumeGidValue string, pod *v1.Pod) (int64, bool) {
 
 	if pod.Spec.SecurityContext != nil {
 		for _, existingGid := range pod.Spec.SecurityContext.SupplementalGroups {
-			if gid == existingGid {
+			if gid == int64(existingGid) {
 				return 0, false
 			}
 		}

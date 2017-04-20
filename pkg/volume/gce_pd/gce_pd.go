@@ -256,12 +256,12 @@ func (b *gcePersistentDiskMounter) CanMount() error {
 }
 
 // SetUp bind mounts the disk global mount to the volume path.
-func (b *gcePersistentDiskMounter) SetUp(fsGroup *int64) error {
+func (b *gcePersistentDiskMounter) SetUp(fsGroup *types.UnixGroupID) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // SetUp bind mounts the disk global mount to the give volume path.
-func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("GCE PersistentDisk set up: Dir (%s) PD name (%q) Mounted (%t) Error (%v), ReadOnly (%t)", dir, b.pdName, !notMnt, err, b.readOnly)

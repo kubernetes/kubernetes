@@ -19,6 +19,7 @@ package flexvolume
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
@@ -47,6 +48,6 @@ func TestSetUpAt(t *testing.T) {
 	m, _ := plugin.newMounterInternal(spec, pod, mounter, plugin.runner)
 	m.SetUpAt(rootDir+"/mount-dir", nil)
 
-	fsGroup := int64(42)
+	fsGroup := types.UnixGroupID(42)
 	m.SetUpAt(rootDir+"/mount-dir", &fsGroup)
 }

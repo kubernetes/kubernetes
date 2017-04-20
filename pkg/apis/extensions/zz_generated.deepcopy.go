@@ -55,10 +55,10 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentStatus, InType: reflect.TypeOf(&DeploymentStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentStrategy, InType: reflect.TypeOf(&DeploymentStrategy{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_FSGroupStrategyOptions, InType: reflect.TypeOf(&FSGroupStrategyOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_GroupIDRange, InType: reflect.TypeOf(&GroupIDRange{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_HTTPIngressPath, InType: reflect.TypeOf(&HTTPIngressPath{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_HTTPIngressRuleValue, InType: reflect.TypeOf(&HTTPIngressRuleValue{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_HostPortRange, InType: reflect.TypeOf(&HostPortRange{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_IDRange, InType: reflect.TypeOf(&IDRange{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_Ingress, InType: reflect.TypeOf(&Ingress{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_IngressBackend, InType: reflect.TypeOf(&IngressBackend{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_IngressList, InType: reflect.TypeOf(&IngressList{})},
@@ -95,6 +95,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ThirdPartyResourceData, InType: reflect.TypeOf(&ThirdPartyResourceData{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ThirdPartyResourceDataList, InType: reflect.TypeOf(&ThirdPartyResourceDataList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ThirdPartyResourceList, InType: reflect.TypeOf(&ThirdPartyResourceList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_UserIDRange, InType: reflect.TypeOf(&UserIDRange{})},
 	)
 }
 
@@ -386,9 +387,18 @@ func DeepCopy_extensions_FSGroupStrategyOptions(in interface{}, out interface{},
 		*out = *in
 		if in.Ranges != nil {
 			in, out := &in.Ranges, &out.Ranges
-			*out = make([]IDRange, len(*in))
+			*out = make([]GroupIDRange, len(*in))
 			copy(*out, *in)
 		}
+		return nil
+	}
+}
+
+func DeepCopy_extensions_GroupIDRange(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*GroupIDRange)
+		out := out.(*GroupIDRange)
+		*out = *in
 		return nil
 	}
 }
@@ -420,15 +430,6 @@ func DeepCopy_extensions_HostPortRange(in interface{}, out interface{}, c *conve
 	{
 		in := in.(*HostPortRange)
 		out := out.(*HostPortRange)
-		*out = *in
-		return nil
-	}
-}
-
-func DeepCopy_extensions_IDRange(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*IDRange)
-		out := out.(*IDRange)
 		*out = *in
 		return nil
 	}
@@ -906,7 +907,7 @@ func DeepCopy_extensions_RunAsUserStrategyOptions(in interface{}, out interface{
 		*out = *in
 		if in.Ranges != nil {
 			in, out := &in.Ranges, &out.Ranges
-			*out = make([]IDRange, len(*in))
+			*out = make([]UserIDRange, len(*in))
 			copy(*out, *in)
 		}
 		return nil
@@ -977,7 +978,7 @@ func DeepCopy_extensions_SupplementalGroupsStrategyOptions(in interface{}, out i
 		*out = *in
 		if in.Ranges != nil {
 			in, out := &in.Ranges, &out.Ranges
-			*out = make([]IDRange, len(*in))
+			*out = make([]GroupIDRange, len(*in))
 			copy(*out, *in)
 		}
 		return nil
@@ -1054,6 +1055,15 @@ func DeepCopy_extensions_ThirdPartyResourceList(in interface{}, out interface{},
 				}
 			}
 		}
+		return nil
+	}
+}
+
+func DeepCopy_extensions_UserIDRange(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*UserIDRange)
+		out := out.(*UserIDRange)
+		*out = *in
 		return nil
 	}
 }
