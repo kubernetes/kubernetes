@@ -33,7 +33,7 @@ const (
 )
 
 // TODO(crassirostris): Remove Flaky once test is stable
-var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]", func() {
+var _ = framework.KubeDescribe("Cluster level logging using GCL [Feature:StackdriverLogging]", func() {
 	f := framework.NewDefaultFramework("gcl-logging-load")
 
 	It("should create a constant load with long-living pods and ensure logs delivery", func() {
