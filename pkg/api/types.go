@@ -2453,6 +2453,10 @@ type LoadBalancerStatus struct {
 	// traffic intended for the service should be sent to these ingress points.
 	// +optional
 	Ingress []LoadBalancerIngress
+
+	// LoadBalancer Name.
+        // +optional
+        Name string
 }
 
 // LoadBalancerIngress represents the status of a load-balancer ingress point:

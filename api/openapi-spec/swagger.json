@@ -38941,6 +38941,10 @@
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LoadBalancerIngress"
       }
+     },
+     "name": {
+      "description": "LoadBalancer Name.",
+      "type": "string"
      }
     }
    },

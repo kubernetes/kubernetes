@@ -2788,6 +2788,10 @@ type LoadBalancerStatus struct {
 	// Traffic intended for the service should be sent to these ingress points.
 	// +optional
 	Ingress []LoadBalancerIngress `json:"ingress,omitempty" protobuf:"bytes,1,rep,name=ingress"`
+
+	// LoadBalancer Name.
+	// +optional
+	Name string `json:"name,omitempty" protobuf:"bytes,2,opt,name=name"`
 }
 
 // LoadBalancerIngress represents the status of a load-balancer ingress point:
