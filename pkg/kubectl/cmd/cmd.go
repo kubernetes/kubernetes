@@ -203,8 +203,8 @@ __custom_func() {
 
     * all
     * certificatesigningrequests (aka 'csr')
-    * clusterrolebindings
-    * clusterroles
+    * clusterrolebindings (aka 'crb')
+    * clusterroles (aka 'cr')
     * clusters (valid only for federation apiservers)
     * componentstatuses (aka 'cs')
     * configmaps (aka 'cm')
@@ -229,7 +229,7 @@ __custom_func() {
     * replicasets (aka 'rs')
     * replicationcontrollers (aka 'rc')
     * resourcequotas (aka 'quota')
-    * rolebindings
+    * rolebindings (aka 'rb')
     * roles
     * secrets
     * serviceaccounts (aka 'sa')
