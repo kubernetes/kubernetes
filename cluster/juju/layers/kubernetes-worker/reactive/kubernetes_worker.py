@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import os
+import random
 import shutil
 
 from shlex import split
@@ -99,7 +100,7 @@ def cleanup_pre_snap_services():
     # cleanup old files
     files = [
         "/lib/systemd/system/kubelet.service",
-        "/lib/systemd/system/kube-proxy.service"
+        "/lib/systemd/system/kube-proxy.service",
         "/etc/default/kube-default",
         "/etc/default/kubelet",
         "/etc/default/kube-proxy",
@@ -319,7 +320,7 @@ def start_worker(kube_api, kube_control, cni):
     # set --allow-privileged flag for kubelet
     set_privileged()
 
-    create_config(servers[0])
+    create_config(random.choice(servers))
     configure_worker_services(servers, dns, cluster_cidr)
     set_state('kubernetes-worker.config.created')
     restart_unit_services()
@@ -475,7 +476,7 @@ def configure_worker_services(api_servers, dns, cluster_cidr):
     kube_proxy_opts.add('kubeconfig', kubeconfig_path)
     kube_proxy_opts.add('logtostderr', 'true')
     kube_proxy_opts.add('v', '0')
-    kube_proxy_opts.add('master', ','.join(api_servers), strict=True)
+    kube_proxy_opts.add('master', random.choice(api_servers), strict=True)
 
     cmd = ['snap', 'set', 'kubelet'] + kubelet_opts.to_s().split(' ')
     check_call(cmd)

@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path"
 	"reflect"
 	"strings"
 	"sync"
@@ -89,6 +91,7 @@ type Framework struct {
 }
 
 type TestDataSummary interface {
+	SummaryKind() string
 	PrintHumanReadable() string
 	PrintJSON() string
 }
@@ -317,17 +320,33 @@ func (f *Framework) AfterEach() {
 	}
 
 	outputTypes := strings.Split(TestContext.OutputPrintType, ",")
+	now := time.Now()
 	for _, printType := range outputTypes {
 		switch printType {
 		case "hr":
 			for i := range summaries {
-				Logf(summaries[i].PrintHumanReadable())
+				if TestContext.ReportDir == "" {
+					Logf(summaries[i].PrintHumanReadable())
+				} else {
+					// TODO: learn to extract test name and append it to the kind instead of timestamp.
+					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+now.Format(time.RFC3339)+".txt")
+					if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
+						Logf("Failed to write file %v with test performance data: %v", filePath, err)
+					}
+				}
 			}
 		case "json":
 			for i := range summaries {
-				typeName := reflect.TypeOf(summaries[i]).String()
-				Logf("%v JSON\n%v", typeName[strings.LastIndex(typeName, ".")+1:], summaries[i].PrintJSON())
-				Logf("Finished")
+				if TestContext.ReportDir == "" {
+					Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
+					Logf("Finished")
+				} else {
+					// TODO: learn to extract test name and append it to the kind instead of timestamp.
+					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+now.Format(time.RFC3339)+".json")
+					if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
+						Logf("Failed to write file %v with test performance data: %v", filePath, err)
+					}
+				}
 			}
 		default:
 			Logf("Unknown output type: %v. Skipping.", printType)
