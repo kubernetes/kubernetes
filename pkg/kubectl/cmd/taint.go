@@ -80,7 +80,13 @@ var (
 		kubectl taint nodes foo dedicated:NoSchedule-
 
 		# Remove from node 'foo' all the taints with key 'dedicated'
-		kubectl taint nodes foo dedicated-`))
+		kubectl taint nodes foo dedicated-
+
+		# Add from node 'foo' all the taints with key 'dedicated'
+		kubectl taint nodes foo dedicated-
+
+		# Add a taint with key 'dedicated' on nodes having label mylabel=X
+		kubectl taint node -l myLabel=X  dedicated=foo:PreferNoSchedule`))
 )
 
 func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -248,12 +254,12 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	o.builder = resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace()
+	if o.selector != "" {
+		o.builder = o.builder.SelectorParam(o.selector).ResourceTypes("node")
+	}
 	if o.all {
 		o.builder = o.builder.SelectAllParam(o.all).ResourceTypes("node")
 	} else {
-		if len(o.resources) < 2 {
-			return fmt.Errorf("at least one resource name must be specified since 'all' parameter is not set")
-		}
 		o.builder = o.builder.ResourceNames("node", o.resources[1:]...)
 	}
 	o.builder = o.builder.SelectorParam(o.selector).
