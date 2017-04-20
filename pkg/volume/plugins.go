@@ -233,6 +233,9 @@ type VolumeHost interface {
 
 	// Returns a function that returns a secret.
 	GetSecretFunc() func(namespace, name string) (*v1.Secret, error)
+
+	// Returns the name of the node kubelet is running on
+	GetNodeName() string
 }
 
 // VolumePluginMgr tracks registered plugins.

@@ -140,3 +140,7 @@ func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
 	return kvh.secretManager.GetSecret
 }
+
+func (kvh *kubeletVolumeHost) GetNodeName() string {
+	return string(kvh.kubelet.nodeName)
+}
