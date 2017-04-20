@@ -24,6 +24,7 @@ import (
 	"path"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -2569,13 +2570,6 @@ var supportedServiceType = sets.NewString(string(api.ServiceTypeClusterIP), stri
 
 // ValidateService tests if required fields/annotations of a Service are valid.
 func ValidateService(service *api.Service) field.ErrorList {
-	allErrs := validateServiceFields(service)
-	allErrs = append(allErrs, validateServiceAnnotations(service, nil)...)
-	return allErrs
-}
-
-// validateServiceFields tests if required fields in the service are set.
-func validateServiceFields(service *api.Service) field.ErrorList {
 	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, field.NewPath("metadata"))
 
 	specPath := field.NewPath("spec")
@@ -2719,6 +2713,9 @@ func validateServiceFields(service *api.Service) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(fieldPath, val, "must be a list of IP ranges. For example, 10.240.0.0/24,10.250.0.0/24 "))
 		}
 	}
+
+	allErrs = append(allErrs, validateServiceExternalTrafficFields(service)...)
+
 	return allErrs
 }
 
@@ -2760,61 +2757,84 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 	return allErrs
 }
 
-func validateServiceAnnotations(service *api.Service, oldService *api.Service) (allErrs field.ErrorList) {
-	// 2 annotations went from alpha to beta in 1.5: healthcheck-nodeport and
-	// external-traffic. The user cannot mix these. All updates to the alpha
-	// annotation are disallowed. The user must change both alpha annotations
-	// to beta before making any modifications, even though the system continues
-	// to respect the alpha version.
-	hcAlpha, healthCheckAlphaOk := service.Annotations[apiservice.AlphaAnnotationHealthCheckNodePort]
-	onlyLocalAlpha, onlyLocalAlphaOk := service.Annotations[apiservice.AlphaAnnotationExternalTraffic]
+// validateServiceExternalTrafficFields validates ExternalTraffic related annotations
+// have legal value.
+func validateServiceExternalTrafficFields(service *api.Service) field.ErrorList {
+	allErrs := field.ErrorList{}
 
-	_, healthCheckBetaOk := service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]
-	_, onlyLocalBetaOk := service.Annotations[apiservice.BetaAnnotationExternalTraffic]
-
-	var oldHealthCheckAlpha, oldOnlyLocalAlpha string
-	var oldHealthCheckAlphaOk, oldOnlyLocalAlphaOk bool
-	if oldService != nil {
-		oldHealthCheckAlpha, oldHealthCheckAlphaOk = oldService.Annotations[apiservice.AlphaAnnotationHealthCheckNodePort]
-		oldOnlyLocalAlpha, oldOnlyLocalAlphaOk = oldService.Annotations[apiservice.AlphaAnnotationExternalTraffic]
+	for _, annotation := range []string{apiservice.AlphaAnnotationExternalTraffic, apiservice.BetaAnnotationExternalTraffic} {
+		if l, ok := service.Annotations[annotation]; ok {
+			if l != apiservice.AnnotationValueExternalTrafficLocal &&
+				l != apiservice.AnnotationValueExternalTrafficGlobal {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(annotation), l,
+					fmt.Sprintf("ExternalTraffic must be %v or %v", apiservice.AnnotationValueExternalTrafficLocal, apiservice.AnnotationValueExternalTrafficGlobal)))
+			}
+		}
 	}
-	hcValueChanged := oldHealthCheckAlphaOk && healthCheckAlphaOk && oldHealthCheckAlpha != hcAlpha
-	hcValueNew := !oldHealthCheckAlphaOk && healthCheckAlphaOk
-	hcValueGone := !healthCheckAlphaOk && !healthCheckBetaOk && oldHealthCheckAlphaOk
-	onlyLocalHCMismatch := onlyLocalBetaOk && healthCheckAlphaOk
+	for _, annotation := range []string{apiservice.AlphaAnnotationHealthCheckNodePort, apiservice.BetaAnnotationHealthCheckNodePort} {
+		if l, ok := service.Annotations[annotation]; ok {
+			p, err := strconv.Atoi(l)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(annotation), l,
+					"HealthCheckNodePort must be a valid port number"))
+			} else if p <= 0 {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(annotation), l,
+					"HealthCheckNodePort must be greater than 0"))
+			}
+		}
+	}
 
-	// On upgrading to a 1.5 cluster, the user is locked in at the current
-	// alpha setting, till they modify the Service such that the pair of
-	// annotations are both beta. Basically this means we need to:
-	// Disallow updates to the alpha annotation.
-	// Disallow creating a Service with the alpha annotation.
-	// Disallow removing both alpha annotations. Removing the health-check
-	// annotation is rejected at a later stage anyway, so if we allow removing
-	// just onlyLocal we might leak the port.
-	// Disallow a single field from transitioning to beta. Mismatched annotations
-	// cause confusion.
-	// Ignore changes to the fields if they're both transitioning to beta.
-	// Allow modifications to Services in fields other than the alpha annotation.
+	allErrs = append(allErrs, validateServiceExternalTrafficAPIVersion(service)...)
 
-	if hcValueNew || hcValueChanged || hcValueGone || onlyLocalHCMismatch {
+	return allErrs
+}
+
+// serviceExternalTrafficStatus stores flags indicating whether ExternalTraffic
+// related beta annotations and alpha annotations are set on service.
+type serviceExternalTrafficStatus struct {
+	alphaExternalTrafficIsSet bool
+	alphaHealthCheckIsSet     bool
+	betaExternalTrafficIsSet  bool
+	betaHealthCheckIsSet      bool
+}
+
+func (s *serviceExternalTrafficStatus) useAlphaExternalTrafficWithBeta() bool {
+	return s.alphaExternalTrafficIsSet && (s.betaExternalTrafficIsSet || s.betaHealthCheckIsSet)
+}
+
+func (s *serviceExternalTrafficStatus) useAlphaHealthCheckWithBeta() bool {
+	return s.alphaHealthCheckIsSet && (s.betaExternalTrafficIsSet || s.betaHealthCheckIsSet)
+}
+
+func getServiceExternalTrafficStatus(service *api.Service) *serviceExternalTrafficStatus {
+	s := serviceExternalTrafficStatus{}
+	_, s.alphaExternalTrafficIsSet = service.Annotations[apiservice.AlphaAnnotationExternalTraffic]
+	_, s.alphaHealthCheckIsSet = service.Annotations[apiservice.AlphaAnnotationHealthCheckNodePort]
+	_, s.betaExternalTrafficIsSet = service.Annotations[apiservice.BetaAnnotationExternalTraffic]
+	_, s.betaHealthCheckIsSet = service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]
+	return &s
+}
+
+// validateServiceExternalTrafficAPIVersion checks if user mixes ExternalTraffic
+// API versions.
+func validateServiceExternalTrafficAPIVersion(service *api.Service) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	status := getServiceExternalTrafficStatus(service)
+
+	if status.useAlphaExternalTrafficWithBeta() {
+		fieldPath := field.NewPath("metadata", "annotations").Key(apiservice.AlphaAnnotationExternalTraffic)
+		msg := fmt.Sprintf("please replace the alpha annotation with beta annotation")
+		allErrs = append(allErrs, field.Invalid(fieldPath, apiservice.AlphaAnnotationExternalTraffic, msg))
+	}
+
+	if status.useAlphaHealthCheckWithBeta() {
 		fieldPath := field.NewPath("metadata", "annotations").Key(apiservice.AlphaAnnotationHealthCheckNodePort)
-		msg := fmt.Sprintf("please replace the alpha annotation with the beta version %v",
-			apiservice.BetaAnnotationHealthCheckNodePort)
+		msg := fmt.Sprintf("please replace the alpha annotation with beta annotation")
 		allErrs = append(allErrs, field.Invalid(fieldPath, apiservice.AlphaAnnotationHealthCheckNodePort, msg))
 	}
 
-	onlyLocalValueChanged := oldOnlyLocalAlphaOk && onlyLocalAlphaOk && oldOnlyLocalAlpha != onlyLocalAlpha
-	onlyLocalValueNew := !oldOnlyLocalAlphaOk && onlyLocalAlphaOk
-	onlyLocalValueGone := !onlyLocalAlphaOk && !onlyLocalBetaOk && oldOnlyLocalAlphaOk
-	hcOnlyLocalMismatch := onlyLocalAlphaOk && healthCheckBetaOk
-
-	if onlyLocalValueNew || onlyLocalValueChanged || onlyLocalValueGone || hcOnlyLocalMismatch {
-		fieldPath := field.NewPath("metadata", "annotations").Key(apiservice.AlphaAnnotationExternalTraffic)
-		msg := fmt.Sprintf("please replace the alpha annotation with the beta version %v",
-			apiservice.BetaAnnotationExternalTraffic)
-		allErrs = append(allErrs, field.Invalid(fieldPath, apiservice.AlphaAnnotationExternalTraffic, msg))
-	}
-	return
+	return allErrs
 }
 
 // ValidateServiceUpdate tests if required fields in the service are set during an update
@@ -2829,8 +2849,7 @@ func ValidateServiceUpdate(service, oldService *api.Service) field.ErrorList {
 		}
 	}
 
-	allErrs = append(allErrs, validateServiceFields(service)...)
-	allErrs = append(allErrs, validateServiceAnnotations(service, oldService)...)
+	allErrs = append(allErrs, ValidateService(service)...)
 	return allErrs
 }
 
