@@ -12,9 +12,9 @@ go_library(
     srcs = ["time.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/go-openapi/spec",
-        "//vendor:github.com/google/gofuzz",
-        "//vendor:k8s.io/apimachinery/pkg/openapi",
+        "//vendor/github.com/go-openapi/spec:go_default_library",
+        "//vendor/github.com/google/gofuzz:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/openapi:go_default_library",
     ],
 )
 

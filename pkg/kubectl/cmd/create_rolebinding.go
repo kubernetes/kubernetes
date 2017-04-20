@@ -29,12 +29,12 @@ import (
 )
 
 var (
-	roleBindingLong = templates.LongDesc(`
-		Create a RoleBinding for a particular Role or ClusterRole.`)
+	roleBindingLong = templates.LongDesc(i18n.T(`
+		Create a RoleBinding for a particular Role or ClusterRole.`))
 
-	roleBindingExample = templates.Examples(`
+	roleBindingExample = templates.Examples(i18n.T(`
 		  # Create a RoleBinding for user1, user2, and group1 using the admin ClusterRole
-		  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1`)
+		  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1`))
 )
 
 // RoleBinding is a command to ease creating RoleBindings.
@@ -55,9 +55,9 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.RoleBindingV1GeneratorName)
 	cmd.Flags().String("clusterrole", "", i18n.T("ClusterRole this RoleBinding should reference"))
 	cmd.Flags().String("role", "", i18n.T("Role this RoleBinding should reference"))
-	cmd.Flags().StringSlice("user", []string{}, "usernames to bind to the role")
-	cmd.Flags().StringSlice("group", []string{}, "groups to bind to the role")
-	cmd.Flags().StringSlice("serviceaccount", []string{}, "service accounts to bind to the role")
+	cmd.Flags().StringArray("user", []string{}, "usernames to bind to the role")
+	cmd.Flags().StringArray("group", []string{}, "groups to bind to the role")
+	cmd.Flags().StringArray("serviceaccount", []string{}, "service accounts to bind to the role, in the format <namespace>:<name>")
 	return cmd
 }
 
@@ -73,9 +73,9 @@ func CreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, 
 			Name:            name,
 			ClusterRole:     cmdutil.GetFlagString(cmd, "clusterrole"),
 			Role:            cmdutil.GetFlagString(cmd, "role"),
-			Users:           cmdutil.GetFlagStringSlice(cmd, "user"),
-			Groups:          cmdutil.GetFlagStringSlice(cmd, "group"),
-			ServiceAccounts: cmdutil.GetFlagStringSlice(cmd, "serviceaccount"),
+			Users:           cmdutil.GetFlagStringArray(cmd, "user"),
+			Groups:          cmdutil.GetFlagStringArray(cmd, "group"),
+			ServiceAccounts: cmdutil.GetFlagStringArray(cmd, "serviceaccount"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))

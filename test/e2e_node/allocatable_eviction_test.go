@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -79,7 +80,7 @@ var _ = framework.KubeDescribe("AllocatableEviction [Slow] [Serial] [Disruptive]
 // Returns TRUE if the node has Memory Pressure, FALSE otherwise
 func hasMemoryPressure(f *framework.Framework, testCondition string) (bool, error) {
 	localNodeStatus := getLocalNode(f).Status
-	_, pressure := v1.GetNodeCondition(&localNodeStatus, v1.NodeMemoryPressure)
+	_, pressure := nodeutil.GetNodeCondition(&localNodeStatus, v1.NodeMemoryPressure)
 	Expect(pressure).NotTo(BeNil())
 	hasPressure := pressure.Status == v1.ConditionTrue
 	By(fmt.Sprintf("checking if pod has %s: %v", testCondition, hasPressure))

@@ -209,7 +209,8 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.ReplicaSet)
-			err := client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, &metav1.DeleteOptions{})
+			orphanDependents := false
+			err := client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
 			return err
 		})
 
@@ -242,14 +243,14 @@ func (frsc *ReplicaSetController) hasFinalizerFunc(obj runtime.Object, finalizer
 	return false
 }
 
-// Removes the finalizer from the given objects ObjectMeta.
+// Removes the finalizers from the given objects ObjectMeta.
 // Assumes that the given object is a replicaset.
-func (frsc *ReplicaSetController) removeFinalizerFunc(obj runtime.Object, finalizer string) (runtime.Object, error) {
+func (frsc *ReplicaSetController) removeFinalizerFunc(obj runtime.Object, finalizers []string) (runtime.Object, error) {
 	replicaset := obj.(*extensionsv1.ReplicaSet)
 	newFinalizers := []string{}
 	hasFinalizer := false
 	for i := range replicaset.ObjectMeta.Finalizers {
-		if string(replicaset.ObjectMeta.Finalizers[i]) != finalizer {
+		if !deletionhelper.ContainsString(finalizers, replicaset.ObjectMeta.Finalizers[i]) {
 			newFinalizers = append(newFinalizers, replicaset.ObjectMeta.Finalizers[i])
 		} else {
 			hasFinalizer = true
@@ -262,7 +263,7 @@ func (frsc *ReplicaSetController) removeFinalizerFunc(obj runtime.Object, finali
 	replicaset.ObjectMeta.Finalizers = newFinalizers
 	replicaset, err := frsc.fedClient.Extensions().ReplicaSets(replicaset.Namespace).Update(replicaset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from replicaset %s: %v", finalizer, replicaset.Name, err)
+		return nil, fmt.Errorf("failed to remove finalizers %v from replicaset %s: %v", finalizers, replicaset.Name, err)
 	}
 	return replicaset, nil
 }
@@ -512,7 +513,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 	if frs.DeletionTimestamp != nil {
 		if err := frsc.delete(frs); err != nil {
 			glog.Errorf("Failed to delete %s: %v", frs, err)
-			frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "DeleteFailed",
+			frsc.eventRecorder.Eventf(frs, api.EventTypeWarning, "DeleteFailed",
 				"ReplicaSet delete failed: %v", err)
 			frsc.deliverReplicaSetByKey(key, 0, true)
 			return statusError, err
@@ -627,7 +628,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		return statusAllOk, nil
 	}
 	err = frsc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
-		frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "FailedUpdateInCluster",
+		frsc.eventRecorder.Eventf(frs, api.EventTypeWarning, "FailedUpdateInCluster",
 			"Replicaset update in cluster %s failed: %v", op.ClusterName, operror)
 	})
 	if err != nil {

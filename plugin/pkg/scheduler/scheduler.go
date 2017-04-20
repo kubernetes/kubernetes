@@ -155,6 +155,11 @@ func (sched *Scheduler) Run() {
 	go wait.Until(sched.scheduleOne, 0, sched.config.StopEverything)
 }
 
+// Config return scheduler's config pointer. It is exposed for testing purposes.
+func (sched *Scheduler) Config() *Config {
+	return sched.config
+}
+
 func (sched *Scheduler) scheduleOne() {
 	pod := sched.config.NextPod()
 	if pod.DeletionTimestamp != nil {
@@ -205,7 +210,9 @@ func (sched *Scheduler) scheduleOne() {
 	}
 
 	go func() {
-		defer metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+		defer func() {
+			metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+		}()
 
 		b := &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
@@ -228,7 +235,7 @@ func (sched *Scheduler) scheduleOne() {
 				glog.Errorf("scheduler cache ForgetPod failed: %v", err)
 			}
 			sched.config.Error(pod, err)
-			sched.config.Recorder.Eventf(pod, v1.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
+			sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "Binding rejected: %v", err)
 			sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
 				Type:   v1.PodScheduled,
 				Status: v1.ConditionFalse,

@@ -246,7 +246,9 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if !notMnt {
 		return nil
 	}
-	os.MkdirAll(dir, 0750)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return err
+	}
 	source := fmt.Sprintf("%s:%s", b.server, b.exportPath)
 	options := []string{}
 	if b.readOnly {

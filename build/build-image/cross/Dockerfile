@@ -79,7 +79,7 @@ RUN export ETCD_VERSION=v3.0.17; \
   && ln -s ../src/etcd/etcd-${ETCD_VERSION}-linux-amd64/etcd /usr/local/bin/
 
 # TODO: Remove the need for two golang versions; when we use go1.8 for all other builds we can remove this
-ENV K8S_GOLANG_EDGE_VERSION=1.8rc2 \
+ENV K8S_GOLANG_EDGE_VERSION=1.8.1 \
     K8S_EDGE_GOROOT=/usr/local/go_k8s_edge
 RUN mkdir -p ${K8S_EDGE_GOROOT} \
   && curl -sSL https://golang.org/dl/go${K8S_GOLANG_EDGE_VERSION}.linux-amd64.tar.gz | tar -xz -C ${K8S_EDGE_GOROOT} --strip-components=1

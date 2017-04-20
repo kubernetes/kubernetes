@@ -117,18 +117,18 @@ func (cc *CertificateController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer cc.queue.ShutDown()
 
-	glog.Infof("Starting certificate controller manager")
+	glog.Infof("Starting certificate controller")
+	defer glog.Infof("Shutting down certificate controller")
 
-	if !cache.WaitForCacheSync(stopCh, cc.csrsSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("certificate", stopCh, cc.csrsSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(cc.worker, time.Second, stopCh)
 	}
+
 	<-stopCh
-	glog.Infof("Shutting down certificate controller")
 }
 
 // worker runs a thread that dequeues CSRs, handles them, and marks them done.

@@ -45,6 +45,13 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
+	if s.ExperimentalDockershim {
+		if err := app.RunDockershim(&s.KubeletConfiguration, s.DockershimRootDirectory); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	if err := app.Run(s, nil); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)

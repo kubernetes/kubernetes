@@ -381,54 +381,6 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 	}, nil
 }
 
-func (og *operationGenerator) GerifyVolumeIsSafeToDetach(
-	volumeToDetach AttachedVolume) error {
-	// Fetch current node object
-	node, fetchErr := og.kubeClient.Core().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})
-	if fetchErr != nil {
-		if errors.IsNotFound(fetchErr) {
-			glog.Warningf("Node %q not found on API server. DetachVolume will skip safe to detach check.",
-				volumeToDetach.NodeName,
-				volumeToDetach.VolumeName,
-				volumeToDetach.VolumeSpec.Name())
-			return nil
-		}
-
-		// On failure, return error. Caller will log and retry.
-		return fmt.Errorf(
-			"DetachVolume failed fetching node from API server for volume %q (spec.Name: %q) from node %q with: %v",
-			volumeToDetach.VolumeName,
-			volumeToDetach.VolumeSpec.Name(),
-			volumeToDetach.NodeName,
-			fetchErr)
-	}
-
-	if node == nil {
-		// On failure, return error. Caller will log and retry.
-		return fmt.Errorf(
-			"DetachVolume failed fetching node from API server for volume %q (spec.Name: %q) from node %q. Error: node object retrieved from API server is nil",
-			volumeToDetach.VolumeName,
-			volumeToDetach.VolumeSpec.Name(),
-			volumeToDetach.NodeName)
-	}
-
-	for _, inUseVolume := range node.Status.VolumesInUse {
-		if inUseVolume == volumeToDetach.VolumeName {
-			return fmt.Errorf("DetachVolume failed for volume %q (spec.Name: %q) from node %q. Error: volume is still in use by node, according to Node status",
-				volumeToDetach.VolumeName,
-				volumeToDetach.VolumeSpec.Name(),
-				volumeToDetach.NodeName)
-		}
-	}
-
-	// Volume is not marked as in use by node
-	glog.Infof("Verified volume is safe to detach for volume %q (spec.Name: %q) from node %q.",
-		volumeToDetach.VolumeName,
-		volumeToDetach.VolumeSpec.Name(),
-		volumeToDetach.NodeName)
-	return nil
-}
-
 func (og *operationGenerator) GenerateMountVolumeFunc(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,

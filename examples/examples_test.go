@@ -201,7 +201,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-slave-service":     &api.Service{},
 		},
 		"../examples/volumes/iscsi": {
-			"iscsi": &api.Pod{},
+			"chap-secret": &api.Secret{},
+			"iscsi":       &api.Pod{},
+			"iscsi-chap":  &api.Pod{},
 		},
 		"../examples/volumes/glusterfs": {
 			"glusterfs-pod":       &api.Pod{},
@@ -405,7 +407,7 @@ func TestReadme(t *testing.T) {
 		expectedType []runtime.Object
 	}{
 		{"../README.md", []runtime.Object{&api.Pod{}}},
-		{"../examples/volumes/iscsi/README.md", []runtime.Object{&api.Pod{}}},
+		{"../examples/volumes/iscsi/README.md", []runtime.Object{&api.Secret{}}},
 	}
 
 	for _, path := range paths {

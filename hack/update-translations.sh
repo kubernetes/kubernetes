@@ -59,8 +59,16 @@ fi
 if [[ "${generate_pot}" == "true" ]]; then
   echo "Extracting strings to POT"
   go-xgettext -k=i18n.T ${KUBECTL_FILES} > tmp.pot
-  msgcat -s tmp.pot > translations/kubectl/template.pot
-  rm tmp.pot
+  perl -pi -e 's/CHARSET/UTF-8/' tmp.pot
+  perl -pi -e 's/\\\(/\\\\\(/g' tmp.pot
+  perl -pi -e 's/\\\)/\\\\\)/g' tmp.pot
+  if msgcat -s tmp.pot > /tmp/template.pot; then
+    mv /tmp/template.pot translations/kubectl/template.pot
+    rm tmp.pot
+  else
+    echo "Failed to update template.pot"
+    exit 1
+  fi
 fi
 
 if [[ "${generate_mo}" == "true" ]]; then

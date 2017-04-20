@@ -38,6 +38,7 @@ const (
 	diskSCSIPrefix     = "wwn-0x"
 	diskformat         = "diskformat"
 	datastore          = "datastore"
+	Fstype             = "fstype"
 
 	HostFailuresToTolerateCapability    = "hostfailurestotolerate"
 	ForceProvisioningCapability         = "forceprovisioning"
@@ -73,10 +74,11 @@ func verifyDevicePath(path string) (string, error) {
 }
 
 // CreateVolume creates a vSphere volume.
-func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeKB int, err error) {
+func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeKB int, fstype string, err error) {
+
 	cloud, err := getCloudProvider(v.plugin.host.GetCloudProvider())
 	if err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 
 	capacity := v.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -98,17 +100,21 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPa
 			volumeOptions.DiskFormat = value
 		case datastore:
 			volumeOptions.Datastore = value
+		case Fstype:
+			fstype = value
+			glog.V(4).Infof("Setting fstype as %q", fstype)
 		case HostFailuresToTolerateCapability, ForceProvisioningCapability,
 			CacheReservationCapability, DiskStripesCapability,
 			ObjectSpaceReservationCapability, IopsLimitCapability:
 			capabilityData, err := validateVSANCapability(strings.ToLower(parameter), value)
 			if err != nil {
-				return "", 0, err
+				return "", 0, "", err
 			} else {
 				volumeOptions.StorageProfileData += capabilityData
 			}
+
 		default:
-			return "", 0, fmt.Errorf("invalid option %q for volume plugin %s", parameter, v.plugin.GetPluginName())
+			return "", 0, "", fmt.Errorf("invalid option %q for volume plugin %s", parameter, v.plugin.GetPluginName())
 		}
 	}
 
@@ -118,16 +124,16 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPa
 	glog.V(1).Infof("StorageProfileData in vsphere volume %q", volumeOptions.StorageProfileData)
 	// TODO: implement PVC.Selector parsing
 	if v.options.PVC.Spec.Selector != nil {
-		return "", 0, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on vSphere")
+		return "", 0, "", fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on vSphere")
 	}
 
 	vmDiskPath, err = cloud.CreateVolume(volumeOptions)
 	if err != nil {
 		glog.V(2).Infof("Error creating vsphere volume: %v", err)
-		return "", 0, err
+		return "", 0, "", err
 	}
 	glog.V(2).Infof("Successfully created vsphere volume %s", name)
-	return vmDiskPath, volSizeKB, nil
+	return vmDiskPath, volSizeKB, fstype, nil
 }
 
 // DeleteVolume deletes a vSphere volume.

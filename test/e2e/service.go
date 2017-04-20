@@ -216,6 +216,16 @@ var _ = framework.KubeDescribe("Services", func() {
 
 	It("should preserve source pod IP for traffic thru service cluster IP", func() {
 
+		// This behavior is not supported if Kube-proxy is in "userspace" mode.
+		// So we check the kube-proxy mode and skip this test if that's the case.
+		if proxyMode, err := framework.ProxyMode(f); err == nil {
+			if proxyMode == "userspace" {
+				framework.Skipf("The test doesn't work with kube-proxy in userspace mode")
+			}
+		} else {
+			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
+		}
+
 		serviceName := "sourceip-test"
 		ns := f.Namespace.Name
 
@@ -1361,12 +1371,12 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 			// All other nodes should fail the healthcheck on the service healthCheckNodePort
 			for n, publicIP := range ips {
 				expectedSuccess := nodes.Items[n].Name == endpointNodeName
-				framework.Logf("Health checking %s, http://%s:%d/%s, expectedSuccess %v", nodes.Items[n].Name, publicIP, healthCheckNodePort, path, expectedSuccess)
+				framework.Logf("Health checking %s, http://%s:%d%s, expectedSuccess %v", nodes.Items[n].Name, publicIP, healthCheckNodePort, path, expectedSuccess)
 				pass, fail, err := jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, path, 5)
 				if expectedSuccess && pass < threshold {
-					framework.Failf("Expected %s successes on %v/%v, got %d, err %v", threshold, endpointNodeName, path, pass, err)
+					framework.Failf("Expected %d successes on %v%v, got %d, err %v", threshold, endpointNodeName, path, pass, err)
 				} else if !expectedSuccess && fail < threshold {
-					framework.Failf("Expected %s failures on %v/%v, got %d, err %v", threshold, endpointNodeName, path, fail, err)
+					framework.Failf("Expected %d failures on %v%v, got %d, err %v", threshold, endpointNodeName, path, fail, err)
 				}
 				// Make sure the loadbalancer picked up the helth check change
 				jig.TestReachableHTTP(ingressIP, svcTCPPort, framework.KubeProxyLagTimeout)

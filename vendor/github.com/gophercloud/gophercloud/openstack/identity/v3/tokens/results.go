@@ -1,7 +1,10 @@
 package tokens
 
-import "errors"
-import "github.com/gophercloud/gophercloud"
+import (
+	"time"
+
+	"github.com/gophercloud/gophercloud"
+)
 
 // Endpoint represents a single API endpoint offered by a service.
 // It matches either a public, internal or admin URL.
@@ -35,7 +38,7 @@ type CatalogEntry struct {
 
 // ServiceCatalog provides a view into the service catalog from a previous, successful authentication.
 type ServiceCatalog struct {
-	Entries []CatalogEntry
+	Entries []CatalogEntry `json:"catalog"`
 }
 
 // commonResult is the deferred result of a Create or a Get call.
@@ -51,47 +54,29 @@ func (r commonResult) Extract() (*Token, error) {
 
 // ExtractToken interprets a commonResult as a Token.
 func (r commonResult) ExtractToken() (*Token, error) {
-	var s struct {
-		Token *Token `json:"token"`
-	}
-
+	var s Token
 	err := r.ExtractInto(&s)
 	if err != nil {
 		return nil, err
 	}
 
-	if s.Token == nil {
-		return nil, errors.New("'token' missing in JSON response")
-	}
-
 	// Parse the token itself from the stored headers.
-	s.Token.ID = r.Header.Get("X-Subject-Token")
+	s.ID = r.Header.Get("X-Subject-Token")
 
-	return s.Token, err
+	return &s, err
 }
 
 // ExtractServiceCatalog returns the ServiceCatalog that was generated along with the user's Token.
 func (r CreateResult) ExtractServiceCatalog() (*ServiceCatalog, error) {
-	var s struct {
-		Token struct {
-			Entries []CatalogEntry `json:"catalog"`
-		} `json:"token"`
-	}
+	var s ServiceCatalog
 	err := r.ExtractInto(&s)
-	return &ServiceCatalog{Entries: s.Token.Entries}, err
+	return &s, err
 }
 
 // CreateResult defers the interpretation of a created token.
 // Use ExtractToken() to interpret it as a Token, or ExtractServiceCatalog() to interpret it as a service catalog.
 type CreateResult struct {
 	commonResult
-}
-
-// createErr quickly creates a CreateResult that reports an error.
-func createErr(err error) CreateResult {
-	return CreateResult{
-		commonResult: commonResult{Result: gophercloud.Result{Err: err}},
-	}
 }
 
 // GetResult is the deferred response from a Get call.
@@ -110,5 +95,9 @@ type Token struct {
 	// ID is the issued token.
 	ID string `json:"id"`
 	// ExpiresAt is the timestamp at which this token will no longer be accepted.
-	ExpiresAt gophercloud.JSONRFC3339Milli `json:"expires_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+func (r commonResult) ExtractInto(v interface{}) error {
+	return r.ExtractIntoStructPtr(v, "token")
 }

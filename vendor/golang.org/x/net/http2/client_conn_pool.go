@@ -53,13 +53,13 @@ const (
 )
 
 func (p *clientConnPool) getClientConn(req *http.Request, addr string, dialOnMiss bool) (*ClientConn, error) {
-	if req.Close && dialOnMiss {
+	if isConnectionCloseRequest(req) && dialOnMiss {
 		// It gets its own connection.
-		cc, err := p.t.dialClientConn(addr)
+		const singleUse = true
+		cc, err := p.t.dialClientConn(addr, singleUse)
 		if err != nil {
 			return nil, err
 		}
-		cc.singleUse = true
 		return cc, nil
 	}
 	p.mu.Lock()
@@ -104,7 +104,8 @@ func (p *clientConnPool) getStartDialLocked(addr string) *dialCall {
 
 // run in its own goroutine.
 func (c *dialCall) dial(addr string) {
-	c.res, c.err = c.p.t.dialClientConn(addr)
+	const singleUse = false // shared conn
+	c.res, c.err = c.p.t.dialClientConn(addr, singleUse)
 	close(c.done)
 
 	c.p.mu.Lock()

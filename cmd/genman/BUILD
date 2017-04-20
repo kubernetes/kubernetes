@@ -27,9 +27,9 @@ go_library(
         "//pkg/kubectl/cmd:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//plugin/cmd/kube-scheduler/app:go_default_library",
-        "//vendor:github.com/cpuguy83/go-md2man/md2man",
-        "//vendor:github.com/spf13/cobra",
-        "//vendor:github.com/spf13/pflag",
+        "//vendor/github.com/cpuguy83/go-md2man/md2man:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
 

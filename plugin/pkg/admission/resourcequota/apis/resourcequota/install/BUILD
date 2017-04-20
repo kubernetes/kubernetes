@@ -14,9 +14,9 @@ go_library(
     deps = [
         "//plugin/pkg/admission/resourcequota/apis/resourcequota:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],
 )
 

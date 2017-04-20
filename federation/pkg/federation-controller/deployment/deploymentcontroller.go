@@ -201,7 +201,8 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.Deployment)
-			err := client.Extensions().Deployments(rs.Namespace).Delete(rs.Name, &metav1.DeleteOptions{})
+			orphanDependents := false
+			err := client.Extensions().Deployments(rs.Namespace).Delete(rs.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
 			return err
 		})
 
@@ -234,14 +235,14 @@ func (fdc *DeploymentController) hasFinalizerFunc(obj runtime.Object, finalizer 
 	return false
 }
 
-// Removes the finalizer from the given objects ObjectMeta.
+// Removes the finalizers from the given objects ObjectMeta.
 // Assumes that the given object is a deployment.
-func (fdc *DeploymentController) removeFinalizerFunc(obj runtime.Object, finalizer string) (runtime.Object, error) {
+func (fdc *DeploymentController) removeFinalizerFunc(obj runtime.Object, finalizers []string) (runtime.Object, error) {
 	deployment := obj.(*extensionsv1.Deployment)
 	newFinalizers := []string{}
 	hasFinalizer := false
 	for i := range deployment.ObjectMeta.Finalizers {
-		if string(deployment.ObjectMeta.Finalizers[i]) != finalizer {
+		if !deletionhelper.ContainsString(finalizers, deployment.ObjectMeta.Finalizers[i]) {
 			newFinalizers = append(newFinalizers, deployment.ObjectMeta.Finalizers[i])
 		} else {
 			hasFinalizer = true
@@ -254,7 +255,7 @@ func (fdc *DeploymentController) removeFinalizerFunc(obj runtime.Object, finaliz
 	deployment.ObjectMeta.Finalizers = newFinalizers
 	deployment, err := fdc.fedClient.Extensions().Deployments(deployment.Namespace).Update(deployment)
 	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from deployment %s: %v", finalizer, deployment.Name, err)
+		return nil, fmt.Errorf("failed to remove finalizers %v from deployment %s: %v", finalizers, deployment.Name, err)
 	}
 	return deployment, nil
 }
@@ -500,7 +501,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 	if fd.DeletionTimestamp != nil {
 		if err := fdc.delete(fd); err != nil {
 			glog.Errorf("Failed to delete %s: %v", fd.Name, err)
-			fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "DeleteFailed",
+			fdc.eventRecorder.Eventf(fd, api.EventTypeWarning, "DeleteFailed",
 				"Deployment delete failed: %v", err)
 			return statusError, err
 		}
@@ -615,7 +616,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		return statusAllOk, nil
 	}
 	err = fdc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
-		fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "FailedUpdateInCluster",
+		fdc.eventRecorder.Eventf(fd, api.EventTypeWarning, "FailedUpdateInCluster",
 			"Deployment update in cluster %s failed: %v", op.ClusterName, operror)
 	})
 	if err != nil {

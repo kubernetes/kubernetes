@@ -683,6 +683,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Description: "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
 					Properties: map[string]spec.Schema{
 						"key": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "key",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "key is the label key that the selector applies to.",
 								Type:        []string{"string"},
@@ -901,6 +907,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"ownerReferences": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "uid",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
 								Type:        []string{"array"},
@@ -914,6 +926,11 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"finalizers": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-strategy": "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed.",
 								Type:        []string{"array"},
@@ -1674,6 +1691,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Description: "ClusterSpec describes the attributes of a kubernetes cluster.",
 					Properties: map[string]spec.Schema{
 						"serverAddressByClientCIDRs": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "clientCIDR",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "A map of client CIDR to server address. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR.",
 								Type:        []string{"array"},
@@ -2197,6 +2220,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"conditions": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "type",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "List of component conditions observed",
 								Type:        []string{"array"},
@@ -2287,7 +2316,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"data": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.",
+								Description: "Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'.",
 								Type:        []string{"object"},
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
@@ -2544,6 +2573,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"ports": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "containerPort",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
 								Type:        []string{"array"},
@@ -2570,6 +2605,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"env": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "name",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "List of environment variables to set in the container. Cannot be updated.",
 								Type:        []string{"array"},
@@ -2589,6 +2630,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"volumeMounts": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "mountPath",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "Pod volumes to mount into the container's filesystem. Cannot be updated.",
 								Type:        []string{"array"},
@@ -3355,7 +3402,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"fieldRef": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.podIP.",
+								Description: "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.",
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.ObjectFieldSelector"),
 							},
 						},
@@ -3971,11 +4018,32 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"chapAuthDiscovery": {
+							SchemaProps: spec.SchemaProps{
+								Description: "whether support iSCSI Discovery CHAP authentication",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"chapAuthSession": {
+							SchemaProps: spec.SchemaProps{
+								Description: "whether support iSCSI Session CHAP authentication",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"secretRef": {
+							SchemaProps: spec.SchemaProps{
+								Description: "CHAP secret for iSCSI target and initiator authentication",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.LocalObjectReference"),
+							},
+						},
 					},
 					Required: []string{"targetPortal", "iqn", "lun"},
 				},
 			},
-			Dependencies: []string{},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.LocalObjectReference"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.KeyToPath": {
 			Schema: spec.Schema{
@@ -4792,6 +4860,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Description: "A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
 					Properties: map[string]spec.Schema{
 						"key": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "key",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "The label key that the selector applies to.",
 								Type:        []string{"string"},
@@ -4941,6 +5015,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"conditions": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "type",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "Conditions is an array of current observed node conditions. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-condition",
 								Type:        []string{"array"},
@@ -4954,6 +5034,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"addresses": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "type",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "List of addresses reachable to the node. Queried from cloud provider, if available. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-addresses",
 								Type:        []string{"array"},
@@ -6448,6 +6534,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Description: "PodSpec is a description of a pod.",
 					Properties: map[string]spec.Schema{
 						"volumes": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "name",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "List of volumes that can be mounted by containers belonging to the pod. More info: http://kubernetes.io/docs/user-guide/volumes",
 								Type:        []string{"array"},
@@ -6461,6 +6553,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"initContainers": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "name",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, or Liveness probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
 								Type:        []string{"array"},
@@ -6474,6 +6572,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"containers": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "name",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
 								Type:        []string{"array"},
@@ -6584,6 +6688,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"imagePullSecrets": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "name",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: http://kubernetes.io/docs/user-guide/images#specifying-imagepullsecrets-on-a-pod",
 								Type:        []string{"array"},
@@ -6656,6 +6766,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"conditions": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "type",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "Current service state of pod. More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions",
 								Type:        []string{"array"},
@@ -7460,6 +7576,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"conditions": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "type",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "Represents the latest available observations of a replication controller's current state.",
 								Type:        []string{"array"},
@@ -7857,7 +7979,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"data": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Data contains the secret data. Each key must be a valid DNS_SUBDOMAIN or leading dot followed by valid DNS_SUBDOMAIN. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4",
+								Description: "Data contains the secret data. Each key must consist of alphanumeric characters, '-', '_' or '.'. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4",
 								Type:        []string{"object"},
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
@@ -8231,6 +8353,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"secrets": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "name",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount. More info: http://kubernetes.io/docs/user-guide/secrets",
 								Type:        []string{"array"},
@@ -8442,6 +8570,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Description: "ServiceSpec describes the attributes that a user creates on a service.",
 					Properties: map[string]spec.Schema{
 						"ports": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "port",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "The list of ports that are exposed by this service. More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies",
 								Type:        []string{"array"},
@@ -8484,21 +8618,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"externalIPs": {
 							SchemaProps: spec.SchemaProps{
-								Description: "externalIPs is a list of IP addresses for which nodes in the cluster will also accept traffic for this service.  These IPs are not managed by Kubernetes.  The user is responsible for ensuring that traffic arrives at a node with this IP.  A common example is external load-balancers that are not part of the Kubernetes system.  A previous form of this functionality exists as the deprecatedPublicIPs field.  When using this field, callers should also clear the deprecatedPublicIPs field.",
-								Type:        []string{"array"},
-								Items: &spec.SchemaOrArray{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Type:   []string{"string"},
-											Format: "",
-										},
-									},
-								},
-							},
-						},
-						"deprecatedPublicIPs": {
-							SchemaProps: spec.SchemaProps{
-								Description: "deprecatedPublicIPs is deprecated and replaced by the externalIPs field with almost the exact same semantics.  This field is retained in the v1 API for compatibility until at least 8/20/2016.  It will be removed from any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are set, deprecatedPublicIPs is used.",
+								Description: "externalIPs is a list of IP addresses for which nodes in the cluster will also accept traffic for this service.  These IPs are not managed by Kubernetes.  The user is responsible for ensuring that traffic arrives at a node with this IP.  A common example is external load-balancers that are not part of the Kubernetes system.",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -8571,17 +8691,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 		"k8s.io/kubernetes/pkg/api/v1.Sysctl": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
+					Description: "Sysctl defines a kernel parameter to be set",
 					Properties: map[string]spec.Schema{
 						"Name": {
 							SchemaProps: spec.SchemaProps{
-								Type:   []string{"string"},
-								Format: "",
+								Description: "Name of a property to set",
+								Type:        []string{"string"},
+								Format:      "",
 							},
 						},
 						"Value": {
 							SchemaProps: spec.SchemaProps{
-								Type:   []string{"string"},
-								Format: "",
+								Description: "Value of a property to set",
+								Type:        []string{"string"},
+								Format:      "",
 							},
 						},
 					},
@@ -8621,6 +8744,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Description: "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint.",
 					Properties: map[string]spec.Schema{
 						"key": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "key",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "Required. The taint key to be applied to a node.",
 								Type:        []string{"string"},
@@ -8660,6 +8789,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Description: "The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
 					Properties: map[string]spec.Schema{
 						"key": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "key",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.",
 								Type:        []string{"string"},
@@ -9571,6 +9706,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"conditions": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "type",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "Represents the latest available observations of a deployment's current state.",
 								Type:        []string{"array"},
@@ -11910,13 +12051,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"spec": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Description: "Specification of the desired behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v1.JobSpec"),
 							},
 						},
 						"status": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Description: "Current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v1.JobStatus"),
 							},
 						},
@@ -11999,13 +12140,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
 							},
 						},
 						"items": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Items is the list of Job.",
+								Description: "items is the list of Jobs.",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -12030,14 +12171,14 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"parallelism": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs",
+								Description: "Specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
 						},
 						"completions": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs",
+								Description: "Specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
@@ -12051,20 +12192,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"selector": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+								Description: "A label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
 							},
 						},
 						"manualSelector": {
 							SchemaProps: spec.SchemaProps{
-								Description: "ManualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md",
+								Description: "manualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md",
 								Type:        []string{"boolean"},
 								Format:      "",
 							},
 						},
 						"template": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
+								Description: "Describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.PodTemplateSpec"),
 							},
 						},
@@ -12081,8 +12222,14 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Description: "JobStatus represents the current state of a Job.",
 					Properties: map[string]spec.Schema{
 						"conditions": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "type",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
-								Description: "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
+								Description: "The latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -12095,33 +12242,33 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"startTime": {
 							SchemaProps: spec.SchemaProps{
-								Description: "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+								Description: "Represents time when the job was acknowledged by the job controller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 							},
 						},
 						"completionTime": {
 							SchemaProps: spec.SchemaProps{
-								Description: "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+								Description: "Represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 							},
 						},
 						"active": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Active is the number of actively running pods.",
+								Description: "The number of actively running pods.",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
 						},
 						"succeeded": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Succeeded is the number of pods which reached Phase Succeeded.",
+								Description: "The number of pods which reached phase Succeeded.",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
 						},
 						"failed": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Failed is the number of pods which reached Phase Failed.",
+								Description: "The number of pods which reached phase Failed.",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
@@ -12159,13 +12306,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"spec": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Description: "Specification of the desired behavior of a cron job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v2alpha1.CronJobSpec"),
 							},
 						},
 						"status": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Description: "Current status of a cron job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v2alpha1.CronJobStatus"),
 							},
 						},
@@ -12196,13 +12343,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
 							},
 						},
 						"items": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Items is the list of CronJob.",
+								Description: "items is the list of CronJobs.",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -12227,7 +12374,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"schedule": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+								Description: "The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -12241,21 +12388,21 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"concurrencyPolicy": {
 							SchemaProps: spec.SchemaProps{
-								Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
+								Description: "Specifies how to treat concurrent executions of a Job. Defaults to Allow.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
 						"suspend": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+								Description: "This flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
 								Type:        []string{"boolean"},
 								Format:      "",
 							},
 						},
 						"jobTemplate": {
 							SchemaProps: spec.SchemaProps{
-								Description: "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
+								Description: "Specifies the job that will be created when executing a CronJob.",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v2alpha1.JobTemplateSpec"),
 							},
 						},
@@ -12287,7 +12434,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"active": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Active holds pointers to currently running jobs.",
+								Description: "A list of pointers to currently running jobs.",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -12300,7 +12447,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"lastScheduleTime": {
 							SchemaProps: spec.SchemaProps{
-								Description: "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
+								Description: "Information when was the last time the job was successfully scheduled.",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 							},
 						},
@@ -12337,7 +12484,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"template": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Template defines jobs that will be created from this template http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Description: "Defines jobs that will be created from this template. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v2alpha1.JobTemplateSpec"),
 							},
 						},
@@ -12878,8 +13025,43 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.LeaderElectionConfiguration"),
 							},
 						},
+						"lockObjectNamespace": {
+							SchemaProps: spec.SchemaProps{
+								Description: "LockObjectNamespace defines the namespace of the lock object",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"lockObjectName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "LockObjectName defines the lock object name",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"policyConfigMapName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "PolicyConfigMapName is the name of the ConfigMap object that specifies the scheduler's policy config. If UseLegacyPolicyConfig is true, scheduler uses PolicyConfigFile. If UseLegacyPolicyConfig is false and PolicyConfigMapName is not empty, the ConfigMap object with this name must exist in PolicyConfigMapNamespace before scheduler initialization.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"policyConfigMapNamespace": {
+							SchemaProps: spec.SchemaProps{
+								Description: "PolicyConfigMapNamespace is the namespace where the above policy config map is located. If none is provided default system namespace (\"kube-system\") will be used.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"useLegacyPolicyConfig": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UseLegacyPolicyConfig tells the scheduler to ignore Policy ConfigMap and to use PolicyConfigFile if available.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 					},
-					Required: []string{"port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection"},
+					Required: []string{"port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection", "lockObjectNamespace", "lockObjectName", "policyConfigMapName", "policyConfigMapNamespace", "useLegacyPolicyConfig"},
 				},
 			},
 			Dependencies: []string{
@@ -12958,6 +13140,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeletConfiguration": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
+					Description: "A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true: - its value will never, or cannot safely be changed during the lifetime of a node - its value cannot be safely shared between nodes at the same time (e.g. a hostname)\n  KubeletConfiguration is intended to be shared between nodes\nIn general, please try to avoid adding flags or configuration fields, we already have a confusingly large amount of them.",
 					Properties: map[string]spec.Schema{
 						"kind": {
 							SchemaProps: spec.SchemaProps{
@@ -13071,13 +13254,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							SchemaProps: spec.SchemaProps{
 								Description: "authorization specifies how requests to the Kubelet's server are authorized",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeletAuthorization"),
-							},
-						},
-						"hostnameOverride": {
-							SchemaProps: spec.SchemaProps{
-								Description: "hostnameOverride is the hostname used to identify the kubelet instead of the actual hostname.",
-								Type:        []string{"string"},
-								Format:      "",
 							},
 						},
 						"podInfraContainerImage": {
@@ -13617,13 +13793,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 							},
 						},
-						"nodeIP": {
-							SchemaProps: spec.SchemaProps{
-								Description: "nodeIP is IP address of the node. If set, kubelet will use this IP address for the node.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
 						"nodeLabels": {
 							SchemaProps: spec.SchemaProps{
 								Description: "nodeLabels to add when registering the node in the cluster.",
@@ -13784,6 +13953,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"experimentalDockershim": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Enable dockershim only mode.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 						"experimentalFailSwapOn": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Tells the Kubelet to fail to start if swap is enabled on the node.",
@@ -13869,7 +14045,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "enableContentionProfiling", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "experimentalQOSReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "systemReserved", "kubeReserved"},
+					Required: []string{"podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "enableContentionProfiling", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "experimentalQOSReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "systemReserved", "kubeReserved"},
 				},
 			},
 			Dependencies: []string{
@@ -14622,6 +14798,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"conditions": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "type",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "Represents the latest available observations of a deployment's current state.",
 								Type:        []string{"array"},
@@ -15081,7 +15263,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"ports": {
 							SchemaProps: spec.SchemaProps{
-								Description: "List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is not provided, this rule matches all ports (traffic not restricted by port). If this field is empty, this rule matches no ports (no traffic matches). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.",
+								Description: "List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -15094,7 +15276,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"from": {
 							SchemaProps: spec.SchemaProps{
-								Description: "List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is not provided, this rule matches all sources (traffic not restricted by source). If this field is empty, this rule matches no sources (no traffic matches). If this field is present and contains at least on item, this rule allows traffic only if the traffic matches at least one item in the from list.",
+								Description: "List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least on item, this rule allows traffic only if the traffic matches at least one item in the from list.",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -15162,13 +15344,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"podSelector": {
 							SchemaProps: spec.SchemaProps{
-								Description: "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If not provided, this selector selects no pods. If present but empty, this selector selects all pods in this namespace.",
+								Description: "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If present but empty, this selector selects all pods in this namespace.",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
 							},
 						},
 						"namespaceSelector": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omitted, this selector selects no namespaces. If present but empty, this selector selects all namespaces.",
+								Description: "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces.",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
 							},
 						},
@@ -15665,6 +15847,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 						"conditions": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-merge-key": "type",
+									"x-kubernetes-patch-strategy":  "merge",
+								},
+							},
 							SchemaProps: spec.SchemaProps{
 								Description: "Represents the latest available observations of a replica set's current state.",
 								Type:        []string{"array"},

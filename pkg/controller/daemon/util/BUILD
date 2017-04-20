@@ -15,9 +15,10 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/util/labels:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )
 
@@ -43,6 +44,6 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )

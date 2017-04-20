@@ -23,6 +23,7 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 
 	// add the kubernetes feature gates
@@ -51,7 +52,7 @@ type ServerRunOptions struct {
 // NewServerRunOptions creates a new ServerRunOptions object with default values.
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
-		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
+		GenericServerRunOptions: genericoptions.NewServerRunOptions(&kubeapiserveradmission.Plugins),
 		Etcd:                 genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, api.Scheme, nil)),
 		SecureServing:        kubeoptions.NewSecureServingOptions(),
 		InsecureServing:      kubeoptions.NewInsecureServingOptions(),

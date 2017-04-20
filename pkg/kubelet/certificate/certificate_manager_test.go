@@ -78,18 +78,6 @@ O1eRCsCGPAnUCviFgNeH15ug+6N54DTTR6ZV/TTV64FDOcsox9nrhYcmH9sYuITi
 -----END CERTIFICATE-----`
 )
 
-func TestNewManagerNoRotation(t *testing.T) {
-	cert, err := tls.X509KeyPair([]byte(certificateData), []byte(privateKeyData))
-	if err != nil {
-		t.Fatalf("Unable to initialize a certificate: %v", err)
-	}
-
-	store := &fakeStore{cert: &cert}
-	if _, err := NewManager(nil, &x509.CertificateRequest{}, []certificates.KeyUsage{}, store, 0); err != nil {
-		t.Fatalf("Failed to initialize the certificate manager: %v", err)
-	}
-}
-
 func TestShouldRotate(t *testing.T) {
 	now := time.Now()
 	tests := []struct {
@@ -98,32 +86,34 @@ func TestShouldRotate(t *testing.T) {
 		notAfter     time.Time
 		shouldRotate bool
 	}{
-		{"half way", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), false},
-		{"nearly there", now.Add(-100 * time.Hour), now.Add(1 * time.Hour), true},
-		{"just started", now.Add(-1 * time.Hour), now.Add(100 * time.Hour), false},
+		{"just issued, still good", now.Add(-1 * time.Hour), now.Add(99 * time.Hour), false},
+		{"half way expired, still good", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), false},
+		{"mostly expired, still good", now.Add(-69 * time.Hour), now.Add(31 * time.Hour), false},
+		{"just about expired, should rotate", now.Add(-91 * time.Hour), now.Add(9 * time.Hour), true},
+		{"nearly expired, should rotate", now.Add(-99 * time.Hour), now.Add(1 * time.Hour), true},
+		{"already expired, should rotate", now.Add(-10 * time.Hour), now.Add(-1 * time.Hour), true},
 	}
 
 	for _, test := range tests {
-		m := manager{
-			cert: &tls.Certificate{
-				Leaf: &x509.Certificate{
-					NotAfter:  test.notAfter,
-					NotBefore: test.notBefore,
+		t.Run(test.name, func(t *testing.T) {
+			m := manager{
+				cert: &tls.Certificate{
+					Leaf: &x509.Certificate{
+						NotAfter:  test.notAfter,
+						NotBefore: test.notBefore,
+					},
 				},
-			},
-			template:            &x509.CertificateRequest{},
-			usages:              []certificates.KeyUsage{},
-			shouldRotatePercent: 10,
-		}
-
-		if m.shouldRotate() != test.shouldRotate {
-			t.Errorf("For test case %s, time %v, a certificate issued for (%v, %v) should rotate should be %t.",
-				test.name,
-				now,
-				m.cert.Leaf.NotBefore,
-				m.cert.Leaf.NotAfter,
-				test.shouldRotate)
-		}
+				template: &x509.CertificateRequest{},
+				usages:   []certificates.KeyUsage{},
+			}
+			if m.shouldRotate() != test.shouldRotate {
+				t.Errorf("For time %v, a certificate issued for (%v, %v) should rotate should be %t.",
+					now,
+					m.cert.Leaf.NotBefore,
+					m.cert.Leaf.NotAfter,
+					test.shouldRotate)
+			}
+		})
 	}
 }
 

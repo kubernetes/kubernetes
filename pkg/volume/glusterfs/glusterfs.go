@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -329,6 +330,8 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 		}
 
+		options = append(options, "backup-volfile-servers="+dstrings.Join(addrlist[:], ":"))
+
 		// Avoid mount storm, pick a host randomly.
 		// Iterate all hosts until mount succeeds.
 		for _, ip := range addrlist {
@@ -474,7 +477,7 @@ func (p *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAllocato
 	}
 
 	for _, pv := range pvList.Items {
-		if v1.GetPersistentVolumeClass(&pv) != className {
+		if v1helper.GetPersistentVolumeClass(&pv) != className {
 			continue
 		}
 
@@ -653,7 +656,7 @@ func (r *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, fmt.Errorf("glusterfs: not able to parse your claim Selector")
 	}
 	glog.V(4).Infof("glusterfs: Provison VolumeOptions %v", r.options)
-	scName := v1.GetPersistentVolumeClaimClass(r.options.PVC)
+	scName := v1helper.GetPersistentVolumeClaimClass(r.options.PVC)
 	cfg, err := parseClassParameters(r.options.Parameters, r.plugin.host.GetKubeClient())
 	if err != nil {
 		return nil, err
@@ -770,9 +773,9 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
 	if err != nil {
 		glog.Errorf("glusterfs: failed to create endpoint/service: %v", err)
-		err = cli.VolumeDelete(volume.Id)
-		if err != nil {
-			glog.Errorf("glusterfs: error when deleting the volume :%v , manual deletion required", err)
+		delete_err := cli.VolumeDelete(volume.Id)
+		if delete_err != nil {
+			glog.Errorf("glusterfs: error when deleting the volume :%v , manual deletion required", delete_err)
 		}
 		return nil, 0, fmt.Errorf("failed to create endpoint/service %v", err)
 	}

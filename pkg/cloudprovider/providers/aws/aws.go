@@ -392,6 +392,10 @@ type CloudConfig struct {
 		// on a different aws account, on a different cloud provider or on-premise.
 		// If the flag is set also the KubernetesClusterTag must be provided
 		VPC string
+		// SubnetID enables using a specific subnet to use for ELB's
+		SubnetID string
+		// RouteTableID enables using a specific RouteTable
+		RouteTableID string
 
 		// KubernetesClusterTag is the legacy cluster id we'll use to identify our cluster resources
 		KubernetesClusterTag string
@@ -817,13 +821,14 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
 	}
 
-	if cfg.Global.VPC != "" && cfg.Global.KubernetesClusterTag != "" {
+	if cfg.Global.VPC != "" && cfg.Global.SubnetID != "" && (cfg.Global.KubernetesClusterTag != "" || cfg.Global.KubernetesClusterID != "") {
 		// When the master is running on a different AWS account, cloud provider or on-premise
 		// build up a dummy instance and use the VPC from the nodes account
-		glog.Info("Master is configured to run on a AWS account, different cloud provider or on-premise")
+		glog.Info("Master is configured to run on a different AWS account, different cloud provider or on-premise")
 		awsCloud.selfAWSInstance = &awsInstance{
 			nodeName: "master-dummy",
 			vpcID:    cfg.Global.VPC,
+			subnetID: cfg.Global.SubnetID,
 		}
 		awsCloud.vpcID = cfg.Global.VPC
 	} else {
@@ -1276,9 +1281,13 @@ func (c *Cloud) getMountDevice(
 		// we want device names with two significant characters, starting with /dev/xvdbb
 		// the allowed range is /dev/xvd[b-c][a-z]
 		// http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
-		deviceAllocator = NewDeviceAllocator(0)
+		deviceAllocator = NewDeviceAllocator()
 		c.deviceAllocators[i.nodeName] = deviceAllocator
 	}
+	// We need to lock deviceAllocator to prevent possible race with Deprioritize function
+	deviceAllocator.Lock()
+	defer deviceAllocator.Unlock()
+
 	chosen, err := deviceAllocator.GetNext(deviceMappings)
 	if err != nil {
 		glog.Warningf("Could not assign a mount device.  mappings=%v, error: %v", deviceMappings, err)
@@ -1539,7 +1548,9 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 			// TODO: Check if the volume was concurrently attached?
 			return "", fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", disk.awsID, awsInstance.awsID, err)
 		}
-
+		if da, ok := c.deviceAllocators[awsInstance.nodeName]; ok {
+			da.Deprioritize(mountDevice)
+		}
 		glog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", disk.awsID, awsInstance.awsID, attachResponse)
 	}
 
@@ -1615,6 +1626,9 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 	attachment, err := disk.waitForAttachmentStatus("detached")
 	if err != nil {
 		return "", err
+	}
+	if da, ok := c.deviceAllocators[awsInstance.nodeName]; ok {
+		da.Deprioritize(mountDevice)
 	}
 	if attachment != nil {
 		// We expect it to be nil, it is (maybe) interesting if it is not

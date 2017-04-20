@@ -19,11 +19,11 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/emicklei/go-restful"
 	"github.com/evanphx/json-patch"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -74,7 +74,7 @@ func TestPatchAnonymousField(t *testing.T) {
 	}
 
 	actual := &testPatchType{}
-	_, _, err := strategicPatchObject(codec, defaulter, original, []byte(patch), actual, &testPatchType{})
+	err := strategicPatchObject(codec, defaulter, original, []byte(patch), actual, &testPatchType{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -128,13 +128,13 @@ type testNamer struct {
 	name      string
 }
 
-func (p *testNamer) Namespace(req *restful.Request) (namespace string, err error) {
+func (p *testNamer) Namespace(req *http.Request) (namespace string, err error) {
 	return p.namespace, nil
 }
 
 // Name returns the name from the request, and an optional namespace value if this is a namespace
 // scoped call. An error is returned if the name is not available.
-func (p *testNamer) Name(req *restful.Request) (namespace, name string, err error) {
+func (p *testNamer) Name(req *http.Request) (namespace, name string, err error) {
 	return p.namespace, p.name, nil
 }
 
@@ -151,12 +151,12 @@ func (p *testNamer) SetSelfLink(obj runtime.Object, url string) error {
 }
 
 // GenerateLink creates a path and query for a given runtime object that represents the canonical path.
-func (p *testNamer) GenerateLink(req *restful.Request, obj runtime.Object) (uri string, err error) {
+func (p *testNamer) GenerateLink(req *http.Request, obj runtime.Object) (uri string, err error) {
 	return "", errors.New("not implemented")
 }
 
 // GenerateLink creates a path and query for a list that represents the canonical path.
-func (p *testNamer) GenerateListLink(req *restful.Request) (uri string, err error) {
+func (p *testNamer) GenerateListLink(req *http.Request) (uri string, err error) {
 	return "", errors.New("not implemented")
 }
 
@@ -314,7 +314,7 @@ func TestNumberConversion(t *testing.T) {
 
 	patchJS := []byte(`{"spec":{"ports":[{"port":80,"nodePort":31789}]}}`)
 
-	_, _, err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
+	err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
 	if err != nil {
 		t.Fatal(err)
 	}

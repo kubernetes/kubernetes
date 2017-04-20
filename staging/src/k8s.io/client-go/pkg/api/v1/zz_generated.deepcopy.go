@@ -1198,6 +1198,11 @@ func DeepCopy_v1_ISCSIVolumeSource(in interface{}, out interface{}, c *conversio
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
+		if in.SecretRef != nil {
+			in, out := &in.SecretRef, &out.SecretRef
+			*out = new(LocalObjectReference)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -3195,11 +3200,6 @@ func DeepCopy_v1_ServiceSpec(in interface{}, out interface{}, c *conversion.Clon
 		}
 		if in.ExternalIPs != nil {
 			in, out := &in.ExternalIPs, &out.ExternalIPs
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.DeprecatedPublicIPs != nil {
-			in, out := &in.DeprecatedPublicIPs, &out.DeprecatedPublicIPs
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}

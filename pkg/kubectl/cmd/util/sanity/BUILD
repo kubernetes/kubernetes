@@ -13,7 +13,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/kubectl/cmd/templates:go_default_library",
-        "//vendor:github.com/spf13/cobra",
+        "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
 

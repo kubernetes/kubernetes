@@ -502,6 +502,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 							},
 						},
 					},
+					{
+						Name: "HOST_IP",
+						ValueFrom: &v1.EnvVarSource{
+							FieldRef: &v1.ObjectFieldSelector{
+								APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								FieldPath:  "status.hostIP",
+							},
+						},
+					},
 				},
 			},
 			masterServiceNs: "nothing",
@@ -512,6 +521,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "POD_NODE_NAME", Value: "node-name"},
 				{Name: "POD_SERVICE_ACCOUNT_NAME", Value: "special"},
 				{Name: "POD_IP", Value: "1.2.3.4"},
+				{Name: "HOST_IP", Value: testKubeletHostIP},
 			},
 		},
 		{

@@ -18,7 +18,7 @@ go_library(
     name = "go_default_library",
     srcs = ["goproxy.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/elazarl/goproxy"],
+    deps = ["//vendor/github.com/elazarl/goproxy:go_default_library"],
 )
 
 filegroup(

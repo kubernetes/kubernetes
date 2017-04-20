@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -296,3 +297,120 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 }
 
 // TODO(a-robinson): Add tests for update/sync/delete.
+
+func TestSyncService(t *testing.T) {
+	controller, _, _ := newController()
+
+	testServiceName := "sync-test-name"
+	testServiceUID := types.UID("sync-test-uid")
+
+	testService := newService(testServiceName, testServiceUID, v1.ServiceTypeLoadBalancer)
+
+	keyExpected := testService.GetObjectMeta().GetNamespace() + "/" + testService.GetObjectMeta().GetName()
+
+	controller.enqueueService(testService)
+	cachedServiceTest := controller.cache.getOrCreate(keyExpected)
+	cachedServiceTest.state = testService
+
+	controller.cache.set(keyExpected, cachedServiceTest)
+
+	keyGot, quit := controller.workingQueue.Get()
+
+	if quit {
+		t.Fatalf("get no workingQueue element")
+	}
+	if keyExpected != keyGot.(string) {
+		t.Fatalf("get service key error, expected: %s, got: %s", keyExpected, keyGot.(string))
+	}
+
+	err := controller.syncService(keyExpected)
+	if err != nil {
+		t.Fatalf("sync service error: %v", err)
+	}
+
+	_, exist := controller.cache.get(keyExpected)
+	if exist {
+		t.Fatalf("sync service error, workingQueue should not contain service: %s any more", keyExpected)
+	}
+
+}
+
+func TestProcessServiceDeletion(t *testing.T) {
+	controller, _, _ := newController()
+
+	testServiceName := "sync-test-name"
+	testServiceUID := types.UID("sync-test-uid")
+	testService := newService(testServiceName, testServiceUID, v1.ServiceTypeLoadBalancer)
+
+	keyExpected := testService.GetObjectMeta().GetNamespace() + "/" + testService.GetObjectMeta().GetName()
+
+	controller.enqueueService(testService)
+	cachedServiceTest := controller.cache.getOrCreate(keyExpected)
+	cachedServiceTest.state = testService
+	controller.cache.set(keyExpected, cachedServiceTest)
+
+	keyGot, quit := controller.workingQueue.Get()
+
+	if quit {
+		t.Fatalf("get no workingQueue element")
+	}
+	if keyExpected != keyGot.(string) {
+		t.Fatalf("get service key error, expected: %s, got: %s", keyExpected, keyGot.(string))
+	}
+
+	err, _ := controller.processServiceDeletion(keyExpected)
+	if err != nil {
+		t.Fatalf("delete service error: %v", err)
+	}
+
+	_, exist := controller.cache.get(keyExpected)
+	if exist {
+		t.Fatalf("delete service error, workingQueue should not contain service: %s any more", keyExpected)
+	}
+}
+
+func TestProcessServiceUpdate(t *testing.T) {
+	controller, _, _ := newController()
+
+	testServiceName := "sync-test-name"
+	testServiceUID := types.UID("sync-test-uid")
+	lbIP := "192.168.1.1"
+	testService := newService(testServiceName, testServiceUID, v1.ServiceTypeLoadBalancer)
+	testService.Spec.LoadBalancerIP = lbIP
+
+	keyExpected := testService.GetObjectMeta().GetNamespace() + "/" + testService.GetObjectMeta().GetName()
+
+	controller.enqueueService(testService)
+	cachedServiceTest := controller.cache.getOrCreate(keyExpected)
+	cachedServiceTest.state = testService
+	controller.cache.set(keyExpected, cachedServiceTest)
+
+	keyGot, quit := controller.workingQueue.Get()
+	if quit {
+		t.Fatalf("get no workingQueue element")
+	}
+	if keyExpected != keyGot.(string) {
+		t.Fatalf("get service key error, expected: %s, got: %s", keyExpected, keyGot.(string))
+	}
+
+	copy, err := api.Scheme.DeepCopy(testService)
+	if err != nil {
+		t.Fatalf("copy service error: %v", err)
+	}
+	newService := copy.(*v1.Service)
+
+	newLBIP := "192.168.1.11"
+	newService.Spec.LoadBalancerIP = newLBIP
+	err, _ = controller.processServiceUpdate(cachedServiceTest, newService, keyExpected)
+	if err != nil {
+		t.Fatalf("update service error: %v", err)
+	}
+
+	cachedServiceGot, exist := controller.cache.get(keyExpected)
+	if !exist {
+		t.Fatalf("update service error, workingQueue should contain service: %s", keyExpected)
+	}
+	if cachedServiceGot.state.Spec.LoadBalancerIP != newLBIP {
+		t.Fatalf("update LoadBalancerIP error, expected: %s, got: %s", newLBIP, cachedServiceGot.state.Spec.LoadBalancerIP)
+	}
+}

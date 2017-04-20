@@ -68,11 +68,13 @@ NODE_TARGETS = [
 # No need to duplicate CLIENT_TARGETS or NODE_TARGETS here,
 # since we include them in the actual build rule.
 SERVER_TARGETS = [
+    "//cmd/cloud-controller-manager",
     "//cmd/hyperkube",
     "//cmd/kube-apiserver",
     "//cmd/kube-controller-manager",
     "//cmd/kubeadm",
     "//plugin/cmd/kube-scheduler",
+    "//vendor/k8s.io/kube-aggregator",
 ]
 
 # kube::golang::test_targets
@@ -87,7 +89,7 @@ TEST_BINARY_TARGETS = [
     "//examples/k8petstore/web-server/src",
     "//federation/cmd/genfeddocs",
     "//test/e2e:e2e.test",
-    "//vendor:github.com/onsi/ginkgo/ginkgo_bin",
+    "//vendor/github.com/onsi/ginkgo/ginkgo:ginkgo",
     "//cmd/kubemark",  # TODO: server platforms only
     "//test/e2e_node:e2e_node.test",  # TODO: server platforms only
 ]
@@ -226,6 +228,7 @@ pkg_tar(
         "//cluster:all-srcs",
         "//docs:all-srcs",
         "//examples:all-srcs",
+        "//hack/lib:all-srcs",
         "//third_party/htpasswd:all-srcs",
     ],
     package_dir = "kubernetes",

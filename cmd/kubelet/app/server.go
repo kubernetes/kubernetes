@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"net/url"
 	"os"
 	"path"
 	"strconv"
@@ -70,10 +71,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim"
+	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/server"
+	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/flock"
@@ -124,9 +128,8 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 // UnsecuredKubeletDeps returns a KubeletDeps suitable for being run, or an error if the server setup
 // is not valid.  It will not start any background processes, and does not include authentication/authorization
 func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error) {
-
 	// Initialize the TLS Options
-	tlsOptions, err := InitializeTLS(&s.KubeletConfiguration)
+	tlsOptions, err := InitializeTLS(&s.KubeletFlags, &s.KubeletConfiguration)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +352,6 @@ func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubele
 	} else {
 		glog.Warning("No api server defined - no events will be sent to API server.")
 	}
-
 }
 
 func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
@@ -574,7 +576,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		glog.Warning(err)
 	}
 
-	if err := RunKubelet(&s.KubeletConfiguration, kubeDeps, s.RunOnce, standaloneMode); err != nil {
+	if err := RunKubelet(&s.KubeletFlags, &s.KubeletConfiguration, kubeDeps, s.RunOnce, standaloneMode); err != nil {
 		return err
 	}
 
@@ -620,7 +622,7 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
-func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions, error) {
+func InitializeTLS(kf *options.KubeletFlags, kc *componentconfig.KubeletConfiguration) (*server.TLSOptions, error) {
 	if kc.TLSCertFile == "" && kc.TLSPrivateKeyFile == "" {
 		kc.TLSCertFile = path.Join(kc.CertDirectory, "kubelet.crt")
 		kc.TLSPrivateKeyFile = path.Join(kc.CertDirectory, "kubelet.key")
@@ -630,7 +632,7 @@ func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions
 			return nil, err
 		}
 		if !canReadCertAndKey {
-			cert, key, err := certutil.GenerateSelfSignedCertKey(nodeutil.GetHostname(kc.HostnameOverride), nil, nil)
+			cert, key, err := certutil.GenerateSelfSignedCertKey(nodeutil.GetHostname(kf.HostnameOverride), nil, nil)
 			if err != nil {
 				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
 			}
@@ -761,8 +763,8 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, runOnce bool, standaloneMode bool) error {
-	hostname := nodeutil.GetHostname(kubeCfg.HostnameOverride)
+func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, runOnce bool, standaloneMode bool) error {
+	hostname := nodeutil.GetHostname(kubeFlags.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname if kcfg.Cloud == nil
 	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
 	if err != nil {
@@ -808,7 +810,7 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
-	k, err := builder(kubeCfg, kubeDeps, standaloneMode)
+	k, err := builder(kubeCfg, kubeDeps, standaloneMode, kubeFlags.HostnameOverride, kubeFlags.NodeIP, kubeFlags.DockershimRootDirectory)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -888,11 +890,11 @@ func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg 
 	}
 }
 
-func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, standaloneMode bool) (k kubelet.KubeletBootstrap, err error) {
+func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, standaloneMode bool, hostnameOverride, nodeIP, dockershimRootDir string) (k kubelet.KubeletBootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, standaloneMode)
+	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, standaloneMode, hostnameOverride, nodeIP, dockershimRootDir)
 	if err != nil {
 		return nil, err
 	}
@@ -928,4 +930,73 @@ func parseResourceList(m componentconfig.ConfigurationMap) (v1.ResourceList, err
 		}
 	}
 	return rl, nil
+}
+
+// RunDockershim only starts the dockershim in current process. This is only used for cri validate testing purpose
+// TODO(random-liu): Move this to a separate binary.
+func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir string) error {
+	// Create docker client.
+	dockerClient := dockertools.ConnectToDockerOrDie(c.DockerEndpoint, c.RuntimeRequestTimeout.Duration,
+		c.ImagePullProgressDeadline.Duration)
+
+	// Initialize docker exec handler.
+	var dockerExecHandler dockertools.ExecHandler
+	switch c.DockerExecHandlerName {
+	case "native":
+		dockerExecHandler = &dockertools.NativeExecHandler{}
+	case "nsenter":
+		dockerExecHandler = &dockertools.NsenterExecHandler{}
+	default:
+		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", c.DockerExecHandlerName)
+		dockerExecHandler = &dockertools.NativeExecHandler{}
+	}
+
+	// Initialize network plugin settings.
+	binDir := c.CNIBinDir
+	if binDir == "" {
+		binDir = c.NetworkPluginDir
+	}
+	pluginSettings := dockershim.NetworkPluginSettings{
+		HairpinMode:       componentconfig.HairpinMode(c.HairpinMode),
+		NonMasqueradeCIDR: c.NonMasqueradeCIDR,
+		PluginName:        c.NetworkPluginName,
+		PluginConfDir:     c.CNIConfDir,
+		PluginBinDir:      binDir,
+		MTU:               int(c.NetworkPluginMTU),
+	}
+
+	// Initialize streaming configuration. (Not using TLS now)
+	streamingConfig := &streaming.Config{
+		// Use a relative redirect (no scheme or host).
+		BaseURL:                         &url.URL{Path: "/cri/"},
+		StreamIdleTimeout:               c.StreamingConnectionIdleTimeout.Duration,
+		StreamCreationTimeout:           streaming.DefaultConfig.StreamCreationTimeout,
+		SupportedRemoteCommandProtocols: streaming.DefaultConfig.SupportedRemoteCommandProtocols,
+		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
+	}
+
+	ds, err := dockershim.NewDockerService(dockerClient, c.SeccompProfileRoot, c.PodInfraContainerImage,
+		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, dockerExecHandler, dockershimRootDir)
+	if err != nil {
+		return err
+	}
+	if err := ds.Start(); err != nil {
+		return err
+	}
+
+	// The unix socket for kubelet <-> dockershim communication.
+	ep := c.RemoteRuntimeEndpoint
+	if len(ep) == 0 {
+		ep = "/var/run/dockershim.sock"
+	}
+
+	glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
+	server := dockerremote.NewDockerServer(ep, ds)
+	if err := server.Start(); err != nil {
+		return err
+	}
+
+	// Start the streaming server
+	addr := net.JoinHostPort(c.Address, strconv.Itoa(int(c.Port)))
+	return http.ListenAndServe(addr, ds)
 }

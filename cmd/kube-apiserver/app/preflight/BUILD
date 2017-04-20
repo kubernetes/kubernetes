@@ -19,7 +19,7 @@ go_test(
     srcs = ["checks_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/util/wait"],
+    deps = ["//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library"],
 )
 
 filegroup(

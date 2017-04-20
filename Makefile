@@ -233,11 +233,15 @@ define TEST_E2E_NODE_HELP_INFO
 #  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
 #  RUNTIME: Container runtime to use (eg. docker, rkt, remote).
 #    Defaults to "docker".
+#  CONTAINER_RUNTIME_ENDPOINT: remote container endpoint to connect to.
+#   Used when RUNTIME is set to "remote".
+#  IMAGE_SERVICE_ENDPOINT: remote image endpoint to connect to, to prepull images.
+#   Used when RUNTIME is set to "remote".
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
 #   make test-e2e-node REMOTE=true DELETE_INSTANCES=true
-#   make test-e2e-node TEST_ARGS="--cgroups-per-qos=true"
+#   make test-e2e-node TEST_ARGS='--kubelet-flags="--cgroups-per-qos=true"'
 # Build and run tests.
 endef
 .PHONY: test-e2e-node
@@ -496,7 +500,7 @@ bazel-build:
 	@echo "$$BAZEL_BUILD_HELP_INFO"
 else
 bazel-build:
-	bazel build //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //examples/... //test/...
+	bazel build //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //examples/... //test/... //vendor/k8s.io/...
 endif
 
 
@@ -511,7 +515,7 @@ bazel-test:
 	@echo "$$BAZEL_TEST_HELP_INFO"
 else
 bazel-test:
-	bazel test --flaky_test_attempts=3 //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all
+	bazel test --flaky_test_attempts=3 //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all //vendor/k8s.io/...
 endif
 
 ifeq ($(PRINT_HELP),y)

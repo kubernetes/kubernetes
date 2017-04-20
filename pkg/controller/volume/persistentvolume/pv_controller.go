@@ -28,6 +28,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	"k8s.io/kubernetes/pkg/api/v1/ref"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -97,7 +99,7 @@ import (
 //
 // The binding is two-step process. PV.Spec.ClaimRef is modified first and
 // PVC.Spec.VolumeName second. At any point of this transaction, the PV or PVC
-// can be modified by user or other controller or completelly deleted. Also,
+// can be modified by user or other controller or completely deleted. Also,
 // two (or more) controllers may try to bind different volumes to different
 // claims at the same time. The controller must recover from any conflicts
 // that may arise from these conditions.
@@ -125,17 +127,17 @@ const annDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 // a volume for this PVC.
 const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 
-// Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
+// CloudVolumeCreatedForClaimNamespaceTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
 // with namespace of a persistent volume claim used to create this volume.
-const cloudVolumeCreatedForClaimNamespaceTag = "kubernetes.io/created-for/pvc/namespace"
+const CloudVolumeCreatedForClaimNamespaceTag = "kubernetes.io/created-for/pvc/namespace"
 
-// Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
+// CloudVolumeCreatedForClaimNameTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
 // with name of a persistent volume claim used to create this volume.
-const cloudVolumeCreatedForClaimNameTag = "kubernetes.io/created-for/pvc/name"
+const CloudVolumeCreatedForClaimNameTag = "kubernetes.io/created-for/pvc/name"
 
-// Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
+// CloudVolumeCreatedForVolumeNameTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
 // with name of appropriate Kubernetes persistent volume .
-const cloudVolumeCreatedForVolumeNameTag = "kubernetes.io/created-for/pv/name"
+const CloudVolumeCreatedForVolumeNameTag = "kubernetes.io/created-for/pv/name"
 
 // Number of retries when we create a PV object for a provisioned volume.
 const createProvisionedPVRetryCount = 5
@@ -203,10 +205,6 @@ type PersistentVolumeController struct {
 
 	createProvisionedPVRetryCount int
 	createProvisionedPVInterval   time.Duration
-
-	// Provisioner for annAlphaClass.
-	// TODO: remove in 1.5
-	alphaProvisioner vol.ProvisionableVolumePlugin
 }
 
 // syncClaim is the main controller method to decide what to do with a claim.
@@ -223,6 +221,25 @@ func (ctrl *PersistentVolumeController) syncClaim(claim *v1.PersistentVolumeClai
 	} else {
 		return ctrl.syncBoundClaim(claim)
 	}
+}
+
+//checkVolumeSatisfyClaim checks if the volume requested by the claim satisfies the requirements of the claim
+func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) error {
+	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	requestedSize := requestedQty.Value()
+
+	volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
+	volumeSize := volumeQty.Value()
+	if volumeSize < requestedSize {
+		return fmt.Errorf("Storage capacity of volume[%s] requested by claim[%v] is not enough", volume.Name, claimToClaimKey(claim))
+	}
+
+	requestedClass := v1helper.GetPersistentVolumeClaimClass(claim)
+	if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
+		return fmt.Errorf("Class of volume[%s] is not the same as claim[%v]", volume.Name, claimToClaimKey(claim))
+	}
+
+	return nil
 }
 
 // syncUnboundClaim is the main controller method to decide what to do with an
@@ -243,7 +260,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: no volume found", claimToClaimKey(claim))
 			// No PV could be found
 			// OBSERVATION: pvc is "Pending", will retry
-			if v1.GetPersistentVolumeClaimClass(claim) != "" || metav1.HasAnnotation(claim.ObjectMeta, v1.AlphaStorageClassAnnotation) {
+			if v1helper.GetPersistentVolumeClaimClass(claim) != "" {
 				if err = ctrl.provisionClaim(claim); err != nil {
 					return err
 				}
@@ -295,7 +312,15 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				// User asked for a PV that is not claimed
 				// OBSERVATION: pvc is "Pending", pv is "Available"
 				glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume is unbound, binding", claimToClaimKey(claim))
-				if err = ctrl.bind(volume, claim); err != nil {
+				if err = checkVolumeSatisfyClaim(volume, claim); err != nil {
+					glog.V(4).Infof("Can't bind the claim to volume %q: %v", volume.Name, err)
+					//send a event
+					ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, "VolumeMismatch", "Volume's size is smaller than requested or volume's class does not match with claim")
+					//volume does not satisfy the requirements of the claim
+					if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
+						return err
+					}
+				} else if err = ctrl.bind(volume, claim); err != nil {
 					// On any error saving the volume or the claim, subsequent
 					// syncClaim will finish the binding.
 					return err
@@ -747,7 +772,7 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *v1.PersistentV
 		volume.Spec.ClaimRef.Namespace != claim.Namespace ||
 		volume.Spec.ClaimRef.UID != claim.UID {
 
-		claimRef, err := v1.GetReference(api.Scheme, claim)
+		claimRef, err := ref.GetReference(api.Scheme, claim)
 		if err != nil {
 			return nil, fmt.Errorf("Unexpected error getting claim reference: %v", err)
 		}
@@ -1222,7 +1247,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		return
 	}
 
-	claimClass := v1.GetPersistentVolumeClaimClass(claim)
+	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
 	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
@@ -1250,7 +1275,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		// This means that an unknown provisioner is requested. Report an event
 		// and wait for the external provisioner
 		if storageClass != nil {
-			msg := fmt.Sprintf("cannot find provisioner %q, expecting that a volume for the claim is provisioned either manually or via external software", storageClass.Provisioner)
+			msg := fmt.Sprintf("waiting for a volume to be created, either by external provisioner %q or manually created by system administrator", storageClass.Provisioner)
 			ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ExternalProvisioning", msg)
 			glog.V(3).Infof("provisioning claim %q: %s", claimToClaimKey(claim), msg)
 		} else {
@@ -1275,7 +1300,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 
 	// Prepare a claimRef to the claim early (to fail before a volume is
 	// provisioned)
-	claimRef, err := v1.GetReference(api.Scheme, claim)
+	claimRef, err := ref.GetReference(api.Scheme, claim)
 	if err != nil {
 		glog.V(3).Infof("unexpected error getting claim reference: %v", err)
 		return
@@ -1283,9 +1308,9 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 
 	// Gather provisioning options
 	tags := make(map[string]string)
-	tags[cloudVolumeCreatedForClaimNamespaceTag] = claim.Namespace
-	tags[cloudVolumeCreatedForClaimNameTag] = claim.Name
-	tags[cloudVolumeCreatedForVolumeNameTag] = pvName
+	tags[CloudVolumeCreatedForClaimNamespaceTag] = claim.Namespace
+	tags[CloudVolumeCreatedForClaimNameTag] = claim.Name
+	tags[CloudVolumeCreatedForVolumeNameTag] = pvName
 
 	options := vol.VolumeOptions{
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
@@ -1322,16 +1347,11 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	// Bind it to the claim
 	volume.Spec.ClaimRef = claimRef
 	volume.Status.Phase = v1.VolumeBound
+	volume.Spec.StorageClassName = claimClass
 
 	// Add annBoundByController (used in deleting the volume)
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annBoundByController, "yes")
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, plugin.GetPluginName())
-	// For Alpha provisioning behavior, do not add storage.BetaStorageClassAnnotations for volumes created
-	// by storage.AlphaStorageClassAnnotation
-	// TODO: remove this check in 1.5, storage.StorageClassAnnotation will be always non-empty there.
-	if claimClass != "" {
-		volume.Spec.StorageClassName = claimClass
-	}
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
@@ -1438,23 +1458,9 @@ func (ctrl *PersistentVolumeController) newRecyclerEventRecorder(volume *v1.Pers
 // It returns either the provisioning plugin or nil when an external
 // provisioner is requested.
 func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *v1.PersistentVolumeClaim) (vol.ProvisionableVolumePlugin, *storage.StorageClass, error) {
-	// TODO: remove this alpha behavior in 1.5
-	alpha := metav1.HasAnnotation(claim.ObjectMeta, v1.AlphaStorageClassAnnotation)
-	if alpha && v1.PersistentVolumeClaimHasClass(claim) {
-		// Both Alpha annotation and storage class name is set. Use the storage
-		// class name.
-		alpha = false
-		msg := fmt.Sprintf("both %q annotation and storageClassName are present, using storageClassName", v1.AlphaStorageClassAnnotation)
-		ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ProvisioningIgnoreAlpha", msg)
-	}
-	if alpha {
-		// Fall back to fixed list of provisioner plugins
-		return ctrl.findAlphaProvisionablePlugin()
-	}
-
 	// provisionClaim() which leads here is never called with claimClass=="", we
 	// can save some checks.
-	claimClass := v1.GetPersistentVolumeClaimClass(claim)
+	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	class, err := ctrl.classLister.Get(claimClass)
 	if err != nil {
 		return nil, nil, err
@@ -1470,28 +1476,6 @@ func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *v1.Persis
 		return nil, class, err
 	}
 	return plugin, class, nil
-}
-
-// findAlphaProvisionablePlugin returns a volume plugin compatible with
-// Kubernetes 1.3.
-// TODO: remove in Kubernetes 1.5
-func (ctrl *PersistentVolumeController) findAlphaProvisionablePlugin() (vol.ProvisionableVolumePlugin, *storage.StorageClass, error) {
-	if ctrl.alphaProvisioner == nil {
-		return nil, nil, fmt.Errorf("cannot find volume plugin for alpha provisioning")
-	}
-
-	// Return a dummy StorageClass instance with no parameters
-	storageClass := &storage.StorageClass{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "",
-		},
-		Provisioner: ctrl.alphaProvisioner.GetPluginName(),
-	}
-	glog.V(4).Infof("using alpha provisioner %s", ctrl.alphaProvisioner.GetPluginName())
-	return ctrl.alphaProvisioner, storageClass, nil
 }
 
 // findDeletablePlugin finds a deleter plugin for a given volume. It returns

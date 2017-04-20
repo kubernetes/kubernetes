@@ -226,7 +226,7 @@ func (f *fixture) run_(deploymentName string, startInformers bool, expectError b
 		}
 
 		expectedAction := f.actions[i]
-		if !expectedAction.Matches(action.GetVerb(), action.GetResource().Resource) {
+		if !(expectedAction.Matches(action.GetVerb(), action.GetResource().Resource) && action.GetSubresource() == expectedAction.GetSubresource()) {
 			f.t.Errorf("Expected\n\t%#v\ngot\n\t%#v", expectedAction, action)
 			continue
 		}
@@ -560,18 +560,21 @@ func TestGetPodMapForReplicaSets(t *testing.T) {
 	for _, podList := range podMap {
 		podCount += len(podList.Items)
 	}
-	if got, want := podCount, 2; got != want {
+	if got, want := podCount, 3; got != want {
 		t.Errorf("podCount = %v, want %v", got, want)
 	}
 
 	if got, want := len(podMap), 2; got != want {
 		t.Errorf("len(podMap) = %v, want %v", got, want)
 	}
-	if got, want := len(podMap[rs1.UID].Items), 1; got != want {
+	if got, want := len(podMap[rs1.UID].Items), 2; got != want {
 		t.Errorf("len(podMap[rs1]) = %v, want %v", got, want)
 	}
-	if got, want := podMap[rs1.UID].Items[0].Name, "rs1-pod"; got != want {
-		t.Errorf("podMap[rs1] = [%v], want [%v]", got, want)
+	expect := map[string]struct{}{"rs1-pod": {}, "pod4": {}}
+	for _, pod := range podMap[rs1.UID].Items {
+		if _, ok := expect[pod.Name]; !ok {
+			t.Errorf("unexpected pod name for rs1: %s", pod.Name)
+		}
 	}
 	if got, want := len(podMap[rs2.UID].Items), 1; got != want {
 		t.Errorf("len(podMap[rs2]) = %v, want %v", got, want)

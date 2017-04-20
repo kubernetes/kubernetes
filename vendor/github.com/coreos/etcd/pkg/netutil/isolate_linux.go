@@ -43,17 +43,24 @@ func RecoverPort(port int) error {
 
 // SetLatency adds latency in millisecond scale with random variations.
 func SetLatency(ms, rv int) error {
+	ifces, err := GetDefaultInterfaces()
+	if err != nil {
+		return err
+	}
+
 	if rv > ms {
 		rv = 1
 	}
-	cmdStr := fmt.Sprintf("sudo tc qdisc add dev eth0 root netem delay %dms %dms distribution normal", ms, rv)
-	_, err := exec.Command("/bin/sh", "-c", cmdStr).Output()
-	if err != nil {
-		// the rule has already been added. Overwrite it.
-		cmdStr = fmt.Sprintf("sudo tc qdisc change dev eth0 root netem delay %dms %dms distribution normal", ms, rv)
+	for ifce := range ifces {
+		cmdStr := fmt.Sprintf("sudo tc qdisc add dev %s root netem delay %dms %dms distribution normal", ifce, ms, rv)
 		_, err = exec.Command("/bin/sh", "-c", cmdStr).Output()
 		if err != nil {
-			return err
+			// the rule has already been added. Overwrite it.
+			cmdStr = fmt.Sprintf("sudo tc qdisc change dev %s root netem delay %dms %dms distribution normal", ifce, ms, rv)
+			_, err = exec.Command("/bin/sh", "-c", cmdStr).Output()
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -61,6 +68,15 @@ func SetLatency(ms, rv int) error {
 
 // RemoveLatency resets latency configurations.
 func RemoveLatency() error {
-	_, err := exec.Command("/bin/sh", "-c", "sudo tc qdisc del dev eth0 root netem").Output()
-	return err
+	ifces, err := GetDefaultInterfaces()
+	if err != nil {
+		return err
+	}
+	for ifce := range ifces {
+		_, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("sudo tc qdisc del dev %s root netem", ifce)).Output()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

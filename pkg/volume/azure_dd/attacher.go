@@ -94,6 +94,7 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.Node
 		// Volume is already attached to node.
 		glog.V(4).Infof("Attach operation is successful. volume %q is already attached to node %q at lun %d.", volumeSource.DiskName, instanceid, lun)
 	} else {
+		glog.V(4).Infof("GetDiskLun returned: %v. Initiating attaching volume %q to node %q.", err, volumeSource.DataDiskURI, nodeName)
 		getLunMutex.LockKey(instanceid)
 		defer getLunMutex.UnlockKey(instanceid)
 
@@ -102,7 +103,7 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.Node
 			glog.Warningf("no LUN available for instance %q", nodeName)
 			return "", fmt.Errorf("all LUNs are used, cannot attach volume %q to instance %q", volumeSource.DiskName, instanceid)
 		}
-
+		glog.V(4).Infof("Trying to attach volume %q lun %d to node %q.", volumeSource.DataDiskURI, lun, nodeName)
 		err = attacher.azureProvider.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, nodeName, lun, compute.CachingTypes(*volumeSource.CachingMode))
 		if err == nil {
 			glog.V(4).Infof("Attach operation successful: volume %q attached to node %q.", volumeSource.DataDiskURI, nodeName)

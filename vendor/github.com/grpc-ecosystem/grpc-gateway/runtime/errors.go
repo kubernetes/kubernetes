@@ -63,8 +63,8 @@ var (
 )
 
 type errorBody struct {
-	Error string `json:"error"`
-	Code  int    `json:"code"`
+	Error string `protobuf:"bytes,1,name=error" json:"error"`
+	Code  int    `protobuf:"bytes,2,name=code" json:"code"`
 }
 
 //Make this also conform to proto.Message for builtin JSONPb Marshaler

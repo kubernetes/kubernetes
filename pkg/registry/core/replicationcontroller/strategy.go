@@ -34,6 +34,7 @@ import (
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/validation"
 )
 
@@ -110,7 +111,7 @@ func (rcStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime
 	updateErrorList := validation.ValidateReplicationControllerUpdate(newRc, oldRc)
 	errs := append(validationErrorList, updateErrorList...)
 
-	for key, value := range api.NonConvertibleFields(oldRc.Annotations) {
+	for key, value := range helper.NonConvertibleFields(oldRc.Annotations) {
 		parts := strings.Split(key, "/")
 		if len(parts) != 2 {
 			continue

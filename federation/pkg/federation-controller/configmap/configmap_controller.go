@@ -169,7 +169,8 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			configmap := obj.(*apiv1.ConfigMap)
-			err := client.Core().ConfigMaps(configmap.Namespace).Delete(configmap.Name, &metav1.DeleteOptions{})
+			orphanDependents := false
+			err := client.Core().ConfigMaps(configmap.Namespace).Delete(configmap.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
 			return err
 		})
 
@@ -202,13 +203,13 @@ func (configmapcontroller *ConfigMapController) hasFinalizerFunc(obj pkgruntime.
 	return false
 }
 
-// removeFinalizerFunc removes the finalizer from the given objects ObjectMeta. Assumes that the given object is a configmap.
-func (configmapcontroller *ConfigMapController) removeFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
+// removeFinalizerFunc removes the given finalizers from the given objects ObjectMeta. Assumes that the given object is a configmap.
+func (configmapcontroller *ConfigMapController) removeFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
 	configmap := obj.(*apiv1.ConfigMap)
 	newFinalizers := []string{}
 	hasFinalizer := false
 	for i := range configmap.ObjectMeta.Finalizers {
-		if string(configmap.ObjectMeta.Finalizers[i]) != finalizer {
+		if !deletionhelper.ContainsString(finalizers, configmap.ObjectMeta.Finalizers[i]) {
 			newFinalizers = append(newFinalizers, configmap.ObjectMeta.Finalizers[i])
 		} else {
 			hasFinalizer = true
@@ -221,7 +222,7 @@ func (configmapcontroller *ConfigMapController) removeFinalizerFunc(obj pkgrunti
 	configmap.ObjectMeta.Finalizers = newFinalizers
 	configmap, err := configmapcontroller.federatedApiClient.Core().ConfigMaps(configmap.Namespace).Update(configmap)
 	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from configmap %s: %v", finalizer, configmap.Name, err)
+		return nil, fmt.Errorf("failed to remove finalizers %v from configmap %s: %v", finalizers, configmap.Name, err)
 	}
 	return configmap, nil
 }
@@ -334,7 +335,7 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 	if configMap.DeletionTimestamp != nil {
 		if err := configmapcontroller.delete(configMap); err != nil {
 			glog.Errorf("Failed to delete %s: %v", configmap, err)
-			configmapcontroller.eventRecorder.Eventf(configMap, api.EventTypeNormal, "DeleteFailed",
+			configmapcontroller.eventRecorder.Eventf(configMap, api.EventTypeWarning, "DeleteFailed",
 				"ConfigMap delete failed: %v", err)
 			configmapcontroller.deliverConfigMap(configmap, 0, true)
 		}
@@ -409,7 +410,7 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 	}
 	err = configmapcontroller.federatedUpdater.UpdateWithOnError(operations, configmapcontroller.updateTimeout,
 		func(op util.FederatedOperation, operror error) {
-			configmapcontroller.eventRecorder.Eventf(configMap, api.EventTypeNormal, "UpdateInClusterFailed",
+			configmapcontroller.eventRecorder.Eventf(configMap, api.EventTypeWarning, "UpdateInClusterFailed",
 				"ConfigMap update in cluster %s failed: %v", op.ClusterName, operror)
 		})
 

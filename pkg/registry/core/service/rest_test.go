@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -98,7 +99,11 @@ func TestServiceRegistryCreate(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	created_service := created_svc.(*api.Service)
-	if !metav1.HasObjectMetaSystemFieldValues(&created_service.ObjectMeta) {
+	objMeta, err := meta.Accessor(created_service)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !metav1.HasObjectMetaSystemFieldValues(objMeta) {
 		t.Errorf("storage did not populate object meta field values")
 	}
 	if created_service.Name != "foo" {
@@ -218,7 +223,11 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 		created_service := created_svc.(*api.Service)
-		if !metav1.HasObjectMetaSystemFieldValues(&created_service.ObjectMeta) {
+		objMeta, err := meta.Accessor(created_service)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !metav1.HasObjectMetaSystemFieldValues(objMeta) {
 			t.Errorf("storage did not populate object meta field values")
 		}
 		if created_service.Name != test.name {
@@ -1012,7 +1021,7 @@ func TestServiceRegistryExternalTrafficBetaAnnotationHealthCheckNodePortUserAllo
 	}
 	created_svc, err := storage.Create(ctx, svc)
 	if created_svc == nil || err != nil {
-		t.Errorf("Unexpected failure creating service %v", err)
+		t.Fatalf("Unexpected failure creating service: %v", err)
 	}
 	created_service := created_svc.(*api.Service)
 	if !service.NeedsHealthCheck(created_service) {

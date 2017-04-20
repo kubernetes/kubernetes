@@ -41,7 +41,7 @@ spec:
         tier: frontend
     spec:
       containers:
-      - image: wordpress:4.6.1-apache
+      - image: wordpress:4.7.3-apache
         name: wordpress
         env:
         - name: WORDPRESS_DB_HOST

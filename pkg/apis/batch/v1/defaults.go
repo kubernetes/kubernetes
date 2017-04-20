@@ -21,10 +21,7 @@ import (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	RegisterDefaults(scheme)
-	return scheme.AddDefaultingFuncs(
-		SetDefaults_Job,
-	)
+	return RegisterDefaults(scheme)
 }
 
 func SetDefaults_Job(obj *Job) {

@@ -489,6 +489,37 @@ func GetExtensions(pb Message, es []*ExtensionDesc) (extensions []interface{}, e
 	return
 }
 
+// ExtensionDescs returns a new slice containing pb's extension descriptors, in undefined order.
+// For non-registered extensions, ExtensionDescs returns an incomplete descriptor containing
+// just the Field field, which defines the extension's field number.
+func ExtensionDescs(pb Message) ([]*ExtensionDesc, error) {
+	epb, ok := extendable(pb)
+	if !ok {
+		return nil, fmt.Errorf("proto: %T is not an extendable proto.Message", pb)
+	}
+	registeredExtensions := RegisteredExtensions(pb)
+
+	emap, mu := epb.extensionsRead()
+	if emap == nil {
+		return nil, nil
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	extensions := make([]*ExtensionDesc, 0, len(emap))
+	for extid, e := range emap {
+		desc := e.desc
+		if desc == nil {
+			desc = registeredExtensions[extid]
+			if desc == nil {
+				desc = &ExtensionDesc{Field: extid}
+			}
+		}
+
+		extensions = append(extensions, desc)
+	}
+	return extensions, nil
+}
+
 // SetExtension sets the specified extension of pb to the specified value.
 func SetExtension(pb Message, extension *ExtensionDesc, value interface{}) error {
 	epb, ok := extendable(pb)

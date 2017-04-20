@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -55,16 +56,16 @@ type TaintOptions struct {
 }
 
 var (
-	taint_long = templates.LongDesc(`
+	taint_long = templates.LongDesc(i18n.T(`
 		Update the taints on one or more nodes.
 
 		* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
 		* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
 		* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.
 		* The effect must be NoSchedule, PreferNoSchedule or NoExecute.
-		* Currently taint can only apply to node.`)
+		* Currently taint can only apply to node.`))
 
-	taint_example = templates.Examples(`
+	taint_example = templates.Examples(i18n.T(`
 		# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.
 		# If a taint with that key and effect already exists, its value is replaced as specified.
 		kubectl taint nodes foo dedicated=special-user:NoSchedule
@@ -73,7 +74,7 @@ var (
 		kubectl taint nodes foo dedicated:NoSchedule-
 
 		# Remove from node 'foo' all the taints with key 'dedicated'
-		kubectl taint nodes foo dedicated-`)
+		kubectl taint nodes foo dedicated-`))
 )
 
 func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -91,7 +92,7 @@ func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			if err := options.Complete(f, out, cmd, args); err != nil {
 				cmdutil.CheckErr(err)
 			}
-			if err := options.Validate(args); err != nil {
+			if err := options.Validate(); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
 			if err := options.RunTaint(); err != nil {
@@ -140,9 +141,9 @@ func reorganizeTaints(obj runtime.Object, overwrite bool, taintsToAdd []v1.Taint
 	for _, taintToRemove := range taintsToRemove {
 		removed := false
 		if len(taintToRemove.Effect) > 0 {
-			newTaints, removed = v1.DeleteTaint(newTaints, &taintToRemove)
+			newTaints, removed = v1helper.DeleteTaint(newTaints, &taintToRemove)
 		} else {
-			newTaints, removed = v1.DeleteTaintsByKey(newTaints, taintToRemove.Key)
+			newTaints, removed = v1helper.DeleteTaintsByKey(newTaints, taintToRemove.Key)
 		}
 		if !removed {
 			allErrs = append(allErrs, fmt.Errorf("taint %q not found", taintToRemove.ToString()))
@@ -249,7 +250,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 }
 
 // Validate checks to the TaintOptions to see if there is sufficient information run the command.
-func (o TaintOptions) Validate(args []string) error {
+func (o TaintOptions) Validate() error {
 	resourceType := strings.ToLower(o.resources[0])
 	validResources, isValidResource := append(kubectl.ResourceAliases([]string{"node"}), "node"), false
 	for _, validResource := range validResources {

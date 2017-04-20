@@ -19,10 +19,11 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/util/interrupt:go_default_library",
-        "//vendor:github.com/docker/docker/pkg/term",
-        "//vendor:github.com/mitchellh/go-wordwrap",
-        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor/github.com/docker/docker/pkg/term:go_default_library",
+        "//vendor/github.com/mitchellh/go-wordwrap:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
     ],
 )
 

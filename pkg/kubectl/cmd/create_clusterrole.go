@@ -24,18 +24,19 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
-	clusterRoleLong = templates.LongDesc(`
-		Create a ClusterRole.`)
+	clusterRoleLong = templates.LongDesc(i18n.T(`
+		Create a ClusterRole.`))
 
-	clusterRoleExample = templates.Examples(`
+	clusterRoleExample = templates.Examples(i18n.T(`
 		# Create a ClusterRole named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
 		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods
 
 		# Create a ClusterRole named "pod-reader" with ResourceName specified
-		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod`)
+		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod`))
 )
 
 type CreateClusterRoleOptions struct {

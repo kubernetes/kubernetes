@@ -322,6 +322,8 @@ type DeploymentStatus struct {
 	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty" protobuf:"varint,5,opt,name=unavailableReplicas"`
 
 	// Represents the latest available observations of a deployment's current state.
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	Conditions []DeploymentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,6,rep,name=conditions"`
 }
 
@@ -802,6 +804,8 @@ type ReplicaSetStatus struct {
 
 	// Represents the latest available observations of a replica set's current state.
 	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	Conditions []ReplicaSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,6,rep,name=conditions"`
 }
 
@@ -1081,21 +1085,17 @@ type NetworkPolicySpec struct {
 type NetworkPolicyIngressRule struct {
 	// List of ports which should be made accessible on the pods selected for this rule.
 	// Each item in this list is combined using a logical OR.
-	// If this field is not provided, this rule matches all ports (traffic not restricted by port).
-	// If this field is empty, this rule matches no ports (no traffic matches).
+	// If this field is empty or missing, this rule matches all ports (traffic not restricted by port).
 	// If this field is present and contains at least one item, then this rule allows traffic
 	// only if the traffic matches at least one port in the list.
-	// TODO: Update this to be a pointer to slice as soon as auto-generation supports it.
 	// +optional
 	Ports []NetworkPolicyPort `json:"ports,omitempty" protobuf:"bytes,1,rep,name=ports"`
 
 	// List of sources which should be able to access the pods selected for this rule.
 	// Items in this list are combined using a logical OR operation.
-	// If this field is not provided, this rule matches all sources (traffic not restricted by source).
-	// If this field is empty, this rule matches no sources (no traffic matches).
+	// If this field is empty or missing, this rule matches all sources (traffic not restricted by source).
 	// If this field is present and contains at least on item, this rule allows traffic only if the
 	// traffic matches at least one item in the from list.
-	// TODO: Update this to be a pointer to slice as soon as auto-generation supports it.
 	// +optional
 	From []NetworkPolicyPeer `json:"from,omitempty" protobuf:"bytes,2,rep,name=from"`
 }
@@ -1120,7 +1120,6 @@ type NetworkPolicyPeer struct {
 
 	// This is a label selector which selects Pods in this namespace.
 	// This field follows standard label selector semantics.
-	// If not provided, this selector selects no pods.
 	// If present but empty, this selector selects all pods in this namespace.
 	// +optional
 	PodSelector *metav1.LabelSelector `json:"podSelector,omitempty" protobuf:"bytes,1,opt,name=podSelector"`
@@ -1128,7 +1127,6 @@ type NetworkPolicyPeer struct {
 	// Selects Namespaces using cluster scoped-labels.  This
 	// matches all pods in all namespaces selected by this label selector.
 	// This field follows standard label selector semantics.
-	// If omitted, this selector selects no namespaces.
 	// If present but empty, this selector selects all namespaces.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,2,opt,name=namespaceSelector"`

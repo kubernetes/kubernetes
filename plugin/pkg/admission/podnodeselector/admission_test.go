@@ -141,6 +141,14 @@ func TestPodAdmission(t *testing.T) {
 			admit:                 false,
 			testName:              "Merged pod node selectors conflict with the whitelist",
 		},
+		{
+			defaultNodeSelector:             "env=dev",
+			ignoreTestNamespaceNodeSelector: true,
+			whitelist:                       "env=prd",
+			podNodeSelector:                 map[string]string{},
+			admit:                           false,
+			testName:                        "Default node selector conflict with the whitelist",
+		},
 	}
 	for _, test := range tests {
 		if !test.ignoreTestNamespaceNodeSelector {
@@ -183,7 +191,7 @@ func TestHandles(t *testing.T) {
 func newHandlerForTest(c clientset.Interface) (*podNodeSelector, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler := NewPodNodeSelector(nil)
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err := admission.Validate(handler)
 	return handler, f, err
