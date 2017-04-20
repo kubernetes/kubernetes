@@ -98,6 +98,7 @@ func token2Cfg(token *azureToken) map[string]string {
 	cfg[cfgTokenType] = token.token.Type
 	cfg[cfgClientID] = token.clientID
 	cfg[cfgTenantID] = token.tenantID
+	cfg[cfgApiserverID] = token.token.Resource
 	cfg[cfgExpiresIn] = token.token.ExpiresIn
 	cfg[cfgExpiresOn] = token.token.ExpiresOn
 	return cfg
