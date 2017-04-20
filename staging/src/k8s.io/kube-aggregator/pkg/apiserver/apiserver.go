@@ -215,6 +215,7 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService, de
 	proxyHandler := &proxyHandler{
 		contextMapper:   s.contextMapper,
 		localDelegate:   s.delegateHandler,
+		proxyHandlers:   s.proxyHandlers,
 		proxyClientCert: s.proxyClientCert,
 		proxyClientKey:  s.proxyClientKey,
 	}

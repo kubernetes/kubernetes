@@ -18,18 +18,28 @@ package apiserver
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericrest "k8s.io/apiserver/pkg/registry/generic/rest"
+	"k8s.io/apiserver/pkg/server"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 
+	"crypto/rand"
+	"github.com/golang/glog"
 	apiregistrationapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"math/big"
 )
 
 // proxyHandler provides a http.Handler which will proxy traffic to locations
@@ -39,6 +49,9 @@ type proxyHandler struct {
 
 	// localDelegate is used to satisfy local APIServices
 	localDelegate http.Handler
+
+	// lookup map to allow proxy handlers to make sideways calls to other proxy handlers
+	proxyHandlers map[string]*proxyHandler
 
 	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
@@ -61,6 +74,10 @@ type proxyHandlingInfo struct {
 	proxyRoundTripper http.RoundTripper
 	// destinationHost is the hostname of the backing API server
 	destinationHost string
+	// serviceName is the name of the service this handler proxies to
+	serviceName string
+	// namespace is the namespace the service lives in
+	namespace string
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -99,7 +116,12 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// write a new location based on the existing request pointed at the target service
 	location := &url.URL{}
 	location.Scheme = "https"
-	location.Host = handlingInfo.destinationHost
+	// Try to lookup the service and find the pods which implement this service.
+	location.Host, ok = r.getPodIpForService(handlingInfo)
+	if !ok {
+		glog.V(2).Info("Aggregation unable to get pod ip for service.")
+		location.Host = handlingInfo.destinationHost
+	}
 	location.Path = req.URL.Path
 	location.RawQuery = req.URL.Query().Encode()
 
@@ -134,6 +156,90 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	handler := genericrest.NewUpgradeAwareProxyHandler(location, proxyRoundTripper, true, upgrade, &responder{w: w})
 	handler.ServeHTTP(w, newReq)
+}
+
+// Look up and pick a pod ip for the requested service.
+func (r *proxyHandler) getPodIpForService(handlingInfo proxyHandlingInfo) (string, bool) {
+	if handlingInfo.local || handlingInfo.serviceName == "endpoints" {
+		glog.V(9).Infof("Aggregation refused local pod ip lookup for %s.", handlingInfo.serviceName)
+		return "", false
+	}
+	if handlingInfo.namespace == "" {
+		glog.V(2).Info("Aggregation missing namespace")
+		return "", false
+	}
+	if handlingInfo.serviceName == "" {
+		glog.V(2).Infof("Aggregation missing service name")
+		return "", false
+	}
+	endpointsProxy, ok := r.proxyHandlers[legacyAPIServiceName]
+	if !ok {
+		glog.V(2).Infof("Aggregation missing legacy API proxy handler")
+		return "", false
+	}
+	endpointLoc := &url.URL{}
+	endpointLoc.Scheme = "https"
+	// Setting current host - proxy will "fix" it.
+	// endpointLoc.Host = handlingInfo.destinationHost
+	endpointLoc.Path = "/api/v1/namespaces/" + handlingInfo.namespace + "/endpoints/" + handlingInfo.serviceName
+	endpointReq, err := http.NewRequest("GET", endpointLoc.String(), nil)
+	if err != nil {
+		glog.V(2).Infof("Aggregation failed to create endpoints request %v.", err)
+		return "", false
+	}
+	endpointReq.Proto = "HTTP/2.0"
+	endpointReq.ProtoMajor = 2
+	endpointReq.ProtoMinor = 0
+	endpointReq.Header.Add("Accept", "application/vnd.kubernetes.protobuf")
+	infoFactory := &genericapirequest.RequestInfoFactory{
+		APIPrefixes: sets.NewString(strings.Trim(server.APIGroupPrefix, "/"),
+			strings.Trim(server.DefaultLegacyAPIPrefix, "/")),
+		GrouplessAPIPrefixes: sets.NewString(strings.Trim(server.DefaultLegacyAPIPrefix, "/")),
+	}
+	info, err := infoFactory.NewRequestInfo(endpointReq)
+	if err != nil {
+		glog.V(2).Infof("Aggregation failed to create endpoints request info %v.", err)
+		return "", false
+	}
+	endpointCtx := genericapirequest.NewContext()
+	endpointCtx = genericapirequest.WithNamespace(endpointCtx, handlingInfo.namespace)
+	endpointCtx = genericapirequest.WithRequestInfo(endpointCtx, info)
+	endpointReq = endpointReq.WithContext(endpointCtx)
+
+	contextHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		err := r.contextMapper.Update(req, endpointCtx)
+		if err != nil {
+			glog.V(2).Infof("Aggregation could not update endpoints context, %v.", err)
+		}
+		endpointsProxy.ServeHTTP(w, req)
+	})
+
+	handler := genericapirequest.WithRequestContext(contextHandler, r.contextMapper)
+	httpWriter := httptest.NewRecorder()
+	handler.ServeHTTP(httpWriter, endpointReq)
+	var endpoints v1.Endpoints
+	d := api.Codecs.UniversalDeserializer()
+	_, _, err = d.Decode(httpWriter.Body.Bytes(), &schema.GroupVersionKind{Kind: "Endpoints", Version: "v1"}, &endpoints)
+	if err != nil {
+		glog.V(2).Infof("Aggregation failed to decode endpoints %v.", err)
+		return "", false
+	}
+	var ips []string
+	for _, subset := range endpoints.Subsets {
+		for _, address := range subset.Addresses {
+			ips = append(ips, address.IP)
+		}
+	}
+	if len(ips) > 0 {
+		index, err := rand.Int(rand.Reader, big.NewInt(int64(len(ips))))
+		if err != nil {
+			glog.V(2).Infof("Aggregation failed to generate random number %v.", err)
+			return ips[0], true
+		}
+		return ips[index.Int64()], true
+	}
+	glog.V(2).Infof("Aggregation found no ips for %v", handlingInfo.serviceName)
+	return "", false
 }
 
 // maybeWrapForConnectionUpgrades wraps the roundtripper for upgrades.  The bool indicates if it was wrapped
@@ -198,6 +304,8 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 				CAData:     apiService.Spec.CABundle,
 			},
 		},
+		serviceName: apiService.Spec.Service.Name,
+		namespace:   apiService.Spec.Service.Namespace,
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
 	r.handlingInfo.Store(newInfo)
