@@ -53,11 +53,13 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	podSc := pod.Spec.SecurityContext
 	if podSc != nil {
 		if podSc.FSGroup != nil {
-			synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, *podSc.FSGroup)
+			synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, int64(*podSc.FSGroup))
 		}
 
 		if podSc.SupplementalGroups != nil {
-			synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, podSc.SupplementalGroups...)
+			for _, sg := range podSc.SupplementalGroups {
+				synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, int64(sg))
+			}
 		}
 	}
 	if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {
@@ -99,7 +101,7 @@ func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *runti
 		SelinuxOptions: convertToRuntimeSELinuxOption(securityContext.SELinuxOptions),
 	}
 	if securityContext.RunAsUser != nil {
-		sc.RunAsUser = &runtimeapi.Int64Value{Value: *securityContext.RunAsUser}
+		sc.RunAsUser = &runtimeapi.Int64Value{Value: int64(*securityContext.RunAsUser)}
 	}
 	if securityContext.Privileged != nil {
 		sc.Privileged = *securityContext.Privileged

@@ -19,6 +19,7 @@ package scdeny
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -27,7 +28,7 @@ import (
 func TestAdmission(t *testing.T) {
 	handler := NewSecurityContextDeny()
 
-	var runAsUser int64 = 1
+	runAsUser := types.UnixUserID(1)
 	priv := true
 
 	cases := []struct {
@@ -115,7 +116,7 @@ func TestPodSecurityContextAdmission(t *testing.T) {
 		},
 	}
 
-	fsGroup := int64(1001)
+	fsGroup := types.UnixGroupID(1001)
 
 	tests := []struct {
 		securityContext api.PodSecurityContext
@@ -127,7 +128,7 @@ func TestPodSecurityContextAdmission(t *testing.T) {
 		},
 		{
 			securityContext: api.PodSecurityContext{
-				SupplementalGroups: []int64{1234},
+				SupplementalGroups: []types.UnixGroupID{types.UnixGroupID(1234)},
 			},
 			errorExpected: true,
 		},

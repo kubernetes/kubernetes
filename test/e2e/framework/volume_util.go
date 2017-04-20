@@ -46,6 +46,7 @@ import (
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
@@ -223,7 +224,7 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 // and check that the pod sees expected data, e.g. from the server pod.
 // Multiple VolumeTests can be specified to mount multiple volumes to a single
 // pod.
-func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, tests []VolumeTest) {
+func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *types.UnixGroupID, tests []VolumeTest) {
 	By(fmt.Sprint("starting ", config.Prefix, " client"))
 	clientPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
