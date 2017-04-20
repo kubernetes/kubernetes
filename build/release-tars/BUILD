@@ -228,6 +228,7 @@ pkg_tar(
         "//cluster:all-srcs",
         "//docs:all-srcs",
         "//examples:all-srcs",
+        "//hack/lib:all-srcs",
         "//third_party/htpasswd:all-srcs",
     ],
     package_dir = "kubernetes",
