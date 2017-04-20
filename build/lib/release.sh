@@ -362,7 +362,6 @@ function kube::release::package_kube_manifests_tarball() {
   rm -rf "${release_stage}"
 
   mkdir -p "${release_stage}"
-  cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
 
