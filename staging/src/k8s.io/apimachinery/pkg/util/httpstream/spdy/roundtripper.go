@@ -37,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/third_party/forked/golang/netutil"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // SpdyRoundTripper knows how to upgrade an HTTP request to one that supports
@@ -66,7 +68,7 @@ type SpdyRoundTripper struct {
 
 var _ utilnet.TLSClientConfigHolder = &SpdyRoundTripper{}
 var _ httpstream.UpgradeRoundTripper = &SpdyRoundTripper{}
-var _ utilnet.RequestSender = &SpdyRoundTripper{}
+var _ utilnet.Dialer = &SpdyRoundTripper{}
 
 // NewRoundTripper creates a new SpdyRoundTripper that will use
 // the specified tlsConfig.
@@ -86,14 +88,8 @@ func (s *SpdyRoundTripper) TLSClientConfig() *tls.Config {
 	return s.tlsConfig
 }
 
-// SendRequest implements k8s.io/apimachinery/pkg/util/net.RequestSender.
-func (s *SpdyRoundTripper) SendRequest(method string, location *url.URL, header http.Header, body io.Reader) (net.Conn, error) {
-	req, err := http.NewRequest(method, location.String(), body)
-	if err != nil {
-		return nil, err
-	}
-	req.Header = header
-
+// Dial implements k8s.io/apimachinery/pkg/util/net.Dialer.
+func (s *SpdyRoundTripper) Dial(req *http.Request) (net.Conn, error) {
 	conn, err := s.dial(req)
 	if err != nil {
 		return nil, err
@@ -246,7 +242,19 @@ func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	header.Add(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
 	header.Add(httpstream.HeaderUpgrade, HeaderSpdy31)
 
-	conn, rawResponse, err := utilnet.ConnectWithRedirects(req.Method, req.URL, header, req.Body, s)
+	var (
+		conn        net.Conn
+		rawResponse []byte
+		err         error
+	)
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects) {
+		conn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, req.URL, header, req.Body, s)
+	} else {
+		clone := utilnet.CloneRequest(req)
+		clone.Header = header
+		conn, err = s.Dial(clone)
+	}
 	if err != nil {
 		return nil, err
 	}

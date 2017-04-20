@@ -144,10 +144,13 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 		rawResponse []byte
 		err         error
 	)
+
 	if h.InterceptRedirects && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects) {
-		backendConn, rawResponse, err = h.connectBackendWithRedirects(req)
+		backendConn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, h.Location, req.Header, req.Body, h)
 	} else {
-		backendConn, err = h.connectBackend(req.Method, h.Location, req.Header, req.Body)
+		clone := utilnet.CloneRequest(req)
+		clone.URL = h.Location
+		backendConn, err = h.Dial(clone)
 	}
 	if err != nil {
 		h.Responder.Error(err)
@@ -212,43 +215,22 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 	return true
 }
 
-func (h *UpgradeAwareProxyHandler) SendRequest(method string, location *url.URL, header http.Header, body io.Reader) (net.Conn, error) {
-	return h.connectBackend(method, location, header, body)
-}
-
-// connectBackend dials the backend at location and forwards a copy of the client request.
-func (h *UpgradeAwareProxyHandler) connectBackend(method string, location *url.URL, header http.Header, body io.Reader) (conn net.Conn, err error) {
-	defer func() {
-		if err != nil && conn != nil {
-			conn.Close()
-			conn = nil
-		}
-	}()
-
-	beReq, err := http.NewRequest(method, location.String(), body)
+// Dial dials the backend at req.URL and writes req to it.
+func (h *UpgradeAwareProxyHandler) Dial(req *http.Request) (net.Conn, error) {
+	conn, err := proxy.DialURL(req.URL, h.Transport)
 	if err != nil {
-		return nil, err
-	}
-	beReq.Header = header
-
-	conn, err = proxy.DialURL(location, h.Transport)
-	if err != nil {
-		return conn, fmt.Errorf("error dialing backend: %v", err)
+		return nil, fmt.Errorf("error dialing backend: %v", err)
 	}
 
-	if err = beReq.Write(conn); err != nil {
-		return conn, fmt.Errorf("error sending request: %v", err)
+	if err = req.Write(conn); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("error sending request: %v", err)
 	}
 
 	return conn, err
 }
 
-// connectBackendWithRedirects dials the backend and forwards a copy of the client request. If the
-// client responds with a redirect, it is followed. The raw response bytes are returned, and should
-// be forwarded back to the client.
-func (h *UpgradeAwareProxyHandler) connectBackendWithRedirects(req *http.Request) (net.Conn, []byte, error) {
-	return utilnet.ConnectWithRedirects(req.Method, h.Location, req.Header, req.Body, h)
-}
+var _ utilnet.Dialer = &UpgradeAwareProxyHandler{}
 
 func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL, internalTransport http.RoundTripper) http.RoundTripper {
 	scheme := url.Scheme

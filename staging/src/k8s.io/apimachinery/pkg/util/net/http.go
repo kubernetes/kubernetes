@@ -97,7 +97,7 @@ type RoundTripperWrapper interface {
 
 type DialFunc func(net, addr string) (net.Conn, error)
 
-func Dialer(transport http.RoundTripper) (DialFunc, error) {
+func DialerFor(transport http.RoundTripper) (DialFunc, error) {
 	if transport == nil {
 		return nil, nil
 	}
@@ -106,7 +106,7 @@ func Dialer(transport http.RoundTripper) (DialFunc, error) {
 	case *http.Transport:
 		return transport.Dial, nil
 	case RoundTripperWrapper:
-		return Dialer(transport.WrappedRoundTripper())
+		return DialerFor(transport.WrappedRoundTripper())
 	default:
 		return nil, fmt.Errorf("unknown transport type: %v", transport)
 	}
@@ -270,28 +270,27 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 	}
 }
 
-// RequestSender creates and sends an http.Request.
-type RequestSender interface {
-	// SendRequest connects to the address specified by location, constructs a new http.Request,
-	// writes the request to the connection, and returns the opened net.Conn.
-	SendRequest(method string, location *url.URL, header http.Header, body io.Reader) (net.Conn, error)
+// Dialer dials a host and writes a request to it.
+type Dialer interface {
+	// Dial connects to the host specified by req's URL, writes the request to the connection, and
+	// returns the opened net.Conn.
+	Dial(req *http.Request) (net.Conn, error)
 }
 
-// ConnectWithRedirects uses requestSender to send req, following up to 10 redirects (relative to
-// baseLocation). It returns the opened net.Conn and the raw response bytes.
-func ConnectWithRedirects(originalMethod string, baseLocation *url.URL, header http.Header, originalBody io.Reader, requestSender RequestSender) (net.Conn, []byte, error) {
+// ConnectWithRedirects uses dialer to send req, following up to 10 redirects (relative to
+// originalLocation). It returns the opened net.Conn and the raw response bytes.
+func ConnectWithRedirects(originalMethod string, originalLocation *url.URL, header http.Header, originalBody io.Reader, dialer Dialer) (net.Conn, []byte, error) {
 	const (
 		maxRedirects    = 10
 		maxResponseSize = 16384 // play it safe to allow the potential for lots of / large headers
 	)
 
 	var (
-		location         = baseLocation
+		location         = originalLocation
 		method           = originalMethod
 		intermediateConn net.Conn
 		rawResponse      = bytes.NewBuffer(make([]byte, 0, 256))
 		body             = originalBody
-		err              error
 	)
 
 	defer func() {
@@ -306,7 +305,14 @@ redirectLoop:
 			return nil, nil, fmt.Errorf("too many redirects (%d)", redirects)
 		}
 
-		intermediateConn, err = requestSender.SendRequest(method, location, header, body)
+		req, err := http.NewRequest(method, location.String(), body)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		req.Header = header
+
+		intermediateConn, err = dialer.Dial(req)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -348,7 +354,7 @@ redirectLoop:
 		if redirectStr == "" {
 			return nil, nil, fmt.Errorf("%d response missing Location header", resp.StatusCode)
 		}
-		// We have to parse relative to the current location, NOT baseLocation. For example,
+		// We have to parse relative to the current location, NOT originalLocation. For example,
 		// if we request http://foo.com/a and get back "http://bar.com/b", the result should be
 		// http://bar.com/b. If we then make that request and get back a redirect to "/c", the result
 		// should be http://bar.com/c, not http://foo.com/c.
