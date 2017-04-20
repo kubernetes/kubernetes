@@ -37,8 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/third_party/forked/golang/netutil"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // SpdyRoundTripper knows how to upgrade an HTTP request to one that supports
@@ -64,6 +62,10 @@ type SpdyRoundTripper struct {
 	// proxier knows which proxy to use given a request, defaults to http.ProxyFromEnvironment
 	// Used primarily for mocking the proxy discovery in tests.
 	proxier func(req *http.Request) (*url.URL, error)
+
+	// followRedirects indicates if the round tripper should examine responses for redirects and
+	// follow them.
+	followRedirects bool
 }
 
 var _ utilnet.TLSClientConfigHolder = &SpdyRoundTripper{}
@@ -72,14 +74,14 @@ var _ utilnet.Dialer = &SpdyRoundTripper{}
 
 // NewRoundTripper creates a new SpdyRoundTripper that will use
 // the specified tlsConfig.
-func NewRoundTripper(tlsConfig *tls.Config) httpstream.UpgradeRoundTripper {
-	return NewSpdyRoundTripper(tlsConfig)
+func NewRoundTripper(tlsConfig *tls.Config, followRedirects bool) httpstream.UpgradeRoundTripper {
+	return NewSpdyRoundTripper(tlsConfig, followRedirects)
 }
 
 // NewSpdyRoundTripper creates a new SpdyRoundTripper that will use
 // the specified tlsConfig. This function is mostly meant for unit tests.
-func NewSpdyRoundTripper(tlsConfig *tls.Config) *SpdyRoundTripper {
-	return &SpdyRoundTripper{tlsConfig: tlsConfig}
+func NewSpdyRoundTripper(tlsConfig *tls.Config, followRedirects bool) *SpdyRoundTripper {
+	return &SpdyRoundTripper{tlsConfig: tlsConfig, followRedirects: followRedirects}
 }
 
 // TLSClientConfig implements pkg/util/net.TLSClientConfigHolder for proper TLS checking during
@@ -248,7 +250,7 @@ func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 		err         error
 	)
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects) {
+	if s.followRedirects {
 		conn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, req.URL, header, req.Body, s)
 	} else {
 		clone := utilnet.CloneRequest(req)

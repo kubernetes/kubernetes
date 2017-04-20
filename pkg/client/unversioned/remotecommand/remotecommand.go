@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 )
@@ -78,7 +80,8 @@ func NewExecutor(config *restclient.Config, method string, url *url.URL) (Stream
 		return nil, err
 	}
 
-	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig)
+	followRedirects := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
+	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, followRedirects)
 	wrapper, err := restclient.HTTPWrappersForConfig(config, upgradeRoundTripper)
 	if err != nil {
 		return nil, err

@@ -32,15 +32,12 @@ import (
 	"github.com/elazarl/goproxy"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // be sure to unset environment variable https_proxy (if exported) before testing, otherwise the testing will fail unexpectedly.
 func TestRoundTripAndNewConnection(t *testing.T) {
-	for _, redirect := range []string{"false", "true"} {
-		t.Run(fmt.Sprintf("redirect = %s", redirect), func(t *testing.T) {
-			utilfeature.DefaultFeatureGate.Set(string(genericfeatures.StreamingProxyRedirects) + "=" + redirect)
+	for _, redirect := range []bool{false, true} {
+		t.Run(fmt.Sprintf("redirect = %t", redirect), func(t *testing.T) {
 			localhostPool := x509.NewCertPool()
 			if !localhostPool.AppendCertsFromPEM(localhostCert) {
 				t.Errorf("error setting up localhostCert pool")
@@ -285,7 +282,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					t.Fatalf("%s: Error creating request: %s", k, err)
 				}
 
-				spdyTransport := NewSpdyRoundTripper(testCase.clientTLS)
+				spdyTransport := NewSpdyRoundTripper(testCase.clientTLS, redirect)
 
 				var proxierCalled bool
 				var proxyCalledWithHost string
@@ -428,7 +425,7 @@ func TestRoundTripRedirects(t *testing.T) {
 				t.Fatalf("Error creating request: %s", err)
 			}
 
-			spdyTransport := NewSpdyRoundTripper(nil)
+			spdyTransport := NewSpdyRoundTripper(nil, true)
 			client := &http.Client{Transport: spdyTransport}
 
 			resp, err := client.Do(req)
