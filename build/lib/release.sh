@@ -476,6 +476,10 @@ EOF
   cp -R "${KUBE_ROOT}/federation/manifests" "${release_stage}/federation/"
   cp -R "${KUBE_ROOT}/federation/deploy" "${release_stage}/federation/"
 
+  # Include hack/lib as a dependency for the cluster/ scripts
+  mkdir -p "${release_stage}/hack"
+  cp -R "${KUBE_ROOT}/hack/lib" "${release_stage}/hack/"
+
   cp -R "${KUBE_ROOT}/examples" "${release_stage}/"
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
