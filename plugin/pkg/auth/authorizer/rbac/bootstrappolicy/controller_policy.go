@@ -152,7 +152,7 @@ func init() {
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch", "update").Groups(batchGroup).Resources("jobs").RuleOrDie(),
 			rbac.NewRule("update").Groups(batchGroup).Resources("jobs/status").RuleOrDie(),
-			rbac.NewRule("list", "watch", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+			rbac.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
 		},
 	})
