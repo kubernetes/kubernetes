@@ -52,7 +52,7 @@ func ConstructFirewallForLBService(svc *v1.Service, nodesTags []string) *compute
 		Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
-	fw.Name = MakeFirewallNameForLBService(cloudprovider.GetLoadBalancerName(svc))
+	fw.Name = MakeFirewallNameForLBService(cloudprovider.DeprecatedGetLoadBalancerName(svc))
 	fw.TargetTags = nodesTags
 	if svc.Spec.LoadBalancerSourceRanges == nil {
 		fw.SourceRanges = []string{"0.0.0.0/0"}
