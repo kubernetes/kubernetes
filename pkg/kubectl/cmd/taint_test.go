@@ -86,6 +86,7 @@ func TestTaint(t *testing.T) {
 		args        []string
 		expectFatal bool
 		expectTaint bool
+		selector    bool
 	}{
 		// success cases
 		{
@@ -237,7 +238,6 @@ func TestTaint(t *testing.T) {
 
 	for _, test := range tests {
 		oldNode, expectNewNode := generateNodeAndTaintedNode(test.oldTaints, test.newTaints)
-
 		new_node := &v1.Node{}
 		tainted := false
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
@@ -248,6 +248,8 @@ func TestTaint(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {
+				case m.isFor("GET", "/nodes"):
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
 				case m.isFor("GET", "/nodes/node-name"):
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
 				case m.isFor("PATCH", "/nodes/node-name"):
@@ -328,6 +330,53 @@ func TestTaint(t *testing.T) {
 		if !test.expectTaint {
 			if tainted {
 				t.Fatalf("%s: unexpected taint", test.description)
+			}
+		}
+	}
+}
+
+func TestValidateFlags(t *testing.T) {
+	tests := []struct {
+		taintOpts   TaintOptions
+		description string
+		expectFatal bool
+	}{
+
+		{
+			taintOpts:   TaintOptions{selector: "myLabel=X", all: false},
+			description: "With selector and without all flag",
+			expectFatal: false,
+		},
+		{
+			taintOpts:   TaintOptions{selector: "", all: true},
+			description: "Without selector and all flag",
+			expectFatal: false,
+		},
+		{
+			taintOpts:   TaintOptions{selector: "myLabel=X", all: true},
+			description: "With selector and with all flags",
+			expectFatal: true,
+		},
+		{
+			taintOpts:   TaintOptions{selector: "", all: false, resources: []string{"node"}},
+			description: "With both selector and all flags and if node name is not provided",
+			expectFatal: true,
+		},
+		{
+			taintOpts:   TaintOptions{selector: "", all: false, resources: []string{"node", "node-name"}},
+			description: "With both selector and flag and if node name is provided",
+			expectFatal: false,
+		},
+	}
+	for _, test := range tests {
+		sawFatal := false
+		err := test.taintOpts.validateFlags()
+		if err != nil {
+			sawFatal = true
+		}
+		if test.expectFatal {
+			if !sawFatal {
+				t.Fatalf("%s expected not to fail", test.description)
 			}
 		}
 	}
