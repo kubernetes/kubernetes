@@ -95,6 +95,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "udp-service",
 					Namespace: "default",
+					UID:       "1243",
 					SelfLink:  testapi.Default.SelfLink("services", "udp-service"),
 				},
 				Spec: v1.ServiceSpec{
@@ -130,11 +131,30 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 
 	for _, item := range table {
 		controller, cloud, client := newController()
+		if item.service.Spec.Type == v1.ServiceTypeLoadBalancer {
+			_, err := controller.kubeClient.Core().Services(item.service.Namespace).Create(item.service)
+			if err != nil {
+				t.Errorf("Can not create the service %v", err)
+			}
+		}
 		err, _ := controller.createLoadBalancerIfNeeded("foo/bar", item.service)
 		if !item.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		} else if item.expectErr && err == nil {
 			t.Errorf("expected error creating %v, got nil", item.service)
+		}
+		if item.service.Spec.Type == v1.ServiceTypeLoadBalancer {
+			svc, err := controller.kubeClient.Core().Services(item.service.Namespace).Get(item.service.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Found the errors while looking for service %v", err)
+			}
+			loadBalancerStatus, _, err := controller.balancer.GetLoadBalancer(controller.clusterName, svc)
+			if err != nil {
+				t.Errorf("Error getting LB for service %v", item.service)
+			}
+			if controller.loadBalancerName(item.service) != loadBalancerStatus.Name {
+				t.Errorf("Expected LoadBalancer name %s, got %s", controller.loadBalancerName(item.service), loadBalancerStatus.Name)
+			}
 		}
 		actions := client.Actions()
 		if !item.expectCreateAttempt {
