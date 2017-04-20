@@ -132,7 +132,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 	*/
 	framework.AddCleanupAction(func() {
 		if len(volumePath) > 0 {
-			waitForVSphereDiskToDetach(vsp, volumePath, node)
+			framework.ExpectNoError(waitForVSphereDiskToDetach(vsp, volumePath, node))
 			vsp.DeleteVolume(volumePath)
 		}
 	})
