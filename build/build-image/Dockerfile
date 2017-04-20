@@ -19,7 +19,7 @@ FROM gcr.io/google_containers/kube-cross:KUBE_BUILD_IMAGE_CROSS_TAG
 RUN touch /kube-build-image
 
 # To run as non-root we sometimes need to rebuild go stdlib packages.
-RUN chmod -R a+rwx /usr/local/go/pkg ${K8S_EDGE_GOROOT}/pkg
+RUN chmod -R a+rwx /usr/local/go/pkg
 
 # For running integration tests /var/run/kubernetes is required
 # and should be writable by user
