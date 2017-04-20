@@ -40,6 +40,7 @@ const (
 	cfgExpiresIn    = "expires-in"
 	cfgExpiresOn    = "expires-on"
 	cfgEnvironment  = "environment"
+	cfgApiserverID  = "apiserver-id"
 )
 
 func init() {
@@ -78,7 +79,7 @@ func newAzureAuthProvider(_ string, cfg map[string]string, persister restclient.
 	if err != nil {
 		environment = azure.PublicCloud
 	}
-	ts, err = newAzureTokenSourceDeviceCode(environment, cfg[cfgClientID], cfg[cfgTenantID])
+	ts, err = newAzureTokenSourceDeviceCode(environment, cfg[cfgClientID], cfg[cfgTenantID], cfg[cfgApiserverID])
 	if err != nil {
 		return nil, err
 	}
@@ -212,6 +213,10 @@ func (ts *azureTokenSourceFromCache) retrieveTokenFromCfg() (*azureToken, error)
 	if tenantID == "" {
 		return nil, fmt.Errorf("no tenant ID in cfg: %s", cfgTenantID)
 	}
+	apiserverID := ts.cfg[cfgApiserverID]
+	if apiserverID == "" {
+		return nil, fmt.Errorf("no apiserver ID in cfg: %s", apiserverID)
+	}
 	expiresIn := ts.cfg[cfgExpiresIn]
 	if expiresIn == "" {
 		return nil, fmt.Errorf("no expiresIn in cfg: %s", cfgExpiresIn)
@@ -228,7 +233,7 @@ func (ts *azureTokenSourceFromCache) retrieveTokenFromCfg() (*azureToken, error)
 			ExpiresIn:    expiresIn,
 			ExpiresOn:    expiresOn,
 			NotBefore:    expiresOn,
-			Resource:     clientID,
+			Resource:     apiserverID,
 			Type:         tokenType,
 		},
 		clientID: clientID,
@@ -243,6 +248,7 @@ func (ts *azureTokenSourceFromCache) storeTokenInCfg(token *azureToken) error {
 	newCfg[cfgTokenType] = token.token.Type
 	newCfg[cfgClientID] = token.clientID
 	newCfg[cfgTenantID] = token.tenantID
+	newCfg[cfgApiserverID] = token.token.Resource
 	newCfg[cfgExpiresIn] = token.token.ExpiresIn
 	newCfg[cfgExpiresOn] = token.token.ExpiresOn
 
@@ -289,19 +295,24 @@ type azureTokenSourceDeviceCode struct {
 	environment azure.Environment
 	clientID    string
 	tenantID    string
+	apiserverID string
 }
 
-func newAzureTokenSourceDeviceCode(environment azure.Environment, clientID string, tenantID string) (tokenSource, error) {
+func newAzureTokenSourceDeviceCode(environment azure.Environment, clientID string, tenantID string, apiserverID string) (tokenSource, error) {
 	if clientID == "" {
 		return nil, errors.New("client-id is empty")
 	}
 	if tenantID == "" {
 		return nil, errors.New("tenant-id is empty")
 	}
+	if apiserverID == "" {
+		return nil, errors.New("apiserver-id is empty")
+	}
 	return &azureTokenSourceDeviceCode{
 		environment: environment,
 		clientID:    clientID,
 		tenantID:    tenantID,
+		apiserverID: apiserverID,
 	}, nil
 }
 
@@ -311,7 +322,7 @@ func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
 		return nil, err
 	}
 	client := &autorest.Client{}
-	deviceCode, err := azure.InitiateDeviceAuth(client, *oauthConfig, ts.clientID, ts.clientID)
+	deviceCode, err := azure.InitiateDeviceAuth(client, *oauthConfig, ts.clientID, ts.apiserverID)
 	if err != nil {
 		return nil, err
 	}
