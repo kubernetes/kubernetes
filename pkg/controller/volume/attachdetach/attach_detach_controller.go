@@ -297,7 +297,8 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 
 	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
 		// Newly added node is managed by controller, ensure all pods are up to date.
-		adc.processPodsForNode(nodeName)
+		// Run in a separate goroutine so we don't block the node handler goroutine.
+		go adc.processPodsForNode(nodeName)
 	}
 }
 
@@ -321,19 +322,20 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 	}
 
 	nodeName := types.NodeName(node.Name)
-	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
+	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
+
+	if _, managed := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; managed {
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
 		adc.desiredStateOfWorld.AddNode(nodeName)
-	}
-	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
 
-	if oldNode, ok := oldObj.(*v1.Node); ok {
-		_, oldManaged := oldNode.Annotations[volumehelper.ControllerManagedAttachAnnotation]
-		_, newManaged := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]
-		if !oldManaged && newManaged {
-			// Node is newly managed by controller, ensure all pods are up to date.
-			adc.processPodsForNode(nodeName)
+		if oldNode, ok := oldObj.(*v1.Node); ok {
+			_, oldManaged := oldNode.Annotations[volumehelper.ControllerManagedAttachAnnotation]
+			if !oldManaged {
+				// Node is newly managed by controller, ensure all pods are up to date.
+				// Run in a separate goroutine so we don't block the node handler goroutine.
+				go adc.processPodsForNode(nodeName)
+			}
 		}
 	}
 }
