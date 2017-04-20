@@ -1015,6 +1015,7 @@ function start-kube-apiserver {
   params+=" --secure-port=443"
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
+  params+=" --enable-aggregator-routing=true"
   if [[ -e "${APISERVER_CLIENT_CERT_PATH}" ]] && [[ -e "${APISERVER_CLIENT_KEY_PATH}" ]]; then
     params+=" --kubelet-client-certificate=${APISERVER_CLIENT_CERT_PATH}"
     params+=" --kubelet-client-key=${APISERVER_CLIENT_KEY_PATH}"

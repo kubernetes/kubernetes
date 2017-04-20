@@ -79,11 +79,13 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 			return nil, err
 		}
 	}
+
 	aggregatorConfig := &aggregatorapiserver.Config{
-		GenericConfig:       &genericConfig,
-		CoreAPIServerClient: client,
-		ProxyClientCert:     certBytes,
-		ProxyClientKey:      keyBytes,
+		GenericConfig:           &genericConfig,
+		CoreAPIServerClient:     client,
+		ProxyClientCert:         certBytes,
+		ProxyClientKey:          keyBytes,
+		EnableAggregatorRouting: commandOptions.EnableAggregatorRouting,
 	}
 
 	return aggregatorConfig, nil
