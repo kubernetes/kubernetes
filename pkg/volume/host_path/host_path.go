@@ -203,12 +203,12 @@ func (b *hostPathMounter) CanMount() error {
 }
 
 // SetUp does nothing.
-func (b *hostPathMounter) SetUp(fsGroup *int64) error {
+func (b *hostPathMounter) SetUp(fsGroup *types.UnixGroupID) error {
 	return nil
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
-func (b *hostPathMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *hostPathMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	return fmt.Errorf("SetUpAt() does not make sense for host paths")
 }
 

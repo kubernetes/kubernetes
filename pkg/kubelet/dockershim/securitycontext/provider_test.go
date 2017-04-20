@@ -23,13 +23,14 @@ import (
 	"testing"
 
 	dockercontainer "github.com/docker/engine-api/types/container"
+	"k8s.io/apimachinery/pkg/types"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestModifyContainerConfig(t *testing.T) {
-	var uid int64 = 123
-	var overrideUid int64 = 321
+	userID := types.UnixUserID(123)
+	overrideUserID := types.UnixUserID(321)
 
 	cases := []struct {
 		name     string
@@ -40,10 +41,10 @@ func TestModifyContainerConfig(t *testing.T) {
 		{
 			name: "container.SecurityContext.RunAsUser set",
 			sc: &v1.SecurityContext{
-				RunAsUser: &uid,
+				RunAsUser: &userID,
 			},
 			expected: &dockercontainer.Config{
-				User: strconv.FormatInt(uid, 10),
+				User: strconv.FormatInt(int64(userID), 10),
 			},
 		},
 		{
@@ -54,22 +55,22 @@ func TestModifyContainerConfig(t *testing.T) {
 		{
 			name: "pod.Spec.SecurityContext.RunAsUser set",
 			podSc: &v1.PodSecurityContext{
-				RunAsUser: &uid,
+				RunAsUser: &userID,
 			},
 			expected: &dockercontainer.Config{
-				User: strconv.FormatInt(uid, 10),
+				User: strconv.FormatInt(int64(userID), 10),
 			},
 		},
 		{
 			name: "container.SecurityContext.RunAsUser overrides pod.Spec.SecurityContext.RunAsUser",
 			podSc: &v1.PodSecurityContext{
-				RunAsUser: &uid,
+				RunAsUser: &userID,
 			},
 			sc: &v1.SecurityContext{
-				RunAsUser: &overrideUid,
+				RunAsUser: &overrideUserID,
 			},
 			expected: &dockercontainer.Config{
-				User: strconv.FormatInt(overrideUid, 10),
+				User: strconv.FormatInt(int64(overrideUserID), 10),
 			},
 		},
 	}
@@ -176,7 +177,7 @@ func TestModifyHostConfig(t *testing.T) {
 
 func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 	supplementalGroupsSC := &v1.PodSecurityContext{}
-	supplementalGroupsSC.SupplementalGroups = []int64{2222}
+	supplementalGroupsSC.SupplementalGroups = []types.UnixGroupID{2222}
 	supplementalGroupHC := fullValidHostConfig()
 	supplementalGroupHC.GroupAdd = []string{"2222"}
 	fsGroupHC := fullValidHostConfig()
@@ -185,7 +186,7 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 	extraSupplementalGroupHC.GroupAdd = []string{"1234"}
 	bothHC := fullValidHostConfig()
 	bothHC.GroupAdd = []string{"2222", "1234"}
-	fsGroup := int64(1234)
+	fsGroup := types.UnixGroupID(1234)
 	extraSupplementalGroup := []int64{1234}
 
 	testCases := map[string]struct {
@@ -210,7 +211,7 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 		},
 		"FSGroup + SupplementalGroups": {
 			securityContext: &v1.PodSecurityContext{
-				SupplementalGroups: []int64{2222},
+				SupplementalGroups: []types.UnixGroupID{2222},
 				FSGroup:            &fsGroup,
 			},
 			expected:                bothHC,

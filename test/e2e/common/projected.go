@@ -29,6 +29,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = framework.KubeDescribe("Projected", func() {
@@ -46,8 +47,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 
 	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Conformance] [Volume]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
-		fsGroup := int64(1001)
-		uid := int64(1000)
+		fsGroup := types.UnixGroupID(1001)
+		uid := types.UnixUserID(1000)
 		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), &fsGroup, &uid)
 	})
 
@@ -833,8 +834,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 
 	It("should provide podname as non-root with fsgroup [Feature:FSGroup] [Volume]", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
-		uid := int64(1001)
-		gid := int64(1234)
+		uid := types.UnixUserID(1001)
+		gid := types.UnixGroupID(1234)
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			RunAsUser: &uid,
@@ -847,8 +848,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 
 	It("should provide podname as non-root with fsgroup and defaultMode [Feature:FSGroup] [Volume]", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
-		uid := int64(1001)
-		gid := int64(1234)
+		uid := types.UnixUserID(1001)
+		gid := types.UnixGroupID(1234)
 		mode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		pod := projectedDownwardAPIVolumePodForModeTest(podName, "/etc/podname", &mode, nil)
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
@@ -1023,7 +1024,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 	})
 })
 
-func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secretName string, fsGroup *int64, uid *int64) {
+func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32,
+	secretName string, fsGroup *types.UnixGroupID, uid *types.UnixUserID) {
 	var (
 		volumeName      = "projected-secret-volume"
 		volumeMountPath = "/etc/projected-secret-volume"
@@ -1183,6 +1185,9 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 }
 
 func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
+	userID := types.UnixUserID(uid)
+	groupID := types.UnixGroupID(fsGroup)
+
 	var (
 		name            = "projected-configmap-test-volume-" + string(uuid.NewUUID())
 		volumeName      = "projected-configmap-volume"
@@ -1239,13 +1244,14 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup
 		},
 	}
 
-	if uid != 0 {
-		pod.Spec.SecurityContext.RunAsUser = &uid
+	if userID != 0 {
+		pod.Spec.SecurityContext.RunAsUser = &userID
 	}
 
-	if fsGroup != 0 {
-		pod.Spec.SecurityContext.FSGroup = &fsGroup
+	if groupID != 0 {
+		pod.Spec.SecurityContext.FSGroup = &groupID
 	}
+
 	if defaultMode != nil {
 		//pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].ConfigMap.DefaultMode = defaultMode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = defaultMode
@@ -1263,6 +1269,9 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup
 }
 
 func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
+	userID := types.UnixUserID(uid)
+	groupID := types.UnixGroupID(fsGroup)
+
 	var (
 		name            = "projected-configmap-test-volume-map-" + string(uuid.NewUUID())
 		volumeName      = "projected-configmap-volume"
@@ -1326,13 +1335,14 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup in
 		},
 	}
 
-	if uid != 0 {
-		pod.Spec.SecurityContext.RunAsUser = &uid
+	if userID != 0 {
+		pod.Spec.SecurityContext.RunAsUser = &userID
 	}
 
-	if fsGroup != 0 {
-		pod.Spec.SecurityContext.FSGroup = &fsGroup
+	if groupID != 0 {
+		pod.Spec.SecurityContext.FSGroup = &groupID
 	}
+
 	if itemMode != nil {
 		//pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items[0].Mode = itemMode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = itemMode
