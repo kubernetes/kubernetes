@@ -1262,6 +1262,9 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("localStorage"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
+			if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalStorage) {
+				allErrs = append(allErrs, field.Forbidden(specPath.Child("localStorage"), "LocalStorage volumes are disabled by feature-gate"))
+			}
 			allErrs = append(allErrs, validateLocalStorageVolumeSource(pv.Spec.LocalStorage, specPath.Child("localStorage"))...)
 			// StorageClass is required
 			if len(pv.Spec.StorageClassName) == 0 {

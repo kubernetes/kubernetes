@@ -221,6 +221,43 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				StorageClassName: "-invalid-",
 			}),
 		},
+		// LocalStorage alpha feature disabled
+		// TODO: remove when no longer alpha
+		"alpha disabled valid local storage": {
+			isExpectedFailure: true,
+			volume: testVolume("valid-local-storage", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					LocalStorage: &api.LocalStorageVolumeSource{
+						NodeName: "node-foo",
+						Fs:       &api.LocalStorageFsVolume{Path: "/foo"},
+					},
+				},
+				StorageClassName: "test-storage-class",
+			}),
+		},
+	}
+
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolume(scenario.volume)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+
+}
+
+func TestValidateLocalStorage(t *testing.T) {
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		volume            *api.PersistentVolume
+	}{
 		// LocalStorage
 		"valid local storage": {
 			isExpectedFailure: false,
@@ -238,7 +275,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				StorageClassName: "test-storage-class",
 			}),
 		},
-		"invvalid local storage empty node": {
+		"invalid local storage empty node": {
 			isExpectedFailure: true,
 			volume: testVolume("valid-local-storage", "", api.PersistentVolumeSpec{
 				Capacity: api.ResourceList{
@@ -297,6 +334,11 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		},
 	}
 
+	err := utilfeature.DefaultFeatureGate.Set("PersistentLocalStorage=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalPersistentStorage: %v", err)
+		return
+	}
 	for name, scenario := range scenarios {
 		errs := ValidatePersistentVolume(scenario.volume)
 		if len(errs) == 0 && scenario.isExpectedFailure {
@@ -306,7 +348,6 @@ func TestValidatePersistentVolumes(t *testing.T) {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
 		}
 	}
-
 }
 
 func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
