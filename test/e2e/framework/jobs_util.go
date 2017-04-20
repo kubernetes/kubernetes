@@ -17,8 +17,10 @@ limitations under the License.
 package framework
 
 import (
+	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -118,6 +120,29 @@ func CreateJob(c clientset.Interface, ns string, job *batch.Job) (*batch.Job, er
 // been updated.
 func UpdateJob(c clientset.Interface, ns string, job *batch.Job) (*batch.Job, error) {
 	return c.Batch().Jobs(ns).Update(job)
+}
+
+// UpdateJobFunc updates the job object. It retries if there is a conflict, throw out error if
+// there is any other errors. name is the job name, updateFn is the function updating the
+// job object.
+func UpdateJobFunc(c clientset.Interface, ns, name string, updateFn func(job *batch.Job)) {
+	ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
+		job, err := GetJob(c, ns, name)
+		if err != nil {
+			return false, fmt.Errorf("failed to get pod %q: %v", name, err)
+		}
+		updateFn(job)
+		_, err = UpdateJob(c, ns, job)
+		if err == nil {
+			Logf("Successfully updated job %q", name)
+			return true, nil
+		}
+		if errors.IsConflict(err) {
+			Logf("Conflicting update to job %q, re-get and re-update: %v", name, err)
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to update job %q: %v", name, err)
+	}))
 }
 
 // DeleteJob uses c to delete the Job named name in namespace ns. If the returned error is nil, the Job has been
