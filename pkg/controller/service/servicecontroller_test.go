@@ -403,7 +403,6 @@ func TestProcessServiceUpdate(t *testing.T) {
 	for _, tc := range testCases {
 		newSvc := tc.updateFn(tc.svc)
 		svcCache := controller.cache.getOrCreate(tc.key)
-		fmt.Printf("LBIP:%v\n", tc.svc.Spec.LoadBalancerIP)
 		obtErr, retryDuration := controller.processServiceUpdate(svcCache, newSvc, tc.key)
 		if err := tc.expectedFn(newSvc, obtErr, retryDuration); err != nil {
 			t.Errorf("%v processServiceUpdate() %v", tc.testName, err)
