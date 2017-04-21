@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	core "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -183,7 +184,8 @@ func newDControllerRef(d *extensions.Deployment) *metav1.OwnerReference {
 
 // generateRS creates a replica set, with the input deployment's template as its template
 func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
-	template := GetNewReplicaSetTemplate(&deployment)
+	cp, _ := api.Scheme.DeepCopy(deployment.Spec.Template)
+	template := cp.(v1.PodTemplateSpec)
 	return extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             randomUID(),
@@ -192,7 +194,7 @@ func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 			OwnerReferences: []metav1.OwnerReference{*newDControllerRef(&deployment)},
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas: func() *int32 { i := int32(0); return &i }(),
+			Replicas: new(int32),
 			Template: template,
 			Selector: &metav1.LabelSelector{MatchLabels: template.Labels},
 		},
