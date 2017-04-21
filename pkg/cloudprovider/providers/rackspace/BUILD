@@ -26,6 +26,7 @@ go_library(
         "//vendor/github.com/rackspace/gophercloud/rackspace/compute/v2/volumeattach:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 

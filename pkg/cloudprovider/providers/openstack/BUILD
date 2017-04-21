@@ -33,6 +33,7 @@ go_library(
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes:go_default_library",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/servers:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts:go_default_library",
@@ -56,6 +57,7 @@ go_library(
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
     ],
 )

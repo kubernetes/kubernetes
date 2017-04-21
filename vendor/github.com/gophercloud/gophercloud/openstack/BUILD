@@ -39,6 +39,7 @@ filegroup(
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/common/extensions:all-srcs",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/flavors:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/images:all-srcs",
