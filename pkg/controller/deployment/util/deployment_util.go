@@ -638,29 +638,42 @@ func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet
 // We ignore pod-template-hash because the hash result would be different upon podTemplateSpec API changes
 // (e.g. the addition of a new field will cause the hash code to change)
 // Note that we assume input podTemplateSpecs contain non-empty labels
-func EqualIgnoreHash(template1, template2 v1.PodTemplateSpec) bool {
+func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) (bool, error) {
+	cp, err := api.Scheme.DeepCopy(template1)
+	if err != nil {
+		return false, err
+	}
+	t1Copy := cp.(*v1.PodTemplateSpec)
+	cp, err = api.Scheme.DeepCopy(template2)
+	if err != nil {
+		return false, err
+	}
+	t2Copy := cp.(*v1.PodTemplateSpec)
 	// First, compare template.Labels (ignoring hash)
-	labels1, labels2 := template1.Labels, template2.Labels
+	labels1, labels2 := t1Copy.Labels, t2Copy.Labels
 	if len(labels1) > len(labels2) {
 		labels1, labels2 = labels2, labels1
 	}
 	// We make sure len(labels2) >= len(labels1)
 	for k, v := range labels2 {
 		if labels1[k] != v && k != extensions.DefaultDeploymentUniqueLabelKey {
-			return false
+			return false, nil
 		}
 	}
 	// Then, compare the templates without comparing their labels
-	template1.Labels, template2.Labels = nil, nil
-	return apiequality.Semantic.DeepEqual(template1, template2)
+	t1Copy.Labels, t2Copy.Labels = nil, nil
+	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy), nil
 }
 
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).
 func FindNewReplicaSet(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
-	newRSTemplate := GetNewReplicaSetTemplate(deployment)
 	sort.Sort(controller.ReplicaSetsByCreationTimestamp(rsList))
 	for i := range rsList {
-		if EqualIgnoreHash(rsList[i].Spec.Template, newRSTemplate) {
+		equal, err := EqualIgnoreHash(&rsList[i].Spec.Template, &deployment.Spec.Template)
+		if err != nil {
+			return nil, err
+		}
+		if equal {
 			// In rare cases, such as after cluster upgrades, Deployment may end up with
 			// having more than one new ReplicaSets that have the same template as its template,
 			// see https://github.com/kubernetes/kubernetes/issues/40415
