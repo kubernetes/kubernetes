@@ -23,7 +23,7 @@ go_library(
     deps = [
         "//vendor/github.com/elazarl/go-bindata-assetfs:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
-        "//vendor/github.com/emicklei/go-restful/swagger:go_default_library",
+        "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

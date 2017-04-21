@@ -32,11 +32,11 @@
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
-			"Rev": "09691a3b6378b740595c1002f40c34dd5f218a22"
+			"Rev": "ff4f55a206334ef123e4f79bbf348980da81ca46"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful/log",
-			"Rev": "09691a3b6378b740595c1002f40c34dd5f218a22"
+			"Rev": "ff4f55a206334ef123e4f79bbf348980da81ca46"
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",

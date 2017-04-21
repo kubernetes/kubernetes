@@ -83,7 +83,7 @@ go_library(
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/slice:go_default_library",
-        "//vendor/github.com/emicklei/go-restful/swagger:go_default_library",
+        "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

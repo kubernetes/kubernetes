@@ -19,7 +19,7 @@ package routes
 import (
 	"k8s.io/apiserver/pkg/server/mux"
 
-	"github.com/emicklei/go-restful/swagger"
+	"github.com/emicklei/go-restful-swagger12"
 )
 
 // Swagger installs the /swaggerapi/ endpoint to allow schema discovery
