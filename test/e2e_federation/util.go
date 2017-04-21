@@ -53,11 +53,12 @@ const (
 
 var FederationSuite common.Suite
 
-func createClusterObjectOrFail(f *fedframework.Framework, context *fedframework.E2EContext) {
-	framework.Logf("Creating cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
+func createClusterObjectOrFail(f *fedframework.Framework, context *fedframework.E2EContext, clusterNamePrefix string) {
+	clusterName := clusterNamePrefix + context.Name
+	framework.Logf("Creating cluster object: %s (%s, secret: %s)", clusterName, context.Cluster.Cluster.Server, context.Name)
 	cluster := federationapi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: context.Name,
+			Name: clusterName,
 		},
 		Spec: federationapi.ClusterSpec{
 			ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
@@ -74,9 +75,12 @@ func createClusterObjectOrFail(f *fedframework.Framework, context *fedframework.
 			},
 		},
 	}
+	if clusterNamePrefix != "" {
+		cluster.Labels = map[string]string{"prefix": clusterNamePrefix}
+	}
 	_, err := f.FederationClientset.Federation().Clusters().Create(&cluster)
 	framework.ExpectNoError(err, fmt.Sprintf("creating cluster: %+v", err))
-	framework.Logf("Successfully created cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
+	framework.Logf("Successfully created cluster object: %s (%s, secret: %s)", clusterName, context.Cluster.Cluster.Server, context.Name)
 }
 
 // waitForServiceOrFail waits until a service is either present or absent in the cluster specified by clientset.
