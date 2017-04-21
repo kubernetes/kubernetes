@@ -27,12 +27,10 @@ import (
 )
 
 const (
-	// TODO(crassirostris): Once test is stable, decrease allowed loses
-	loadTestMaxAllowedLostFraction    = 0.05
+	loadTestMaxAllowedLostFraction    = 0.01
 	loadTestMaxAllowedFluentdRestarts = 1
 )
 
-// TODO(crassirostris): Remove Flaky once test is stable
 var _ = framework.KubeDescribe("Cluster level logging using GCL [Feature:StackdriverLogging]", func() {
 	f := framework.NewDefaultFramework("gcl-logging-load")
 
