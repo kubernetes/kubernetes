@@ -110,7 +110,7 @@ func TestPodTemplateSpecHash(t *testing.T) {
 		specJson := strings.Replace(podSpec, "@@VERSION@@", strconv.Itoa(i), 1)
 		spec := v1.PodTemplateSpec{}
 		json.Unmarshal([]byte(specJson), &spec)
-		hash := GetPodTemplateSpecHash(spec)
+		hash := GetPodTemplateSpecHash(&spec, nil)
 		if v, ok := seenHashes[hash]; ok {
 			t.Errorf("Hash collision, old: %d new: %d", v, i)
 			break
@@ -139,6 +139,6 @@ func BenchmarkFnv(b *testing.B) {
 	json.Unmarshal([]byte(podSpec), &spec)
 
 	for i := 0; i < b.N; i++ {
-		GetPodTemplateSpecHash(spec)
+		GetPodTemplateSpecHash(&spec, nil)
 	}
 }

@@ -3409,9 +3409,10 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 		// The new ReplicaSet needs to be non-nil and contain the pod-template-hash label
 
 		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c)
-
 		if err != nil {
-			return false, err
+			reason = fmt.Sprintf("Cannot get new replica set for deployment %q: %v", deployment.Name, err)
+			Logf(reason)
+			return false, nil
 		}
 		if newRS == nil {
 			reason = fmt.Sprintf("New replica set for deployment %q is yet to be created", deployment.Name)
@@ -3619,16 +3620,17 @@ func WaitForPartialEvents(c clientset.Interface, ns string, objOrRef runtime.Obj
 
 type updateDeploymentFunc func(d *extensions.Deployment)
 
-func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {
-	deployments := c.Extensions().Deployments(namespace)
+func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDeploymentFunc) (*extensions.Deployment, error) {
+	var deployment *extensions.Deployment
 	var updateErr error
-	pollErr := wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		if deployment, err = deployments.Get(name, metav1.GetOptions{}); err != nil {
+	pollErr := wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		var err error
+		if deployment, err = c.Extensions().Deployments(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(deployment)
-		if deployment, err = deployments.Update(deployment); err == nil {
+		if deployment, err = c.Extensions().Deployments(namespace).Update(deployment); err == nil {
 			Logf("Updating deployment %s", name)
 			return true, nil
 		}
@@ -3646,7 +3648,7 @@ type updateRsFunc func(d *extensions.ReplicaSet)
 func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRsFunc) (*extensions.ReplicaSet, error) {
 	var rs *extensions.ReplicaSet
 	var updateErr error
-	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+	pollErr := wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		var err error
 		if rs, err = c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
