@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -444,29 +443,22 @@ func TestEqualIgnoreHash(t *testing.T) {
 
 	for _, test := range tests {
 		runTest := func(t1, t2 *v1.PodTemplateSpec, reversed bool) {
-			// Set up
-			t1Copy, err := api.Scheme.DeepCopy(t1)
-			if err != nil {
-				t.Errorf("Failed setting up the test: %v", err)
-			}
-			t2Copy, err := api.Scheme.DeepCopy(t2)
-			if err != nil {
-				t.Errorf("Failed setting up the test: %v", err)
-			}
 			reverseString := ""
 			if reversed {
 				reverseString = " (reverse order)"
 			}
 			// Run
-			equal := EqualIgnoreHash(*t1, *t2)
+			equal, err := EqualIgnoreHash(t1, t2)
+			if err != nil {
+				t.Errorf("%s: unexpected error: %v", err, test.test)
+				return
+			}
 			if equal != test.expected {
-				t.Errorf("In test case %q%s, expected %v", test.test, reverseString, test.expected)
+				t.Errorf("%q%s: expected %v", test.test, reverseString, test.expected)
+				return
 			}
 			if t1.Labels == nil || t2.Labels == nil {
-				t.Errorf("In test case %q%s, unexpected labels becomes nil", test.test, reverseString)
-			}
-			if !reflect.DeepEqual(t1, t1Copy) || !reflect.DeepEqual(t2, t2Copy) {
-				t.Errorf("In test case %q%s, unexpected input template modified", test.test, reverseString)
+				t.Errorf("%q%s: unexpected labels becomes nil", test.test, reverseString)
 			}
 		}
 		runTest(&test.former, &test.latter, false)
