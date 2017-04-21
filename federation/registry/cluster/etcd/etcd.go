@@ -48,12 +48,9 @@ func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo 
 // NewREST returns a RESTStorage object that will work against clusters.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
-		NewFunc:     func() runtime.Object { return &federation.Cluster{} },
-		NewListFunc: func() runtime.Object { return &federation.ClusterList{} },
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*federation.Cluster).Name, nil
-		},
+		Copier:            api.Scheme,
+		NewFunc:           func() runtime.Object { return &federation.Cluster{} },
+		NewListFunc:       func() runtime.Object { return &federation.ClusterList{} },
 		PredicateFunc:     cluster.MatchCluster,
 		QualifiedResource: federation.Resource("clusters"),
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("clusters"),
