@@ -12,15 +12,24 @@ git_repository(
 
 git_repository(
     name = "io_bazel",
-    commit = "1fe52dd4b2d77a740648bc1509b68acae49deffc",
+    commit = "b571b72961b9244059bdf96818948623cebf342e",
     remote = "https://github.com/ixdy/bazel.git",
 )
 
+git_repository(
+    name = "io_bazel_rules_docker",
+    commit = "52d9faf209ff6d16eb850b6b66d03483735e0633",
+    remote = "https://github.com/bazelbuild/rules_docker.git",
+)
+
 load("@io_bazel_rules_go//go:def.bzl", "go_repositories")
+load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories")
 
 go_repositories(
     go_version = "1.8.1",
 )
+
+docker_repositories()
 
 # for building docker base images
 debs = (
