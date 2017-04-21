@@ -57,6 +57,10 @@ func CheckErr(err error) {
 	checkErr("", err, fatal)
 }
 
+func AlreadyExistsError(err error) bool {
+	return strings.Contains(err.Error(), "already exists")
+}
+
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an kubectl exit code.
 func checkErr(prefix string, err error, handleErr func(string, int)) {

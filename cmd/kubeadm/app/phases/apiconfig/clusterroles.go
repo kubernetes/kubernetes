@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	rbac "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
@@ -80,7 +81,9 @@ func CreateServiceAccounts(clientset *clientset.Clientset) error {
 
 	for _, sa := range serviceAccounts {
 		if _, err := clientset.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Create(&sa); err != nil {
-			return err
+			if !kubeadmutil.AlreadyExistsError(err) {
+				return err
+			}
 		}
 	}
 	return nil
@@ -101,7 +104,9 @@ func CreateRoles(clientset *clientset.Clientset) error {
 	}
 	for _, role := range roles {
 		if _, err := clientset.RbacV1beta1().Roles(metav1.NamespacePublic).Create(&role); err != nil {
-			return err
+			if !kubeadmutil.AlreadyExistsError(err) {
+				return err
+			}
 		}
 	}
 	return nil
@@ -131,7 +136,9 @@ func CreateRoleBindings(clientset *clientset.Clientset) error {
 
 	for _, roleBinding := range roleBindings {
 		if _, err := clientset.RbacV1beta1().RoleBindings(metav1.NamespacePublic).Create(&roleBinding); err != nil {
-			return err
+			if !kubeadmutil.AlreadyExistsError(err) {
+				return err
+			}
 		}
 	}
 	return nil
@@ -177,7 +184,9 @@ func CreateClusterRoleBindings(clientset *clientset.Clientset) error {
 
 	for _, clusterRoleBinding := range clusterRoleBindings {
 		if _, err := clientset.RbacV1beta1().ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
-			return err
+			if !kubeadmutil.AlreadyExistsError(err) {
+				return err
+			}
 		}
 	}
 	return nil
