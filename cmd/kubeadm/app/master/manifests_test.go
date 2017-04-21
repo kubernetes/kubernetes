@@ -299,7 +299,7 @@ func TestK8sVolumeMount(t *testing.T) {
 		{
 			expected: api.VolumeMount{
 				Name:      "k8s",
-				MountPath: "/etc/kubernetes/",
+				MountPath: kubeadmapi.GlobalEnvParams.KubernetesDir,
 				ReadOnly:  true,
 			},
 		},
