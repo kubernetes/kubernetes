@@ -294,6 +294,7 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&c.PodsPerCore, "pods-per-core", c.PodsPerCore, "Number of Pods per core that can run on this Kubelet. The total number of Pods on this Kubelet cannot exceed max-pods, so max-pods will be used if this calculation results in a larger number of Pods allowed on the Kubelet. A value of 0 disables this limit.")
 	fs.BoolVar(&c.ProtectKernelDefaults, "protect-kernel-defaults", c.ProtectKernelDefaults, "Default kubelet behaviour for kernel tuning. If set, kubelet errors if any of kernel tunables is different than kubelet defaults.")
 	fs.BoolVar(&c.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", c.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
+	fs.BoolVar(&c.ExperimentalEnableHostPathMountPropagation, "experimental-enable-host-path-mount-propagation", c.ExperimentalEnableHostPathMountPropagation, "Make hostPath volumes use rslave mount propagation")
 
 	// CRI flags.
 	// TODO: Remove experimental-cri in kubernetes 1.7.

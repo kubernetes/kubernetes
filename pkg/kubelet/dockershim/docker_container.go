@@ -141,7 +141,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	// Set propagation mode to "rslave" for HostPath volume mount if current
 	// Docker version supports it
 	propagation := ""
-	if dockerSupportsMountPropagation(apiVersion) {
+	if ds.enableHostPathMountPropagation && dockerSupportsMountPropagation(apiVersion) {
 		propagation = "rslave"
 	}
 

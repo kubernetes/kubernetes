@@ -197,6 +197,9 @@ type DockerManager struct {
 
 	// Directory to host local seccomp profiles.
 	seccompProfileRoot string
+
+	// Make hostPath volumes use rslave mount propagation
+	enableHostPathMountPropagation bool
 }
 
 // A subset of the pod.Manager interface extracted for testing purposes.
@@ -240,6 +243,7 @@ func NewDockerManager(
 	enableCustomMetrics bool,
 	hairpinMode bool,
 	seccompProfileRoot string,
+	enableHostPathMountPropagation bool,
 	options ...kubecontainer.Option) *DockerManager {
 	// Wrap the docker client with instrumentedDockerInterface
 	client = NewInstrumentedDockerInterface(client)
@@ -260,26 +264,27 @@ func NewDockerManager(
 	}
 
 	dm := &DockerManager{
-		client:                 client,
-		recorder:               recorder,
-		containerRefManager:    containerRefManager,
-		os:                     osInterface,
-		machineInfo:            machineInfo,
-		podInfraContainerImage: podInfraContainerImage,
-		dockerPuller:           newDockerPuller(client),
-		cgroupDriver:           cgroupDriver,
-		containerLogsDir:       containerLogsDir,
-		network:                knetwork.NewPluginManager(networkPlugin),
-		livenessManager:        livenessManager,
-		runtimeHelper:          runtimeHelper,
-		execHandler:            execHandler,
-		oomAdjuster:            oomAdjuster,
-		procFs:                 procFs,
-		cpuCFSQuota:            cpuCFSQuota,
-		enableCustomMetrics:    enableCustomMetrics,
-		configureHairpinMode:   hairpinMode,
-		imageStatsProvider:     newImageStatsProvider(client),
-		seccompProfileRoot:     seccompProfileRoot,
+		client:                         client,
+		recorder:                       recorder,
+		containerRefManager:            containerRefManager,
+		os:                             osInterface,
+		machineInfo:                    machineInfo,
+		podInfraContainerImage:         podInfraContainerImage,
+		dockerPuller:                   newDockerPuller(client),
+		cgroupDriver:                   cgroupDriver,
+		containerLogsDir:               containerLogsDir,
+		network:                        knetwork.NewPluginManager(networkPlugin),
+		livenessManager:                livenessManager,
+		runtimeHelper:                  runtimeHelper,
+		execHandler:                    execHandler,
+		oomAdjuster:                    oomAdjuster,
+		procFs:                         procFs,
+		cpuCFSQuota:                    cpuCFSQuota,
+		enableCustomMetrics:            enableCustomMetrics,
+		configureHairpinMode:           hairpinMode,
+		imageStatsProvider:             newImageStatsProvider(client),
+		seccompProfileRoot:             seccompProfileRoot,
+		enableHostPathMountPropagation: enableHostPathMountPropagation,
 	}
 	cmdRunner := kubecontainer.DirectStreamingRunner(dm)
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, cmdRunner, dm)
@@ -703,7 +708,7 @@ func (dm *DockerManager) runContainer(
 	// Set propagation mode to "rslave" for HostPath volume mount if current
 	// Docker version supports it
 	propagation := ""
-	if dockerNewerThanV110 >= 0 {
+	if dm.enableHostPathMountPropagation && dockerNewerThanV110 >= 0 {
 		propagation = "rslave"
 	}
 	binds := makeMountBindings(opts.Mounts, selinux.SELinuxEnabled(), propagation)
