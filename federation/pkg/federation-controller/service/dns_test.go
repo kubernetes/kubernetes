@@ -20,12 +20,10 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"sync"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
@@ -45,10 +43,9 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 	barZoneDNSName := "servicename.servicenamespace.myfederation.svc.barzone.barregion.federation.example.com"
 
 	tests := []struct {
-		name          string
-		service       v1.Service
-		expected      []string
-		serviceStatus v1.LoadBalancerStatus
+		name     string
+		service  v1.Service
+		expected []string
 	}{
 		{
 			name: "ServiceWithSingleLBIngress",
@@ -62,7 +59,6 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 							String()},
 				},
 			},
-			serviceStatus: buildServiceStatus([][]string{{"198.51.100.1", ""}}),
 			expected: []string{
 				"example.com:" + globalDNSName + ":A:180:[198.51.100.1]",
 				"example.com:" + fooRegionDNSName + ":A:180:[198.51.100.1]",
@@ -82,7 +78,6 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 						Namespace: "servicenamespace",
 					},
 				},
-				serviceStatus: buildServiceStatus([][]string{{"", "randomstring.amazonelb.example.com"}}),
 				expected: []string{
 					"example.com:"+globalDNSName+":A:180:[198.51.100.1]",
 					"example.com:"+fooRegionDNSName+":A:180:[198.51.100.1]",
@@ -207,31 +202,6 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			serviceDnsSuffix: "federation.example.com",
 			zoneName:         "example.com",
 			federationName:   "myfederation",
-			serviceCache:     &serviceCache{fedServiceMap: make(map[string]*cachedService)},
-			clusterCache: &clusterClientCache{
-				rwlock:    sync.Mutex{},
-				clientMap: make(map[string]*clusterCache),
-			},
-			knownClusterSet: make(sets.String),
-		}
-
-		serviceController.clusterCache.clientMap[cluster1Name] = &clusterCache{
-			cluster: &v1beta1.Cluster{
-				Status: v1beta1.ClusterStatus{
-					Zones:  []string{"foozone"},
-					Region: "fooregion",
-				},
-			},
-		}
-
-		cachedService := &cachedService{
-			lastState:        &test.service,
-			endpointMap:      make(map[string]int),
-			serviceStatusMap: make(map[string]v1.LoadBalancerStatus),
-		}
-		cachedService.endpointMap[cluster1Name] = 1
-		if !reflect.DeepEqual(&test.serviceStatus, &v1.LoadBalancerStatus{}) {
-			cachedService.serviceStatusMap[cluster1Name] = test.serviceStatus
 		}
 
 		err := serviceController.ensureDnsRecords(cluster1Name, &test.service)
