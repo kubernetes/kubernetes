@@ -346,7 +346,7 @@ func TestProcessServiceUpdate(t *testing.T) {
 			},
 		},
 		{
-			testName: "If Updating a  new Loadbalancer IP",
+			testName: "If Updating Loadbalancer IP",
 			key:      "default/sync-test-name",
 			svc:      newService("sync-test-name", types.UID("sync-test-uid"), v1.ServiceTypeLoadBalancer),
 			updateFn: func(svc *v1.Service) *v1.Service {
@@ -417,10 +417,10 @@ func TestSyncService(t *testing.T) {
 	var cloud *fakecloud.FakeCloud
 
 	testCases := []struct {
-		testName    string
-		key         string
-		updateFn    func() //Function to manipulate the controller element to simulate error
-		expectedErr error  //syncService() only returns error
+		testName   string
+		key        string
+		updateFn   func()            //Function to manipulate the controller element to simulate error
+		expectedFn func(error) error //Expected function if returns nil then test passed, failed otherwise
 	}{
 		{
 			testName: "if an invalid service name is synced",
@@ -429,7 +429,16 @@ func TestSyncService(t *testing.T) {
 				controller, cloud, _ = newController()
 
 			},
-			expectedErr: fmt.Errorf("unexpected key format: %q", "invalid/key/string"),
+			expectedFn: func(e error) error {
+				//TODO: Expected error is of the format fmt.Errorf("unexpected key format: %q", "invalid/key/string"),
+				//TODO: should find a way to test for dependent package errors in such a way that it wont break
+				//TODO:	our tests, currently we only test if there is an error.
+				//Error should be non-nil
+				if e == nil {
+					return fmt.Errorf("Expected=unexpected key format: %q, Obtained=nil", "invalid/key/string")
+				}
+				return nil
+			},
 		},
 		/* We cannot open this test case as syncService(key) currently runtime.HandleError(err) and suppresses frequently occurring errors
 		{
@@ -455,7 +464,13 @@ func TestSyncService(t *testing.T) {
 				svc := controller.cache.getOrCreate("external-balancer")
 				svc.state = testSvc
 			},
-			expectedErr: nil,
+			expectedFn: func(e error) error {
+				//error should be nil
+				if e != nil {
+					return fmt.Errorf("Expected=nil, Obtained=%v", e)
+				}
+				return nil
+			},
 		},
 	}
 
@@ -464,18 +479,17 @@ func TestSyncService(t *testing.T) {
 		tc.updateFn()
 		obtainedErr := controller.syncService(tc.key)
 
-		//Lets only check if we expect error but recived nil and viceversa.
-		if (obtainedErr != nil && tc.expectedErr == nil) && (obtainedErr == nil && tc.expectedErr != nil) {
-			t.Errorf("%v Expected=%v Obtained=%v", tc.testName, tc.expectedErr, obtainedErr)
+		//expected matches obtained ??.
+		if exp := tc.expectedFn(obtainedErr); exp != nil {
+			t.Errorf("%v Error:%v", tc.testName, exp)
 		}
 
-		//Post processing the element should not be there in teh sync queue
+		//Post processing, the element should not be in the sync queue.
 		_, exist := controller.cache.get(tc.key)
 		if exist {
-			t.Fatalf("sync service error, workingQueue should not contain service: %s any more", tc.key)
+			t.Fatalf("%v working Queue should be empty, but contains %s", tc.testName, tc.key)
 		}
 	}
-
 }
 
 func TestProcessDeleteService(t *testing.T) {
@@ -673,8 +687,8 @@ func TestDoesExternalLoadBalancerNeedsUpdate(t *testing.T) {
 
 //All the testcases for ServiceCache uses a single cache, these below test cases should be run in order,
 //as tc1 (addCache would add elements to the cache)
-//and tc2 (delCache woudl remove element from the cache without it adding automatically)
-//Please keep this in mnid while adding new test cases.
+//and tc2 (delCache would remove element from the cache without it adding automatically)
+//Please keep this in mind while adding new test cases.
 func TestServiceCache(t *testing.T) {
 
 	//ServiceCache a common service cache for all the test cases
@@ -741,9 +755,6 @@ func TestServiceCache(t *testing.T) {
 				keys := sc.ListKeys()
 				if len(keys) != 2 {
 					return fmt.Errorf("Elementes Expected=2 Obtained=%v", len(keys))
-				}
-				if keys[0] != "addTest" || keys[1] != "addTest1" {
-					return fmt.Errorf("Keys do not match")
 				}
 				return nil
 			},
