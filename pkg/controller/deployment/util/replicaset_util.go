@@ -77,13 +77,3 @@ func GetReplicaSetHash(rs *extensions.ReplicaSet) string {
 		Spec:       rs.Spec.Template.Spec,
 	}))
 }
-
-// GetReplicaSetHashFnv returns the pod template hash of a ReplicaSet's pod template spec.
-func GetReplicaSetHashFnv(rs *extensions.ReplicaSet) string {
-	meta := rs.Spec.Template.ObjectMeta
-	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
-	return fmt.Sprintf("%d", GetPodTemplateSpecHashFnv(v1.PodTemplateSpec{
-		ObjectMeta: meta,
-		Spec:       rs.Spec.Template.Spec,
-	}))
-}
