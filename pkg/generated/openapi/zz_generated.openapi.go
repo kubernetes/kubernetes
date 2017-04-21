@@ -9724,6 +9724,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"uniquifier": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Monotonically increasing counter that tracks hash collisions for the Deployment. Used as a collision avoidance mechanism by the Deployment controller.",
+								Type:        []string{"integer"},
+								Format:      "int64",
+							},
+						},
 					},
 				},
 			},
@@ -14814,6 +14821,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 										},
 									},
 								},
+							},
+						},
+						"uniquifier": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Monotonically increasing counter that tracks hash collisions for the Deployment. Used as a collision avoidance mechanism by the Deployment controller.",
+								Type:        []string{"integer"},
+								Format:      "int64",
 							},
 						},
 					},

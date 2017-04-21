@@ -330,6 +330,12 @@ type DeploymentStatus struct {
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	Conditions []DeploymentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,6,rep,name=conditions"`
+
+	// Monotonically increasing counter that tracks hash collisions for
+	// the Deployment. Used as a collision avoidance mechanism by the
+	// Deployment controller.
+	// +optional
+	Uniquifier *int64 `json:"uniquifier,omitempty" protobuf:"varint,8,opt,name=uniquifier"`
 }
 
 type DeploymentConditionType string

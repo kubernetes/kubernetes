@@ -157,7 +157,6 @@ go_test(
         "//pkg/client/clientset_generated/internalclientset/typed/batch/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
-        "//pkg/controller/deployment/util:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

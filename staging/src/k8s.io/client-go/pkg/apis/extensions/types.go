@@ -326,6 +326,11 @@ type DeploymentStatus struct {
 
 	// Represents the latest available observations of a deployment's current state.
 	Conditions []DeploymentCondition
+
+	// Monotonically increasing counter that tracks hash collisions for
+	// the Deployment. Used as a collision avoidance mechanism by the
+	// Deployment controller.
+	Uniquifier *int64
 }
 
 type DeploymentConditionType string

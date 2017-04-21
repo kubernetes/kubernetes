@@ -330,7 +330,7 @@ type DeploymentStatus struct {
 	// the Deployment. Used as a collision avoidance mechanism by the
 	// Deployment controller.
 	// +optional
-	Uniquifier *int64 `json:"uniquifier,omitempty"`
+	Uniquifier *int64 `json:"uniquifier,omitempty" protobuf:"varint,8,opt,name=uniquifier"`
 }
 
 type DeploymentConditionType string
