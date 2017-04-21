@@ -17,19 +17,19 @@ limitations under the License.
 package v1_test
 
 import (
-"k8s.io/api/core/v1"
 	"net/url"
 	"reflect"
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/api/core/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestPodLogOptions(t *testing.T) {
@@ -39,7 +39,7 @@ func TestPodLogOptions(t *testing.T) {
 	limitBytes := int64(3)
 
 	versionedLogOptions := &v1.PodLogOptions{
-		v1.Container:    "mycontainer",
+		Container:    "mycontainer",
 		Follow:       true,
 		Previous:     true,
 		SinceSeconds: &sinceSeconds,
@@ -49,7 +49,7 @@ func TestPodLogOptions(t *testing.T) {
 		LimitBytes:   &limitBytes,
 	}
 	unversionedLogOptions := &api.PodLogOptions{
-		v1.Container:    "mycontainer",
+		Container:    "mycontainer",
 		Follow:       true,
 		Previous:     true,
 		SinceSeconds: &sinceSeconds,
@@ -211,7 +211,7 @@ func TestResourceListConversion(t *testing.T) {
 
 		// defaulting is a separate step from conversion that is applied when reading from the API or from etcd.
 		// perform that step explicitly.
-		v1.SetDefaults_ResourceList(&test.input)
+		k8s_api_v1.SetDefaults_ResourceList(&test.input)
 
 		err := api.Scheme.Convert(&test.input, &output, nil)
 		if err != nil {

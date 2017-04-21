@@ -20,12 +20,10 @@ import (
 	"reflect"
 	"testing"
 
-	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
-
+	"k8s.io/api/rbac/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
-	"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 )
 
 func TestConversion(t *testing.T) {
@@ -35,27 +33,27 @@ func TestConversion(t *testing.T) {
 	}{
 		"specific user": {
 			old: &v1alpha1.RoleBinding{
-				rbacv1alpha1.RoleRef: v1alpha1.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
-				Subjects:             []v1alpha1.Subject{{Kind: "User", APIVersion: v1alpha1.SchemeGroupVersion.String(), Name: "bob"}},
+				RoleRef:  v1alpha1.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				Subjects: []v1alpha1.Subject{{Kind: "User", APIVersion: v1alpha1.SchemeGroupVersion.String(), Name: "bob"}},
 			},
 			expected: &rbacapi.RoleBinding{
-				rbacv1alpha1.RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
-				Subjects:             []rbacapi.Subject{{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "bob"}},
+				RoleRef:  rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				Subjects: []rbacapi.Subject{{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "bob"}},
 			},
 		},
 		"wildcard user matches authenticated": {
 			old: &v1alpha1.RoleBinding{
-				rbacv1alpha1.RoleRef: v1alpha1.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
-				Subjects:             []v1alpha1.Subject{{Kind: "User", APIVersion: v1alpha1.SchemeGroupVersion.String(), Name: "*"}},
+				RoleRef:  v1alpha1.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				Subjects: []v1alpha1.Subject{{Kind: "User", APIVersion: v1alpha1.SchemeGroupVersion.String(), Name: "*"}},
 			},
 			expected: &rbacapi.RoleBinding{
-				rbacv1alpha1.RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
-				Subjects:             []rbacapi.Subject{{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "system:authenticated"}},
+				RoleRef:  rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				Subjects: []rbacapi.Subject{{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "system:authenticated"}},
 			},
 		},
 		"missing api group gets defaulted": {
 			old: &v1alpha1.RoleBinding{
-				rbacv1alpha1.RoleRef: v1alpha1.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				RoleRef: v1alpha1.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
 				Subjects: []v1alpha1.Subject{
 					{Kind: "User", Name: "myuser"},
 					{Kind: "Group", Name: "mygroup"},
@@ -63,7 +61,7 @@ func TestConversion(t *testing.T) {
 				},
 			},
 			expected: &rbacapi.RoleBinding{
-				rbacv1alpha1.RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
 				Subjects: []rbacapi.Subject{
 					{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "myuser"},
 					{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "mygroup"},
@@ -73,7 +71,7 @@ func TestConversion(t *testing.T) {
 		},
 		"bad api group gets defaulted": {
 			old: &v1alpha1.RoleBinding{
-				rbacv1alpha1.RoleRef: v1alpha1.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				RoleRef: v1alpha1.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
 				Subjects: []v1alpha1.Subject{
 					{Kind: "User", APIVersion: "rbac", Name: "myuser"},
 					{Kind: "Group", APIVersion: "rbac", Name: "mygroup"},
@@ -84,7 +82,7 @@ func TestConversion(t *testing.T) {
 				},
 			},
 			expected: &rbacapi.RoleBinding{
-				rbacv1alpha1.RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
 				Subjects: []rbacapi.Subject{
 					{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "myuser"},
 					{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "mygroup"},
