@@ -23,14 +23,13 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
@@ -109,7 +108,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: namespace,
 					},
-					Timestamp:  unversioned.Time{Time: fixedTimestamp.Add(time.Duration(tc.targetTimestamp) * time.Minute)},
+					Timestamp:  metav1.Time{Time: fixedTimestamp.Add(time.Duration(tc.targetTimestamp) * time.Minute)},
 					Containers: []metricsapi.ContainerMetrics{},
 				}
 				for j, cpu := range containers {
