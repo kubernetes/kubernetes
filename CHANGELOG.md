@@ -35,7 +35,7 @@
   - [Downloads for v1.6.0](#downloads-for-v160)
     - [Client Binaries](#client-binaries-5)
     - [Server Binaries](#server-binaries-5)
-  - [WARNING: etcd backup strongly recommended](#warning:-etcd-backup-strongly-recommended)
+  - [WARNING: etcd backup strongly recommended](#warning-etcd-backup-strongly-recommended)
   - [Major updates and release themes](#major-updates-and-release-themes)
   - [Action Required](#action-required-1)
     - [Certificates API](#certificates-api)
@@ -683,21 +683,6 @@ filename | sha256 hash
 * In 'kubectl describe', find controllers with ControllerRef, instead of showing the original creator. ([#42849](https://github.com/kubernetes/kubernetes/pull/42849), [@janetkuo](https://github.com/janetkuo))
 * Heat cluster operations now support environments that have multiple Swift URLs ([#41561](https://github.com/kubernetes/kubernetes/pull/41561), [@jamiehannaford](https://github.com/jamiehannaford))
 * Adds support for allocation of pod IPs via IP aliases. ([#42147](https://github.com/kubernetes/kubernetes/pull/42147), [@bowei](https://github.com/bowei))
-    * # Adds KUBE_GCE_ENABLE_IP_ALIASES flag to the cluster up scripts (`kube-{up,down}.sh`).
-    * KUBE_GCE_ENABLE_IP_ALIASES=true will enable allocation of PodCIDR ips
-    * using the ip alias mechanism rather than using routes. This feature is currently
-    * only available on GCE.
-    * ## Usage
-    * $ CLUSTER_IP_RANGE=10.100.0.0/16 KUBE_GCE_ENABLE_IP_ALIASES=true bash -x cluster/kube-up.sh
-    * # Adds CloudAllocator to the node CIDR allocator (kubernetes-controller manager).
-    * If CIDRAllocatorType is set to `CloudCIDRAllocator`, then allocation
-    * of CIDR allocation instead is done by the external cloud provider and
-    * the node controller is only responsible for reflecting the allocation
-    * into the node spec.
-    * - Splits off the rangeAllocator from the cidr_allocator.go file.
-    * - Adds cloudCIDRAllocator, which is used when the cloud provider allocates
-    *   the CIDR ranges externally. (GCE support only)
-    * - Updates RBAC permission for node controller to include PATCH
 * alpha volume provisioning is removed and default storage class should be used instead. ([#44090](https://github.com/kubernetes/kubernetes/pull/44090), [@NickrenREN](https://github.com/NickrenREN))
 * validateClusterInfo: use clientcmdapi.NewCluster() ([#44221](https://github.com/kubernetes/kubernetes/pull/44221), [@ncdc](https://github.com/ncdc))
 * Fix corner-case with OnlyLocal Service healthchecks. ([#44313](https://github.com/kubernetes/kubernetes/pull/44313), [@thockin](https://github.com/thockin))
@@ -2078,10 +2063,10 @@ filename | sha256 hash
 
 * Update dashboard version to v1.6.0 ([#43210](https://github.com/kubernetes/kubernetes/pull/43210), [@floreks](https://github.com/floreks))
 * Update photon controller go SDK in vendor code. ([#43108](https://github.com/kubernetes/kubernetes/pull/43108), [@luomiao](https://github.com/luomiao))
-* TBD ([#42931](https://github.com/kubernetes/kubernetes/pull/42931), [@piosz](https://github.com/piosz))
+* Fluentd was migrated to Daemon Set, which targets nodes with beta.kubernetes.io/fluentd-ds-ready=true label. If you use fluentd in your cluster please make sure that the nodes with version 1.6+ contains this label. ([#42931](https://github.com/kubernetes/kubernetes/pull/42931), [@piosz](https://github.com/piosz))
 * if kube-apiserver is started with `--storage-backend=etcd2`, the media type `application/json` is used. ([#43122](https://github.com/kubernetes/kubernetes/pull/43122), [@liggitt](https://github.com/liggitt))
 * Add -p to mkdirs in gci-mounter function of gce configure.sh script ([#43134](https://github.com/kubernetes/kubernetes/pull/43134), [@shyamjvs](https://github.com/shyamjvs))
-* TBD ([#43106](https://github.com/kubernetes/kubernetes/pull/43106), [@piosz](https://github.com/piosz))
+* Rescheduler uses taints in v1beta1 and will remove old ones (in version v1alpha1) right after its start. ([#43106](https://github.com/kubernetes/kubernetes/pull/43106), [@piosz](https://github.com/piosz))
 * kubeadm: `kubeadm reset` won't drain and remove the current node anymore ([#42713](https://github.com/kubernetes/kubernetes/pull/42713), [@luxas](https://github.com/luxas))
 * hack/godep-restore.sh: use godep v79 which works ([#42965](https://github.com/kubernetes/kubernetes/pull/42965), [@sttts](https://github.com/sttts))
 * Patch CVE-2016-8859 in gcr.io/google-containers/cluster-proportional-autoscaler-amd64 ([#42933](https://github.com/kubernetes/kubernetes/pull/42933), [@timstclair](https://github.com/timstclair))
