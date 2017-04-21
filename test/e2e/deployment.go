@@ -112,6 +112,9 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	It("test Deployment ReplicaSet orphaning and adoption regarding controllerRef", func() {
 		testDeploymentsControllerRef(f)
 	})
+	It("deployment can avoid hash collisions", func() {
+		testDeploymentHashCollisionAvoidance(f)
+	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
 })
@@ -1393,4 +1396,48 @@ func orphanDeploymentReplicaSets(c clientset.Interface, d *extensions.Deployment
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &trueVar}
 	deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(d.UID))
 	return c.Extensions().Deployments(d.Namespace).Delete(d.Name, deleteOptions)
+}
+
+func testDeploymentHashCollisionAvoidance(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := f.ClientSet
+
+	deploymentName := "test-hash-collision"
+	framework.Logf("Creating Deployment %q", deploymentName)
+	podLabels := map[string]string{"name": nginxImageName}
+	d := framework.NewDeployment(deploymentName, int32(0), podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType)
+	deployment, err := c.Extensions().Deployments(ns).Create(d)
+	Expect(err).NotTo(HaveOccurred())
+	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", nginxImage)
+	Expect(err).NotTo(HaveOccurred())
+
+	// TODO: Switch this to do a non-cascading deletion of the Deployment, mutate the ReplicaSet
+	// once it has no owner reference, then recreate the Deployment if we ever proceed with
+	// https://github.com/kubernetes/kubernetes/issues/44237
+	framework.Logf("Mock a hash collision")
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	Expect(err).NotTo(HaveOccurred())
+	var nilRs *extensions.ReplicaSet
+	Expect(newRS).NotTo(Equal(nilRs))
+	_, err = framework.UpdateReplicaSetWithRetries(c, ns, newRS.Name, func(update *extensions.ReplicaSet) {
+		*update.Spec.Template.Spec.TerminationGracePeriodSeconds = int64(5)
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Expect deployment uniquifier to increment")
+	if err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+		d, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+		if err != nil {
+			framework.Logf("cannot get deployment %q: %v", deploymentName, err)
+			return false, nil
+		}
+		framework.Logf("deployment status: %v", d.Status)
+		return d.Status.Uniquifier != nil && *d.Status.Uniquifier == int64(1), nil
+	}); err != nil {
+		framework.Failf("Failed to increment uniquifier for deployment %q: %v", deploymentName, err)
+	}
+
+	framework.Logf("Expect a new ReplicaSet to be created")
+	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", nginxImage)
+	Expect(err).NotTo(HaveOccurred())
 }
