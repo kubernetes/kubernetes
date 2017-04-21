@@ -744,31 +744,6 @@ func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister cor
 	return nil
 }
 
-// GetNewReplicaSetTemplate returns the desired PodTemplateSpec for the new ReplicaSet corresponding to the given ReplicaSet.
-// Callers of this helper need to set the DefaultDeploymentUniqueLabelKey k/v pair.
-func GetNewReplicaSetTemplate(deployment *extensions.Deployment) v1.PodTemplateSpec {
-	// newRS will have the same template as in deployment spec.
-	return v1.PodTemplateSpec{
-		ObjectMeta: deployment.Spec.Template.ObjectMeta,
-		Spec:       deployment.Spec.Template.Spec,
-	}
-}
-
-// TODO: remove the duplicate
-// GetNewReplicaSetTemplateInternal returns the desired PodTemplateSpec for the new ReplicaSet corresponding to the given ReplicaSet.
-func GetNewReplicaSetTemplateInternal(deployment *internalextensions.Deployment) api.PodTemplateSpec {
-	// newRS will have the same template as in deployment spec, plus a unique label in some cases.
-	newRSTemplate := api.PodTemplateSpec{
-		ObjectMeta: deployment.Spec.Template.ObjectMeta,
-		Spec:       deployment.Spec.Template.Spec,
-	}
-	newRSTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
-		deployment.Spec.Template.ObjectMeta.Labels,
-		internalextensions.DefaultDeploymentUniqueLabelKey,
-		fmt.Sprintf("%d", GetInternalPodTemplateSpecHash(newRSTemplate)))
-	return newRSTemplate
-}
-
 // SetFromReplicaSetTemplate sets the desired PodTemplateSpec from a replica set template to the given deployment.
 func SetFromReplicaSetTemplate(deployment *extensions.Deployment, template v1.PodTemplateSpec) *extensions.Deployment {
 	deployment.Spec.Template.ObjectMeta = template.ObjectMeta

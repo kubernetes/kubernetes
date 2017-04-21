@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 func TestReplicationControllerStop(t *testing.T) {
@@ -441,7 +440,6 @@ func TestDeploymentStop(t *testing.T) {
 			Replicas: 0,
 		},
 	}
-	template := deploymentutil.GetNewReplicaSetTemplateInternal(&deployment)
 	trueVar := true
 	tests := []struct {
 		Name            string
@@ -492,9 +490,7 @@ func TestDeploymentStop(t *testing.T) {
 									},
 								},
 							},
-							Spec: extensions.ReplicaSetSpec{
-								Template: template,
-							},
+							Spec: extensions.ReplicaSetSpec{},
 						},
 						// ReplicaSet owned by something else (should be ignored).
 						{
@@ -512,9 +508,7 @@ func TestDeploymentStop(t *testing.T) {
 									},
 								},
 							},
-							Spec: extensions.ReplicaSetSpec{
-								Template: template,
-							},
+							Spec: extensions.ReplicaSetSpec{},
 						},
 					},
 				},
@@ -709,7 +703,6 @@ func TestDeploymentNotFoundError(t *testing.T) {
 			Replicas: 0,
 		},
 	}
-	template := deploymentutil.GetNewReplicaSetTemplateInternal(deployment)
 
 	fake := fake.NewSimpleClientset(
 		deployment,
@@ -719,9 +712,7 @@ func TestDeploymentNotFoundError(t *testing.T) {
 					Name:      name,
 					Namespace: ns,
 				},
-				Spec: extensions.ReplicaSetSpec{
-					Template: template,
-				},
+				Spec: extensions.ReplicaSetSpec{},
 			},
 		},
 		},
