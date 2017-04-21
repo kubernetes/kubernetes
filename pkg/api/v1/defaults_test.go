@@ -17,17 +17,17 @@ limitations under the License.
 package v1_test
 
 import (
-"k8s.io/api/core/v1"
 	"encoding/json"
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/api/core/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
@@ -61,7 +61,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 			rc: &v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -74,14 +74,14 @@ func TestSetDefaultReplicationController(t *testing.T) {
 		},
 		{
 			rc: &v1.ReplicationController{
-				v1.ObjectMeta: metav1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
 				},
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -94,7 +94,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 		},
 		{
 			rc: &v1.ReplicationController{
-				v1.ObjectMeta: metav1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
@@ -104,7 +104,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 						"some": "other",
 					},
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -122,7 +122,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 						"some": "other",
 					},
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -175,7 +175,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -190,7 +190,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: newInt(0),
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -205,7 +205,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: newInt(3),
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -256,7 +256,7 @@ func TestSetDefaultReplicationControllerImagePullPolicy(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": string(containersWithoutPullPolicy),
 							},
@@ -270,7 +270,7 @@ func TestSetDefaultReplicationControllerImagePullPolicy(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": string(containersWithPullPolicy),
 							},
@@ -315,8 +315,8 @@ func TestSetDefaultSecretVolumeSource(t *testing.T) {
 	s := v1.PodSpec{}
 	s.Volumes = []v1.Volume{
 		{
-			v1.VolumeSource: v1.VolumeSource{
-				v1.Secret: &v1.SecretVolumeSource{},
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{},
 			},
 		},
 	}
@@ -337,8 +337,8 @@ func TestSetDefaultConfigMapVolumeSource(t *testing.T) {
 	s := v1.PodSpec{}
 	s.Volumes = []v1.Volume{
 		{
-			v1.VolumeSource: v1.VolumeSource{
-				v1.ConfigMap: &v1.ConfigMapVolumeSource{},
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{},
 			},
 		},
 	}
@@ -359,7 +359,7 @@ func TestSetDefaultDownwardAPIVolumeSource(t *testing.T) {
 	s := v1.PodSpec{}
 	s.Volumes = []v1.Volume{
 		{
-			v1.VolumeSource: v1.VolumeSource{
+			VolumeSource: v1.VolumeSource{
 				DownwardAPI: &v1.DownwardAPIVolumeSource{},
 			},
 		},
@@ -381,7 +381,7 @@ func TestSetDefaultProjectedVolumeSource(t *testing.T) {
 	s := v1.PodSpec{}
 	s.Volumes = []v1.Volume{
 		{
-			v1.VolumeSource: v1.VolumeSource{
+			VolumeSource: v1.VolumeSource{
 				Projected: &v1.ProjectedVolumeSource{},
 			},
 		},
@@ -532,7 +532,7 @@ func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 		{
 			Ports: []v1.ContainerPort{
 				{
-					v1.ContainerPort: portNum,
+					ContainerPort: portNum,
 				},
 			},
 		},
@@ -541,7 +541,7 @@ func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 		{
 			Ports: []v1.ContainerPort{
 				{
-					v1.ContainerPort: portNum,
+					ContainerPort: portNum,
 				},
 			},
 		},
@@ -709,7 +709,7 @@ func TestSetMinimumScalePod(t *testing.T) {
 	pod := &v1.Pod{
 		Spec: s,
 	}
-	v1.SetObjectDefaults_Pod(pod)
+	k8s_api_v1.SetObjectDefaults_Pod(pod)
 
 	if expect := resource.MustParse("1m"); expect.Cmp(pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory]) != 0 {
 		t.Errorf("did not round resources: %#v", pod.Spec.Containers[0].Resources)
@@ -802,7 +802,7 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 		Spec: v1.ReplicationControllerSpec{
 			Replicas: newInt(3),
 			Template: &v1.PodTemplateSpec{
-				v1.ObjectMeta: metav1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -822,7 +822,7 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 
 func TestSetDefaultLimitRangeItem(t *testing.T) {
 	limitRange := &v1.LimitRange{
-		v1.ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-defaults",
 		},
 		Spec: v1.LimitRangeSpec{
