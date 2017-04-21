@@ -23,7 +23,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/emicklei/go-restful/swagger"
+	"github.com/emicklei/go-restful-swagger12"
 
 	"github.com/go-openapi/loads"
 	"github.com/go-openapi/spec"
