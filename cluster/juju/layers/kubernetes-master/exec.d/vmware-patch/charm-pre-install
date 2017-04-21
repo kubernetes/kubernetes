@@ -1,0 +1,17 @@
+#!/bin/bash
+MY_HOSTNAME=$(hostname)
+
+if [ "${MY_HOSTNAME}" == "ubuntuguest" ]; then
+    echo "Detected broken vsphere integration. Applying hostname override"
+    if [ -z "${JUJU_UNIT_NAME}" ]; then
+      echo "Missing required environment variable JUJU_UNIT_NAME. Taking no action"
+      exit 0
+    fi
+    FRIENDLY_HOSTNAME=$(echo $JUJU_UNIT_NAME | tr / -)
+    echo "Setting hostname to $FRIENDLY_HOSTNAME"
+    if [ ! -f /etc/hostname.orig ]; then
+      mv /etc/hostname /etc/hostname.orig
+    fi
+    echo "${FRIENDLY_HOSTNAME}" > /etc/hostname
+    hostname $FRIENDLY_HOSTNAME
+fi
