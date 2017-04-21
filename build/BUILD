@@ -1,6 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel//tools/build_defs/docker:docker.bzl", "docker_build")
+load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build", "docker_bundle")
 load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 
 filegroup(
@@ -69,31 +69,32 @@ DOCKERIZED_BINARIES = {
     },
 }
 
+[docker_build(
+    name = binary + "-internal",
+    base = meta["base"],
+    cmd = ["/usr/bin/" + binary],
+    debs = [
+        "//build/debs:%s.deb" % binary,
+    ],
+    symlinks = {
+        # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
+        # but the debs install the binaries into /usr/bin.
+        "/usr/local/bin/" + binary: "/usr/bin/" + binary,
+    },
+) for binary, meta in DOCKERIZED_BINARIES.items()]
+
+[docker_bundle(
+    name = binary,
+    images = {"gcr.io/google_containers/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal"},
+    stamp = True,
+) for binary in DOCKERIZED_BINARIES.keys()]
+
 [genrule(
     name = binary + "_docker_tag",
     srcs = [meta["target"]],
     outs = [binary + ".docker_tag"],
     cmd = "grep ^STABLE_DOCKER_TAG bazel-out/stable-status.txt | awk '{print $$2}' >$@",
     stamp = 1,
-) for binary, meta in DOCKERIZED_BINARIES.items()]
-
-[docker_build(
-    name = binary,
-    base = meta["base"],
-    cmd = ["/usr/bin/" + binary],
-    debs = [
-        "//build/debs:%s.deb" % binary,
-    ],
-    image_tags = [
-        "@%s.docker_tag" % binary,
-    ],
-    repository = "gcr.io/google_containers/" + binary,
-    repository_append_package = False,
-    symlinks = {
-        # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
-        # but the debs install the binaries into /usr/bin.
-        "/usr/local/bin/" + binary: "/usr/bin/" + binary,
-    },
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
 
 release_filegroup(
