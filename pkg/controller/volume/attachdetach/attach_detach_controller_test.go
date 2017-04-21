@@ -196,6 +196,12 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		i++
 	}
 
+	if !controller.WaitForCacheSync("attach detach", stopCh,
+		informerFactory.Core().V1().Pods().Informer().HasSynced,
+		informerFactory.Core().V1().Nodes().Informer().HasSynced) {
+		t.Fatalf("Error waiting for the informer caches to sync")
+	}
+
 	// Create the controller
 	adcObj, err := NewAttachDetachController(
 		fakeKubeClient,
