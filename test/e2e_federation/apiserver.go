@@ -30,6 +30,7 @@ import (
 // Create/delete cluster api objects
 var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federation-cluster")
+	testClusterPrefix := "test"
 
 	Describe("Cluster objects [Serial]", func() {
 		AfterEach(func() {
@@ -37,7 +38,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 
 			// Delete registered clusters.
 			// This is if a test failed, it should not affect other tests.
-			clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
+			clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{LabelSelector: "prefix=" + testClusterPrefix})
 			Expect(err).NotTo(HaveOccurred())
 			for _, cluster := range clusterList.Items {
 				err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &metav1.DeleteOptions{})
@@ -50,12 +51,12 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 
 			contexts := f.GetUnderlyingFederatedContexts()
 
-			framework.Logf("Creating %d cluster objects", len(contexts))
+			By(fmt.Sprintf("Creating %d cluster objects", len(contexts)))
 			for _, context := range contexts {
-				createClusterObjectOrFail(f, &context)
+				createClusterObjectOrFail(f, &context, testClusterPrefix)
 			}
 
-			framework.Logf("Checking that %d clusters are Ready", len(contexts))
+			By(fmt.Sprintf("Checking that %d clusters are ready", len(contexts)))
 			for _, context := range contexts {
 				fedframework.ClusterIsReadyOrFail(f, context.Name)
 			}
@@ -64,15 +65,16 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 			// Verify that deletion works.
 			framework.Logf("Deleting %d clusters", len(contexts))
 			for _, context := range contexts {
-				framework.Logf("Deleting cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
-				err := f.FederationClientset.Federation().Clusters().Delete(context.Name, &metav1.DeleteOptions{})
-				framework.ExpectNoError(err, fmt.Sprintf("unexpected error in deleting cluster %s: %+v", context.Name, err))
-				framework.Logf("Successfully deleted cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
+				clusterName := testClusterPrefix + context.Name
+				framework.Logf("Deleting cluster object: %s (%s, secret: %s)", clusterName, context.Cluster.Cluster.Server, context.Name)
+				err := f.FederationClientset.Federation().Clusters().Delete(clusterName, &metav1.DeleteOptions{})
+				framework.ExpectNoError(err, fmt.Sprintf("unexpected error in deleting cluster %s: %+v", clusterName, err))
+				framework.Logf("Successfully deleted cluster object: %s (%s, secret: %s)", clusterName, context.Cluster.Cluster.Server, context.Name)
 			}
 
 			// There should not be any remaining cluster.
-			framework.Logf("Verifying that zero clusters remain")
-			clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
+			framework.Logf("Verifying that zero test clusters remain")
+			clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{LabelSelector: "prefix=" + testClusterPrefix})
 			Expect(err).NotTo(HaveOccurred())
 			if len(clusterList.Items) != 0 {
 				framework.Failf("there should not have been any remaining clusters. Found: %+v", clusterList)
