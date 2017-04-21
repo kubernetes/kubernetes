@@ -117,6 +117,7 @@ cni-conf-dir
 concurrent-deployment-syncs
 concurrent-endpoint-syncs
 concurrent-gc-syncs
+concurrent-job-syncs
 concurrent-namespace-syncs
 concurrent-replicaset-syncs
 concurrent-resource-quota-syncs
