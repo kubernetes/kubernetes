@@ -68,9 +68,18 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["gce_test.go"],
+    srcs = [
+        "gce_disks_test.go",
+        "gce_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = [
+        "//pkg/cloudprovider:go_default_library",
+        "//vendor/google.golang.org/api/compute/v1:go_default_library",
+        "//vendor/google.golang.org/api/googleapi:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+    ],
 )
 
 filegroup(
