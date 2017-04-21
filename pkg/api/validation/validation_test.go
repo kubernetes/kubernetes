@@ -46,14 +46,6 @@ const (
 	idErrMsg                = "a valid C identifier must"
 )
 
-func expectPrefix(t *testing.T, prefix string, errs field.ErrorList) {
-	for i := range errs {
-		if f, p := errs[i].Field, prefix; !strings.HasPrefix(f, p) {
-			t.Errorf("expected prefix '%s' for field '%s' (%v)", p, f, errs[i])
-		}
-	}
-}
-
 func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
 	objMeta := metav1.ObjectMeta{Name: name}
 	if namespace != "" {
