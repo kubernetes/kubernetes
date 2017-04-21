@@ -69,11 +69,12 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rsL
 }
 
 // GetReplicaSetHash returns the pod template hash of a ReplicaSet's pod template space
-func GetReplicaSetHash(rs *extensions.ReplicaSet) string {
-	meta := rs.Spec.Template.ObjectMeta
-	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
-	return fmt.Sprintf("%d", GetPodTemplateSpecHash(v1.PodTemplateSpec{
-		ObjectMeta: meta,
-		Spec:       rs.Spec.Template.Spec,
-	}))
+func GetReplicaSetHash(rs *extensions.ReplicaSet, uniquifier *int64) (string, error) {
+	template, err := api.Scheme.DeepCopy(rs.Spec.Template)
+	if err != nil {
+		return "", err
+	}
+	rsTemplate := template.(v1.PodTemplateSpec)
+	rsTemplate.Labels = labelsutil.CloneAndRemoveLabel(rsTemplate.Labels, extensions.DefaultDeploymentUniqueLabelKey)
+	return fmt.Sprintf("%d", GetPodTemplateSpecHash(&rsTemplate, uniquifier)), nil
 }
