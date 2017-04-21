@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 licenses(["notice"])
 
 load(
@@ -47,6 +45,10 @@ go_library(
         "versioned_client.go",
     ],
     tags = ["automanaged"],
+    visibility = [
+        "//build/visible_to:COMMON_testing",
+        "//build/visible_to:pkg_kubectl_CONSUMERS",
+    ],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",
@@ -181,7 +183,6 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
-    visibility = ["//visibility:private"],
 )
 
 filegroup(
@@ -195,4 +196,7 @@ filegroup(
         "//pkg/kubectl/testing:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = [
+        "//build/visible_to:pkg_kubectl_CONSUMERS",
+    ],
 )
