@@ -60,7 +60,7 @@ func WithImpersonation(handler http.Handler, requestContextMapper request.Reques
 		}
 
 		// if groups are not specified, then we need to look them up differently depending on the type of user
-		// if they are specified, then they are the authority
+		// if they are specified, then they are the authority (including the inclusion of system:authenticated/system:unauthenticated groups)
 		groupsSpecified := len(req.Header[authenticationapi.ImpersonateGroupHeader]) > 0
 
 		// make sure we're allowed to impersonate each thing we're requesting.  While we're iterating through, start building username
@@ -113,6 +113,22 @@ func WithImpersonation(handler http.Handler, requestContextMapper request.Reques
 				glog.V(4).Infof("Forbidden: %#v, Reason: %s, Error: %v", req.RequestURI, reason, err)
 				responsewriters.Forbidden(actingAsAttributes, w, req, reason)
 				return
+			}
+		}
+
+		if !groupsSpecified && username != user.Anonymous {
+			// When impersonating a non-anonymous user, if no groups were specified
+			// if neither the system:authenticated nor system:unauthenticated groups are explicitly included,
+			// include the system:authenticated group in the impersonated user info
+			found := false
+			for _, group := range groups {
+				if group == user.AllAuthenticated || group == user.AllUnauthenticated {
+					found = true
+					break
+				}
+			}
+			if !found {
+				groups = append(groups, user.AllAuthenticated)
 			}
 		}
 
