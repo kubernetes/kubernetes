@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 licenses(["notice"])
 
 load(
@@ -32,7 +30,6 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
-    visibility = ["//visibility:private"],
 )
 
 filegroup(
@@ -42,4 +39,7 @@ filegroup(
         "//cmd/kubectl/app:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = [
+        "//visible_to:cmd_kubectl_CONSUMERS",
+    ],
 )
