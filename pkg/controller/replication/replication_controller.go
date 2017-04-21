@@ -214,7 +214,7 @@ func (rm *ReplicationManager) updateRC(old, cur interface{}) {
 	// this function), but in general extra resyncs shouldn't be
 	// that bad as rcs that haven't met expectations yet won't
 	// sync, and all the listing is done using local stores.
-	if oldRC.Spec.Replicas != curRC.Spec.Replicas {
+	if *(oldRC.Spec.Replicas) != *(curRC.Spec.Replicas) {
 		glog.V(4).Infof("Replication controller %v updated. Desired pod count change: %d->%d", curRC.Name, *(oldRC.Spec.Replicas), *(curRC.Spec.Replicas))
 	}
 	rm.enqueueController(cur)
