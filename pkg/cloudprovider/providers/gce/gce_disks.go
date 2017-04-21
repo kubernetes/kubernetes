@@ -229,12 +229,14 @@ func (gce *GCECloud) CreateDisk(name string, diskType string, zone string, sizeG
 		Type:        diskTypeUri,
 	}
 	dc := contextWithNamespace(name, "gce_disk_insert")
-	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Context(dc).Do()
+
+	createOp, err := gce.manager.CreateDisk(gce.projectID, zone, diskToCreate, dc)
+
 	if err != nil {
 		return err
 	}
 
-	err = gce.waitForZoneOp(createOp, zone)
+	err = gce.manager.WaitForZoneOp(createOp, zone)
 	if isGCEError(err, "alreadyExists") {
 		glog.Warningf("GCE PD %q already exists, reusing", name)
 		return nil
@@ -305,7 +307,7 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 // If not found, returns (nil, nil)
 func (gce *GCECloud) findDiskByName(diskName string, zone string) (*GCEDisk, error) {
 	dc := contextWithNamespace(diskName, "gce_list_disk")
-	disk, err := gce.service.Disks.Get(gce.projectID, zone, diskName).Context(dc).Do()
+	disk, err := gce.manager.GetDisk(gce.projectID, zone, diskName, dc)
 	if err == nil {
 		d := &GCEDisk{
 			Zone: lastComponent(disk.Zone),
@@ -391,12 +393,12 @@ func (gce *GCECloud) doDeleteDisk(diskToDelete string) error {
 	}
 
 	dc := contextWithNamespace(diskToDelete, "gce_disk_delete")
-	deleteOp, err := gce.service.Disks.Delete(gce.projectID, disk.Zone, disk.Name).Context(dc).Do()
+	deleteOp, err := gce.manager.DeleteDisk(gce.projectID, disk.Zone, disk.Name, dc)
 	if err != nil {
 		return err
 	}
 
-	return gce.waitForZoneOp(deleteOp, disk.Zone)
+	return gce.manager.WaitForZoneOp(deleteOp, disk.Zone)
 }
 
 // Converts a Disk resource to an AttachedDisk resource.

@@ -73,6 +73,9 @@ const (
 	gceHcHealthyThreshold = int64(1)
 	// Defaults to 5 * 2 = 10 seconds before the LB will steer traffic away
 	gceHcUnhealthyThreshold = int64(5)
+
+	// Key for GCP API context
+	apiContextKey = "kube-api-namespace"
 )
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
@@ -89,6 +92,33 @@ type GCECloud struct {
 	nodeInstancePrefix       string   // If non-"", an advisory prefix for all nodes in the cluster
 	useMetadataServer        bool
 	operationPollRateLimiter flowcontrol.RateLimiter
+	manager                  ServiceManager
+}
+
+type ServiceManager interface {
+	CreateDisk(
+		project string,
+		zone string,
+		disk *compute.Disk,
+		dc context.Context) (*compute.Operation, error)
+
+	GetDisk(
+		project string,
+		zone string,
+		diskName string,
+		dc context.Context) (*compute.Disk, error)
+
+	DeleteDisk(
+		project string,
+		zone string,
+		disk string,
+		dc context.Context) (*compute.Operation, error)
+
+	WaitForZoneOp(op *compute.Operation, zone string) error
+}
+
+type GCEServiceManager struct {
+	gce *GCECloud
 }
 
 type Config struct {
@@ -121,7 +151,7 @@ func init() {
 
 func trackAPILatency(ctx context.Context, req *http.Request) func(resp *http.Response) {
 	requestTime := time.Now()
-	t := ctx.Value("kube-api-namespace")
+	t := ctx.Value(apiContextKey)
 	apiNamespace, ok := t.(apiWithNamespace)
 
 	if !ok {
@@ -143,7 +173,7 @@ func contextWithNamespace(namespace string, apiCall string) context.Context {
 		namespace: namespace,
 		apiCall:   apiCall,
 	}
-	return context.WithValue(rootContext, "kube-api-namespace", apiNamespace)
+	return context.WithValue(rootContext, apiContextKey, apiNamespace)
 }
 
 // Raw access to the underlying GCE service, probably should only be used for e2e tests
@@ -254,7 +284,7 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 
 	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(10, 100) // 10 qps, 100 bucket size.
 
-	return &GCECloud{
+	gce := &GCECloud{
 		service:                  service,
 		serviceAlpha:             serviceAlpha,
 		containerService:         containerService,
@@ -267,7 +297,10 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		nodeInstancePrefix:       nodeInstancePrefix,
 		useMetadataServer:        useMetadataServer,
 		operationPollRateLimiter: operationPollRateLimiter,
-	}, nil
+	}
+
+	gce.manager = &GCEServiceManager{gce}
+	return gce, nil
 }
 
 // LoadBalancer returns an implementation of LoadBalancer for Google Compute Engine.
@@ -394,4 +427,35 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 	}
 
 	return oauth2.NewClient(oauth2.NoContext, tokenSource), nil
+}
+
+func (manager *GCEServiceManager) CreateDisk(
+	project string,
+	zone string,
+	disk *compute.Disk,
+	dc context.Context) (*compute.Operation, error) {
+
+	return manager.gce.service.Disks.Insert(project, zone, disk).Context(dc).Do()
+}
+
+func (manager *GCEServiceManager) GetDisk(
+	project string,
+	zone string,
+	diskName string,
+	dc context.Context) (*compute.Disk, error) {
+
+	return manager.gce.service.Disks.Get(project, zone, diskName).Context(dc).Do()
+}
+
+func (manager *GCEServiceManager) DeleteDisk(
+	project string,
+	zone string,
+	disk string,
+	dc context.Context) (*compute.Operation, error) {
+
+	return manager.gce.service.Disks.Delete(project, zone, disk).Context(dc).Do()
+}
+
+func (manager *GCEServiceManager) WaitForZoneOp(op *compute.Operation, zone string) error {
+	return manager.gce.waitForZoneOp(op, zone)
 }
