@@ -161,7 +161,8 @@ ifeq ($(PRINT_HELP),y)
 check test:
 	@echo "$$CHECK_TEST_HELP_INFO"
 else
-check test: generated_files
+#check test: generated_files
+check test:
 	hack/make-rules/test.sh $(WHAT) $(TESTS)
 endif
 
