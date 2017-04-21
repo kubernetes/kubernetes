@@ -386,9 +386,9 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	return &Proxier{
 		exec:             &exec.FakeExec{},
 		serviceMap:       make(proxyServiceMap),
-		serviceChanges:   make(serviceChangeMap),
+		serviceChanges:   newServiceChangeMap(),
 		endpointsMap:     make(proxyEndpointsMap),
-		endpointsChanges: make(endpointsChangeMap),
+		endpointsChanges: newEndpointsChangeMap(),
 		iptables:         ipt,
 		clusterCIDR:      "10.0.0.0/24",
 		hostname:         testHostname,
