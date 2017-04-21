@@ -17,19 +17,18 @@ limitations under the License.
 package v1_test
 
 import (
-"k8s.io/api/core/v1"
 	"net/url"
 	"reflect"
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/api/core/v1"
 )
 
 func TestPodLogOptions(t *testing.T) {
@@ -39,7 +38,7 @@ func TestPodLogOptions(t *testing.T) {
 	limitBytes := int64(3)
 
 	versionedLogOptions := &v1.PodLogOptions{
-		v1.Container:    "mycontainer",
+		Container:    "mycontainer",
 		Follow:       true,
 		Previous:     true,
 		SinceSeconds: &sinceSeconds,
@@ -49,7 +48,7 @@ func TestPodLogOptions(t *testing.T) {
 		LimitBytes:   &limitBytes,
 	}
 	unversionedLogOptions := &api.PodLogOptions{
-		v1.Container:    "mycontainer",
+		Container:    "mycontainer",
 		Follow:       true,
 		Previous:     true,
 		SinceSeconds: &sinceSeconds,
