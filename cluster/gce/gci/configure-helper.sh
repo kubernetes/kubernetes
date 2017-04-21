@@ -286,8 +286,11 @@ function create-master-auth {
   local -r auth_dir="/etc/srv/kubernetes"
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
-    # Remove basic_auth_csv because we will rewrite it.
     if [[ -e "${basic_auth_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
+      # If METADATA_CLOBBERS_CONFIG is true, we want to rewrite the file
+      # completely, because if we're changing KUBE_USER and KUBE_PASSWORD, we
+      # have nothing to match on.  The file is replaced just below with
+      # append_or_replace_prefixed_line.
       rm "${basic_auth_csv}"
     fi
     append_or_replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER},"      "admin,system:masters"
