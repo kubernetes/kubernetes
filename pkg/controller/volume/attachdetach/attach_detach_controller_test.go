@@ -168,6 +168,12 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	informerFactory.Start(stopCh)
 
+	if !controller.WaitForCacheSync("attach detach", stopCh,
+		informerFactory.Core().V1().Pods().Informer().HasSynced,
+		informerFactory.Core().V1().Nodes().Informer().HasSynced) {
+		t.Fatalf("Error waiting for the informer caches to sync")
+	}
+
 	// Make sure the nodes and pods are in the inforer cache
 	i = 0
 	nodeList, err := informerFactory.Core().V1().Nodes().Lister().List(labels.Everything())
