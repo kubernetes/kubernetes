@@ -180,6 +180,10 @@ func (o *CanIOptions) RunAccessCheck() (bool, error) {
 }
 
 func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) schema.GroupVersionResource {
+	if resourceArg == "*" {
+		return schema.GroupVersionResource{Resource: resourceArg}
+	}
+
 	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(strings.ToLower(resourceArg))
 	gvr := schema.GroupVersionResource{}
 	if fullySpecifiedGVR != nil {
