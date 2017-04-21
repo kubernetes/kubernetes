@@ -383,7 +383,12 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 	allErrs := field.ErrorList{}
 	if source.EmptyDir != nil {
 		numVolumes++
-		// EmptyDirs have nothing to validate
+		if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+			unsetSizeLimit := resource.Quantity{}
+			if unsetSizeLimit.Cmp(source.EmptyDir.SizeLimit) != 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "LocalStorageCapacityIsolation are disabled by feature-gate"))
+			}
+		}
 	}
 	if source.HostPath != nil {
 		if numVolumes > 0 {

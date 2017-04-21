@@ -88,6 +88,12 @@ const (
 	// Changes the logic behind evicting Pods from not ready Nodes
 	// to take advantage of NoExecute Taints and Tolerations.
 	TaintBasedEvictions utilfeature.Feature = "TaintBasedEvictions"
+
+	// owner: @jinxu
+	// alpha: v1.7
+	//
+	// New local storage types to support local storage capacity isolation
+	LocalStorageCapacityIsolation utilfeature.Feature = "LocalStorageCapacityIsolation"
 )
 
 func init() {
@@ -107,6 +113,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	AffinityInAnnotations:                       {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
+	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
