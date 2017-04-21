@@ -346,6 +346,9 @@ func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *fiel
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UnavailableReplicas), fldPath.Child("unavailableReplicas"))...)
+	if status.CollisionCount != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(*status.CollisionCount, fldPath.Child("collisionCount"))...)
+	}
 	msg := "cannot be greater than status.replicas"
 	if status.UpdatedReplicas > status.Replicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("updatedReplicas"), status.UpdatedReplicas, msg))
@@ -372,8 +375,27 @@ func ValidateDeploymentUpdate(update, old *extensions.Deployment) field.ErrorLis
 
 func ValidateDeploymentStatusUpdate(update, old *extensions.Deployment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateDeploymentStatus(&update.Status, field.NewPath("status"))...)
+	fldPath := field.NewPath("status")
+	allErrs = append(allErrs, ValidateDeploymentStatus(&update.Status, fldPath)...)
+	if isDecremented(update.Status.CollisionCount, old.Status.CollisionCount) {
+		value := int64(0)
+		if update.Status.CollisionCount != nil {
+			value = *update.Status.CollisionCount
+		}
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("collisionCount"), value, "cannot be decremented"))
+	}
 	return allErrs
+}
+
+// TODO: Move in "k8s.io/kubernetes/pkg/api/validation"
+func isDecremented(update, old *int64) bool {
+	if update == nil && old != nil {
+		return true
+	}
+	if update == nil || old == nil {
+		return false
+	}
+	return *update < *old
 }
 
 func ValidateDeployment(obj *extensions.Deployment) field.ErrorList {
