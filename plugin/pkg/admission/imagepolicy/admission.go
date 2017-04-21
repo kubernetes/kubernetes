@@ -184,7 +184,7 @@ func (a *imagePolicyWebhook) admitPod(pod *api.Pod, attributes admission.Attribu
 }
 
 // NewImagePolicyWebhook a new imagePolicyWebhook from the provided config file.
-// The config file is specified by --admission-controller-config-file and has the
+// The config file is specified by --admission-control-config-file and has the
 // following format for a webhook:
 //
 //   {
