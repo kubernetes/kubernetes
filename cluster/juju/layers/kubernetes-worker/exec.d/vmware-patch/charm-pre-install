@@ -1,0 +1,17 @@
+#!/bin/bash
+MY_HOSTNAME=$(hostname)
+
+: ${JUJU_UNIT_NAME:=`uuidgen`}
+
+
+if [ "${MY_HOSTNAME}" == "ubuntuguest" ]; then
+    juju-log "Detected broken vsphere integration. Applying hostname override"
+
+    FRIENDLY_HOSTNAME=$(echo $JUJU_UNIT_NAME | tr / -)
+    juju-log "Setting hostname to $FRIENDLY_HOSTNAME"
+    if [ ! -f /etc/hostname.orig ]; then
+      mv /etc/hostname /etc/hostname.orig
+    fi
+    echo "${FRIENDLY_HOSTNAME}" > /etc/hostname
+    hostname $FRIENDLY_HOSTNAME
+fi
