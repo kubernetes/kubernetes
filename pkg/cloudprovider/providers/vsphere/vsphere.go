@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -798,7 +799,7 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName k8stypes.NodeName) (di
 		glog.Errorf("Failed while searching for datastore %+q. err %s", datastorePathObj.Datastore, err)
 		return "", "", err
 	}
-
+	vmDiskPath = removeClusterFromVDiskPath(vmDiskPath)
 	disk := vmDevices.CreateDisk(scsiController, ds.Reference(), vmDiskPath)
 	unitNumber, err := getNextUnitNumber(vmDevices, scsiController)
 	if err != nil {
@@ -1045,6 +1046,7 @@ func checkDiskAttached(volPath string, vmdevices object.VirtualDeviceList, dc *o
 
 // Returns the object key that denotes the controller object to which vmdk is attached.
 func getVirtualDiskControllerKey(volPath string, vmDevices object.VirtualDeviceList, dc *object.Datacenter, client *govmomi.Client) (int32, error) {
+	volPath = removeClusterFromVDiskPath(volPath)
 	volumeUUID, err := getVirtualDiskUUIDByPath(volPath, dc, client)
 
 	if err != nil {
@@ -1175,7 +1177,7 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 	if err != nil {
 		return err
 	}
-
+	volPath = removeClusterFromVDiskPath(volPath)
 	diskID, err := getVirtualDiskID(volPath, vmDevices, dc, vs.client)
 	if err != nil {
 		glog.Warningf("disk ID not found for %v ", volPath)
@@ -1332,6 +1334,11 @@ func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions) (volumePath string
 			return "", fmt.Errorf("Failed to create the virtual disk having name: %+q with err: %+v", destVolPath, err)
 		}
 	}
+
+	if filepath.Base(datastore) != datastore {
+		// If Datastore is within cluster, add cluster path to the destVolPath
+		destVolPath = strings.Replace(destVolPath, filepath.Base(datastore), datastore, 1)
+	}
 	glog.V(1).Infof("VM Disk path is %+q", destVolPath)
 	return destVolPath, nil
 }
@@ -1380,6 +1387,7 @@ func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
 	}
 
 	// Delete virtual disk
+	vmDiskPath = removeClusterFromVDiskPath(vmDiskPath)
 	task, err := virtualDiskManager.DeleteVirtualDisk(ctx, vmDiskPath, dc)
 	if err != nil {
 		return err
@@ -1828,4 +1836,16 @@ func deleteVM(ctx context.Context, vm *object.VirtualMachine) error {
 		return err
 	}
 	return destroyTask.Wait(ctx)
+}
+
+// Remove the cluster or folder path from the vDiskPath
+// for vDiskPath [DatastoreCluster/sharedVmfs-0] kubevols/e2e-vmdk-1234.vmdk, return value is [sharedVmfs-0] kubevols/e2e-vmdk-1234.vmdk
+// for vDiskPath [sharedVmfs-0] kubevols/e2e-vmdk-1234.vmdk, return value remains same [sharedVmfs-0] kubevols/e2e-vmdk-1234.vmdk
+
+func removeClusterFromVDiskPath(vDiskPath string) string {
+	datastore := regexp.MustCompile("\\[(.*?)\\]").FindStringSubmatch(vDiskPath)[1]
+	if filepath.Base(datastore) != datastore {
+		vDiskPath = strings.Replace(vDiskPath, datastore, filepath.Base(datastore), 1)
+	}
+	return vDiskPath
 }
