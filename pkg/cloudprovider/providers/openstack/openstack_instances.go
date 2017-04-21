@@ -24,14 +24,21 @@ import (
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/pagination"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 type Instances struct {
 	compute *gophercloud.ServiceClient
+}
+
+type ServerWithExt struct {
+	servers.Server
+	availabilityzones.ServerExt
 }
 
 // Instances returns an implementation of Instances for OpenStack.
@@ -79,6 +86,41 @@ func (i *Instances) List(name_filter string) ([]types.NodeName, error) {
 		len(ret), name_filter, ret)
 
 	return ret, nil
+}
+
+// GetAllZones returns all the zones from current servers in same region
+func (os *OpenStack) GetAllZones() (sets.String, error) {
+	// TODO: Caching, but this is currently only called when we are creating a volume,
+	// which is a relatively infrequent operation, and this is only # zones API calls
+	zones := sets.NewString()
+
+	// retrieve all servers
+	opts := servers.ListOpts{}
+	// Retrieve a pager (i.e. a paginated collection)
+	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
+	})
+	if err != nil {
+		glog.Warningf("Failed to find compute endpoint: %v", err)
+		return nil, err
+	}
+	pager := servers.List(compute, opts)
+
+	// Define an anonymous function to be executed on each page's iteration
+	err = pager.EachPage(func(page pagination.Page) (bool, error) {
+		var actual []ServerWithExt
+		servers.ExtractServersInto(page, &actual)
+		for _, s := range actual {
+			if !zones.HasAny(s.AvailabilityZone) {
+				zones.Insert(s.AvailabilityZone)
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return zones, nil
 }
 
 // Implementation of Instances.CurrentNodeName

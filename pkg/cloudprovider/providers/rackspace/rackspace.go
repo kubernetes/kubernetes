@@ -40,6 +40,7 @@ import (
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/servers"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/volumeattach"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -422,6 +423,10 @@ func (i *Instances) InstanceID(nodeName types.NodeName) (string, error) {
 	return probeInstanceID(i.compute, serverName)
 }
 
+func (rs *Rackspace) GetAllZones() (sets.String, error) {
+	return nil, errors.New("unimplemented")
+}
+
 // InstanceType returns the type of the specified instance.
 func (i *Instances) InstanceType(name types.NodeName) (string, error) {
 	return "", nil
@@ -480,8 +485,8 @@ func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
 }
 
 // Create a volume of given size (in GiB)
-func (rs *Rackspace) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, err error) {
-	return "", errors.New("unimplemented")
+func (rs *Rackspace) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, zone string, err error) {
+	return "", "", errors.New("unimplemented")
 }
 
 func (rs *Rackspace) DeleteVolume(volumeName string) error {
