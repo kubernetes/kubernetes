@@ -89,7 +89,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		return "", fmt.Errorf("isolator returned error: %s", eventReply.Error)
 	}
 	// Apply aggregated isolator responses to the container create config.
-	eventDispatcher.UpdateContainerConfigWithReply(eventReply, containerConfig)
+	containermanager.UpdateContainerConfigWithReply(eventReply, containerConfig)
 
 	containerID, err := m.runtimeService.CreateContainer(podSandboxID, containerConfig, podSandboxConfig)
 	if err != nil {

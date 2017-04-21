@@ -1479,9 +1479,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// TODO(squall0): Write down documentation here
-	if kl.eventDispacherEventChannel == nil {
-		kl.eventDispacherEventChannel = pcm.GetEventDispatcherChan()
-	}
+	kl.eventDispacherEventChannel = pcm.GetEventDispatcherChan()
 
 	// Create Mirror Pod for Static Pod if it doesn't already exist
 	if kubepod.IsStaticPod(pod) {

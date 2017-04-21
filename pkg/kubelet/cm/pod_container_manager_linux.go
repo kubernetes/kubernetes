@@ -97,7 +97,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	}
 	// retrieve cgroupResources from replies from isolators and apply them on existing CgroupConfig
 	if reply != nil {
-		containerConfig.ResourceParameters = m.eventDispatcher.ResourceConfigFromReply(reply, containerConfig.ResourceParameters)
+		containerConfig.ResourceParameters = ResourceConfigFromReply(reply, containerConfig.ResourceParameters)
 	}
 
 	// Apply appropriate resource limits on the pod container
@@ -111,9 +111,6 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 }
 
 func (m *podContainerManagerImpl) GetEventDispatcherChan() chan EventDispatcherEvent {
-	if m.eventDispatcher == nil {
-		return nil
-	}
 	return m.eventDispatcher.GetEventChannel()
 }
 

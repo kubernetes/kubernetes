@@ -66,15 +66,6 @@ type EventDispatcher interface {
 	// can register themselves to receive lifecycle events.
 	Start(socketAddress string)
 
-	// Returns a pointer to an updated copy of the supplied resource config,
-	// based on the isolation controls in the event reply. The original resource
-	// config is not updated in-place.
-	ResourceConfigFromReply(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig
-
-	// Updates the supplied container config in-place based on the isolation
-	// controls in the event reply.
-	UpdateContainerConfigWithReply(reply *lifecycle.EventReply, config *runtime.ContainerConfig)
-
 	// Get communication channel.
 	GetEventChannel() chan EventDispatcherEvent
 }
@@ -94,18 +85,32 @@ type eventDispatcher struct {
 	eventChannel chan EventDispatcherEvent
 }
 
-var dispatcher *eventDispatcher
+var eventDispatcherEnabled bool
+var dispatcherSingleton EventDispatcher
 var once sync.Once
 
-func GetEventDispatcherSingleton() *eventDispatcher {
+// Enables the event dispatcher subsystem for this Kubelet instance.
+//
+// This function must be called before the first call to
+// GetEventDispatcherSingleton(), otherwise that and all subsequent calls
+// will return a noop event dispatcher.
+func EnableEventDispatcher() {
+	eventDispatcherEnabled = true
+}
+
+func GetEventDispatcherSingleton() EventDispatcher {
 	once.Do(func() {
-		dispatcher = &eventDispatcher{
-			isolators:    map[string]*registeredIsolator{},
-			eventChannel: make(chan EventDispatcherEvent),
+		if eventDispatcherEnabled {
+			dispatcherSingleton = &eventDispatcher{
+				isolators:    map[string]*registeredIsolator{},
+				eventChannel: make(chan EventDispatcherEvent),
+			}
+			dispatcherSingleton.Start(":5433") // "life" on a North American keypad
+		} else {
+			dispatcherSingleton = &eventDispatcherNoop{}
 		}
-		dispatcher.Start(":5433") // "life" on a North American keypad
 	})
-	return dispatcher
+	return dispatcherSingleton
 }
 
 func (ed *eventDispatcher) GetEventChannel() chan EventDispatcherEvent {
@@ -273,7 +278,10 @@ func (ed *eventDispatcher) Unregister(ctx context.Context, request *lifecycle.Un
 	return &lifecycle.UnregisterReply{}, nil
 }
 
-func (ed *eventDispatcher) ResourceConfigFromReply(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig {
+// Returns a pointer to an updated copy of the supplied resource config,
+// based on the isolation controls in the event reply. The original resource
+// config is not updated in-place.
+func ResourceConfigFromReply(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig {
 	// This is a safe copy; ResourceConfig contains only pointers to primitives.
 	updatedResources := &ResourceConfig{}
 	*updatedResources = *resources
@@ -291,7 +299,9 @@ func (ed *eventDispatcher) ResourceConfigFromReply(reply *lifecycle.EventReply, 
 	return updatedResources
 }
 
-func (ed *eventDispatcher) UpdateContainerConfigWithReply(reply *lifecycle.EventReply, config *runtime.ContainerConfig) {
+// Updates the supplied container config in-place based on the isolation
+// controls in the event reply.
+func UpdateContainerConfigWithReply(reply *lifecycle.EventReply, config *runtime.ContainerConfig) {
 	// Append environment variables to container config.
 	for _, control := range reply.IsolationControls {
 		switch control.Kind {
@@ -330,5 +340,39 @@ func (ed *eventDispatcher) isolator(name string) *registeredIsolator {
 			return isolator
 		}
 	}
+	return nil
+}
+
+// eventDispatcherNoop implements EventDispatcher interface.
+// It is a no-op implementation and basically does nothing
+// eventDispatcherNoop is used in case the QoS cgroup Hierarchy is
+// enabled but enable-extended-isolation is not
+type eventDispatcherNoop struct {
+}
+
+// Make sure that eventDispatcherNoop implements the EventDispatcher interface
+var _ EventDispatcher = &eventDispatcherNoop{}
+
+func (ed *eventDispatcherNoop) PreStartPod(pod *v1.Pod, cgroupPath string) (*lifecycle.EventReply, error) {
+	return nil, nil
+}
+
+func (ed *eventDispatcherNoop) PostStopPod(cgroupPath string) error {
+	return nil
+}
+
+func (ed *eventDispatcherNoop) PreStartContainer(podName, containerName string) (*lifecycle.EventReply, error) {
+	return nil, nil
+}
+
+func (ed *eventDispatcherNoop) PostStopContainer(podName, containerName string) error {
+	return nil
+}
+
+func (ed *eventDispatcherNoop) Start(socketAddress string) {
+
+}
+
+func (ed *eventDispatcherNoop) GetEventChannel() chan EventDispatcherEvent {
 	return nil
 }
