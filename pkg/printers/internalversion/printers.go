@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/printers"
@@ -100,6 +101,7 @@ var (
 	clusterColumns                   = []string{"NAME", "STATUS", "AGE"}
 	networkPolicyColumns             = []string{"NAME", "POD-SELECTOR", "AGE"}
 	certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
+	podPresetColumns                 = []string{"NAME", "AGE"}
 )
 
 func printPod(pod *api.Pod, w io.Writer, options printers.PrintOptions) error {
@@ -193,6 +195,8 @@ func AddHandlers(h *printers.HumanReadablePrinter) {
 	h.Handler(certificateSigningRequestColumns, nil, printCertificateSigningRequestList)
 	h.Handler(storageClassColumns, nil, printStorageClass)
 	h.Handler(storageClassColumns, nil, printStorageClassList)
+	h.Handler(podPresetColumns, nil, printPodPreset)
+	h.Handler(podPresetColumns, nil, printPodPresetList)
 	h.Handler(statusColumns, nil, printStatus)
 }
 
@@ -1900,6 +1904,19 @@ func printStorageClass(sc *storage.StorageClass, w io.Writer, options printers.P
 func printStorageClassList(scList *storage.StorageClassList, w io.Writer, options printers.PrintOptions) error {
 	for _, sc := range scList.Items {
 		if err := printStorageClass(&sc, w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printPodPreset(podPreset *settings.PodPreset, w io.Writer, options printers.PrintOptions) error {
+	return printObjectMeta(podPreset.ObjectMeta, w, options, false)
+}
+
+func printPodPresetList(list *settings.PodPresetList, w io.Writer, options printers.PrintOptions) error {
+	for i := range list.Items {
+		if err := printPodPreset(&list.Items[i], w, options); err != nil {
 			return err
 		}
 	}
