@@ -18,43 +18,96 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/pkg/transport"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 )
 
-var (
-	etcdAddress   = flag.String("etcd-address", "", "Etcd address")
-	ttlKeysPrefix = flag.String("ttl-keys-prefix", "", "Prefix for TTL keys")
-	leaseDuration = flag.Duration("lease-duration", time.Hour, "Lease duration (seconds granularity)")
-)
+type etcdFlags struct {
+	etcdAddress   *string
+	ttlKeysPrefix *string
+	leaseDuration *time.Duration
+	certFile      *string
+	keyFile       *string
+	caFile        *string
+}
+
+func generateClientConfig(flags *etcdFlags) (*clientv3.Config, error) {
+	if *(flags.etcdAddress) == "" {
+		return nil, fmt.Errorf("--etcd-address flag is required")
+	}
+
+	c := &clientv3.Config{
+		Endpoints: []string{*(flags.etcdAddress)},
+	}
+
+	var cfgtls *transport.TLSInfo
+	tlsinfo := transport.TLSInfo{}
+	if *(flags.certFile) != "" {
+		tlsinfo.CertFile = *(flags.certFile)
+		cfgtls = &tlsinfo
+	}
+
+	if *(flags.keyFile) != "" {
+		tlsinfo.KeyFile = *(flags.keyFile)
+		cfgtls = &tlsinfo
+	}
+
+	if *(flags.caFile) != "" {
+		tlsinfo.CAFile = *(flags.caFile)
+		cfgtls = &tlsinfo
+	}
+
+	if cfgtls != nil {
+		clientTLS, err := cfgtls.ClientConfig()
+		if err != nil {
+			return nil, fmt.Errorf("Error while creating etcd client: %v", err)
+		}
+		c.TLS = clientTLS
+	}
+	return c, nil
+}
 
 func main() {
+
+	flags := &etcdFlags{
+		etcdAddress:   flag.String("etcd-address", "", "Etcd address"),
+		ttlKeysPrefix: flag.String("ttl-keys-prefix", "", "Prefix for TTL keys"),
+		leaseDuration: flag.Duration("lease-duration", time.Hour, "Lease duration (seconds granularity)"),
+		certFile:      flag.String("cert", "", "identify secure client using this TLS certificate file"),
+		keyFile:       flag.String("key", "", "identify secure client using this TLS key file"),
+		caFile:        flag.String("cacert", "", "verify certificates of TLS-enabled secure servers using this CA bundle"),
+	}
+
 	flag.Parse()
 
-	if *etcdAddress == "" {
-		glog.Fatalf("--etcd-address flag is required")
+	c, err := generateClientConfig(flags)
+	if err != nil {
+		glog.Fatalf(err.Error())
 	}
-	client, err := clientv3.New(clientv3.Config{Endpoints: []string{*etcdAddress}})
+
+	client, err := clientv3.New(*c)
 	if err != nil {
 		glog.Fatalf("Error while creating etcd client: %v", err)
 	}
 
 	// Make sure that ttlKeysPrefix is ended with "/" so that we only get children "directories".
-	if !strings.HasSuffix(*ttlKeysPrefix, "/") {
-		*ttlKeysPrefix += "/"
+	if !strings.HasSuffix(*(flags.ttlKeysPrefix), "/") {
+		*(flags.ttlKeysPrefix) += "/"
 	}
 	ctx := context.Background()
 
-	objectsResp, err := client.KV.Get(ctx, *ttlKeysPrefix, clientv3.WithPrefix())
+	objectsResp, err := client.KV.Get(ctx, *(flags.ttlKeysPrefix), clientv3.WithPrefix())
 	if err != nil {
 		glog.Fatalf("Error while getting objects to attach to the lease")
 	}
 
-	lease, err := client.Lease.Grant(ctx, int64(*leaseDuration/time.Second))
+	lease, err := client.Lease.Grant(ctx, int64(*(flags.leaseDuration)/time.Second))
 	if err != nil {
 		glog.Fatalf("Error while creating lease: %v", err)
 	}
