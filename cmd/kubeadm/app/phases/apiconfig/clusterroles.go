@@ -39,8 +39,8 @@ const (
 	clusterRoleKind    = "ClusterRole"
 	roleKind           = "Role"
 	serviceAccountKind = "ServiceAccount"
-	rbacAPIGroup       = "rbac.authorization.k8s.io"
 	anonymousUser      = "system:anonymous"
+
 )
 
 // TODO: Are there any unit tests that could be made for this file other than duplicating all values and logic in a separate file?
@@ -116,7 +116,7 @@ func CreateRoleBindings(clientset *clientset.Clientset) error {
 				Namespace: metav1.NamespacePublic,
 			},
 			RoleRef: rbac.RoleRef{
-				APIGroup: rbacAPIGroup,
+				APIGroup: rbac.GroupName,
 				Kind:     roleKind,
 				Name:     BootstrapSignerClusterRoleName,
 			},
@@ -145,7 +145,7 @@ func CreateClusterRoleBindings(clientset *clientset.Clientset) error {
 				Name: "kubeadm:kubelet-bootstrap",
 			},
 			RoleRef: rbac.RoleRef{
-				APIGroup: rbacAPIGroup,
+				APIGroup: rbac.GroupName,
 				Kind:     clusterRoleKind,
 				Name:     NodeBootstrapperClusterRoleName,
 			},
@@ -161,7 +161,7 @@ func CreateClusterRoleBindings(clientset *clientset.Clientset) error {
 				Name: "kubeadm:node-proxier",
 			},
 			RoleRef: rbac.RoleRef{
-				APIGroup: rbacAPIGroup,
+				APIGroup: rbac.GroupName,
 				Kind:     clusterRoleKind,
 				Name:     KubeProxyClusterRoleName,
 			},
