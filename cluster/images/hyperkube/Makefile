@@ -60,6 +60,7 @@ ifndef VERSION
     $(error VERSION is undefined)
 endif
 	cp -r ./* ${TEMP_DIR}
+	mkdir -p ${TEMP_DIR}/cni-bin
 
 	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
 	chmod a+rx ${TEMP_DIR}/hyperkube
