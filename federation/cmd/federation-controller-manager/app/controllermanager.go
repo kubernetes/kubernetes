@@ -39,6 +39,7 @@ import (
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
 	deploymentcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/deployment"
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
+	jobcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/job"
 	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
 	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
@@ -181,6 +182,12 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		glog.V(3).Infof("Running deployment controller")
 		// TODO: rename s.ConcurrentReplicaSetSyncs
 		go deploymentController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
+	}
+
+	if controllerEnabled(s.Controllers, serverResources, jobcontroller.ControllerName, jobcontroller.RequiredResources, true) {
+		jobClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, jobcontroller.UserAgentName))
+		jobController := jobcontroller.NewJobController(jobClientset)
+		go jobController.Run(s.ConcurrentJobSyncs, wait.NeverStop)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, ingresscontroller.ControllerName, ingresscontroller.RequiredResources, true) {
