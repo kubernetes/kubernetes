@@ -109,6 +109,7 @@ parameters:
   gidMin: "40000"
   gidMax: "50000"
   volumetype: "replicate:3"
+  volume: "rwo"
 ```
 
 * `resturl` : Gluster REST service/Heketi service url which provision gluster volumes on demand. The general format should be `IPaddress:Port` and this is a mandatory parameter for GlusterFS dynamic provisioner. If Heketi service is exposed as a routable service in openshift/kubernetes setup, this can have a format similar to
@@ -135,6 +136,8 @@ For example:
     `volumetype: none`
 
 For available volume types and its administration options refer: ([Administration Guide](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/3.1/html/Administration_Guide/part-Overview.html))
+
+*`volume` : The `volume` should be set to `rwo` if provisioner has to create block volumes from gluster backend. If this parameter has not specified, file volumes will be provisioned by the provisioner by default. This is an optional parameter.
 
 Reference : ([How to configure Heketi](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
 
