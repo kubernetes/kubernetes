@@ -492,7 +492,7 @@ func TestSyncService(t *testing.T) {
 	}
 }
 
-func TestProcessDeleteService(t *testing.T) {
+func TestProcessServiceDeletion(t *testing.T) {
 
 	var controller *ServiceController
 	var cloud *fakecloud.FakeCloud
