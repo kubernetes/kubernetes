@@ -211,10 +211,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.CertDirectory == "" {
 		obj.CertDirectory = "/var/run/kubernetes"
 	}
-	if obj.CertRotation == nil {
-		temp := int32(0)
-		obj.CertRotation = &temp
-	}
 	if obj.ContainerRuntime == "" {
 		obj.ContainerRuntime = "docker"
 	}

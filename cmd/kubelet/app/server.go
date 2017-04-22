@@ -457,7 +457,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			if err != nil {
 				return err
 			}
-			clientCertificateManager, err = initializeCertificateManager(s.CertDirectory, s.CertRotation, nodeName, clientConfig.CertData, clientConfig.KeyData)
+			clientCertificateManager, err = initializeCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData)
 			if err != nil {
 				glog.Warningf("Unable to initialize the certificate manager: %v", err)
 			} else {
@@ -622,7 +622,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	return nil
 }
 
-func initializeCertificateManager(certDirectory string, certRotation int32, nodeName types.NodeName, certData []byte, keyData []byte) (certificate.Manager, error) {
+func initializeCertificateManager(certDirectory string, nodeName types.NodeName, certData []byte, keyData []byte) (certificate.Manager, error) {
 	certificateStore, err := certificate.NewFileStore(
 		"kubelet-client",
 		certDirectory,
@@ -631,10 +631,6 @@ func initializeCertificateManager(certDirectory string, certRotation int32, node
 		"")
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize certificate store: %v", err)
-	}
-	var rotation uint
-	if certRotation > 0 {
-		rotation = uint(certRotation)
 	}
 	clientCertificateManager, err := certificate.NewManager(&certificate.Config{
 		Template: &x509.CertificateRequest{
@@ -648,8 +644,7 @@ func initializeCertificateManager(certDirectory string, certRotation int32, node
 			certificates.UsageKeyEncipherment,
 			certificates.UsageClientAuth,
 		},
-		CertificateStore:           certificateStore,
-		CertificateRotationPercent: rotation,
+		CertificateStore: certificateStore,
 		Rotation: func() {
 			// Restarting the kubelet to have the new client certificate take
 			// effect is a temporary measure until kubernetes is transitioned
