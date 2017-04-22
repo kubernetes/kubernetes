@@ -113,9 +113,13 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// Add etcd static pod spec only if external etcd is not configured
 	if len(cfg.Etcd.Endpoints) == 0 {
+		etcdCommand, err := getEtcdCommand(cfg)
+		if err != nil {
+			return err
+		}
 		etcdPod := componentPod(api.Container{
 			Name:          etcd,
-			Command:       getEtcdCommand(cfg),
+			Command:       etcdCommand,
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(cfg.Etcd.DataDir), k8sVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
 			LivenessProbe: componentProbe(2379, "/health", api.URISchemeHTTP),
@@ -379,7 +383,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 	return command
 }
 
-func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
+func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) ([]string, error) {
 	var command []string
 	var defaultArguments map[string]string
 	if len(cfg.Etcd.Discovery) > 1 {
@@ -387,16 +391,16 @@ func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		name := node.GetHostname(cfg.HostnameOverride)
 		ip, err := net.ChooseHostInterface()
 		if err != nil {
-			return fmt.Errorf("failed to get host interface address for etcd [%v]", err)
+			return nil, fmt.Errorf("failed to get host interface address for etcd [%v]", err)
 		}
 		defaultArguments = map[string]string{
-			"name":name,
-			"initial-advertise-peer-urls":fmt.Sprintf("http://%v:2380", ip.String()),
-			"listen-peer-urls":fmt.Sprintf("http://%v:2380", ip.String()),
-			"listen-client-urls":fmt.Sprintf("http://%v:2379,http://127.0.0.1:2379", ip.String()),
-			"advertise-client-urls":fmt.Sprintf("http://%v:2379", ip.String()),
-			"discovery":cfg.Etcd.Discovery,
-			"data-dir":cfg.Etcd.DataDir,
+			"name": name,
+			"initial-advertise-peer-urls": fmt.Sprintf("http://%v:2380", ip.String()),
+			"listen-peer-urls":            fmt.Sprintf("http://%v:2380", ip.String()),
+			"listen-client-urls":          fmt.Sprintf("http://%v:2379,http://127.0.0.1:2379", ip.String()),
+			"advertise-client-urls":       fmt.Sprintf("http://%v:2379", ip.String()),
+			"discovery":                   cfg.Etcd.Discovery,
+			"data-dir":                    cfg.Etcd.DataDir,
 		}
 	} else {
 		defaultArguments = map[string]string{
@@ -409,7 +413,7 @@ func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	command = append(command, "etcd")
 	command = append(command, getExtraParameters(cfg.Etcd.ExtraArgs, defaultArguments)...)
 
-	return command
+	return command, nil
 }
 
 func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
