@@ -70,7 +70,15 @@ func (gce *GCECloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddr
 // node that is requesting this ID. i.e. metadata service and other local
 // methods cannot be used here
 func (gce *GCECloud) InstanceTypeByProviderID(providerID string) (string, error) {
-	return "", errors.New("unimplemented")
+	project, zone, name, err := splitProviderID(providerID)
+	if err != nil {
+		return "", err
+	}
+	instance, err := gce.getInstanceFromProjectInZoneByName(project, zone, name)
+	if err != nil {
+		return "", err
+	}
+	return instance.Type, nil
 }
 
 // ExternalID returns the cloud provider ID of the node with the specified NodeName (deprecated).
