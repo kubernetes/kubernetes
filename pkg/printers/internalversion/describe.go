@@ -1372,8 +1372,14 @@ func describeReplicationController(controller *api.ReplicationController, events
 		printAnnotationsMultiline(w, "Annotations", controller.Annotations)
 		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
-
 		DescribePodTemplate(controller.Spec.Template, w)
+		if len(controller.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
+			w.Write(LEVEL_1, "----\t------\t------\n")
+			for _, c := range controller.Status.Conditions {
+				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
+			}
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1449,6 +1455,13 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 			w.Write(LEVEL_0, "%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		}
 		DescribePodTemplate(&rs.Spec.Template, w)
+		if len(rs.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
+			w.Write(LEVEL_1, "----\t------\t------\n")
+			for _, c := range rs.Status.Conditions {
+				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
+			}
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}

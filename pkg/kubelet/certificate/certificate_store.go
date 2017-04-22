@@ -148,12 +148,14 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 		return loadX509KeyPair(c, k)
 	}
 
-	return nil, fmt.Errorf("no cert/key files read at %q, (%q, %q) or (%q, %q)",
-		pairFile,
-		s.certFile,
-		s.keyFile,
-		s.certDirectory,
-		s.keyDirectory)
+	noKeyErr := NoCertKeyError(
+		fmt.Sprintf("no cert/key files read at %q, (%q, %q) or (%q, %q)",
+			pairFile,
+			s.certFile,
+			s.keyFile,
+			s.certDirectory,
+			s.keyDirectory))
+	return nil, &noKeyErr
 }
 
 func loadFile(pairFile string) (*tls.Certificate, error) {

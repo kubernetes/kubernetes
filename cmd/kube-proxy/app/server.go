@@ -225,7 +225,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	var serviceHandler proxyconfig.ServiceConfigHandler
 	var endpointsEventHandler proxyconfig.EndpointsHandler
 
-	proxyMode := getProxyMode(string(config.Mode), client.Core().Nodes(), hostname, iptInterface, iptables.LinuxKernelCompatTester{})
+	proxyMode := getProxyMode(string(config.Mode), iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")
 		if config.IPTablesMasqueradeBit == nil {
@@ -442,19 +442,15 @@ func getConntrackMax(config *options.ProxyServerConfig) (int, error) {
 	return 0, nil
 }
 
-type nodeGetter interface {
-	Get(hostname string, options metav1.GetOptions) (*api.Node, error)
-}
-
-func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
+func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
 	if proxyMode == proxyModeUserspace {
 		return proxyModeUserspace
-	} else if proxyMode == proxyModeIPTables {
-		return tryIPTablesProxy(iptver, kcompat)
-	} else if proxyMode != "" {
-		glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
-		return tryIPTablesProxy(iptver, kcompat)
 	}
+
+	if proxyMode != "" && proxyMode != proxyModeIPTables {
+		glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
+	}
+
 	return tryIPTablesProxy(iptver, kcompat)
 }
 

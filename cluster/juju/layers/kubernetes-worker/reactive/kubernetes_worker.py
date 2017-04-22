@@ -39,7 +39,6 @@ from charmhelpers.core import hookenv, unitdata
 from charmhelpers.core.host import service_stop, service_restart
 from charmhelpers.contrib.charmsupport import nrpe
 
-
 # Override the default nagios shortname regex to allow periods, which we
 # need because our bin names contain them (e.g. 'snap.foo.daemon'). The
 # default regex in charmhelpers doesn't allow periods, but nagios itself does.
@@ -54,6 +53,10 @@ db = unitdata.kv()
 
 @hook('upgrade-charm')
 def upgrade_charm():
+    # Trigger removal of PPA docker installation if it was previously set.
+    set_state('config.changed.install_from_upstream')
+    hookenv.atexit(remove_state, 'config.changed.install_from_upstream')
+
     cleanup_pre_snap_services()
     check_resources_for_upgrade_needed()
 
