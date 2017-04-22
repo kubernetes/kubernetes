@@ -327,13 +327,18 @@ func buildAttributes(info user.Info, namespace string, policy *extensions.PodSec
 // logProviders logs what providers were found for the pod as well as any errors that were encountered
 // while creating providers.
 func logProviders(pod *api.Pod, providers []psp.Provider, providerCreationErrs []error) {
+	for _, err := range providerCreationErrs {
+		glog.V(4).Infof("provider creation error: %v", err)
+	}
+
+	if len(providers) == 0 {
+		glog.V(4).Infof("unable to validate pod %s (generate: %s) against any provider.", pod.Name, pod.GenerateName)
+		return
+	}
+
 	names := make([]string, len(providers))
 	for i, p := range providers {
 		names[i] = p.GetPSPName()
 	}
-	glog.V(4).Infof("validating pod %s (generate: %s) against providers %s", pod.Name, pod.GenerateName, strings.Join(names, ","))
-
-	for _, err := range providerCreationErrs {
-		glog.V(4).Infof("provider creation error: %v", err)
-	}
+	glog.V(4).Infof("validating pod %s (generate: %s) against providers: %s", pod.Name, pod.GenerateName, strings.Join(names, ","))
 }
