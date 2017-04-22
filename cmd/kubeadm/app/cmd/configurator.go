@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
 package cmd
 
 import (
@@ -32,7 +31,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	"net/http"
-
 	"regexp"
 )
 
@@ -81,8 +79,7 @@ func NewConfigurator(out io.Writer) *cobra.Command {
 	)
 	cmd.PersistentFlags().IntVar(
 		&cfg.Count, "master-count", 1,
-		"Spevify Master count for multi master cinfiguration",
-		"Master count",
+		"Spevify Master count for multi master configuration",
 	)
 	cmd.PersistentFlags().Int32Var(
 		&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort,
