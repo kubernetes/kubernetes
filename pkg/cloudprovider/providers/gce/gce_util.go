@@ -100,3 +100,25 @@ func isHTTPErrorCode(err error, code int) bool {
 	apiErr, ok := err.(*googleapi.Error)
 	return ok && apiErr.Code == code
 }
+
+// splitProviderID splits a provider's id into core components.
+// A providerID is build out of '${ProviderName}://${project-id}/${zone}/${instance-name}'
+// See cloudprovider.GetInstanceProviderID.
+func splitProviderID(providerID string) (project, zone, instance string, err error) {
+	if !strings.HasPrefix(providerID, ProviderName+"://") {
+		return "", "", "", fmt.Errorf("could not split providerID %q", providerID)
+	}
+
+	instanceID := providerID[len(ProviderName)+len("://"):]
+	instanceInfo := strings.SplitN(instanceID, "/", 3)
+
+	if len(instanceInfo) < 3 {
+		return "", "", "", fmt.Errorf("error splitting providerID %q", providerID)
+	}
+
+	if strings.IndexRune(instanceInfo[2], '/') != -1 {
+		return "", "", "", fmt.Errorf("error interpreting providerID %q", providerID)
+	}
+
+	return instanceInfo[0], instanceInfo[1], instanceInfo[2], nil
+}
