@@ -97,6 +97,9 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 			return fmt.Errorf("couldn't generate random token: %v", err)
 		}
 	}
+	if cfg.Etcd.DataDir == "" && len(cfg.Etcd.Endpoints) == 0 {
+		cfg.Etcd.DataDir = "/var/lib/etcd"
+	}
 
 	return nil
 }
