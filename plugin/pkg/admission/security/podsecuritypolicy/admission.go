@@ -151,7 +151,7 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 	// all containers in a single pod must validate under a single provider or we will reject the request
 	validationErrs := field.ErrorList{}
 	for _, provider := range providers {
-		if errs := assignSecurityContext(provider, pod, field.NewPath(fmt.Sprintf("provider %s: ", provider.GetPSPName()))); len(errs) > 0 {
+		if errs := assignSecurityContext(provider, pod); len(errs) > 0 {
 			validationErrs = append(validationErrs, errs...)
 			continue
 		}
@@ -173,7 +173,7 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 // assignSecurityContext creates a security context for each container in the pod
 // and validates that the sc falls within the psp constraints.  All containers must validate against
 // the same psp or is not considered valid.
-func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.Path) field.ErrorList {
+func assignSecurityContext(provider psp.Provider, pod *api.Pod) field.ErrorList {
 	generatedSCs := make([]*api.SecurityContext, len(pod.Spec.Containers))
 	var generatedInitSCs []*api.SecurityContext
 
