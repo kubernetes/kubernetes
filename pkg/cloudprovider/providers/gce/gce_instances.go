@@ -17,7 +17,6 @@ limitations under the License.
 package gce
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -62,7 +61,27 @@ func (gce *GCECloud) NodeAddresses(_ types.NodeName) ([]v1.NodeAddress, error) {
 // This method will not be called from the node that is requesting this ID.
 // i.e. metadata service and other local methods cannot be used here
 func (gce *GCECloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	return []v1.NodeAddress{}, errors.New("unimplemented")
+	project, zone, name, err := splitProviderID(providerID)
+	if err != nil {
+		return []v1.NodeAddress{}, err
+	}
+
+	instance, err := gce.service.Instances.Get(project, zone, canonicalizeInstanceName(name)).Do()
+	if err != nil {
+		return []v1.NodeAddress{}, fmt.Errorf("error while querying for providerID %q: %v", providerID, err)
+	}
+
+	if len(instance.NetworkInterfaces) < 1 {
+		return []v1.NodeAddress{}, fmt.Errorf("could not find network interfaces for providerID %q", providerID)
+	}
+	networkInterface := instance.NetworkInterfaces[0]
+
+	nodeAddresses := []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: networkInterface.NetworkIP}}
+	for _, config := range networkInterface.AccessConfigs {
+		nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: config.NatIP})
+	}
+
+	return nodeAddresses, nil
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node
@@ -357,8 +376,7 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 
 func (gce *GCECloud) getInstanceFromProjectInZoneByName(project, zone, name string) (*gceInstance, error) {
 	name = canonicalizeInstanceName(name)
-	dc := contextWithNamespace(name, "gce_instance_list")
-	res, err := gce.service.Instances.Get(project, zone, name).Context(dc).Do()
+	res, err := gce.service.Instances.Get(project, zone, name).Do()
 
 	if err != nil {
 		glog.Errorf("getInstanceFromZoneByName: failed to get instance %s; err: %v", name, err)
