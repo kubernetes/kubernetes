@@ -27,10 +27,13 @@ import (
 	"k8s.io/apiserver/pkg/util/webhook"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/apis/authentication/install"
 	authentication "k8s.io/client-go/pkg/apis/authentication/v1beta1"
-
-	_ "k8s.io/client-go/pkg/apis/authentication/install"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 var (
 	groupVersions = []schema.GroupVersion{authentication.SchemeGroupVersion}

@@ -21,23 +21,38 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/apis/apps/install"
-	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
-	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	_ "k8s.io/kubernetes/pkg/apis/batch/install"
-	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
-	_ "k8s.io/kubernetes/pkg/apis/policy/install"
-	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
-	_ "k8s.io/kubernetes/pkg/apis/settings/install"
-	_ "k8s.io/kubernetes/pkg/apis/storage/install"
+	core "k8s.io/kubernetes/pkg/api/install"
+	apps "k8s.io/kubernetes/pkg/apis/apps/install"
+	authentication "k8s.io/kubernetes/pkg/apis/authentication/install"
+	authorization "k8s.io/kubernetes/pkg/apis/authorization/install"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/install"
+	batch "k8s.io/kubernetes/pkg/apis/batch/install"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/install"
+	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig/install"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/install"
+	imagepolicy "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
+	policy "k8s.io/kubernetes/pkg/apis/policy/install"
+	rbac "k8s.io/kubernetes/pkg/apis/rbac/install"
+	settings "k8s.io/kubernetes/pkg/apis/settings/install"
+	storage "k8s.io/kubernetes/pkg/apis/storage/install"
 )
 
 func init() {
+	core.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	apps.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	authentication.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	authorization.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	autoscaling.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	batch.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	certificates.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	componentconfig.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	extensions.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	imagepolicy.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	policy.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	rbac.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	settings.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	storage.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+
 	if missingVersions := api.Registry.ValidateEnvRequestedVersions(); len(missingVersions) != 0 {
 		panic(fmt.Sprintf("KUBE_API_VERSIONS contains versions that are not installed: %q.", missingVersions))
 	}

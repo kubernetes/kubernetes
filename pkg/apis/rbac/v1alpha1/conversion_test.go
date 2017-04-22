@@ -22,9 +22,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
-	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
+	rbacinstall "k8s.io/kubernetes/pkg/apis/rbac/install"
 	"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 )
+
+func init() {
+	rbacinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 func TestConversion(t *testing.T) {
 	testcases := map[string]struct {

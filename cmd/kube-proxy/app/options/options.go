@@ -25,6 +25,7 @@ import (
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/apis/componentconfig/install"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	_ "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -35,6 +36,10 @@ import (
 
 	"github.com/spf13/pflag"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 // ProxyServerConfig configures and runs a Kubernetes proxy server
 type ProxyServerConfig struct {

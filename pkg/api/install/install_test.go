@@ -28,6 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
+func init() {
+	Install(internal.GroupFactoryRegistry, internal.Registry, internal.Scheme)
+}
+
 func TestResourceVersioner(t *testing.T) {
 	g, err := internal.Registry.Group(v1.GroupName)
 	if err != nil {

@@ -28,9 +28,13 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
+	"k8s.io/kubernetes/pkg/apis/certificates/install"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 var (
 	groupVersions = []schema.GroupVersion{certificates.SchemeGroupVersion}

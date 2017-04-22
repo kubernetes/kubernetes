@@ -27,8 +27,15 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
+	coreinstall "k8s.io/kubernetes/pkg/api/install"
+	extensionsinstall "k8s.io/kubernetes/pkg/apis/extensions/install"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
+
+func init() {
+	coreinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	extensionsinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 type fakeAuthorizer struct{}
 

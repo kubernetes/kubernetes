@@ -29,11 +29,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/install"
 	"k8s.io/client-go/pkg/api/v1"
 	restclientwatch "k8s.io/client-go/rest/watch"
-
-	_ "k8s.io/client-go/pkg/api/install"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 func TestDecoder(t *testing.T) {
 	table := []watch.EventType{watch.Added, watch.Deleted, watch.Modified, watch.Error}

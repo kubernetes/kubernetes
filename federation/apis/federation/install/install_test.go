@@ -28,6 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+func init() {
+	Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
+
 func TestResourceVersioner(t *testing.T) {
 	accessor := meta.NewAccessor()
 	cluster := federation.Cluster{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}
