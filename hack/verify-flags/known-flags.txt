@@ -207,6 +207,7 @@ etcd-address
 etcd-cafile
 etcd-certfile
 etcd-config
+etcd-discovery
 etcd-keyfile
 etcd-metrics-scrape-uri
 etcd-metrics-scrape-uri
@@ -442,6 +443,7 @@ manifest-url-header
 masquerade-all
 master-os-distro
 master-service-namespace
+master-count
 max-concurrency
 max-connection-bytes-per-sec
 maximum-dead-containers
@@ -548,6 +550,7 @@ proxy-kubeconfig
 proxy-logv
 proxy-mode
 proxy-port-range
+public-address
 public-address-override
 pvclaimbinder-sync-period
 pvclaimbinder-sync-period

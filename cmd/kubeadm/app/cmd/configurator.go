@@ -1,3 +1,19 @@
+/*
+Copyright 2017 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package cmd
 
 import (
@@ -15,15 +31,13 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	"net/http"
-	"os"
 	"regexp"
 )
 
 func NewConfigurator(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapiext.MasterConfiguration{}
 	api.Scheme.Default(cfg)
-	etcdDiscveryService := ""
-	outFile := ""
+	etcdDiscoveryService := ""
 	cmd := &cobra.Command{
 		Use:   "configure",
 		Short: "Run this in order to generate masters configurations",
@@ -36,27 +50,19 @@ func NewConfigurator(out io.Writer) *cobra.Command {
 			internalcfg.MasterCertificates = &kubeadmapi.MasterCertificates{}
 			err = certs.GeneratePKIAssets(&internalcfg)
 			kubeadmutil.CheckErr(err)
-			if etcdDiscveryService != "" {
+			if etcdDiscoveryService != "" {
 				if internalcfg.Count < 1 {
 					internalcfg.Count = 1
 				}
-				token, err := getDiscoveryToken(etcdDiscveryService, internalcfg.Count)
+				token, err := getDiscoveryToken(etcdDiscoveryService, internalcfg.Count)
 				kubeadmutil.CheckErr(err)
 				internalcfg.Etcd.Discovery = token
 			}
 			confData, err := yaml.Marshal(&internalcfg)
 			kubeadmutil.CheckErr(err)
-			if outFile == "" {
-				out.Write(confData)
-				fmt.Fprintf(out, "\n")
-			} else {
-				fileOut, err := os.Create(outFile)
-				kubeadmutil.CheckErr(err)
-				fileOut.Write(confData)
-				fileOut.Close()
-				fmt.Fprintf(out, "Result saved to %s\n", outFile)
-
-			}
+			fmt.Fprintln(out, "****Master configuration:")
+			out.Write(confData)
+			fmt.Fprintf(out, "\n")
 		},
 	}
 	cmd.PersistentFlags().StringVar(
@@ -65,7 +71,7 @@ func NewConfigurator(out io.Writer) *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVar(
 		&cfg.PublicAddress, "public-address", cfg.PublicAddress,
-		"The PublicAddress address e.g. LoadBalancer",
+		"The PublicAddress address to connect to kubernetes cluster, e.g. LoadBalancer",
 	)
 	cmd.PersistentFlags().StringVar(
 		&cfg.HostnameOverride, "hostname-override", cfg.HostnameOverride,
@@ -73,7 +79,7 @@ func NewConfigurator(out io.Writer) *cobra.Command {
 	)
 	cmd.PersistentFlags().IntVar(
 		&cfg.Count, "master-count", 1,
-		"Master count",
+		"Spevify Master count for multi master cinfiguration",
 	)
 	cmd.PersistentFlags().Int32Var(
 		&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort,
@@ -104,19 +110,17 @@ func NewConfigurator(out io.Writer) *cobra.Command {
 		`Optional extra altnames to use for the API Server serving cert. Can be both IP addresses and dns names.`,
 	)
 	cmd.PersistentFlags().StringVar(
-		&etcdDiscveryService, "etcd-discovery", "https://discovery.etcd.io",
-		`Use etcd discovery service to join etcd nodes to cluster.`,
-	)
-	cmd.PersistentFlags().StringVar(
-		&outFile, "out", "",
-		`May be save configureation to this file?`,
+		&etcdDiscoveryService, "etcd-discovery", "https://discovery.etcd.io",
+		`Use etcd discovery service to join etcd nodes to cluster in multi master environment.`,
 	)
 	cmd.PersistentFlags().StringVar(
 		&cfg.ClusterName, "cluster-name", cfg.ClusterName,
 		"Cluster name. Used for tagging cloud provider resources")
 	return cmd
 }
+
 func getDiscoveryToken(url string, size int) (string, error) {
+	//get discovery token from existing etcd cluster.
 	resp, err := http.Get(fmt.Sprintf("%s/new?size=%v", url, size))
 
 	if err != nil {
