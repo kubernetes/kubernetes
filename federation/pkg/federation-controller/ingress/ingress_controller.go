@@ -847,6 +847,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		} else {
 			clusterIngress := clusterIngressObj.(*extensionsv1beta1.Ingress)
 			glog.V(4).Infof("Found existing Ingress %s in cluster %s - checking if update is required (in either direction)", ingress, cluster.Name)
+			glog.V(4).Infof("Existing Cluster Ingress object: %#v", clusterIngress)
 			clusterIPName, clusterIPNameExists := clusterIngress.ObjectMeta.Annotations[staticIPNameKeyReadonly]
 			baseLBStatusExists := len(baseIngress.Status.LoadBalancer.Ingress) > 0
 			clusterLBStatusExists := len(clusterIngress.Status.LoadBalancer.Ingress) > 0
