@@ -339,28 +339,36 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 	// Avoid changing behaviour when not managing multiple zones
 	for _, zone := range gce.managedZones {
-		name = canonicalizeInstanceName(name)
-		mc := newInstancesMetricContext("get", zone)
-		res, err := gce.service.Instances.Get(gce.projectID, zone, name).Do()
-		mc.Observe(err)
+		instance, err := gce.getInstanceFromProjectInZoneByName(gce.projectID, zone, name)
 		if err != nil {
-			glog.Errorf("getInstanceByName: failed to get instance %s; err: %v", name, err)
-
 			if isHTTPErrorCode(err, http.StatusNotFound) {
 				continue
 			}
 			return nil, err
 		}
-		return &gceInstance{
-			Zone:  lastComponent(res.Zone),
-			Name:  res.Name,
-			ID:    res.Id,
-			Disks: res.Disks,
-			Type:  lastComponent(res.MachineType),
-		}, nil
+		return instance, nil
 	}
 
 	return nil, cloudprovider.InstanceNotFound
+}
+
+func (gce *GCECloud) getInstanceFromProjectInZoneByName(project, zone, name string) (*gceInstance, error) {
+	name = canonicalizeInstanceName(name)
+	mc := newInstancesMetricContext("get", zone)
+	res, err := gce.service.Instances.Get(project, zone, name).Do()
+	mc.Observe(err)
+	if err != nil {
+		glog.Errorf("getInstanceFromProjectInZoneByName: failed to get instance %s; err: %v", name, err)
+		return nil, err
+	}
+
+	return &gceInstance{
+		Zone:  lastComponent(res.Zone),
+		Name:  res.Name,
+		ID:    res.Id,
+		Disks: res.Disks,
+		Type:  lastComponent(res.MachineType),
+	}, nil
 }
 
 func getInstanceIDViaMetadata() (string, error) {
