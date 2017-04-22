@@ -193,11 +193,6 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		}
 	}
 
-	testPatcher := &testPatcher{}
-	testPatcher.t = t
-	testPatcher.startingPod = tc.startingPod
-	testPatcher.updatePod = tc.updatePod
-
 	ctx := request.NewDefaultContext()
 	ctx = request.WithNamespace(ctx, namespace)
 
@@ -211,6 +206,13 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	versionedObj := &v1.Pod{}
 
 	for _, patchType := range []types.PatchType{types.JSONPatchType, types.MergePatchType, types.StrategicMergePatchType} {
+		// This needs to be reset on each iteration.
+		testPatcher := &testPatcher{
+			t:           t,
+			startingPod: tc.startingPod,
+			updatePod:   tc.updatePod,
+		}
+
 		// TODO SUPPORT THIS!
 		if patchType == types.JSONPatchType {
 			continue
@@ -220,12 +222,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		originalObjJS, err := runtime.Encode(codec, tc.startingPod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
-			return
+			continue
 		}
 		changedJS, err := runtime.Encode(codec, tc.changedPod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
-			return
+			continue
 		}
 
 		patch := []byte{}
@@ -237,14 +239,14 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			patch, err = strategicpatch.CreateTwoWayMergePatch(originalObjJS, changedJS, versionedObj)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
-				return
+				continue
 			}
 
 		case types.MergePatchType:
 			patch, err = jsonpatch.CreateMergePatch(originalObjJS, changedJS)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
-				return
+				continue
 			}
 
 		}
@@ -253,12 +255,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
-				return
+				continue
 			}
 		} else {
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
-				return
+				continue
 			}
 		}
 
@@ -266,7 +268,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			if resultObj != nil {
 				t.Errorf("%s: unexpected result: %v", tc.name, resultObj)
 			}
-			return
+			continue
 		}
 
 		resultPod := resultObj.(*api.Pod)
@@ -275,18 +277,18 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		expectedJS, err := runtime.Encode(codec, tc.expectedPod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
-			return
+			continue
 		}
 		expectedObj, err := runtime.Decode(codec, expectedJS)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
-			return
+			continue
 		}
 		reallyExpectedPod := expectedObj.(*api.Pod)
 
 		if !reflect.DeepEqual(*reallyExpectedPod, *resultPod) {
 			t.Errorf("%s mismatch: %v\n", tc.name, diff.ObjectGoPrintDiff(reallyExpectedPod, resultPod))
-			return
+			continue
 		}
 	}
 
@@ -322,6 +324,59 @@ func TestNumberConversion(t *testing.T) {
 	if len(ports) != 1 || ports[0].Port != 80 || ports[0].NodePort != 31789 {
 		t.Fatal(errors.New("Ports failed to merge because of number conversion issue"))
 	}
+}
+
+func TestPatchResourceNumberConversion(t *testing.T) {
+	namespace := "bar"
+	name := "foo"
+	uid := types.UID("uid")
+	fifteen := int64(15)
+	thirty := int64(30)
+
+	tc := &patchTestCase{
+		name: "TestPatchResourceNumberConversion",
+
+		startingPod: &api.Pod{},
+		changedPod:  &api.Pod{},
+		updatePod:   &api.Pod{},
+
+		expectedPod: &api.Pod{},
+	}
+
+	tc.startingPod.Name = name
+	tc.startingPod.Namespace = namespace
+	tc.startingPod.UID = uid
+	tc.startingPod.ResourceVersion = "1"
+	tc.startingPod.APIVersion = "v1"
+	tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
+
+	// Patch tries to change to 30.
+	tc.changedPod.Name = name
+	tc.changedPod.Namespace = namespace
+	tc.changedPod.UID = uid
+	tc.changedPod.ResourceVersion = "1"
+	tc.changedPod.APIVersion = "v1"
+	tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
+
+	// Someone else already changed it to 30.
+	// This should be fine since it's not a "meaningful conflict".
+	// Previously this was detected as a meaningful conflict because int64(30) != float64(30).
+	tc.updatePod.Name = name
+	tc.updatePod.Namespace = namespace
+	tc.updatePod.UID = uid
+	tc.updatePod.ResourceVersion = "2"
+	tc.updatePod.APIVersion = "v1"
+	tc.updatePod.Spec.ActiveDeadlineSeconds = &thirty
+	tc.updatePod.Spec.NodeName = "anywhere"
+
+	tc.expectedPod.Name = name
+	tc.expectedPod.Namespace = namespace
+	tc.expectedPod.UID = uid
+	tc.expectedPod.ResourceVersion = "2"
+	tc.expectedPod.Spec.ActiveDeadlineSeconds = &thirty
+	tc.expectedPod.Spec.NodeName = "anywhere"
+
+	tc.Run(t)
 }
 
 func TestPatchResourceWithVersionConflict(t *testing.T) {
