@@ -43,10 +43,10 @@ var (
 		kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods
 
 		# Create a Role named "pod-reader" with ResourceName specified
-		kubectl create role pod-reader --verb=get --verg=list --verb=watch --resource=pods --resource-name=readablepod`))
+		kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods --resource-name=readablepod`))
 
 	// Valid resource verb list for validation.
-	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "redirect", "deletecollection", "use"}
+	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "redirect", "deletecollection", "use", "bind", "impersonate"}
 )
 
 type CreateRoleOptions struct {
