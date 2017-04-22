@@ -28,6 +28,7 @@ go_library(
         "//federation/apis/federation/install:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/cmd/federation-apiserver/app/options:go_default_library",
+        "//federation/plugin/pkg/admission/schedulingpolicy:go_default_library",
         "//federation/registry/cluster/etcd:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
