@@ -101,6 +101,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ComponentStatus"
      }
     },
     "parameters": [
@@ -176,6 +181,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ComponentStatus"
      }
     },
     "parameters": [
@@ -226,6 +236,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -303,6 +318,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Endpoints"
      }
     },
     "parameters": [
@@ -380,6 +400,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "parameters": [
@@ -457,6 +482,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "LimitRange"
      }
     },
     "parameters": [
@@ -571,6 +601,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "post": {
@@ -610,6 +645,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "delete": {
@@ -676,6 +716,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "parameters": [
@@ -726,6 +771,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Binding"
      }
     },
     "parameters": [
@@ -813,6 +863,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "post": {
@@ -852,6 +907,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "delete": {
@@ -918,6 +978,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -982,6 +1047,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "put": {
@@ -1021,6 +1091,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "delete": {
@@ -1081,6 +1156,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "patch": {
@@ -1122,6 +1202,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -1217,6 +1302,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Endpoints"
      }
     },
     "post": {
@@ -1256,6 +1346,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Endpoints"
      }
     },
     "delete": {
@@ -1322,6 +1417,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Endpoints"
      }
     },
     "parameters": [
@@ -1386,6 +1486,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Endpoints"
      }
     },
     "put": {
@@ -1425,6 +1530,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Endpoints"
      }
     },
     "delete": {
@@ -1485,6 +1595,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Endpoints"
      }
     },
     "patch": {
@@ -1526,6 +1641,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Endpoints"
      }
     },
     "parameters": [
@@ -1621,6 +1741,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "post": {
@@ -1660,6 +1785,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "delete": {
@@ -1726,6 +1856,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "parameters": [
@@ -1790,6 +1925,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "put": {
@@ -1829,6 +1969,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "delete": {
@@ -1889,6 +2034,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "patch": {
@@ -1930,6 +2080,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "parameters": [
@@ -2025,6 +2180,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "LimitRange"
      }
     },
     "post": {
@@ -2064,6 +2224,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "LimitRange"
      }
     },
     "delete": {
@@ -2130,6 +2295,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "LimitRange"
      }
     },
     "parameters": [
@@ -2194,6 +2364,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "LimitRange"
      }
     },
     "put": {
@@ -2233,6 +2408,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "LimitRange"
      }
     },
     "delete": {
@@ -2293,6 +2473,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "LimitRange"
      }
     },
     "patch": {
@@ -2334,6 +2519,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "LimitRange"
      }
     },
     "parameters": [
@@ -2429,6 +2619,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "post": {
@@ -2468,6 +2663,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "delete": {
@@ -2534,6 +2734,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "parameters": [
@@ -2598,6 +2803,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "put": {
@@ -2637,6 +2847,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "delete": {
@@ -2697,6 +2912,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "patch": {
@@ -2738,6 +2958,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "parameters": [
@@ -2794,6 +3019,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "put": {
@@ -2833,6 +3063,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "patch": {
@@ -2874,6 +3109,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "parameters": [
@@ -2969,6 +3209,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "post": {
@@ -3008,6 +3253,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "delete": {
@@ -3074,6 +3324,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -3138,6 +3393,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "put": {
@@ -3177,6 +3437,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "delete": {
@@ -3237,6 +3502,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "patch": {
@@ -3278,6 +3548,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -3332,6 +3607,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "post": {
@@ -3359,6 +3639,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -3453,6 +3738,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Binding"
      }
     },
     "parameters": [
@@ -3519,6 +3809,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "Eviction"
      }
     },
     "parameters": [
@@ -3573,6 +3868,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "post": {
@@ -3600,6 +3900,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -3692,6 +3997,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -3795,6 +4105,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "post": {
@@ -3822,6 +4137,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -3876,6 +4196,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "put": {
@@ -3903,6 +4228,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "post": {
@@ -3930,6 +4260,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "delete": {
@@ -3957,6 +4292,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "options": {
@@ -3984,6 +4324,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "head": {
@@ -4011,6 +4356,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "patch": {
@@ -4092,6 +4442,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "put": {
@@ -4119,6 +4474,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "post": {
@@ -4146,6 +4506,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "delete": {
@@ -4173,6 +4538,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "options": {
@@ -4200,6 +4570,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "head": {
@@ -4227,6 +4602,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "patch": {
@@ -4318,6 +4698,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "put": {
@@ -4357,6 +4742,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "patch": {
@@ -4398,6 +4788,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -4493,6 +4888,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PodTemplate"
      }
     },
     "post": {
@@ -4532,6 +4932,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PodTemplate"
      }
     },
     "delete": {
@@ -4598,6 +5003,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PodTemplate"
      }
     },
     "parameters": [
@@ -4662,6 +5072,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PodTemplate"
      }
     },
     "put": {
@@ -4701,6 +5116,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PodTemplate"
      }
     },
     "delete": {
@@ -4761,6 +5181,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PodTemplate"
      }
     },
     "patch": {
@@ -4802,6 +5227,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PodTemplate"
      }
     },
     "parameters": [
@@ -4897,6 +5327,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "post": {
@@ -4936,6 +5371,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "delete": {
@@ -5002,6 +5442,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "parameters": [
@@ -5066,6 +5511,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "put": {
@@ -5105,6 +5555,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "delete": {
@@ -5165,6 +5620,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "patch": {
@@ -5206,6 +5666,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "parameters": [
@@ -5262,6 +5727,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "Scale"
      }
     },
     "put": {
@@ -5301,6 +5771,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "Scale"
      }
     },
     "patch": {
@@ -5342,6 +5817,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "Scale"
      }
     },
     "parameters": [
@@ -5398,6 +5878,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "put": {
@@ -5437,6 +5922,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "patch": {
@@ -5478,6 +5968,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "parameters": [
@@ -5573,6 +6068,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "post": {
@@ -5612,6 +6112,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "delete": {
@@ -5678,6 +6183,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "parameters": [
@@ -5742,6 +6252,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "put": {
@@ -5781,6 +6296,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "delete": {
@@ -5841,6 +6361,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "patch": {
@@ -5882,6 +6407,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "parameters": [
@@ -5938,6 +6468,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "put": {
@@ -5977,6 +6512,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "patch": {
@@ -6018,6 +6558,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "parameters": [
@@ -6113,6 +6658,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "post": {
@@ -6152,6 +6702,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "delete": {
@@ -6218,6 +6773,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "parameters": [
@@ -6282,6 +6842,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "put": {
@@ -6321,6 +6886,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "delete": {
@@ -6381,6 +6951,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "patch": {
@@ -6422,6 +6997,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "parameters": [
@@ -6517,6 +7097,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ServiceAccount"
      }
     },
     "post": {
@@ -6556,6 +7141,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ServiceAccount"
      }
     },
     "delete": {
@@ -6622,6 +7212,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ServiceAccount"
      }
     },
     "parameters": [
@@ -6686,6 +7281,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ServiceAccount"
      }
     },
     "put": {
@@ -6725,6 +7325,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ServiceAccount"
      }
     },
     "delete": {
@@ -6785,6 +7390,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ServiceAccount"
      }
     },
     "patch": {
@@ -6826,6 +7436,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ServiceAccount"
      }
     },
     "parameters": [
@@ -6921,6 +7536,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "post": {
@@ -6960,6 +7580,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -7024,6 +7649,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "put": {
@@ -7063,6 +7693,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "delete": {
@@ -7092,6 +7727,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "patch": {
@@ -7133,6 +7773,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -7187,6 +7832,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "put": {
@@ -7214,6 +7864,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "post": {
@@ -7241,6 +7896,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "delete": {
@@ -7268,6 +7928,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "options": {
@@ -7295,6 +7960,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "head": {
@@ -7322,6 +7992,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "patch": {
@@ -7403,6 +8078,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "put": {
@@ -7430,6 +8110,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "post": {
@@ -7457,6 +8142,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "delete": {
@@ -7484,6 +8174,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "options": {
@@ -7511,6 +8206,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "head": {
@@ -7538,6 +8238,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "patch": {
@@ -7629,6 +8334,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "put": {
@@ -7668,6 +8378,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "patch": {
@@ -7709,6 +8424,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -7781,6 +8501,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "put": {
@@ -7820,6 +8545,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "delete": {
@@ -7880,6 +8610,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "patch": {
@@ -7921,6 +8656,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "parameters": [
@@ -7979,6 +8719,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "parameters": [
@@ -8027,6 +8772,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "put": {
@@ -8066,6 +8816,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "patch": {
@@ -8107,6 +8862,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "parameters": [
@@ -8194,6 +8954,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "post": {
@@ -8233,6 +8998,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "delete": {
@@ -8299,6 +9069,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "parameters": [
@@ -8355,6 +9130,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "put": {
@@ -8394,6 +9174,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "delete": {
@@ -8454,6 +9239,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "patch": {
@@ -8495,6 +9285,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "parameters": [
@@ -8541,6 +9336,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "put": {
@@ -8568,6 +9368,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "post": {
@@ -8595,6 +9400,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "delete": {
@@ -8622,6 +9432,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "options": {
@@ -8649,6 +9464,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "head": {
@@ -8676,6 +9496,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "patch": {
@@ -8749,6 +9574,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "put": {
@@ -8776,6 +9606,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "post": {
@@ -8803,6 +9638,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "delete": {
@@ -8830,6 +9670,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "options": {
@@ -8857,6 +9702,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "head": {
@@ -8884,6 +9734,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "patch": {
@@ -8967,6 +9822,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "put": {
@@ -9006,6 +9866,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "patch": {
@@ -9047,6 +9912,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "parameters": [
@@ -9097,6 +9967,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "parameters": [
@@ -9211,6 +10086,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolume"
      }
     },
     "post": {
@@ -9250,6 +10130,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolume"
      }
     },
     "delete": {
@@ -9316,6 +10201,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolume"
      }
     },
     "parameters": [
@@ -9372,6 +10262,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolume"
      }
     },
     "put": {
@@ -9411,6 +10306,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolume"
      }
     },
     "delete": {
@@ -9471,6 +10371,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolume"
      }
     },
     "patch": {
@@ -9512,6 +10417,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolume"
      }
     },
     "parameters": [
@@ -9560,6 +10470,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolume"
      }
     },
     "put": {
@@ -9599,6 +10514,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolume"
      }
     },
     "patch": {
@@ -9640,6 +10560,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolume"
      }
     },
     "parameters": [
@@ -9690,6 +10615,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -9767,6 +10697,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PodTemplate"
      }
     },
     "parameters": [
@@ -9840,6 +10775,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "put": {
@@ -9867,6 +10807,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "post": {
@@ -9894,6 +10839,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "delete": {
@@ -9921,6 +10871,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "options": {
@@ -9948,6 +10903,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "head": {
@@ -9975,6 +10935,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "patch": {
@@ -10002,6 +10967,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -10049,6 +11019,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "put": {
@@ -10076,6 +11051,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "post": {
@@ -10103,6 +11083,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "delete": {
@@ -10130,6 +11115,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "options": {
@@ -10157,6 +11147,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "head": {
@@ -10184,6 +11179,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "patch": {
@@ -10211,6 +11211,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -10266,6 +11271,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "put": {
@@ -10293,6 +11303,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "post": {
@@ -10320,6 +11335,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "delete": {
@@ -10347,6 +11367,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "options": {
@@ -10374,6 +11399,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "head": {
@@ -10401,6 +11431,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "patch": {
@@ -10428,6 +11463,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -10475,6 +11515,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "put": {
@@ -10502,6 +11547,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "post": {
@@ -10529,6 +11579,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "delete": {
@@ -10556,6 +11611,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "options": {
@@ -10583,6 +11643,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "head": {
@@ -10610,6 +11675,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "patch": {
@@ -10637,6 +11707,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -10692,6 +11767,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "put": {
@@ -10719,6 +11799,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "post": {
@@ -10746,6 +11831,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "delete": {
@@ -10773,6 +11863,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "options": {
@@ -10800,6 +11895,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "head": {
@@ -10827,6 +11927,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "patch": {
@@ -10854,6 +11959,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "parameters": [
@@ -10893,6 +12003,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "put": {
@@ -10920,6 +12035,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "post": {
@@ -10947,6 +12067,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "delete": {
@@ -10974,6 +12099,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "options": {
@@ -11001,6 +12131,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "head": {
@@ -11028,6 +12163,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "patch": {
@@ -11055,6 +12195,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "parameters": [
@@ -11106,6 +12251,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "parameters": [
@@ -11183,6 +12333,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "parameters": [
@@ -11260,6 +12415,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "parameters": [
@@ -11337,6 +12497,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ServiceAccount"
      }
     },
     "parameters": [
@@ -11414,6 +12579,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -11491,6 +12661,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -11568,6 +12743,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Endpoints"
      }
     },
     "parameters": [
@@ -11645,6 +12825,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "parameters": [
@@ -11722,6 +12907,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "LimitRange"
      }
     },
     "parameters": [
@@ -11799,6 +12989,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "parameters": [
@@ -11876,6 +13071,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -11961,6 +13161,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -12054,6 +13259,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Endpoints"
      }
     },
     "parameters": [
@@ -12139,6 +13349,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Endpoints"
      }
     },
     "parameters": [
@@ -12232,6 +13447,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "parameters": [
@@ -12317,6 +13537,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "parameters": [
@@ -12410,6 +13635,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "LimitRange"
      }
     },
     "parameters": [
@@ -12495,6 +13725,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "LimitRange"
      }
     },
     "parameters": [
@@ -12588,6 +13823,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "parameters": [
@@ -12673,6 +13913,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "parameters": [
@@ -12766,6 +14011,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -12851,6 +14101,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -12944,6 +14199,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PodTemplate"
      }
     },
     "parameters": [
@@ -13029,6 +14289,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PodTemplate"
      }
     },
     "parameters": [
@@ -13122,6 +14387,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "parameters": [
@@ -13207,6 +14477,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "parameters": [
@@ -13300,6 +14575,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "parameters": [
@@ -13385,6 +14665,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "parameters": [
@@ -13478,6 +14763,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "parameters": [
@@ -13563,6 +14853,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "parameters": [
@@ -13656,6 +14951,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ServiceAccount"
      }
     },
     "parameters": [
@@ -13741,6 +15041,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ServiceAccount"
      }
     },
     "parameters": [
@@ -13834,6 +15139,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -13919,6 +15229,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -14012,6 +15327,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "parameters": [
@@ -14097,6 +15417,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "parameters": [
@@ -14174,6 +15499,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Node"
      }
     },
     "parameters": [
@@ -14259,6 +15589,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolumeClaim"
      }
     },
     "parameters": [
@@ -14336,6 +15671,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolume"
      }
     },
     "parameters": [
@@ -14413,6 +15753,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PersistentVolume"
      }
     },
     "parameters": [
@@ -14498,6 +15843,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Pod"
      }
     },
     "parameters": [
@@ -14575,6 +15925,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "PodTemplate"
      }
     },
     "parameters": [
@@ -14652,6 +16007,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ReplicationController"
      }
     },
     "parameters": [
@@ -14729,6 +16089,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ResourceQuota"
      }
     },
     "parameters": [
@@ -14806,6 +16171,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "parameters": [
@@ -14883,6 +16253,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ServiceAccount"
      }
     },
     "parameters": [
@@ -14960,6 +16335,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -15136,6 +16516,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -15250,6 +16635,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "post": {
@@ -15289,6 +16679,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "delete": {
@@ -15355,6 +16750,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -15419,6 +16819,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "put": {
@@ -15458,6 +16863,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "delete": {
@@ -15518,6 +16928,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "patch": {
@@ -15559,6 +16974,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -15625,6 +17045,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "DeploymentRollback"
      }
     },
     "parameters": [
@@ -15681,6 +17106,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "put": {
@@ -15720,6 +17150,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "patch": {
@@ -15761,6 +17196,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "parameters": [
@@ -15817,6 +17257,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "put": {
@@ -15856,6 +17301,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "patch": {
@@ -15897,6 +17347,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -15992,6 +17447,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "post": {
@@ -16031,6 +17491,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "delete": {
@@ -16097,6 +17562,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "parameters": [
@@ -16161,6 +17631,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "put": {
@@ -16200,6 +17675,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "delete": {
@@ -16260,6 +17740,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "patch": {
@@ -16301,6 +17786,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "parameters": [
@@ -16357,6 +17847,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "put": {
@@ -16396,6 +17891,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "patch": {
@@ -16437,6 +17937,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "parameters": [
@@ -16495,6 +18000,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "parameters": [
@@ -16572,6 +18082,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -16649,6 +18164,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -16734,6 +18254,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -16827,6 +18352,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "parameters": [
@@ -16912,6 +18442,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "parameters": [
@@ -17005,6 +18540,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "apps",
+      "Version": "v1beta1",
+      "Kind": "StatefulSet"
      }
     },
     "parameters": [
@@ -17156,6 +18696,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "authentication.k8s.io",
+      "Version": "v1",
+      "Kind": "TokenReview"
      }
     },
     "parameters": [
@@ -17239,6 +18784,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "authentication.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "TokenReview"
      }
     },
     "parameters": [
@@ -17355,6 +18905,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "authorization.k8s.io",
+      "Version": "v1",
+      "Kind": "LocalSubjectAccessReview"
      }
     },
     "parameters": [
@@ -17413,6 +18968,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "authorization.k8s.io",
+      "Version": "v1",
+      "Kind": "SelfSubjectAccessReview"
      }
     },
     "parameters": [
@@ -17463,6 +19023,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "authorization.k8s.io",
+      "Version": "v1",
+      "Kind": "SubjectAccessReview"
      }
     },
     "parameters": [
@@ -17546,6 +19111,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "LocalSubjectAccessReview"
      }
     },
     "parameters": [
@@ -17604,6 +19174,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "SelfSubjectAccessReview"
      }
     },
     "parameters": [
@@ -17654,6 +19229,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "SubjectAccessReview"
      }
     },
     "parameters": [
@@ -17762,6 +19342,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -17876,6 +19461,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "post": {
@@ -17915,6 +19505,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "delete": {
@@ -17981,6 +19576,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -18045,6 +19645,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "put": {
@@ -18084,6 +19689,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "delete": {
@@ -18144,6 +19754,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "patch": {
@@ -18185,6 +19800,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -18241,6 +19861,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "put": {
@@ -18280,6 +19905,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "patch": {
@@ -18321,6 +19951,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -18379,6 +20014,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -18456,6 +20096,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -18541,6 +20186,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -18667,6 +20317,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -18781,6 +20436,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "post": {
@@ -18820,6 +20480,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "delete": {
@@ -18886,6 +20551,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -18950,6 +20620,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "put": {
@@ -18989,6 +20664,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "delete": {
@@ -19049,6 +20729,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "patch": {
@@ -19090,6 +20775,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -19146,6 +20836,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "put": {
@@ -19185,6 +20880,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "patch": {
@@ -19226,6 +20926,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -19284,6 +20989,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -19361,6 +21071,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -19446,6 +21161,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
      }
     },
     "parameters": [
@@ -19605,6 +21325,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "parameters": [
@@ -19719,6 +21444,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "post": {
@@ -19758,6 +21488,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "delete": {
@@ -19824,6 +21559,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "parameters": [
@@ -19888,6 +21628,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "put": {
@@ -19927,6 +21672,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "delete": {
@@ -19987,6 +21737,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "patch": {
@@ -20028,6 +21783,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "parameters": [
@@ -20084,6 +21844,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "put": {
@@ -20123,6 +21888,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "patch": {
@@ -20164,6 +21934,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "parameters": [
@@ -20222,6 +21997,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "parameters": [
@@ -20299,6 +22079,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "parameters": [
@@ -20384,6 +22169,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v1",
+      "Kind": "Job"
      }
     },
     "parameters": [
@@ -20510,6 +22300,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "parameters": [
@@ -20624,6 +22419,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "post": {
@@ -20663,6 +22463,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "delete": {
@@ -20729,6 +22534,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "parameters": [
@@ -20793,6 +22603,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "put": {
@@ -20832,6 +22647,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "delete": {
@@ -20892,6 +22712,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "patch": {
@@ -20933,6 +22758,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "parameters": [
@@ -20989,6 +22819,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "put": {
@@ -21028,6 +22863,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "patch": {
@@ -21069,6 +22909,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "parameters": [
@@ -21164,6 +23009,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "post": {
@@ -21203,6 +23053,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "delete": {
@@ -21269,6 +23124,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "parameters": [
@@ -21333,6 +23193,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "put": {
@@ -21372,6 +23237,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "delete": {
@@ -21432,6 +23302,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "patch": {
@@ -21473,6 +23348,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "parameters": [
@@ -21529,6 +23409,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "put": {
@@ -21568,6 +23453,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "patch": {
@@ -21609,6 +23499,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "parameters": [
@@ -21667,6 +23562,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "parameters": [
@@ -21744,6 +23644,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "parameters": [
@@ -21821,6 +23726,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "parameters": [
@@ -21906,6 +23816,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "CronJob"
      }
     },
     "parameters": [
@@ -21999,6 +23914,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "parameters": [
@@ -22084,6 +24004,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "parameters": [
@@ -22177,6 +24102,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "batch",
+      "Version": "v2alpha1",
+      "Kind": "ScheduledJob"
      }
     },
     "parameters": [
@@ -22357,6 +24287,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "certificates.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "CertificateSigningRequest"
      }
     },
     "post": {
@@ -22396,6 +24331,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "certificates.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "CertificateSigningRequest"
      }
     },
     "delete": {
@@ -22462,6 +24402,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "certificates.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "CertificateSigningRequest"
      }
     },
     "parameters": [
@@ -22518,6 +24463,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "certificates.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "CertificateSigningRequest"
      }
     },
     "put": {
@@ -22557,6 +24507,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "certificates.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "CertificateSigningRequest"
      }
     },
     "delete": {
@@ -22617,6 +24572,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "certificates.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "CertificateSigningRequest"
      }
     },
     "patch": {
@@ -22658,6 +24618,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "certificates.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "CertificateSigningRequest"
      }
     },
     "parameters": [
@@ -22716,6 +24681,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "certificates.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "CertificateSigningRequest"
      }
     },
     "parameters": [
@@ -22774,6 +24744,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "certificates.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "CertificateSigningRequest"
      }
     },
     "parameters": [
@@ -22824,6 +24799,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "certificates.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "CertificateSigningRequest"
      }
     },
     "parameters": [
@@ -22901,6 +24881,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "certificates.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "CertificateSigningRequest"
      }
     },
     "parameters": [
@@ -23052,6 +25037,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -23129,6 +25119,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -23206,6 +25201,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -23320,6 +25320,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "post": {
@@ -23359,6 +25364,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "delete": {
@@ -23425,6 +25435,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -23489,6 +25504,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "put": {
@@ -23528,6 +25548,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "delete": {
@@ -23588,6 +25613,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "patch": {
@@ -23629,6 +25659,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -23685,6 +25720,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "put": {
@@ -23724,6 +25764,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "patch": {
@@ -23765,6 +25810,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -23860,6 +25910,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "post": {
@@ -23899,6 +25954,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "delete": {
@@ -23965,6 +26025,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -24029,6 +26094,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "put": {
@@ -24068,6 +26138,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "delete": {
@@ -24128,6 +26203,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "patch": {
@@ -24169,6 +26249,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -24235,6 +26320,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DeploymentRollback"
      }
     },
     "parameters": [
@@ -24291,6 +26381,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "put": {
@@ -24330,6 +26425,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "patch": {
@@ -24371,6 +26471,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "parameters": [
@@ -24427,6 +26532,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "put": {
@@ -24466,6 +26576,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "patch": {
@@ -24507,6 +26622,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -24602,6 +26722,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "post": {
@@ -24641,6 +26766,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "delete": {
@@ -24707,6 +26837,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -24771,6 +26906,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "put": {
@@ -24810,6 +26950,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "delete": {
@@ -24870,6 +27015,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "patch": {
@@ -24911,6 +27061,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -24967,6 +27122,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "put": {
@@ -25006,6 +27166,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "patch": {
@@ -25047,6 +27212,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -25142,6 +27312,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "NetworkPolicy"
      }
     },
     "post": {
@@ -25181,6 +27356,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "NetworkPolicy"
      }
     },
     "delete": {
@@ -25247,6 +27427,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "NetworkPolicy"
      }
     },
     "parameters": [
@@ -25311,6 +27496,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "NetworkPolicy"
      }
     },
     "put": {
@@ -25350,6 +27540,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "NetworkPolicy"
      }
     },
     "delete": {
@@ -25410,6 +27605,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "NetworkPolicy"
      }
     },
     "patch": {
@@ -25451,6 +27651,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "NetworkPolicy"
      }
     },
     "parameters": [
@@ -25546,6 +27751,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "post": {
@@ -25585,6 +27795,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "delete": {
@@ -25651,6 +27866,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -25715,6 +27935,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "put": {
@@ -25754,6 +27979,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "delete": {
@@ -25814,6 +28044,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "patch": {
@@ -25855,6 +28090,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -25911,6 +28151,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "put": {
@@ -25950,6 +28195,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "patch": {
@@ -25991,6 +28241,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "parameters": [
@@ -26047,6 +28302,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "put": {
@@ -26086,6 +28346,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "patch": {
@@ -26127,6 +28392,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -26183,6 +28453,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "put": {
@@ -26222,6 +28497,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "patch": {
@@ -26263,6 +28543,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "parameters": [
@@ -26321,6 +28606,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "NetworkPolicy"
      }
     },
     "parameters": [
@@ -26435,6 +28725,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "PodSecurityPolicy"
      }
     },
     "post": {
@@ -26474,6 +28769,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "PodSecurityPolicy"
      }
     },
     "delete": {
@@ -26540,6 +28840,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "PodSecurityPolicy"
      }
     },
     "parameters": [
@@ -26596,6 +28901,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "PodSecurityPolicy"
      }
     },
     "put": {
@@ -26635,6 +28945,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "PodSecurityPolicy"
      }
     },
     "delete": {
@@ -26695,6 +29010,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "PodSecurityPolicy"
      }
     },
     "patch": {
@@ -26736,6 +29056,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "PodSecurityPolicy"
      }
     },
     "parameters": [
@@ -26786,6 +29111,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -26900,6 +29230,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ThirdPartyResource"
      }
     },
     "post": {
@@ -26939,6 +29274,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ThirdPartyResource"
      }
     },
     "delete": {
@@ -27005,6 +29345,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ThirdPartyResource"
      }
     },
     "parameters": [
@@ -27061,6 +29406,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ThirdPartyResource"
      }
     },
     "put": {
@@ -27100,6 +29450,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ThirdPartyResource"
      }
     },
     "delete": {
@@ -27160,6 +29515,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ThirdPartyResource"
      }
     },
     "patch": {
@@ -27201,6 +29561,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ThirdPartyResource"
      }
     },
     "parameters": [
@@ -27251,6 +29616,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -27328,6 +29698,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -27405,6 +29780,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -27482,6 +29862,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -27567,6 +29952,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -27660,6 +30050,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -27745,6 +30140,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -27838,6 +30238,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -27923,6 +30328,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -28016,6 +30426,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "NetworkPolicy"
      }
     },
     "parameters": [
@@ -28101,6 +30516,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "NetworkPolicy"
      }
     },
     "parameters": [
@@ -28194,6 +30614,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -28279,6 +30704,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -28372,6 +30802,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "NetworkPolicy"
      }
     },
     "parameters": [
@@ -28449,6 +30884,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "PodSecurityPolicy"
      }
     },
     "parameters": [
@@ -28526,6 +30966,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "PodSecurityPolicy"
      }
     },
     "parameters": [
@@ -28611,6 +31056,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -28688,6 +31138,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ThirdPartyResource"
      }
     },
     "parameters": [
@@ -28765,6 +31220,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ThirdPartyResource"
      }
     },
     "parameters": [
@@ -28953,6 +31413,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "post": {
@@ -28992,6 +31457,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "delete": {
@@ -29058,6 +31528,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "parameters": [
@@ -29122,6 +31597,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "put": {
@@ -29161,6 +31641,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "delete": {
@@ -29221,6 +31706,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "patch": {
@@ -29262,6 +31752,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "parameters": [
@@ -29318,6 +31813,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "put": {
@@ -29357,6 +31857,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "patch": {
@@ -29398,6 +31903,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "parameters": [
@@ -29456,6 +31966,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "parameters": [
@@ -29533,6 +32048,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "parameters": [
@@ -29618,6 +32138,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "parameters": [
@@ -29711,6 +32236,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "policy",
+      "Version": "v1beta1",
+      "Kind": "PodDisruptionBudget"
      }
     },
     "parameters": [
@@ -29891,6 +32421,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "post": {
@@ -29930,6 +32465,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "delete": {
@@ -29996,6 +32536,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "parameters": [
@@ -30036,6 +32581,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "put": {
@@ -30075,6 +32625,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "delete": {
@@ -30135,6 +32690,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "patch": {
@@ -30176,6 +32736,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "parameters": [
@@ -30263,6 +32828,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRole"
      }
     },
     "post": {
@@ -30302,6 +32872,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRole"
      }
     },
     "delete": {
@@ -30368,6 +32943,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRole"
      }
     },
     "parameters": [
@@ -30408,6 +32988,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRole"
      }
     },
     "put": {
@@ -30447,6 +33032,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRole"
      }
     },
     "delete": {
@@ -30507,6 +33097,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRole"
      }
     },
     "patch": {
@@ -30548,6 +33143,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRole"
      }
     },
     "parameters": [
@@ -30635,6 +33235,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "RoleBinding"
      }
     },
     "post": {
@@ -30674,6 +33279,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "RoleBinding"
      }
     },
     "delete": {
@@ -30740,6 +33350,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "RoleBinding"
      }
     },
     "parameters": [
@@ -30788,6 +33403,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "RoleBinding"
      }
     },
     "put": {
@@ -30827,6 +33447,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "RoleBinding"
      }
     },
     "delete": {
@@ -30887,6 +33512,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "RoleBinding"
      }
     },
     "patch": {
@@ -30928,6 +33558,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "RoleBinding"
      }
     },
     "parameters": [
@@ -31023,6 +33658,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "Role"
      }
     },
     "post": {
@@ -31062,6 +33702,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "Role"
      }
     },
     "delete": {
@@ -31128,6 +33773,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "Role"
      }
     },
     "parameters": [
@@ -31176,6 +33826,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "Role"
      }
     },
     "put": {
@@ -31215,6 +33870,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "Role"
      }
     },
     "delete": {
@@ -31275,6 +33935,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "Role"
      }
     },
     "patch": {
@@ -31316,6 +33981,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "Role"
      }
     },
     "parameters": [
@@ -31374,6 +34044,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "RoleBinding"
      }
     },
     "parameters": [
@@ -31451,6 +34126,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "Role"
      }
     },
     "parameters": [
@@ -31528,6 +34208,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "parameters": [
@@ -31605,6 +34290,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "parameters": [
@@ -31690,6 +34380,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRole"
      }
     },
     "parameters": [
@@ -31767,6 +34462,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "ClusterRole"
      }
     },
     "parameters": [
@@ -31852,6 +34552,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "RoleBinding"
      }
     },
     "parameters": [
@@ -31937,6 +34642,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "RoleBinding"
      }
     },
     "parameters": [
@@ -32030,6 +34740,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "Role"
      }
     },
     "parameters": [
@@ -32115,6 +34830,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "Role"
      }
     },
     "parameters": [
@@ -32208,6 +34928,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "RoleBinding"
      }
     },
     "parameters": [
@@ -32285,6 +35010,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "Role"
      }
     },
     "parameters": [
@@ -32432,6 +35162,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "post": {
@@ -32471,6 +35206,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "delete": {
@@ -32537,6 +35277,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "parameters": [
@@ -32577,6 +35322,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "put": {
@@ -32616,6 +35366,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "delete": {
@@ -32676,6 +35431,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "patch": {
@@ -32717,6 +35477,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "parameters": [
@@ -32804,6 +35569,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRole"
      }
     },
     "post": {
@@ -32843,6 +35613,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRole"
      }
     },
     "delete": {
@@ -32909,6 +35684,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRole"
      }
     },
     "parameters": [
@@ -32949,6 +35729,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRole"
      }
     },
     "put": {
@@ -32988,6 +35773,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRole"
      }
     },
     "delete": {
@@ -33048,6 +35838,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRole"
      }
     },
     "patch": {
@@ -33089,6 +35884,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRole"
      }
     },
     "parameters": [
@@ -33176,6 +35976,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "RoleBinding"
      }
     },
     "post": {
@@ -33215,6 +36020,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "RoleBinding"
      }
     },
     "delete": {
@@ -33281,6 +36091,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "RoleBinding"
      }
     },
     "parameters": [
@@ -33329,6 +36144,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "RoleBinding"
      }
     },
     "put": {
@@ -33368,6 +36188,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "RoleBinding"
      }
     },
     "delete": {
@@ -33428,6 +36253,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "RoleBinding"
      }
     },
     "patch": {
@@ -33469,6 +36299,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "RoleBinding"
      }
     },
     "parameters": [
@@ -33564,6 +36399,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "Role"
      }
     },
     "post": {
@@ -33603,6 +36443,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "Role"
      }
     },
     "delete": {
@@ -33669,6 +36514,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "Role"
      }
     },
     "parameters": [
@@ -33717,6 +36567,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "Role"
      }
     },
     "put": {
@@ -33756,6 +36611,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "Role"
      }
     },
     "delete": {
@@ -33816,6 +36676,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "Role"
      }
     },
     "patch": {
@@ -33857,6 +36722,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "Role"
      }
     },
     "parameters": [
@@ -33915,6 +36785,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "RoleBinding"
      }
     },
     "parameters": [
@@ -33992,6 +36867,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "Role"
      }
     },
     "parameters": [
@@ -34069,6 +36949,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "parameters": [
@@ -34146,6 +37031,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRoleBinding"
      }
     },
     "parameters": [
@@ -34231,6 +37121,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRole"
      }
     },
     "parameters": [
@@ -34308,6 +37203,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "ClusterRole"
      }
     },
     "parameters": [
@@ -34393,6 +37293,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "RoleBinding"
      }
     },
     "parameters": [
@@ -34478,6 +37383,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "RoleBinding"
      }
     },
     "parameters": [
@@ -34571,6 +37481,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "Role"
      }
     },
     "parameters": [
@@ -34656,6 +37571,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "Role"
      }
     },
     "parameters": [
@@ -34749,6 +37669,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "RoleBinding"
      }
     },
     "parameters": [
@@ -34826,6 +37751,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "rbac.authorization.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "Role"
      }
     },
     "parameters": [
@@ -35006,6 +37936,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPreset"
      }
     },
     "post": {
@@ -35045,6 +37980,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPreset"
      }
     },
     "delete": {
@@ -35111,6 +38051,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPreset"
      }
     },
     "parameters": [
@@ -35175,6 +38120,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPreset"
      }
     },
     "put": {
@@ -35214,6 +38164,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPreset"
      }
     },
     "delete": {
@@ -35274,6 +38229,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPreset"
      }
     },
     "patch": {
@@ -35315,6 +38275,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPreset"
      }
     },
     "parameters": [
@@ -35373,6 +38338,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPreset"
      }
     },
     "parameters": [
@@ -35450,6 +38420,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPreset"
      }
     },
     "parameters": [
@@ -35535,6 +38510,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPreset"
      }
     },
     "parameters": [
@@ -35628,6 +38608,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPreset"
      }
     },
     "parameters": [
@@ -35808,6 +38793,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClass"
      }
     },
     "post": {
@@ -35847,6 +38837,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClass"
      }
     },
     "delete": {
@@ -35913,6 +38908,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClass"
      }
     },
     "parameters": [
@@ -35969,6 +38969,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClass"
      }
     },
     "put": {
@@ -36008,6 +39013,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClass"
      }
     },
     "delete": {
@@ -36068,6 +39078,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClass"
      }
     },
     "patch": {
@@ -36109,6 +39124,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClass"
      }
     },
     "parameters": [
@@ -36159,6 +39179,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClass"
      }
     },
     "parameters": [
@@ -36236,6 +39261,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClass"
      }
     },
     "parameters": [
@@ -36391,6 +39421,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "StorageClass"
      }
     },
     "post": {
@@ -36430,6 +39465,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "StorageClass"
      }
     },
     "delete": {
@@ -36496,6 +39536,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "StorageClass"
      }
     },
     "parameters": [
@@ -36552,6 +39597,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "StorageClass"
      }
     },
     "put": {
@@ -36591,6 +39641,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "StorageClass"
      }
     },
     "delete": {
@@ -36651,6 +39706,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "StorageClass"
      }
     },
     "patch": {
@@ -36692,6 +39752,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "StorageClass"
      }
     },
     "parameters": [
@@ -36742,6 +39807,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "StorageClass"
      }
     },
     "parameters": [
@@ -36819,6 +39889,11 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kuberentes-group-version-kind": {
+      "Group": "storage.k8s.io",
+      "Version": "v1beta1",
+      "Kind": "StorageClass"
      }
     },
     "parameters": [
