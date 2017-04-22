@@ -667,6 +667,7 @@ storage-media-type
 storage-version
 storage-versions
 streaming-connection-idle-timeout
+subresource
 suicide-timeout
 sync-frequency
 system-cgroups
