@@ -42,6 +42,11 @@ import (
 	"github.com/emicklei/go-restful"
 )
 
+const (
+	ROUTE_META_GVK    = "x-kubernetes-group-version-kind"
+	ROUTE_META_ACTION = "x-kubernetes-action"
+)
+
 type APIInstaller struct {
 	group             *APIGroupVersion
 	prefix            string // Path prefix where API resources are to be registered.
@@ -557,6 +562,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, fmt.Errorf("unknown action verb for discovery: %s", action.Verb)
 		}
 
+		routes := []*restful.RouteBuilder{}
+
 		switch action.Verb {
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
@@ -588,7 +595,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				}
 			}
 			addParams(route, action.Params)
-			ws.Route(route)
+			routes = append(routes, route)
 		case "LIST": // List all resources of a kind.
 			doc := "list objects of kind " + kind
 			if hasSubresource {
@@ -620,7 +627,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				route.Doc(doc)
 			}
 			addParams(route, action.Params)
-			ws.Route(route)
+			routes = append(routes, route)
 		case "PUT": // Update a resource.
 			doc := "replace the specified " + kind
 			if hasSubresource {
@@ -636,7 +643,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Reads(versionedObject).
 				Writes(versionedObject)
 			addParams(route, action.Params)
-			ws.Route(route)
+			routes = append(routes, route)
 		case "PATCH": // Partially update a resource
 			doc := "partially update the specified " + kind
 			if hasSubresource {
@@ -653,7 +660,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Reads(metav1.Patch{}).
 				Writes(versionedObject)
 			addParams(route, action.Params)
-			ws.Route(route)
+			routes = append(routes, route)
 		case "POST": // Create a resource.
 			var handler restful.RouteFunction
 			if isNamedCreater {
@@ -676,7 +683,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Reads(versionedObject).
 				Writes(versionedObject)
 			addParams(route, action.Params)
-			ws.Route(route)
+			routes = append(routes, route)
 		case "DELETE": // Delete a resource.
 			article := getArticleForNoun(kind, " ")
 			doc := "delete" + article + kind
@@ -698,7 +705,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				}
 			}
 			addParams(route, action.Params)
-			ws.Route(route)
+			routes = append(routes, route)
 		case "DELETECOLLECTION":
 			doc := "delete collection of " + kind
 			if hasSubresource {
@@ -716,7 +723,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				return nil, err
 			}
 			addParams(route, action.Params)
-			ws.Route(route)
+			routes = append(routes, route)
 		// TODO: deprecated
 		case "WATCH": // Watch a resource.
 			doc := "watch changes to an object of kind " + kind
@@ -735,7 +742,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				return nil, err
 			}
 			addParams(route, action.Params)
-			ws.Route(route)
+			routes = append(routes, route)
 		// TODO: deprecated
 		case "WATCHLIST": // Watch all resources of a kind.
 			doc := "watch individual changes to a list of " + kind
@@ -754,19 +761,19 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				return nil, err
 			}
 			addParams(route, action.Params)
-			ws.Route(route)
+			routes = append(routes, route)
 		// We add "proxy" subresource to remove the need for the generic top level prefix proxy.
 		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
 		// TODO: DEPRECATED in v1.2.
 		case "PROXY": // Proxy requests to a resource.
 			// Accept all methods as per http://issue.k8s.io/3996
-			addProxyRoute(ws, "GET", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
-			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
-			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
-			addProxyRoute(ws, "PATCH", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
-			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
-			addProxyRoute(ws, "HEAD", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
-			addProxyRoute(ws, "OPTIONS", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
+			routes = append(routes, buildProxyRoute(ws, "GET", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix))
+			routes = append(routes, buildProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix))
+			routes = append(routes, buildProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix))
+			routes = append(routes, buildProxyRoute(ws, "PATCH", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix))
+			routes = append(routes, buildProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix))
+			routes = append(routes, buildProxyRoute(ws, "HEAD", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix))
+			routes = append(routes, buildProxyRoute(ws, "OPTIONS", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix))
 		case "CONNECT":
 			for _, method := range connecter.ConnectMethods() {
 				doc := "connect " + method + " requests to " + kind
@@ -787,10 +794,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					}
 				}
 				addParams(route, action.Params)
-				ws.Route(route)
+				routes = append(routes, route)
 			}
 		default:
 			return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
+		}
+		for _, route := range routes {
+			route.Metadata(ROUTE_META_GVK, reqScope.Kind)
+			route.Metadata(ROUTE_META_ACTION, action.Verb)
+			ws.Route(route)
 		}
 		// Note: update GetAuthorizerAttributes() when adding a custom handler.
 	}
@@ -824,7 +836,7 @@ func routeFunction(handler http.Handler) restful.RouteFunction {
 	}
 }
 
-func addProxyRoute(ws *restful.WebService, method string, prefix string, path string, proxyHandler http.Handler, namespaced, kind, resource, subresource string, hasSubresource bool, params []*restful.Parameter, operationSuffix string) {
+func buildProxyRoute(ws *restful.WebService, method string, prefix string, path string, proxyHandler http.Handler, namespaced, kind, resource, subresource string, hasSubresource bool, params []*restful.Parameter, operationSuffix string) *restful.RouteBuilder {
 	doc := "proxy " + method + " requests to " + kind
 	if hasSubresource {
 		doc = "proxy " + method + " requests to " + subresource + " of " + kind
@@ -837,7 +849,7 @@ func addProxyRoute(ws *restful.WebService, method string, prefix string, path st
 		Consumes("*/*").
 		Writes("string")
 	addParams(proxyRoute, params)
-	ws.Route(proxyRoute)
+	return proxyRoute
 }
 
 func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
