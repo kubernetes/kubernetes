@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/golang/glog"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -90,6 +91,8 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 	memoryLimits := int64(0)
 	memoryLimitsDeclared := true
 	cpuLimitsDeclared := true
+	// TODO: demo is just a single size for now (2MB)
+	hugePageLimit := int64(0)
 	for _, container := range pod.Spec.Containers {
 		cpuRequests += container.Resources.Requests.Cpu().MilliValue()
 		cpuLimits += container.Resources.Limits.Cpu().MilliValue()
@@ -99,6 +102,12 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 		memoryLimits += container.Resources.Limits.Memory().Value()
 		if container.Resources.Limits.Memory().IsZero() {
 			memoryLimitsDeclared = false
+		}
+
+		hugePage, found := container.Resources.Requests[v1.ResourceName("alpha.kubernetes.io/hugepages-2048kB")]
+		if found {
+			glog.Infof("FOUND HUGEPAGE LIMIT: %v", hugePage.String())
+			hugePageLimit += hugePage.Value() * int64(2*1024*1024)
 		}
 	}
 
@@ -129,6 +138,7 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 		shares := int64(MinShares)
 		result.CpuShares = &shares
 	}
+	result.HugePageLimit = &hugePageLimit
 	return result
 }
 

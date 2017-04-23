@@ -31,6 +31,9 @@ type ResourceConfig struct {
 	CpuQuota *int64
 	// CPU quota period.
 	CpuPeriod *int64
+
+	// TODO: right now, I am hardcoding as always 2048kb page size for demo
+	HugePageLimit *int64
 }
 
 // CgroupName is the abstract name of a cgroup prior to any driver specific conversion.

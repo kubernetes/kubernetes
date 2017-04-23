@@ -29,6 +29,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
+// IsHugePageResourceName returns true if the resource name has the huge page
+// resource prefix.
+func IsHugePageResourceName(name v1.ResourceName) bool {
+	return strings.HasPrefix(string(name), "alpha.kubernetes.io/hugepages-")
+}
+
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
 // integer resource prefix.
 func IsOpaqueIntResourceName(name v1.ResourceName) bool {

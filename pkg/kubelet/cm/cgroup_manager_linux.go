@@ -291,6 +291,7 @@ type subsystem interface {
 var supportedSubsystems = []subsystem{
 	&cgroupfs.MemoryGroup{},
 	&cgroupfs.CpuGroup{},
+	&cgroupfs.HugetlbGroup{},
 }
 
 // setSupportedSubsytems sets cgroup resource limits only on the supported
@@ -330,6 +331,27 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	}
 	if resourceConfig.CpuPeriod != nil {
 		resources.CpuPeriod = *resourceConfig.CpuPeriod
+	}
+	if resourceConfig.HugePageLimit != nil {
+		// this needs to be dynamic, for now, we disable all usage not in my default 2MB page
+		resources.HugetlbLimit = []*libcontainerconfigs.HugepageLimit{}
+		for _, pagesize := range cgroupfs.HugePageSizes {
+			// this is a hack, but i want to only allow 2MB huge pages for this demo
+			if pagesize == "2MB" {
+				resources.HugetlbLimit = append(resources.HugetlbLimit, &libcontainerconfigs.HugepageLimit{
+					Pagesize: pagesize,
+					Limit:    uint64(*resourceConfig.HugePageLimit),
+				})
+			} else {
+				resources.HugetlbLimit = append(resources.HugetlbLimit, &libcontainerconfigs.HugepageLimit{
+					Pagesize: pagesize,
+					Limit:    uint64(0),
+				})
+			}
+		}
+	}
+	for _, item := range resources.HugetlbLimit {
+		glog.Infof("SET RESOURCES.HugeTlbLimit pagesize: %v, limit: %v", item.Pagesize, item.Limit)
 	}
 	return resources
 }

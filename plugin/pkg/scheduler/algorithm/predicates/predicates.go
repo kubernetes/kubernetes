@@ -508,6 +508,9 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 				if v1helper.IsOpaqueIntResourceName(rName) {
 					result.AddOpaque(rName, rQuantity.Value())
 				}
+				if v1helper.IsHugePageResourceName(rName) {
+					result.AddHugePages(rName, rQuantity.Value())
+				}
 			}
 		}
 	}
@@ -532,6 +535,12 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 					value := rQuantity.Value()
 					if value > result.OpaqueIntResources[rName] {
 						result.SetOpaque(rName, value)
+					}
+				}
+				if v1helper.IsHugePageResourceName(rName) {
+					value := rQuantity.Value()
+					if value > result.HugePages[rName] {
+						result.SetHugePages(rName, value)
 					}
 				}
 			}
@@ -563,7 +572,7 @@ func PodFitsResources(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 		// We couldn't parse metadata - fallback to computing it.
 		podRequest = GetResourceRequest(pod)
 	}
-	if podRequest.MilliCPU == 0 && podRequest.Memory == 0 && podRequest.NvidiaGPU == 0 && len(podRequest.OpaqueIntResources) == 0 {
+	if podRequest.MilliCPU == 0 && podRequest.Memory == 0 && podRequest.NvidiaGPU == 0 && len(podRequest.OpaqueIntResources) == 0 && len(podRequest.HugePages) == 0 {
 		return len(predicateFails) == 0, predicateFails, nil
 	}
 
@@ -580,6 +589,11 @@ func PodFitsResources(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 	for rName, rQuant := range podRequest.OpaqueIntResources {
 		if allocatable.OpaqueIntResources[rName] < rQuant+nodeInfo.RequestedResource().OpaqueIntResources[rName] {
 			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.OpaqueIntResources[rName], nodeInfo.RequestedResource().OpaqueIntResources[rName], allocatable.OpaqueIntResources[rName]))
+		}
+	}
+	for rName, rQuant := range podRequest.HugePages {
+		if allocatable.HugePages[rName] < rQuant+nodeInfo.RequestedResource().HugePages[rName] {
+			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.HugePages[rName], nodeInfo.RequestedResource().HugePages[rName], allocatable.HugePages[rName]))
 		}
 	}
 

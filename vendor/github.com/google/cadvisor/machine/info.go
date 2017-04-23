@@ -65,6 +65,25 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		return nil, err
 	}
 
+	// TODO: find out number of hugepages by size
+	meminfo, err := ioutil.ReadFile(filepath.Join(rootFs, "/proc/meminfo"))
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: read from /sys/kernel/mm/hugepages/hugepages-${size}kB directories
+	// TODO: right now, i am just reporting the default huge page size.
+	hugepageSize, err := GetHugePageSize(string(meminfo))
+	if err != nil {
+		glog.Errorf("Failed to get hugepage size information: %v", err)
+	}
+	hugepagesTotal, err := GetHugePagesTotal(string(meminfo))
+	if err != nil {
+		glog.Errorf("Failed to get hugepages total information: %v", err)
+	}
+	glog.Infof("FOUND HUGEPAGE SIZE: %v", hugepageSize)
+	glog.Infof("FOUND HUGEPAGES TOTAL: %v", hugepagesTotal)
+
 	filesystems, err := fsInfo.GetGlobalFsInfo()
 	if err != nil {
 		glog.Errorf("Failed to get global filesystem information: %v", err)
@@ -108,6 +127,8 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		CloudProvider:  cloudProvider,
 		InstanceType:   instanceType,
 		InstanceID:     instanceID,
+		HugePageSize:   hugepageSize,
+		HugePagesTotal: hugepagesTotal,
 	}
 
 	for i := range filesystems {

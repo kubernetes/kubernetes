@@ -17,6 +17,8 @@ limitations under the License.
 package cadvisor
 
 import (
+	"strconv"
+
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -31,5 +33,8 @@ func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
 			int64(info.MemoryCapacity),
 			resource.BinarySI),
 	}
+	//  TODO: clean this up, we will need to support each size (not just default)
+	hugepagesName := "alpha.kubernetes.io/hugepages-" + strconv.Itoa(int(info.HugePageSize)) + "kB"
+	c[v1.ResourceName(hugepagesName)] = *resource.NewQuantity(int64(info.HugePagesTotal), resource.DecimalSI)
 	return c
 }

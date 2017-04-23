@@ -154,6 +154,14 @@ type MachineInfo struct {
 	// The amount of memory (in bytes) in this machine
 	MemoryCapacity uint64 `json:"memory_capacity"`
 
+	// The default hugepage size (in kB) on this machine.
+	// TODO: this should be a slice of supported sizes
+	HugePageSize uint64 `json:"hugepage_size"`
+
+	// The number of hugepage of the default size on this machine.
+	// TODO: this should be a slice of supported sizes.
+	HugePagesTotal uint64 `json:"hugepages_total"`
+
 	// The machine id
 	MachineID string `json:"machine_id"`
 
