@@ -22,9 +22,6 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"k8s.io/kubernetes/pkg/util/chmod"
-	"k8s.io/kubernetes/pkg/util/chown"
-
 	"os"
 
 	"github.com/golang/glog"
@@ -44,8 +41,6 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 		return nil
 	}
 
-	chownRunner := chown.New()
-	chmodRunner := chmod.New()
 	return filepath.Walk(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -72,7 +67,7 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 			return nil
 		}
 
-		err = chownRunner.Chown(path, int(stat.Uid), int(*fsGroup))
+		err = os.Chown(path, int(stat.Uid), int(*fsGroup))
 		if err != nil {
 			glog.Errorf("Chown failed on %v: %v", path, err)
 		}
@@ -86,7 +81,7 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 			mask |= os.ModeSetgid
 		}
 
-		err = chmodRunner.Chmod(path, info.Mode()|mask)
+		err = os.Chmod(path, info.Mode()|mask)
 		if err != nil {
 			glog.Errorf("Chmod failed on %v: %v", path, err)
 		}
