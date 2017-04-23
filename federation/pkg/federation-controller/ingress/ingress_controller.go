@@ -18,11 +18,12 @@ package ingress
 
 import (
 	"crypto/md5"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -647,13 +648,15 @@ func (ic *IngressController) getMasterCluster() (master *federationapi.Cluster, 
   If there is no master cluster, then fallbackUID is used (and hence this cluster becomes the master).
 */
 func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federationapi.Cluster, fallbackUID string) (string, error) {
-	masterCluster, masterUID, err := ic.getMasterCluster()
 	clusterObj, clusterErr := api.Scheme.DeepCopy(cluster) // Make a clone so that we don't clobber our input param
 	cluster, ok := clusterObj.(*federationapi.Cluster)
 	if clusterErr != nil || !ok {
-		glog.Errorf("Internal error: Failed clone cluster resource while attempting to add master ingress UID annotation (%q = %q) from master cluster %q to cluster %q, will try again later: %v", uidAnnotationKey, masterUID, masterCluster.Name, cluster.Name, err)
-		return "", err
+		errmsg := fmt.Sprintf("Internal error: Failed clone cluster %q resource: %v", cluster.Name, clusterErr)
+		glog.Errorf(errmsg)
+		return "", errors.New(errmsg)
 	}
+
+	masterCluster, masterUID, err := ic.getMasterCluster()
 	if err == nil {
 		if masterCluster.Name != cluster.Name { // We're not the master, need to get in sync
 			if cluster.ObjectMeta.Annotations == nil {
@@ -672,8 +675,9 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 			return cluster.ObjectMeta.Annotations[uidAnnotationKey], nil
 		}
 	} else {
-		glog.V(2).Infof("No master cluster found to source an ingress UID from for cluster %q.  Attempting to elect new master cluster %q with ingress UID %q = %q", cluster.Name, cluster.Name, uidAnnotationKey, fallbackUID)
+		glog.V(2).Infof("No master cluster found to source an ingress UID from for cluster %q.", cluster.Name)
 		if fallbackUID != "" {
+			glog.V(2).Infof("Attempting to elect new master cluster %q with ingress UID %q = %q", cluster.Name, uidAnnotationKey, fallbackUID)
 			if cluster.ObjectMeta.Annotations == nil {
 				cluster.ObjectMeta.Annotations = map[string]string{}
 			}
@@ -686,7 +690,7 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 				return fallbackUID, nil
 			}
 		} else {
-			glog.Errorf("No master cluster exists, and fallbackUID for cluster %q is invalid (%q).  This probably means that no clusters have an ingress controller configmap with key %q.  Federated Ingress currently supports clusters running Google Loadbalancer Controller (\"GLBC\")", cluster.Name, fallbackUID, uidKey)
+			glog.Errorf("No master cluster exists, and fallbackUID for cluster %q is nil.  This probably means that no clusters have an ingress controller configmap with key %q.  Federated Ingress currently supports clusters running Google Loadbalancer Controller (\"GLBC\")", cluster.Name, uidKey)
 			return "", err
 		}
 	}
@@ -956,7 +960,7 @@ func (ic *IngressController) delete(ingress *extensionsv1beta1.Ingress) error {
 		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
 		// This is expected when we are processing an update as a result of ingress finalizer deletion.
 		// The process that deleted the last finalizer is also going to delete the ingress and we do not have to do anything.
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete ingress: %v", err)
 		}
 	}
