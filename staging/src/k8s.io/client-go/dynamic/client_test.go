@@ -556,3 +556,11 @@ func TestPatch(t *testing.T) {
 		}
 	}
 }
+
+func TestVersionedParameterEncoderWithV1Fallback(t *testing.T) {
+	enc := VersionedParameterEncoderWithV1Fallback
+	_, err := enc.EncodeParameters(&metav1.ListOptions{}, schema.GroupVersion{Group: "foo.bar.com", Version: "v4"})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
