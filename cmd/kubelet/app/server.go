@@ -453,17 +453,19 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 		var clientCertificateManager certificate.Manager
 		if err == nil {
-			nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
-			if err != nil {
-				return err
-			}
-			clientCertificateManager, err = initializeCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData)
-			if err != nil {
-				glog.Warningf("Unable to initialize the certificate manager: %v", err)
-			} else {
-				certKeyData := clientCertificateManager.Current()
-				clientConfig.CertData = certKeyData.CertPEM
-				clientConfig.KeyData = certKeyData.KeyPEM
+			if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
+				nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+				if err != nil {
+					return err
+				}
+				clientCertificateManager, err = initializeCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData)
+				if err != nil {
+					glog.Warningf("Unable to initialize the certificate manager: %v", err)
+				} else {
+					certKeyData := clientCertificateManager.Current()
+					clientConfig.CertData = certKeyData.CertPEM
+					clientConfig.KeyData = certKeyData.KeyPEM
+				}
 			}
 
 			kubeClient, err = clientset.NewForConfig(clientConfig)
