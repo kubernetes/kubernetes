@@ -129,7 +129,6 @@ func TestCompressUsername(t *testing.T) {
 	tests := []struct{ username, expected string }{
 		// Known system accounts should be reported as-is.
 		{"kubelet", "kubelet"},
-		{"kubecfg", "kubecfg"},
 		{"admin", "admin"},
 		{"system:kube-controller-manager", "system:kube-controller-manager"},
 		{"system:kube-scheduler", "system:kube-scheduler"},
@@ -158,6 +157,7 @@ func TestCompressUsername(t *testing.T) {
 		{"foo-bar-baz@k8s.io.edu.gov", "email_id"},
 		{"system:serviceaccount:default:foo-service", "system:serviceaccount"},
 		{"system:serviceaccount:my-namespace:bar", "system:serviceaccount"},
+		{"kubecfg", "other"},
 		{"whatsit", "other"},
 		{"foo-user", "other"},
 	}
