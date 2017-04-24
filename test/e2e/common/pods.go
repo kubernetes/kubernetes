@@ -368,7 +368,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "srv",
-						Image: "gcr.io/google_containers/serve_hostname:v1.4",
+						Image: framework.ServeHostnameImage,
 						Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 					},
 				},
