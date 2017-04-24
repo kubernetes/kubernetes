@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
@@ -49,8 +50,10 @@ import (
 )
 
 const (
-	filter     = "filter"
-	prioritize = "prioritize"
+	filter      = "filter"
+	prioritize  = "prioritize"
+	bind        = "bind"
+	failPodName = "extender-fail-pod"
 )
 
 type fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
@@ -66,38 +69,61 @@ type Extender struct {
 	predicates       []fitPredicate
 	prioritizers     []priorityConfig
 	nodeCacheCapable bool
+	Client           clientset.Interface
 }
 
 func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Request) {
-	var args schedulerapi.ExtenderArgs
-
 	decoder := json.NewDecoder(req.Body)
 	defer req.Body.Close()
 
-	if err := decoder.Decode(&args); err != nil {
-		http.Error(w, "Decode error", http.StatusBadRequest)
-		return
-	}
-
 	encoder := json.NewEncoder(w)
 
-	if strings.Contains(req.URL.Path, filter) {
-		resp := &schedulerapi.ExtenderFilterResult{}
-		resp, err := e.Filter(&args)
-		if err != nil {
+	if strings.Contains(req.URL.Path, filter) || strings.Contains(req.URL.Path, prioritize) {
+		var args schedulerapi.ExtenderArgs
+
+		if err := decoder.Decode(&args); err != nil {
+			http.Error(w, "Decode error", http.StatusBadRequest)
+			return
+		}
+
+		if strings.Contains(req.URL.Path, filter) {
+			resp := &schedulerapi.ExtenderFilterResult{}
+			resp, err := e.Filter(&args)
+			if err != nil {
+				resp.Error = err.Error()
+			}
+
+			if err := encoder.Encode(resp); err != nil {
+				t.Fatalf("Failed to encode %v", resp)
+			}
+		} else if strings.Contains(req.URL.Path, prioritize) {
+			// Prioritize errors are ignored. Default k8s priorities or another extender's
+			// priorities may be applied.
+			priorities, _ := e.Prioritize(&args)
+
+			if err := encoder.Encode(priorities); err != nil {
+				t.Fatalf("Failed to encode %+v", priorities)
+			}
+		}
+	} else if strings.Contains(req.URL.Path, bind) {
+		var args schedulerapi.Binding
+
+		decoder := json.NewDecoder(req.Body)
+		defer req.Body.Close()
+
+		if err := decoder.Decode(&args); err != nil {
+			http.Error(w, "Decode error", http.StatusBadRequest)
+			return
+		}
+
+		resp := &schedulerapi.BindingResult{}
+
+		if err := e.Bind(&args); err != nil {
 			resp.Error = err.Error()
 		}
 
 		if err := encoder.Encode(resp); err != nil {
 			t.Fatalf("Failed to encode %+v", resp)
-		}
-	} else if strings.Contains(req.URL.Path, prioritize) {
-		// Prioritize errors are ignored. Default k8s priorities or another extender's
-		// priorities may be applied.
-		priorities, _ := e.Prioritize(&args)
-
-		if err := encoder.Encode(priorities); err != nil {
-			t.Fatalf("Failed to encode %+v", priorities)
 		}
 	} else {
 		http.Error(w, "Unknown method", http.StatusNotFound)
@@ -211,6 +237,19 @@ func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (*schedulerapi.Ho
 	return &result, nil
 }
 
+func (e *Extender) Bind(binding *schedulerapi.Binding) error {
+	b := &v1.Binding{
+		ObjectMeta: metav1.ObjectMeta{Namespace: binding.PodNamespace, Name: binding.PodName, UID: binding.PodUID},
+		Target: v1.ObjectReference{
+			Kind: "Node",
+			Name: binding.Node,
+		},
+	}
+
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), b.Namespace)
+	return e.Client.Core().RESTClient().Post().Namespace(genericapirequest.NamespaceValue(ctx)).Resource("bindings").Body(b).Do().Error()
+}
+
 func machine_1_2_3_Predicate(pod *v1.Pod, node *v1.Node) (bool, error) {
 	if node.Name == "machine1" || node.Name == "machine2" || node.Name == "machine3" {
 		return true, nil
@@ -272,6 +311,7 @@ func TestSchedulerExtender(t *testing.T) {
 		name:         "extender2",
 		predicates:   []fitPredicate{machine_2_3_5_Predicate},
 		prioritizers: []priorityConfig{{machine_3_Prioritizer, 1}},
+		Client:       clientSet,
 	}
 	es2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		extender2.serveHTTP(t, w, req)
@@ -302,6 +342,7 @@ func TestSchedulerExtender(t *testing.T) {
 				URLPrefix:      es2.URL,
 				FilterVerb:     filter,
 				PrioritizeVerb: prioritize,
+				BindVerb:       bind,
 				Weight:         4,
 				EnableHttps:    false,
 			},
@@ -396,6 +437,14 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		t.Fatalf("Failed to get pod: %v", err)
 	} else if myPod.Spec.NodeName != "machine2" {
 		t.Fatalf("Failed to schedule using extender, expected machine2, got %v", myPod.Spec.NodeName)
+	}
+	var gracePeriod int64
+	if err := cs.Core().Pods(ns.Name).Delete(myPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}); err != nil {
+		t.Fatalf("Failed to delete pod: %v", err)
+	}
+	_, err = cs.Core().Pods(ns.Name).Get(myPod.Name, metav1.GetOptions{})
+	if err == nil {
+		t.Fatalf("Failed to delete pod: %v", err)
 	}
 	t.Logf("Scheduled pod using extenders")
 }

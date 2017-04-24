@@ -84,7 +84,7 @@ type Configurator interface {
 	Create() (*Config, error)
 	CreateFromProvider(providerName string) (*Config, error)
 	CreateFromConfig(policy schedulerapi.Policy) (*Config, error)
-	CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error)
+	CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender, binder Binder) (*Config, error)
 }
 
 // Config is an implementation of the Scheduler's configured input data.
@@ -215,7 +215,7 @@ func (sched *Scheduler) scheduleOne() {
 		}()
 
 		b := &v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
+			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, UID: pod.UID},
 			Target: v1.ObjectReference{
 				Kind: "Node",
 				Name: dest,
