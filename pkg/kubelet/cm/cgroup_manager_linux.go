@@ -338,6 +338,9 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	if resourceConfig.CpusetMems != nil {
 		resources.CpusetMems = *resourceConfig.CpusetMems
 	}
+	if resourceConfig.HugetlbLimit != nil {
+		resources.HugetlbLimit = resourceConfig.HugetlbLimit
+	}
 	return resources
 }
 

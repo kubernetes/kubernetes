@@ -74,6 +74,7 @@ message IsolationControl {
     CGROUP_CPUSET_CPUS = 0;
     CGROUP_CPUSET_MEMS = 1;
     CONTAINER_ENV_VAR = 2;
+    CGROUP_HUGETLB_LIMIT = 3;
   };
   Kind kind = 1;
   string value = 2;
