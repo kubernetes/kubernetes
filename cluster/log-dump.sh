@@ -248,6 +248,11 @@ function dump_nodes() {
 }
 
 setup
-echo "Dumping master and node logs to ${report_dir}"
+echo "Dumping master logs to ${report_dir}"
 dump_masters
-dump_nodes
+if [[ "${DUMP_ONLY_MASTER_LOGS:-}" != "true" ]]; then
+  echo "Dumping node logs to ${report_dir}"
+  dump_nodes
+else
+  echo "Skipping dumping of node logs"
+fi
