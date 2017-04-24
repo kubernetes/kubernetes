@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"math"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"github.com/golang/glog"
+
+	"k8s.io/client-go/pkg/api/v1"
+
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
-
-	"github.com/golang/glog"
 )
 
 // This is a reasonable size range of all container images. 90%ile of images on dockerhub drops into this range.

@@ -18,11 +18,13 @@ package util
 
 import (
 	"fmt"
-	"github.com/golang/glog"
-	ktypes "k8s.io/apimachinery/pkg/types"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/golang/glog"
+
+	ktypes "k8s.io/apimachinery/pkg/types"
 )
 
 type clock interface {

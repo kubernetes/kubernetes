@@ -22,9 +22,9 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/client-go/pkg/api/v1"
+	v1helper "k8s.io/client-go/pkg/api/v1/helper"
 	clientcache "k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/v1"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 )
 
