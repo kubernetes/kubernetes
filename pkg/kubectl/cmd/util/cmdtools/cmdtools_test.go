@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package editor
+package cmdtools
 
 import (
 	"bytes"
@@ -26,24 +26,24 @@ import (
 )
 
 func TestArgs(t *testing.T) {
-	if e, a := []string{"/bin/bash", "-c \"test\""}, (Editor{Args: []string{"/bin/bash", "-c"}, Shell: true}).args("test"); !reflect.DeepEqual(e, a) {
+	if e, a := []string{"/bin/bash", "-c \"test\""}, (CmdTool{Args: []string{"/bin/bash", "-c"}, Shell: true}).args([]string{"/bin/bash", "-c"}, "test"); !reflect.DeepEqual(e, a) {
 		t.Errorf("unexpected args: %v", a)
 	}
-	if e, a := []string{"/bin/bash", "-c", "test"}, (Editor{Args: []string{"/bin/bash", "-c"}, Shell: false}).args("test"); !reflect.DeepEqual(e, a) {
+	if e, a := []string{"/bin/bash", "-c", "test"}, (CmdTool{Args: []string{"/bin/bash", "-c"}, Shell: false}).args([]string{"/bin/bash", "-c"}, "test"); !reflect.DeepEqual(e, a) {
 		t.Errorf("unexpected args: %v", a)
 	}
-	if e, a := []string{"/bin/bash", "-i -c \"test\""}, (Editor{Args: []string{"/bin/bash", "-i -c"}, Shell: true}).args("test"); !reflect.DeepEqual(e, a) {
+	if e, a := []string{"/bin/bash", "-i -c \"test\""}, (CmdTool{Args: []string{"/bin/bash", "-i -c"}, Shell: true}).args([]string{"/bin/bash", "-i -c"}, "test"); !reflect.DeepEqual(e, a) {
 		t.Errorf("unexpected args: %v", a)
 	}
-	if e, a := []string{"/test", "test"}, (Editor{Args: []string{"/test"}}).args("test"); !reflect.DeepEqual(e, a) {
+	if e, a := []string{"/test", "test"}, (CmdTool{Args: []string{"/test"}}).args([]string{"/test"}, "test"); !reflect.DeepEqual(e, a) {
 		t.Errorf("unexpected args: %v", a)
 	}
 }
 
 func TestEditor(t *testing.T) {
-	edit := Editor{Args: []string{"cat"}}
+	edit := CmdTool{Args: []string{"cat"}}
 	testStr := "test something\n"
-	contents, path, err := edit.LaunchTempFile("", "someprefix", bytes.NewBufferString(testStr))
+	contents, path, err := edit.LaunchTempFile("", "someprefix", bytes.NewBufferString(testStr), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
