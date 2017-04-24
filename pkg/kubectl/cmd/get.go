@@ -362,8 +362,10 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				},
 			}
 			if listMeta, err := meta.ListAccessor(obj); err == nil {
-				list.Object["selfLink"] = listMeta.GetSelfLink()
-				list.Object["resourceVersion"] = listMeta.GetResourceVersion()
+				list.Object["metadata"] = map[string]interface{}{
+					"selfLink":        listMeta.GetSelfLink(),
+					"resourceVersion": listMeta.GetResourceVersion(),
+				}
 			}
 
 			for _, item := range items {
