@@ -286,7 +286,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			}
 
 			for newNode := range newNodesSet {
-				if output, err := exec.Command("gcloud", "compute", "instances", "describe",
+				if output, err := execCmd("gcloud", "compute", "instances", "describe",
 					newNode,
 					"--project="+framework.TestContext.CloudConfig.ProjectID,
 					"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err == nil {
@@ -456,6 +456,11 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 })
 
+func execCmd(args ...string) *exec.Cmd {
+	glog.Info("Executing: %s", strings.Join(args, " "))
+	return exec.Command(args[0], args[1:]...)
+}
+
 func runDrainTest(f *framework.Framework, migSizes map[string]int, podsPerNode, pdbSize int, verifyFunction func(int)) {
 	increasedSize := manuallyIncreaseClusterSize(f, migSizes)
 
@@ -493,7 +498,7 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, podsPerNode, 
 }
 
 func getGKEClusterUrl() string {
-	out, err := exec.Command("gcloud", "auth", "print-access-token").Output()
+	out, err := execCmd("gcloud", "auth", "print-access-token").Output()
 	framework.ExpectNoError(err)
 	token := strings.Replace(string(out), "\n", "", -1)
 
@@ -516,8 +521,6 @@ func isAutoscalerEnabled(expectedMinNodeCountInTargetPool int) (bool, error) {
 		return false, err
 	}
 	strBody := string(body)
-	glog.Infof("Cluster config %s", strBody)
-
 	if strings.Contains(strBody, "\"minNodeCount\": "+strconv.Itoa(expectedMinNodeCountInTargetPool)) {
 		return true, nil
 	}
@@ -529,7 +532,7 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 	if nodePool == "default-pool" {
 		glog.Infof("Using gcloud to enable autoscaling for pool %s", nodePool)
 
-		output, err := exec.Command("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+		output, err := execCmd("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
 			"--enable-autoscaling",
 			"--min-nodes="+strconv.Itoa(minCount),
 			"--max-nodes="+strconv.Itoa(maxCount),
@@ -577,7 +580,7 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 	if nodePool == "default-pool" {
 		glog.Infof("Using gcloud to disable autoscaling for pool %s", nodePool)
 
-		output, err := exec.Command("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+		output, err := execCmd("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
 			"--no-enable-autoscaling",
 			"--node-pool="+nodePool,
 			"--project="+framework.TestContext.CloudConfig.ProjectID,
@@ -617,7 +620,7 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 }
 
 func addNodePool(name string, machineType string, numNodes int) {
-	output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create", name, "--quiet",
+	output, err := execCmd("gcloud", "alpha", "container", "node-pools", "create", name, "--quiet",
 		"--machine-type="+machineType,
 		"--num-nodes="+strconv.Itoa(numNodes),
 		"--project="+framework.TestContext.CloudConfig.ProjectID,
@@ -629,7 +632,7 @@ func addNodePool(name string, machineType string, numNodes int) {
 
 func deleteNodePool(name string) {
 	glog.Infof("Deleting node pool %s", name)
-	output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "delete", name, "--quiet",
+	output, err := execCmd("gcloud", "alpha", "container", "node-pools", "delete", name, "--quiet",
 		"--project="+framework.TestContext.CloudConfig.ProjectID,
 		"--zone="+framework.TestContext.CloudConfig.Zone,
 		"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
