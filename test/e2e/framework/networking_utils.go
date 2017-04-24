@@ -476,10 +476,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 	config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeExternalIP)
-	if len(config.ExternalAddrs) < 2 {
-		// fall back to legacy IPs
-		config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeLegacyHostIP)
-	}
+
 	SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
 

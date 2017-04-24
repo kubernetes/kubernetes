@@ -852,7 +852,6 @@ func TestPrintNodeExternalIP(t *testing.T) {
 			node: api.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
 				Status: api.NodeStatus{Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "1.1.1.1"},
 					{Type: api.NodeExternalIP, Address: "2.2.2.2"},
 					{Type: api.NodeInternalIP, Address: "3.3.3.3"},
 					{Type: api.NodeExternalIP, Address: "4.4.4.4"},

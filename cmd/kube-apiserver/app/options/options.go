@@ -102,8 +102,6 @@ func NewServerRunOptions() *ServerRunOptions {
 				// external, preferring DNS if reported
 				string(api.NodeExternalDNS),
 				string(api.NodeExternalIP),
-
-				string(api.NodeLegacyHostIP),
 			},
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
