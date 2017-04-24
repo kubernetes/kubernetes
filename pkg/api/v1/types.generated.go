@@ -35594,7 +35594,7 @@ func (x *HostMapping) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq2[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("IP"))
+					r.EncodeString(codecSelferC_UTF81234, string("ip"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					yym5 := z.EncBinary()
 					_ = yym5
@@ -35698,7 +35698,7 @@ func (x *HostMapping) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 		yys3 := string(yys3Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
 		switch yys3 {
-		case "IP":
+		case "ip":
 			if r.TryDecodeAsNil() {
 				x.IP = ""
 			} else {

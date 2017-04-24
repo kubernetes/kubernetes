@@ -641,7 +641,9 @@ func (Handler) SwaggerDoc() map[string]string {
 }
 
 var map_HostMapping = map[string]string{
-	"": "HostMapping holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
+	"":      "HostMapping holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
+	"ip":    "IP address of the host file entry.",
+	"names": "Hostnames for the the above IP address.",
 }
 
 func (HostMapping) SwaggerDoc() map[string]string {

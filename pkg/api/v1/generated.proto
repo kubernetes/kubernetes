@@ -1195,8 +1195,10 @@ message Handler {
 // HostMapping holds the mapping between IP and hostnames that will be injected as an entry in the
 // pod's hosts file.
 message HostMapping {
-  optional string IP = 1;
+  // IP address of the host file entry.
+  optional string ip = 1;
 
+  // Hostnames for the the above IP address.
   repeated string names = 2;
 }
 
