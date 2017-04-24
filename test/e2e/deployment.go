@@ -127,6 +127,7 @@ func checkDeploymentRevision(c clientset.Interface, ns, deploymentName, revision
 	// Check revision of the new replica set of this deployment
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
+	Expect(newRS).NotTo(Equal(nil))
 	Expect(newRS.Annotations).NotTo(Equal(nil))
 	Expect(newRS.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal(revision))
 	// Check revision of This deployment
