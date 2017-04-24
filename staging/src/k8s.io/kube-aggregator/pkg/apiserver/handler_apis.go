@@ -22,7 +22,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -88,14 +88,7 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	json, err := runtime.Encode(r.codecs.LegacyCodec(), discoveryGroupList)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if _, err := w.Write(json); err != nil {
-		panic(err)
-	}
+	responsewriters.WriteObjectNegotiated(r.codecs, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroupList)
 }
 
 // convertToDiscoveryAPIGroup takes apiservices in a single group and returns a discovery compatible object.
@@ -198,12 +191,5 @@ func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "", http.StatusNotFound)
 		return
 	}
-	json, err := runtime.Encode(r.codecs.LegacyCodec(), discoveryGroup)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if _, err := w.Write(json); err != nil {
-		panic(err)
-	}
+	responsewriters.WriteObjectNegotiated(r.codecs, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroup)
 }
