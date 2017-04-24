@@ -124,3 +124,46 @@ func TestAuthenticateRequestError(t *testing.T) {
 		t.Fatalf("contextMapper should have no stored requests: %v", contextMapper)
 	}
 }
+
+func TestCompressUsername(t *testing.T) {
+	tests := []struct{ username, expected string }{
+		// Known system accounts should be reported as-is.
+		{"kubelet", "kubelet"},
+		{"kubecfg", "kubecfg"},
+		{"admin", "admin"},
+		{"system:kube-controller-manager", "system:kube-controller-manager"},
+		{"system:kube-scheduler", "system:kube-scheduler"},
+		{"system:apiserver", "system:apiserver"},
+		{"system:anonymous", "system:anonymous"},
+		{"system:kube-proxy", "system:kube-proxy"},
+		{"system:serviceaccount:kube-system:default", "system:serviceaccount:kube-system:default"},
+		{"system:serviceaccount:kube-system:node-controller", "system:serviceaccount:kube-system:node-controller"},
+		{"system:serviceaccount:kube-system:endpoint-controller", "system:serviceaccount:kube-system:endpoint-controller"},
+		{"system:serviceaccount:kube-system:cronjob-controller", "system:serviceaccount:kube-system:cronjob-controller"},
+		{"system:serviceaccount:kube-system:generic-garbage-collector", "system:serviceaccount:kube-system:generic-garbage-collector"},
+		{"system:serviceaccount:kube-system:pod-garbage-collector", "system:serviceaccount:kube-system:pod-garbage-collector"},
+		{"system:serviceaccount:kube-system:node-problem-detector", "system:serviceaccount:kube-system:node-problem-detector"},
+		{"system:serviceaccount:kube-system:kube-dns", "system:serviceaccount:kube-system:kube-dns"},
+		{"system:serviceaccount:kube-system:namespace-controller", "system:serviceaccount:kube-system:namespace-controller"},
+		{"system:serviceaccount:kube-system:replicaset-controller", "system:serviceaccount:kube-system:replicaset-controller"},
+		{"system:serviceaccount:kube-system:deployment-controller", "system:serviceaccount:kube-system:deployment-controller"},
+		{"system:serviceaccount:kube-system:daemon-set-controller", "system:serviceaccount:kube-system:daemon-set-controller"},
+		{"system:serviceaccount:kube-system:controller-discovery", "system:serviceaccount:kube-system:controller-discovery"},
+		{"system:serviceaccount:kube-system:replication-controller", "system:serviceaccount:kube-system:replication-controller"},
+		{"system:serviceaccount:kube-system:ttl-controller", "system:serviceaccount:kube-system:ttl-controller"},
+		{"system:serviceaccount:kube-system:route-controller", "system:serviceaccount:kube-system:route-controller"},
+		{"system:serviceaccount:kube-system:service-account-controller", "system:serviceaccount:kube-system:service-account-controller"},
+		// Custom service & user accounts should be compressed.
+		{"foo@bar.com", "email_id"},
+		{"foo-bar-baz@k8s.io.edu.gov", "email_id"},
+		{"system:serviceaccount:default:foo-service", "system:serviceaccount"},
+		{"system:serviceaccount:my-namespace:bar", "system:serviceaccount"},
+		{"whatsit", "other"},
+		{"foo-user", "other"},
+	}
+	for i, test := range tests {
+		if actual := compressUsername(test.username); actual != test.expected {
+			t.Errorf("[%d  %s] expected: %q, got: %q", i, test.username, test.expected, actual)
+		}
+	}
+}
