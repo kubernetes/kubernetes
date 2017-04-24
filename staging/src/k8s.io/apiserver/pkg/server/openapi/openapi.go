@@ -32,7 +32,8 @@ import (
 )
 
 const (
-	OpenAPIVersion = "2.0"
+	OpenAPIVersion  = "2.0"
+	extensionPrefix = "x-kuberentes-"
 )
 
 type openAPI struct {
@@ -256,6 +257,14 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 				},
 			},
 		},
+	}
+	for k, v := range route.Metadata {
+		if strings.HasPrefix(k, extensionPrefix) {
+			if ret.Extensions == nil {
+				ret.Extensions = spec.Extensions{}
+			}
+			ret.Extensions.Add(k, v)
+		}
 	}
 	if ret.ID, ret.Tags, err = o.config.GetOperationIDAndTags(o.servePath, &route); err != nil {
 		return ret, err
