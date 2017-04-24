@@ -3946,13 +3946,15 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"IP": {
 							SchemaProps: spec.SchemaProps{
-								Type:   []string{"string"},
-								Format: "",
+								Description: "IP address of the host file entry.",
+								Type:        []string{"string"},
+								Format:      "",
 							},
 						},
 						"names": {
 							SchemaProps: spec.SchemaProps{
-								Type: []string{"array"},
+								Description: "Hostnames for the the above IP address.",
+								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{

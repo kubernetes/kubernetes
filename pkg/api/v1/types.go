@@ -2414,7 +2414,9 @@ type PodSpec struct {
 // HostMapping holds the mapping between IP and hostnames that will be injected as an entry in the
 // pod's hosts file.
 type HostMapping struct {
+	// IP address of the host file entry.
 	IP    string   `json:"IP,omitempty" protobuf:"bytes,1,opt,name=IP"`
+	// Hostnames for the the above IP address.
 	Names []string `json:"names,omitempty" protobuf:"bytes,2,rep,name=names"`
 }
 
