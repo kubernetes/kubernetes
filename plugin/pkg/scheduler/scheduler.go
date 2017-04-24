@@ -271,7 +271,7 @@ func (sched *Scheduler) scheduleOne() {
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
 		err := sched.bind(pod, &v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
+			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, UID: pod.UID},
 			Target: v1.ObjectReference{
 				Kind: "Node",
 				Name: suggestedHost,
