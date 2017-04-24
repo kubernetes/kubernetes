@@ -205,16 +205,6 @@ func TestGetNodeAddresses(t *testing.T) {
 	addrs, err = addressProvider.externalAddresses()
 	assert.NoError(err, "addresses should not have returned an error.")
 	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
-
-	// Pass case with LegacyHost type IP
-	nodes, _ = fakeNodeClient.List(metav1.ListOptions{})
-	for index := range nodes.Items {
-		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeLegacyHostIP, Address: "127.0.0.2"}}
-		fakeNodeClient.Update(&nodes.Items[index])
-	}
-	addrs, err = addressProvider.externalAddresses()
-	assert.NoError(err, "addresses failback should not have returned an error.")
-	assert.Equal([]string{"127.0.0.2", "127.0.0.2"}, addrs)
 }
 
 func decodeResponse(resp *http.Response, obj interface{}) error {
