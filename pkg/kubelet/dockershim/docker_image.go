@@ -17,6 +17,8 @@ limitations under the License.
 package dockershim
 
 import (
+	"fmt"
+
 	dockertypes "github.com/docker/engine-api/types"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -100,4 +102,9 @@ func (ds *dockerService) RemoveImage(image *runtimeapi.ImageSpec) error {
 
 	_, err = ds.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{PruneChildren: true})
 	return err
+}
+
+// ImageFsInfo returns information of the filesystem that is used to store images.
+func (ds *dockerService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
+	return nil, fmt.Errorf("not implemented")
 }
