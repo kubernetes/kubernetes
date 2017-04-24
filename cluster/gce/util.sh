@@ -45,9 +45,6 @@ if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
 elif [[ "${MASTER_OS_DISTRIBUTION}" == "debian" ]]; then
   MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${CVM_VERSION}}
   MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
-elif [[ "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
-  MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE}
-  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT}
 fi
 
 # Sets node image based on the specified os distro. Currently this function only
@@ -61,9 +58,6 @@ function set-node-image() {
   elif [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
     NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
     NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
-  elif [[ "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
-    NODE_IMAGE=${KUBE_GCE_NODE_IMAGE}
-    NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT}
   fi
 }
 
