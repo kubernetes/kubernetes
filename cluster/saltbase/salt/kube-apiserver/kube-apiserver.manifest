@@ -266,6 +266,11 @@
         { "name": "etcpki",
         "mountPath": "/etc/srv/pki",
         "readOnly": true},
+{% if grains['os_family'] == 'RedHat' %}
+        { "name": "etcpkica-trustextractedpem",
+        "mountPath": "/etc/pki/ca-trust/extracted/pem",
+        "readOnly": true},
+{% endif %}
         { "name": "srvsshproxy",
         "mountPath": "{{srv_sshproxy_path}}",
         "readOnly": false}
@@ -311,6 +316,12 @@
     "hostPath": {
         "path": "/etc/srv/pki"}
   },
+{% if grains['os_family'] == 'RedHat' %}
+  { "name": "etcpkica-trustextractedpem",
+    "hostPath": {
+        "path": "/etc/pki/ca-trust/extracted/pem"}
+  },
+{% endif %}
   { "name": "srvsshproxy",
     "hostPath": {
         "path": "{{srv_sshproxy_path}}"}

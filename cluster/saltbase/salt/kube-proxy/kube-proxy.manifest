@@ -72,6 +72,11 @@ spec:
     - mountPath: /usr/share/ca-certificates
       name: usr-ca-certs
       readOnly: true
+{% if grains['os_family'] == 'RedHat' %}
+    - mountPath: /etc/pki/ca-trust/extracted/pem
+      name: etcpkica-trustextractedpem
+      readOnly: true
+{% endif %}
     - mountPath: /var/log
       name: varlog
       readOnly: false
@@ -85,6 +90,11 @@ spec:
   - hostPath:
       path: /etc/ssl/certs
     name: etc-ssl-certs
+{% if grains['os_family'] == 'RedHat' %}
+  - hostPath:
+      path: /etc/pki/ca-trust/extracted/pem
+    name: etcpkica-trustextractedpem
+{% endif %}
   - hostPath:
       path: /var/lib/kube-proxy/kubeconfig
     name: kubeconfig
