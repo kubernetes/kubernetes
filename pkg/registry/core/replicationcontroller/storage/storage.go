@@ -61,12 +61,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against replication controllers.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
-		NewFunc:     func() runtime.Object { return &api.ReplicationController{} },
-		NewListFunc: func() runtime.Object { return &api.ReplicationControllerList{} },
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*api.ReplicationController).Name, nil
-		},
+		Copier:            api.Scheme,
+		NewFunc:           func() runtime.Object { return &api.ReplicationController{} },
+		NewListFunc:       func() runtime.Object { return &api.ReplicationControllerList{} },
 		PredicateFunc:     replicationcontroller.MatchController,
 		QualifiedResource: api.Resource("replicationcontrollers"),
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("replicationcontrollers"),

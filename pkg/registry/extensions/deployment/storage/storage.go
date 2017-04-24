@@ -63,12 +63,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against deployments.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST) {
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
-		NewFunc:     func() runtime.Object { return &extensions.Deployment{} },
-		NewListFunc: func() runtime.Object { return &extensions.DeploymentList{} },
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*extensions.Deployment).Name, nil
-		},
+		Copier:            api.Scheme,
+		NewFunc:           func() runtime.Object { return &extensions.Deployment{} },
+		NewListFunc:       func() runtime.Object { return &extensions.DeploymentList{} },
 		PredicateFunc:     deployment.MatchDeployment,
 		QualifiedResource: extensions.Resource("deployments"),
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("deployments"),

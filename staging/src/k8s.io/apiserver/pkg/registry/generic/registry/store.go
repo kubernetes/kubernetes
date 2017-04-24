@@ -1194,6 +1194,16 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 
 	e.EnableGarbageCollection = opts.EnableGarbageCollection
 
+	if e.ObjectNameFunc == nil {
+		e.ObjectNameFunc = func(obj runtime.Object) (string, error) {
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return "", err
+			}
+			return accessor.GetName(), nil
+		}
+	}
+
 	if e.Storage == nil {
 		capacity := DefaultWatchCacheSize
 		if e.WatchCacheSize != 0 {
