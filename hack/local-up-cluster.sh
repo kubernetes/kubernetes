@@ -806,7 +806,9 @@ fi
 }
 
 # validate that etcd is: not running, in path, and has minimum required version.
-kube::etcd::validate
+if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  kube::etcd::validate
+fi
 
 if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
   exit 1
