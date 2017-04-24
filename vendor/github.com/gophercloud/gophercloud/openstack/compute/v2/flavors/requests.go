@@ -54,6 +54,47 @@ func ListDetail(client *gophercloud.ServiceClient, opts ListOptsBuilder) paginat
 	})
 }
 
+type CreateOptsBuilder interface {
+	ToFlavorCreateMap() (map[string]interface{}, error)
+}
+
+// CreateOpts is passed to Create to create a flavor
+// Source:
+// https://github.com/openstack/nova/blob/stable/newton/nova/api/openstack/compute/schemas/flavor_manage.py#L20
+type CreateOpts struct {
+	Name string `json:"name" required:"true"`
+	// memory size, in MBs
+	RAM   int `json:"ram" required:"true"`
+	VCPUs int `json:"vcpus" required:"true"`
+	// disk size, in GBs
+	Disk *int   `json:"disk" required:"true"`
+	ID   string `json:"id,omitempty"`
+	// non-zero, positive
+	Swap       *int    `json:"swap,omitempty"`
+	RxTxFactor float64 `json:"rxtx_factor,omitempty"`
+	IsPublic   *bool   `json:"os-flavor-access:is_public,omitempty"`
+	// ephemeral disk size, in GBs, non-zero, positive
+	Ephemeral *int `json:"OS-FLV-EXT-DATA:ephemeral,omitempty"`
+}
+
+// ToFlavorCreateMap satisfies the CreateOptsBuilder interface
+func (opts *CreateOpts) ToFlavorCreateMap() (map[string]interface{}, error) {
+	return gophercloud.BuildRequestBody(opts, "flavor")
+}
+
+// Create a flavor
+func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) (r CreateResult) {
+	b, err := opts.ToFlavorCreateMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+	_, r.Err = client.Post(createURL(client), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 201},
+	})
+	return
+}
+
 // Get instructs OpenStack to provide details on a single flavor, identified by its ID.
 // Use ExtractFlavor to convert its result into a Flavor.
 func Get(client *gophercloud.ServiceClient, id string) (r GetResult) {

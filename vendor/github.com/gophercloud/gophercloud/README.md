@@ -74,7 +74,7 @@ import (
 
 // Option 1: Pass in the values yourself
 opts := gophercloud.AuthOptions{
-  IdentityEndpoint: "https://my-openstack.com:5000/v2.0",
+  IdentityEndpoint: "https://openstack.example.com:5000/v2.0",
   Username: "{username}",
   Password: "{password}",
 }

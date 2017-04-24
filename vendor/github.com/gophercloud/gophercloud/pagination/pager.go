@@ -145,26 +145,23 @@ func (p Pager) AllPages() (Page, error) {
 
 	// Switch on the page body type. Recognized types are `map[string]interface{}`,
 	// `[]byte`, and `[]interface{}`.
-	switch testPage.GetBody().(type) {
+	switch pb := testPage.GetBody().(type) {
 	case map[string]interface{}:
 		// key is the map key for the page body if the body type is `map[string]interface{}`.
 		var key string
 		// Iterate over the pages to concatenate the bodies.
 		err = p.EachPage(func(page Page) (bool, error) {
 			b := page.GetBody().(map[string]interface{})
-			for k := range b {
+			for k, v := range b {
 				// If it's a linked page, we don't want the `links`, we want the other one.
 				if !strings.HasSuffix(k, "links") {
-					key = k
+					// check the field's type. we only want []interface{} (which is really []map[string]interface{})
+					switch vt := v.(type) {
+					case []interface{}:
+						key = k
+						pagesSlice = append(pagesSlice, vt...)
+					}
 				}
-			}
-			switch keyType := b[key].(type) {
-			case map[string]interface{}:
-				pagesSlice = append(pagesSlice, keyType)
-			case []interface{}:
-				pagesSlice = append(pagesSlice, b[key].([]interface{})...)
-			default:
-				return false, fmt.Errorf("Unsupported page body type: %+v", keyType)
 			}
 			return true, nil
 		})
@@ -216,7 +213,7 @@ func (p Pager) AllPages() (Page, error) {
 	default:
 		err := gophercloud.ErrUnexpectedType{}
 		err.Expected = "map[string]interface{}/[]byte/[]interface{}"
-		err.Actual = fmt.Sprintf("%v", reflect.TypeOf(testPage.GetBody()))
+		err.Actual = fmt.Sprintf("%T", pb)
 		return nil, err
 	}
 
