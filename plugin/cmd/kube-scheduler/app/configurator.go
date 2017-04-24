@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 
-	"k8s.io/client-go/tools/cache"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 
@@ -77,7 +77,7 @@ func createClient(s *options.SchedulerServer) (*clientset.Clientset, error) {
 func CreateScheduler(
 	s *options.SchedulerServer,
 	kubecli *clientset.Clientset,
-  informerFactory informers.SharedInformerFactory,
+	informerFactory informers.SharedInformerFactory,
 	recorder record.EventRecorder,
 ) (*scheduler.Scheduler, error) {
 	configurator := factory.NewConfigFactory(
@@ -149,7 +149,7 @@ func (sc *schedulerConfigurator) getSchedulerPolicyConfig() (*schedulerapi.Polic
 			if !policyConfigMapFound {
 				return nil, fmt.Errorf("No element with key = '%v' is found in the ConfigMap 'Data'.", options.SchedulerPolicyConfigMapKey)
 			}
-			glog.V(5).Infof("Scheduler policy ConfigMap: %v", configString)
+			glog.Infof("Scheduler policy ConfigMap: %v", configString)
 			configData = []byte(configString)
 		}
 	}
@@ -207,8 +207,8 @@ func (sc *schedulerConfigurator) SetupPolicyConfigMapEventHandlers(client client
 	})
 
 	sharedIndexInformer.AddEventHandlerWithResyncPeriod(
-		cache.ResourceEventHandlerFuncs {
-			AddFunc:    nil, // scheduler aborts if its policy ConfigMap does not exist. So, we do not need and "add" handler.
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    nil, // scheduler aborts if its policy ConfigMap does not exist. So, we do not need an "add" handler.
 			UpdateFunc: sc.updatePolicyConfigMap,
 			DeleteFunc: sc.deletePolicyConfigMap,
 		},
@@ -238,19 +238,8 @@ func verifyNewPolicyConfig(obj interface{}) error {
 	return nil
 }
 
-func (sc *schedulerConfigurator) addPolicyConfigMap(obj interface{}) {
-	glog.Info("Received a request to add a scheduler policy config.")
-	err := verifyNewPolicyConfig(obj)
-	if err != nil {
-		glog.Error(err)
-		return
-	}
-	// If things are in order, kill the scheduler to apply the new config.
-	sc.KillScheduler()
-}
-
 func (sc *schedulerConfigurator) updatePolicyConfigMap(oldObj, newObj interface{}) {
-	glog.Info("Received an update to the scheduler policy config.")
+	glog.Info("Received an update to the scheduler policy config (%v/%v).", sc.policyConfigMapNamespace, sc.policyConfigMap)
 	_, ok := oldObj.(*v1.ConfigMap)
 	if !ok {
 		glog.Errorf("cannot convert oldObj to *v1.ConfigMap: %v", oldObj)
@@ -265,11 +254,10 @@ func (sc *schedulerConfigurator) updatePolicyConfigMap(oldObj, newObj interface{
 	sc.KillScheduler()
 }
 
-
 func (sc *schedulerConfigurator) deletePolicyConfigMap(obj interface{}) {
-	glog.Info("Scheduler's policy ConfigMap is deleted.")
+	glog.Infof("Scheduler's policy ConfigMap (%v/%v) is deleted.", sc.policyConfigMapNamespace, sc.policyConfigMap)
 	switch t := obj.(type) {
-	case *v1.ConfigMap:  // Nothing is needed. Jump out of the switch.
+	case *v1.ConfigMap: // Nothing is needed. Jump out of the switch.
 	case cache.DeletedFinalStateUnknown:
 		_, ok := t.Obj.(*v1.ConfigMap)
 		if !ok {
@@ -290,14 +278,13 @@ func (sc *schedulerConfigurator) KillScheduler() {
 	if SchedulerKillFunc != nil {
 		SchedulerKillFunc()
 	} else {
+		glog.Infof("Scheduler is going to die (and restarted) in order to update its policy.")
 		if sc.schedulerConfig != nil {
-			glog.Infof("Scheduler is going to die (and restarted) in order to update its policy.")
 			close(sc.schedulerConfig.StopEverything)
-			// The sleep is only to allow cleanups to happen.
-			time.Sleep(2 * time.Second)
-			glog.Flush()
-			os.Exit(0)
 		}
-		glog.Infof("Scheduler is not going to exit, as it doesn't seem to be initialized yet.")
+		// The sleep is only to allow cleanups to happen. The 2 second wait is chosen randomly!
+		time.Sleep(2 * time.Second)
+		glog.Flush()
+		os.Exit(0)
 	}
 }
