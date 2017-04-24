@@ -40,7 +40,7 @@ func (s ResourceRecordSetsService) managedZone(project, managedZone string) (*Ma
 	if z == nil {
 		return nil, fmt.Errorf("Zone %s not found in project %s", managedZone, project)
 	}
-	return s.Service.ManagedZones_.Impl[project][managedZone].(*ManagedZone), nil
+	return z.(*ManagedZone), nil
 }
 
 func (s ResourceRecordSetsService) List(project string, managedZone string) interfaces.ResourceRecordSetsListCall {
