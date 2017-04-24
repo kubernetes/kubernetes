@@ -25,5 +25,9 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 kube::util::ensure_godep_version v79
 
 echo "Starting to download all kubernetes godeps. This takes a while"
-GOPATH=${GOPATH}:${KUBE_ROOT}/staging godep restore "$@"
+if ! GOPATH=${GOPATH}:${KUBE_ROOT}/staging godep restore "$@"; then
+  echo "\"godep restore\" failed. Removing the packages that caused the failure from your GOPATH might solve the problem."
+  exit 1
+fi
+  
 echo "Download finished"
