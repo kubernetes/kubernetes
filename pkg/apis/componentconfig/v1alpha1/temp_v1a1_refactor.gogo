@@ -9,6 +9,24 @@ type KubeletConfiguration struct {
   // TODO(kc-refactor): Recompose this from the structures below.
 }
 
+// TODO(mtaufen): Feature owners for each config field
+// TODO(mtaufen): optional fields? also include defaults.
+
+// TODO(mtaufen): Reorganize under these categories:
+/*
+- Node lifecycle
+- Pod lifecycle
+- Monitoring/logging
+- Resource management
+- Security
+- Networking
+*/
+
+// TODO(mtaufen): CAUTION PEOPLE THAT THERE MAY BE INTERDEPENDENCIES BETWEEN SUBOBJECTS
+// AND THEY SHOULD BE REALLY CAREFUL!!!!!! YOU NEED TO ALSO WRITE EVERY SUBOBJECT!
+
+// TODO(mtaufen): Have every maintainer of node review this and get an approval from each, also heads up to storage and networking
+
 // These are marked deprecated and shoud be left as flags-only,
 // and eventually removed per the deprecation policy: https://kubernetes.io/docs/home/deprecation-policy/.
 type MarkedDeprecated struct {
@@ -72,7 +90,7 @@ type ShouldProbablyJustBeFlags struct {
 
   // experimentalMounterPath is the path to mounter binary. If not set, kubelet will attempt to use mount
   // binary that is available via $PATH,
-  ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"`
+  ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"` // There is now a use-case for this being dynamic
 
   // containerized should be set to true if kubelet is running in a container.
   Containerized *bool `json:"containerized"`
@@ -102,6 +120,8 @@ type ShouldProbablyJustBeFlags struct {
 }
 
 /* BEGIN RUNTIME REMOVAL */
+
+// TODO(mtaufen): These will be marked deprecated
 
 // I believe the plan is to remove ALL of these from the Kubelet/Node configuration
 // e.g. they become flags-only for now and are immediately marked deprecated, for later removal.
@@ -147,6 +167,8 @@ type RktOptions struct {
 
 /* END RUNTIME REMOVAL */
 
+// TODO(mtaufen): Registration and Status could be NodeLifecycleConfig
+
 type NodeRegistrationConfig struct {
     // registerNode enables automatic registration with the apiserver.
   RegisterNode *bool `json:"registerNode"`
@@ -166,6 +188,9 @@ type NodeStatusConfig struct {
   NodeStatusUpdateFrequency metav1.Duration `json:"nodeStatusUpdateFrequency"`
 }
 
+
+// TODO(mtaufen): Should we just roll this into NodeNetworkConfig
+// How is DNS generated?
 type ClusterDNSConfig struct {
   // clusterDNS is a list of IP address for the cluster DNS server.  If set,
   // kubelet will configure all containers to use this for DNS resolution
