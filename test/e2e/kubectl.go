@@ -636,13 +636,42 @@ users:
     tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
 `), os.FileMode(0755)))
 			framework.Logf("copying override kubeconfig to the %s pod", simplePodName)
-			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, overrideKubeconfigName), ns+"/"+simplePodName+":/tmp/"+overrideKubeconfigName)
+			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, overrideKubeconfigName), ns+"/"+simplePodName+":/tmp/")
+
+			framework.ExpectNoError(ioutil.WriteFile(filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), []byte(`
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: "configmap with namespace and invalid name"
+  namespace: configmap-namespace
+`), os.FileMode(0755)))
+			framework.ExpectNoError(ioutil.WriteFile(filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), []byte(`
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: "configmap without namespace and invalid name"
+`), os.FileMode(0755)))
+			framework.Logf("copying configmap manifests to the %s pod", simplePodName)
+			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
+			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
 
 			By("getting pods with in-cluster configs")
 			execOutput := framework.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --v=7 2>&1")
 			Expect(execOutput).To(MatchRegexp("nginx +1/1 +Running"))
 			Expect(execOutput).To(ContainSubstring("Using in-cluster namespace"))
 			Expect(execOutput).To(ContainSubstring("Using in-cluster configuration"))
+
+			By("creating an object containing a namespace with in-cluster config")
+			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-with-namespace.yaml --v=7 2>&1")
+			Expect(err).To(ContainSubstring("Using in-cluster namespace"))
+			Expect(err).To(ContainSubstring("Using in-cluster configuration"))
+			Expect(err).To(ContainSubstring(fmt.Sprintf("POST https://%s:%s/api/v1/namespaces/configmap-namespace/configmaps", inClusterHost, inClusterPort)))
+
+			By("creating an object not containing a namespace with in-cluster config")
+			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-without-namespace.yaml --v=7 2>&1")
+			Expect(err).To(ContainSubstring("Using in-cluster namespace"))
+			Expect(err).To(ContainSubstring("Using in-cluster configuration"))
+			Expect(err).To(ContainSubstring(fmt.Sprintf("POST https://%s:%s/api/v1/namespaces/%s/configmaps", inClusterHost, inClusterPort, f.Namespace.Name)))
 
 			By("trying to use kubectl with invalid token")
 			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
