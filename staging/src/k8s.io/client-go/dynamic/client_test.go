@@ -34,6 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	restclientwatch "k8s.io/client-go/rest/watch"
+
+	// install to get v1 fallbacks for Get/List/DeleteOptions registered
+	_ "k8s.io/client-go/pkg/api/install"
 )
 
 func getJSON(version, kind, name string) []byte {
@@ -554,5 +557,13 @@ func TestPatch(t *testing.T) {
 		if !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("Patch(%q) want: %v\ngot: %v", tc.name, tc.want, got)
 		}
+	}
+}
+
+func TestVersionedParameterEncoderWithV1Fallback(t *testing.T) {
+	enc := VersionedParameterEncoderWithV1Fallback
+	_, err := enc.EncodeParameters(&metav1.ListOptions{}, schema.GroupVersion{Group: "foo.bar.com", Version: "v4"})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
