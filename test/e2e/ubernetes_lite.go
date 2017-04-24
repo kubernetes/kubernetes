@@ -37,7 +37,7 @@ var _ = framework.KubeDescribe("Multi-AZ Clusters", func() {
 	f := framework.NewDefaultFramework("multi-az")
 	var zoneCount int
 	var err error
-	image := "gcr.io/google_containers/serve_hostname:v1.4"
+	image := framework.ServeHostnameImage
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 		if zoneCount <= 0 {

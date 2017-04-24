@@ -238,16 +238,6 @@ func RegisterNodeFlags() {
 	flag.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 }
 
-// overwriteFlagsWithViperConfig finds and writes values to flags using viper as input.
-func overwriteFlagsWithViperConfig() {
-	viperFlagSetter := func(f *flag.Flag) {
-		if viper.IsSet(f.Name) {
-			f.Value.Set(viper.GetString(f.Name))
-		}
-	}
-	flag.VisitAll(viperFlagSetter)
-}
-
 // ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.
 func ViperizeFlags() {
 

@@ -203,7 +203,7 @@ func main() {
 						Containers: []v1.Container{
 							{
 								Name:  "serve-hostname",
-								Image: "gcr.io/google_containers/serve_hostname:v1.4",
+								Image: e2e.ServeHostnameImage,
 								Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 							},
 						},
