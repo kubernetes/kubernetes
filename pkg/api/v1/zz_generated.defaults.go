@@ -210,6 +210,9 @@ func SetObjectDefaults_Pod(in *Pod) {
 		if a.VolumeSource.ScaleIO != nil {
 			SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
+		if a.VolumeSource.HugePages != nil {
+			SetDefaults_HugePagesVolumeSource(a.VolumeSource.HugePages)
+		}
 	}
 	for i := range in.Spec.InitContainers {
 		a := &in.Spec.InitContainers[i]
@@ -358,6 +361,9 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 		if a.VolumeSource.ScaleIO != nil {
 			SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
+		if a.VolumeSource.HugePages != nil {
+			SetDefaults_HugePagesVolumeSource(a.VolumeSource.HugePages)
+		}
 	}
 	for i := range in.Template.Spec.InitContainers {
 		a := &in.Template.Spec.InitContainers[i]
@@ -499,6 +505,9 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 			}
 			if a.VolumeSource.ScaleIO != nil {
 				SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			}
+			if a.VolumeSource.HugePages != nil {
+				SetDefaults_HugePagesVolumeSource(a.VolumeSource.HugePages)
 			}
 		}
 		for i := range in.Spec.Template.Spec.InitContainers {

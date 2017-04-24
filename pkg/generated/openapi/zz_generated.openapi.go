@@ -3957,6 +3957,30 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"k8s.io/kubernetes/pkg/api/v1.HugePagesVolumeSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "HugePagesSource represents Linux HugeTlbPage https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt",
+					Properties: map[string]spec.Schema{
+						"pageSize": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Defaults to 2M",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"size": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Size of HugePages mount For pagesize, size, min_size and nr_inodes options, you can use [G|g]/[M|m]/[K|k] to represent giga/mega/kilo. For example, size=2K has the same meaning as size=2048.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -9002,12 +9026,18 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.ScaleIOVolumeSource"),
 							},
 						},
+						"hugePages": {
+							SchemaProps: spec.SchemaProps{
+								Description: "HugePages represensts a hugepage resource.",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.HugePagesVolumeSource"),
+							},
+						},
 					},
 					Required: []string{"name"},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.EmptyDirVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GitRepoVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PortworxVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ScaleIOVolumeSource", "k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
+				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.EmptyDirVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GitRepoVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HugePagesVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PortworxVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ScaleIOVolumeSource", "k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.VolumeMount": {
 			Schema: spec.Schema{
@@ -9238,11 +9268,17 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.ScaleIOVolumeSource"),
 							},
 						},
+						"hugePages": {
+							SchemaProps: spec.SchemaProps{
+								Description: "HugePages represensts a hugepage resource.",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.HugePagesVolumeSource"),
+							},
+						},
 					},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.EmptyDirVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GitRepoVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PortworxVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ScaleIOVolumeSource", "k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
+				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.EmptyDirVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GitRepoVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HugePagesVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PortworxVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ScaleIOVolumeSource", "k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource": {
 			Schema: spec.Schema{

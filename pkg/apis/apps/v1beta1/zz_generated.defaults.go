@@ -83,6 +83,9 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 		if a.VolumeSource.ScaleIO != nil {
 			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
+		if a.VolumeSource.HugePages != nil {
+			v1.SetDefaults_HugePagesVolumeSource(a.VolumeSource.HugePages)
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
@@ -223,6 +226,9 @@ func SetObjectDefaults_StatefulSet(in *StatefulSet) {
 		}
 		if a.VolumeSource.ScaleIO != nil {
 			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
+		if a.VolumeSource.HugePages != nil {
+			v1.SetDefaults_HugePagesVolumeSource(a.VolumeSource.HugePages)
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {

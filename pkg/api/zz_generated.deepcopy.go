@@ -93,6 +93,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_HTTPHeader, InType: reflect.TypeOf(&HTTPHeader{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Handler, InType: reflect.TypeOf(&Handler{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_HostPathVolumeSource, InType: reflect.TypeOf(&HostPathVolumeSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_HugePagesVolumeSource, InType: reflect.TypeOf(&HugePagesVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ISCSIVolumeSource, InType: reflect.TypeOf(&ISCSIVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_KeyToPath, InType: reflect.TypeOf(&KeyToPath{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Lifecycle, InType: reflect.TypeOf(&Lifecycle{})},
@@ -1185,6 +1186,15 @@ func DeepCopy_api_HostPathVolumeSource(in interface{}, out interface{}, c *conve
 	{
 		in := in.(*HostPathVolumeSource)
 		out := out.(*HostPathVolumeSource)
+		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_api_HugePagesVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*HugePagesVolumeSource)
+		out := out.(*HugePagesVolumeSource)
 		*out = *in
 		return nil
 	}
@@ -3479,6 +3489,11 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 			if err := DeepCopy_api_ScaleIOVolumeSource(*in, *out, c); err != nil {
 				return err
 			}
+		}
+		if in.HugePages != nil {
+			in, out := &in.HugePages, &out.HugePages
+			*out = new(HugePagesVolumeSource)
+			**out = **in
 		}
 		return nil
 	}

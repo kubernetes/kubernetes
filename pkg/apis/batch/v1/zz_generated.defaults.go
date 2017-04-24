@@ -81,6 +81,9 @@ func SetObjectDefaults_Job(in *Job) {
 		if a.VolumeSource.ScaleIO != nil {
 			api_v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
+		if a.VolumeSource.HugePages != nil {
+			api_v1.SetDefaults_HugePagesVolumeSource(a.VolumeSource.HugePages)
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
