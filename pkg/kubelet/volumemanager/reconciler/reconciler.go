@@ -80,6 +80,8 @@ type Reconciler interface {
 // nodeName - the Name for this node, used by Attach and Detach methods
 // desiredStateOfWorld - cache containing the desired state of the world
 // actualStateOfWorld - cache containing the actual state of the world
+// populatorHasAddedPods - checker for whether the populator has added pods to
+//   the desiredStateOfWorld yet
 // operationExecutor - used to trigger attach/detach/mount/unmount operations
 //   safely (prevents more than one operation from being triggered on the same
 //   volume)
@@ -94,6 +96,7 @@ func NewReconciler(
 	nodeName types.NodeName,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
+	populatorHasAddedPods func() bool,
 	operationExecutor operationexecutor.OperationExecutor,
 	mounter mount.Interface,
 	volumePluginMgr *volumepkg.VolumePluginMgr,
@@ -107,6 +110,7 @@ func NewReconciler(
 		nodeName:                      nodeName,
 		desiredStateOfWorld:           desiredStateOfWorld,
 		actualStateOfWorld:            actualStateOfWorld,
+		populatorHasAddedPods:         populatorHasAddedPods,
 		operationExecutor:             operationExecutor,
 		mounter:                       mounter,
 		volumePluginMgr:               volumePluginMgr,
@@ -124,6 +128,7 @@ type reconciler struct {
 	nodeName                      types.NodeName
 	desiredStateOfWorld           cache.DesiredStateOfWorld
 	actualStateOfWorld            cache.ActualStateOfWorld
+	populatorHasAddedPods         func() bool
 	operationExecutor             operationexecutor.OperationExecutor
 	mounter                       mount.Interface
 	volumePluginMgr               *volumepkg.VolumePluginMgr
@@ -139,13 +144,13 @@ func (rc *reconciler) reconciliationLoopFunc(sourcesReady config.SourcesReady) f
 	return func() {
 		rc.reconcile()
 
-		// Add all sources ready check so that reconciler's reconstruct process will start after
-		// desired state of world is populated with pod volume information from different sources. Otherwise,
-		// reconciler's reconstruct process may add incomplete volume information and cause confusion.
-		// In addition, if some sources are not ready, the reconstruct process may clean up pods' volumes
-		// that are still in use because desired states could not get a complete list of pods.
-		if sourcesReady.AllReady() && time.Since(rc.timeOfLastSync) > rc.syncDuration {
-			glog.V(5).Infof("Sources are all ready, starting reconstruct state function")
+		// Add a check that the populator has added pods so that reconciler's reconstruct process will start
+		// after desired state of world is populated with pod volume information. Otherwise, reconciler's
+		// reconstruct process may add incomplete volume information and cause confusion. In addition, if the
+		// desired state of world has not been populated yet, the reconstruct process may clean up pods' volumes
+		// that are still in use because desired state of world does not contain a complete list of pods.
+		if sourcesReady.AllReady() && rc.populatorHasAddedPods() && time.Since(rc.timeOfLastSync) > rc.syncDuration {
+			glog.V(5).Infof("Desired state of world has been populated with pods, starting reconstruct state function")
 			rc.sync()
 		}
 	}
