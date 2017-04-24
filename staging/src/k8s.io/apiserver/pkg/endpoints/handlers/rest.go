@@ -18,7 +18,6 @@ package handlers
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
