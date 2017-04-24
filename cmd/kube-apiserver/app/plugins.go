@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
 	podpreset "k8s.io/kubernetes/plugin/pkg/admission/podpreset"
+	"k8s.io/kubernetes/plugin/pkg/admission/podpresetrestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
 	podsecuritypolicy "k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
@@ -69,6 +70,7 @@ func registerAllAdmissionPlugins(plugins *admission.Plugins) {
 	label.Register(plugins)
 	podnodeselector.Register(plugins)
 	podpreset.Register(plugins)
+	podpresetrestriction.Register(plugins)
 	podtolerationrestriction.Register(plugins)
 	resourcequota.Register(plugins)
 	podsecuritypolicy.Register(plugins)
