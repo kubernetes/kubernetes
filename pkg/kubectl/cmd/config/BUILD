@@ -56,6 +56,7 @@ go_test(
         "get_clusters_test.go",
         "get_contexts_test.go",
         "navigation_step_parser_test.go",
+        "set_test.go",
         "unset_test.go",
         "use_context_test.go",
         "view_test.go",
