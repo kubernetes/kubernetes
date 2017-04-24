@@ -43,7 +43,8 @@ import (
 )
 
 const (
-	ROUTE_META_GVK = "x-kuberentes-group-version-kind"
+	ROUTE_META_GVK    = "x-kuberentes-group-version-kind"
+	ROUTE_META_ACTION = "x-kuberentes-action"
 )
 
 type APIInstaller struct {
@@ -800,6 +801,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		for _, route := range routes {
 			route.Metadata(ROUTE_META_GVK, reqScope.Kind)
+			route.Metadata(ROUTE_META_ACTION, action.Verb)
 			ws.Route(route)
 		}
 		// Note: update GetAuthorizerAttributes() when adding a custom handler.
