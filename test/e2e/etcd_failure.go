@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -130,7 +130,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 		pods, err := podClient.List(options)
 		Expect(err).NotTo(HaveOccurred())
 		for _, pod := range pods.Items {
-			if pod.DeletionTimestamp == nil && v1.IsPodReady(&pod) {
+			if pod.DeletionTimestamp == nil && podutil.IsPodReady(&pod) {
 				return true, nil
 			}
 		}

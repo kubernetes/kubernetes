@@ -1251,6 +1251,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	if kl.kubeClient == nil {
 		glog.Warning("No api server defined - no node status update will be sent.")
 	}
+
 	if err := kl.initializeModules(); err != nil {
 		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
 		glog.Error(err)
@@ -2059,7 +2060,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 	}
 	// Only check specific conditions when runtime integration type is cri,
 	// because the old integration doesn't populate any runtime condition.
-	if kl.kubeletConfiguration.EnableCRI {
+	if kl.kubeletConfiguration.EnableCRI && kl.kubeletConfiguration.ContainerRuntime != "rkt" {
 		if s == nil {
 			glog.Errorf("Container runtime status is nil")
 			return

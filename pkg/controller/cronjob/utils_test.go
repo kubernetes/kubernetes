@@ -17,6 +17,8 @@ limitations under the License.
 package cronjob
 
 import (
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func TestGetJobFromTemplate(t *testing.T) {
@@ -366,5 +369,35 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 			t.Errorf("unexpected error")
 		}
 	}
+}
 
+func TestAdoptJobs(t *testing.T) {
+	sj := cronJob()
+	controllerRef := newControllerRef(&sj)
+	jc := &fakeJobControl{}
+	jobs := []batchv1.Job{newJob("uid0"), newJob("uid1")}
+	jobs[0].OwnerReferences = nil
+	jobs[0].Name = "job0"
+	jobs[1].OwnerReferences = []metav1.OwnerReference{*controllerRef}
+	jobs[1].Name = "job1"
+
+	if err := adoptJobs(&sj, jobs, jc); err != nil {
+		t.Errorf("adoptJobs() error: %v", err)
+	}
+	if got, want := len(jc.PatchJobName), 1; got != want {
+		t.Fatalf("len(PatchJobName) = %v, want %v", got, want)
+	}
+	if got, want := jc.PatchJobName[0], "job0"; got != want {
+		t.Errorf("PatchJobName = %v, want %v", got, want)
+	}
+	if got, want := len(jc.Patches), 1; got != want {
+		t.Fatalf("len(Patches) = %v, want %v", got, want)
+	}
+	patch := &batchv1.Job{}
+	if err := json.Unmarshal(jc.Patches[0], patch); err != nil {
+		t.Fatalf("Unmarshal error: %v", err)
+	}
+	if got, want := controller.GetControllerOf(patch), controllerRef; !reflect.DeepEqual(got, want) {
+		t.Errorf("ControllerRef = %#v, want %#v", got, want)
+	}
 }

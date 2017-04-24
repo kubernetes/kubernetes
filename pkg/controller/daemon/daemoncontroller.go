@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
@@ -323,7 +324,7 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 		// Two different versions of the same pod will always have different RVs.
 		return
 	}
-	changedToReady := !v1.IsPodReady(oldPod) && v1.IsPodReady(curPod)
+	changedToReady := !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod)
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 
 	curControllerRef := controller.GetControllerOf(curPod)
@@ -491,6 +492,10 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 	// Group Pods by Node name.
 	nodeToDaemonPods := make(map[string][]*v1.Pod)
 	for _, pod := range claimedPods {
+		// Skip terminating pods
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
 		nodeName := pod.Spec.NodeName
 		nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], pod)
 	}
@@ -552,10 +557,6 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 			var daemonPodsRunning []*v1.Pod
 			for i := range daemonPods {
 				pod := daemonPods[i]
-				// Skip terminating pods. We won't delete them again or count them as running daemon pods.
-				if pod.DeletionTimestamp != nil {
-					continue
-				}
 				if pod.Status.Phase == v1.PodFailed {
 					msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
 					glog.V(2).Infof(msg)
@@ -732,9 +733,9 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 				daemonPods, _ := nodeToDaemonPods[node.Name]
 				sort.Sort(podByCreationTimestamp(daemonPods))
 				pod := daemonPods[0]
-				if v1.IsPodReady(pod) {
+				if podutil.IsPodReady(pod) {
 					numberReady++
-					if v1.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+					if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
 						numberAvailable++
 					}
 				}

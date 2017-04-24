@@ -277,11 +277,11 @@ var _ = framework.KubeDescribe("Volume Placement [Volume]", func() {
 
 		defer func() {
 			By("clean up undeleted pods")
-			framework.DeletePodWithWait(f, c, podA)
-			framework.DeletePodWithWait(f, c, podB)
+			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podA), "defer: Failed to delete pod ", podA.Name)
+			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podB), "defer: Failed to delete pod ", podB.Name)
 			By(fmt.Sprintf("wait for volumes to be detached from the node: %v", node1Name))
 			for _, volumePath := range volumePaths {
-				waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(node1Name))
+				framework.ExpectNoError(waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(node1Name)))
 			}
 		}()
 
@@ -319,9 +319,9 @@ var _ = framework.KubeDescribe("Volume Placement [Volume]", func() {
 			verifyFilesExistOnVSphereVolume(ns, podB.Name, podBFiles)
 
 			By("Deleting pod-A")
-			framework.DeletePodWithWait(f, c, podA)
+			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podA), "Failed to delete pod ", podA.Name)
 			By("Deleting pod-B")
-			framework.DeletePodWithWait(f, c, podB)
+			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podB), "Failed to delete pod ", podB.Name)
 		}
 	})
 })
@@ -377,10 +377,10 @@ func createAndVerifyFilesOnVolume(namespace string, podname string, newEmptyfile
 
 func deletePodAndWaitForVolumeToDetach(f *framework.Framework, c clientset.Interface, pod *v1.Pod, vsp *vsphere.VSphere, nodeName string, volumePaths []string) {
 	By("Deleting pod")
-	framework.DeletePodWithWait(f, c, pod)
+	framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "Failed to delete pod ", pod.Name)
 
 	By("Waiting for volume to be detached from the node")
 	for _, volumePath := range volumePaths {
-		waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(nodeName))
+		framework.ExpectNoError(waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(nodeName)))
 	}
 }

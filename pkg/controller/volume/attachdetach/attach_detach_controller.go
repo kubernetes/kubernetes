@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -36,10 +37,12 @@ import (
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -61,6 +64,11 @@ const (
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
 	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 1 * time.Minute
+
+	// desiredStateOfWorldPopulatorListPodsRetryDuration is the amount of
+	// time the DesiredStateOfWorldPopulator loop waits between list pods
+	// calls.
+	desiredStateOfWorldPopulatorListPodsRetryDuration time.Duration = 3 * time.Minute
 )
 
 // AttachDetachController defines the operations supported by this controller.
@@ -95,12 +103,16 @@ func NewAttachDetachController(
 	// dropped pods so they are continuously processed until it is accepted or
 	// deleted (probably can't do this with sharedInformer), etc.
 	adc := &attachDetachController{
-		kubeClient: kubeClient,
-		pvcLister:  pvcInformer.Lister(),
-		pvcsSynced: pvcInformer.Informer().HasSynced,
-		pvLister:   pvInformer.Lister(),
-		pvsSynced:  pvInformer.Informer().HasSynced,
-		cloud:      cloud,
+		kubeClient:  kubeClient,
+		pvcLister:   pvcInformer.Lister(),
+		pvcsSynced:  pvcInformer.Informer().HasSynced,
+		pvLister:    pvInformer.Lister(),
+		pvsSynced:   pvInformer.Informer().HasSynced,
+		podLister:   podInformer.Lister(),
+		podsSynced:  podInformer.Informer().HasSynced,
+		nodeLister:  nodeInformer.Lister(),
+		nodesSynced: nodeInformer.Informer().HasSynced,
+		cloud:       cloud,
 	}
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, adc); err != nil {
@@ -136,22 +148,24 @@ func NewAttachDetachController(
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
+		desiredStateOfWorldPopulatorListPodsRetryDuration,
 		podInformer.Lister(),
-		adc.desiredStateOfWorld)
+		adc.desiredStateOfWorld,
+		&adc.volumePluginMgr,
+		pvcInformer.Lister(),
+		pvInformer.Lister())
 
 	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc:    adc.podAdd,
 		UpdateFunc: adc.podUpdate,
 		DeleteFunc: adc.podDelete,
 	})
-	adc.podsSynced = podInformer.Informer().HasSynced
 
 	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc:    adc.nodeAdd,
 		UpdateFunc: adc.nodeUpdate,
 		DeleteFunc: adc.nodeDelete,
 	})
-	adc.nodesSynced = nodeInformer.Informer().HasSynced
 
 	return adc, nil
 }
@@ -173,7 +187,10 @@ type attachDetachController struct {
 	pvLister  corelisters.PersistentVolumeLister
 	pvsSynced kcache.InformerSynced
 
-	podsSynced  kcache.InformerSynced
+	podLister  corelisters.PodLister
+	podsSynced kcache.InformerSynced
+
+	nodeLister  corelisters.NodeLister
 	nodesSynced kcache.InformerSynced
 
 	// cloud provider used by volume host
@@ -224,17 +241,138 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting attach detach controller")
 	defer glog.Infof("Shutting down attach detach controller")
 
-	// TODO uncomment once we agree this is ok and we fix the attach/detach integration test that
-	// currently fails because it doesn't set pvcsSynced and pvsSynced to alwaysReady, so this
-	// controller never runs.
-	// if !controller.WaitForCacheSync("attach detach", stopCh, adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced) {
-	// 	return
-	// }
+	if !controller.WaitForCacheSync("attach detach", stopCh, adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced) {
+		return
+	}
 
+	err := adc.populateActualStateOfWorld()
+	if err != nil {
+		glog.Errorf("Error populating the actual state of world: %v", err)
+	}
+	err = adc.populateDesiredStateOfWorld()
+	if err != nil {
+		glog.Errorf("Error populating the desired state of world: %v", err)
+	}
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
 
 	<-stopCh
+}
+
+func (adc *attachDetachController) populateActualStateOfWorld() error {
+	glog.V(5).Infof("Populating ActualStateOfworld")
+	nodes, err := adc.nodeLister.List(labels.Everything())
+	if err != nil {
+		return err
+	}
+
+	for _, node := range nodes {
+		nodeName := types.NodeName(node.Name)
+		for _, attachedVolume := range node.Status.VolumesAttached {
+			uniqueName := attachedVolume.Name
+			// The nil VolumeSpec is safe only in the case the volume is not in use by any pod.
+			// In such a case it should be detached in the first reconciliation cycle and the
+			// volume spec is not needed to detach a volume. If the volume is used by a pod, it
+			// its spec can be: this would happen during in the populateDesiredStateOfWorld which
+			// scans the pods and updates their volumes in the ActualStateOfWorld too.
+			err = adc.actualStateOfWorld.MarkVolumeAsAttached(uniqueName, nil /* VolumeSpec */, nodeName, attachedVolume.DevicePath)
+			if err != nil {
+				glog.Errorf("Failed to mark the volume as attached: %v", err)
+				continue
+			}
+			adc.processVolumesInUse(nodeName, node.Status.VolumesInUse, true /* forceUnmount */)
+			if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
+				// Node specifies annotation indicating it should be managed by
+				// attach detach controller. Add it to desired state of world.
+				adc.desiredStateOfWorld.AddNode(types.NodeName(node.Name)) // Needed for DesiredStateOfWorld population
+			}
+		}
+	}
+	return nil
+}
+
+func (adc *attachDetachController) getNodeVolumeDevicePath(
+	volumeName v1.UniqueVolumeName, nodeName types.NodeName) (string, error) {
+	var devicePath string
+	var found bool
+	node, err := adc.nodeLister.Get(string(nodeName))
+	if err != nil {
+		return devicePath, err
+	}
+	for _, attachedVolume := range node.Status.VolumesAttached {
+		if volumeName == attachedVolume.Name {
+			devicePath = attachedVolume.DevicePath
+			found = true
+			break
+		}
+	}
+	if !found {
+		err = fmt.Errorf("Volume %s not found on node %s", volumeName, nodeName)
+	}
+
+	return devicePath, err
+}
+
+func (adc *attachDetachController) populateDesiredStateOfWorld() error {
+	glog.V(5).Infof("Populating DesiredStateOfworld")
+
+	pods, err := adc.podLister.List(labels.Everything())
+	if err != nil {
+		return err
+	}
+	for _, pod := range pods {
+		podToAdd := pod
+		adc.podAdd(&podToAdd)
+		for _, podVolume := range podToAdd.Spec.Volumes {
+			// The volume specs present in the ActualStateOfWorld are nil, let's replace those
+			// with the correct ones found on pods. The present in the ASW with no corresponding
+			// pod will be detached and the spec is irrelevant.
+			volumeSpec, err := util.CreateVolumeSpec(podVolume, podToAdd.Namespace, adc.pvcLister, adc.pvLister)
+			if err != nil {
+				glog.Errorf(
+					"Error creating spec for volume %q, pod %q/%q: %v",
+					podVolume.Name,
+					podToAdd.Namespace,
+					podToAdd.Name,
+					err)
+				continue
+			}
+			nodeName := types.NodeName(podToAdd.Spec.NodeName)
+			plugin, err := adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+			if err != nil || plugin == nil {
+				glog.V(10).Infof(
+					"Skipping volume %q for pod %q/%q: it does not implement attacher interface. err=%v",
+					podVolume.Name,
+					podToAdd.Namespace,
+					podToAdd.Name,
+					err)
+				continue
+			}
+			volumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+			if err != nil {
+				glog.Errorf(
+					"Failed to find unique name for volume %q, pod %q/%q: %v",
+					podVolume.Name,
+					podToAdd.Namespace,
+					podToAdd.Name,
+					err)
+				continue
+			}
+			if adc.actualStateOfWorld.VolumeNodeExists(volumeName, nodeName) {
+				devicePath, err := adc.getNodeVolumeDevicePath(volumeName, nodeName)
+				if err != nil {
+					glog.Errorf("Failed to find device path: %v", err)
+					continue
+				}
+				err = adc.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, devicePath)
+				if err != nil {
+					glog.Errorf("Failed to update volume spec for node %s: %v", nodeName, err)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func (adc *attachDetachController) podAdd(obj interface{}) {
@@ -247,7 +385,8 @@ func (adc *attachDetachController) podAdd(obj interface{}) {
 		return
 	}
 
-	adc.processPodVolumes(pod, true /* addVolumes */)
+	util.ProcessPodVolumes(pod, true, /* addVolumes */
+		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
 }
 
 // GetDesiredStateOfWorld returns desired state of world associated with controller
@@ -266,7 +405,8 @@ func (adc *attachDetachController) podDelete(obj interface{}) {
 		return
 	}
 
-	adc.processPodVolumes(pod, false /* addVolumes */)
+	util.ProcessPodVolumes(pod, false, /* addVolumes */
+		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
 }
 
 func (adc *attachDetachController) nodeAdd(obj interface{}) {
@@ -298,7 +438,7 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 		// detach controller. Add it to desired state of world.
 		adc.desiredStateOfWorld.AddNode(nodeName)
 	}
-	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
+	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse, false /* forceUnmount */)
 }
 
 func (adc *attachDetachController) nodeDelete(obj interface{}) {
@@ -312,226 +452,7 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 		glog.V(10).Infof("%v", err)
 	}
 
-	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
-}
-
-// processPodVolumes processes the volumes in the given pod and adds them to the
-// desired state of the world if addVolumes is true, otherwise it removes them.
-func (adc *attachDetachController) processPodVolumes(
-	pod *v1.Pod, addVolumes bool) {
-	if pod == nil {
-		return
-	}
-
-	if len(pod.Spec.Volumes) <= 0 {
-		return
-	}
-
-	nodeName := types.NodeName(pod.Spec.NodeName)
-
-	if !adc.desiredStateOfWorld.NodeExists(nodeName) {
-		// If the node the pod is scheduled to does not exist in the desired
-		// state of the world data structure, that indicates the node is not
-		// yet managed by the controller. Therefore, ignore the pod.
-		// If the node is added to the list of managed nodes in the future,
-		// future adds and updates to the pod will be processed.
-		glog.V(10).Infof(
-			"Skipping processing of pod %q/%q: it is scheduled to node %q which is not managed by the controller.",
-			pod.Namespace,
-			pod.Name,
-			nodeName)
-		return
-	}
-
-	// Process volume spec for each volume defined in pod
-	for _, podVolume := range pod.Spec.Volumes {
-		volumeSpec, err := adc.createVolumeSpec(podVolume, pod.Namespace)
-		if err != nil {
-			glog.V(10).Infof(
-				"Error processing volume %q for pod %q/%q: %v",
-				podVolume.Name,
-				pod.Namespace,
-				pod.Name,
-				err)
-			continue
-		}
-
-		attachableVolumePlugin, err :=
-			adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
-		if err != nil || attachableVolumePlugin == nil {
-			glog.V(10).Infof(
-				"Skipping volume %q for pod %q/%q: it does not implement attacher interface. err=%v",
-				podVolume.Name,
-				pod.Namespace,
-				pod.Name,
-				err)
-			continue
-		}
-
-		uniquePodName := volumehelper.GetUniquePodName(pod)
-		if addVolumes {
-			// Add volume to desired state of world
-			_, err := adc.desiredStateOfWorld.AddPod(
-				uniquePodName, pod, volumeSpec, nodeName)
-			if err != nil {
-				glog.V(10).Infof(
-					"Failed to add volume %q for pod %q/%q to desiredStateOfWorld. %v",
-					podVolume.Name,
-					pod.Namespace,
-					pod.Name,
-					err)
-			}
-
-		} else {
-			// Remove volume from desired state of world
-			uniqueVolumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
-				attachableVolumePlugin, volumeSpec)
-			if err != nil {
-				glog.V(10).Infof(
-					"Failed to delete volume %q for pod %q/%q from desiredStateOfWorld. GetUniqueVolumeNameFromSpec failed with %v",
-					podVolume.Name,
-					pod.Namespace,
-					pod.Name,
-					err)
-				continue
-			}
-			adc.desiredStateOfWorld.DeletePod(
-				uniquePodName, uniqueVolumeName, nodeName)
-		}
-	}
-
-	return
-}
-
-// createVolumeSpec creates and returns a mutatable volume.Spec object for the
-// specified volume. It dereference any PVC to get PV objects, if needed.
-func (adc *attachDetachController) createVolumeSpec(
-	podVolume v1.Volume, podNamespace string) (*volume.Spec, error) {
-	if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
-		glog.V(10).Infof(
-			"Found PVC, ClaimName: %q/%q",
-			podNamespace,
-			pvcSource.ClaimName)
-
-		// If podVolume is a PVC, fetch the real PV behind the claim
-		pvName, pvcUID, err := adc.getPVCFromCacheExtractPV(
-			podNamespace, pvcSource.ClaimName)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"error processing PVC %q/%q: %v",
-				podNamespace,
-				pvcSource.ClaimName,
-				err)
-		}
-
-		glog.V(10).Infof(
-			"Found bound PV for PVC (ClaimName %q/%q pvcUID %v): pvName=%q",
-			podNamespace,
-			pvcSource.ClaimName,
-			pvcUID,
-			pvName)
-
-		// Fetch actual PV object
-		volumeSpec, err := adc.getPVSpecFromCache(
-			pvName, pvcSource.ReadOnly, pvcUID)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"error processing PVC %q/%q: %v",
-				podNamespace,
-				pvcSource.ClaimName,
-				err)
-		}
-
-		glog.V(10).Infof(
-			"Extracted volumeSpec (%v) from bound PV (pvName %q) and PVC (ClaimName %q/%q pvcUID %v)",
-			volumeSpec.Name,
-			pvName,
-			podNamespace,
-			pvcSource.ClaimName,
-			pvcUID)
-
-		return volumeSpec, nil
-	}
-
-	// Do not return the original volume object, since it's from the shared
-	// informer it may be mutated by another consumer.
-	clonedPodVolumeObj, err := api.Scheme.DeepCopy(&podVolume)
-	if err != nil || clonedPodVolumeObj == nil {
-		return nil, fmt.Errorf(
-			"failed to deep copy %q volume object. err=%v", podVolume.Name, err)
-	}
-
-	clonedPodVolume, ok := clonedPodVolumeObj.(*v1.Volume)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast clonedPodVolume %#v to v1.Volume", clonedPodVolumeObj)
-	}
-
-	return volume.NewSpecFromVolume(clonedPodVolume), nil
-}
-
-// getPVCFromCacheExtractPV fetches the PVC object with the given namespace and
-// name from the shared internal PVC store extracts the name of the PV it is
-// pointing to and returns it.
-// This method returns an error if a PVC object does not exist in the cache
-// with the given namespace/name.
-// This method returns an error if the PVC object's phase is not "Bound".
-func (adc *attachDetachController) getPVCFromCacheExtractPV(namespace string, name string) (string, types.UID, error) {
-	pvc, err := adc.pvcLister.PersistentVolumeClaims(namespace).Get(name)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to find PVC %s/%s in PVCInformer cache: %v", namespace, name, err)
-	}
-
-	if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
-		return "", "", fmt.Errorf(
-			"PVC %s/%s has non-bound phase (%q) or empty pvc.Spec.VolumeName (%q)",
-			namespace,
-			name,
-			pvc.Status.Phase,
-			pvc.Spec.VolumeName)
-	}
-
-	return pvc.Spec.VolumeName, pvc.UID, nil
-}
-
-// getPVSpecFromCache fetches the PV object with the given name from the shared
-// internal PV store and returns a volume.Spec representing it.
-// This method returns an error if a PV object does not exist in the cache with
-// the given name.
-// This method deep copies the PV object so the caller may use the returned
-// volume.Spec object without worrying about it mutating unexpectedly.
-func (adc *attachDetachController) getPVSpecFromCache(name string, pvcReadOnly bool, expectedClaimUID types.UID) (*volume.Spec, error) {
-	pv, err := adc.pvLister.Get(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find PV %q in PVInformer cache: %v", name, err)
-	}
-
-	if pv.Spec.ClaimRef == nil {
-		return nil, fmt.Errorf(
-			"found PV object %q but it has a nil pv.Spec.ClaimRef indicating it is not yet bound to the claim",
-			name)
-	}
-
-	if pv.Spec.ClaimRef.UID != expectedClaimUID {
-		return nil, fmt.Errorf(
-			"found PV object %q but its pv.Spec.ClaimRef.UID (%q) does not point to claim.UID (%q)",
-			name,
-			pv.Spec.ClaimRef.UID,
-			expectedClaimUID)
-	}
-
-	// Do not return the object from the informer, since the store is shared it
-	// may be mutated by another consumer.
-	clonedPVObj, err := api.Scheme.DeepCopy(pv)
-	if err != nil || clonedPVObj == nil {
-		return nil, fmt.Errorf("failed to deep copy %q PV object. err=%v", name, err)
-	}
-
-	clonedPV, ok := clonedPVObj.(*v1.PersistentVolume)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast %q clonedPV %#v to PersistentVolume", name, pv)
-	}
-
-	return volume.NewSpecFromPersistentVolume(clonedPV, pvcReadOnly), nil
+	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse, false /* forceUnmount */)
 }
 
 // processVolumesInUse processes the list of volumes marked as "in-use"
@@ -539,7 +460,7 @@ func (adc *attachDetachController) getPVSpecFromCache(name string, pvcReadOnly b
 // corresponding volume in the actual state of the world to indicate that it is
 // mounted.
 func (adc *attachDetachController) processVolumesInUse(
-	nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
+	nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName, forceUnmount bool) {
 	glog.V(4).Infof("processVolumesInUse for node %q", nodeName)
 	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
 		mounted := false
@@ -550,7 +471,7 @@ func (adc *attachDetachController) processVolumesInUse(
 			}
 		}
 		err := adc.actualStateOfWorld.SetVolumeMountedByNode(
-			attachedVolume.VolumeName, nodeName, mounted)
+			attachedVolume.VolumeName, nodeName, mounted, forceUnmount)
 		if err != nil {
 			glog.Warningf(
 				"SetVolumeMountedByNode(%q, %q, %q) returned an error: %v",

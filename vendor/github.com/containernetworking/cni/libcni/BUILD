@@ -17,6 +17,7 @@ go_library(
     deps = [
         "//vendor/github.com/containernetworking/cni/pkg/invoke:go_default_library",
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
+        "//vendor/github.com/containernetworking/cni/pkg/version:go_default_library",
     ],
 )
 

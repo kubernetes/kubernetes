@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -81,7 +82,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			if err != nil {
 				return false, err
 			}
-			return v1.IsPodReady(p), nil
+			return podutil.IsPodReady(p), nil
 		}, 1*time.Minute, 1*time.Second).ShouldNot(BeTrue(), "pod should not be ready")
 
 		p, err := podClient.Get(p.Name, metav1.GetOptions{})
@@ -369,7 +370,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	By("checking the pod's current state and verifying that restartCount is present")
 	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
-	initialRestartCount := v1.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
+	initialRestartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
 
 	// Wait for the restart state to be as desired.
@@ -379,7 +380,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
 		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
-		restartCount := v1.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
+		restartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 		if restartCount != lastRestartCount {
 			framework.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
 				ns, pod.Name, restartCount, time.Since(start))

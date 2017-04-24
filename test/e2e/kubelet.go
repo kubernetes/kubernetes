@@ -457,8 +457,8 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			})
 
 			AfterEach(func() {
-				framework.DeletePodWithWait(f, c, pod)
-				framework.DeletePodWithWait(f, c, nfsServerPod)
+				framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "AfterEach: Failed to delete pod ", pod.Name)
+				framework.ExpectNoError(framework.DeletePodWithWait(f, c, nfsServerPod), "AfterEach: Failed to delete pod ", nfsServerPod.Name)
 			})
 
 			// execute It blocks from above table of tests
@@ -470,7 +470,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 					stopNfsServer(nfsServerPod)
 
 					By("Delete the pod mounted to the NFS volume")
-					framework.DeletePodWithWait(f, c, pod)
+					framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "Failed to delete pod ", pod.Name)
 					// pod object is now stale, but is intentionally not nil
 
 					By("Check if pod's host has been cleaned up -- expect not")

@@ -61,6 +61,7 @@ pkg/api/pod
 pkg/api/resource
 pkg/api/service
 pkg/api/v1
+pkg/api/v1/node
 pkg/api/v1/service
 pkg/apis/abac/v0
 pkg/apis/abac/v1beta1
@@ -176,6 +177,7 @@ pkg/cloudprovider/providers/cloudstack
 pkg/controller/volume/attachdetach/cache
 pkg/controller/volume/attachdetach/populator
 pkg/controller/volume/attachdetach/reconciler
+pkg/controller/volume/attachdetach/util
 pkg/conversion
 pkg/conversion/queryparams
 pkg/credentialprovider/aws
@@ -397,7 +399,6 @@ staging/src/k8s.io/kube-aggregator/pkg/controllers
 staging/src/k8s.io/sample-apiserver
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/install
 test/e2e/perftype
-test/e2e_federation/upgrades
 test/e2e_node/runner/local
 test/images/clusterapi-tester
 test/images/entrypoint-tester

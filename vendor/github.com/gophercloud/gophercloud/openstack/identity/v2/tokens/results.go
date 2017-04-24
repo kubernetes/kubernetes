@@ -132,11 +132,6 @@ func (r CreateResult) ExtractServiceCatalog() (*ServiceCatalog, error) {
 	return &ServiceCatalog{Entries: s.Access.Entries}, err
 }
 
-// createErr quickly packs an error in a CreateResult.
-func createErr(err error) CreateResult {
-	return CreateResult{gophercloud.Result{Err: err}}
-}
-
 // ExtractUser returns the User from a GetResult.
 func (r GetResult) ExtractUser() (*User, error) {
 	var s struct {

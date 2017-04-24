@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
+	"k8s.io/kubernetes/pkg/util/system"
 
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -103,6 +104,10 @@ func (m *MetricsForE2E) PrintHumanReadable() string {
 func (m *MetricsForE2E) PrintJSON() string {
 	m.filterMetrics()
 	return PrettyPrintJSON(*m)
+}
+
+func (m *MetricsForE2E) SummaryKind() string {
+	return "MetricsForE2E"
 }
 
 var InterestingApiServerMetrics = []string{
@@ -335,7 +340,7 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 	var data string
 	var masterRegistered = false
 	for _, node := range nodes.Items {
-		if strings.HasSuffix(node.Name, "master") {
+		if system.IsMasterNode(node.Name) {
 			masterRegistered = true
 		}
 	}

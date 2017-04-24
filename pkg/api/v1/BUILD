@@ -18,9 +18,9 @@ go_library(
         "generate.go",
         "generated.pb.go",
         "meta.go",
-        "ref.go",
+        "objectreference.go",
         "register.go",
-        "resource_helpers.go",
+        "resource.go",
         "taint.go",
         "toleration.go",
         "types.generated.go",
@@ -39,7 +39,6 @@ go_library(
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
         "//vendor/github.com/ugorji/go/codec:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
@@ -79,17 +78,11 @@ go_test(
 go_test(
     name = "go_default_test",
     srcs = [
-        "resource_helpers_test.go",
         "taint_test.go",
         "toleration_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-    ],
 )
 
 filegroup(
@@ -105,7 +98,10 @@ filegroup(
         ":package-srcs",
         "//pkg/api/v1/endpoints:all-srcs",
         "//pkg/api/v1/helper:all-srcs",
+        "//pkg/api/v1/node:all-srcs",
         "//pkg/api/v1/pod:all-srcs",
+        "//pkg/api/v1/ref:all-srcs",
+        "//pkg/api/v1/resource:all-srcs",
         "//pkg/api/v1/service:all-srcs",
         "//pkg/api/v1/validation:all-srcs",
     ],

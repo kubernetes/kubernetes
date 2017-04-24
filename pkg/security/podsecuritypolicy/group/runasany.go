@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// mustRunAs implements the GroupStrategy interface
+// runAsAny implements the GroupStrategy interface.
 type runAsAny struct {
 }
 

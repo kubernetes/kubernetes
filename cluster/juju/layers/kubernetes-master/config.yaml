@@ -21,3 +21,8 @@ options:
       privileged mode. If "auto", kube-apiserver will not run in privileged
       mode by default, but will switch to privileged mode if gpu hardware is
       detected on a worker node.
+  channel:
+    type: string
+    default: "stable"
+    description: |
+      Snap channel to install Kubernetes master services from

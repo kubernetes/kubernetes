@@ -268,6 +268,7 @@ feature-gates
 federated-api-burst
 federated-api-qps
 federated-kube-context
+federation-config-from-cluster
 federation-name
 federation-system-namespace
 federation-upgrade-target

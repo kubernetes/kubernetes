@@ -77,11 +77,11 @@ type VolumeCreateOpts struct {
 func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, error) {
 
 	create_opts := volumes_v1.CreateOpts{
-		Name:         opts.Name,
-		Size:         opts.Size,
-		VolumeType:   opts.VolumeType,
-		Availability: opts.Availability,
-		Metadata:     opts.Metadata,
+		Name:             opts.Name,
+		Size:             opts.Size,
+		VolumeType:       opts.VolumeType,
+		AvailabilityZone: opts.Availability,
+		Metadata:         opts.Metadata,
 	}
 
 	vol, err := volumes_v1.Create(volumes.blockstorage, create_opts).Extract()
@@ -316,6 +316,8 @@ func (os *OpenStack) GetDevicePath(diskId string) string {
 	candidateDeviceNodes := []string{
 		// KVM
 		fmt.Sprintf("virtio-%s", diskId[:20]),
+		// KVM virtio-scsi
+		fmt.Sprintf("scsi-0QEMU_QEMU_HARDDISK_%s", diskId[:20]),
 		// ESXi
 		fmt.Sprintf("wwn-0x%s", strings.Replace(diskId, "-", "", -1)),
 	}

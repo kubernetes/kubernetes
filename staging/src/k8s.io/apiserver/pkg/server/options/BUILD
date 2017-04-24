@@ -30,6 +30,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "admission.go",
         "audit.go",
         "authentication.go",
         "authorization.go",

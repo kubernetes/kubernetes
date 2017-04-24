@@ -31,6 +31,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/fatih/camelcase"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -70,6 +71,7 @@ import (
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 // Each level has 2 spaces for PrefixWriter
@@ -198,11 +200,74 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings pr
 		w.Write(LEVEL_0, "Name:\t%s\n", obj.GetName())
 		w.Write(LEVEL_0, "Namespace:\t%s\n", obj.GetNamespace())
 		printLabelsMultiline(w, "Labels", obj.GetLabels())
+		printAnnotationsMultiline(w, "Annotations", obj.GetAnnotations())
+		printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), "", ".metadata.name", ".metadata.namespace", ".metadata.labels", ".metadata.annotations")
 		if events != nil {
 			DescribeEvents(events, w)
 		}
 		return nil
 	})
+}
+
+func printUnstructuredContent(w PrefixWriter, level int, content map[string]interface{}, skipPrefix string, skip ...string) {
+	fields := []string{}
+	for field := range content {
+		fields = append(fields, field)
+	}
+	sort.Strings(fields)
+
+	for _, field := range fields {
+		value := content[field]
+		switch typedValue := value.(type) {
+		case map[string]interface{}:
+			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
+			if slice.ContainsString(skip, skipExpr, nil) {
+				continue
+			}
+			w.Write(level, fmt.Sprintf("%s:\n", smartLabelFor(field)))
+			printUnstructuredContent(w, level+1, typedValue, skipExpr, skip...)
+
+		case []interface{}:
+			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
+			if slice.ContainsString(skip, skipExpr, nil) {
+				continue
+			}
+			w.Write(level, fmt.Sprintf("%s:\n", smartLabelFor(field)))
+			for _, child := range typedValue {
+				switch typedChild := child.(type) {
+				case map[string]interface{}:
+					printUnstructuredContent(w, level+1, typedChild, skipExpr, skip...)
+				default:
+					w.Write(level+1, fmt.Sprintf("%v\n", typedChild))
+				}
+			}
+
+		default:
+			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
+			if slice.ContainsString(skip, skipExpr, nil) {
+				continue
+			}
+			w.Write(level, fmt.Sprintf("%s:\t%v\n", smartLabelFor(field), typedValue))
+		}
+	}
+}
+
+func smartLabelFor(field string) string {
+	commonAcronyms := []string{"API", "URL", "UID", "OSB", "GUID"}
+
+	splitted := camelcase.Split(field)
+	for i := 0; i < len(splitted); i++ {
+		part := splitted[i]
+
+		if slice.ContainsString(commonAcronyms, strings.ToUpper(part), nil) {
+			part = strings.ToUpper(part)
+		} else {
+			part = strings.Title(part)
+		}
+		splitted[i] = part
+	}
+
+	return strings.Join(splitted, " ")
 }
 
 // DefaultObjectDescriber can describe the default Kubernetes objects.
@@ -1307,8 +1372,14 @@ func describeReplicationController(controller *api.ReplicationController, events
 		printAnnotationsMultiline(w, "Annotations", controller.Annotations)
 		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
-
 		DescribePodTemplate(controller.Spec.Template, w)
+		if len(controller.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
+			w.Write(LEVEL_1, "----\t------\t------\n")
+			for _, c := range controller.Status.Conditions {
+				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
+			}
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1384,6 +1455,13 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 			w.Write(LEVEL_0, "%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		}
 		DescribePodTemplate(&rs.Spec.Template, w)
+		if len(rs.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
+			w.Write(LEVEL_1, "----\t------\t------\n")
+			for _, c := range rs.Status.Conditions {
+				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
+			}
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -2056,7 +2134,6 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 		printAnnotationsMultiline(w, "Annotations", node.Annotations)
 		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
-		w.Write(LEVEL_0, "Phase:\t%v\n", node.Status.Phase)
 		if len(node.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
 			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")

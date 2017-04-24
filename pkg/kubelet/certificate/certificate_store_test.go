@@ -181,7 +181,7 @@ func TestUpdateSymlinkReplaceExistingSymlink(t *testing.T) {
 func TestLoadCertKeyBlocksNoFile(t *testing.T) {
 	dir, err := ioutil.TempDir("", "k8s-test-load-cert-key-blocks")
 	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
@@ -199,7 +199,7 @@ func TestLoadCertKeyBlocksNoFile(t *testing.T) {
 func TestLoadCertKeyBlocksEmptyFile(t *testing.T) {
 	dir, err := ioutil.TempDir("", "k8s-test-load-cert-key-blocks")
 	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
@@ -220,7 +220,7 @@ func TestLoadCertKeyBlocksEmptyFile(t *testing.T) {
 func TestLoadCertKeyBlocksPartialFile(t *testing.T) {
 	dir, err := ioutil.TempDir("", "k8s-test-load-cert-key-blocks")
 	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
@@ -241,7 +241,7 @@ func TestLoadCertKeyBlocksPartialFile(t *testing.T) {
 func TestLoadCertKeyBlocks(t *testing.T) {
 	dir, err := ioutil.TempDir("", "k8s-test-load-cert-key-blocks")
 	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
@@ -269,7 +269,7 @@ func TestLoadCertKeyBlocks(t *testing.T) {
 func TestLoadFile(t *testing.T) {
 	dir, err := ioutil.TempDir("", "k8s-test-load-cert-key-blocks")
 	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
@@ -298,7 +298,7 @@ func TestUpdateNoRotation(t *testing.T) {
 	prefix := "kubelet-server"
 	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
 	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
@@ -332,7 +332,7 @@ func TestUpdateRotation(t *testing.T) {
 	prefix := "kubelet-server"
 	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
 	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
@@ -366,7 +366,7 @@ func TestUpdateWithBadCertKeyData(t *testing.T) {
 	prefix := "kubelet-server"
 	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
 	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
@@ -400,7 +400,7 @@ func TestCurrentPairFile(t *testing.T) {
 	prefix := "kubelet-server"
 	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
 	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
@@ -437,7 +437,7 @@ func TestCurrentCertKeyFiles(t *testing.T) {
 	prefix := "kubelet-server"
 	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
 	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
@@ -467,5 +467,33 @@ func TestCurrentCertKeyFiles(t *testing.T) {
 	}
 	if cert.Leaf == nil {
 		t.Fatalf("Got an empty leaf, expected private data.")
+	}
+}
+
+func TestCurrentNoFiles(t *testing.T) {
+	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
+	if err != nil {
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
+		}
+	}()
+
+	store, err := NewFileStore("kubelet-server", dir, dir, "", "")
+	if err != nil {
+		t.Fatalf("Failed to initialize certificate store: %v", err)
+	}
+
+	cert, err := store.Current()
+	if err == nil {
+		t.Fatalf("Got no error, expected an error because the cert/key files don't exist.")
+	}
+	if _, ok := err.(*NoCertKeyError); !ok {
+		t.Fatalf("Got error %v, expected NoCertKeyError.", err)
+	}
+	if cert != nil {
+		t.Fatalf("Got certificate, expected no certificate because the cert/key files don't exist.")
 	}
 }

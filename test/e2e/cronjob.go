@@ -33,6 +33,7 @@ import (
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -124,7 +125,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cronJob.Status.Active).Should(HaveLen(1))
 
-		By("Ensuring exaclty one running job exists by listing jobs explicitly")
+		By("Ensuring exactly one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs, _ := filterActiveJobs(jobs)
@@ -156,7 +157,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cronJob.Status.Active).Should(HaveLen(1))
 
-		By("Ensuring exaclty one running job exists by listing jobs explicitly")
+		By("Ensuring exactly one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs, _ := filterActiveJobs(jobs)
@@ -274,6 +275,53 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
 		Expect(err).NotTo(HaveOccurred())
 	})
+
+	// Adopt Jobs it owns that don't have ControllerRef yet.
+	// That is, the Jobs were created by a pre-v1.6.0 master.
+	It("should adopt Jobs it owns that don't have ControllerRef yet", func() {
+		By("Creating a cronjob")
+		cronJob := newTestCronJob("adopt", "*/1 * * * ?", batchv2alpha1.ForbidConcurrent,
+			sleepCommand, nil)
+		// Replace cronJob with the one returned from Create() so it has the UID.
+		// Save Kind since it won't be populated in the returned cronJob.
+		kind := cronJob.Kind
+		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
+		Expect(err).NotTo(HaveOccurred())
+		cronJob.Kind = kind
+
+		By("Ensuring a Job is running")
+		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Orphaning a Job")
+		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(jobs.Items).To(HaveLen(1))
+		job := jobs.Items[0]
+		framework.UpdateJobFunc(f.ClientSet, f.Namespace.Name, job.Name, func(job *batchv1.Job) {
+			job.OwnerReferences = nil
+		})
+
+		By("Checking that the CronJob readopts the Job")
+		Expect(wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
+			job, err := framework.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
+			if err != nil {
+				return false, err
+			}
+			controllerRef := controller.GetControllerOf(job)
+			if controllerRef == nil {
+				return false, nil
+			}
+			if controllerRef.Kind != cronJob.Kind || controllerRef.Name != cronJob.Name || controllerRef.UID != cronJob.UID {
+				return false, fmt.Errorf("Job has wrong controllerRef: got %v, want %v", controllerRef, cronJob)
+			}
+			return true, nil
+		})).To(Succeed(), "wait for Job %q to be readopted", job.Name)
+
+		By("Removing CronJob")
+		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
 
 // newTestCronJob returns a cronjob which does one of several testing behaviors.
@@ -284,6 +332,9 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batchv2alpha1.Concu
 	sj := &batchv2alpha1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "CronJob",
 		},
 		Spec: batchv2alpha1.CronJobSpec{
 			Schedule:          schedule,
@@ -394,13 +445,15 @@ func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error
 		if err != nil {
 			return false, err
 		}
-		if len(jobs.Items) > 1 {
+		// Ignore Jobs pending deletion, since deletion of Jobs is now asynchronous.
+		aliveJobs := filterNotDeletedJobs(jobs)
+		if len(aliveJobs) > 1 {
 			return false, fmt.Errorf("More than one job is running %+v", jobs.Items)
-		} else if len(jobs.Items) == 0 {
+		} else if len(aliveJobs) == 0 {
 			framework.Logf("Warning: Found 0 jobs in namespace %v", ns)
 			return false, nil
 		}
-		return jobs.Items[0].Name != previousJobName, nil
+		return aliveJobs[0].Name != previousJobName, nil
 	})
 }
 
@@ -449,6 +502,19 @@ func checkNoEventWithReason(c clientset.Interface, ns, cronJobName string, reaso
 		}
 	}
 	return nil
+}
+
+// filterNotDeletedJobs returns the job list without any jobs that are pending
+// deletion.
+func filterNotDeletedJobs(jobs *batchv1.JobList) []*batchv1.Job {
+	var alive []*batchv1.Job
+	for i := range jobs.Items {
+		job := &jobs.Items[i]
+		if job.DeletionTimestamp == nil {
+			alive = append(alive, job)
+		}
+	}
+	return alive
 }
 
 func filterActiveJobs(jobs *batchv1.JobList) (active []*batchv1.Job, finished []*batchv1.Job) {

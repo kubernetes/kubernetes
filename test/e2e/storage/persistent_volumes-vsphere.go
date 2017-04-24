@@ -17,17 +17,17 @@ limitations under the License.
 package storage
 
 import (
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"time"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 // Testing configurations of single a PV/PVC pair attached to a vSphere Disk
@@ -95,11 +95,13 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 			}
 		}
 		By("Creating the PV and PVC")
-		pv, pvc = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
-		framework.WaitOnPVandPVC(c, ns, pv, pvc)
+		pv, pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
+		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 
 		By("Creating the Client Pod")
-		clientPod = framework.CreateClientPod(c, ns, pvc)
+		clientPod, err = framework.CreateClientPod(c, ns, pvc)
+		Expect(err).NotTo(HaveOccurred())
 		node := types.NodeName(clientPod.Spec.NodeName)
 
 		By("Verify disk should be attached to the node")
@@ -111,18 +113,13 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 	AfterEach(func() {
 		framework.Logf("AfterEach: Cleaning up test resources")
 		if c != nil {
-			if clientPod != nil {
-				clientPod, err = c.CoreV1().Pods(ns).Get(clientPod.Name, metav1.GetOptions{})
-				if !apierrs.IsNotFound(err) {
-					framework.DeletePodWithWait(f, c, clientPod)
-				}
-			}
+			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
 
 			if pv != nil {
-				framework.DeletePersistentVolume(c, pv.Name)
+				framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "AfterEach: failed to delete PV ", pv.Name)
 			}
 			if pvc != nil {
-				framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
+				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "AfterEach: failed to delete PVC ", pvc.Name)
 			}
 		}
 	})
@@ -135,7 +132,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 	*/
 	framework.AddCleanupAction(func() {
 		if len(volumePath) > 0 {
-			waitForVSphereDiskToDetach(vsp, volumePath, node)
+			framework.ExpectNoError(waitForVSphereDiskToDetach(vsp, volumePath, node))
 			vsp.DeleteVolume(volumePath)
 		}
 	})
@@ -148,18 +145,13 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 		2. Delete POD, POD deletion should succeed.
 	*/
 
-	It("should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach", func() {
+	It("should test that deleting a PVC before the pod does not cause pod deletion to fail on vsphere volume detach", func() {
 		By("Deleting the Claim")
-		framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
-
-		pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
-		if !apierrs.IsNotFound(err) {
-			Expect(err).NotTo(HaveOccurred())
-		}
+		framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
 		pvc = nil
-		By("Deleting the Pod")
-		framework.DeletePodWithWait(f, c, clientPod)
 
+		By("Deleting the Pod")
+		framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "Failed to delete pod ", clientPod.Name)
 	})
 
 	/*
@@ -169,15 +161,57 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 		1. Delete PV.
 		2. Delete POD, POD deletion should succeed.
 	*/
-	It("should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach", func() {
+	It("should test that deleting the PV before the pod does not cause pod deletion to fail on vspehre volume detach", func() {
 		By("Deleting the Persistent Volume")
-		framework.DeletePersistentVolume(c, pv.Name)
-		pv, err = c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
-		if !apierrs.IsNotFound(err) {
-			Expect(err).NotTo(HaveOccurred())
-		}
+		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
 		pv = nil
+
 		By("Deleting the pod")
-		framework.DeletePodWithWait(f, c, clientPod)
+		framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "Failed to delete pod ", clientPod.Name)
+	})
+	/*
+		This test verifies that a volume mounted to a pod remains mounted after a kubelet restarts.
+		Steps:
+		1. Write to the volume
+		2. Restart kubelet
+		3. Verify that written file is accessible after kubelet restart
+	*/
+	It("should test that a file written to the vspehre volume mount before kubelet restart can be read after restart [Disruptive]", func() {
+		testKubeletRestartsAndRestoresMount(c, f, clientPod, pvc, pv)
+	})
+
+	/*
+		This test verifies that a volume mounted to a pod that is deleted while the kubelet is down
+		unmounts volume when the kubelet returns.
+
+		Steps:
+		1. Verify volume is mounted on the node.
+		2. Stop kubelet.
+		3. Delete pod.
+		4. Start kubelet.
+		5. Verify that volume mount not to be found.
+	*/
+	It("should test that a vspehre volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]", func() {
+		testVolumeUnmountsFromDeletedPod(c, f, clientPod, pvc, pv)
+	})
+
+	/*
+		This test verifies that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk
+
+		Steps:
+		1. Delete Namespace.
+		2. Wait for namespace to get deleted. (Namespace deletion should trigger deletion of belonging pods)
+		3. Verify volume should be detached from the node.
+	*/
+	It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of vsphere volume", func() {
+		By("Deleting the Namespace")
+		err := c.CoreV1().Namespaces().Delete(ns, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = framework.WaitForNamespacesDeleted(c, []string{ns}, 3*time.Minute)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Verifying Persistent Disk detaches")
+		waitForVSphereDiskToDetach(vsp, volumePath, node)
 	})
 })
