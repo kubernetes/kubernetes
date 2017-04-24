@@ -160,7 +160,7 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 		}
 
 		//only add to PatchBufferList when changed
-		if !bytes.Equal(stripComments(oringalBuf), stripComments(diffBuf)) {
+		if !bytes.Equal(cmdutil.StripComments(oringalBuf), cmdutil.StripComments(diffBuf)) {
 			o.PatchBufferList = append(o.PatchBufferList, patchBuf)
 			o.InfoList = append(o.InfoList, info)
 		} else {
