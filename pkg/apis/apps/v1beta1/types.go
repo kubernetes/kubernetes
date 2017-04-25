@@ -25,6 +25,10 @@ import (
 const (
 	// StatefulSetInitAnnotation if present, and set to false, indicates that a Pod's readiness should be ignored.
 	StatefulSetInitAnnotation = "pod.alpha.kubernetes.io/initialized"
+	// StatefulsetBurstAnnotation instructs the stateful set controller to not wait when replacing pods from the set,
+	// and that it may create pods out of order. If enabling this annotation, ensure that your set is capable of
+	// forming a safe quorum even if pod creation is out of order. Accepts "true".
+	StatefulSetBurstAnnotation = "statefulset.alpha.kubernetes.io/burst"
 )
 
 // ScaleSpec describes the attributes of a scale subresource
