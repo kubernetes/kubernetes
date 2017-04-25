@@ -55,15 +55,17 @@ func TestValidateStatefulSet(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: validPodTemplate.Template,
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: validPodTemplate.Template,
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
 			},
 		},
 	}
@@ -77,41 +79,47 @@ func TestValidateStatefulSet(t *testing.T) {
 		"zero-length ID": {
 			ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: validPodTemplate.Template,
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
 			},
 		},
 		"missing-namespace": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
 			Spec: apps.StatefulSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: validPodTemplate.Template,
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
 			},
 		},
 		"empty selector": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
-				Template: validPodTemplate.Template,
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Template:            validPodTemplate.Template,
 			},
 		},
 		"selector_doesnt_match": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-				Template: validPodTemplate.Template,
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				Template:            validPodTemplate.Template,
 			},
 		},
 		"invalid manifest": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
 			},
 		},
 		"negative_replicas": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
-				Replicas: -1,
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Replicas:            -1,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
 			},
 		},
 		"invalid_label": {
@@ -123,8 +131,9 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			Spec: apps.StatefulSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: validPodTemplate.Template,
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
 			},
 		},
 		"invalid_label 2": {
@@ -136,7 +145,8 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			Spec: apps.StatefulSetSpec{
-				Template: invalidPodTemplate.Template,
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Template:            invalidPodTemplate.Template,
 			},
 		},
 		"invalid_annotation": {
@@ -148,8 +158,9 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			Spec: apps.StatefulSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: validPodTemplate.Template,
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
 			},
 		},
 		"invalid restart policy 1": {
@@ -158,7 +169,8 @@ func TestValidateStatefulSet(t *testing.T) {
 				Namespace: metav1.NamespaceDefault,
 			},
 			Spec: apps.StatefulSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyOnFailure,
@@ -177,7 +189,8 @@ func TestValidateStatefulSet(t *testing.T) {
 				Namespace: metav1.NamespaceDefault,
 			},
 			Spec: apps.StatefulSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyNever,
@@ -263,16 +276,18 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			old: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: validPodTemplate.Template,
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
 				},
 			},
 			update: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Replicas: 3,
-					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: validPodTemplate.Template,
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Replicas:            3,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
 				},
 			},
 		},
@@ -296,9 +311,45 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			update: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Replicas: 2,
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Replicas:            2,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            readWriteVolumePodTemplate.Template,
+				},
+			},
+		},
+		"empty pod creation policy": {
+			old: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: readWriteVolumePodTemplate.Template,
+					Template: validPodTemplate.Template,
+				},
+			},
+			update: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					Replicas: 3,
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: validPodTemplate.Template,
+				},
+			},
+		},
+		"invalid pod creation policy": {
+			old: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: validPodTemplate.Template,
+				},
+			},
+			update: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.PodManagementPolicyType("Other"),
+					Replicas:            3,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
 				},
 			},
 		},
@@ -313,9 +364,10 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			update: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Replicas: 1,
-					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: readWriteVolumePodTemplate.Template,
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Replicas:            1,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            readWriteVolumePodTemplate.Template,
 				},
 			},
 		},
@@ -330,9 +382,10 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			update: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Replicas: 2,
-					Selector: &metav1.LabelSelector{MatchLabels: invalidLabels},
-					Template: validPodTemplate.Template,
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Replicas:            2,
+					Selector:            &metav1.LabelSelector{MatchLabels: invalidLabels},
+					Template:            validPodTemplate.Template,
 				},
 			},
 		},
@@ -340,8 +393,9 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			old: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: validPodTemplate.Template,
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
 				},
 			},
 			update: apps.StatefulSet{
@@ -364,9 +418,10 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			update: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Replicas: -1,
-					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: validPodTemplate.Template,
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Replicas:            -1,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
 				},
 			},
 		},
