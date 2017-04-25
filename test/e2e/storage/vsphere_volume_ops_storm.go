@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	k8stype "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -84,7 +84,7 @@ var _ = framework.KubeDescribe("vsphere volume operations storm [Volume]", func(
 			framework.DeletePersistentVolumeClaim(client, claim.Name, namespace)
 		}
 		By("Deleting StorageClass")
-		err = client.StorageV1beta1().StorageClasses().Delete(storageclass.Name, nil)
+		err = client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -93,7 +93,7 @@ var _ = framework.KubeDescribe("vsphere volume operations storm [Volume]", func(
 		By("Creating Storage Class")
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
-		storageclass, err = client.StorageV1beta1().StorageClasses().Create(getVSphereStorageClassSpec("thinsc", scParameters))
+		storageclass, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("thinsc", scParameters))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating PVCs using the Storage Class")
