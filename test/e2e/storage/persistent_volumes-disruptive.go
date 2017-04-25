@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -58,8 +59,8 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 		volLabel                  labels.Set
 		selector                  *metav1.LabelSelector
 	)
-
 	BeforeEach(func() {
+
 		// To protect the NFS volume pod from the kubelet restart, we isolate it on its own node.
 		framework.SkipUnlessNodeCountIsAtLeast(MinNodes)
 		c = f.ClientSet
@@ -70,7 +71,6 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 		// Start the NFS server pod.
 		framework.Logf("[BeforeEach] Creating NFS Server Pod")
 		nfsServerPod = initNFSserverPod(c, ns)
-
 		framework.Logf("[BeforeEach] Configuring PersistentVolume")
 		nfsServerIP = nfsServerPod.Status.PodIP
 		Expect(nfsServerIP).NotTo(BeEmpty())
@@ -134,7 +134,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 		// to runTest.
 		disruptiveTestTable := []disruptiveTest{
 			{
-				testItStmt: "Should test that a file written to the mount before kubelet restart can be read after restart.",
+				testItStmt: "Should test that a file written to the mount before kubelet restart is readable after restart.",
 				runTest:    testKubeletRestartsAndRestoresMount,
 			},
 			{
@@ -180,19 +180,33 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 	nodeIP = nodeIP + ":22"
 
 	By("Expecting the volume mount to be found.")
-	result, err := framework.SSH(fmt.Sprintf("mount| grep %s", string(clientPod.UID)), nodeIP, framework.TestContext.Provider)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(result.Code).To(BeZero())
+	result, err := framework.SSH("mount | grep "+string(clientPod.UID), nodeIP, framework.TestContext.Provider)
+	framework.LogSSHResult(result)
+	Expect(err).NotTo(HaveOccurred(), "Encountered SSH error.")
+	Expect(result.Code).To(BeZero(), "Expected grep exit code of 0, got "+string(result.Code))
 
-	By("Restarting the kubelet.")
+	By("Stopping the kubelet.")
 	kubeletCommand(kStop, c, clientPod)
-	framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "Failed to delete pod ", clientPod.Name)
+	defer func() {
+		if err != nil {
+			kubeletCommand(kStart, c, clientPod)
+		}
+	}()
+	By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
+	err = c.Core().Pods(clientPod.Namespace).Delete(clientPod.Name, &metav1.DeleteOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	err = f.WaitForPodTerminated(clientPod.Name, "")
+	if !apierrs.IsNotFound(err) && err != nil {
+		Expect(err).NotTo(HaveOccurred(), "Expected pod to terminate.")
+	}
+	By("Starting the kubelet")
 	kubeletCommand(kStart, c, clientPod)
 
 	By("Expecting the volume mount not to be found.")
-	result, err = framework.SSH(fmt.Sprintf("mount| grep %s", string(clientPod.UID)), nodeIP, framework.TestContext.Provider)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(result.Code).NotTo(BeZero())
+	result, err = framework.SSH("mount| grep "+string(clientPod.UID), nodeIP, framework.TestContext.Provider)
+	framework.LogSSHResult(result)
+	Expect(err).NotTo(HaveOccurred(), "Encountered SSH error.")
+	Expect(result.Stdout).To(BeEmpty(), "Expected grep stdout to be empty.")
 	framework.Logf("Volume unmounted on node %s", clientPod.Spec.NodeName)
 }
 
@@ -201,14 +215,26 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framework.PersistentVolumeConfig, pvcConfig framework.PersistentVolumeClaimConfig, ns, nodeName string) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 
 	pv, pvc, err := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
+	defer func() {
+		if err != nil {
+			framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
+			framework.DeletePersistentVolume(c, pv.Name)
+		}
+	}()
+	//framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 1*time.Second, 20*time.Second)
 	Expect(err).NotTo(HaveOccurred())
 	pod := framework.MakePod(ns, []*v1.PersistentVolumeClaim{pvc}, true, "")
 	pod.Spec.NodeName = nodeName
-	framework.Logf("Creating nfs client Pod %s on node %s", pod.Name, nodeName)
+	framework.Logf("Creating nfs client Pod %s on node %s", pod.GenerateName, nodeName)
 	pod, err = c.CoreV1().Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		if err != nil {
+			framework.DeletePodWithWait(f, c, pod)
+		}
+	}()
 	err = framework.WaitForPodRunningInNamespace(c, pod)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Pod %q timed out waiting for phase: Running", pod.Name))
 
 	pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
@@ -220,11 +246,10 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framew
 }
 
 // tearDownTestCase destroy resources created by initTestCase.
-
 func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, client, server *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
+	framework.DeletePodWithWait(f, c, client)
 	framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
 	framework.DeletePersistentVolume(c, pv.Name)
-	framework.DeletePodWithWait(f, c, client)
 	framework.DeletePodWithWait(f, c, server)
 }
 
