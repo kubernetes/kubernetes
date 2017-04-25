@@ -343,51 +343,114 @@ function do-node-upgrade() {
         --zones="${ZONE}" \
         --regexp="${group}" \
         --format='value(instanceTemplate)' || true))
-    echo "== Calling rolling-update for ${group}. ==" >&2
-    update=$(gcloud alpha compute rolling-updates \
-        --project="${PROJECT}" \
-        --zone="${ZONE}" \
-        start \
-        --group="${group}" \
-        --template="${template_name}" \
-        --instance-startup-timeout=300s \
-        --max-num-concurrent-instances=1 \
-        --max-num-failed-instances=0 \
-        --min-instance-update-time=0s 2>&1) && update_rc=$? || update_rc=$?
-
-    if [[ "${update_rc}" != 0 ]]; then
-      echo "== FAILED to start rolling-update: =="
-      echo "${update}"
-      echo "  This may be due to a preexisting rolling-update;"
-      echo "  see https://github.com/kubernetes/kubernetes/issues/33113 for details."
-      echo "  All rolling-updates in project ${PROJECT} zone ${ZONE}:"
-      gcloud alpha compute rolling-updates \
-        --project="${PROJECT}" \
-        --zone="${ZONE}" \
-        list || true
-      return ${update_rc}
+    set_instance_template_out=$(gcloud compute instance-groups managed set-instance-template "${group}" \
+      --template="${template_name}" \
+      --project="${PROJECT}" \
+      --zone="${ZONE}" 2>&1) && set_instance_template_rc=$? || set_instance_template_rc=$?
+    if [[ "${set_instance_template_rc}" != 0 ]]; then
+      echo "== FAILED to set-instance-template for ${group} to ${template_name} =="
+      echo "${set_instance_template_out}"
+      return ${set_instance_template_rc}
     fi
-
-    id=$(echo "${update}" | grep "Started" | cut -d '/' -f 11 | cut -d ']' -f 1)
-    updates+=("${id}")
-  done
-
-  echo "== Waiting for Upgrading nodes to be finished. ==" >&2
-  # Wait until rolling updates are finished.
-  for update in ${updates[@]}; do
-    while true; do
-      result=$(gcloud alpha compute rolling-updates \
-          --project="${PROJECT}" \
-          --zone="${ZONE}" \
-          describe \
-          ${update} \
-          --format='value(status)' || true)
-      if [ $result = "ROLLED_OUT" ]; then
-        echo "Rolling update ${update} is ${result} state and finished."
-        break
+    instances=()
+    instances+=($(gcloud compute instance-groups managed list-instances "${group}" \
+        --format='value(instance)' \
+        --project="${PROJECT}" \
+        --zone="${ZONE}" 2>&1)) && list_instances_rc=$? || list_instances_rc=$?
+    if [[ "${list_instances_rc}" != 0 ]]; then
+      echo "== FAILED to list instances in group ${group} =="
+      echo "${instances}"
+      return ${list_instances_rc}
+    fi
+    for instance in ${instances[@]}; do
+      # Cache instance id for later
+      instance_id=$(gcloud compute instances describe "${instance}" \
+        --format='get(id)' \
+        --project="${PROJECT}" \
+        --zone="${ZONE}" 2>&1) && describe_rc=$? || describe_rc=$?
+      if [[ "${describe_rc}" != 0 ]]; then
+        echo "== FAILED to describe ${instance} =="
+        echo "${instance_id}"
+        return ${describe_rc}
       fi
-      echo "Rolling update ${update} is still in ${result} state."
-      sleep 10
+
+      # Drain node
+      echo "== Draining ${instance}. == " >&2
+      "${KUBE_ROOT}/cluster/kubectl.sh" drain --delete-local-data --force --ignore-daemonsets "${instance}" \
+        && drain_rc=$? || drain_rc=$?
+      if [[ "${drain_rc}" != 0 ]]; then
+        echo "== FAILED to drain ${instance} =="
+        return ${drain_rc}
+      fi
+
+      # Recreate instance
+      echo "== Recreating instance ${instance}. ==" >&2
+      recreate=$(gcloud compute instance-groups managed recreate-instances "${group}" \
+        --project="${PROJECT}" \
+        --zone="${ZONE}" \
+        --instances="${instance}" 2>&1) && recreate_rc=$? || recreate_rc=$?
+      if [[ "${recreate_rc}" != 0 ]]; then
+        echo "== FAILED to recreate ${instance} =="
+        echo "${recreate}"
+        return ${recreate_rc}
+      fi
+
+      # Wait for instance to be recreated
+      echo "== Waiting for instance ${instance} to be recreated. ==" >&2
+      while true; do
+        new_instance_id=$(gcloud compute instances describe "${instance}" \
+          --format='get(id)' \
+          --project="${PROJECT}" \
+          --zone="${ZONE}" 2>&1) && describe_rc=$? || describe_rc=$?
+        if [[ "${describe_rc}" != 0 ]]; then
+          echo "== FAILED to describe ${instance} =="
+          echo "${new_instance_id}"
+          echo "  (Will retry.)"
+        elif [[ "${new_instance_id}" == "${instance_id}" ]]; then
+          echo -n .
+        else
+          echo "Instance ${instance} recreated."
+          break
+        fi
+        sleep 1
+      done
+
+      # Wait for k8s node object to reflect new instance id
+      echo "== Waiting for new node to be added to k8s.  ==" >&2
+      while true; do
+        external_id=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.spec.externalID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
+        if [[ "${kubectl_rc}" != 0 ]]; then
+          echo "== FAILED to get node ${instance} =="
+          echo "${external_id}"
+          echo "  (Will retry.)"
+        elif [[ "${external_id}" == "${new_instance_id}" ]]; then
+          echo "Node ${instance} recreated."
+          break
+        elif [[ "${external_id}" == "${instance_id}" ]]; then
+          echo -n .
+        else
+          echo "Unexpected external_id '${external_id}' matches neither old ('${instance_id}') nor new ('${new_instance_id}')."
+          echo "  (Will retry.)"
+        fi
+        sleep 1
+      done
+
+      # Wait for the node to not have SchedulingDisabled=True and also to have
+      # Ready=True.
+      echo "== Waiting for ${instance} to become ready. ==" >&2
+      while true; do
+        cordoned=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output='jsonpath={.status.conditions[?(@.type == "SchedulingDisabled")].status}')
+        ready=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output='jsonpath={.status.conditions[?(@.type == "Ready")].status}')
+        if [[ "${cordoned}" == 'True' ]]; then
+          echo "Node ${instance} is still not ready: SchedulingDisabled=${ready}"
+        elif [[ "${ready}" != 'True' ]]; then
+          echo "Node ${instance} is still not ready: Ready=${ready}"
+        else
+          echo "Node ${instance} Ready=${ready}"
+          break
+        fi
+        sleep 1
+      done
     done
   done
 
