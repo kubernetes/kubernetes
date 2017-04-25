@@ -1271,6 +1271,46 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 	}
 }
 
+func TestRootSelfLink(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := GetWithOptionsRootRESTStorage{
+		SimpleTypedStorage: &SimpleTypedStorage{
+			baseType: &genericapitesting.SimpleRoot{}, // a root scoped type
+			item: &genericapitesting.SimpleRoot{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Other:      "foo",
+			},
+		},
+		takesPath: "atAPath",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		t.Logf("Data: %s", string(body))
+	}
+	var out genericapitesting.SimpleRoot
+	if _, err := extractBody(resp, &out); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if out.SelfLink != "/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/simple/foo" {
+		t.Errorf("unexpected self link: %#v", out)
+	}
+}
+
 func TestMetadata(t *testing.T) {
 	simpleStorage := &MetadataRESTStorage{&SimpleRESTStorage{}, []string{"text/plain"}}
 	h := handle(map[string]rest.Storage{"simple": simpleStorage})
