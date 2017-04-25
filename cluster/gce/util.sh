@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,13 +45,10 @@ if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
 elif [[ "${MASTER_OS_DISTRIBUTION}" == "debian" ]]; then
   MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${CVM_VERSION}}
   MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
-elif [[ "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
-  MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE}
-  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT}
 fi
 
 # Sets node image based on the specified os distro. Currently this function only
-# supports gci, debian, and ubuntu.
+# supports gci and debian.
 function set-node-image() {
   if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
     # If the node image is not set, we use the latest GCI image.
@@ -61,9 +58,6 @@ function set-node-image() {
   elif [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
     NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
     NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
-  elif [[ "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
-    NODE_IMAGE=${KUBE_GCE_NODE_IMAGE}
-    NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT}
   fi
 }
 
