@@ -75,11 +75,18 @@ type VolumeTestConfig struct {
 	ServerImage string
 	// Ports to export from the server pod. TCP only.
 	ServerPorts []int
+	// Commands to run in the comtainer image.
+	ServerCmds []string
 	// Arguments to pass to the container image.
 	ServerArgs []string
 	// Volumes needed to be mounted to the server container from the host
 	// map <host (source) path> -> <container (dst.) path>
 	ServerVolumes map[string]string
+	// Wait for the pod to terminate successfully
+	// False indicates that the pod is long running
+	WaitForCompletion bool
+	// NodeName to run pod on.  Default is any node.
+	NodeName string
 }
 
 // VolumeTest contains a volume to mount into a client pod and its
@@ -132,6 +139,11 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 	By(fmt.Sprint("creating ", serverPodName, " pod"))
 	privileged := new(bool)
 	*privileged = true
+
+	restartPolicy := v1.RestartPolicyAlways
+	if config.WaitForCompletion {
+		restartPolicy = v1.RestartPolicyNever
+	}
 	serverPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -152,12 +164,15 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 					SecurityContext: &v1.SecurityContext{
 						Privileged: privileged,
 					},
+					Command:      config.ServerCmds,
 					Args:         config.ServerArgs,
 					Ports:        serverPodPorts,
 					VolumeMounts: mounts,
 				},
 			},
-			Volumes: volumes,
+			Volumes:       volumes,
+			RestartPolicy: restartPolicy,
+			NodeName:      config.NodeName,
 		},
 	}
 
@@ -175,12 +190,16 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 			ExpectNoError(err, "Failed to create %q pod: %v", serverPodName, err)
 		}
 	}
-	ExpectNoError(WaitForPodRunningInNamespace(client, serverPod))
-
-	if pod == nil {
-		By(fmt.Sprintf("locating the %q server pod", serverPodName))
-		pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
-		ExpectNoError(err, "Cannot locate the server pod %q: %v", serverPodName, err)
+	if config.WaitForCompletion {
+		ExpectNoError(WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
+		ExpectNoError(podClient.Delete(serverPod.Name, nil))
+	} else {
+		ExpectNoError(WaitForPodRunningInNamespace(client, serverPod))
+		if pod == nil {
+			By(fmt.Sprintf("locating the %q server pod", serverPodName))
+			pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
+			ExpectNoError(err, "Cannot locate the server pod %q: %v", serverPodName, err)
+		}
 	}
 	return pod
 }
