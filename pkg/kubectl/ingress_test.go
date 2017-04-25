@@ -17,7 +17,9 @@ limitations under the License.
 package kubectl
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +35,7 @@ func TestIngressBasicGenerate(t *testing.T) {
 		host        []string
 		tlsAcme     bool
 		expected    *extensions.Ingress
-		expectErr   bool
+		expectErr   string
 	}{
 		{
 			name: "minimal-ok",
@@ -64,12 +66,23 @@ func TestIngressBasicGenerate(t *testing.T) {
 					},
 				},
 			},
-			expectErr: false,
 		},
 		{
 			name:      "hosts-missing",
 			host:      []string{},
-			expectErr: true,
+			expectErr: "at least one host must be specified",
+		},
+		{
+			name:        "bad-int-port",
+			servicePort: intstr.FromInt(123456),
+			host:        []string{"bad-int-port.example.com"},
+			expectErr:   "must be between 1 and 65535",
+		},
+		{
+			name:        "bad-string-port",
+			servicePort: intstr.FromString("port.names.cannot.contain.dots"),
+			host:        []string{"bad-string-port.example.com"},
+			expectErr:   "must be no more than 15 characters",
 		},
 		{
 			name: "multiple-hosts",
@@ -116,7 +129,6 @@ func TestIngressBasicGenerate(t *testing.T) {
 					},
 				},
 			},
-			expectErr: false,
 		},
 		{
 			name:    "acme-example",
@@ -171,10 +183,9 @@ func TestIngressBasicGenerate(t *testing.T) {
 					},
 				},
 			},
-			expectErr: false,
 		},
 		{
-			expectErr: true,
+			expectErr: "name must be specified",
 		},
 		{
 			name:        "specified-backend",
@@ -207,7 +218,6 @@ func TestIngressBasicGenerate(t *testing.T) {
 					},
 				},
 			},
-			expectErr: false,
 		},
 	}
 	for _, test := range tests {
@@ -219,10 +229,16 @@ func TestIngressBasicGenerate(t *testing.T) {
 			ServicePort: test.servicePort,
 		}
 		obj, err := generator.StructuredGenerate()
-		if !test.expectErr && err != nil {
+		if test.expectErr == "" && err != nil {
 			t.Errorf("unexpected error: %v", err)
+			continue
 		}
-		if test.expectErr && err != nil {
+		if test.expectErr != "" && err != nil {
+			actualErr := fmt.Sprintf("%v", err)
+			if !strings.Contains(actualErr, test.expectErr) {
+				t.Errorf("expected error %q to contain %q", err, test.expectErr)
+				continue
+			}
 			continue
 		}
 		if !reflect.DeepEqual(obj.(*extensions.Ingress), test.expected) {

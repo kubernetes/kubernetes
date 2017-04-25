@@ -60,7 +60,7 @@ func NewCmdCreateIngress(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd.Flags().StringSlice("host", []string{}, "Host name for the ingress record")
 	cmd.Flags().Bool("tls-acme", false, "Enables ACME (LetEncrypt) support for automatic TLS")
 	cmd.Flags().String("service-name", "", "Name of backend service; defaults to same as ingress name.")
-	cmd.Flags().String("service-port", "80", "Port of backend service.")
+	cmd.Flags().String("service-port", "80", "Port of backend service; defaults to port 80.")
 	return cmd
 }
 

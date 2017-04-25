@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -101,7 +102,7 @@ func (g IngressV1Beta1) Generate(params map[string]interface{}) (runtime.Object,
 	return delegate.StructuredGenerate()
 }
 
-// StructuredGenerate outputs a ResourceQuota object using the configured fields
+// StructuredGenerate outputs an Ingress object using the configured fields
 func (g *IngressV1Beta1) StructuredGenerate() (runtime.Object, error) {
 	if err := g.validate(); err != nil {
 		return nil, err
@@ -170,7 +171,21 @@ func (g *IngressV1Beta1) validate() error {
 		return fmt.Errorf("name must be specified")
 	}
 	if len(g.Host) == 0 {
-		return fmt.Errorf("at least one Host must be provided")
+		return fmt.Errorf("at least one host must be specified")
 	}
+	if g.ServicePort.StrVal != "" {
+		errorMessages := validation.IsValidPortName(g.ServicePort.StrVal)
+		if len(errorMessages) > 0 {
+			return fmt.Errorf("invalid service-port name %s: %s", g.ServicePort.StrVal, errorMessages[0])
+		}
+	} else if g.ServicePort.IntVal != 0 {
+		errorMessages := validation.IsValidPortNum(int(g.ServicePort.IntVal))
+		if len(errorMessages) > 0 {
+			return fmt.Errorf("invalid service-port number %d: %s", g.ServicePort.IntVal, errorMessages[0])
+		}
+	} else {
+		// We will default the service port
+	}
+
 	return nil
 }
