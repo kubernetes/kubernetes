@@ -54,7 +54,7 @@ var getLunMutex = keymutex.NewKeyMutex()
 
 // NewAttacher initializes an Attacher
 func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, err := getAzureCloudProvider(plugin.cloud)
 	if err != nil {
 		glog.V(4).Infof("failed to get azure provider")
 		return nil, err
@@ -185,6 +185,10 @@ func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, lunStr strin
 
 // GetDeviceMountPath finds the volume's mount path on the node
 func (attacher *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
+	if attacher.host == nil {
+		return "", fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", azureDataDiskPluginName)
+	}
+
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -195,6 +199,9 @@ func (attacher *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string
 
 // MountDevice runs mount command on the node to mount the volume
 func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	if attacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", azureDataDiskPluginName)
+	}
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -230,7 +237,7 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 }
 
 type azureDiskDetacher struct {
-	mounter       mount.Interface
+	host          volume.VolumeHost
 	azureProvider azureCloudProvider
 }
 
@@ -238,13 +245,13 @@ var _ volume.Detacher = &azureDiskDetacher{}
 
 // NewDetacher initializes a volume Detacher
 func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, err := getAzureCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}
 
 	return &azureDiskDetacher{
-		mounter:       plugin.host.GetMounter(),
+		host:          plugin.host,
 		azureProvider: azure,
 	}, nil
 }
@@ -274,8 +281,12 @@ func (detacher *azureDiskDetacher) Detach(diskName string, nodeName types.NodeNa
 
 // UnmountDevice unmounts the volume on the node
 func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
+	if detacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", azureDataDiskPluginName)
+	}
+
 	volume := path.Base(deviceMountPath)
-	if err := util.UnmountPath(deviceMountPath, detacher.mounter); err != nil {
+	if err := util.UnmountPath(deviceMountPath, detacher.host.GetMounter()); err != nil {
 		glog.Errorf("Error unmounting %q: %v", volume, err)
 		return err
 	} else {

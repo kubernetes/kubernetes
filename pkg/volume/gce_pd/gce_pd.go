@@ -27,6 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -35,11 +37,12 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&gcePersistentDiskPlugin{nil}}
+	return []volume.VolumePlugin{&gcePersistentDiskPlugin{}}
 }
 
 type gcePersistentDiskPlugin struct {
-	host volume.VolumeHost
+	host  volume.VolumeHost
+	cloud cloudprovider.Interface
 }
 
 var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
@@ -55,8 +58,9 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
 }
 
-func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) error {
+func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
+	plugin.cloud = cloud
 	return nil
 }
 
@@ -98,6 +102,9 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAcc
 }
 
 func (plugin *gcePersistentDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	// Inject real implementations here, test through the internal function.
 	return plugin.newMounterInternal(spec, pod.UID, &GCEDiskUtil{}, plugin.host.GetMounter())
 }
@@ -143,6 +150,9 @@ func (plugin *gcePersistentDiskPlugin) newMounterInternal(spec *volume.Spec, pod
 }
 
 func (plugin *gcePersistentDiskPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	// Inject real implementations here, test through the internal function.
 	return plugin.newUnmounterInternal(volName, podUID, &GCEDiskUtil{}, plugin.host.GetMounter())
 }
@@ -190,6 +200,9 @@ func (plugin *gcePersistentDiskPlugin) newProvisionerInternal(options volume.Vol
 }
 
 func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	mounter := plugin.host.GetMounter()
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
 	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
@@ -357,10 +370,6 @@ type gcePersistentDiskDeleter struct {
 }
 
 var _ volume.Deleter = &gcePersistentDiskDeleter{}
-
-func (d *gcePersistentDiskDeleter) GetPath() string {
-	return getPath(d.podUID, d.volName, d.plugin.host)
-}
 
 func (d *gcePersistentDiskDeleter) Delete() error {
 	return d.manager.DeleteVolume(d)

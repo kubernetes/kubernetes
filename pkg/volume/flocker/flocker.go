@@ -25,6 +25,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -36,7 +38,7 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&flockerPlugin{nil}}
+	return []volume.VolumePlugin{&flockerPlugin{}}
 }
 
 type flockerPlugin struct {
@@ -85,7 +87,7 @@ func makeGlobalFlockerPath(datasetUUID string) string {
 	return path.Join(defaultMountPath, datasetUUID)
 }
 
-func (p *flockerPlugin) Init(host volume.VolumeHost) error {
+func (p *flockerPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	p.host = host
 	return nil
 }
@@ -137,6 +139,9 @@ func (p *flockerPlugin) getFlockerVolumeSource(spec *volume.Spec) (*v1.FlockerVo
 }
 
 func (plugin *flockerPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	// Inject real implementations here, test through the internal function.
 	return plugin.newMounterInternal(spec, pod.UID, &FlockerUtil{}, plugin.host.GetMounter())
 }
@@ -165,6 +170,9 @@ func (plugin *flockerPlugin) newMounterInternal(spec *volume.Spec, podUID types.
 }
 
 func (p *flockerPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if p.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", p.GetPluginName())
+	}
 	// Inject real implementations here, test through the internal function.
 	return p.newUnmounterInternal(volName, podUID, &FlockerUtil{}, p.host.GetMounter())
 }

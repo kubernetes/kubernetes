@@ -18,10 +18,13 @@ package scaleio
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -34,9 +37,10 @@ const (
 )
 
 type sioPlugin struct {
-	host      volume.VolumeHost
-	mounter   mount.Interface
-	volumeMtx keymutex.KeyMutex
+	host       volume.VolumeHost
+	kubeClient clientset.Interface
+	mounter    mount.Interface
+	volumeMtx  keymutex.KeyMutex
 }
 
 func ProbeVolumePlugins() []volume.VolumePlugin {
@@ -51,9 +55,12 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 // *******************
 var _ volume.VolumePlugin = &sioPlugin{}
 
-func (p *sioPlugin) Init(host volume.VolumeHost) error {
+func (p *sioPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	p.host = host
-	p.mounter = host.GetMounter()
+	if host != nil {
+		p.mounter = host.GetMounter()
+	}
+	p.kubeClient = client
 	p.volumeMtx = keymutex.NewKeyMutex()
 	return nil
 }
@@ -84,6 +91,9 @@ func (p *sioPlugin) NewMounter(
 	spec *volume.Spec,
 	pod *api.Pod,
 	_ volume.VolumeOptions) (volume.Mounter, error) {
+	if p.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", p.GetPluginName())
+	}
 	sioSource, err := getVolumeSourceFromSpec(spec)
 	if err != nil {
 		glog.Error(log("failed to extract ScaleIOVolumeSource from spec: %v", err))
@@ -109,6 +119,9 @@ func (p *sioPlugin) NewMounter(
 // specName = [<namespace>nsSep]<somevalue> where the specname is pre-pended with the namespace
 func (p *sioPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
 	glog.V(4).Info(log("Unmounter for %s", specName))
+	if p.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", p.GetPluginName())
+	}
 
 	return &sioVolume{
 		podUID:      podUID,

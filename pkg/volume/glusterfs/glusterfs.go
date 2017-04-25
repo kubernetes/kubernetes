@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -52,6 +53,7 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 
 type glusterfsPlugin struct {
 	host         volume.VolumeHost
+	kubeClient   clientset.Interface
 	exe          exec.Interface
 	gidTable     map[string]*MinMaxAllocator
 	gidTableLock sync.Mutex
@@ -82,8 +84,9 @@ const (
 	absoluteGidMax = math.MaxInt32
 )
 
-func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
+func (plugin *glusterfsPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
+	plugin.kubeClient = client
 	return nil
 }
 
@@ -133,15 +136,17 @@ func (plugin *glusterfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode 
 }
 
 func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	source, _ := plugin.getGlusterVolumeSource(spec)
 	epName := source.EndpointsName
 	// PVC/POD is in same ns.
 	ns := pod.Namespace
-	kubeClient := plugin.host.GetKubeClient()
-	if kubeClient == nil {
+	if plugin.kubeClient == nil {
 		return nil, fmt.Errorf("glusterfs: failed to get kube client to initialize mounter")
 	}
-	ep, err := kubeClient.Core().Endpoints(ns).Get(epName, metav1.GetOptions{})
+	ep, err := plugin.kubeClient.Core().Endpoints(ns).Get(epName, metav1.GetOptions{})
 	if err != nil {
 		glog.Errorf("glusterfs: failed to get endpoints %s[%v]", epName, err)
 		return nil, err
@@ -178,6 +183,9 @@ func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endp
 }
 
 func (plugin *glusterfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
 }
 
@@ -456,21 +464,15 @@ type glusterfsVolumeDeleter struct {
 	spec *v1.PersistentVolume
 }
 
-func (d *glusterfsVolumeDeleter) GetPath() string {
-	name := glusterfsPluginName
-	return d.plugin.host.GetPodVolumeDir(d.glusterfsMounter.glusterfs.pod.UID, strings.EscapeQualifiedNameForDisk(name), d.glusterfsMounter.glusterfs.volName)
-}
-
 //
 // Traverse the PVs, fetching all the GIDs from those
 // in a given storage class, and mark them in the table.
 //
 func (p *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAllocator) error {
-	kubeClient := p.host.GetKubeClient()
-	if kubeClient == nil {
+	if p.kubeClient == nil {
 		return fmt.Errorf("glusterfs: failed to get kube client when collecting gids")
 	}
-	pvList, err := kubeClient.Core().PersistentVolumes().List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	pvList, err := p.kubeClient.Core().PersistentVolumes().List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	if err != nil {
 		glog.Errorf("glusterfs: failed to get existing persistent volumes")
 		return err
@@ -584,12 +586,12 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	glog.V(2).Infof("glusterfs: delete volume: %s ", d.glusterfsMounter.path)
 	volumeName := d.glusterfsMounter.path
 	volumeId := dstrings.TrimPrefix(volumeName, volPrefix)
-	class, err := volutil.GetClassForVolume(d.plugin.host.GetKubeClient(), d.spec)
+	class, err := volutil.GetClassForVolume(d.plugin.kubeClient, d.spec)
 	if err != nil {
 		return err
 	}
 
-	cfg, err := parseClassParameters(class.Parameters, d.plugin.host.GetKubeClient())
+	cfg, err := parseClassParameters(class.Parameters, d.plugin.kubeClient)
 	if err != nil {
 		return err
 	}
@@ -657,7 +659,7 @@ func (r *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	}
 	glog.V(4).Infof("glusterfs: Provison VolumeOptions %v", r.options)
 	scName := v1helper.GetPersistentVolumeClaimClass(r.options.PVC)
-	cfg, err := parseClassParameters(r.options.Parameters, r.plugin.host.GetKubeClient())
+	cfg, err := parseClassParameters(r.options.Parameters, r.plugin.kubeClient)
 	if err != nil {
 		return nil, err
 	}
@@ -806,11 +808,10 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 			Ports:     []v1.EndpointPort{{Port: 1, Protocol: "TCP"}},
 		}},
 	}
-	kubeClient := p.plugin.host.GetKubeClient()
-	if kubeClient == nil {
+	if p.plugin.kubeClient == nil {
 		return nil, nil, fmt.Errorf("glusterfs: failed to get kube client when creating endpoint service")
 	}
-	_, err = kubeClient.Core().Endpoints(namespace).Create(endpoint)
+	_, err = p.plugin.kubeClient.Core().Endpoints(namespace).Create(endpoint)
 	if err != nil && errors.IsAlreadyExists(err) {
 		glog.V(1).Infof("glusterfs: endpoint [%s] already exist in namespace [%s]", endpoint, namespace)
 		err = nil
@@ -830,7 +831,7 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{Protocol: "TCP", Port: 1}}}}
-	_, err = kubeClient.Core().Services(namespace).Create(service)
+	_, err = p.plugin.kubeClient.Core().Services(namespace).Create(service)
 	if err != nil && errors.IsAlreadyExists(err) {
 		glog.V(1).Infof("glusterfs: service [%s] already exist in namespace [%s]", service, namespace)
 		err = nil
@@ -843,11 +844,10 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 }
 
 func (d *glusterfsVolumeDeleter) deleteEndpointService(namespace string, epServiceName string) (err error) {
-	kubeClient := d.plugin.host.GetKubeClient()
-	if kubeClient == nil {
+	if d.plugin.kubeClient == nil {
 		return fmt.Errorf("glusterfs: failed to get kube client when deleting endpoint service")
 	}
-	err = kubeClient.Core().Services(namespace).Delete(epServiceName, nil)
+	err = d.plugin.kubeClient.Core().Services(namespace).Delete(epServiceName, nil)
 	if err != nil {
 		glog.Errorf("glusterfs: error deleting service %s/%s: %v", namespace, epServiceName, err)
 		return fmt.Errorf("error deleting service %s/%s: %v", namespace, epServiceName, err)

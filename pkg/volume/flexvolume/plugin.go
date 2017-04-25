@@ -17,12 +17,15 @@ limitations under the License.
 package flexvolume
 
 import (
+	"fmt"
 	"path"
 	"strings"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -36,6 +39,7 @@ type flexVolumePlugin struct {
 	driverName string
 	execPath   string
 	host       volume.VolumeHost
+	kubeClient clientset.Interface
 	runner     exec.Interface
 
 	sync.Mutex
@@ -46,8 +50,9 @@ var _ volume.AttachableVolumePlugin = &flexVolumePlugin{}
 var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
 
 // Init is part of the volume.VolumePlugin interface.
-func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
+func (plugin *flexVolumePlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
+	plugin.kubeClient = client
 	// call the init script
 	call := plugin.NewDriverCall(initCmd)
 	_, err := call.Run()
@@ -68,7 +73,7 @@ func (plugin *flexVolumePlugin) GetPluginName() string {
 // GetVolumeName is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	call := plugin.NewDriverCall(getVolumeNameCmd)
-	call.AppendSpec(spec, plugin.host, nil)
+	call.AppendSpec(spec, nil)
 
 	status, err := call.Run()
 	if isCmdNotSupportedErr(err) {
@@ -100,6 +105,9 @@ func (plugin *flexVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMod
 
 // NewMounter is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), plugin.runner)
 }
 
@@ -125,6 +133,9 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 
 // NewUnmounter is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(), plugin.runner)
 }
 

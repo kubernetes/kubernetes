@@ -23,6 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -33,11 +35,13 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&azureFilePlugin{nil}}
+	return []volume.VolumePlugin{&azureFilePlugin{}}
 }
 
 type azureFilePlugin struct {
-	host volume.VolumeHost
+	host       volume.VolumeHost
+	cloud      cloudprovider.Interface
+	kubeClient clientset.Interface
 }
 
 var _ volume.VolumePlugin = &azureFilePlugin{}
@@ -51,8 +55,10 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(azureFilePluginName), volName)
 }
 
-func (plugin *azureFilePlugin) Init(host volume.VolumeHost) error {
+func (plugin *azureFilePlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
+	plugin.cloud = cloud
+	plugin.kubeClient = client
 	return nil
 }
 
@@ -96,6 +102,9 @@ func (plugin *azureFilePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode 
 }
 
 func (plugin *azureFilePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newMounterInternal(spec, pod, &azureSvc{}, plugin.host.GetMounter())
 }
 
@@ -122,6 +131,9 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 }
 
 func (plugin *azureFilePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
 }
 
@@ -203,7 +215,7 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return nil
 	}
 	var accountKey, accountName string
-	if accountName, accountKey, err = b.util.GetAzureCredentials(b.plugin.host, b.pod.Namespace, b.secretName); err != nil {
+	if accountName, accountKey, err = b.util.GetAzureCredentials(b.plugin.kubeClient, b.pod.Namespace, b.secretName); err != nil {
 		return err
 	}
 	os.MkdirAll(dir, 0750)

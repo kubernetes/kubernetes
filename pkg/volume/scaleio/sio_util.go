@@ -195,8 +195,7 @@ func saveConfig(configName string, data map[string]string) error {
 func attachSecret(plug *sioPlugin, namespace string, configData map[string]string) error {
 	// load secret
 	secretRefName := configData[confKey.secretRef]
-	kubeClient := plug.host.GetKubeClient()
-	secretMap, err := volutil.GetSecretForPV(namespace, secretRefName, sioPluginName, kubeClient)
+	secretMap, err := volutil.GetSecretForPV(namespace, secretRefName, sioPluginName, plug.kubeClient)
 	if err != nil {
 		glog.Error(log("failed to get secret: %v", err))
 		return secretNotFoundErr

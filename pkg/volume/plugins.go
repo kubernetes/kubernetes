@@ -66,7 +66,7 @@ type VolumePlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any New* calls are made - implementations of plugins may
 	// depend on this.
-	Init(host VolumeHost) error
+	Init(host VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error
 
 	// Name returns the plugin's name.  Plugins must use namespaced names
 	// such as "example.com/volume" and contain exactly one '/' character.
@@ -200,9 +200,6 @@ type VolumeHost interface {
 	// directory might not actually exist on disk yet.
 	GetPodPluginDir(podUID types.UID, pluginName string) string
 
-	// GetKubeClient returns a client interface
-	GetKubeClient() clientset.Interface
-
 	// NewWrapperMounter finds an appropriate plugin with which to handle
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
@@ -213,9 +210,6 @@ type VolumeHost interface {
 	// the provided spec.  See comments on NewWrapperMounter for more
 	// context.
 	NewWrapperUnmounter(volName string, spec Spec, podUID types.UID) (Unmounter, error)
-
-	// Get cloud provider from kubelet.
-	GetCloudProvider() cloudprovider.Interface
 
 	// Get mounter interface.
 	GetMounter() mount.Interface
@@ -334,7 +328,7 @@ func NewSpecFromPersistentVolume(pv *v1.PersistentVolume, readOnly bool) *Spec {
 // InitPlugins initializes each plugin.  All plugins must have unique names.
 // This must be called exactly once before any New* methods are called on any
 // plugins.
-func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) error {
+func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
@@ -354,7 +348,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) 
 			allErrs = append(allErrs, fmt.Errorf("volume plugin %q was registered more than once", name))
 			continue
 		}
-		err := plugin.Init(host)
+		err := plugin.Init(host, client, cloud)
 		if err != nil {
 			glog.Errorf("Failed to load volume plugin %s, error: %s", plugin, err.Error())
 			allErrs = append(allErrs, err)

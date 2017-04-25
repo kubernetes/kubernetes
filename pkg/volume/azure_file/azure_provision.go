@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -49,7 +48,7 @@ type azureFileDeleter struct {
 }
 
 func (plugin *azureFilePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, err := getAzureCloudProvider(plugin.cloud)
 	if err != nil {
 		glog.V(4).Infof("failed to get azure provider")
 		return nil, err
@@ -70,7 +69,7 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 	nameSpace := pvSpec.Spec.ClaimRef.Namespace
 	secretName := pvSpec.Spec.AzureFile.SecretName
 	shareName := pvSpec.Spec.AzureFile.ShareName
-	if accountName, accountKey, err := util.GetAzureCredentials(plugin.host, nameSpace, secretName); err != nil {
+	if accountName, accountKey, err := util.GetAzureCredentials(plugin.kubeClient, nameSpace, secretName); err != nil {
 		return nil, err
 	} else {
 		return &azureFileDeleter{
@@ -87,7 +86,7 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 }
 
 func (plugin *azureFilePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, err := getAzureCloudProvider(plugin.cloud)
 	if err != nil {
 		glog.V(4).Infof("failed to get azure provider")
 		return nil, err
@@ -110,11 +109,6 @@ func (plugin *azureFilePlugin) newProvisionerInternal(options volume.VolumeOptio
 }
 
 var _ volume.Deleter = &azureFileDeleter{}
-
-func (f *azureFileDeleter) GetPath() string {
-	name := azureFilePluginName
-	return f.plugin.host.GetPodVolumeDir(f.podUID, utilstrings.EscapeQualifiedNameForDisk(name), f.volName)
-}
 
 func (f *azureFileDeleter) Delete() error {
 	glog.V(4).Infof("deleting volume %s", f.shareName)
@@ -162,7 +156,7 @@ func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, err
 	}
 	// create a secret for storage account and key
-	secretName, err := a.util.SetAzureCredentials(a.plugin.host, a.options.PVC.Namespace, account, key)
+	secretName, err := a.util.SetAzureCredentials(a.plugin.kubeClient, a.options.PVC.Namespace, account, key)
 	if err != nil {
 		return nil, err
 	}

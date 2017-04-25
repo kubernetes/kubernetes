@@ -44,7 +44,7 @@ var _ volume.AttachableVolumePlugin = &vsphereVolumePlugin{}
 var attachdetachMutex = keymutex.NewKeyMutex()
 
 func (plugin *vsphereVolumePlugin) NewAttacher() (volume.Attacher, error) {
-	vsphereCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	vsphereCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +155,9 @@ func (attacher *vsphereVMDKAttacher) WaitForAttach(spec *volume.Spec, devicePath
 // GetDeviceMountPath returns a path where the device should
 // point which should be bind mounted for individual volumes.
 func (attacher *vsphereVMDKAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
+	if attacher.host == nil {
+		return "", fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", vsphereVolumePluginName)
+	}
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -166,12 +169,18 @@ func (attacher *vsphereVMDKAttacher) GetDeviceMountPath(spec *volume.Spec) (stri
 // GetMountDeviceRefs finds all other references to the device referenced
 // by deviceMountPath; returns a list of paths.
 func (plugin *vsphereVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	mounter := plugin.host.GetMounter()
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
 // MountDevice mounts device to global mount point.
 func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	if attacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", vsphereVolumePluginName)
+	}
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -207,20 +216,20 @@ func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath s
 }
 
 type vsphereVMDKDetacher struct {
-	mounter        mount.Interface
+	host           volume.VolumeHost
 	vsphereVolumes vsphere.Volumes
 }
 
 var _ volume.Detacher = &vsphereVMDKDetacher{}
 
 func (plugin *vsphereVolumePlugin) NewDetacher() (volume.Detacher, error) {
-	vsphereCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	vsphereCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}
 
 	return &vsphereVMDKDetacher{
-		mounter:        plugin.host.GetMounter(),
+		host:           plugin.host,
 		vsphereVolumes: vsphereCloud,
 	}, nil
 }
@@ -253,5 +262,8 @@ func (detacher *vsphereVMDKDetacher) Detach(deviceMountPath string, nodeName typ
 }
 
 func (detacher *vsphereVMDKDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	if detacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", vsphereVolumePluginName)
+	}
+	return volumeutil.UnmountPath(deviceMountPath, detacher.host.GetMounter())
 }

@@ -20,7 +20,6 @@ package attachdetach
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/golang/glog"
@@ -43,8 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
-	"k8s.io/kubernetes/pkg/util/io"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -115,7 +112,7 @@ func NewAttachDetachController(
 		cloud:       cloud,
 	}
 
-	if err := adc.volumePluginMgr.InitPlugins(plugins, adc); err != nil {
+	if err := adc.volumePluginMgr.InitPlugins(plugins, nil /*volumeHost*/, kubeClient, cloud); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
 	}
 
@@ -477,65 +474,5 @@ func (adc *attachDetachController) processVolumesInUse(
 				"SetVolumeMountedByNode(%q, %q, %q) returned an error: %v",
 				attachedVolume.VolumeName, nodeName, mounted, err)
 		}
-	}
-}
-
-// VolumeHost implementation
-// This is an unfortunate requirement of the current factoring of volume plugin
-// initializing code. It requires kubelet specific methods used by the mounting
-// code to be implemented by all initializers even if the initializer does not
-// do mounting (like this attach/detach controller).
-// Issue kubernetes/kubernetes/issues/14217 to fix this.
-func (adc *attachDetachController) GetPluginDir(podUID string) string {
-	return ""
-}
-
-func (adc *attachDetachController) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
-	return ""
-}
-
-func (adc *attachDetachController) GetPodPluginDir(podUID types.UID, pluginName string) string {
-	return ""
-}
-
-func (adc *attachDetachController) GetKubeClient() clientset.Interface {
-	return adc.kubeClient
-}
-
-func (adc *attachDetachController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
-	return nil, fmt.Errorf("NewWrapperMounter not supported by Attach/Detach controller's VolumeHost implementation")
-}
-
-func (adc *attachDetachController) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
-	return nil, fmt.Errorf("NewWrapperUnmounter not supported by Attach/Detach controller's VolumeHost implementation")
-}
-
-func (adc *attachDetachController) GetCloudProvider() cloudprovider.Interface {
-	return adc.cloud
-}
-
-func (adc *attachDetachController) GetMounter() mount.Interface {
-	return nil
-}
-
-func (adc *attachDetachController) GetWriter() io.Writer {
-	return nil
-}
-
-func (adc *attachDetachController) GetHostName() string {
-	return ""
-}
-
-func (adc *attachDetachController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP() not supported by Attach/Detach controller's VolumeHost implementation")
-}
-
-func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {
-	return v1.ResourceList{}, nil
-}
-
-func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
-		return nil, fmt.Errorf("GetSecret unsupported in attachDetachController")
 	}
 }

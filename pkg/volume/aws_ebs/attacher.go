@@ -42,7 +42,7 @@ var _ volume.Attacher = &awsElasticBlockStoreAttacher{}
 var _ volume.AttachableVolumePlugin = &awsElasticBlockStorePlugin{}
 
 func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error) {
-	awsCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	awsCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}
@@ -54,6 +54,9 @@ func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error)
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	mounter := plugin.host.GetMounter()
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
@@ -189,6 +192,10 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, d
 
 func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath(
 	spec *volume.Spec) (string, error) {
+	if attacher.host == nil {
+		return "", fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", awsElasticBlockStorePluginName)
+	}
+
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -199,6 +206,10 @@ func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath(
 
 // FIXME: this method can be further pruned.
 func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	if attacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", awsElasticBlockStorePluginName)
+	}
+
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -234,20 +245,20 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 }
 
 type awsElasticBlockStoreDetacher struct {
-	mounter    mount.Interface
+	host       volume.VolumeHost
 	awsVolumes aws.Volumes
 }
 
 var _ volume.Detacher = &awsElasticBlockStoreDetacher{}
 
 func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error) {
-	awsCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	awsCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}
 
 	return &awsElasticBlockStoreDetacher{
-		mounter:    plugin.host.GetMounter(),
+		host:       plugin.host,
 		awsVolumes: awsCloud,
 	}, nil
 }
@@ -277,7 +288,11 @@ func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, nod
 }
 
 func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	if detacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", awsElasticBlockStorePluginName)
+	}
+
+	return volumeutil.UnmountPath(deviceMountPath, detacher.host.GetMounter())
 }
 
 func setNodeDisk(

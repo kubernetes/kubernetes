@@ -24,6 +24,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -33,12 +35,13 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&iscsiPlugin{nil, exec.New()}}
+	return []volume.VolumePlugin{&iscsiPlugin{exe: exec.New()}}
 }
 
 type iscsiPlugin struct {
-	host volume.VolumeHost
-	exe  exec.Interface
+	host       volume.VolumeHost
+	exe        exec.Interface
+	kubeClient clientset.Interface
 }
 
 var _ volume.VolumePlugin = &iscsiPlugin{}
@@ -48,8 +51,9 @@ const (
 	iscsiPluginName = "kubernetes.io/iscsi"
 )
 
-func (plugin *iscsiPlugin) Init(host volume.VolumeHost) error {
+func (plugin *iscsiPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
+	plugin.kubeClient = client
 	return nil
 }
 
@@ -98,6 +102,9 @@ func (plugin *iscsiPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *iscsiPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	// Inject real implementations here, test through the internal function.
 	var secret map[string]string
 	source, _, err := getVolumeSource(spec)
@@ -106,7 +113,7 @@ func (plugin *iscsiPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.V
 	}
 
 	if source.SecretRef != nil {
-		if secret, err = ioutil.GetSecretForPod(pod, source.SecretRef.Name, plugin.host.GetKubeClient()); err != nil {
+		if secret, err = ioutil.GetSecretForPod(pod, source.SecretRef.Name, plugin.kubeClient); err != nil {
 			glog.Errorf("Couldn't get secret from %v/%v", pod.Namespace, source.SecretRef)
 			return nil, err
 		}
@@ -154,6 +161,9 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 }
 
 func (plugin *iscsiPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	// Inject real implementations here, test through the internal function.
 	return plugin.newUnmounterInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetMounter())
 }

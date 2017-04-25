@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -35,6 +36,7 @@ import (
 
 type photonPersistentDiskAttacher struct {
 	host        volume.VolumeHost
+	cloud       cloudprovider.Interface
 	photonDisks photon.Disks
 }
 
@@ -42,7 +44,7 @@ var _ volume.Attacher = &photonPersistentDiskAttacher{}
 var _ volume.AttachableVolumePlugin = &photonPersistentDiskPlugin{}
 
 func (plugin *photonPersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
-	photonCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	photonCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		glog.Errorf("Photon Controller attacher: NewAttacher failed to get cloud provider")
 		return nil, err
@@ -50,6 +52,7 @@ func (plugin *photonPersistentDiskPlugin) NewAttacher() (volume.Attacher, error)
 
 	return &photonPersistentDiskAttacher{
 		host:        plugin.host,
+		cloud:       photonCloud,
 		photonDisks: photonCloud,
 	}, nil
 }
@@ -161,6 +164,9 @@ func (attacher *photonPersistentDiskAttacher) WaitForAttach(spec *volume.Spec, d
 // GetDeviceMountPath returns a path where the device should
 // point which should be bind mounted for individual volumes.
 func (attacher *photonPersistentDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
+	if attacher.host == nil {
+		return "", fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", photonPersistentDiskPluginName)
+	}
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		glog.Errorf("Photon Controller attacher: GetDeviceMountPath failed to get volume source")
@@ -173,12 +179,18 @@ func (attacher *photonPersistentDiskAttacher) GetDeviceMountPath(spec *volume.Sp
 // GetMountDeviceRefs finds all other references to the device referenced
 // by deviceMountPath; returns a list of paths.
 func (plugin *photonPersistentDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	mounter := plugin.host.GetMounter()
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
 // MountDevice mounts device to global mount point.
 func (attacher *photonPersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	if attacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", photonPersistentDiskPluginName)
+	}
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -215,21 +227,21 @@ func (attacher *photonPersistentDiskAttacher) MountDevice(spec *volume.Spec, dev
 }
 
 type photonPersistentDiskDetacher struct {
-	mounter     mount.Interface
+	host        volume.VolumeHost
 	photonDisks photon.Disks
 }
 
 var _ volume.Detacher = &photonPersistentDiskDetacher{}
 
 func (plugin *photonPersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
-	photonCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	photonCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		glog.Errorf("Photon Controller attacher: NewDetacher failed to get cloud provider. err: %s", err)
 		return nil, err
 	}
 
 	return &photonPersistentDiskDetacher{
-		mounter:     plugin.host.GetMounter(),
+		host:        plugin.host,
 		photonDisks: photonCloud,
 	}, nil
 }
@@ -282,5 +294,8 @@ func (detacher *photonPersistentDiskDetacher) WaitForDetach(devicePath string, t
 }
 
 func (detacher *photonPersistentDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	if detacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", photonPersistentDiskPluginName)
+	}
+	return volumeutil.UnmountPath(deviceMountPath, detacher.host.GetMounter())
 }

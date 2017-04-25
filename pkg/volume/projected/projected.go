@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/configmap"
@@ -45,8 +47,9 @@ const (
 )
 
 type projectedPlugin struct {
-	host      volume.VolumeHost
-	getSecret func(namespace, name string) (*v1.Secret, error)
+	host       volume.VolumeHost
+	kubeClient clientset.Interface
+	getSecret  func(namespace, name string) (*v1.Secret, error)
 }
 
 var _ volume.VolumePlugin = &projectedPlugin{}
@@ -65,8 +68,9 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedNameForDisk(projectedPluginName), volName)
 }
 
-func (plugin *projectedPlugin) Init(host volume.VolumeHost) error {
+func (plugin *projectedPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
+	plugin.kubeClient = client
 	plugin.getSecret = host.GetSecretFunc()
 	return nil
 }
@@ -101,6 +105,9 @@ func (plugin *projectedPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return &projectedVolumeMounter{
 		projectedVolume: &projectedVolume{
 			volName: spec.Name(),
@@ -115,6 +122,9 @@ func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts v
 }
 
 func (plugin *projectedPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return &projectedVolumeUnmounter{
 		&projectedVolume{
 			volName: volName,
@@ -222,8 +232,7 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
 	}
 
-	kubeClient := s.plugin.host.GetKubeClient()
-	if kubeClient == nil {
+	if s.plugin.kubeClient == nil {
 		return nil, fmt.Errorf("Cannot setup projected volume %v because kube client is not configured", s.volName)
 	}
 
@@ -258,7 +267,7 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			}
 		} else if source.ConfigMap != nil {
 			optional := source.ConfigMap.Optional != nil && *source.ConfigMap.Optional
-			configMap, err := kubeClient.Core().ConfigMaps(s.pod.Namespace).Get(source.ConfigMap.Name, metav1.GetOptions{})
+			configMap, err := s.plugin.kubeClient.Core().ConfigMaps(s.pod.Namespace).Get(source.ConfigMap.Name, metav1.GetOptions{})
 			if err != nil {
 				if !(errors.IsNotFound(err) && optional) {
 					glog.Errorf("Couldn't get configMap %v/%v: %v", s.pod.Namespace, source.ConfigMap.Name, err)

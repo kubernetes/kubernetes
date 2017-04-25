@@ -25,6 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -33,11 +35,12 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&cephfsPlugin{nil}}
+	return []volume.VolumePlugin{&cephfsPlugin{}}
 }
 
 type cephfsPlugin struct {
-	host volume.VolumeHost
+	host       volume.VolumeHost
+	kubeClient clientset.Interface
 }
 
 var _ volume.VolumePlugin = &cephfsPlugin{}
@@ -46,8 +49,9 @@ const (
 	cephfsPluginName = "kubernetes.io/cephfs"
 )
 
-func (plugin *cephfsPlugin) Init(host volume.VolumeHost) error {
+func (plugin *cephfsPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
+	plugin.kubeClient = client
 	return nil
 }
 
@@ -89,13 +93,16 @@ func (plugin *cephfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	cephvs, _, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
 	}
 	secret := ""
 	if cephvs.SecretRef != nil {
-		kubeClient := plugin.host.GetKubeClient()
+		kubeClient := plugin.kubeClient
 		if kubeClient == nil {
 			return nil, fmt.Errorf("Cannot get kube client")
 		}
@@ -153,6 +160,9 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 }
 
 func (plugin *cephfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
 }
 

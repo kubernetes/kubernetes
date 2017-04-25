@@ -43,7 +43,7 @@ const (
 type AWSDiskUtil struct{}
 
 func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
-	cloud, err := getCloudProvider(d.awsElasticBlockStore.plugin.host.GetCloudProvider())
+	cloud, err := getCloudProvider(d.awsElasticBlockStore.plugin.cloud)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
 // CreateVolume creates an AWS EBS volume.
 // Returns: volumeID, volumeSizeGB, labels, error
 func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.KubernetesVolumeID, int, map[string]string, error) {
-	cloud, err := getCloudProvider(c.awsElasticBlockStore.plugin.host.GetCloudProvider())
+	cloud, err := getCloudProvider(c.awsElasticBlockStore.plugin.cloud)
 	if err != nil {
 		return "", 0, nil, err
 	}

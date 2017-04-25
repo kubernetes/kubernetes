@@ -22,6 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 func TestSpecSourceConverters(t *testing.T) {
@@ -57,7 +59,7 @@ func TestSpecSourceConverters(t *testing.T) {
 type testPlugins struct {
 }
 
-func (plugin *testPlugins) Init(host VolumeHost) error {
+func (plugin *testPlugins) Init(host VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	return nil
 }
 
@@ -103,7 +105,7 @@ func newTestPlugin() []VolumePlugin {
 
 func TestVolumePluginMgrFunc(t *testing.T) {
 	vpm := VolumePluginMgr{}
-	vpm.InitPlugins(newTestPlugin(), nil)
+	vpm.InitPlugins(newTestPlugin(), nil, nil, nil)
 
 	plug, err := vpm.FindPluginByName("testPlugin")
 	if err != nil {

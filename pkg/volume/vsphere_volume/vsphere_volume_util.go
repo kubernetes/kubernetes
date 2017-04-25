@@ -75,8 +75,7 @@ func verifyDevicePath(path string) (string, error) {
 
 // CreateVolume creates a vSphere volume.
 func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeKB int, fstype string, err error) {
-
-	cloud, err := getCloudProvider(v.plugin.host.GetCloudProvider())
+	cloud, err := getCloudProvider(v.plugin.cloud)
 	if err != nil {
 		return "", 0, "", err
 	}
@@ -138,7 +137,7 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPa
 
 // DeleteVolume deletes a vSphere volume.
 func (util *VsphereDiskUtil) DeleteVolume(vd *vsphereVolumeDeleter) error {
-	cloud, err := getCloudProvider(vd.plugin.host.GetCloudProvider())
+	cloud, err := getCloudProvider(vd.plugin.cloud)
 	if err != nil {
 		return err
 	}

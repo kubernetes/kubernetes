@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -42,8 +44,9 @@ func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin 
 }
 
 type hostPathPlugin struct {
-	host   volume.VolumeHost
-	config volume.VolumeConfig
+	host       volume.VolumeHost
+	kubeClient clientset.Interface
+	config     volume.VolumeConfig
 }
 
 var _ volume.VolumePlugin = &hostPathPlugin{}
@@ -56,8 +59,9 @@ const (
 	hostPathPluginName = "kubernetes.io/host-path"
 )
 
-func (plugin *hostPathPlugin) Init(host volume.VolumeHost) error {
+func (plugin *hostPathPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
+	plugin.kubeClient = client
 	return nil
 }
 
@@ -98,6 +102,9 @@ func (plugin *hostPathPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	hostPathVolumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -109,6 +116,9 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volum
 }
 
 func (plugin *hostPathPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return &hostPathUnmounter{&hostPath{
 		path: "",
 	}}, nil
@@ -131,18 +141,18 @@ func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRec
 			Path: spec.PersistentVolume.Spec.HostPath.Path,
 		},
 	}
-	return volume.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
+	return volume.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.kubeClient, eventRecorder)
 }
 
 func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	return newDeleter(spec, plugin.host)
+	return newDeleter(spec)
 }
 
 func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
 	if !plugin.config.ProvisioningEnabled {
 		return nil, fmt.Errorf("Provisioning in volume plugin %q is disabled", plugin.GetPluginName())
 	}
-	return newProvisioner(options, plugin.host, plugin)
+	return newProvisioner(options, plugin)
 }
 
 func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -157,16 +167,16 @@ func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) 
 	return volume.NewSpecFromVolume(hostPathVolume), nil
 }
 
-func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error) {
+func newDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.HostPath == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
 	}
 	path := spec.PersistentVolume.Spec.HostPath.Path
-	return &hostPathDeleter{name: spec.Name(), path: path, host: host}, nil
+	return &hostPathDeleter{name: spec.Name(), path: path}, nil
 }
 
-func newProvisioner(options volume.VolumeOptions, host volume.VolumeHost, plugin *hostPathPlugin) (volume.Provisioner, error) {
-	return &hostPathProvisioner{options: options, host: host, plugin: plugin}, nil
+func newProvisioner(options volume.VolumeOptions, plugin *hostPathPlugin) (volume.Provisioner, error) {
+	return &hostPathProvisioner{options: options, plugin: plugin}, nil
 }
 
 // HostPath volumes represent a bare host file or directory mount.
@@ -235,7 +245,6 @@ func (c *hostPathUnmounter) TearDownAt(dir string) error {
 // hostPathProvisioner implements a Provisioner for the HostPath plugin
 // This implementation is meant for testing only and only works in a single node cluster.
 type hostPathProvisioner struct {
-	host    volume.VolumeHost
 	options volume.VolumeOptions
 	plugin  *hostPathPlugin
 }
@@ -278,12 +287,7 @@ func (r *hostPathProvisioner) Provision() (*v1.PersistentVolume, error) {
 type hostPathDeleter struct {
 	name string
 	path string
-	host volume.VolumeHost
 	volume.MetricsNil
-}
-
-func (r *hostPathDeleter) GetPath() string {
-	return r.path
 }
 
 // Delete for hostPath removes the local directory so long as it is beneath /tmp/*.
@@ -291,10 +295,10 @@ func (r *hostPathDeleter) GetPath() string {
 // this deleter for anything other than development and testing.
 func (r *hostPathDeleter) Delete() error {
 	regexp := regexp.MustCompile("/tmp/.+")
-	if !regexp.MatchString(r.GetPath()) {
-		return fmt.Errorf("host_path deleter only supports /tmp/.+ but received provided %s", r.GetPath())
+	if !regexp.MatchString(r.path) {
+		return fmt.Errorf("host_path deleter only supports /tmp/.+ but received provided %s", r.path)
 	}
-	return os.RemoveAll(r.GetPath())
+	return os.RemoveAll(r.path)
 }
 
 func getVolumeSource(
