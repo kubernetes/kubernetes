@@ -5,172 +5,24 @@
 // In general, please try to avoid adding flags or configuration fields,
 // we already have a confusingly large amount of them.
 type KubeletConfiguration struct {
-  metav1.TypeMeta `json:",inline"`
   // TODO(kc-refactor): Recompose this from the structures below.
 }
 
-// TODO(mtaufen): Feature owners for each config field
-// TODO(mtaufen): optional fields? also include defaults.
+type NodeLifecycleConfig struct {
+  metav1.TypeMeta `json:",inline"`
+  /* validation and setup */
+  // TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
+  // Tells the Kubelet to fail to start if swap is enabled on the node.
+  ExperimentalFailSwapOn bool `json:"experimentalFailSwapOn,omitempty"`
+  // This flag, if set, enables a check prior to mount operations to verify that the required components
+  // (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
+  // and fails the mount operation fails.
+  ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"experimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
+  // Default behaviour for kernel tuning
+  ProtectKernelDefaults bool `json:"protectKernelDefaults"` // If true, Kubelet will error if kernel parameters aren't what it expects. If false, Kubelet will try to set kernel parameters to what it wants.
 
-// TODO(mtaufen): Reorganize under these categories:
-/*
-- Node lifecycle
-- Pod lifecycle
-- Monitoring/logging
-- Resource management
-- Security
-- Networking
-*/
-
-// TODO(mtaufen): CAUTION PEOPLE THAT THERE MAY BE INTERDEPENDENCIES BETWEEN SUBOBJECTS
-// AND THEY SHOULD BE REALLY CAREFUL!!!!!! YOU NEED TO ALSO WRITE EVERY SUBOBJECT!
-
-// TODO(mtaufen): Have every maintainer of node review this and get an approval from each, also heads up to storage and networking
-
-// These are marked deprecated and shoud be left as flags-only,
-// and eventually removed per the deprecation policy: https://kubernetes.io/docs/home/deprecation-policy/.
-type MarkedDeprecated struct {
-  // The node has babysitter process monitoring docker and kubelet.
-  BabysitDaemons bool `json:"babysitDaemons"`
-  // minimumGCAge is the minimum age for a finished container before it is
-  // garbage collected.
-  MinimumGCAge metav1.Duration `json:"minimumGCAge"`
-  // maxPerPodContainerCount is the maximum number of old instances to
-  // retain per container. Each container takes up some disk space.
-  MaxPerPodContainerCount int32 `json:"maxPerPodContainerCount"`
-  // maxContainerCount is the maximum number of old instances of containers
-  // to retain globally. Each container takes up some disk space.
-  MaxContainerCount *int32 `json:"maxContainerCount"`
-  // lowDiskSpaceThresholdMB is the absolute free disk space, in MB, to
-  // maintain. When disk space falls below this threshold, new pods would
-  // be rejected.
-  LowDiskSpaceThresholdMB int32 `json:"lowDiskSpaceThresholdMB"`
-  // rktStage1Image is the image to use as stage1. Local paths and
-  // http/https URLs are supported.
-  RktStage1Image string `json:"rktStage1Image"`
-  // dockerExecHandlerName is the handler to use when executing a command
-  // in a container. Valid values are 'native' and 'nsenter'. Defaults to
-  // 'native'.
-  DockerExecHandlerName string `json:"dockerExecHandlerName"`
-  // registerSchedulable tells the kubelet to register the node as
-  // schedulable. Won't have any effect if register-node is false.
-  // DEPRECATED: use registerWithTaints instead
-  RegisterSchedulable *bool `json:"registerSchedulable"`
-  // outOfDiskTransitionFrequency is duration for which the kubelet has to
-  // wait before transitioning out of out-of-disk node condition status.
-  OutOfDiskTransitionFrequency metav1.Duration `json:"outOfDiskTransitionFrequency"`
-  // Enable Container Runtime Interface (CRI) integration.
-  // +optional
-  EnableCRI *bool `json:"enableCRI,omitempty"`
-  // masterServiceNamespace is The namespace from which the kubernetes
-  // master services should be injected into pods.
-  MasterServiceNamespace string `json:"masterServiceNamespace"` // This isn't marked deprecated yet, but it probably should be. See #44250
-}
-
-// I'm being conservative with elevating flags into the objects that will be available
-// to dynamic config. We can always eleveate these later if we need to.
-type ShouldProbablyJustBeFlags struct {
-  /* Static pod stuff should all just be flags */
-  // podManifestPath is the path to the directory containing pod manifests to
-  // run, or the path to a single manifest file
-  PodManifestPath string `json:"podManifestPath"`
-  // fileCheckFrequency is the duration between checking config files for
-  // new data
-  FileCheckFrequency metav1.Duration `json:"fileCheckFrequency"`
-  // httpCheckFrequency is the duration between checking http for new data
-  HTTPCheckFrequency metav1.Duration `json:"httpCheckFrequency"`
-  // manifestURL is the URL for accessing the container manifest
-  ManifestURL string `json:"manifestURL"`
-  // manifestURLHeader is the HTTP header to use when accessing the manifest
-  // URL, with the key separated from the value with a ':', as in 'key:value'
-  ManifestURLHeader string `json:"manifestURLHeader"`
-
-  // maxOpenFiles is Number of files that can be opened by Kubelet process.
-  MaxOpenFiles int64 `json:"maxOpenFiles"`
-
-  // experimentalMounterPath is the path to mounter binary. If not set, kubelet will attempt to use mount
-  // binary that is available via $PATH,
-  ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"` // There is now a use-case for this being dynamic
-
-  // containerized should be set to true if kubelet is running in a container.
-  Containerized *bool `json:"containerized"`
-  // lockFilePath is the path that kubelet will use to as a lock file.
-  // It uses this file as a lock to synchronize with other kubelet processes
-  // that may be running.
-  LockFilePath *string `json:"lockFilePath"`
-  // ExitOnLockContention is a flag that signifies to the kubelet that it is running
-  // in "bootstrap" mode. This requires that 'LockFilePath' has been set.
-  // This will cause the kubelet to listen to inotify events on the lock file,
-  // releasing it and exiting when another process tries to open that file.
-  ExitOnLockContention bool `json:"exitOnLockContention"`
-
-  // rootDirectory is the directory path to place kubelet files (volume
-  // mounts,etc).
-  RootDirectory string `json:"rootDirectory"`
-
-  // containerRuntime is the container runtime to use.
-  ContainerRuntime string `json:"containerRuntime"`
-  // remoteRuntimeEndpoint is the endpoint of remote runtime service
-  RemoteRuntimeEndpoint string `json:"remoteRuntimeEndpoint"`
-  // remoteImageEndpoint is the endpoint of remote image service
-  RemoteImageEndpoint string `json:"remoteImageEndpoint"`
-  // runtimeRequestTimeout is the timeout for all runtime requests except long running
-  // requests - pull, logs, exec and attach.
-  RuntimeRequestTimeout metav1.Duration `json:"runtimeRequestTimeout"`
-}
-
-/* BEGIN RUNTIME REMOVAL */
-
-// TODO(mtaufen): These will be marked deprecated
-
-// I believe the plan is to remove ALL of these from the Kubelet/Node configuration
-// e.g. they become flags-only for now and are immediately marked deprecated, for later removal.
-
-// Note: The WIP PR for making these flags-only is #44061
-
-type RuntimeOptions struct {
-  // networkPluginName is the name of the network plugin to be invoked for
-  // various events in kubelet/pod lifecycle
-  NetworkPluginName string `json:"networkPluginName"`
-  // networkPluginDir is the full path of the directory in which to search
-  // for network plugins (and, for backwards-compat, CNI config files)
-  NetworkPluginDir string `json:"networkPluginDir"`
-  // networkPluginMTU is the MTU to be passed to the network plugin,
-  // and overrides the default MTU for cases where it cannot be automatically
-  // computed (such as IPSEC).
-  NetworkPluginMTU int32 `json:"networkPluginMTU"`
-  // CNIConfDir is the full path of the directory in which to seardch for
-  // CNI config files
-  CNIConfDir string `json:"cniConfDir"`
-  // CNIBinDir is the full path of the directory in which to search for
-  // CNI plugin binaries
-  CNIBinDir string `json:"cniBinDir"`
-  // podInfraContainerImage is the image whose network/ipc namespaces
-  // containers in each pod will use.
-  PodInfraContainerImage string `json:"podInfraContainerImage"`
-}
-
-type DockerOptions struct {
-  // dockerEndpoint is the path to the docker endpoint to communicate with.
-  DockerEndpoint string `json:"dockerEndpoint"`
-  // enable gathering custom metrics.
-  EnableCustomMetrics bool `json:"enableCustomMetrics"` // for Docker
-}
-
-type RktOptions struct {
-  // rktPath is the  path of rkt binary. Leave empty to use the first rkt in
-  // $PATH.
-  RktPath string `json:"rktPath"`
-  // rktApiEndpoint is the endpoint of the rkt API service to communicate with.
-  RktAPIEndpoint string `json:"rktAPIEndpoint"`
-}
-
-/* END RUNTIME REMOVAL */
-
-// TODO(mtaufen): Registration and Status could be NodeLifecycleConfig
-
-type NodeRegistrationConfig struct {
-    // registerNode enables automatic registration with the apiserver.
+  /* registration */
+  // registerNode enables automatic registration with the apiserver.
   RegisterNode *bool `json:"registerNode"`
   // registerWithTaints are an array of taints to add to a node object when
   // the kubelet registers itself. This only takes effect when registerNode
@@ -178,52 +30,108 @@ type NodeRegistrationConfig struct {
   RegisterWithTaints []v1.Taint `json:"registerWithTaints"`
   // nodeLabels to add when registering the node in the cluster.
   NodeLabels map[string]string `json:"nodeLabels"`
-
 }
 
-type NodeStatusConfig struct {
+// TODO(kc-refactor): I was a little surprised that I only found one field to put here
+type PodLifecycleConfig struct {
+  metav1.TypeMeta `json:",inline"`
+  // syncFrequency is the max period between synchronizing running
+  // containers and config
+  SyncFrequency metav1.Duration `json:"syncFrequency"`
+}
+
+type VolumeConfig struct {
+  metav1.TypeMeta `json:",inline"`
+  // volumePluginDir is the full path of the directory in which to search
+  // for additional third party volume plugins
+  VolumePluginDir string `json:"volumePluginDir"`
+  // enableControllerAttachDetach enables the Attach/Detach controller to
+  // manage attachment/detachment of volumes scheduled to this node, and
+  // disables kubelet from executing any attach/detach operations
+  EnableControllerAttachDetach *bool `json:"enableControllerAttachDetach"`
+}
+
+type NodeMonitoringConfig struct {
+  metav1.TypeMeta `json:",inline"`
   // nodeStatusUpdateFrequency is the frequency that kubelet posts node
   // status to master. Note: be cautious when changing the constant, it
   // must work with nodeMonitorGracePeriod in nodecontroller.
   NodeStatusUpdateFrequency metav1.Duration `json:"nodeStatusUpdateFrequency"`
+  // eventRecordQPS is the maximum event creations per second. If 0, there
+  // is no limit enforced.
+  EventRecordQPS *int32 `json:"eventRecordQPS"`
+  // eventBurst is the maximum size of a bursty event records, temporarily
+  // allows event records to burst to this number, while still not exceeding
+  // event-qps. Only used if eventQps > 0
+  EventBurst int32 `json:"eventBurst"`
+  // How frequently to calculate and cache volume disk usage for all pods
+  VolumeStatsAggPeriod metav1.Duration `json:"volumeStatsAggPeriod"`
+  // enable gathering custom metrics from containers, supported via cadvisor.
+  EnableCustomMetrics bool `json:"enableCustomMetrics"`
 }
 
+type KubeletServerConfig struct {
+  metav1.TypeMeta `json:",inline"`
+  // TODO(kc-refactor): It would probably be a bad idea to turn this off dynamically - the
+  // operator-intervention endpoints for dynamic config are planned to be on the kubelet's server
+  // OTOH if it was turned off in provisioning by accident it wouldn't be fatal,
+  // you would still use dynamic config, you may have problems down the road...
+  // enableServer enables the Kubelet's server
+  EnableServer *bool `json:"enableServer"`
+  // address is the IP address for the Kubelet to serve on (set to 0.0.0.0
+  // for all interfaces)
+  Address string `json:"address"`
+  // port is the port for the Kubelet to serve on.
+  Port int32 `json:"port"`
+  // readOnlyPort is the read-only port for the Kubelet to serve on with
+  // no authentication/authorization (set to 0 to disable)
+  ReadOnlyPort int32 `json:"readOnlyPort"`
 
-// TODO(mtaufen): Should we just roll this into NodeNetworkConfig
-// How is DNS generated?
-type ClusterDNSConfig struct {
-  // clusterDNS is a list of IP address for the cluster DNS server.  If set,
-  // kubelet will configure all containers to use this for DNS resolution
-  // instead of the host's DNS servers
-  ClusterDNS []string `json:"clusterDNS"`
-  // clusterDomain is the DNS domain for this cluster. If set, kubelet will
-  // configure all containers to search this domain in addition to the
-  // host's search domains.
-  ClusterDomain string `json:"clusterDomain"`
-}
+  // TODO(mtaufen): This should be renamed, because it's actually turned on by default
+  // because it's necessary for kubectl features to work. We should split out all things
+  // that are really "debug mode only" and call this something like `EnableContainerHandlers`.
+  // enableDebuggingHandlers enables server endpoints for log collection
+  // and local running of containers and commands
+  EnableDebuggingHandlers *bool `json:"enableDebuggingHandlers"`
+  // streamingConnectionIdleTimeout is the maximum time a streaming connection
+  // can be idle before the connection is automatically closed.
+  StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout"`
 
-type KubeAPIConfig struct {
-  /* requests to API server */
-  // contentType is contentType of requests sent to apiserver.
-  ContentType string `json:"contentType"`
-  // kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
-  KubeAPIQPS *int32 `json:"kubeAPIQPS"`
-  // kubeAPIBurst is the burst to allow while talking with kubernetes
-  // apiserver
-  KubeAPIBurst int32 `json:"kubeAPIBurst"`
-  // syncFrequency is the max period between synchronizing running
-  // containers and config
-  SyncFrequency metav1.Duration `json:"syncFrequency"` // TODO(kc-refactor): This feels right here but take another look later.
-}
+  // healthzBindAddress is the IP address for the Kubelet's healthz server to serve on.
+  HealthzBindAddress string `json:"healthzBindAddress"`
+  // healthzPort is the port of the localhost healthz endpoint
+  HealthzPort int32 `json:"healthzPort"`
 
-type FeatureGates struct {
-  // featureGates is a string of comma-separated key=value pairs that describe feature
-  // gates for alpha/experimental features.
-  FeatureGates string `json:"featureGates,omitempty"`
+  // TODO(kc-refactor): Pretty sure this serves on all interfaces, not just localhost,
+  // given k8s.io/kubernetes/pkg/kubelet/cadvisor/cadvisor_linux.go:140 uses ":port" as the address
+  // cAdvisorPort is the port of the localhost cAdvisor endpoint
+  CAdvisorPort int32 `json:"cAdvisorPort"`
+
+   /* auth */
+  // authentication specifies how requests to the Kubelet's server are authenticated
+  Authentication KubeletAuthentication `json:"authentication"`
+  // authorization specifies how requests to the Kubelet's server are authorized
+  Authorization KubeletAuthorization `json:"authorization"`
+
+  /* TLS */
+  // tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
+  // if any, concatenated after server cert). If tlsCertFile and
+  // tlsPrivateKeyFile are not provided, a self-signed certificate
+  // and key are generated for the public address and saved to the directory
+  // passed to certDir.
+  TLSCertFile string `json:"tlsCertFile"`
+  // tlsPrivateKeyFile is the file containing x509 private key matching tlsCertFile.
+  TLSPrivateKeyFile string `json:"tlsPrivateKeyFile"`
+  // certDirectory is the directory where the TLS certs are located (by
+  // default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
+  // are provided, this flag will be ignored.
+  CertDirectory string `json:"certDirectory"`
 }
 
 // Management of Node resources
 type NodeResourcesConfig struct {
+  metav1.TypeMeta `json:",inline"`
+  /* general resource control */
   // oomScoreAdj is The oom-score-adj value for kubelet process. Values
   // must be within the range [-1000, 1000].
   OOMScoreAdj *int32 `json:"oomScoreAdj"`
@@ -238,17 +146,16 @@ type NodeResourcesConfig struct {
   // cpuCFSQuota is Enable CPU CFS quota enforcement for containers that
   // specify CPU limits
   CPUCFSQuota *bool `json:"cpuCFSQuota"`
-}
 
-type CgroupsConfig struct {
+  /* cgroups */
   // kubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
-  KubeletCgroups string `json:"kubeletCgroups"`
+  // +optional
+  KubeletCgroups string `json:"kubeletCgroups,optional,omitempty"`
   // systemCgroups is absolute name of cgroups in which to place
   // all non-kernel processes that are not already in a container. Empty
   // for no container. Rolling back the flag requires a reboot.
   SystemCgroups string `json:"systemCgroups"`
-  // runtimeCgroups are cgroups that container runtime is expected to be isolated in.
-  RuntimeCgroups string `json:"runtimeCgroups"` // TODO(kc-refactor): Does this become part of CRI now?
+
   // cgroupRoot is the root cgroup to use for pods. This is handled by the
   // container runtime on a best effort basis.
   CgroupRoot string `json:"cgroupRoot"`
@@ -260,9 +167,8 @@ type CgroupsConfig struct {
   // driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
   // +optional
   CgroupDriver string `json:"cgroupDriver,omitempty"`
-}
 
-type NodeAllocatableConfig struct {
+  /* node allocatable */
   // A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
   // that describe resources reserved for non-kubernetes components.
   // Currently only cpu and memory are supported. [default=none]
@@ -286,99 +192,40 @@ type NodeAllocatableConfig struct {
   // This flag, if set, will avoid including `EvictionHard` limits while computing Node Allocatable.
   // Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
   ExperimentalNodeAllocatableIgnoreEvictionThreshold bool `json:"experimentalNodeAllocatableIgnoreEvictionThreshold,omitempty"`
+
+  /* container image garbage collection */
+  // imageMinimumGCAge is the minimum age for an unused image before it is
+  // garbage collected.
+  ImageMinimumGCAge metav1.Duration `json:"imageMinimumGCAge"`
+  // imageGCHighThresholdPercent is the percent of disk usage after which
+  // image garbage collection is always run. The percent is calculated as
+  // this field value out of 100.
+  ImageGCHighThresholdPercent *int32 `json:"imageGCHighThresholdPercent"`
+  // imageGCLowThresholdPercent is the percent of disk usage before which
+  // image garbage collection is never run. Lowest disk usage to garbage
+  // collect to. The percent is calculated as this field value out of 100.
+  ImageGCLowThresholdPercent *int32 `json:"imageGCLowThresholdPercent"`
+
+  /* pod eviction */
+  // Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
+  EvictionHard *string `json:"evictionHard"`
+  // Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.
+  EvictionSoft string `json:"evictionSoft"`
+  // Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
+  EvictionSoftGracePeriod string `json:"evictionSoftGracePeriod"`
+  // Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
+  EvictionPressureTransitionPeriod metav1.Duration `json:"evictionPressureTransitionPeriod"`
+  // Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
+  EvictionMaxPodGracePeriod int32 `json:"evictionMaxPodGracePeriod"`
+  // Comma-delimited list of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.
+  EvictionMinimumReclaim string `json:"evictionMinimumReclaim"`
+  // If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
+  ExperimentalKernelMemcgNotification *bool `json:"experimentalKernelMemcgNotification"`
 }
 
-type KubeletServerConfig struct {
-  // TODO(kc-refactor): It would probably be a bad idea to turn this off dynamically - the
-  // operator-intervention endpoints for dynamic config are planned to be on the kubelet's server
-  // OTOH if it was turned off in provisioning by accident it wouldn't be fatal,
-  // you would still use dynamic config, you may have problems down the road...
-  // enableServer enables the Kubelet's server
-  EnableServer *bool `json:"enableServer"`
-  // address is the IP address for the Kubelet to serve on (set to 0.0.0.0
-  // for all interfaces)
-  Address string `json:"address"`
-  // port is the port for the Kubelet to serve on.
-  Port int32 `json:"port"`
-  // readOnlyPort is the read-only port for the Kubelet to serve on with
-  // no authentication/authorization (set to 0 to disable)
-  ReadOnlyPort int32 `json:"readOnlyPort"`
-  // streamingConnectionIdleTimeout is the maximum time a streaming connection
-  // can be idle before the connection is automatically closed.
-  StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout"` // TODO(kc-refactor): This is for serving remote commands (attach, exec, etc.). Is this subsumed by CRI?
-}
-
-type HealthzServerConfig struct {
-  // healthzBindAddress is the IP address for the healthz server to serve on.
-  HealthzBindAddress string `json:"healthzBindAddress"`
-  // healthzPort is the port of the localhost healthz endpoint
-  HealthzPort int32 `json:"healthzPort"`
-}
-
-type CAdvisorServerConfig struct {
-  // cAdvisorPort is the port of the localhost cAdvisor endpoint
-  CAdvisorPort int32 `json:"cAdvisorPort"`
-}
-
-type PodNetworkConfig struct {
-  // The CIDR to use for pod IP addresses, only used in standalone mode.
-  // In cluster mode, this is obtained from the master.
-  PodCIDR string `json:"podCIDR"`
-  // How should the kubelet configure the container bridge for hairpin packets.
-  // Setting this flag allows endpoints in a Service to loadbalance back to
-  // themselves if they should try to access their own Service. Values:
-  //   "promiscuous-bridge": make the container bridge promiscuous.
-  //   "hairpin-veth":       set the hairpin flag on container veth interfaces.
-  //   "none":               do nothing.
-  // Generally, one must set --hairpin-mode=veth-flag to achieve hairpin NAT,
-  // because promiscous-bridge assumes the existence of a container bridge named cbr0.
-  HairpinMode string `json:"hairpinMode"`
-}
-
-type NodeNetworkConfig struct {
-  // ResolverConfig is the resolver configuration file used as the basis
-  // for the container DNS resolution configuration."), []
-  ResolverConfig string `json:"resolvConf"`
-  // nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
-  NonMasqueradeCIDR string `json:"nonMasqueradeCIDR"`
-  // If true, Kubelet ensures a set of iptables rules are present on host.
-  // These rules will serve as utility rules for various components, e.g. KubeProxy.
-  // The rules will be created based on IPTablesMasqueradeBit and IPTablesDropBit.
-  MakeIPTablesUtilChains *bool `json:"makeIPTablesUtilChains"`
-  // iptablesMasqueradeBit is the bit of the iptables fwmark space to mark for SNAT
-  // Values must be within the range [0, 31]. Must be different from other mark bits.
-  // Warning: Please match the value of corresponding parameter in kube-proxy
-  // TODO: clean up IPTablesMasqueradeBit in kube-proxy
-  IPTablesMasqueradeBit *int32 `json:"iptablesMasqueradeBit"`
-  // iptablesDropBit is the bit of the iptables fwmark space to mark for dropping packets.
-  // Values must be within the range [0, 31]. Must be different from other mark bits.
-  IPTablesDropBit *int32 `json:"iptablesDropBit"`
-}
-
-type KubeletTLSConfig struct {
-  // tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
-  // if any, concatenated after server cert). If tlsCertFile and
-  // tlsPrivateKeyFile are not provided, a self-signed certificate
-  // and key are generated for the public address and saved to the directory
-  // passed to certDir.
-  TLSCertFile string `json:"tlsCertFile"`
-  // tlsPrivateKeyFile is the ile containing x509 private key matching
-  // tlsCertFile.
-  TLSPrivateKeyFile string `json:"tlsPrivateKeyFile"`
-  // certDirectory is the directory where the TLS certs are located (by
-  // default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
-  // are provided, this flag will be ignored.
-  CertDirectory string `json:"certDirectory"`
-}
-
-type KubeletAuthConfig struct {
-    // authentication specifies how requests to the Kubelet's server are authenticated
-  Authentication KubeletAuthentication `json:"authentication"`
-  // authorization specifies how requests to the Kubelet's server are authorized
-  Authorization KubeletAuthorization `json:"authorization"`
-}
-
-type PodSecurityConfig struct {
+type NodeSecurityConfig struct {
+  metav1.TypeMeta `json:",inline"`
+  /* containers */
   // seccompProfileRoot is the directory path for seccomp profiles.
   SeccompProfileRoot string `json:"seccompProfileRoot"`
   // allowPrivileged enables containers to request privileged mode.
@@ -400,8 +247,72 @@ type PodSecurityConfig struct {
   HostNetworkSources []string `json:"hostNetworkSources"`
 }
 
-// Image pulling config
-type ImagePullConfig struct {
+type NodeNetworkConfig struct {
+  metav1.TypeMeta `json:",inline"`
+  // clusterDNS is a list of IP address for the cluster DNS server.  If set,
+  // kubelet will configure all containers to use this for DNS resolution
+  // instead of the host's DNS servers
+  ClusterDNS []string `json:"clusterDNS"`
+  // clusterDomain is the DNS domain for this cluster. If set, kubelet will
+  // configure all containers to search this domain in addition to the
+  // host's search domains.
+  ClusterDomain string `json:"clusterDomain"`
+  // ResolverConfig is the resolver configuration file used as the basis
+  // for the container DNS resolution configuration."), []
+  ResolverConfig string `json:"resolvConf"`
+  // nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
+  NonMasqueradeCIDR string `json:"nonMasqueradeCIDR"`
+  // If true, Kubelet ensures a set of iptables rules are present on host.
+  // These rules will serve as utility rules for various components, e.g. KubeProxy.
+  // The rules will be created based on IPTablesMasqueradeBit and IPTablesDropBit.
+  MakeIPTablesUtilChains *bool `json:"makeIPTablesUtilChains"`
+  // iptablesMasqueradeBit is the bit of the iptables fwmark space to mark for SNAT
+  // Values must be within the range [0, 31]. Must be different from other mark bits.
+  // Warning: Please match the value of corresponding parameter in kube-proxy
+  // TODO: clean up IPTablesMasqueradeBit in kube-proxy
+  IPTablesMasqueradeBit *int32 `json:"iptablesMasqueradeBit"`
+  // iptablesDropBit is the bit of the iptables fwmark space to mark for dropping packets.
+  // Values must be within the range [0, 31]. Must be different from other mark bits.
+  IPTablesDropBit *int32 `json:"iptablesDropBit"`
+  // The CIDR to use for pod IP addresses, only used in standalone mode.
+  // In cluster mode, this is obtained from the master.
+  PodCIDR string `json:"podCIDR"`
+  // How should the kubelet configure the container bridge for hairpin packets.
+  // Setting this flag allows endpoints in a Service to loadbalance back to
+  // themselves if they should try to access their own Service. Values:
+  //   "promiscuous-bridge": make the container bridge promiscuous.
+  //   "hairpin-veth":       set the hairpin flag on container veth interfaces.
+  //   "none":               do nothing.
+  // Generally, one must set --hairpin-mode=veth-flag to achieve hairpin NAT,
+  // because promiscous-bridge assumes the existence of a container bridge named cbr0.
+  HairpinMode string `json:"hairpinMode"`
+}
+
+
+
+// TODO(kc-refactor): This will probably be our best opportunity to stop parsing a string
+// and make the feature gates API better. We should think about how to do that.
+type ClusterFeatureGates struct {
+  metav1.TypeMeta `json:",inline"`
+  // featureGates is a string of comma-separated key=value pairs that describe feature
+  // gates for alpha/experimental features.
+  FeatureGates string `json:"featureGates,omitempty"`
+}
+
+type ClusterAPIConfig struct {
+  metav1.TypeMeta `json:",inline"`
+  /* requests to API server */
+  // contentType is contentType of requests sent to apiserver.
+  ContentType string `json:"contentType"`
+  // kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
+  KubeAPIQPS *int32 `json:"kubeAPIQPS"`
+  // kubeAPIBurst is the burst to allow while talking with kubernetes
+  // apiserver
+  KubeAPIBurst int32 `json:"kubeAPIBurst"`
+}
+
+type ImageAPIConfig struct {
+  metav1.TypeMeta `json:",inline"`
   // serializeImagePulls when enabled, tells the Kubelet to pull images one
   // at a time. We recommend *not* changing the default value on nodes that
   // run docker daemon with version  < 1.9 or an Aufs storage backend.
@@ -419,79 +330,10 @@ type ImagePullConfig struct {
   ImagePullProgressDeadline metav1.Duration `json:"imagePullProgressDeadline,omitempty"`
 }
 
-// Garbage collection of container images
-type ImageGarbageCollectionConfig struct {
-  // imageMinimumGCAge is the minimum age for an unused image before it is
-  // garbage collected.
-  ImageMinimumGCAge metav1.Duration `json:"imageMinimumGCAge"`
-  // imageGCHighThresholdPercent is the percent of disk usage after which
-  // image garbage collection is always run. The percent is calculated as
-  // this field value out of 100.
-  ImageGCHighThresholdPercent *int32 `json:"imageGCHighThresholdPercent"`
-  // imageGCLowThresholdPercent is the percent of disk usage before which
-  // image garbage collection is never run. Lowest disk usage to garbage
-  // collect to. The percent is calculated as this field value out of 100.
-  ImageGCLowThresholdPercent *int32 `json:"imageGCLowThresholdPercent"`
-}
-
-// Pod eviction behaviors
-type PodEvictionConfig struct {
-  // Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
-  EvictionHard *string `json:"evictionHard"`
-  // Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.
-  EvictionSoft string `json:"evictionSoft"`
-  // Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
-  EvictionSoftGracePeriod string `json:"evictionSoftGracePeriod"`
-  // Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
-  EvictionPressureTransitionPeriod metav1.Duration `json:"evictionPressureTransitionPeriod"`
-  // Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
-  EvictionMaxPodGracePeriod int32 `json:"evictionMaxPodGracePeriod"`
-  // Comma-delimited list of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.
-  EvictionMinimumReclaim string `json:"evictionMinimumReclaim"`
-  // If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
-  ExperimentalKernelMemcgNotification *bool `json:"experimentalKernelMemcgNotification"`
-}
-
-// Volume management
-type VolumeConfig struct {
-  // How frequently to calculate and cache volume disk usage for all pods
-  VolumeStatsAggPeriod metav1.Duration `json:"volumeStatsAggPeriod"`
-  // volumePluginDir is the full path of the directory in which to search
-  // for additional third party volume plugins
-  VolumePluginDir string `json:"volumePluginDir"`
-  // enableControllerAttachDetach enables the Attach/Detach controller to
-  // manage attachment/detachment of volumes scheduled to this node, and
-  // disables kubelet from executing any attach/detach operations
-  EnableControllerAttachDetach *bool `json:"enableControllerAttachDetach"`
-}
-
-// Node validation and setup
-type NodeConformanceConfig struct {
-  // TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
-  // Tells the Kubelet to fail to start if swap is enabled on the node.
-  ExperimentalFailSwapOn bool `json:"experimentalFailSwapOn,omitempty"`
-  // This flag, if set, enables a check prior to mount operations to verify that the required components
-  // (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
-  // and fails the mount operation fails.
-  ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"experimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
-  // Default behaviour for kernel tuning
-  ProtectKernelDefaults bool `json:"protectKernelDefaults"` // If true, Kubelet will error if kernel parameters aren't what it expects. If false, Kubelet will try to set kernel parameters to what it wants.
-}
-
-// Events
-type EventConfig struct {
-  // eventRecordQPS is the maximum event creations per second. If 0, there
-  // is no limit enforced.
-  EventRecordQPS *int32 `json:"eventRecordQPS"`
-  // eventBurst is the maximum size of a bursty event records, temporarily
-  // allows event records to burst to this number, while still not exceeding
-  // event-qps. Only used if eventQps > 0
-  EventBurst int32 `json:"eventBurst"`
-}
-
 // Cloud provider configuration
 type CloudConfig struct {
- // cloudProvider is the provider for cloud services.
+  metav1.TypeMeta `json:",inline"`
+  // cloudProvider is the provider for cloud services.
   CloudProvider string `json:"cloudProvider"`
   // cloudConfigFile is the path to the cloud provider configuration file.
   CloudConfigFile string `json:"cloudConfigFile"`
@@ -499,19 +341,15 @@ type CloudConfig struct {
 
 // Debug settings
 type KubeletDebugConfig struct {
-  // enableDebuggingHandlers enables server endpoints for log collection
-  // and local running of containers and commands
-  EnableDebuggingHandlers *bool `json:"enableDebuggingHandlers"`
-  // enableContentionProfiling enables lock contention profiling, if enableDebuggingHandlers is true.
+  metav1.TypeMeta `json:",inline"`
+  // enableContentionProfiling enables lock contention profiling, if enableDebuggingHandlers is true in the KubeletServerConfig.
   EnableContentionProfiling bool `json:"enableContentionProfiling"`
   // This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
   // This can be useful for debugging volume related issues.
   KeepTerminatedPodVolumes bool `json:"keepTerminatedPodVolumes,omitempty"`
 }
 
-
-
-/* SAME AS TODAY */
+/* THESE OBJECTS SAME AS TODAY */
 
 type KubeletAuthorizationMode string
 
@@ -570,4 +408,133 @@ type KubeletAnonymousAuthentication struct {
 }
 
 /* END SAME AS TODAY */
+
+/* EVERYTHING BELOW THIS LINE WILL NOT BE PART OF DYNAMIC KUBELET CONFIG */
+
+// I'm being conservative with elevating flags into the objects that will be available
+// to dynamic config. We can always eleveate these later if we need to.
+type JustKubeletFlags struct {
+  /* Static pod stuff should all just be flags */
+  // podManifestPath is the path to the directory containing pod manifests to
+  // run, or the path to a single manifest file
+  PodManifestPath string `json:"podManifestPath"`
+  // fileCheckFrequency is the duration between checking config files for
+  // new data
+  FileCheckFrequency metav1.Duration `json:"fileCheckFrequency"`
+  // httpCheckFrequency is the duration between checking http for new data
+  HTTPCheckFrequency metav1.Duration `json:"httpCheckFrequency"`
+  // manifestURL is the URL for accessing the container manifest
+  ManifestURL string `json:"manifestURL"`
+  // manifestURLHeader is the HTTP header to use when accessing the manifest
+  // URL, with the key separated from the value with a ':', as in 'key:value'
+  ManifestURLHeader string `json:"manifestURLHeader"`
+
+  // maxOpenFiles is Number of files that can be opened by Kubelet process.
+  MaxOpenFiles int64 `json:"maxOpenFiles"`
+
+  // experimentalMounterPath is the path to mounter binary. If not set, kubelet will attempt to use mount
+  // binary that is available via $PATH,
+  ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"` // There is now a use-case for this being dynamic
+
+  // containerized should be set to true if kubelet is running in a container.
+  Containerized *bool `json:"containerized"`
+  // lockFilePath is the path that kubelet will use to as a lock file.
+  // It uses this file as a lock to synchronize with other kubelet processes
+  // that may be running.
+  LockFilePath *string `json:"lockFilePath"`
+  // ExitOnLockContention is a flag that signifies to the kubelet that it is running
+  // in "bootstrap" mode. This requires that 'LockFilePath' has been set.
+  // This will cause the kubelet to listen to inotify events on the lock file,
+  // releasing it and exiting when another process tries to open that file.
+  ExitOnLockContention bool `json:"exitOnLockContention"`
+
+  // rootDirectory is the directory path to place kubelet files (volume
+  // mounts,etc).
+  RootDirectory string `json:"rootDirectory"`
+
+  // remoteRuntimeEndpoint is the endpoint of remote runtime service
+  RemoteRuntimeEndpoint string `json:"remoteRuntimeEndpoint"`
+  // remoteImageEndpoint is the endpoint of remote image service
+  RemoteImageEndpoint string `json:"remoteImageEndpoint"`
+  // runtimeRequestTimeout is the timeout for all runtime requests except long running
+  // requests - pull, logs, exec and attach.
+  RuntimeRequestTimeout metav1.Duration `json:"runtimeRequestTimeout"`
+}
+
+/* EVERYTHING BELOW THIS LINE IS/WILL BE MARKED DEPRECATED AND REMOVED FROM THE KUBELET */
+
+// These are marked deprecated and shoud be left as flags-only,
+// and eventually removed per the deprecation policy: https://kubernetes.io/docs/home/deprecation-policy/.
+type MarkedDeprecated struct {
+  // The node has babysitter process monitoring docker and kubelet.
+  BabysitDaemons bool `json:"babysitDaemons"`
+  // minimumGCAge is the minimum age for a finished container before it is
+  // garbage collected.
+  MinimumGCAge metav1.Duration `json:"minimumGCAge"`
+  // maxPerPodContainerCount is the maximum number of old instances to
+  // retain per container. Each container takes up some disk space.
+  MaxPerPodContainerCount int32 `json:"maxPerPodContainerCount"`
+  // maxContainerCount is the maximum number of old instances of containers
+  // to retain globally. Each container takes up some disk space.
+  MaxContainerCount *int32 `json:"maxContainerCount"`
+  // lowDiskSpaceThresholdMB is the absolute free disk space, in MB, to
+  // maintain. When disk space falls below this threshold, new pods would
+  // be rejected.
+  LowDiskSpaceThresholdMB int32 `json:"lowDiskSpaceThresholdMB"`
+  // rktStage1Image is the image to use as stage1. Local paths and
+  // http/https URLs are supported.
+  RktStage1Image string `json:"rktStage1Image"`
+  // dockerExecHandlerName is the handler to use when executing a command
+  // in a container. Valid values are 'native' and 'nsenter'. Defaults to
+  // 'native'.
+  DockerExecHandlerName string `json:"dockerExecHandlerName"`
+  // registerSchedulable tells the kubelet to register the node as
+  // schedulable. Won't have any effect if register-node is false.
+  // DEPRECATED: use registerWithTaints instead
+  RegisterSchedulable *bool `json:"registerSchedulable"`
+  // outOfDiskTransitionFrequency is duration for which the kubelet has to
+  // wait before transitioning out of out-of-disk node condition status.
+  OutOfDiskTransitionFrequency metav1.Duration `json:"outOfDiskTransitionFrequency"`
+  // Enable Container Runtime Interface (CRI) integration.
+  // +optional
+  EnableCRI *bool `json:"enableCRI,omitempty"`
+  // masterServiceNamespace is The namespace from which the kubernetes
+  // master services should be injected into pods.
+  MasterServiceNamespace string `json:"masterServiceNamespace"` // This isn't marked deprecated yet, but it probably should be. See #44250
+}
+
+type WillBeDeprecated struct {
+  // Note: The WIP PR for making many container runtime options flags-only prior to deprecation is #44061
+
+  // runtimeCgroups are cgroups that container runtime is expected to be isolated in.
+  RuntimeCgroups string `json:"runtimeCgroups"`
+  // containerRuntime is the container runtime to use.
+  ContainerRuntime string `json:"containerRuntime"`
+  // networkPluginName is the name of the network plugin to be invoked for
+  // various events in kubelet/pod lifecycle
+  NetworkPluginName string `json:"networkPluginName"`
+  // networkPluginDir is the full path of the directory in which to search
+  // for network plugins (and, for backwards-compat, CNI config files)
+  NetworkPluginDir string `json:"networkPluginDir"`
+  // networkPluginMTU is the MTU to be passed to the network plugin,
+  // and overrides the default MTU for cases where it cannot be automatically
+  // computed (such as IPSEC).
+  NetworkPluginMTU int32 `json:"networkPluginMTU"`
+  // CNIConfDir is the full path of the directory in which to seardch for
+  // CNI config files
+  CNIConfDir string `json:"cniConfDir"`
+  // CNIBinDir is the full path of the directory in which to search for
+  // CNI plugin binaries
+  CNIBinDir string `json:"cniBinDir"`
+  // podInfraContainerImage is the image whose network/ipc namespaces
+  // containers in each pod will use.
+  PodInfraContainerImage string `json:"podInfraContainerImage"`
+  // dockerEndpoint is the path to the docker endpoint to communicate with.
+  DockerEndpoint string `json:"dockerEndpoint"`
+  // rktPath is the  path of rkt binary. Leave empty to use the first rkt in
+  // $PATH.
+  RktPath string `json:"rktPath"`
+  // rktApiEndpoint is the endpoint of the rkt API service to communicate with.
+  RktAPIEndpoint string `json:"rktAPIEndpoint"`
+}
 
