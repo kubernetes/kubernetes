@@ -23,7 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"strings"
+	"regexp"
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -56,6 +56,9 @@ var (
 	    <file-spec> is:
 		[namespace/]pod-name:/file/path for a remote file
 		/file/path for a local file`)
+
+	// fileSpec format: [[namespace/]pod:]file/path
+	fileSpecRegexp = regexp.MustCompile(`^(?:(?:([^/:]+)/)?(?:([^/:]+):))?(.+)$`)
 )
 
 // NewCmdCp creates a new Copy command.
@@ -81,31 +84,15 @@ type fileSpec struct {
 }
 
 func extractFileSpec(arg string) (fileSpec, error) {
-	pieces := strings.Split(arg, ":")
-	if len(pieces) == 1 {
-		return fileSpec{File: arg}, nil
-	}
-	if len(pieces) != 2 {
+	matches := fileSpecRegexp.FindStringSubmatch(arg)
+	if len(matches) != 4 {
 		return fileSpec{}, fmt.Errorf("Unexpected fileSpec: %s, expected [[namespace/]pod:]file/path", arg)
 	}
-	file := pieces[1]
-
-	pieces = strings.Split(pieces[0], "/")
-	if len(pieces) == 1 {
-		return fileSpec{
-			PodName: pieces[0],
-			File:    file,
-		}, nil
-	}
-	if len(pieces) == 2 {
-		return fileSpec{
-			PodNamespace: pieces[0],
-			PodName:      pieces[1],
-			File:         file,
-		}, nil
-	}
-
-	return fileSpec{}, fmt.Errorf("Unexpected file spec: %s, expected [[namespace/]pod:]file/path", arg)
+	return fileSpec{
+		PodNamespace: matches[1],
+		PodName:      matches[2],
+		File:         matches[3],
+	}, nil
 }
 
 func runCopy(f cmdutil.Factory, cmd *cobra.Command, out, cmderr io.Writer, args []string) error {
