@@ -19,6 +19,7 @@ package printers
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -62,26 +63,34 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		}
 	}
 
-	kind := obj.GetObjectKind().GroupVersionKind()
-	if len(kind.Kind) == 0 {
-		if gvks, _, err := p.Typer.ObjectKinds(obj); err == nil {
-			for _, gvk := range gvks {
-				if mappings, err := p.Mapper.RESTMappings(gvk.GroupKind(), gvk.Version); err == nil && len(mappings) > 0 {
-					fmt.Fprintf(w, "%s/%s\n", mappings[0].Resource, name)
-				}
-			}
-		} else {
-			fmt.Fprintf(w, "<unknown>/%s\n", name)
-		}
-
-	} else {
-		if mappings, err := p.Mapper.RESTMappings(kind.GroupKind(), kind.Version); err == nil && len(mappings) > 0 {
+	groupVersionKind := obj.GetObjectKind().GroupVersionKind()
+	if len(groupVersionKind.Kind) > 0 {
+		if mappings, err := p.Mapper.RESTMappings(groupVersionKind.GroupKind(), groupVersionKind.Version); err == nil && len(mappings) > 0 {
 			fmt.Fprintf(w, "%s/%s\n", mappings[0].Resource, name)
-		} else {
-			fmt.Fprintf(w, "<unknown>/%s\n", name)
+			return nil
 		}
 	}
 
+	if gvks, _, err := p.Typer.ObjectKinds(obj); err == nil {
+		for _, gvk := range gvks {
+			if mappings, err := p.Mapper.RESTMappings(gvk.GroupKind(), gvk.Version); err == nil && len(mappings) > 0 {
+				fmt.Fprintf(w, "%s/%s\n", mappings[0].Resource, name)
+				return nil
+			}
+		}
+	}
+
+	if unstructured, ok := obj.(runtime.Unstructured); ok {
+		unstructuredContent := unstructured.UnstructuredContent()
+		if unstructuredKind, ok := unstructuredContent["kind"]; ok {
+			if s, ok := unstructuredKind.(string); ok {
+				fmt.Fprintf(w, "%s/%s\n", strings.ToLower(s), name)
+				return nil
+			}
+		}
+	}
+
+	fmt.Fprintf(w, "<unknown>/%s\n", name)
 	return nil
 }
 
