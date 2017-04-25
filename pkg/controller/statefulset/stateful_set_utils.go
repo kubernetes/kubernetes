@@ -229,7 +229,7 @@ func isHealthy(pod *v1.Pod) bool {
 
 // allowsBurst is true if the alpha burst annotation is set.
 func allowsBurst(set *apps.StatefulSet) bool {
-	return set.Annotations[apps.StatefulSetBurstAnnotation] == "true"
+	return set.Spec.PodManagementPolicy == apps.ParallelPodManagement
 }
 
 // newControllerRef returns an ControllerRef pointing to a given StatefulSet.
