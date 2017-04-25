@@ -21,21 +21,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/probe"
 )
-
-func containsAny(s string, substrs []string) bool {
-	for _, substr := range substrs {
-		if strings.Contains(s, substr) {
-			return true
-		}
-	}
-	return false
-}
 
 func TestTcpHealthChecker(t *testing.T) {
 	// Setup a test server that responds to probing correctly
@@ -58,32 +48,21 @@ func TestTcpHealthChecker(t *testing.T) {
 
 		expectedStatus probe.Result
 		expectedError  error
-		// Some errors are different depending on your system.
-		// The test passes as long as the output matches one of them.
-		expectedOutputs []string
 	}{
 		// A connection is made and probing would succeed
-		{tHost, tPort, probe.Success, nil, []string{""}},
+		{tHost, tPort, probe.Success, nil},
 		// No connection can be made and probing would fail
-		{tHost, -1, probe.Failure, nil, []string{
-			"unknown port",
-			"Servname not supported for ai_socktype",
-			"nodename nor servname provided, or not known",
-			"dial tcp: invalid port",
-		}},
+		{tHost, -1, probe.Failure, nil},
 	}
 
 	prober := New()
 	for i, tt := range tests {
-		status, output, err := prober.Probe(tt.host, tt.port, 1*time.Second)
+		status, _, err := prober.Probe(tt.host, tt.port, 1*time.Second)
 		if status != tt.expectedStatus {
 			t.Errorf("#%d: expected status=%v, get=%v", i, tt.expectedStatus, status)
 		}
 		if err != tt.expectedError {
 			t.Errorf("#%d: expected error=%v, get=%v", i, tt.expectedError, err)
-		}
-		if !containsAny(output, tt.expectedOutputs) {
-			t.Errorf("#%d: expected output=one of %#v, get=%s", i, tt.expectedOutputs, output)
 		}
 	}
 }
