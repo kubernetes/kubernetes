@@ -9,9 +9,15 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["services.go"],
+    srcs = ["api.pb.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/kubelet/api/v1alpha1/runtime:go_default_library"],
+    deps = [
+        "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
+        "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
+        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
+    ],
 )
 
 filegroup(
@@ -23,12 +29,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/kubelet/api/testing:all-srcs",
-        "//pkg/kubelet/api/v1alpha1/lifecycle:all-srcs",
-        "//pkg/kubelet/api/v1alpha1/runtime:all-srcs",
-        "//pkg/kubelet/api/v1alpha1/stats:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
