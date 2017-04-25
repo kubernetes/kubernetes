@@ -418,17 +418,6 @@ func MaxUnavailable(deployment extensions.Deployment) int32 {
 	return maxUnavailable
 }
 
-// MaxUnavailableInternal returns the maximum unavailable pods a rolling deployment can take.
-// TODO: remove the duplicate
-func MaxUnavailableInternal(deployment internalextensions.Deployment) int32 {
-	if !(deployment.Spec.Strategy.Type == internalextensions.RollingUpdateDeploymentStrategyType) || deployment.Spec.Replicas == 0 {
-		return int32(0)
-	}
-	// Error caught by validation
-	_, maxUnavailable, _ := ResolveFenceposts(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, &deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
-	return maxUnavailable
-}
-
 // MinAvailable returns the minimum available pods of a given deployment
 func MinAvailable(deployment *extensions.Deployment) int32 {
 	if !IsRollingUpdate(deployment) {
@@ -839,12 +828,12 @@ func IsRollingUpdate(deployment *extensions.Deployment) bool {
 	return deployment.Spec.Strategy.Type == extensions.RollingUpdateDeploymentStrategyType
 }
 
-// DeploymentComplete considers a deployment to be complete once its desired replicas equals its
-// updatedReplicas, no old pods are running, and it doesn't violate minimum availability.
+// DeploymentComplete considers a deployment to be complete once all of its desired replicas
+// are updated and available, and no old pods are running.
 func DeploymentComplete(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	return newStatus.UpdatedReplicas == *(deployment.Spec.Replicas) &&
 		newStatus.Replicas == *(deployment.Spec.Replicas) &&
-		newStatus.AvailableReplicas >= *(deployment.Spec.Replicas)-MaxUnavailable(*deployment) &&
+		newStatus.AvailableReplicas == *(deployment.Spec.Replicas) &&
 		newStatus.ObservedGeneration >= deployment.Generation
 }
 
