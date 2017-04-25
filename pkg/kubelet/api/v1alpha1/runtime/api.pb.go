@@ -2937,7 +2937,8 @@ type RuntimeServiceClient interface {
 	// This call is idempotent, and must not return an error if the sandbox has
 	// already been removed.
 	RemovePodSandbox(ctx context.Context, in *RemovePodSandboxRequest, opts ...grpc.CallOption) (*RemovePodSandboxResponse, error)
-	// PodSandboxStatus returns the status of the PodSandbox.
+	// PodSandboxStatus returns the status of the PodSandbox. If the PodSandbox is not
+	// present, returns an error.
 	PodSandboxStatus(ctx context.Context, in *PodSandboxStatusRequest, opts ...grpc.CallOption) (*PodSandboxStatusResponse, error)
 	// ListPodSandbox returns a list of PodSandboxes.
 	ListPodSandbox(ctx context.Context, in *ListPodSandboxRequest, opts ...grpc.CallOption) (*ListPodSandboxResponse, error)
@@ -2957,7 +2958,8 @@ type RuntimeServiceClient interface {
 	RemoveContainer(ctx context.Context, in *RemoveContainerRequest, opts ...grpc.CallOption) (*RemoveContainerResponse, error)
 	// ListContainers lists all containers by filters.
 	ListContainers(ctx context.Context, in *ListContainersRequest, opts ...grpc.CallOption) (*ListContainersResponse, error)
-	// ContainerStatus returns status of the container.
+	// ContainerStatus returns status of the container. If the container is not
+	// present, returns an error.
 	ContainerStatus(ctx context.Context, in *ContainerStatusRequest, opts ...grpc.CallOption) (*ContainerStatusResponse, error)
 	// ExecSync runs a command in a container synchronously.
 	ExecSync(ctx context.Context, in *ExecSyncRequest, opts ...grpc.CallOption) (*ExecSyncResponse, error)
@@ -3166,7 +3168,8 @@ type RuntimeServiceServer interface {
 	// This call is idempotent, and must not return an error if the sandbox has
 	// already been removed.
 	RemovePodSandbox(context.Context, *RemovePodSandboxRequest) (*RemovePodSandboxResponse, error)
-	// PodSandboxStatus returns the status of the PodSandbox.
+	// PodSandboxStatus returns the status of the PodSandbox. If the PodSandbox is not
+	// present, returns an error.
 	PodSandboxStatus(context.Context, *PodSandboxStatusRequest) (*PodSandboxStatusResponse, error)
 	// ListPodSandbox returns a list of PodSandboxes.
 	ListPodSandbox(context.Context, *ListPodSandboxRequest) (*ListPodSandboxResponse, error)
@@ -3186,7 +3189,8 @@ type RuntimeServiceServer interface {
 	RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error)
 	// ListContainers lists all containers by filters.
 	ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error)
-	// ContainerStatus returns status of the container.
+	// ContainerStatus returns status of the container. If the container is not
+	// present, returns an error.
 	ContainerStatus(context.Context, *ContainerStatusRequest) (*ContainerStatusResponse, error)
 	// ExecSync runs a command in a container synchronously.
 	ExecSync(context.Context, *ExecSyncRequest) (*ExecSyncResponse, error)
