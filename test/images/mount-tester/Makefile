@@ -12,20 +12,73 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 0.8
-PREFIX = gcr.io/google_containers
+# Cross-build the mount-tester image
+#
+# Usage:
+#       [TAG=v1.0] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make all
 
-all: push
+.PHONY: all push container clean
 
-mt: mt.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./mt.go && \
-	chmod a+rx mt
+TAG ?= 0.9
 
-image: mt
-	sudo docker build --pull -t $(PREFIX)/mounttest:$(TAG) .
+REGISTRY ?= gcr.io/google_containers
 
-push: image
-	gcloud docker -- push $(PREFIX)/mounttest:$(TAG)
+# Architectures supported: amd64, arm, arm64, ppc64le and s390x
+ARCH ?= amd64
+
+ALL_ARCH = amd64 arm arm64 ppc64le s390x
+
+GOARM=7
+TEMP_DIR := $(shell mktemp -d)
+GOLANG_VERSION=1.7.5
+
+BIN = mounttest
+SRCS = mt.go
+
+IMAGE = $(REGISTRY)/$(BIN)
+MULTI_ARCH_IMG = $(IMAGE)-$(ARCH)
+
+# If you want to build AND push all containers, see the 'all-push' rule.
+all: all-container
+
+sub-container-%:
+	$(MAKE) ARCH=$* container
+
+sub-push-%:
+	$(MAKE) ARCH=$* push
+
+all-container: $(addprefix sub-container-,$(ALL_ARCH))
+
+all-push: $(addprefix sub-push-,$(ALL_ARCH))
+
+build: bin/$(BIN)-$(ARCH)
+
+bin/$(BIN)-$(ARCH): $(SRCS)
+	# Copy the content in this dir to the temp dir
+	cp ./* $(TEMP_DIR)
+
+	docker run -it -v $(TEMP_DIR):/build \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+            cd /build && \
+            CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(BIN) ./$(SRCS)"
+
+container: .container-$(ARCH)
+.container-$(ARCH): bin/$(BIN)-$(ARCH)
+	docker build --pull -t $(MULTI_ARCH_IMG):$(TAG) $(TEMP_DIR)
+
+ifeq ($(ARCH), amd64)
+	# This is for to maintain the backward compatibility
+	docker tag $(MULTI_ARCH_IMG):$(TAG) $(IMAGE):$(TAG)
+endif
+
+push: .push-$(ARCH)
+.push-$(ARCH): .container-$(ARCH)
+	gcloud docker -- push $(MULTI_ARCH_IMG):$(TAG)
+
+ifeq ($(ARCH),amd64)
+	gcloud docker -- push $(IMAGE):$(TAG)
+endif
 
 clean:
-	rm -f mt
+	rm -rf $(BIN)

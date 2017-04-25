@@ -14,5 +14,5 @@
 
 FROM scratch
 ADD GITHASH.txt /
-ADD gitserver /
-ENTRYPOINT ["/gitserver"]
+ADD fakegitserver /
+ENTRYPOINT ["/fakegitserver"]

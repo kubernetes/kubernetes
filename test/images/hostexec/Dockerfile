@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.2
+FROM BASEIMAGE
 
-# install necessary packages:
-# - curl, nc: used by a lot of e2e tests
-# - iproute2: includes ss used in NodePort tests
-run apk --update add curl netcat-openbsd iproute2 && rm -rf /var/cache/apk/*
+
+CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
+
+COPY install.sh /
+RUN /install.sh
 
 # wait forever
 CMD rm -f /fifo && mkfifo /fifo && exec cat </fifo

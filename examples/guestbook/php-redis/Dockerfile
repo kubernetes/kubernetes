@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM php:5-apache
+FROM BASEIMAGE
+
+CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
 
 RUN apt-get update
 RUN apt-get install -y php-pear

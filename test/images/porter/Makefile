@@ -12,36 +12,76 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Use:
+# Cross-build the porter image
 #
-# `make porter` will build porter.
-# `make tag` will suggest a tag.
-# `make image` will build an image-- you must supply a tag.
-# `make push` will push the image-- you must supply a tag.
+# Usage:
+#       [TAG=v1.0] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] make all
 
-# This image does not tag in the normal way
-# TAG =
-PREFIX = gcr.io/google_containers
-SUGGESTED_TAG = $(shell git rev-parse --verify HEAD)
+.PHONY: all push container clean
 
-porter: porter.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./porter.go
+TAG ?= v1.0
 
-tag:
-	@echo "If all relevant changes are committed, suggest using TAG=$(SUGGESTED_TAG)"
-	@echo "$$ make container TAG=$(SUGGESTED_TAG)"
-	@echo "or"
-	@echo "$$ make push TAG=$(SUGGESTED_TAG)"
+REGISTRY ?= gcr.io/google_containers
 
-container: image
+# Architectures supported: amd64, arm, arm64, ppc64le and s390x
+ARCH ?= amd64
 
-image:
-	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' after committing changes to see a suggestion))
-	docker build --pull -t $(PREFIX)/porter:$(TAG) .
+ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
-push:
-	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' after committing changes to see a suggestion))
-	gcloud docker -- push $(PREFIX)/porter:$(TAG)
+GOARM=7
+TEMP_DIR := $(shell mktemp -d)
+GOLANG_VERSION=1.7.5
+
+BIN = porter
+SRCS = porter.go
+
+IMAGE = $(REGISTRY)/$(BIN)
+MULTI_ARCH_IMG = $(IMAGE)-$(ARCH)
+
+# If you want to build AND push all containers, see the 'all-push' rule.
+all: all-container
+
+sub-container-%:
+	$(MAKE) ARCH=$* container
+
+sub-push-%:
+	$(MAKE) ARCH=$* push
+
+all-container: $(addprefix sub-container-,$(ALL_ARCH))
+
+all-push: $(addprefix sub-push-,$(ALL_ARCH))
+
+build: bin/$(BIN)-$(ARCH)
+
+bin/$(BIN)-$(ARCH): $(SRCS)
+	# Copy the content in this dir to the temp dir
+	cp ./* $(TEMP_DIR)
+
+	docker run -it -v $(TEMP_DIR):/build \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+            cd /build && \
+            go get -d ./... && \
+            CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(BIN) ./$(SRCS)"
+	@echo "$(git rev-parse HEAD)" >> $(TEMP_DIR)/GITHASH.txt
+
+container: .container-$(ARCH)
+.container-$(ARCH): bin/$(BIN)-$(ARCH)
+	docker build --pull -t $(MULTI_ARCH_IMG):$(TAG) $(TEMP_DIR)
+
+ifeq ($(ARCH), amd64)
+	# This is for to maintain the backward compatibility
+	docker tag $(MULTI_ARCH_IMG):$(TAG) $(IMAGE):$(TAG)
+endif
+
+
+push: .push-$(ARCH)
+.push-$(ARCH): .container-$(ARCH)
+	gcloud docker -- push $(MULTI_ARCH_IMG):$(TAG)
+
+ifeq ($(ARCH),amd64)
+	gcloud docker -- push $(IMAGE):$(TAG)
+endif
 
 clean:
-	rm -f porter
+	rm -rf $(BIN)

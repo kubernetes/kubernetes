@@ -12,19 +12,80 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all image push clean
+TAG ?= 1.3
+REGISTRY = gcr.io/google_containers
+ARCH ?= $(shell go env GOARCH)
+ALL_ARCH = amd64 arm arm64 ppc64le
+QEMUVERSION=v2.7.0
 
-TAG = 1.2
-PREFIX = gcr.io/google_containers
+IMGNAME = hostexec
+IMAGE = $(REGISTRY)/$(IMGNAME)
+MULTI_ARCH_IMG = $(IMAGE)-$(ARCH)
 
+# Set default base image dynamically for each arch
+ifeq ($(ARCH),amd64)
+	BASEIMAGE?=alpine
+endif
+ifeq ($(ARCH),arm)
+	BASEIMAGE?=armhf/alpine
+	QEMUARCH=arm
+endif
+ifeq ($(ARCH),arm64)
+	BASEIMAGE?=aarch64/alpine
+	QEMUARCH=aarch64
+endif
+ifeq ($(ARCH),ppc64le)
+	BASEIMAGE?=ppc64le/ubuntu:16.04
+	QEMUARCH=ppc64le
+endif
 
-all: push
+TEMP_DIR := $(shell mktemp -d)
 
-image:
-	docker build --pull -t $(PREFIX)/hostexec:$(TAG) .
+# If you want to build AND push all containers, see the 'all-push' rule.
+all: all-container
 
-push: image
-	gcloud docker -- push $(PREFIX)/hostexec:$(TAG)
+sub-container-%:
+	$(MAKE) ARCH=$* container
+
+sub-push-%:
+	$(MAKE) ARCH=$* push
+
+all-container: $(addprefix sub-container-,$(ALL_ARCH))
+
+all-push: $(addprefix sub-push-,$(ALL_ARCH))
+
+build: bin/$(BIN)-$(ARCH)
+
+container: .container-$(ARCH)
+.container-$(ARCH):
+	cp ./* $(TEMP_DIR)
+	# Set the base image
+	cd $(TEMP_DIR) && sed -i.bak 's|BASEIMAGE|$(BASEIMAGE)|g' Dockerfile
+	cd $(TEMP_DIR) && sed -i "s|ARCH|$(QEMUARCH)|g" Dockerfile
+
+ifeq ($(ARCH),amd64)
+	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
+	cd $(TEMP_DIR) && sed -i "/CROSS_BUILD_/d" Dockerfile
+else
+	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
+	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
+	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMUVERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(TEMP_DIR)
+	cd $(TEMP_DIR) && sed -i "s/CROSS_BUILD_//g" Dockerfile
+endif
+	docker build --pull -t $(MULTI_ARCH_IMG):$(TAG) $(TEMP_DIR)
+
+ifeq ($(ARCH), amd64)
+	# This is for to maintain the backward compatibility
+	docker tag $(MULTI_ARCH_IMG):$(TAG) $(IMAGE):$(TAG)
+endif
+
+push: .push-$(ARCH)
+.push-$(ARCH): .container-$(ARCH)
+	gcloud docker -- push $(MULTI_ARCH_IMG):$(TAG)
+
+ifeq ($(ARCH),amd64)
+	gcloud docker -- push $(IMAGE):$(TAG)
+endif
 
 clean:
-	rm -f hostexec

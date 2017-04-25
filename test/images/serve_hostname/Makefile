@@ -15,14 +15,13 @@
 # Cross-build the serve_hostname image
 #
 # Usage:
-#       [TAG=v1.6] [PREFIX=gcr.io/google_containers] [TEST_REGISTRY=gcr.io/k8s-authenticated-test] [ARCH=amd64] [BASEIMAGE=busybox] make all
+#       [TAG=v1.6] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make all
 
 .PHONY: all push container clean
 
 TAG ?= v1.6
 
-REGISTRY ?= gcr.io/google-containers
-TEST_REGISTRY ?= gcr.io/k8s-authenticated-test
+REGISTRY ?= gcr.io/google_containers
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
 ARCH ?= amd64
@@ -36,8 +35,8 @@ GOLANG_VERSION=1.7.5
 BIN = serve_hostname
 SRCS = serve_hostname.go
 
-IMAGE = $(REGISTRY)/$(BIN)-$(ARCH)
-TEST_IMAGE = $(TEST_REGISTRY)/$(BIN)-$(ARCH)
+IMAGE = $(REGISTRY)/$(BIN)
+MULTI_ARCH_IMG = $(IMAGE)-$(ARCH)
 
 # Set default base image dynamically for each arch
 ifeq ($(ARCH),amd64)
@@ -86,17 +85,20 @@ container: .container-$(ARCH)
 	# Set the base image
 	cd $(TEMP_DIR) && sed -i.bak 's|BASEIMAGE|$(BASEIMAGE)|g' Dockerfile
 
-	docker build --pull -t $(IMAGE):$(TAG) $(TEMP_DIR)
-	if [ -n "$(TEST_REGISTRY)" ]; then \
-		docker tag $(IMAGE):$(TAG) $(TEST_IMAGE):$(TAG) ;\
-	fi
+	docker build --pull -t $(MULTI_ARCH_IMG):$(TAG) $(TEMP_DIR)
+
+ifeq ($(ARCH), amd64)
+	# This is for to maintain the backward compatibility
+	docker tag $(MULTI_ARCH_IMG):$(TAG) $(IMAGE):$(TAG)
+endif
 
 push: .push-$(ARCH)
 .push-$(ARCH): .container-$(ARCH)
+	gcloud docker -- push $(MULTI_ARCH_IMG):$(TAG)
+
+ifeq ($(ARCH),amd64)
 	gcloud docker -- push $(IMAGE):$(TAG)
-	if [ -n "$(TEST_REGISTRY)" ]; then \
-		gcloud docker -- push $(TEST_IMAGE):$(TAG) ;\
-	fi
+endif
 
 clean:
 	rm -rf $(BIN)

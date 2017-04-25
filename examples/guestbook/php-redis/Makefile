@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,44 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Cross-build the logs-generator image
-#
-# Usage:
-#       [TAG=v0.1.1] [PREFIX=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=gcr.io/google_containers/ubuntu-slim] make all
-
 .PHONY: all push container clean
 
-TAG ?= v0.1.2
+TAG ?= v5
 
-REGISTRY ?= gcr.io/google_containers
+REGISTRY ?= gcr.io/google-containers
 
-# Architectures supported: amd64, arm, arm64, ppc64le and s390x
-ARCH ?= amd64
+# Architectures supported: amd64, arm, arm64, ppc64le
+ARCH ?= $(shell go env GOARCH)
+QEMUVERSION=v2.7.0
 
 ALL_ARCH = amd64 arm arm64 ppc64le
 
-GOARM=7
 TEMP_DIR := $(shell mktemp -d)
-GOLANG_VERSION=1.7.5
 
-BIN = logs-generator
-SRCS = logs_generator.go
-
-IMAGE = $(REGISTRY)/$(BIN)
+IMGNAME = gb-frontend
+IMAGE = $(REGISTRY)/$(IMGNAME)
 MULTI_ARCH_IMG = $(IMAGE)-$(ARCH)
 
 # Set default base image dynamically for each arch
 ifeq ($(ARCH),amd64)
-	BASEIMAGE?=busybox
+	BASEIMAGE?=php:5-apache
 endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=armhf/busybox
+	BASEIMAGE?=armhf/php:5.5-apache
+	QEMUARCH=arm
 endif
 ifeq ($(ARCH),arm64)
-	BASEIMAGE?=aarch64/busybox
+	BASEIMAGE?=aarch64/php:5.5-apache
+	QEMUARCH=aarch64
 endif
 ifeq ($(ARCH),ppc64le)
-	BASEIMAGE?=ppc64le/busybox
+	BASEIMAGE?=ppc64le/php:5.5-apache
+	QEMUARCH=ppc64le
 endif
 
 # If you want to build AND push all containers, see the 'all-push' rule.
@@ -67,17 +62,23 @@ all-push: $(addprefix sub-push-,$(ALL_ARCH))
 
 build: bin/$(BIN)-$(ARCH)
 
-bin/$(BIN)-$(ARCH): $(SRCS)
-	# Copy the content in this dir to the temp dir
-	cp ./* $(TEMP_DIR)
-	CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(BIN) ./$(SRCS)
-
 container: .container-$(ARCH)
-.container-$(ARCH): bin/$(BIN)-$(ARCH)
+.container-$(ARCH):
+	cp ./* $(TEMP_DIR)
 	# Set the base image
 	cd $(TEMP_DIR) && sed -i.bak 's|BASEIMAGE|$(BASEIMAGE)|g' Dockerfile
+	cd $(TEMP_DIR) && sed -i "s|ARCH|$(QEMUARCH)|g" Dockerfile
 
-	cp $(BIN) $(TEMP_DIR)
+ifeq ($(ARCH),amd64)
+	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
+	cd $(TEMP_DIR) && sed -i "/CROSS_BUILD_/d" Dockerfile
+else
+	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
+	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
+	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMUVERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(TEMP_DIR)
+	cd $(TEMP_DIR) && sed -i "s/CROSS_BUILD_//g" Dockerfile
+endif
 	docker build --pull -t $(MULTI_ARCH_IMG):$(TAG) $(TEMP_DIR)
 
 ifeq ($(ARCH), amd64)

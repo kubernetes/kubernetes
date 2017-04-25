@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM busybox
-ADD main main
-ENTRYPOINT ["/main"]
+FROM BASEIMAGE
+ADD clusterapi-tester /clusterapi-tester
+ENTRYPOINT ["/clusterapi-tester"]

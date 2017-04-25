@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine
+FROM BASEIMAGE
 
-RUN apk add --no-cache bind-tools
+CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
+
+COPY install.sh /
+
+RUN /install.sh

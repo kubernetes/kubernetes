@@ -12,21 +12,74 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY:	all image push clean
+# Cross-build the fakegitserver image
+#
+# Usage:
+#       [TAG=v1.0] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make all
 
-TAG = 0.1
-PREFIX = gcr.io/google_containers
-IMAGE = fakegitserver
-ARCH = amd64
+.PHONY: all push container clean
 
-image:
-	./prepare.sh $(ARCH)
-	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
+TAG ?= 0.2
 
-push: image
-	gcloud docker -- push $(PREFIX)/$(IMAGE):$(TAG)
+REGISTRY ?= gcr.io/google_containers
 
-all: push
+# Architectures supported: amd64, arm, arm64, ppc64le and s390x
+ARCH ?= amd64
+
+ALL_ARCH = amd64 arm arm64 ppc64le s390x
+
+GOARM=7
+TEMP_DIR := $(shell mktemp -d)
+GOLANG_VERSION=1.7.5
+
+BIN = fakegitserver
+SRCS = gitserver.go
+
+IMAGE = $(REGISTRY)/$(BIN)
+MULTI_ARCH_IMG = $(IMAGE)-$(ARCH)
+
+# If you want to build AND push all containers, see the 'all-push' rule.
+all: all-container
+
+sub-container-%:
+	$(MAKE) ARCH=$* container
+
+sub-push-%:
+	$(MAKE) ARCH=$* push
+
+all-container: $(addprefix sub-container-,$(ALL_ARCH))
+
+all-push: $(addprefix sub-push-,$(ALL_ARCH))
+
+build: bin/$(BIN)-$(ARCH)
+
+bin/$(BIN)-$(ARCH): $(SRCS)
+	# Copy the content in this dir to the temp dir
+	cp ./* $(TEMP_DIR)
+
+	docker run -it -v $(TEMP_DIR):/build \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+            cd /build && \
+            CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(BIN) ./$(SRCS)"
+	echo $(git rev-parse HEAD) >> $(TEMP_DIR)/GITHASH.txt
+
+container: .container-$(ARCH)
+.container-$(ARCH): bin/$(BIN)-$(ARCH)
+	docker build --pull -t $(MULTI_ARCH_IMG):$(TAG) $(TEMP_DIR)
+
+ifeq ($(ARCH), amd64)
+	# This is for to maintain the backward compatibility
+	docker tag $(MULTI_ARCH_IMG):$(TAG) $(IMAGE):$(TAG)
+endif
+
+push: .push-$(ARCH)
+.push-$(ARCH): .container-$(ARCH)
+	gcloud docker -- push $(MULTI_ARCH_IMG):$(TAG)
+
+ifeq ($(ARCH),amd64)
+	gcloud docker -- push $(IMAGE):$(TAG)
+endif
 
 clean:
-	rm -f gitserver GITHASH.txt
+	rm -rf $(BIN)
