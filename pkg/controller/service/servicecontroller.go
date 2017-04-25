@@ -86,7 +86,6 @@ type ServiceController struct {
 	kubeClient          clientset.Interface
 	clusterName         string
 	balancer            cloudprovider.LoadBalancer
-	zone                cloudprovider.Zone
 	cache               *serviceCache
 	serviceLister       corelisters.ServiceLister
 	serviceListerSynced cache.InformerSynced
@@ -219,15 +218,6 @@ func (s *ServiceController) init() error {
 	}
 	s.balancer = balancer
 
-	zones, ok := s.cloud.Zones()
-	if !ok {
-		return fmt.Errorf("the cloud provider does not support zone enumeration, which is required for creating load balancers.")
-	}
-	zone, err := zones.GetZone()
-	if err != nil {
-		return fmt.Errorf("failed to get zone from cloud provider, will not be able to create load balancers: %v", err)
-	}
-	s.zone = zone
 	return nil
 }
 
