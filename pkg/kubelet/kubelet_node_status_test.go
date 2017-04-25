@@ -954,7 +954,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		return node
 	}
 
-	cases := []struct {
+	type testCase struct {
 		name            string
 		newNode         *v1.Node
 		existingNode    *v1.Node
@@ -967,7 +967,8 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		testSavedNode   bool
 		savedNodeIndex  int
 		savedNodeCMAD   bool
-	}{
+	}
+	cases := []testCase{
 		{
 			name:            "success case - new node",
 			newNode:         &v1.Node{},
@@ -1051,10 +1052,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	}
 
-	for _, tc := range cases {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
-		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
+	reactorSetup := func(testKubelet *TestKubelet, tc testCase) *fake.Clientset {
 		kubeClient := testKubelet.fakeKubeClient
 
 		kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
@@ -1076,6 +1074,15 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 			return notImplemented(action)
 		})
+		return kubeClient
+	}
+	for _, tc := range cases {
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
+		defer testKubelet.Cleanup()
+		kubelet := testKubelet.kubelet
+
+		// Setup a kubelet client that returns preset defaults that match the test expectations.
+		kubeClient := reactorSetup(testKubelet, tc)
 
 		result := kubelet.tryRegisterWithApiServer(tc.newNode)
 		require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
