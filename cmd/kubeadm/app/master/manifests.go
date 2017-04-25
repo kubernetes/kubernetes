@@ -264,7 +264,7 @@ func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 func k8sVolumeMount() api.VolumeMount {
 	return api.VolumeMount{
 		Name:      "k8s",
-		MountPath: "/etc/kubernetes/",
+		MountPath: kubeadmapi.GlobalEnvParams.KubernetesDir,
 		ReadOnly:  true,
 	}
 }
