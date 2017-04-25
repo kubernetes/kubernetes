@@ -497,17 +497,6 @@ func LogSuspiciousLatency(latencyData []PodLatencyData, latencyDataLag []PodLate
 		float64(nodeCount)/(latencyDataLag[len(latencyDataLag)-1].Latency.Minutes()))
 }
 
-// testMaximumLatencyValue verifies the highest latency value is less than or equal to
-// the given time.Duration. Since the arrays are sorted we are looking at the last
-// element which will always be the highest. If the latency is higher than the max Failf
-// is called.
-func testMaximumLatencyValue(latencies []PodLatencyData, max time.Duration, name string) {
-	highestLatency := latencies[len(latencies)-1]
-	if !(highestLatency.Latency <= max) {
-		Failf("%s were not all under %s: %#v", name, max.String(), latencies)
-	}
-}
-
 func PrintLatencies(latencies []PodLatencyData, header string) {
 	metrics := ExtractLatencyMetrics(latencies)
 	Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
