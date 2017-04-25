@@ -1,7 +1,6 @@
 hack/verify-flags/known-flags.txt merge=union
 test/test_owners.csv merge=union
 
-**/zz_generated.*.go -diff
 **/types.generated.go -diff
 **/generated.pb.go -diff
 **/generated.proto -diff
