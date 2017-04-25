@@ -27,19 +27,21 @@ type Isolator interface {
 }
 
 type isolator struct {
-	Name        string
-	Address     string
-	GrpcServer  *grpc.Server
-	Socket      net.Listener
-	CPUTopology *cputopology.CPUTopology
+	Name             string
+	Address          string
+	GrpcServer       *grpc.Server
+	Socket           net.Listener
+	CPUTopology      *cputopology.CPUTopology
+	cpuAssignmentMap map[string][]int
 }
 
 // Constructor for Isolator
 func NewIsolator(isolatorName string, isolatorAddress string, topology *cputopology.CPUTopology) (e *isolator) {
 	return &isolator{
-		Name:        isolatorName,
-		Address:     isolatorAddress,
-		CPUTopology: topology,
+		Name:             isolatorName,
+		Address:          isolatorAddress,
+		CPUTopology:      topology,
+		cpuAssignmentMap: make(map[string][]int),
 	}
 }
 
@@ -165,6 +167,8 @@ func (i *isolator) preStart(event *lifecycle.Event) (reply *lifecycle.EventReply
 			CgroupSubsystem: lifecycle.CgroupResource_CPUSET_CPUS,
 		},
 	}
+	i.cpuAssignmentMap[event.CgroupInfo.Path] = reservedCores
+	glog.Infof("CPU MAP: %v", i.cpuAssignmentMap)
 	glog.Infof("cores %v", asCPUList(reservedCores))
 	glog.Infof("available cores after %v", i.CPUTopology)
 
@@ -175,11 +179,29 @@ func (i *isolator) preStart(event *lifecycle.Event) (reply *lifecycle.EventReply
 	}, nil
 }
 
+func (i *isolator) postStop(event *lifecycle.Event) (reply *lifecycle.EventReply, err error) {
+	glog.Infof("Event: %v", event)
+	cpus := i.cpuAssignmentMap[event.CgroupInfo.Path]
+	i.reclaimCPUs(cpus)
+	delete(i.cpuAssignmentMap, event.CgroupInfo.Path)
+
+	glog.Infof("CPUs: %v have been revoked.", cpus)
+	glog.Infof("available cores after %v", i.CPUTopology)
+	return &lifecycle.EventReply{
+		Error:          "",
+		CgroupInfo:     event.CgroupInfo,
+		CgroupResource: []*lifecycle.CgroupResource{},
+	}, nil
+
+}
+
 // TODO: implement PostStop
 func (i *isolator) Notify(context context.Context, event *lifecycle.Event) (reply *lifecycle.EventReply, err error) {
 	switch event.Kind {
 	case lifecycle.Event_POD_PRE_START:
 		return i.preStart(event)
+	case lifecycle.Event_POD_POST_STOP:
+		return i.postStop(event)
 	default:
 		return nil, fmt.Errorf("Wrong event type")
 	}

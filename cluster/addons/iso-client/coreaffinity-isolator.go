@@ -2,15 +2,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
-	// For newer version of k8s use this package
-	//	"k8s.io/apimachinery/pkg/util/uuid"
-
-	"fmt"
 	"github.com/golang/glog"
 	aff "k8s.io/kubernetes/cluster/addons/iso-client/coreaffinity"
 	"k8s.io/kubernetes/cluster/addons/iso-client/discovery"
@@ -38,16 +35,18 @@ func shutdownIsolator(client *aff.EventDispatcherClient, opaque *opaq.OpaqueInte
 		Token: client.Token,
 	}
 
+	glog.Infof("Unregistering custom-isolator: %s", name)
 	if _, err := client.Unregister(client.Ctx, unregisterRequest); err != nil {
 		opaque.RemoveOpaqueResource()
 		glog.Fatalf("Failed to unregister handler: %v")
 	}
-	glog.Infof("Unregistering custom-isolator: %s", name)
 
+	glog.Infof("Removing opque integer resources %q from node %s", opaque.Name, opaque.Node)
 	if err := opaque.RemoveOpaqueResource(); err != nil {
 		glog.Fatalf("Failed to remove opaque resources: %v", err)
 	}
 
+	glog.Infof("%s has been unregistered", name)
 	os.Exit(0)
 
 }
@@ -64,12 +63,12 @@ func main() {
 
 	opaque, err := opaq.NewOpaqueIntegerResourceAdvertiser(name, fmt.Sprintf("%d", topology.GetTotalCPUs()))
 	if err != nil {
+		glog.Errorf("Cannot create opaque resource advertiser: %v", err)
 		shutdownIsolator(nil, opaque)
-		glog.Fatalf("Cannot create opaque resource advertiser: %v", err)
 	}
 	if err = opaque.AdvertiseOpaqueResource(); err != nil {
+		glog.Errorf("Failed to advertise opaque resources: %v", err)
 		shutdownIsolator(nil, opaque)
-		glog.Fatalf("Failed to advertise opaque resources: %v", err)
 	}
 
 	var wg sync.WaitGroup
@@ -77,8 +76,8 @@ func main() {
 	server := aff.NewIsolator(name, isolatorLocalAddress, topology)
 	err = server.RegisterIsolator()
 	if err != nil {
+		glog.Errorf("Cannot register isolator: %v", err)
 		shutdownIsolator(nil, opaque)
-		glog.Fatalf("Cannot register isolator: %v", err)
 	}
 	wg.Add(1)
 	go server.Serve(wg)
@@ -86,16 +85,14 @@ func main() {
 	// Sending address of local isolatorServer
 	client, err := aff.NewEventDispatcherClient(name, eventDispatcherAddress, isolatorLocalAddress)
 	if err != nil {
+		glog.Errorf("Cannot create eventDispatcherClient: %v", err)
 		shutdownIsolator(client, opaque)
-		glog.Fatalf("Cannot create eventDispatcherClient: %v", err)
-		os.Exit(1)
 	}
 
 	reply, err := client.Register()
 	if err != nil {
+		glog.Errorf("Failed to register isolator: %v . Reply: %v", err, reply)
 		shutdownIsolator(client, opaque)
-		glog.Fatalf("Failed to register isolator: %v . Reply: %v", err, reply)
-		os.Exit(1)
 	}
 	glog.Infof("Registering isolator. Reply: %v", reply)
 
