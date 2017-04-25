@@ -1307,7 +1307,7 @@ func Test_getLocalIPs(t *testing.T) {
 			},
 		},
 		expected: map[types.NamespacedName]sets.String{
-			types.NamespacedName{Namespace: "ns1", Name: "ep1"}: sets.NewString("1.1.1.1"),
+			{Namespace: "ns1", Name: "ep1"}: sets.NewString("1.1.1.1"),
 		},
 	}, {
 		// Case[3]: named local and non-local ports for the same IP.
@@ -1322,7 +1322,7 @@ func Test_getLocalIPs(t *testing.T) {
 			},
 		},
 		expected: map[types.NamespacedName]sets.String{
-			types.NamespacedName{Namespace: "ns1", Name: "ep1"}: sets.NewString("1.1.1.2"),
+			{Namespace: "ns1", Name: "ep1"}: sets.NewString("1.1.1.2"),
 		},
 	}, {
 		// Case[4]: named local and non-local ports for different IPs.
@@ -1346,8 +1346,8 @@ func Test_getLocalIPs(t *testing.T) {
 			},
 		},
 		expected: map[types.NamespacedName]sets.String{
-			types.NamespacedName{Namespace: "ns2", Name: "ep2"}: sets.NewString("2.2.2.2", "2.2.2.22", "2.2.2.3"),
-			types.NamespacedName{Namespace: "ns4", Name: "ep4"}: sets.NewString("4.4.4.4", "4.4.4.6"),
+			{Namespace: "ns2", Name: "ep2"}: sets.NewString("2.2.2.2", "2.2.2.22", "2.2.2.3"),
+			{Namespace: "ns4", Name: "ep4"}: sets.NewString("4.4.4.4", "4.4.4.6"),
 		},
 	}}
 
