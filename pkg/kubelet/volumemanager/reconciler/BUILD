@@ -41,6 +41,7 @@ go_test(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
+        "//pkg/kubelet/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util:go_default_library",
