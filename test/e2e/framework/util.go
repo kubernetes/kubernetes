@@ -176,6 +176,9 @@ const (
 
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
+
+	// Serve hostname image name
+	ServeHostnameImage = "gcr.io/google_containers/serve_hostname:v1.4"
 )
 
 var (
@@ -406,9 +409,6 @@ func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr schema.GroupVersio
 
 // ProvidersWithSSH are those providers where each node is accessible with SSH
 var ProvidersWithSSH = []string{"gce", "gke", "aws", "local"}
-
-// providersWithMasterSSH are those providers where master node is accessible with SSH
-var providersWithMasterSSH = []string{"gce", "gke", "kubemark", "aws", "local"}
 
 type podCondition func(pod *v1.Pod) (bool, error)
 
@@ -1375,30 +1375,6 @@ func WaitForPodSuccessInNamespace(c clientset.Interface, podName string, namespa
 // WaitForPodSuccessInNamespaceSlow returns nil if the pod reached state success, or an error if it reached failure or until slowPodStartupTimeout.
 func WaitForPodSuccessInNamespaceSlow(c clientset.Interface, podName string, namespace string) error {
 	return waitForPodSuccessInNamespaceTimeout(c, podName, namespace, slowPodStartTimeout)
-}
-
-// waitForRCPodOnNode returns the pod from the given replication controller (described by rcName) which is scheduled on the given node.
-// In case of failure or too long waiting time, an error is returned.
-func waitForRCPodOnNode(c clientset.Interface, ns, rcName, node string) (*v1.Pod, error) {
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
-	var p *v1.Pod = nil
-	err := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
-		Logf("Waiting for pod %s to appear on node %s", rcName, node)
-		options := metav1.ListOptions{LabelSelector: label.String()}
-		pods, err := c.Core().Pods(ns).List(options)
-		if err != nil {
-			return false, err
-		}
-		for _, pod := range pods.Items {
-			if pod.Spec.NodeName == node {
-				Logf("Pod %s found on node %s", pod.Name, node)
-				p = &pod
-				return true, nil
-			}
-		}
-		return false, nil
-	})
-	return p, err
 }
 
 // WaitForRCToStabilize waits till the RC has a matching generation/replica count between spec and status.

@@ -110,7 +110,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
 								{
-									Image: "gcr.io/google_containers/serve_hostname:v1.4",
+									Image: framework.ServeHostnameImage,
 									Name:  podName,
 								},
 							},

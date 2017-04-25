@@ -78,7 +78,7 @@ var _ = framework.KubeDescribe("ReplicaSet", func() {
 	f := framework.NewDefaultFramework("replicaset")
 
 	It("should serve a basic image on each replica with a public image [Conformance]", func() {
-		testReplicaSetServeImageOrFail(f, "basic", "gcr.io/google_containers/serve_hostname:v1.4")
+		testReplicaSetServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})
 
 	It("should serve a basic image on each replica with a private image", func() {
