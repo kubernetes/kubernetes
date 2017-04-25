@@ -36,7 +36,7 @@ const (
 	DefaultHostAcceptRE   = "^localhost$,^127\\.0\\.0\\.1$,^\\[::1\\]$"
 	DefaultPathAcceptRE   = "^.*"
 	DefaultPathRejectRE   = "^/api/.*/pods/.*/exec,^/api/.*/pods/.*/attach"
-	DefaultMethodRejectRE = "POST,PUT,PATCH"
+	DefaultMethodRejectRE = "^$"
 )
 
 var (
