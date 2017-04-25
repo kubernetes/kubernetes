@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -707,6 +708,18 @@ func rbacFuncs(t apitesting.TestingCommon) []interface{} {
 	}
 }
 
+func appsFuncs(t apitesting.TestingCommon) []interface{} {
+	return []interface{}{
+		func(s *apps.StatefulSet, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+
+			// match defaulter
+			if len(s.Spec.PodManagementPolicy) == 0 {
+				s.Spec.PodManagementPolicy = apps.OrderedReadyPodManagement
+			}
+		},
+	}
+}
 func policyFuncs(t apitesting.TestingCommon) []interface{} {
 	return []interface{}{
 		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
@@ -731,6 +744,7 @@ func FuzzerFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFacto
 		overrideGenericFuncs(t, codecs),
 		coreFuncs(t),
 		extensionFuncs(t),
+		appsFuncs(t),
 		batchFuncs(t),
 		autoscalingFuncs(t),
 		rbacFuncs(t),
