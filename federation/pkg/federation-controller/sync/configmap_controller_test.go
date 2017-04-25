@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configmap
+package sync
 
 import (
 	"fmt"
@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
+	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
@@ -38,13 +39,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	configmaps       string = "configmaps"
-	clusters         string = "clusters"
-	informerStoreErr string = "configmap should have appeared in the informer store"
-)
-
 func TestConfigMapController(t *testing.T) {
+	configmaps := "configmaps"
+	clusters := "clusters"
+	informerStoreErr := "configmap should have appeared in the informer store"
+
 	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 
@@ -66,8 +65,8 @@ func TestConfigMapController(t *testing.T) {
 	RegisterFakeList(configmaps, &cluster2Client.Fake, &apiv1.ConfigMapList{Items: []apiv1.ConfigMap{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate(configmaps, &cluster2Client.Fake, cluster2Watch)
 
-	configmapController := NewConfigMapController(fakeClient)
-	informer := ToFederatedInformerForTestOnly(configmapController.configmapFederatedInformer)
+	configmapController := newFederationSyncController(fakeClient, federatedtypes.NewConfigMapAdapter(fakeClient))
+	informer := ToFederatedInformerForTestOnly(configmapController.informer)
 	informer.SetClientFactory(func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
@@ -79,10 +78,7 @@ func TestConfigMapController(t *testing.T) {
 		}
 	})
 
-	configmapController.clusterAvailableDelay = time.Second
-	configmapController.configmapReviewDelay = 50 * time.Millisecond
-	configmapController.smallDelay = 20 * time.Millisecond
-	configmapController.updateTimeout = 5 * time.Second
+	configmapController.minimizeLatency()
 
 	stop := make(chan struct{})
 	configmapController.Run(stop)
@@ -115,7 +111,7 @@ func TestConfigMapController(t *testing.T) {
 
 	// Wait for the configmap to appear in the informer store
 	err := WaitForStoreUpdate(
-		configmapController.configmapFederatedInformer.GetTargetStore(),
+		configmapController.informer.GetTargetStore(),
 		cluster1.Name, types.NamespacedName{Namespace: configmap1.Namespace, Name: configmap1.Name}.String(), wait.ForeverTestTimeout)
 	assert.Nil(t, err, informerStoreErr)
 
@@ -132,7 +128,7 @@ func TestConfigMapController(t *testing.T) {
 
 	// Wait for the configmap to appear in the informer store
 	err = WaitForConfigMapStoreUpdate(
-		configmapController.configmapFederatedInformer.GetTargetStore(),
+		configmapController.informer.GetTargetStore(),
 		cluster1.Name, types.NamespacedName{Namespace: configmap1.Namespace, Name: configmap1.Name}.String(),
 		configmap1, wait.ForeverTestTimeout)
 	assert.Nil(t, err, informerStoreErr)

@@ -40,12 +40,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	clusters string = "clusters"
-	secrets  string = "secrets"
-)
-
 func TestSecretController(t *testing.T) {
+	clusters := "clusters"
+	secrets := "secrets"
+
 	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 
