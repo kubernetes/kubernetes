@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/golang/glog"
@@ -30,6 +31,17 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 )
+
+type EventDispatcherEventType int
+
+const (
+	ISOLATOR_LIST_CHANGED EventDispatcherEventType = iota
+)
+
+type EventDispatcherEvent struct {
+	Type EventDispatcherEventType
+	Body string
+}
 
 // EventDispatcher manages a set of registered isolators and dispatches
 // lifecycle events to them.
@@ -49,6 +61,9 @@ type EventDispatcher interface {
 	// based on the isolation controls in the event reply. The original resource
 	// config is not updated in-place.
 	ResourceConfigFromReplies(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig
+
+	// Get communication channel.
+	GetEventChannel() chan EventDispatcherEvent
 }
 
 // Represents a registered isolator
@@ -61,8 +76,9 @@ type registeredIsolator struct {
 
 type eventDispatcher struct {
 	sync.Mutex
-	started   bool
-	isolators map[string]*registeredIsolator
+	started      bool
+	isolators    map[string]*registeredIsolator
+	eventChannel chan EventDispatcherEvent
 }
 
 var dispatcher *eventDispatcher
@@ -71,11 +87,16 @@ var once sync.Once
 func newEventDispatcher() *eventDispatcher {
 	once.Do(func() {
 		dispatcher = &eventDispatcher{
-			isolators: map[string]*registeredIsolator{},
+			isolators:    map[string]*registeredIsolator{},
+			eventChannel: make(chan EventDispatcherEvent),
 		}
 		dispatcher.Start(":5433") // "life" on a North American keypad
 	})
 	return dispatcher
+}
+
+func (ed *eventDispatcher) GetEventChannel() chan EventDispatcherEvent {
+	return ed.eventChannel
 }
 
 func (ed *eventDispatcher) dispatchEvent(ev *lifecycle.Event) (*lifecycle.EventReply, error) {
@@ -106,6 +127,19 @@ func (ed *eventDispatcher) dispatchEvent(ev *lifecycle.Event) (*lifecycle.EventR
 
 	}
 	return mergedReplies, utilerrors.NewAggregate(errlist)
+}
+
+func (ed *eventDispatcher) updateIsolators() {
+	isolators := make([]string, len(ed.isolators))
+	idx := 0
+	for isolator := range ed.isolators {
+		isolators[idx] = isolator
+		idx += 1
+	}
+	ed.eventChannel <- EventDispatcherEvent{
+		Type: ISOLATOR_LIST_CHANGED,
+		Body: strings.Join(isolators, "."),
+	}
 }
 
 func (ed *eventDispatcher) PreStartPod(pod *v1.Pod, cgroupPath string) (*lifecycle.EventReply, error) {
@@ -184,9 +218,9 @@ func (ed *eventDispatcher) Register(ctx context.Context, request *lifecycle.Regi
 	if reg != nil {
 		glog.Infof("re-registering isolator [%s]", isolator.name)
 	}
-
 	// Save registeredIsolator
 	ed.isolators[isolator.name] = isolator
+	ed.updateIsolators()
 
 	return &lifecycle.RegisterReply{}, nil
 }
@@ -199,6 +233,7 @@ func (ed *eventDispatcher) Unregister(ctx context.Context, request *lifecycle.Un
 		return &lifecycle.UnregisterReply{Error: msg}, nil
 	}
 	delete(ed.isolators, request.Name)
+	ed.updateIsolators()
 	return &lifecycle.UnregisterReply{}, nil
 }
 

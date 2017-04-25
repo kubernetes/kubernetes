@@ -110,6 +110,13 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	return nil
 }
 
+func (m *podContainerManagerImpl) GetEventDispatcherChan() chan EventDispatcherEvent {
+	if m.eventDispatcher == nil {
+		return nil
+	}
+	return m.eventDispatcher.GetEventChannel()
+}
+
 // GetPodContainerName returns the CgroupName identifer, and its literal cgroupfs form on the host.
 func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, string) {
 	podQOS := qos.GetPodQOS(pod)
@@ -281,6 +288,10 @@ func (m *podContainerManagerNoop) GetPodContainerName(_ *v1.Pod) (CgroupName, st
 
 func (m *podContainerManagerNoop) GetPodContainerNameForDriver(_ *v1.Pod) string {
 	return ""
+}
+
+func (m *podContainerManagerNoop) GetEventDispatcherChan() chan EventDispatcherEvent {
+	return nil
 }
 
 // Destroy destroys the pod container cgroup paths

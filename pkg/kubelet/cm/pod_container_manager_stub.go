@@ -38,6 +38,10 @@ func (m *podContainerManagerStub) GetPodContainerName(_ *v1.Pod) (CgroupName, st
 	return "", ""
 }
 
+func (m *podContainerManagerStub) GetEventDispatcherChan() chan EventDispatcherEvent {
+	return nil
+}
+
 func (m *podContainerManagerStub) Destroy(_ CgroupName) error {
 	return nil
 }
