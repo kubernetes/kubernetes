@@ -20,6 +20,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 
@@ -48,6 +49,22 @@ func (rct realConntracker) SetMax(max int) error {
 	if err := rct.setIntSysCtl("nf_conntrack_max", max); err != nil {
 		return err
 	}
+	glog.Infof("Setting nf_conntrack_max to %d", max)
+
+	// Linux does not support writing to /sys/module/nf_conntrack/parameters/hashsize
+	// when the writer process is not in the initial network namespace
+	// (https://github.com/torvalds/linux/blob/v4.10/net/netfilter/nf_conntrack_core.c#L1795-L1796).
+	// Usually that's fine. But in some configurations such as with github.com/kinvolk/kubeadm-nspawn,
+	// kube-proxy is in another netns.
+	// Therefore, check if writing in hashsize is necessary and skip the writing if not.
+	hashsize, err := readIntStringFile("/sys/module/nf_conntrack/parameters/hashsize")
+	if err != nil {
+		return err
+	}
+	if hashsize >= (max / 4) {
+		return nil
+	}
+
 	// sysfs is expected to be mounted as 'rw'. However, it may be
 	// unexpectedly mounted as 'ro' by docker because of a known docker
 	// issue (https://github.com/docker/docker/issues/24000). Setting
@@ -110,6 +127,14 @@ func isSysFSWritable() (bool, error) {
 	}
 
 	return false, errors.New("No sysfs mounted")
+}
+
+func readIntStringFile(filename string) (int, error) {
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return -1, err
+	}
+	return strconv.Atoi(strings.TrimSpace(string(b)))
 }
 
 func writeIntStringFile(filename string, value int) error {
