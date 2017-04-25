@@ -1,0 +1,34 @@
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: coreaffinity-isolator-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes/status
+  verbs:
+  - update
+  - patch
+  - get
+  - list
+  - delete
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: coreaffinity-isolator-sa
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: coreaffinity-isolator-sa-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: coreaffinity-isolator-role
+subjects:
+- kind: ServiceAccount
+  name: coreaffinity-isolator-sa
+  namespace: kube-system
