@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -51,7 +52,12 @@ const (
 	// maxNamesPerImageInNodeStatus is max number of names per image stored in
 	// the node status.
 	maxNamesPerImageInNodeStatus = 5
+
+	// updateNodeStatusBackoff is the key used to manage the backoff status for node updates.
+	updateNodeStatusBackoff = "updateNodeStatusBackoff"
 )
+
+var nodeUpdateBackoff = flowcontrol.NewBackOff(1*time.Second, nodeStatusUpdateRetryMaximumTime)
 
 // registerWithApiServer registers the node with the cluster master. It is safe
 // to call multiple times, but not concurrently (kl.registrationCompleted is
@@ -60,18 +66,15 @@ func (kl *Kubelet) registerWithApiServer() {
 	if kl.registrationCompleted {
 		return
 	}
-	step := 100 * time.Millisecond
 
+	// Avoid overlimiting attempts to re-register, to prevent pod draining inspite api-server problems.
+	backoff := flowcontrol.NewBackOff(100*time.Millisecond, 7*time.Second)
 	for {
-		time.Sleep(step)
-		step = step * 2
-		if step >= 7*time.Second {
-			step = 7 * time.Second
-		}
-
+		backoff.Next("registerAPIServer", kl.clock.Now())
+		kl.clock.Sleep(backoff.Get("registerAPIServer"))
 		node, err := kl.initialNode()
 		if err != nil {
-			glog.Errorf("Unable to construct v1.Node object for kubelet: %v", err)
+			glog.Errorf("Unable to construct v1.Node object for kubelet: %v.", err)
 			continue
 		}
 
@@ -319,16 +322,57 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 }
 
+// A notifier to make sure logs express backoff state when the kubelet is in trouble.
+var backoffNotifierRunning = false
+
+func (kl *Kubelet) backoffNotifier() {
+	kl.backoffNotifierRunning = true
+	defer func() { kl.backoffNotifierRunning = false }()
+	// Periodically update on the backoff state, especially important after 1 second, where we have frequent polling.
+	for nodeUpdateBackoff.Get(updateNodeStatusBackoff).Seconds() > .01 {
+		glog.Warning("Notice: kubelet updata status is in backoff state, next retry will be in: ", nodeUpdateBackoff.Get(updateNodeStatusBackoff))
+		// don't use clock here, because it will corrupt tests.
+		time.Sleep(5 * time.Second)
+	}
+	glog.Info("Exiting backoff notifier.  This most likely indicates that the Kubelet status has been rectified at the apiserver.")
+}
+
 // updateNodeStatus updates node status to master with retries.
 func (kl *Kubelet) updateNodeStatus() error {
-	for i := 0; i < nodeStatusUpdateRetry; i++ {
-		if err := kl.tryUpdateNodeStatus(i); err != nil {
-			glog.Errorf("Error updating node status, will retry: %v", err)
+
+	// If a fresh call to update node status is made, we will respond optimistically, backoff will increase quickly if we're wrong.
+	nodeUpdateBackoff.Reset(updateNodeStatusBackoff)
+
+	attempts := 0
+	// continue retrying until we exceed the maximum time allowed.
+	start := kl.clock.Now()
+
+	// Retry until backoff is breached.  Termination of this loop is gauranteed, unless the backoff clock is lying.
+	for {
+		nextEstimatedBackoff := kl.clock.Since(start).Minutes() + nodeUpdateBackoff.Get(updateNodeStatusBackoff).Minutes()
+		fmt.Println(nextEstimatedBackoff)
+		// This is the error/timeout termination condition: Modify with caution.
+		if nextEstimatedBackoff >= nodeStatusUpdateRetryMaximumTime.Minutes() {
+			return fmt.Errorf("Couldn't reach the apiserver after backoff attempts %v.  The next backoff will be longer than max allowed time of %v", attempts, nodeStatusUpdateRetryMaximumTime)
+		}
+		err := kl.tryUpdateNodeStatus(attempts)
+		attempts += 1
+		// Termination condition: succeeded in updating the node status.
+		if err != nil {
+			if !kl.backoffNotifierRunning {
+				go kl.backoffNotifier()
+			}
+			glog.Infof("Error (%v) updating node status.", err)
 		} else {
+			// If we get this far, then we eventually updated status within the allowed timeframe, so the kubelet status is up to date.
+			// This is the normal termination condition: Modify with caution.
+			nodeUpdateBackoff.Reset(updateNodeStatusBackoff)
 			return nil
 		}
+		// If we get here, then we failed at updating the node.  Bump the backoff and iterate.
+		nodeUpdateBackoff.Next(updateNodeStatusBackoff, kl.clock.Now())
+		kl.clock.Sleep(nodeUpdateBackoff.Get(updateNodeStatusBackoff))
 	}
-	return fmt.Errorf("update node status exceeds retry count")
 }
 
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
@@ -820,8 +864,8 @@ func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
 			Status: v1.ConditionUnknown,
 		}
 		// nodeOODCondition cannot be appended to node.Status.Conditions here because it gets
-		// copied to the slice. So if we append nodeOODCondition to the slice here none of the
-		// updates we make to nodeOODCondition below are reflected in the slice.
+		// copied (rather then a being written as a pointer) to the slice.  The copy would be
+		// inaccurate since we may mutate later.
 		newOODCondition = true
 	}
 
