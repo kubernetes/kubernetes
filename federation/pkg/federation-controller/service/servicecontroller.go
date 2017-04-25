@@ -295,9 +295,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		})
 
 	s.deletionHelper = deletionhelper.NewDeletionHelper(
-		s.hasFinalizerFunc,
-		s.removeFinalizerFunc,
-		s.addFinalizerFunc,
+		s.updateService,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
 			service := obj.(*v1.Service)
@@ -316,52 +314,11 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	return s
 }
 
-// Returns true if the given object has the given finalizer in its ObjectMeta.
-func (s *ServiceController) hasFinalizerFunc(obj pkgruntime.Object, finalizer string) bool {
-	service := obj.(*v1.Service)
-	for i := range service.ObjectMeta.Finalizers {
-		if string(service.ObjectMeta.Finalizers[i]) == finalizer {
-			return true
-		}
-	}
-	return false
-}
-
-// Removes the finalizers from the given objects ObjectMeta.
+// Sends the given updated object to apiserver.
 // Assumes that the given object is a service.
-func (s *ServiceController) removeFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
+func (s *ServiceController) updateService(obj pkgruntime.Object) (pkgruntime.Object, error) {
 	service := obj.(*v1.Service)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range service.ObjectMeta.Finalizers {
-		if !deletionhelper.ContainsString(finalizers, service.ObjectMeta.Finalizers[i]) {
-			newFinalizers = append(newFinalizers, service.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	service.ObjectMeta.Finalizers = newFinalizers
-	service, err := s.federationClient.Core().Services(service.Namespace).Update(service)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizers %v from service %s: %v", finalizers, service.Name, err)
-	}
-	return service, nil
-}
-
-// Adds the given finalizers to the given objects ObjectMeta.
-// Assumes that the given object is a service.
-func (s *ServiceController) addFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
-	service := obj.(*v1.Service)
-	service.ObjectMeta.Finalizers = append(service.ObjectMeta.Finalizers, finalizers...)
-	service, err := s.federationClient.Core().Services(service.Namespace).Update(service)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizers %v to service %s: %v", finalizers, service.Name, err)
-	}
-	return service, nil
+	return s.federationClient.Core().Services(service.Namespace).Update(service)
 }
 
 // obj could be an *api.Service, or a DeletionFinalStateUnknown marker item.
