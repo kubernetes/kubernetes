@@ -720,7 +720,7 @@ func (c *cockroachDBTester) name() string {
 }
 
 func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
-	cmd = fmt.Sprintf("/cockroach/cockroach sql --host %s.cockroachdb -e \"%v\"", podName, cmd)
+	cmd = fmt.Sprintf("/cockroach/cockroach sql --insecure --host %s.cockroachdb -e \"%v\"", podName, cmd)
 	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
