@@ -539,7 +539,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 			ClusterName:               s.ClusterName,
 			VolumeInformer:            sharedInformers.Core().V1().PersistentVolumes(),
 			ClaimInformer:             sharedInformers.Core().V1().PersistentVolumeClaims(),
-			ClassInformer:             sharedInformers.Storage().V1beta1().StorageClasses(),
+			ClassInformer:             sharedInformers.Storage().V1().StorageClasses(),
 			EnableDynamicProvisioning: s.VolumeConfiguration.EnableDynamicProvisioning,
 		}
 		volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)

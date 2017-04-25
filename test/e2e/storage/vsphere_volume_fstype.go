@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stype "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -94,7 +94,7 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 
 	By("Creating Storage Class With Fstype")
 	storageClassSpec := getVSphereStorageClassSpec("fstype", scParameters)
-	storageclass, err := client.StorageV1beta1().StorageClasses().Create(storageClassSpec)
+	storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Creating PVC using the Storage Class")
