@@ -10,6 +10,7 @@ import (
 	"k8s.io/kubernetes/cluster/addons/iso-client/coreaffinity/discovery"
 	"k8s.io/kubernetes/cluster/addons/iso-client/opaque"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 )
 
@@ -35,7 +36,7 @@ func New(name string) (*coreAffinityIsolator, error) {
 }
 
 func (c *coreAffinityIsolator) gatherContainerRequest(container v1.Container) int64 {
-	resource, ok := container.Resources.Requests[v1.OpaqueIntResourceName(c.name)]
+	resource, ok := container.Resources.Requests[helper.OpaqueIntResourceName(c.name)]
 	if !ok {
 		return 0
 	}
@@ -82,7 +83,7 @@ func asCPUList(cores []int) string {
 }
 
 // implementation of preStart method in  "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle".Isolator
-func (c *coreAffinityIsolator) PreStartPod(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*lifecycle.IsolationControl, error) {
+func (c *coreAffinityIsolator) PreStartPod(podName string, containerName string, pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*lifecycle.IsolationControl, error) {
 	oirCores := c.countCoresFromOIR(pod)
 	glog.Infof("Pod %s requested %d cores", pod.Name, oirCores)
 
@@ -108,7 +109,7 @@ func (c *coreAffinityIsolator) PreStartPod(pod *v1.Pod, resource *lifecycle.Cgro
 }
 
 // implementation of postStop method in "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle".Isolator
-func (c *coreAffinityIsolator) PostStopPod(cgroupInfo *lifecycle.CgroupInfo) error {
+func (c *coreAffinityIsolator) PostStopPod(podName string, containerName string, cgroupInfo *lifecycle.CgroupInfo) error {
 	cpus := c.cpuAssignmentMap[cgroupInfo.Path]
 	c.reclaimCPUs(cpus)
 	delete(c.cpuAssignmentMap, cgroupInfo.Path)
