@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/cluster/addons/iso-client/cputopology"
+	"k8s.io/kubernetes/cluster/addons/iso-client/coreaffinity/cputopology"
 )
 
 func DiscoverTopology() (*cputopology.CPUTopology, error) {

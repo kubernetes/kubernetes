@@ -1,4 +1,4 @@
-package coreaffinity
+package isolator
 
 import (
 	"github.com/golang/glog"

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"sync"
@@ -10,7 +11,7 @@ import (
 
 	"github.com/golang/glog"
 	aff "k8s.io/kubernetes/cluster/addons/iso-client/coreaffinity"
-	"k8s.io/kubernetes/cluster/addons/iso-client/discovery"
+	"k8s.io/kubernetes/cluster/addons/iso-client/isolator"
 	opaq "k8s.io/kubernetes/cluster/addons/iso-client/opaque"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 )
@@ -24,12 +25,12 @@ const (
 	name = "iso"
 )
 
-func handleSIGTERM(sigterm chan os.Signal, client *aff.EventDispatcherClient, opaque *opaq.OpaqueIntegerResourceAdvertiser) {
+func handleSIGTERM(sigterm chan os.Signal, client *isolator.EventDispatcherClient, opaque *opaq.OpaqueIntegerResourceAdvertiser) {
 	<-sigterm
 	shutdownIsolator(client, opaque)
 }
 
-func shutdownIsolator(client *aff.EventDispatcherClient, opaque *opaq.OpaqueIntegerResourceAdvertiser) {
+func shutdownIsolator(client *isolator.EventDispatcherClient, opaque *opaq.OpaqueIntegerResourceAdvertiser) {
 	unregisterRequest := &lifecycle.UnregisterRequest{
 		Name:  client.Name,
 	}
@@ -54,13 +55,13 @@ func shutdownIsolator(client *aff.EventDispatcherClient, opaque *opaq.OpaqueInte
 func main() {
 	flag.Parse()
 	glog.Info("Starting ...")
-	topology, err := discovery.DiscoverTopology()
-	if err != nil {
-		glog.Fatalf("Cannot retrive CPU topology: %q", err)
-	}
-	glog.Infof("Detected topology: %v", topology)
 
-	opaque, err := opaq.NewOpaqueIntegerResourceAdvertiser(name, fmt.Sprintf("%d", topology.GetTotalCPUs()))
+	cpuIsolator, err := aff.NewIsolator(name)
+	if err != nil {
+		glog.Fatalf("Cannot create coreaffinity isolator: %q", err)
+	}
+
+	opaque, err := opaq.NewOpaqueIntegerResourceAdvertiser(name, fmt.Sprintf("%d", cpuIsolator.CPUTopology.GetTotalCPUs()))
 	if err != nil {
 		glog.Errorf("Cannot create opaque resource advertiser: %v", err)
 		shutdownIsolator(nil, opaque)
@@ -72,17 +73,19 @@ func main() {
 
 	var wg sync.WaitGroup
 	// Starting isolatorServer
-	server := aff.NewIsolator(name, isolatorLocalAddress, topology)
-	err = server.RegisterIsolator()
+	server := isolator.NewNotifyHandler(cpuIsolator)
+	grpcServer := isolator.Register(server)
+	socket, err := net.Listen("tcp", isolatorLocalAddress)
 	if err != nil {
-		glog.Errorf("Cannot register isolator: %v", err)
+		glog.Errorf("Cannot create tcp socket: %v", err)
 		shutdownIsolator(nil, opaque)
 	}
+
 	wg.Add(1)
-	go server.Serve(wg)
+	go isolator.Serve(wg, socket, grpcServer)
 
 	// Sending address of local isolatorServer
-	client, err := aff.NewEventDispatcherClient(name, eventDispatcherAddress, isolatorLocalAddress)
+	client, err := isolator.NewEventDispatcherClient(name, eventDispatcherAddress, isolatorLocalAddress)
 	if err != nil {
 		glog.Errorf("Cannot create eventDispatcherClient: %v", err)
 		shutdownIsolator(client, opaque)
