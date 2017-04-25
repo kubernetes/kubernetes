@@ -26,3 +26,23 @@ create-rbd-pv:
   required:
     - name
     - size
+namespace-list:
+  description: List existing k8s namespaces
+namespace-create:
+  description: Create new namespace
+  params:
+    name:
+      type: string
+      description: Namespace name eg. staging
+      minLength: 2
+  required:
+    - name
+namespace-delete:
+  description: Delete namespace
+  params:
+    name:
+      type: string
+      description: Namespace name eg. staging
+      minLength: 2
+  required:
+    - name
