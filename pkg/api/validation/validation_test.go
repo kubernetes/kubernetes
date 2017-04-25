@@ -5622,9 +5622,35 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "LoadBalancer disallows onlyLocal alpha annotations",
+			name: "LoadBalancer allows onlyLocal alpha annotations",
 			tweakSvc: func(s *api.Service) {
 				s.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid externalTraffic beta annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Annotations[service.BetaAnnotationExternalTraffic] = "invalid"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "nagative healthCheckNodePort beta annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				s.Annotations[service.BetaAnnotationHealthCheckNodePort] = "-1"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid healthCheckNodePort beta annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				s.Annotations[service.BetaAnnotationHealthCheckNodePort] = "whatisthis"
 			},
 			numErrs: 1,
 		},
@@ -7028,22 +7054,22 @@ func TestValidateServiceUpdate(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "Service disallows removing one onlyLocal alpha annotation",
+			name: "Service allows removing onlyLocal alpha annotations",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
 				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
 				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
 			},
-			numErrs: 2,
+			numErrs: 0,
 		},
 		{
-			name: "Service disallows modifying onlyLocal alpha annotations",
+			name: "Service allows modifying onlyLocal alpha annotations",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
 				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
 				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
 				newSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficGlobal
 				newSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort]
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "Service disallows promoting one of the onlyLocal pair to beta",
