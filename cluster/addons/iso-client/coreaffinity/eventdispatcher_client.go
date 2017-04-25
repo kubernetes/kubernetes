@@ -1,16 +1,14 @@
 package coreaffinity
 
 import (
-	"os"
-
 	"github.com/golang/glog"
+	"github.com/pborman/uuid"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
-	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
-type eventDispatcherClient struct {
+type EventDispatcherClient struct {
 	Token   string
 	Name    string
 	Address string
@@ -19,13 +17,13 @@ type eventDispatcherClient struct {
 	lifecycle.EventDispatcherClient
 }
 
-// Constructor for eventDispatcherClient
-func NewEventDispatcherClient(name string, serverAddress string, clientAddress string) (*eventDispatcherClient, error) {
+// Constructor for EventDispatcherClient
+func NewEventDispatcherClient(name string, serverAddress string, clientAddress string) (*EventDispatcherClient, error) {
 	clientConn, err := grpc.Dial(serverAddress, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
-	return &eventDispatcherClient{
+	return &EventDispatcherClient{
 			EventDispatcherClient: lifecycle.NewEventDispatcherClient(clientConn),
 			Ctx:     context.Background(),
 			Name:    name,
@@ -34,8 +32,8 @@ func NewEventDispatcherClient(name string, serverAddress string, clientAddress s
 		nil
 }
 
-// Create RegisterRequest and register eventDispatcherClient
-func (edc *eventDispatcherClient) Register() (reply *lifecycle.RegisterReply, err error) {
+// Create RegisterRequest and register EventDispatcherClient
+func (edc *EventDispatcherClient) Register() (reply *lifecycle.RegisterReply, err error) {
 	registerToken := string(uuid.NewUUID())
 	registerRequest := &lifecycle.RegisterRequest{
 		SocketAddress: edc.Address,
@@ -43,28 +41,11 @@ func (edc *eventDispatcherClient) Register() (reply *lifecycle.RegisterReply, er
 		Token:         registerToken,
 	}
 
-	glog.Infof("Attempting to register eventDispatcherClient. Request: %v", registerRequest)
+	glog.Infof("Attempting to register EventDispatcherClient. Request: %v", registerRequest)
 	reply, err = edc.EventDispatcherClient.Register(edc.Ctx, registerRequest)
 	if err != nil {
 		return reply, err
 	}
 	edc.Token = reply.Token
 	return reply, nil
-}
-
-// TODO: handle more than just unregistering  evenDispatcherClient
-func HandleSIGTERM(c chan os.Signal, client *eventDispatcherClient) {
-	<-c
-	unregisterRequest := &lifecycle.UnregisterRequest{
-		Name:  client.Name,
-		Token: client.Token,
-	}
-	rep, err := client.Unregister(client.Ctx, unregisterRequest)
-	if err != nil {
-		glog.Fatalf("Failed to unregister handler: %v")
-		os.Exit(1)
-	}
-	glog.Infof("Unregistering iso: %v\n", rep)
-
-	os.Exit(0)
 }

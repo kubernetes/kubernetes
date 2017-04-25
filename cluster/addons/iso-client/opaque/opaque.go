@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"os"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/transport"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/transport"
 )
 
 // struct which keeps all information necessary for advertising opaque resources

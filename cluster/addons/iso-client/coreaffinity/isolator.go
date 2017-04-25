@@ -3,14 +3,15 @@ package coreaffinity
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 
-	"golang.org/x/net/context"
-
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"k8s.io/kubernetes/cluster/addons/iso-client/cputopology"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 )
@@ -26,23 +27,25 @@ type Isolator interface {
 }
 
 type isolator struct {
-	Name       string
-	Address    string
-	GrpcServer *grpc.Server
-	Socket     net.Listener
+	Name        string
+	Address     string
+	GrpcServer  *grpc.Server
+	Socket      net.Listener
+	CPUTopology *cputopology.CPUTopology
 }
 
 // Constructor for Isolator
-func NewIsolator(isolatorName string, isolatorAddress string) (e *isolator) {
+func NewIsolator(isolatorName string, isolatorAddress string, topology *cputopology.CPUTopology) (e *isolator) {
 	return &isolator{
-		Name:    isolatorName,
-		Address: isolatorAddress,
+		Name:        isolatorName,
+		Address:     isolatorAddress,
+		CPUTopology: topology,
 	}
 }
 
 // Registering isolator server
 func (i *isolator) RegisterIsolator() (err error) {
-	i.Socket, err = net.Listen("tcp", e.Address)
+	i.Socket, err = net.Listen("tcp", i.Address)
 	if err != nil {
 		return fmt.Errorf("Failed to bind to socket address: %v", err)
 	}
@@ -65,11 +68,6 @@ func (i *isolator) Serve(wg sync.WaitGroup) {
 	glog.Info("Stopping isolatorServer")
 }
 
-// isolation api
-type isoSpec struct {
-	CoreAffinity string `json:"core-affinity"`
-}
-
 // extract Pod object from Event
 func getPod(bytePod []byte) (pod *v1.Pod, err error) {
 	pod = &v1.Pod{}
@@ -81,80 +79,107 @@ func getPod(bytePod []byte) (pod *v1.Pod, err error) {
 	return
 }
 
-// check wheter pod should be isolated
-func isIsoPod(pod *v1.Pod) bool {
-	if pod.Annotations["pod.alpha.kubernetes.io/isolation-api"] != "" {
-		return true
+func (i *isolator) gatherContainerRequest(container v1.Container) int64 {
+	resource, ok := container.Resources.Requests[v1.OpaqueIntResourceName(i.Name)]
+	if !ok {
+		return 0
 	}
-	return false
+	return resource.Value()
 }
 
-// extract isoSpec from annotations
-func getIsoSpec(annotations map[string]string) (spec *isoSpec, err error) {
-	spec = &isoSpec{}
-	err = json.Unmarshal([]byte(annotations["pod.alpha.kubernetes.io/isolation-api"]), spec)
+func (i *isolator) countCoresFromOIR(pod *v1.Pod) int64 {
+	var coresAccu int64
+	for _, container := range pod.Spec.Containers {
+		coresAccu = coresAccu + i.gatherContainerRequest(container)
+	}
+	return coresAccu
+}
+
+func (i *isolator) reserveCPUs(cores int64) ([]int, error) {
+	cpus := i.CPUTopology.GetAvailableCPUs()
+	if len(cpus) < int(cores) {
+		return nil, fmt.Errorf("cannot reserved requested number of cores")
+	}
+	var reservedCores []int
+
+	for idx := 0; idx < int(cores); idx++ {
+		if err := i.CPUTopology.Reserve(cpus[idx]); err != nil {
+			return reservedCores, err
+		}
+		reservedCores = append(reservedCores, cpus[idx])
+	}
+	return reservedCores, nil
+
+}
+
+func (i *isolator) reclaimCPUs(cores []int) {
+	for _, core := range cores {
+		i.CPUTopology.Reclaim(core)
+	}
+}
+
+func asCPUList(cores []int) string {
+	var coresStr []string
+	for _, core := range cores {
+		coresStr = append(coresStr, strconv.Itoa(core))
+	}
+	return strings.Join(coresStr, ",")
+}
+
+func (i *isolator) preStart(event *lifecycle.Event) (reply *lifecycle.EventReply, err error) {
+	glog.Infof("available cores before %v", i.CPUTopology)
+	glog.Infof("Received PreStart event: %v\n", event.CgroupInfo)
+	pod, err := getPod(event.Pod)
 	if err != nil {
-		glog.Fatalf("Cannot unmarshal isoSpec: %v", err)
-		return nil, err
+		return &lifecycle.EventReply{
+			Error:          err.Error(),
+			CgroupInfo:     event.CgroupInfo,
+			CgroupResource: []*lifecycle.CgroupResource{},
+		}, err
 	}
-	return
-}
+	oirCores := i.countCoresFromOIR(pod)
+	glog.Infof("Pod %s requested %d cores", pod.Name, oirCores)
 
-// validate isoSpec
-func validateIsoSpec(spec *isoSpec) (err error) {
-	if spec.CoreAffinity == "" {
-		return fmt.Errorf("Required field core-affinity is missing.")
+	if oirCores == 0 {
+		glog.Infof("Pod %q isn't managed by this isolator", pod.Name)
+		return &lifecycle.EventReply{
+			Error:          "",
+			CgroupInfo:     event.CgroupInfo,
+			CgroupResource: []*lifecycle.CgroupResource{},
+		}, nil
 	}
-	return nil
+
+	reservedCores, err := i.reserveCPUs(oirCores)
+	if err != nil {
+		i.reclaimCPUs(reservedCores)
+		return &lifecycle.EventReply{
+			Error:          err.Error(),
+			CgroupInfo:     event.CgroupInfo,
+			CgroupResource: []*lifecycle.CgroupResource{},
+		}, err
+	}
+
+	cgroupResource := []*lifecycle.CgroupResource{
+		{
+			Value:           asCPUList(reservedCores),
+			CgroupSubsystem: lifecycle.CgroupResource_CPUSET_CPUS,
+		},
+	}
+	glog.Infof("cores %v", asCPUList(reservedCores))
+	glog.Infof("available cores after %v", i.CPUTopology)
+
+	return &lifecycle.EventReply{
+		Error:          "",
+		CgroupInfo:     event.CgroupInfo,
+		CgroupResource: cgroupResource,
+	}, nil
 }
 
 // TODO: implement PostStop
 func (i *isolator) Notify(context context.Context, event *lifecycle.Event) (reply *lifecycle.EventReply, err error) {
 	switch event.Kind {
 	case lifecycle.Event_POD_PRE_START:
-		glog.Infof("Received PreStart event: %v\n", event.CgroupInfo)
-		pod, err := getPod(event.Pod)
-		if err != nil {
-			return &lifecycle.EventReply{
-				Error:      err.Error(),
-				CgroupInfo: event.CgroupInfo,
-			}, err
-		}
-
-		if !isIsoPod(pod) {
-			glog.Infof("Pod %s is not managed by this isolator", pod.Name)
-			return &lifecycle.EventReply{
-				Error:      "",
-				CgroupInfo: event.CgroupInfo,
-			}, nil
-		}
-
-		glog.Infof("Pod %s is managed by this isolator", pod.Name)
-		spec, err := getIsoSpec(pod.Annotations)
-		if err != nil {
-			return &lifecycle.EventReply{
-				Error:      err.Error(),
-				CgroupInfo: event.CgroupInfo,
-			}, nil
-		}
-		// TODO: Decide whether typo should error POD or not
-		err = validateIsoSpec(spec)
-		if err != nil {
-			return &lifecycle.EventReply{
-				Error:      fmt.Sprintf("Spec is not valid. Given json: %v", pod.Annotations["pod.alpha.kubernetes.io/isolation-api"]),
-				CgroupInfo: event.CgroupInfo,
-			}, nil
-		}
-		glog.Infof("Pod %s is valid. Value of core-affinity: %s", pod.Name, spec.CoreAffinity)
-
-		return &lifecycle.EventReply{
-			Error:      "",
-			CgroupInfo: event.CgroupInfo,
-			CgroupResource: &lifecycle.CgroupResource{
-				Value:           spec.CoreAffinity,
-				CgroupSubsystem: lifecycle.CgroupResource_CPUSET_CPUS,
-			},
-		}, nil
+		return i.preStart(event)
 	default:
 		return nil, fmt.Errorf("Wrong event type")
 	}
