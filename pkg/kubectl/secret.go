@@ -154,8 +154,7 @@ func handleFromLiteralSources(secret *api.Secret, literalSources []string) error
 		if err != nil {
 			return err
 		}
-		err = addKeyFromLiteralToSecret(secret, keyName, []byte(value))
-		if err != nil {
+		if err = addKeyFromLiteralToSecret(secret, keyName, []byte(value)); err != nil {
 			return err
 		}
 	}
@@ -190,15 +189,13 @@ func handleFromFileSources(secret *api.Secret, fileSources []string) error {
 				itemPath := path.Join(filePath, item.Name())
 				if item.Mode().IsRegular() {
 					keyName = item.Name()
-					err = addKeyFromFileToSecret(secret, keyName, itemPath)
-					if err != nil {
+					if err = addKeyFromFileToSecret(secret, keyName, itemPath); err != nil {
 						return err
 					}
 				}
 			}
 		} else {
-			err = addKeyFromFileToSecret(secret, keyName, filePath)
-			if err != nil {
+			if err := addKeyFromFileToSecret(secret, keyName, filePath); err != nil {
 				return err
 			}
 		}
