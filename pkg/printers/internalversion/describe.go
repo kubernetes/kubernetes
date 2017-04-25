@@ -729,6 +729,8 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printPortworxVolumeSource(volume.VolumeSource.PortworxVolume, w)
 		case volume.VolumeSource.ScaleIO != nil:
 			printScaleIOVolumeSource(volume.VolumeSource.ScaleIO, w)
+		case volume.VolumeSource.HugePages != nil:
+			printHugePagesVolumeSource(volume.VolumeSource.HugePages, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -902,6 +904,11 @@ func printScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, w PrefixWriter) {
 		"    FSType:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		sio.Gateway, sio.System, sio.ProtectionDomain, sio.StoragePool, sio.StorageMode, sio.VolumeName, sio.FSType, sio.ReadOnly)
+}
+
+func printHugePagesVolumeSource(hp *api.HugePagesVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tHugePages (represensts a hugepage resource)\n"+
+		"    PageSize:\t%v\n", hp.PageSize)
 }
 
 type PersistentVolumeDescriber struct {

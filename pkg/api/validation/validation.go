@@ -394,6 +394,14 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 			allErrs = append(allErrs, validateHostPathVolumeSource(source.HostPath, fldPath.Child("hostPath"))...)
 		}
 	}
+	if source.HugePages != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hugePages"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateHugePagesVolumeSource(source.HugePages, fldPath.Child("hugePages"))...)
+		}
+	}
 	if source.GitRepo != nil {
 		if numVolumes > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("gitRepo"), "may not specify more than 1 volume type"))
@@ -602,6 +610,15 @@ func validateGitRepoVolumeSource(gitRepo *api.GitRepoVolumeSource, fldPath *fiel
 
 	pathErrs := validateLocalDescendingPath(gitRepo.Directory, fldPath.Child("directory"))
 	allErrs = append(allErrs, pathErrs...)
+	return allErrs
+}
+
+func validateHugePagesVolumeSource(hugePages *api.HugePagesVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	glog.Infof("PageSIze is: %v", hugePages.PageSize)
+	if hugePages.PageSize != "2M" && hugePages.PageSize != "1G" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("pageSize"), hugePages.PageSize, "Not supported page size"))
+	}
 	return allErrs
 }
 

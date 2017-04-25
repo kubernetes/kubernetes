@@ -1200,6 +1200,19 @@ message HostPathVolumeSource {
   optional string path = 1;
 }
 
+// HugePagesSource represents Linux HugeTlbPage https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt
+message HugePagesVolumeSource {
+  // Defaults to 2M
+  // +optional
+  optional string pageSize = 1;
+
+  // Size of HugePages mount For pagesize, size, min_size and nr_inodes options, you
+  // can use [G|g]/[M|m]/[K|k] to represent giga/mega/kilo. For example, size=2K
+  // has the same meaning as size=2048.
+  // +optional
+  optional string size = 2;
+}
+
 // Represents an ISCSI disk.
 // ISCSI volumes can only be mounted as read/write once.
 // ISCSI volumes support ownership management and SELinux relabeling.
@@ -3940,6 +3953,10 @@ message VolumeSource {
   // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
   // +optional
   optional ScaleIOVolumeSource scaleIO = 25;
+
+  // HugePages represensts a hugepage resource.
+  // +optional
+  optional HugePagesVolumeSource hugePages = 27;
 }
 
 // Represents a vSphere volume resource.

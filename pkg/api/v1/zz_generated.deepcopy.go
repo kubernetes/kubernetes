@@ -91,6 +91,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HTTPHeader, InType: reflect.TypeOf(&HTTPHeader{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Handler, InType: reflect.TypeOf(&Handler{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HostPathVolumeSource, InType: reflect.TypeOf(&HostPathVolumeSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HugePagesVolumeSource, InType: reflect.TypeOf(&HugePagesVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ISCSIVolumeSource, InType: reflect.TypeOf(&ISCSIVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_KeyToPath, InType: reflect.TypeOf(&KeyToPath{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Lifecycle, InType: reflect.TypeOf(&Lifecycle{})},
@@ -1183,6 +1184,15 @@ func DeepCopy_v1_HostPathVolumeSource(in interface{}, out interface{}, c *conver
 	{
 		in := in.(*HostPathVolumeSource)
 		out := out.(*HostPathVolumeSource)
+		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_HugePagesVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*HugePagesVolumeSource)
+		out := out.(*HugePagesVolumeSource)
 		*out = *in
 		return nil
 	}
@@ -3473,6 +3483,11 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 			if err := DeepCopy_v1_ScaleIOVolumeSource(*in, *out, c); err != nil {
 				return err
 			}
+		}
+		if in.HugePages != nil {
+			in, out := &in.HugePages, &out.HugePages
+			*out = new(HugePagesVolumeSource)
+			**out = **in
 		}
 		return nil
 	}

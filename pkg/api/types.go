@@ -302,6 +302,9 @@ type VolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource
+	// HugePages represensts a hugepage resource.
+	// +optional
+	HugePages *HugePagesVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -1108,6 +1111,16 @@ type ScaleIOVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+}
+
+// HugePagesSource represents Linux HugeTlbPage https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt
+type HugePagesVolumeSource struct {
+	// Defaults to 2M
+	PageSize string
+	// Size of HugePages mount For pagesize, size, min_size and nr_inodes options, you
+	// can use [G|g]/[M|m]/[K|k] to represent giga/mega/kilo. For example, size=2K
+	// has the same meaning as size=2048.
+	MaxSize string
 }
 
 // Adapts a ConfigMap into a volume.
