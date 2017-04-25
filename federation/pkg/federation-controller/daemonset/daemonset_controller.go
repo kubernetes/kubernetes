@@ -193,9 +193,7 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 		})
 
 	daemonsetcontroller.deletionHelper = deletionhelper.NewDeletionHelper(
-		daemonsetcontroller.hasFinalizerFunc,
-		daemonsetcontroller.removeFinalizerFunc,
-		daemonsetcontroller.addFinalizerFunc,
+		daemonsetcontroller.updateDaemonSet,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
 			daemonset := obj.(*extensionsv1.DaemonSet)
@@ -210,52 +208,11 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 	return daemonsetcontroller
 }
 
-// Returns true if the given object has the given finalizer in its ObjectMeta.
-func (daemonsetcontroller *DaemonSetController) hasFinalizerFunc(obj pkgruntime.Object, finalizer string) bool {
-	daemonset := obj.(*extensionsv1.DaemonSet)
-	for i := range daemonset.ObjectMeta.Finalizers {
-		if string(daemonset.ObjectMeta.Finalizers[i]) == finalizer {
-			return true
-		}
-	}
-	return false
-}
-
-// Removes the finalizers from the given objects ObjectMeta.
+// Sends the given updated object to apiserver.
 // Assumes that the given object is a daemonset.
-func (daemonsetcontroller *DaemonSetController) removeFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
+func (daemonsetcontroller *DaemonSetController) updateDaemonSet(obj pkgruntime.Object) (pkgruntime.Object, error) {
 	daemonset := obj.(*extensionsv1.DaemonSet)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range daemonset.ObjectMeta.Finalizers {
-		if !deletionhelper.ContainsString(finalizers, daemonset.ObjectMeta.Finalizers[i]) {
-			newFinalizers = append(newFinalizers, daemonset.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	daemonset.ObjectMeta.Finalizers = newFinalizers
-	daemonset, err := daemonsetcontroller.federatedApiClient.Extensions().DaemonSets(daemonset.Namespace).Update(daemonset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizers %v from daemonset %s: %v", finalizers, daemonset.Name, err)
-	}
-	return daemonset, nil
-}
-
-// Adds the given finalizers to the given objects ObjectMeta.
-// Assumes that the given object is a daemonset.
-func (daemonsetcontroller *DaemonSetController) addFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
-	daemonset := obj.(*extensionsv1.DaemonSet)
-	daemonset.ObjectMeta.Finalizers = append(daemonset.ObjectMeta.Finalizers, finalizers...)
-	daemonset, err := daemonsetcontroller.federatedApiClient.Extensions().DaemonSets(daemonset.Namespace).Update(daemonset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizers %v to daemonset %s: %v", finalizers, daemonset.Name, err)
-	}
-	return daemonset, nil
+	return daemonsetcontroller.federatedApiClient.Extensions().DaemonSets(daemonset.Namespace).Update(daemonset)
 }
 
 func (daemonsetcontroller *DaemonSetController) Run(stopChan <-chan struct{}) {

@@ -179,9 +179,7 @@ func NewNamespaceController(client federationclientset.Interface, dynamicClientP
 		})
 
 	nc.deletionHelper = deletionhelper.NewDeletionHelper(
-		nc.hasFinalizerFunc,
-		nc.removeFinalizerFunc,
-		nc.addFinalizerFunc,
+		nc.updateNamespace,
 		// objNameFunc
 		func(obj runtime.Object) string {
 			namespace := obj.(*apiv1.Namespace)
@@ -200,52 +198,11 @@ func NewNamespaceController(client federationclientset.Interface, dynamicClientP
 	return nc
 }
 
-// Returns true if the given object has the given finalizer in its ObjectMeta.
-func (nc *NamespaceController) hasFinalizerFunc(obj runtime.Object, finalizer string) bool {
-	namespace := obj.(*apiv1.Namespace)
-	for i := range namespace.ObjectMeta.Finalizers {
-		if string(namespace.ObjectMeta.Finalizers[i]) == finalizer {
-			return true
-		}
-	}
-	return false
-}
-
-// Removes the finalizers from the given objects ObjectMeta.
+// Sends the given update object to apiserver.
 // Assumes that the given object is a namespace.
-func (nc *NamespaceController) removeFinalizerFunc(obj runtime.Object, finalizers []string) (runtime.Object, error) {
+func (nc *NamespaceController) updateNamespace(obj runtime.Object) (runtime.Object, error) {
 	namespace := obj.(*apiv1.Namespace)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range namespace.ObjectMeta.Finalizers {
-		if !deletionhelper.ContainsString(finalizers, namespace.ObjectMeta.Finalizers[i]) {
-			newFinalizers = append(newFinalizers, namespace.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	namespace.ObjectMeta.Finalizers = newFinalizers
-	namespace, err := nc.federatedApiClient.Core().Namespaces().Update(namespace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizers %v from namespace %s: %v", finalizers, namespace.Name, err)
-	}
-	return namespace, nil
-}
-
-// Adds the given finalizers to the given objects ObjectMeta.
-// Assumes that the given object is a namespace.
-func (nc *NamespaceController) addFinalizerFunc(obj runtime.Object, finalizers []string) (runtime.Object, error) {
-	namespace := obj.(*apiv1.Namespace)
-	namespace.ObjectMeta.Finalizers = append(namespace.ObjectMeta.Finalizers, finalizers...)
-	namespace, err := nc.federatedApiClient.Core().Namespaces().Finalize(namespace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizers %v to namespace %s: %v", finalizers, namespace.Name, err)
-	}
-	return namespace, nil
+	return nc.federatedApiClient.Core().Namespaces().Update(namespace)
 }
 
 // Returns true if the given object has the given finalizer in its NamespaceSpec.
