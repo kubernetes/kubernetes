@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/helper"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -47,7 +48,7 @@ func escapeResourcePath(resName api.ResourceName) string {
 
 // genereate OIR path for patch operation
 func opaqueResourcePath(name string) string {
-	return fmt.Sprintf("/status/capacity/%s", escapeResourcePath(api.OpaqueIntResourceName(name)))
+	return fmt.Sprintf("/status/capacity/%s", escapeResourcePath(helper.OpaqueIntResourceName(name)))
 }
 
 // Getting config for accesing apiserver, assuming pod ir run within the cluster
