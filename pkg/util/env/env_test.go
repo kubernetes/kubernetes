@@ -55,7 +55,7 @@ func TestGetEnvAsIntOrFallback(t *testing.T) {
 	os.Setenv(key, "not-an-int")
 	returnVal, err := GetEnvAsIntOrFallback(key, 1)
 	assert.Equal(expected, returnVal)
-	assert.EqualError(err, "strconv.ParseInt: parsing \"not-an-int\": invalid syntax")
+	assert.EqualError(err, "strconv.Atoi: parsing \"not-an-int\": invalid syntax")
 }
 
 func TestGetEnvAsFloat64OrFallback(t *testing.T) {
