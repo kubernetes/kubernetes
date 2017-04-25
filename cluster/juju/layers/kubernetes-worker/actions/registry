@@ -98,7 +98,7 @@ if create_response == 0:
 
     if check_cm_response == 0:
         # There is an existing ConfigMap, patch it
-        patch = '{"data":{"max-body-size":"1024m"}}'
+        patch = '{"data":{"body-size":"1024m"}}'
         patch_cm_command = kubectl + ['patch', 'cm', cm_name, '-p', patch]
         patch_cm_response = call(patch_cm_command)
 
