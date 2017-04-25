@@ -311,7 +311,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			sst.UpdateReplicas(ss, 1)
 
 			By("Verifying that the 2nd pod wont be removed if it is not running and ready")
-			sst.ConfirmStatefulPodCount(2, ss, 10*time.Second)
+			sst.ConfirmStatefulPodCount(2, ss, 10*time.Second, true)
 			expectedPodName := ss.Name + "-1"
 			expectedPod, err := f.ClientSet.Core().Pods(ns).Get(expectedPodName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
@@ -369,7 +369,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			sst.WaitForRunningAndNotReady(*ss.Spec.Replicas, ss)
 			sst.WaitForStatus(ss, 0)
 			sst.UpdateReplicas(ss, 3)
-			sst.ConfirmStatefulPodCount(1, ss, 10*time.Second)
+			sst.ConfirmStatefulPodCount(1, ss, 10*time.Second, true)
 
 			By("Scaling up stateful set " + ssName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
 			sst.RestoreProbe(ss, testProbe)
@@ -400,7 +400,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			sst.WaitForStatus(ss, 0)
 			sst.WaitForRunningAndNotReady(3, ss)
 			sst.UpdateReplicas(ss, 0)
-			sst.ConfirmStatefulPodCount(3, ss, 10*time.Second)
+			sst.ConfirmStatefulPodCount(3, ss, 10*time.Second, true)
 
 			By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
 			sst.RestoreProbe(ss, testProbe)
@@ -420,6 +420,47 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 
 			})
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Burst scaling should run to completion even with unhealthy pods", func() {
+			psLabels := klabels.Set(labels)
+
+			By("Creating stateful set " + ssName + " in namespace " + ns)
+			testProbe := &v1.Probe{Handler: v1.Handler{HTTPGet: &v1.HTTPGetAction{
+				Path: "/index.html",
+				Port: intstr.IntOrString{IntVal: 80}}}}
+			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
+			ss.Annotations = map[string]string{apps.StatefulSetBurstAnnotation: "true"}
+			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
+			ss, err := c.Apps().StatefulSets(ns).Create(ss)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
+			sst := framework.NewStatefulSetTester(c)
+			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
+
+			By("Confirming that stateful set scale up will not halt with unhealthy stateful pod")
+			sst.BreakProbe(ss, testProbe)
+			sst.WaitForRunningAndNotReady(*ss.Spec.Replicas, ss)
+			sst.WaitForStatus(ss, 0)
+			sst.UpdateReplicas(ss, 3)
+			sst.ConfirmStatefulPodCount(3, ss, 10*time.Second, false)
+
+			By("Scaling up stateful set " + ssName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
+			sst.RestoreProbe(ss, testProbe)
+			sst.WaitForRunningAndReady(3, ss)
+
+			By("Scale down will not halt with unhealthy stateful pod")
+			sst.BreakProbe(ss, testProbe)
+			sst.WaitForStatus(ss, 0)
+			sst.WaitForRunningAndNotReady(3, ss)
+			sst.UpdateReplicas(ss, 0)
+			sst.ConfirmStatefulPodCount(0, ss, 10*time.Second, false)
+
+			By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
+			sst.RestoreProbe(ss, testProbe)
+			sst.Scale(ss, 0)
+			sst.WaitForStatus(ss, 0)
 		})
 
 		It("Should recreate evicted statefulset", func() {
