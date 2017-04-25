@@ -348,25 +348,6 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		},
 	}
 
-	// Loads plugins and create commands for each plugin identified
-	loadedPlugins, loadErr := f.PluginLoader().Load()
-	if loadErr != nil {
-		glog.V(1).Infof("Unable to load plugins: %v", loadErr)
-	}
-	pluginRunner := f.PluginRunner()
-	if len(loadedPlugins) > 0 {
-		pluginCmds := []*cobra.Command{}
-		for _, p := range loadedPlugins {
-			pluginCmds = append(pluginCmds, NewCmdForPlugin(p, pluginRunner, in, out, err))
-		}
-		groups = append(groups, templates.CommandGroup{
-			Message:  "Plugins:",
-			Commands: pluginCmds,
-		})
-	}
-
-	groups.Add(cmds)
-
 	filters := []string{
 		"options",
 		Deprecated("kubectl", "delete", cmds, NewCmdStop(f, out)),
@@ -386,6 +367,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	}
 
 	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out, err))
+	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
 	cmds.AddCommand(NewCmdOptions())
