@@ -14,6 +14,7 @@ go_library(
         "persistent_volumes.go",
         "persistent_volumes-disruptive.go",
         "persistent_volumes-gce.go",
+        "persistent_volumes-local.go",
         "persistent_volumes-vsphere.go",
         "pv_reclaimpolicy.go",
         "pvc_label_selector.go",

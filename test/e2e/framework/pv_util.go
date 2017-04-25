@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -73,11 +74,13 @@ type PVCMap map[types.NamespacedName]pvcval
 //	 	},
 //	 }
 type PersistentVolumeConfig struct {
-	PVSource      v1.PersistentVolumeSource
-	Prebind       *v1.PersistentVolumeClaim
-	ReclaimPolicy v1.PersistentVolumeReclaimPolicy
-	NamePrefix    string
-	Labels        labels.Set
+	PVSource         v1.PersistentVolumeSource
+	Prebind          *v1.PersistentVolumeClaim
+	ReclaimPolicy    v1.PersistentVolumeReclaimPolicy
+	NamePrefix       string
+	Labels           labels.Set
+	StorageClassName string
+	NodeAffinity     *v1.NodeAffinity
 }
 
 // PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to generate a PVC object.
@@ -85,9 +88,10 @@ type PersistentVolumeConfig struct {
 // (+optional) Annotations defines the PVC's annotations
 
 type PersistentVolumeClaimConfig struct {
-	AccessModes []v1.PersistentVolumeAccessMode
-	Annotations map[string]string
-	Selector    *metav1.LabelSelector
+	AccessModes      []v1.PersistentVolumeAccessMode
+	Annotations      map[string]string
+	Selector         *metav1.LabelSelector
+	StorageClassName *string
 }
 
 // Clean up a pv and pvc in a single pv/pvc test case.
@@ -561,7 +565,7 @@ func makePvcKey(ns, name string) types.NamespacedName {
 // is assigned, assumes "Retain". Specs are expected to match the test's PVC.
 // Note: the passed-in claim does not have a name until it is created and thus the PV's
 //   ClaimRef cannot be completely filled-in in this func. Therefore, the ClaimRef's name
-//   is added later in createPVCPV.
+//   is added later in CreatePVCPV.
 func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume {
 	var claimRef *v1.ObjectReference
 	// If the reclaimPolicy is not provided, assume Retain
@@ -575,7 +579,7 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 			Namespace: pvConfig.Prebind.Namespace,
 		}
 	}
-	return &v1.PersistentVolume{
+	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.NamePrefix,
 			Labels:       pvConfig.Labels,
@@ -594,9 +598,16 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 				v1.ReadOnlyMany,
 				v1.ReadWriteMany,
 			},
-			ClaimRef: claimRef,
+			ClaimRef:         claimRef,
+			StorageClassName: pvConfig.StorageClassName,
 		},
 	}
+	err := helper.StorageNodeAffinityToAlphaAnnotation(pv.Annotations, pvConfig.NodeAffinity)
+	if err != nil {
+		Logf("Setting storage node affinity failed: %v", err)
+		return nil
+	}
+	return pv
 }
 
 // Returns a PVC definition based on the namespace.
@@ -625,6 +636,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
 				},
 			},
+			StorageClassName: cfg.StorageClassName,
 		},
 	}
 }
