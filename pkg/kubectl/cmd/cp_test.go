@@ -49,7 +49,35 @@ func TestExtractFileSpec(t *testing.T) {
 			expectedFile: "/some/file",
 		},
 		{
-			spec:      "some:bad:spec",
+			spec:              "namespace/pod:/some/file/with/timestamp-00:00:00",
+			expectedPod:       "pod",
+			expectedNamespace: "namespace",
+			expectedFile:      "/some/file/with/timestamp-00:00:00",
+		},
+		{
+			spec:         "pod:/some/file/with/timestamp-00:00:00",
+			expectedPod:  "pod",
+			expectedFile: "/some/file/with/timestamp-00:00:00",
+		},
+		{
+			spec:         "/some/file/with/timestamp-00:00:00",
+			expectedFile: "/some/file/with/timestamp-00:00:00",
+		},
+		{
+			spec:         "/some:/file",
+			expectedFile: "/some:/file",
+		},
+		{
+			spec:         "some/:/file",
+			expectedFile: "some/:/file",
+		},
+		{
+			spec:         "pod:some:file",
+			expectedPod:  "pod",
+			expectedFile: "some:file",
+		},
+		{
+			spec:      "",
 			expectErr: true,
 		},
 	}
