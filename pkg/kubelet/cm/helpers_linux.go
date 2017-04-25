@@ -102,6 +102,18 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 		}
 	}
 
+	// For cpuLimits, need to compare the normal containers' resource
+	// requirement against the init-containers' and choose a bigger one.
+	// Otherwise, if a bigger init-container for a pod is provided,
+	// pod will fail to start due to "invalid argument" error when trying
+	// to write the cpu configuration into cpu.cfs_quota_us.
+	for _, container := range pod.Spec.InitContainers {
+		limits := container.Resources.Limits.Cpu().MilliValue()
+		if limits > cpuLimits {
+			cpuLimits = limits
+		}
+	}
+
 	// convert to CFS values
 	cpuShares := MilliCPUToShares(cpuRequests)
 	cpuQuota, cpuPeriod := MilliCPUToQuota(cpuLimits)
