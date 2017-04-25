@@ -254,9 +254,9 @@ func GetVersionedClientForRBACOrFail(hostFactory cmdutil.Factory) (client.Interf
 				}
 				return hostFactory.ClientSetForVersion(&gv)
 			}
-			for i := 0; i < len(g.Versions); i++ {
-				if g.Versions[i].GroupVersion != "" {
-					gv, err := schema.ParseGroupVersion(g.Versions[i].GroupVersion)
+			for _, version := range g.Versions {
+				if version.GroupVersion != "" {
+					gv, err := schema.ParseGroupVersion(version.GroupVersion)
 					if err != nil {
 						return nil, err
 					}
