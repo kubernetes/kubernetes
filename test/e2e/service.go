@@ -1334,7 +1334,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 		}
 	})
 
-	It("should only target nodes with endpoints [Feature:ExternalTrafficLocalOnly]", func() {
+	It("should only target nodes with endpoints", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local"
 		jig := framework.NewServiceTestJig(cs, serviceName)
@@ -1394,7 +1394,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 		}
 	})
 
-	It("should work from pods [Feature:ExternalTrafficLocalOnly]", func() {
+	It("should work from pods", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local"
 		jig := framework.NewServiceTestJig(cs, serviceName)
@@ -1441,7 +1441,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 		}
 	})
 
-	It("should handle updates to source ip annotation [Feature:ExternalTrafficLocalOnly]", func() {
+	It("should handle updates to source ip annotation", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local"
 		jig := framework.NewServiceTestJig(cs, serviceName)
