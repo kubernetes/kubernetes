@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/client-go/pkg/api/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
@@ -71,6 +72,11 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	if isPkiVolumeMountNeeded() {
 		volumes = append(volumes, pkiVolume(cfg))
 		volumeMounts = append(volumeMounts, pkiVolumeMount())
+	}
+
+	if cfg.CertificatesDir != kubeadmapiext.DefaultCertificatesDir {
+		volumes = append(volumes, newVolume("certdir", cfg.CertificatesDir))
+		volumeMounts = append(volumeMounts, newVolumeMount("certdir", cfg.CertificatesDir))
 	}
 
 	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
@@ -144,6 +150,22 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		}
 	}
 	return nil
+}
+
+func newVolume(name, path string) api.Volume {
+	return api.Volume{
+		Name: name,
+		VolumeSource: api.VolumeSource{
+			HostPath: &api.HostPathVolumeSource{Path: path},
+		},
+	}
+}
+
+func newVolumeMount(name, path string) api.VolumeMount {
+	return api.VolumeMount{
+		Name:      name,
+		MountPath: path,
+	}
 }
 
 // etcdVolume exposes a path on the host in order to guarantee data survival during reboot.
