@@ -157,8 +157,6 @@ const (
 	// Name of a volume in external cloud that is being provisioned and thus
 	// should be ignored by rest of Kubernetes.
 	ProvisionedVolumeName = "placeholder-for-provisioning"
-	// Mount options annotations
-	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
 )
 
 // ProvisionableVolumePlugin is an extended interface of VolumePlugin and is
