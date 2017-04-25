@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "adapter.go",
+        "configmap.go",
         "registry.go",
         "secret.go",
     ],

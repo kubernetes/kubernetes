@@ -51,7 +51,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["secret_controller_test.go"],
+    srcs = [
+        "configmap_controller_test.go",
+        "secret_controller_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
