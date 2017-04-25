@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/ref"
 	resourcehelper "k8s.io/kubernetes/pkg/api/resource"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -69,7 +70,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fieldpath"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/slice"
 )
@@ -646,7 +646,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		if pod.Status.QOSClass != "" {
 			w.Write(LEVEL_0, "QoS Class:\t%s\n", pod.Status.QOSClass)
 		} else {
-			w.Write(LEVEL_0, "QoS Class:\t%s\n", qos.InternalGetPodQOS(pod))
+			w.Write(LEVEL_0, "QoS Class:\t%s\n", helper.GetPodQOS(pod))
 		}
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
@@ -3155,7 +3155,7 @@ func (list SortableVolumeMounts) Less(i, j int) bool {
 }
 
 // SortedQoSResourceNames returns the sorted resource names of a QoS list.
-func SortedQoSResourceNames(list qos.QOSList) []api.ResourceName {
+func SortedQoSResourceNames(list v1helper.QOSList) []api.ResourceName {
 	resources := make([]api.ResourceName, 0, len(list))
 	for res := range list {
 		resources = append(resources, api.ResourceName(res))
