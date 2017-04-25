@@ -369,7 +369,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Name = path
 		apiResource.Namespaced = false
 		apiResource.Kind = resourceKind
-		namer := rootScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, resourcePath, "/"), suffix}
+		namer := rootScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, resourcePath) + "/", suffix}
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 		// Add actions at the resource path: /api/apiVersion/resource
