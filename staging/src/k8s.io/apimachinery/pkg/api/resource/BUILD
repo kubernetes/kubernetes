@@ -13,6 +13,7 @@ go_test(
     srcs = [
         "amount_test.go",
         "math_test.go",
+        "quantity_proto_test.go",
         "quantity_test.go",
         "scale_int_test.go",
     ],
