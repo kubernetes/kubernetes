@@ -54,6 +54,7 @@
 #    * arm64
 #
 #  Set KUBERNETES_SKIP_DOWNLOAD to skip downloading a release.
+#  Set KUBERNETES_SKIP_DOWNLOAD_SERVER_TAR to skip downloading a server tarballs.
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 #  Set KUBERNETES_SKIP_CREATE_CLUSTER to skip starting a cluster.
 

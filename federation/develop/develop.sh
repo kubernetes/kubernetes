@@ -32,7 +32,12 @@ KUBE_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 DEPLOY_ROOT="${KUBE_ROOT}/federation/deploy"
 CUR_ROOT="$(pwd)"
 
+# This script is only used for dev and testing where
+# we only care about fast builds.
+KUBE_FASTBUILD="true"
+
 source "${KUBE_ROOT}/build/common.sh"
+source "${KUBE_ROOT}/build/lib/release.sh"
 source "${KUBE_ROOT}/build/util.sh"
 # Provides the detect-project function
 source "${KUBE_ROOT}/cluster/kube-util.sh"
@@ -45,6 +50,10 @@ readonly VERSIONS_FILE="${FEDERATION_OUTPUT_ROOT}/versions"
 
 readonly KUBE_PLATFORM=${KUBE_PLATFORM:-linux}
 readonly KUBE_ARCH=${KUBE_ARCH:-amd64}
+
+readonly FEDERATION_TARGETS=(
+  cmd/hyperkube
+)
 
 if [[ "${KUBERNETES_PROVIDER}" == "gke" || "${KUBERNETES_PROVIDER}" == "gce" ]]; then
   detect-project
@@ -83,10 +92,19 @@ function dirty_sha() {
 }
 
 function build_binaries() {
+  targets_arr=(
+    "${KUBE_CLIENT_TARGETS[@]}"
+    "${FEDERATION_TARGETS[@]}"
+  )
+
+  # Convert the array to a string of space separated elements.
+  # "make WHAT" below doesn't take newline separated string.
+  targets="${targets_arr[@]//\\n/ }"
+
   cd "${KUBE_ROOT}"
   kube::build::verify_prereqs
   kube::build::build_image
-  kube::build::run_build_command make WHAT="cmd/kubectl cmd/hyperkube federation/cmd/kubefed"
+  kube::build::run_build_command make WHAT="${targets}"
   kube::build::copy_output
 }
 
@@ -130,7 +148,7 @@ function build_image() {
   cp "${bin_path}" "${docker_build_path}/${binary}"
   printf " FROM ubuntu:16.04 \n ADD ${binary} /${binary}\n" > ${docker_file_path}
 
-  local docker_image_tag="${KUBE_REGISTRY}:${kube_version}"
+  local docker_image_tag="${KUBE_REGISTRY}/hyperkube-amd64:${kube_version}"
 
   # Build the docker image on-the-fly.
   #
@@ -141,6 +159,38 @@ function build_image() {
   docker build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
 
   rm -rf ${docker_build_path}
+}
+
+function package_test() {
+  targets_arr=(
+    "${KUBE_CLIENT_TARGETS[@]}"
+    "${KUBE_TEST_TARGETS[@]}"
+    "${KUBE_TEST_SERVER_TARGETS[@]}"
+    "${FEDERATION_TARGETS[@]}"
+  )
+
+  # Convert the array to a string of space separated elements.
+  # "make WHAT" below doesn't take newline separated string.
+  targets=${targets_arr[@]//\\n/ }
+
+  cd "${KUBE_ROOT}"
+
+  kube::build::verify_prereqs
+  kube::build::build_image
+  kube::build::run_build_command make WHAT="${targets}"
+  kube::build::copy_output
+  kube::release::init_release_dir
+  kube::release::package_src_tarball &
+  kube::release::package_client_tarballs &
+  kube::release::package_salt_tarball &
+  kube::release::package_kube_manifests_tarball &
+  kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
+
+  kube::release::package_final_tarball & # _final depends on some of the previous phases
+  kube::release::package_test_tarball & # _test doesn't depend on anything
+  kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
+
+  build_image
 }
 
 function get_version() {
@@ -177,6 +227,9 @@ case "${ACTION}" in
   ;;
   "build_image")
   build_image
+  ;;
+  "package_test")
+  package_test
   ;;
   "push")
   push

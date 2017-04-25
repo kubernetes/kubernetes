@@ -49,6 +49,10 @@ build_binaries:
 build_image:
 	./develop/develop.sh build_image
 
+.PHONY: package_test
+package_test:
+	./develop/develop.sh package_test
+
 .PHONY: deploy_clusters
 deploy_clusters:
 	./develop/develop.sh deploy_clusters

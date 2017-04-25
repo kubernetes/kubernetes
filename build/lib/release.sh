@@ -79,10 +79,15 @@ function kube::release::package_hyperkube() {
   fi
 }
 
-function kube::release::package_tarballs() {
+function kube::release::init_release_dir() {
   # Clean out any old releases
   rm -rf "${RELEASE_DIR}"
   mkdir -p "${RELEASE_DIR}"
+}
+
+function kube::release::package_tarballs() {
+  kube::release::init_release_dir
+
   kube::release::package_src_tarball &
   kube::release::package_client_tarballs &
   kube::release::package_salt_tarball &
