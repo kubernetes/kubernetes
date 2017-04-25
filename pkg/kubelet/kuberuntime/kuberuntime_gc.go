@@ -134,7 +134,7 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 
 // removeOldestNSandboxes removes the oldest inactive toRemove sandboxes and
 // returns the resulting slice.
-func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemove int) []sandboxGCInfo {
+func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemove int) {
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(sandboxes) - toRemove
 	for i := numToKeep; i < len(sandboxes); i++ {
@@ -142,9 +142,6 @@ func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemo
 			cgc.removeSandbox(sandboxes[i].id)
 		}
 	}
-
-	// Assume we removed the containers so that we're not too aggressive.
-	return sandboxes[:numToKeep]
 }
 
 // removeSandbox removes the sandbox by sandboxID.
@@ -258,7 +255,7 @@ func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.ContainerGCPolicy
 	return nil
 }
 
-// evictSandboxes remove all evictable sandboes. An evictable sandbox must
+// evictSandboxes remove all evictable sandboxes. An evictable sandbox must
 // meet the following requirements:
 //   1. not in ready state
 //   2. contains no containers.
