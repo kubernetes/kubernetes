@@ -225,6 +225,7 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("storage.k8s.io", "v1beta1", "storageclasses"): {
 		stub:             `{"metadata": {"name": "sc1"}, "provisioner": "aws"}`,
 		expectedEtcdPath: "/registry/storageclasses/sc1",
+		expectedGVK:      gvkP("storage.k8s.io", "v1", "StorageClass"),
 	},
 	// --
 
@@ -232,7 +233,6 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("storage.k8s.io", "v1", "storageclasses"): {
 		stub:             `{"metadata": {"name": "sc2"}, "provisioner": "aws"}`,
 		expectedEtcdPath: "/registry/storageclasses/sc2",
-		expectedGVK:      gvkP("storage.k8s.io", "v1beta1", "StorageClass"),
 	},
 	// --
 
