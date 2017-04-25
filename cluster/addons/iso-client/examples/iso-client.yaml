@@ -5,16 +5,20 @@ metadata:
   namespace: kube-system
 spec:
   template:
-    serviceAccountName: coreaffinity-isolator-sa
-    containers:
-    - command:
-      - /coreaffinity-isolator
-      - -v
-      - "4"
-      - -logtostderr
-      image: iso-client:latest
-      name: iso-client
-      resources:
-        requests:
-          cpu: 250m
-    hostNetwork: true
+    metadata:
+      labels:
+        isolator: coreaffinity
+    spec:
+      serviceAccountName: coreaffinity-isolator-sa
+      containers:
+      - command:
+        - /coreaffinity-isolator
+        - -v
+        - "4"
+        - -logtostderr
+        image: iso-client:latest
+        name: iso-client
+        resources:
+          requests:
+            cpu: 250m
+      hostNetwork: true
