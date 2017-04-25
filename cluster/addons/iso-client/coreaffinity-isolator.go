@@ -12,6 +12,7 @@ import (
 	//	"k8s.io/apimachinery/pkg/util/uuid"
 
 	aff "k8s.io/kubernetes/cluster/addons/iso-client/coreaffinity"
+	"k8s.io/kubernetes/cluster/addons/iso-client/discovery"
 )
 
 const (
@@ -27,6 +28,13 @@ const (
 func main() {
 	flag.Parse()
 	glog.Info("Starting ...")
+	cpuTopo, err := discovery.DiscoverTopology()
+	if err != nil {
+		glog.Fatalf("Cannot retrive CPU topology: %q", err)
+	}
+
+	glog.Infof("Detected topology: %v", cpuTopo)
+
 	var wg sync.WaitGroup
 	// Starting eventHandlerServer
 	server := aff.NewEventHandler(name, eventHandlerLocalAddress)
