@@ -32,13 +32,15 @@ import (
 
 func TestAccept(t *testing.T) {
 	tests := []struct {
-		acceptPaths  string
-		rejectPaths  string
-		acceptHosts  string
-		path         string
-		host         string
-		method       string
-		expectAccept bool
+		tag           string
+		acceptPaths   string
+		rejectPaths   string
+		acceptHosts   string
+		rejectMethods string
+		path          string
+		host          string
+		method        string
+		expectAccept  bool
 	}{
 
 		{
@@ -182,7 +184,7 @@ func TestAccept(t *testing.T) {
 			AcceptPaths:   MakeRegexpArrayOrDie(test.acceptPaths),
 			RejectPaths:   MakeRegexpArrayOrDie(test.rejectPaths),
 			AcceptHosts:   MakeRegexpArrayOrDie(test.acceptHosts),
-			RejectMethods: MakeRegexpArrayOrDie(DefaultMethodRejectRE),
+			RejectMethods: MakeRegexpArrayOrDie(test.rejectMethods),
 		}
 		accept := filter.accept(test.method, test.path, test.host)
 		if accept != test.expectAccept {
