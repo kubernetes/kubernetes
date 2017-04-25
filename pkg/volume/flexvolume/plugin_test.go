@@ -27,7 +27,7 @@ func TestInit(t *testing.T) {
 	plugin.runner = fakeRunner(
 		assertDriverCall(t, successOutput(), "init"),
 	)
-	plugin.Init(plugin.host)
+	plugin.Init(plugin.host, nil, nil)
 }
 
 func fakeVolumeNameOutput(name string) exec.FakeCombinedOutputAction {

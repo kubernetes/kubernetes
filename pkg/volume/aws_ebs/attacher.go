@@ -42,7 +42,7 @@ var _ volume.Attacher = &awsElasticBlockStoreAttacher{}
 var _ volume.AttachableVolumePlugin = &awsElasticBlockStorePlugin{}
 
 func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error) {
-	awsCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	awsCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +241,7 @@ type awsElasticBlockStoreDetacher struct {
 var _ volume.Detacher = &awsElasticBlockStoreDetacher{}
 
 func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error) {
-	awsCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	awsCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}

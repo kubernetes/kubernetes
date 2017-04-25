@@ -258,8 +258,9 @@ func TestCollectDataWithSecret(t *testing.T) {
 				sources: source.Sources,
 				podUID:  pod.UID,
 				plugin: &projectedPlugin{
-					host:      host,
-					getSecret: host.GetSecretFunc(),
+					host:       host,
+					kubeClient: client,
+					getSecret:  host.GetSecretFunc(),
 				},
 			},
 			source: *source,
@@ -505,7 +506,8 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 				sources: source.Sources,
 				podUID:  pod.UID,
 				plugin: &projectedPlugin{
-					host: host,
+					host:       host,
+					kubeClient: client,
 				},
 			},
 			source: *source,
@@ -631,7 +633,8 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 				sources: source.Sources,
 				podUID:  tc.pod.UID,
 				plugin: &projectedPlugin{
-					host: host,
+					host:       host,
+					kubeClient: client,
 				},
 			},
 			source: *source,
@@ -661,15 +664,23 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
+	host := volumetest.NewFakeVolumeHost(tempDir)
+	host.SetSecretFunc(func(namespace, name string) (*v1.Secret, error) {
+		return clientset.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
+	})
 
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
+	// Inject empty_dir into host's plugin manager to make NewWrapperMounter
+	// working.
+	mgr := host.GetPluginMgr()
+	mgr.InitPlugins(empty_dir.ProbeVolumePlugins(), host, clientset, nil)
+	return tempDir, host
 }
 
 func TestCanSupport(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	tempDir, host := newTestHost(t, nil)
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host, nil, nil)
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -700,7 +711,7 @@ func TestPlugin(t *testing.T) {
 		rootDir, host = newTestHost(t, client)
 	)
 	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host, client, nil)
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -764,7 +775,7 @@ func TestPluginReboot(t *testing.T) {
 		rootDir, host = newTestHost(t, client)
 	)
 	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host, client, nil)
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -818,7 +829,7 @@ func TestPluginOptional(t *testing.T) {
 	)
 	volumeSpec.VolumeSource.Projected.Sources[0].Secret.Optional = &trueVal
 	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host, client, nil)
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -895,7 +906,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 	}
 	volumeSpec.VolumeSource.Projected.Sources[0].Secret.Optional = &trueVal
 	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host, client, nil)
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {

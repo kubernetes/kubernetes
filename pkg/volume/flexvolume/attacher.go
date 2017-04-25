@@ -34,7 +34,7 @@ var _ volume.Attacher = &flexVolumeAttacher{}
 // Attach is part of the volume.Attacher interface
 func (a *flexVolumeAttacher) Attach(spec *volume.Spec, hostName types.NodeName) (string, error) {
 	call := a.plugin.NewDriverCall(attachCmd)
-	call.AppendSpec(spec, a.plugin.host, nil)
+	call.AppendSpec(spec, nil)
 	call.Append(string(hostName))
 
 	status, err := call.Run()
@@ -50,7 +50,7 @@ func (a *flexVolumeAttacher) Attach(spec *volume.Spec, hostName types.NodeName) 
 func (a *flexVolumeAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
 	call := a.plugin.NewDriverCallWithTimeout(waitForAttachCmd, timeout)
 	call.Append(devicePath)
-	call.AppendSpec(spec, a.plugin.host, nil)
+	call.AppendSpec(spec, nil)
 
 	status, err := call.Run()
 	if isCmdNotSupportedErr(err) {
@@ -82,7 +82,7 @@ func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 	call := a.plugin.NewDriverCall(mountDeviceCmd)
 	call.Append(deviceMountPath)
 	call.Append(devicePath)
-	call.AppendSpec(spec, a.plugin.host, nil)
+	call.AppendSpec(spec, nil)
 
 	_, err = call.Run()
 	if isCmdNotSupportedErr(err) {
@@ -103,7 +103,7 @@ func (a *flexVolumeAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName t
 		volumesAttachedCheck[spec] = true
 
 		call := a.plugin.NewDriverCall(isAttached)
-		call.AppendSpec(spec, a.plugin.host, nil)
+		call.AppendSpec(spec, nil)
 		call.Append(string(nodeName))
 
 		status, err := call.Run()

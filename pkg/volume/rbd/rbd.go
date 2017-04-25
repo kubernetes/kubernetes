@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -35,12 +36,13 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&rbdPlugin{nil, exec.New()}}
+	return []volume.VolumePlugin{&rbdPlugin{exe: exec.New()}}
 }
 
 type rbdPlugin struct {
-	host volume.VolumeHost
-	exe  exec.Interface
+	host       volume.VolumeHost
+	kubeClient clientset.Interface
+	exe        exec.Interface
 }
 
 var _ volume.VolumePlugin = &rbdPlugin{}
@@ -53,8 +55,9 @@ const (
 	secretKeyName = "key" // key name used in secret
 )
 
-func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
+func (plugin *rbdPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
+	plugin.kubeClient = client
 	return nil
 }
 
@@ -107,7 +110,7 @@ func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.Vol
 	source, _ := plugin.getRBDVolumeSource(spec)
 
 	if source.SecretRef != nil {
-		if secret, err = parsePodSecret(pod, source.SecretRef.Name, plugin.host.GetKubeClient()); err != nil {
+		if secret, err = parsePodSecret(pod, source.SecretRef.Name, plugin.kubeClient); err != nil {
 			glog.Errorf("Couldn't get secret from %v/%v", pod.Namespace, source.SecretRef)
 			return nil, err
 		}
@@ -189,7 +192,7 @@ func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.RBD is nil")
 	}
-	class, err := volutil.GetClassForVolume(plugin.host.GetKubeClient(), spec.PersistentVolume)
+	class, err := volutil.GetClassForVolume(plugin.kubeClient, spec.PersistentVolume)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +211,7 @@ func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 		}
 	}
 
-	secret, err := parsePVSecret(adminSecretNamespace, adminSecretName, plugin.host.GetKubeClient())
+	secret, err := parsePVSecret(adminSecretNamespace, adminSecretName, plugin.kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
 	}
@@ -289,7 +292,7 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	if adminSecretName == "" {
 		return nil, fmt.Errorf("missing Ceph admin secret name")
 	}
-	if secret, err = parsePVSecret(adminSecretNamespace, adminSecretName, r.plugin.host.GetKubeClient()); err != nil {
+	if secret, err = parsePVSecret(adminSecretNamespace, adminSecretName, r.plugin.kubeClient); err != nil {
 		return nil, fmt.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
 	}
 	r.adminSecret = secret

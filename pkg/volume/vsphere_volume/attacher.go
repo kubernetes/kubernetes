@@ -44,7 +44,7 @@ var _ volume.AttachableVolumePlugin = &vsphereVolumePlugin{}
 var attachdetachMutex = keymutex.NewKeyMutex()
 
 func (plugin *vsphereVolumePlugin) NewAttacher() (volume.Attacher, error) {
-	vsphereCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	vsphereCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,7 @@ type vsphereVMDKDetacher struct {
 var _ volume.Detacher = &vsphereVMDKDetacher{}
 
 func (plugin *vsphereVolumePlugin) NewDetacher() (volume.Detacher, error) {
-	vsphereCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	vsphereCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		return nil, err
 	}

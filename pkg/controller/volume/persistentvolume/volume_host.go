@@ -22,8 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -45,20 +43,12 @@ func (ctrl *PersistentVolumeController) GetPodPluginDir(podUID types.UID, plugin
 	return ""
 }
 
-func (ctrl *PersistentVolumeController) GetKubeClient() clientset.Interface {
-	return ctrl.kubeClient
-}
-
 func (ctrl *PersistentVolumeController) NewWrapperMounter(volName string, spec vol.Spec, pod *v1.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {
 	return nil, fmt.Errorf("PersistentVolumeController.NewWrapperMounter is not implemented")
 }
 
 func (ctrl *PersistentVolumeController) NewWrapperUnmounter(volName string, spec vol.Spec, podUID types.UID) (vol.Unmounter, error) {
 	return nil, fmt.Errorf("PersistentVolumeController.NewWrapperMounter is not implemented")
-}
-
-func (ctrl *PersistentVolumeController) GetCloudProvider() cloudprovider.Interface {
-	return ctrl.cloud
 }
 
 func (ctrl *PersistentVolumeController) GetMounter() mount.Interface {

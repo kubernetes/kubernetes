@@ -36,7 +36,7 @@ func testPlugin() (*flexVolumePlugin, string) {
 	return &flexVolumePlugin{
 		driverName:          "test",
 		execPath:            "/plugin",
-		host:                volumetesting.NewFakeVolumeHost(rootDir, nil, nil),
+		host:                volumetesting.NewFakeVolumeHost(rootDir),
 		unsupportedCommands: []string{},
 	}, rootDir
 }
@@ -127,7 +127,7 @@ func fakePersistentVolumeSpec() *volume.Spec {
 }
 
 func specJson(plugin *flexVolumePlugin, spec *volume.Spec, extraOptions map[string]string) string {
-	o, err := NewOptionsForDriver(spec, plugin.host, extraOptions)
+	o, err := NewOptionsForDriver(spec, extraOptions)
 	if err != nil {
 		panic("Failed to convert spec: " + err.Error())
 	}

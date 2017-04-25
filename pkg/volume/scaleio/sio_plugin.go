@@ -22,6 +22,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -34,9 +36,10 @@ const (
 )
 
 type sioPlugin struct {
-	host      volume.VolumeHost
-	mounter   mount.Interface
-	volumeMtx keymutex.KeyMutex
+	host       volume.VolumeHost
+	kubeClient clientset.Interface
+	mounter    mount.Interface
+	volumeMtx  keymutex.KeyMutex
 }
 
 func ProbeVolumePlugins() []volume.VolumePlugin {
@@ -51,9 +54,12 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 // *******************
 var _ volume.VolumePlugin = &sioPlugin{}
 
-func (p *sioPlugin) Init(host volume.VolumeHost) error {
+func (p *sioPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	p.host = host
-	p.mounter = host.GetMounter()
+	if host != nil {
+		p.mounter = host.GetMounter()
+	}
+	p.kubeClient = client
 	p.volumeMtx = keymutex.NewKeyMutex()
 	return nil
 }

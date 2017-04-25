@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
@@ -259,20 +258,24 @@ func TestMakePayload(t *testing.T) {
 	}
 }
 
-func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
+func newTestHost(t *testing.T) (string, volume.VolumeHost) {
 	tempDir, err := ioutil.TempDir("/tmp", "configmap_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
+	host := volumetest.NewFakeVolumeHost(tempDir)
+	// Inject empty_dir into host's plugin manager to make NewWrapperMounter
+	// working.
+	mgr := host.GetPluginMgr()
+	mgr.InitPlugins(empty_dir.ProbeVolumePlugins(), host, nil, nil)
+	return tempDir, host
 }
 
 func TestCanSupport(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
-	tempDir, host := newTestHost(t, nil)
+	tempDir, host := newTestHost(t)
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host, nil, nil)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -300,11 +303,11 @@ func TestPlugin(t *testing.T) {
 		configMap     = configMap(testNamespace, testName)
 		client        = fake.NewSimpleClientset(&configMap)
 		pluginMgr     = volume.VolumePluginMgr{}
-		tempDir, host = newTestHost(t, client)
+		tempDir, host = newTestHost(t)
 	)
 
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host, client, nil)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -364,11 +367,11 @@ func TestPluginReboot(t *testing.T) {
 		configMap     = configMap(testNamespace, testName)
 		client        = fake.NewSimpleClientset(&configMap)
 		pluginMgr     = volume.VolumePluginMgr{}
-		rootDir, host = newTestHost(t, client)
+		rootDir, host = newTestHost(t)
 	)
 
 	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host, client, nil)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -419,12 +422,12 @@ func TestPluginOptional(t *testing.T) {
 		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
 		client        = fake.NewSimpleClientset()
 		pluginMgr     = volume.VolumePluginMgr{}
-		tempDir, host = newTestHost(t, client)
+		tempDir, host = newTestHost(t)
 	)
 	volumeSpec.VolumeSource.ConfigMap.Optional = &trueVal
 
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host, client, nil)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -488,7 +491,7 @@ func TestPluginKeysOptional(t *testing.T) {
 		configMap     = configMap(testNamespace, testName)
 		client        = fake.NewSimpleClientset(&configMap)
 		pluginMgr     = volume.VolumePluginMgr{}
-		tempDir, host = newTestHost(t, client)
+		tempDir, host = newTestHost(t)
 	)
 	volumeSpec.VolumeSource.ConfigMap.Items = []v1.KeyToPath{
 		{Key: "data-1", Path: "data-1"},
@@ -499,7 +502,7 @@ func TestPluginKeysOptional(t *testing.T) {
 	volumeSpec.VolumeSource.ConfigMap.Optional = &trueVal
 
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host, client, nil)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {

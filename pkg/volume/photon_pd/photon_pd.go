@@ -26,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -39,7 +41,8 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 }
 
 type photonPersistentDiskPlugin struct {
-	host volume.VolumeHost
+	host  volume.VolumeHost
+	cloud cloudprovider.Interface
 }
 
 var _ volume.VolumePlugin = &photonPersistentDiskPlugin{}
@@ -51,7 +54,7 @@ const (
 	photonPersistentDiskPluginName = "kubernetes.io/photon-pd"
 )
 
-func (plugin *photonPersistentDiskPlugin) Init(host volume.VolumeHost) error {
+func (plugin *photonPersistentDiskPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
 	return nil
 }

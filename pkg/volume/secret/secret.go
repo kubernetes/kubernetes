@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -42,8 +44,9 @@ const (
 
 // secretPlugin implements the VolumePlugin interface.
 type secretPlugin struct {
-	host      volume.VolumeHost
-	getSecret func(namespace, name string) (*v1.Secret, error)
+	host       volume.VolumeHost
+	getSecret  func(namespace, name string) (*v1.Secret, error)
+	kubeClient clientset.Interface
 }
 
 var _ volume.VolumePlugin = &secretPlugin{}
@@ -58,9 +61,10 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(secretPluginName), volName)
 }
 
-func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
+func (plugin *secretPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
 	plugin.getSecret = host.GetSecretFunc()
+	plugin.kubeClient = client
 	return nil
 }
 

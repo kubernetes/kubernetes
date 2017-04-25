@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
@@ -58,7 +59,8 @@ type CinderProvider interface {
 }
 
 type cinderPlugin struct {
-	host volume.VolumeHost
+	host  volume.VolumeHost
+	cloud cloudprovider.Interface
 	// Guarding SetUp and TearDown operations
 	volumeLocks keymutex.KeyMutex
 }
@@ -72,8 +74,9 @@ const (
 	cinderVolumePluginName = "kubernetes.io/cinder"
 )
 
-func (plugin *cinderPlugin) Init(host volume.VolumeHost) error {
+func (plugin *cinderPlugin) Init(host volume.VolumeHost, client clientset.Interface, cloud cloudprovider.Interface) error {
 	plugin.host = host
+	plugin.cloud = cloud
 	plugin.volumeLocks = keymutex.NewKeyMutex()
 	return nil
 }
@@ -197,13 +200,12 @@ func getCloudProvider(cloudProvider cloudprovider.Interface) (CinderProvider, er
 }
 
 func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
-	cloud := plugin.host.GetCloudProvider()
-	if cloud == nil {
+	if plugin.cloud == nil {
 		glog.Errorf("Cloud provider not initialized properly")
 		return nil, errors.New("Cloud provider not initialized properly")
 	}
 
-	switch cloud := cloud.(type) {
+	switch cloud := plugin.cloud.(type) {
 	case *rackspace.Rackspace:
 		return cloud, nil
 	case *openstack.OpenStack:

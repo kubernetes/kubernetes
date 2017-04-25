@@ -66,7 +66,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	extraOptions := make(map[string]string)
 
 	// Extract secret and pass it as options.
-	if err := addSecretsToOptions(extraOptions, f.spec, f.podNamespace, f.driverName, f.plugin.host); err != nil {
+	if err := addSecretsToOptions(extraOptions, f.spec, f.podNamespace, f.driverName, f.plugin.kubeClient); err != nil {
 		return err
 	}
 
@@ -75,7 +75,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		extraOptions[optionFSGroup] = strconv.FormatInt(*fsGroup, 10)
 	}
 
-	call.AppendSpec(f.spec, f.plugin.host, extraOptions)
+	call.AppendSpec(f.spec, extraOptions)
 
 	_, err = call.Run()
 	if isCmdNotSupportedErr(err) {

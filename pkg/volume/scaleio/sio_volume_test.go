@@ -60,9 +60,9 @@ func newPluginMgr(t *testing.T) (*volume.VolumePluginMgr, string) {
 		},
 	}
 	fakeClient := fakeclient.NewSimpleClientset(config)
-	host := volumetest.NewFakeVolumeHost(tmpDir, fakeClient, nil)
+	host := volumetest.NewFakeVolumeHost(tmpDir)
 	plugMgr := &volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), host)
+	plugMgr.InitPlugins(ProbeVolumePlugins(), host, fakeClient, nil)
 
 	return plugMgr, tmpDir
 }
@@ -344,7 +344,7 @@ func TestVolumeProvisioner(t *testing.T) {
 	if err := deleter.Delete(); err != nil {
 		t.Fatalf("failed while deleteing vol: %v", err)
 	}
-	path := deleter.GetPath()
+	path := sioUnmounter.GetPath()
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {

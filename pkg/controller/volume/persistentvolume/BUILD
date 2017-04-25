@@ -74,6 +74,7 @@ go_test(
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/client/listers/storage/v1beta1:go_default_library",
+        "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

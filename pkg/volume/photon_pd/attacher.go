@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -35,6 +36,7 @@ import (
 
 type photonPersistentDiskAttacher struct {
 	host        volume.VolumeHost
+	cloud       cloudprovider.Interface
 	photonDisks photon.Disks
 }
 
@@ -42,7 +44,7 @@ var _ volume.Attacher = &photonPersistentDiskAttacher{}
 var _ volume.AttachableVolumePlugin = &photonPersistentDiskPlugin{}
 
 func (plugin *photonPersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
-	photonCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	photonCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		glog.Errorf("Photon Controller attacher: NewAttacher failed to get cloud provider")
 		return nil, err
@@ -50,6 +52,7 @@ func (plugin *photonPersistentDiskPlugin) NewAttacher() (volume.Attacher, error)
 
 	return &photonPersistentDiskAttacher{
 		host:        plugin.host,
+		cloud:       photonCloud,
 		photonDisks: photonCloud,
 	}, nil
 }
@@ -222,7 +225,7 @@ type photonPersistentDiskDetacher struct {
 var _ volume.Detacher = &photonPersistentDiskDetacher{}
 
 func (plugin *photonPersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
-	photonCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	photonCloud, err := getCloudProvider(plugin.cloud)
 	if err != nil {
 		glog.Errorf("Photon Controller attacher: NewDetacher failed to get cloud provider. err: %s", err)
 		return nil, err

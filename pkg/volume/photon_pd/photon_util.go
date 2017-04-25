@@ -81,7 +81,7 @@ func verifyDevicePath(path string) (string, error) {
 
 // CreateVolume creates a PhotonController persistent disk.
 func (util *PhotonDiskUtil) CreateVolume(p *photonPersistentDiskProvisioner) (pdID string, capacityGB int, fstype string, err error) {
-	cloud, err := getCloudProvider(p.plugin.host.GetCloudProvider())
+	cloud, err := getCloudProvider(p.plugin.cloud)
 	if err != nil {
 		glog.Errorf("Photon Controller Util: CreateVolume failed to get cloud provider. Error [%v]", err)
 		return "", 0, "", err
@@ -123,7 +123,7 @@ func (util *PhotonDiskUtil) CreateVolume(p *photonPersistentDiskProvisioner) (pd
 
 // DeleteVolume deletes a vSphere volume.
 func (util *PhotonDiskUtil) DeleteVolume(pd *photonPersistentDiskDeleter) error {
-	cloud, err := getCloudProvider(pd.plugin.host.GetCloudProvider())
+	cloud, err := getCloudProvider(pd.plugin.cloud)
 	if err != nil {
 		glog.Errorf("Photon Controller Util: DeleteVolume failed to get cloud provider. Error [%v]", err)
 		return err

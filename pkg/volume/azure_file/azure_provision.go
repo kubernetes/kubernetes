@@ -49,7 +49,7 @@ type azureFileDeleter struct {
 }
 
 func (plugin *azureFilePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, err := getAzureCloudProvider(plugin.cloud)
 	if err != nil {
 		glog.V(4).Infof("failed to get azure provider")
 		return nil, err
@@ -70,7 +70,7 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 	nameSpace := pvSpec.Spec.ClaimRef.Namespace
 	secretName := pvSpec.Spec.AzureFile.SecretName
 	shareName := pvSpec.Spec.AzureFile.ShareName
-	if accountName, accountKey, err := util.GetAzureCredentials(plugin.host, nameSpace, secretName); err != nil {
+	if accountName, accountKey, err := util.GetAzureCredentials(plugin.kubeClient, nameSpace, secretName); err != nil {
 		return nil, err
 	} else {
 		return &azureFileDeleter{
@@ -87,7 +87,7 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 }
 
 func (plugin *azureFilePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, err := getAzureCloudProvider(plugin.cloud)
 	if err != nil {
 		glog.V(4).Infof("failed to get azure provider")
 		return nil, err
@@ -162,7 +162,7 @@ func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, err
 	}
 	// create a secret for storage account and key
-	secretName, err := a.util.SetAzureCredentials(a.plugin.host, a.options.PVC.Namespace, account, key)
+	secretName, err := a.util.SetAzureCredentials(a.plugin.kubeClient, a.options.PVC.Namespace, account, key)
 	if err != nil {
 		return nil, err
 	}
