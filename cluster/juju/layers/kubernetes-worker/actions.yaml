@@ -1,6 +1,17 @@
 pause:
     description: |
       Cordon the unit, draining all active workloads.
+    params:
+      delete-local-data:
+        type: boolean
+        description: Force deletion of local storage to enable a drain
+        default: False
+      force:
+        type: boolean
+        description: |
+            Continue even if there are pods not managed by a RC, RS, Job, DS or SS
+        default: False
+
 resume:
     description: |
       UnCordon the unit, enabling workload scheduling.
