@@ -36,7 +36,8 @@ service RuntimeService {
     // This call is idempotent, and must not return an error if the sandbox has
     // already been removed.
     rpc RemovePodSandbox(RemovePodSandboxRequest) returns (RemovePodSandboxResponse) {}
-    // PodSandboxStatus returns the status of the PodSandbox.
+    // PodSandboxStatus returns the status of the PodSandbox. If the PodSandbox is not
+    // present, returns an error.
     rpc PodSandboxStatus(PodSandboxStatusRequest) returns (PodSandboxStatusResponse) {}
     // ListPodSandbox returns a list of PodSandboxes.
     rpc ListPodSandbox(ListPodSandboxRequest) returns (ListPodSandboxResponse) {}
@@ -57,7 +58,8 @@ service RuntimeService {
     rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse) {}
     // ListContainers lists all containers by filters.
     rpc ListContainers(ListContainersRequest) returns (ListContainersResponse) {}
-    // ContainerStatus returns status of the container.
+    // ContainerStatus returns status of the container. If the container is not
+    // present, returns an error.
     rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
 
     // ExecSync runs a command in a container synchronously.
