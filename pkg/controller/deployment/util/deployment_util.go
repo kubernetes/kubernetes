@@ -1059,7 +1059,8 @@ func NewRSNewReplicas(deployment *extensions.Deployment, allRSs []*extensions.Re
 
 // IsSaturated checks if the new replica set is saturated by comparing its size with its deployment size.
 // Both the deployment and the replica set have to believe this replica set can own all of the desired
-// replicas in the deployment and the annotation helps in achieving that.
+// replicas in the deployment and the annotation helps in achieving that. All pods of the ReplicaSet
+// need to be available.
 func IsSaturated(deployment *extensions.Deployment, rs *extensions.ReplicaSet) bool {
 	if rs == nil {
 		return false
@@ -1069,7 +1070,9 @@ func IsSaturated(deployment *extensions.Deployment, rs *extensions.ReplicaSet) b
 	if err != nil {
 		return false
 	}
-	return *(rs.Spec.Replicas) == *(deployment.Spec.Replicas) && int32(desired) == *(deployment.Spec.Replicas)
+	return *(rs.Spec.Replicas) == *(deployment.Spec.Replicas) &&
+		int32(desired) == *(deployment.Spec.Replicas) &&
+		rs.Status.AvailableReplicas == *(deployment.Spec.Replicas)
 }
 
 // WaitForObservedDeployment polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
