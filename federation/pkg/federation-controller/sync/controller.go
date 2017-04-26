@@ -308,6 +308,10 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 	}
 	obj := copiedObj.(pkgruntime.Object)
 	meta := s.adapter.ObjectMeta(obj)
+	if util.IsFederationOnlyObject(obj) {
+		glog.V(4).Infof("Skipping federation-only %q: %s", kind, key)
+		return
+	}
 
 	if meta.DeletionTimestamp != nil {
 		if err := s.delete(obj, namespacedName); err != nil {

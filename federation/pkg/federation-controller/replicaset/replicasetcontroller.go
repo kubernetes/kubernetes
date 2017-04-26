@@ -467,6 +467,10 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		frsc.deliverReplicaSetByKey(key, 0, true)
 		return statusError, err
 	}
+	if fedutil.IsFederationOnlyObject(frs) {
+		glog.V(4).Infof("Skipping federation-only ReplicaSet: %s", key)
+		return statusAllOk, nil
+	}
 	if frs.DeletionTimestamp != nil {
 		if err := frsc.delete(frs); err != nil {
 			glog.Errorf("Failed to delete %s: %v", frs, err)

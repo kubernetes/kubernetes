@@ -289,7 +289,10 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
 		return
 	}
-
+	if util.IsFederationOnlyObject(configMap) {
+		glog.V(4).Infof("Skipping federation-only ConfigMap: %s", key)
+		return
+	}
 	// Check if deletion has been requested.
 	if configMap.DeletionTimestamp != nil {
 		if err := configmapcontroller.delete(configMap); err != nil {

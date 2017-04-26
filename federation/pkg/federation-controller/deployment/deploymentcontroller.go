@@ -454,6 +454,10 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
 		return statusError, err
 	}
+	if fedutil.IsFederationOnlyObject(fd) {
+		glog.V(4).Infof("Skipping federation-only Deployment: %s", key)
+		return statusAllOk, nil
+	}
 
 	if fd.DeletionTimestamp != nil {
 		if err := fdc.delete(fd); err != nil {

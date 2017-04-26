@@ -115,3 +115,30 @@ func TestObjectMetaAndSpec(t *testing.T) {
 	assert.False(t, ObjectMetaAndSpecEquivalent(&s1, &s3))
 	assert.False(t, ObjectMetaAndSpecEquivalent(&s2, &s3))
 }
+
+func TestIsFederationOnlyObject(t *testing.T) {
+	testCases := []struct {
+		configMap      api_v1.ConfigMap
+		expectedResult bool
+	}{
+		{
+			configMap: api_v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{},
+			},
+			expectedResult: false,
+		},
+		{
+			configMap: api_v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						FederationOnlyAnnotation: "true",
+					},
+				},
+			},
+			expectedResult: true,
+		},
+	}
+	for i, tc := range testCases {
+		assert.Equal(t, tc.expectedResult, IsFederationOnlyObject(&tc.configMap), "testcase - %d", i)
+	}
+}

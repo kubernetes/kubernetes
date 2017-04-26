@@ -700,7 +700,10 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	} else {
 		glog.V(4).Infof("Base (federated) ingress: %v", baseIngress)
 	}
-
+	if util.IsFederationOnlyObject(baseIngress) {
+		glog.V(4).Infof("Skipping federation-only Ingress: %s", key)
+		return
+	}
 	if baseIngress.DeletionTimestamp != nil {
 		if err := ic.delete(baseIngress); err != nil {
 			glog.Errorf("Failed to delete %s: %v", ingress, err)
