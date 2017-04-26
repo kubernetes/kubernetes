@@ -235,6 +235,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 				if !reflect.DeepEqual(oldCluster.Spec, curCluster.Spec) {
 					// update when spec is changed
 					s.clusterCache.addToClientMap(cur)
+					return
 				}
 
 				pred := getClusterConditionPredicate()
