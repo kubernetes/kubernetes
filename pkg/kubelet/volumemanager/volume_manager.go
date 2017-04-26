@@ -171,6 +171,13 @@ func NewVolumeManager(
 			checkNodeCapabilitiesBeforeMount),
 	}
 
+	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
+		kubeClient,
+		desiredStateOfWorldPopulatorLoopSleepPeriod,
+		desiredStateOfWorldPopulatorGetPodStatusRetryDuration,
+		podManager,
+		vm.desiredStateOfWorld,
+		kubeContainerRuntime)
 	vm.reconciler = reconciler.NewReconciler(
 		kubeClient,
 		controllerAttachDetachEnabled,
@@ -180,17 +187,11 @@ func NewVolumeManager(
 		nodeName,
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
+		vm.desiredStateOfWorldPopulator.HasAddedPods,
 		vm.operationExecutor,
 		mounter,
 		volumePluginMgr,
 		kubeletPodsDir)
-	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
-		kubeClient,
-		desiredStateOfWorldPopulatorLoopSleepPeriod,
-		desiredStateOfWorldPopulatorGetPodStatusRetryDuration,
-		podManager,
-		vm.desiredStateOfWorld,
-		kubeContainerRuntime)
 
 	return vm, nil
 }
@@ -236,11 +237,11 @@ type volumeManager struct {
 func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
-	go vm.desiredStateOfWorldPopulator.Run(stopCh)
+	go vm.desiredStateOfWorldPopulator.Run(sourcesReady, stopCh)
 	glog.V(2).Infof("The desired_state_of_world populator starts")
 
 	glog.Infof("Starting Kubelet Volume Manager")
-	go vm.reconciler.Run(sourcesReady, stopCh)
+	go vm.reconciler.Run(stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down Kubelet Volume Manager")
