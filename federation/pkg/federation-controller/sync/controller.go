@@ -168,17 +168,35 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 	// Federated updeater along with Create/Update/Delete operations.
 	s.updater = util.NewFederatedUpdater(s.informer,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
+			secret := obj.(*apiv1.Secret)
 			_, err := adapter.ClusterCreate(client, obj)
+			if err != nil {
+				glog.Errorf("Failed to create secret %s/%s: %v", secret.Namespace, secret.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully created secret %s/%s", secret.Namespace, secret.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
+			secret := obj.(*apiv1.Secret)
 			_, err := adapter.ClusterUpdate(client, obj)
+			if err != nil {
+				glog.Errorf("Failed to update secret %s/%s: %v", secret.Namespace, secret.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully updated secret %s/%s", secret.Namespace, secret.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
+			secret := obj.(*apiv1.Secret)
 			namespacedName := adapter.NamespacedName(obj)
 			orphanDependents := false
 			err := adapter.ClusterDelete(client, namespacedName, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
+			if err != nil {
+				glog.Errorf("Failed to delete secret %s/%s: %v", secret.Namespace, secret.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully deleted secret %s/%s", secret.Namespace, secret.Name)
+			}
 			return err
 		})
 

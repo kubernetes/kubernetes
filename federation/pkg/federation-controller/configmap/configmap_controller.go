@@ -159,18 +159,36 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 	configmapcontroller.federatedUpdater = util.NewFederatedUpdater(configmapcontroller.configmapFederatedInformer,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			configmap := obj.(*apiv1.ConfigMap)
+			glog.V(4).Infof("Attempting to create configmap: %s/%s", configmap.Namespace, configmap.Name)
 			_, err := client.Core().ConfigMaps(configmap.Namespace).Create(configmap)
+			if err != nil {
+				glog.Errorf("Failed to create configmap %s/%s: %v", configmap.Namespace, configmap.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully created configmap %s/%s", configmap.Namespace, configmap.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			configmap := obj.(*apiv1.ConfigMap)
+			glog.V(4).Infof("Attempting to update configmap: %s/%s", configmap.Namespace, configmap.Name)
 			_, err := client.Core().ConfigMaps(configmap.Namespace).Update(configmap)
+			if err != nil {
+				glog.Errorf("Failed to update configmap %s/%s: %v", configmap.Namespace, configmap.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully updated configmap %s/%s", configmap.Namespace, configmap.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			configmap := obj.(*apiv1.ConfigMap)
+			glog.V(4).Infof("Attempting to delete configmap: %s/%s", configmap.Namespace, configmap.Name)
 			orphanDependents := false
 			err := client.Core().ConfigMaps(configmap.Namespace).Delete(configmap.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
+			if err != nil {
+				glog.Errorf("Failed to delete configmap %s/%s: %v", configmap.Namespace, configmap.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully deleted configmap %s/%s", configmap.Namespace, configmap.Name)
+			}
 			return err
 		})
 

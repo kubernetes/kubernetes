@@ -159,21 +159,39 @@ func NewNamespaceController(client federationclientset.Interface, dynamicClientP
 	nc.federatedUpdater = util.NewFederatedUpdater(nc.namespaceFederatedInformer,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			namespace := obj.(*apiv1.Namespace)
+			glog.V(4).Infof("Attempting to create namespace: %s", namespace.Name)
 			_, err := client.Core().Namespaces().Create(namespace)
+			if err != nil {
+				glog.Errorf("Failed to create namespace %s: %v", namespace.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully created namespace %s", namespace.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			namespace := obj.(*apiv1.Namespace)
+			glog.V(4).Infof("Attempting to update namespace: %s", namespace.Name)
 			_, err := client.Core().Namespaces().Update(namespace)
+			if err != nil {
+				glog.Errorf("Failed to update namespace %s: %v", namespace.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully updated namespace %s", namespace.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			namespace := obj.(*apiv1.Namespace)
+			glog.V(4).Infof("Attempting to delete namespace: %s", namespace.Name)
 			orphanDependents := false
 			err := client.Core().Namespaces().Delete(namespace.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
 			// IsNotFound error is fine since that means the object is deleted already.
 			if errors.IsNotFound(err) {
 				return nil
+			}
+			if err != nil {
+				glog.Errorf("Failed to delete namespace %s: %v", namespace.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully deleted namespace %s", namespace.Name)
 			}
 			return err
 		})

@@ -162,7 +162,7 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 			glog.V(4).Infof("Attempting to create daemonset: %s/%s", daemonset.Namespace, daemonset.Name)
 			_, err := client.Extensions().DaemonSets(daemonset.Namespace).Create(daemonset)
 			if err != nil {
-				glog.Errorf("Error creating daemonset %s/%s/: %v", daemonset.Namespace, daemonset.Name, err)
+				glog.Errorf("Error creating daemonset %s/%s: %v", daemonset.Namespace, daemonset.Name, err)
 			} else {
 				glog.V(4).Infof("Successfully created daemonset %s/%s", daemonset.Namespace, daemonset.Name)
 			}
@@ -173,7 +173,7 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 			glog.V(4).Infof("Attempting to update daemonset: %s/%s", daemonset.Namespace, daemonset.Name)
 			_, err := client.Extensions().DaemonSets(daemonset.Namespace).Update(daemonset)
 			if err != nil {
-				glog.Errorf("Error updating daemonset %s/%s/: %v", daemonset.Namespace, daemonset.Name, err)
+				glog.Errorf("Error updating daemonset %s/%s: %v", daemonset.Namespace, daemonset.Name, err)
 			} else {
 				glog.V(4).Infof("Successfully updating daemonset %s/%s", daemonset.Namespace, daemonset.Name)
 			}
@@ -185,7 +185,7 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 			orphanDependents := false
 			err := client.Extensions().DaemonSets(daemonset.Namespace).Delete(daemonset.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
 			if err != nil {
-				glog.Errorf("Error deleting daemonset %s/%s/: %v", daemonset.Namespace, daemonset.Name, err)
+				glog.Errorf("Error deleting daemonset %s/%s: %v", daemonset.Namespace, daemonset.Name, err)
 			} else {
 				glog.V(4).Infof("Successfully deleting daemonset %s/%s", daemonset.Namespace, daemonset.Name)
 			}
