@@ -61,7 +61,7 @@ var (
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
 // where kubelet will pick and schedule them.
 func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
-	volumes := []api.Volume{k8sVolume(cfg)}
+	volumes := []api.Volume{k8sVolume()}
 	volumeMounts := []api.VolumeMount{k8sVolumeMount()}
 
 	if isCertsVolumeMountNeeded() {
@@ -70,7 +70,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 
 	if isPkiVolumeMountNeeded() {
-		volumes = append(volumes, pkiVolume(cfg))
+		volumes = append(volumes, pkiVolume())
 		volumeMounts = append(volumeMounts, pkiVolumeMount())
 	}
 
@@ -112,7 +112,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			LivenessProbe: componentProbe(10251, "/healthz", api.URISchemeHTTP),
 			Resources:     componentResources("100m"),
 			Env:           getProxyEnvVars(),
-		}, k8sVolume(cfg)),
+		}, k8sVolume()),
 	}
 
 	// Add etcd static pod spec only if external etcd is not configured
@@ -123,7 +123,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(cfg.Etcd.DataDir), k8sVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
 			LivenessProbe: componentProbe(2379, "/health", api.URISchemeHTTP),
-		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))
+		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume())
 
 		etcdPod.Spec.SecurityContext = &api.PodSecurityContext{
 			SELinuxOptions: &api.SELinuxOptions{
@@ -218,7 +218,7 @@ func isPkiVolumeMountNeeded() bool {
 	return false
 }
 
-func pkiVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
+func pkiVolume() api.Volume {
 	return api.Volume{
 		Name: "pki",
 		VolumeSource: api.VolumeSource{
@@ -252,7 +252,7 @@ func flockVolumeMount() api.VolumeMount {
 	}
 }
 
-func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
+func k8sVolume() api.Volume {
 	return api.Volume{
 		Name: "k8s",
 		VolumeSource: api.VolumeSource{
