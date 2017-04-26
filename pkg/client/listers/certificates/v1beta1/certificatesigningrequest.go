@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 )
 
@@ -62,7 +61,7 @@ func (s *certificateSigningRequestLister) Get(name string) (*v1beta1.Certificate
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(certificates.Resource("certificatesigningrequest"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("certificatesigningrequest"), name)
 	}
 	return obj.(*v1beta1.CertificateSigningRequest), nil
 }

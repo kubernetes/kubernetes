@@ -21,7 +21,6 @@ package v1alpha1
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	settings "k8s.io/client-go/pkg/apis/settings"
 	v1alpha1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -89,7 +88,7 @@ func (s podPresetNamespaceLister) Get(name string) (*v1alpha1.PodPreset, error) 
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(settings.Resource("podpreset"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("podpreset"), name)
 	}
 	return obj.(*v1alpha1.PodPreset), nil
 }
