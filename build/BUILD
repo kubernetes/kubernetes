@@ -1,7 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@io_bazel//tools/build_defs/docker:docker.bzl", "docker_build")
-load("@io_kubernetes_build//defs:build.bzl", "md5sum", "release_filegroup")
+load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 
 filegroup(
     name = "package-srcs",
@@ -63,9 +63,12 @@ DOCKERIZED_BINARIES = {
     },
 }
 
-[md5sum(
-    name = binary + ".docker_tag",
-    src = meta["target"],
+[genrule(
+    name = binary + "_docker_tag",
+    srcs = [meta["target"]],
+    outs = [binary + ".docker_tag"],
+    cmd = "grep ^STABLE_DOCKER_TAG bazel-out/stable-status.txt | awk '{print $$2}' >$@",
+    stamp = 1,
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
 
 [docker_build(
