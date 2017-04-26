@@ -2406,6 +2406,21 @@ type PodSpec struct {
 	// If specified, the pod's tolerations.
 	// +optional
 	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
+	// HostMappings is an optional list of hosts and IPs that will be injected into the pod's hosts
+	// file if specified. This is only valid for non-hostNetwork pods.
+	// +optional
+	// +patchMergeKey=IP
+	// +patchStrategy=merge
+	HostMappings []HostMapping `json:"hostMappings,omitempty" patchStrategy:"merge" patchMergeKey:"IP" protobuf:"bytes,23,rep,name=hostMappings"`
+}
+
+// HostMapping holds the mapping between IP and hostnames that will be injected as an entry in the
+// pod's hosts file.
+type HostMapping struct {
+	// IP address of the host file entry.
+	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
+	// Hostnames for the the above IP address.
+	Names []string `json:"names,omitempty" protobuf:"bytes,2,rep,name=names"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
