@@ -18,8 +18,8 @@ package petset
 
 import (
 	"fmt"
-	"reflect"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,7 +73,7 @@ func (statefulSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
 	// See metav1.ObjectMeta description for more information on Generation.
-	if !reflect.DeepEqual(oldStatefulSet.Spec, newStatefulSet.Spec) {
+	if !apiequality.Semantic.DeepEqual(oldStatefulSet.Spec, newStatefulSet.Spec) {
 		newStatefulSet.Generation = oldStatefulSet.Generation + 1
 	}
 
