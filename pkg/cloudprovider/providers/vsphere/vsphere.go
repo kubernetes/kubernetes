@@ -1267,17 +1267,32 @@ func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions) (volumePath string
 
 		// 2. Reconfigure the VM to attach the disk with the VSAN policy configured.
 		vmDiskPath, err := vs.createVirtualDiskWithPolicy(ctx, dc, ds, dummyVM, volumeOptions)
+		fileAlreadyExist := false
 		if err != nil {
-			glog.Errorf("Failed to attach the disk to VM: %q with err: %+v", DummyVMName, err)
-			return "", err
+			vmDiskPath = filepath.Clean(ds.Path(VolDir)) + "/" + volumeOptions.Name + ".vmdk"
+			errorMessage := fmt.Sprintf("Cannot complete the operation because the file or folder %s already exists", vmDiskPath)
+			if errorMessage == err.Error() {
+				//Skip error and continue to Detach Disk, Disk was already created on the datastore.
+				fileAlreadyExist = true
+				glog.V(1).Infof("File: %v is already exists", vmDiskPath)
+			} else {
+				glog.Errorf("Failed to attach the disk to VM: %q with err: %+v", DummyVMName, err)
+				return "", err
+			}
 		}
 
 		dummyVMNodeName := vmNameToNodeName(DummyVMName)
 		// 3. Detach the disk from the dummy VM.
 		err = vs.DetachDisk(vmDiskPath, dummyVMNodeName)
 		if err != nil {
-			glog.Errorf("Failed to detach the disk: %q from VM: %q with err: %+v", vmDiskPath, DummyVMName, err)
-			return "", fmt.Errorf("Failed to create the volume: %q with err: %+v", volumeOptions.Name, err)
+			errorMessage := "No vSphere disk ID found"
+			if errorMessage == err.Error() && fileAlreadyExist {
+				// Disk was already detached from the helper VM, and present on the datastore.
+				glog.V(1).Infof("File: %v is already detached", vmDiskPath)
+			} else {
+				glog.Errorf("Failed to detach the disk: %q from VM: %q with err: %+v", vmDiskPath, DummyVMName, err)
+				return "", fmt.Errorf("Failed to create the volume: %q with err: %+v", volumeOptions.Name, err)
+			}
 		}
 		destVolPath = vmDiskPath
 	} else {
