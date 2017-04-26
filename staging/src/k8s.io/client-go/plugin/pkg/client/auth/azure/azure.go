@@ -31,12 +31,12 @@ import (
 
 const (
 	azureTokenKey = "azureTokenKey"
+	tokenType     = "Bearer"
 
 	cfgClientID     = "client-id"
 	cfgTenantID     = "tenant-id"
 	cfgAccessToken  = "access-token"
 	cfgRefreshToken = "refresh-token"
-	cfgTokenType    = "token-type"
 	cfgExpiresIn    = "expires-in"
 	cfgExpiresOn    = "expires-on"
 	cfgEnvironment  = "environment"
@@ -125,7 +125,7 @@ func (r *azureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 		req2.Header[k] = append([]string(nil), s...)
 	}
 
-	req2.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.token.AccessToken))
+	req2.Header.Set("Authorization", fmt.Sprintf("%s %s", tokenType, token.token.AccessToken))
 
 	return r.roundTripper.RoundTrip(req2)
 }
@@ -201,10 +201,6 @@ func (ts *azureTokenSource) retrieveTokenFromCfg() (*azureToken, error) {
 	if refreshToken == "" {
 		return nil, fmt.Errorf("no refresh token in cfg: %s", cfgRefreshToken)
 	}
-	tokenType := ts.cfg[cfgTokenType]
-	if tokenType == "" {
-		tokenType = "Bearer"
-	}
 	clientID := ts.cfg[cfgClientID]
 	if clientID == "" {
 		return nil, fmt.Errorf("no client ID in cfg: %s", cfgClientID)
@@ -245,7 +241,6 @@ func (ts *azureTokenSource) storeTokenInCfg(token *azureToken) error {
 	newCfg := make(map[string]string)
 	newCfg[cfgAccessToken] = token.token.AccessToken
 	newCfg[cfgRefreshToken] = token.token.RefreshToken
-	newCfg[cfgTokenType] = token.token.Type
 	newCfg[cfgClientID] = token.clientID
 	newCfg[cfgTenantID] = token.tenantID
 	newCfg[cfgApiserverID] = token.token.Resource

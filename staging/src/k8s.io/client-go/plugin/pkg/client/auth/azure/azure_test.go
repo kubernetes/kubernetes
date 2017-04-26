@@ -95,7 +95,6 @@ func token2Cfg(token *azureToken) map[string]string {
 	cfg := make(map[string]string)
 	cfg[cfgAccessToken] = token.token.AccessToken
 	cfg[cfgRefreshToken] = token.token.RefreshToken
-	cfg[cfgTokenType] = token.token.Type
 	cfg[cfgClientID] = token.clientID
 	cfg[cfgTenantID] = token.tenantID
 	cfg[cfgApiserverID] = token.token.Resource
