@@ -138,6 +138,9 @@ type ServiceController struct {
 	// services that need to be synced
 	queue           *workqueue.Type
 	knownClusterSet sets.String
+	// servicesRetryUpdate contains some services that we failed to update last time around. We
+	// should retry updating them at next time.
+	servicesRetryUpdate []*cachedService
 	// endpoint worker map contains all the clusters registered with an indication that worker exist
 	// key clusterName
 	endpointWorkerMap map[string]bool
@@ -758,10 +761,13 @@ func (s *ServiceController) clusterSyncLoop() {
 	if newSet.Equal(s.knownClusterSet) {
 		// The set of cluster names in the services in the federation hasn't changed, but we can retry
 		// updating any services that we failed to update last time around.
-		servicesToUpdate = s.updateDNSRecords(servicesToUpdate, newClusters)
+		if len(s.servicesRetryUpdate) != 0 {
+			servicesToUpdate = s.servicesRetryUpdate
+			s.servicesRetryUpdate = s.updateDNSRecords(servicesToUpdate, newClusters)
+		}
 		return
 	}
-	glog.Infof("Detected change in list of cluster names. New  set: %v, Old set: %v", newSet, s.knownClusterSet)
+	glog.Infof("Detected change in list of cluster names. New set: %v, Old set: %v", newSet, s.knownClusterSet)
 	increase = newSet.Difference(s.knownClusterSet)
 	// do nothing when cluster is removed.
 	if increase != nil {
@@ -773,9 +779,9 @@ func (s *ServiceController) clusterSyncLoop() {
 			glog.Infof("New cluster observed %s", newCluster)
 			s.updateAllServicesToCluster(servicesToUpdate, newCluster)
 		}
-		servicesToUpdate = s.updateDNSRecords(servicesToUpdate, newClusters)
+		s.servicesRetryUpdate = s.updateDNSRecords(servicesToUpdate, newClusters)
 		glog.Infof("Successfully updated %d out of %d DNS records to direct traffic to the updated cluster",
-			numServices-len(servicesToUpdate), numServices)
+			numServices-len(s.servicesRetryUpdate), numServices)
 	}
 	s.knownClusterSet = newSet
 }
