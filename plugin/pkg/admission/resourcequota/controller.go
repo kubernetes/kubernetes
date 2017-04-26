@@ -379,17 +379,28 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		return quotas, nil
 	}
 
-	// if we have limited resources enabled for this resource, always calculate usage
 	inputObject := a.GetObject()
+
+	// Usage of some resources cannot be counted in isolation. For example, when
+	// the resource represents a number of unique references to external
+	// resource. In such a case an evaluator needs to process other objects in
+	// the same namespace which needs to be known.
+	if accessor, err := meta.Accessor(inputObject); namespace != "" && err == nil {
+		if accessor.GetNamespace() == "" {
+			accessor.SetNamespace(namespace)
+		}
+	}
+
+	// if we have limited resources enabled for this resource, always calculate usage
+	deltaUsage, err := evaluator.Usage(inputObject)
+	if err != nil {
+		return quotas, err
+	}
 
 	// determine the set of resource names that must exist in a covering quota
 	limitedResourceNames := []api.ResourceName{}
 	limitedResources := filterLimitedResourcesByGroupResource(e.config.LimitedResources, a.GetResource().GroupResource())
 	if len(limitedResources) > 0 {
-		deltaUsage, err := evaluator.Usage(inputObject)
-		if err != nil {
-			return quotas, err
-		}
 		limitedResourceNames = limitedByDefault(deltaUsage, limitedResources)
 	}
 	limitedResourceNamesSet := quota.ToSet(limitedResourceNames)
@@ -438,30 +449,15 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		return quotas, nil
 	}
 
-	// Usage of some resources cannot be counted in isolation. For example, when
-	// the resource represents a number of unique references to external
-	// resource. In such a case an evaluator needs to process other objects in
-	// the same namespace which needs to be known.
-	if accessor, err := meta.Accessor(inputObject); namespace != "" && err == nil {
-		if accessor.GetNamespace() == "" {
-			accessor.SetNamespace(namespace)
-		}
+	// ensure that usage for input object is never negative (this would mean a resource made a negative resource requirement)
+	if negativeUsage := quota.IsNegative(deltaUsage); len(negativeUsage) > 0 {
+		return nil, admission.NewForbidden(a, fmt.Errorf("quota usage is negative for resource(s): %s", prettyPrintResourceNames(negativeUsage)))
 	}
 
 	// there is at least one quota that definitely matches our object
 	// as a result, we need to measure the usage of this object for quota
 	// on updates, we need to subtract the previous measured usage
 	// if usage shows no change, just return since it has no impact on quota
-	deltaUsage, err := evaluator.Usage(inputObject)
-	if err != nil {
-		return quotas, err
-	}
-
-	// ensure that usage for input object is never negative (this would mean a resource made a negative resource requirement)
-	if negativeUsage := quota.IsNegative(deltaUsage); len(negativeUsage) > 0 {
-		return nil, admission.NewForbidden(a, fmt.Errorf("quota usage is negative for resource(s): %s", prettyPrintResourceNames(negativeUsage)))
-	}
-
 	if admission.Update == op {
 		prevItem := a.GetOldObject()
 		if prevItem == nil {
