@@ -640,6 +640,16 @@ func (Handler) SwaggerDoc() map[string]string {
 	return map_Handler
 }
 
+var map_HostMapping = map[string]string{
+	"":      "HostMapping holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
+	"ip":    "IP address of the host file entry.",
+	"names": "Hostnames for the the above IP address.",
+}
+
+func (HostMapping) SwaggerDoc() map[string]string {
+	return map_HostMapping
+}
+
 var map_HostPathVolumeSource = map[string]string{
 	"":     "Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.",
 	"path": "Path of the directory on the host. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath",
@@ -1350,6 +1360,7 @@ var map_PodSpec = map[string]string{
 	"affinity":                      "If specified, the pod's scheduling constraints",
 	"schedulerName":                 "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
 	"tolerations":                   "If specified, the pod's tolerations.",
+	"hostMappings":                  "HostMappings is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
