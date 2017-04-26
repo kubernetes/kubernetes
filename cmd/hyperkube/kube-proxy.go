@@ -17,39 +17,37 @@ limitations under the License.
 package main
 
 import (
+	"flag"
+
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/cmd/kube-proxy/app"
-	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 )
-
-func init() {
-	healthz.DefaultHealthz()
-}
 
 // NewKubeProxy creates a new hyperkube Server object that includes the
 // description and flags.
 func NewKubeProxy() *Server {
-	config := options.NewProxyConfig()
+	healthz.DefaultHealthz()
+
+	command := app.NewProxyCommand()
 
 	hks := Server{
 		name:            "proxy",
 		AlternativeName: "kube-proxy",
 		SimpleUsage:     "proxy",
-		Long: `The Kubernetes proxy server is responsible for taking traffic directed at
-		services and forwarding it to the appropriate pods. It generally runs on
-		nodes next to the Kubelet and proxies traffic from local pods to remote pods.
-		It is also used when handling incoming external traffic.`,
+		Long:            command.Long,
 	}
 
-	config.AddFlags(hks.Flags())
+	serverFlags := hks.Flags()
+	serverFlags.AddFlagSet(command.Flags())
 
-	hks.Run = func(_ *Server, _ []string) error {
-		s, err := app.NewProxyServerDefault(config)
-		if err != nil {
-			return err
-		}
+	// FIXME this is here because hyperkube does its own flag parsing, and we need
+	// the command to know about the go flag set. Remove this once hyperkube is
+	// refactored to use cobra throughout.
+	command.Flags().AddGoFlagSet(flag.CommandLine)
 
-		return s.Run()
+	hks.Run = func(_ *Server, args []string) error {
+		command.SetArgs(args)
+		return command.Execute()
 	}
 
 	return &hks
