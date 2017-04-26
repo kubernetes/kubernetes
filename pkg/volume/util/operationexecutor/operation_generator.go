@@ -115,7 +115,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 		volumePlugin, err :=
 			og.volumePluginMgr.FindPluginBySpec(volumeAttached.VolumeSpec)
 		if err != nil || volumePlugin == nil {
-			_, detailedErr := volumeAttached.GenerateError("VolumesAreAttached.FindPluginBySpec failed", err)
+			detailedErr := volumeAttached.GenerateErrorDetailed("VolumesAreAttached.FindPluginBySpec failed", err)
 			glog.Errorf(detailedErr.Error())
 		}
 		volumeSpecList, pluginExists := volumesPerPlugin[volumePlugin.GetPluginName()]
@@ -244,13 +244,13 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	attachableVolumePlugin, err :=
 		og.volumePluginMgr.FindAttachablePluginBySpec(volumeToAttach.VolumeSpec)
 	if err != nil || attachableVolumePlugin == nil {
-		_, detailedErr := volumeToAttach.GenerateError("AttachVolume.FindAttachablePluginBySpec failed", err)
+		detailedErr := volumeToAttach.GenerateErrorDetailed("AttachVolume.FindAttachablePluginBySpec failed", err)
 		return nil, detailedErr
 	}
 
 	volumeAttacher, newAttacherErr := attachableVolumePlugin.NewAttacher()
 	if newAttacherErr != nil {
-		_, detailedErr := volumeToAttach.GenerateError("AttachVolume.NewAttacher failed", newAttacherErr)
+		detailedErr := volumeToAttach.GenerateErrorDetailed("AttachVolume.NewAttacher failed", newAttacherErr)
 		return nil, detailedErr
 	}
 
@@ -268,7 +268,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			return detailedErr
 		}
 
-		_, detailedMsg := volumeToAttach.GenerateMsg("AttachVolume.Attach succeeded", "")
+		detailedMsg := volumeToAttach.GenerateMsgDetailed("AttachVolume.Attach succeeded", "")
 		glog.Infof(detailedMsg)
 
 		// Update actual state of world
@@ -276,7 +276,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
 		if addVolumeNodeErr != nil {
 			// On failure, return error. Caller will log and retry.
-			_, detailedErr := volumeToAttach.GenerateError("AttachVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
+			detailedErr := volumeToAttach.GenerateErrorDetailed("AttachVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
 			return detailedErr
 		}
 
@@ -301,14 +301,14 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		attachableVolumePlugin, err =
 			og.volumePluginMgr.FindAttachablePluginBySpec(volumeToDetach.VolumeSpec)
 		if err != nil || attachableVolumePlugin == nil {
-			_, detailedErr := volumeToDetach.GenerateError("DetachVolume.FindAttachablePluginBySpec failed", err)
+			detailedErr := volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
 			return nil, detailedErr
 		}
 
 		volumeName, err =
 			attachableVolumePlugin.GetVolumeName(volumeToDetach.VolumeSpec)
 		if err != nil {
-			_, detailedErr := volumeToDetach.GenerateError("DetachVolume.GetVolumeName failed", err)
+			detailedErr := volumeToDetach.GenerateErrorDetailed("DetachVolume.GetVolumeName failed", err)
 			return nil, detailedErr
 		}
 	} else {
@@ -322,14 +322,14 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		}
 		attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(pluginName)
 		if err != nil {
-			_, detailedErr := volumeToDetach.GenerateError("DetachVolume.FindAttachablePluginBySpec failed", err)
+			detailedErr := volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
 			return nil, detailedErr
 
 		}
 	}
 	volumeDetacher, err := attachableVolumePlugin.NewDetacher()
 	if err != nil {
-		_, detailedErr := volumeToDetach.GenerateError("DetachVolume.NewDetacher failed", err)
+		detailedErr := volumeToDetach.GenerateErrorDetailed("DetachVolume.NewDetacher failed", err)
 		return nil, detailedErr
 	}
 
@@ -345,11 +345,11 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			// On failure, add volume back to ReportAsAttached list
 			actualStateOfWorld.AddVolumeToReportAsAttached(
 				volumeToDetach.VolumeName, volumeToDetach.NodeName)
-			_, detailedErr := volumeToDetach.GenerateError("DetachVolume.Detach failed", err)
+			detailedErr := volumeToDetach.GenerateErrorDetailed("DetachVolume.Detach failed", err)
 			return detailedErr
 		}
 
-		_, detailedMsg := volumeToDetach.GenerateMsg("DetachVolume.Detach succeeded", "")
+		detailedMsg := volumeToDetach.GenerateMsgDetailed("DetachVolume.Detach succeeded", "")
 		glog.Infof(detailedMsg)
 
 		// Update actual state of world
@@ -368,7 +368,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
 	if err != nil || volumePlugin == nil {
-		_, detailedErr := volumeToMount.GenerateError("MountVolume.FindPluginBySpec failed", err)
+		detailedErr := volumeToMount.GenerateErrorDetailed("MountVolume.FindPluginBySpec failed", err)
 		return nil, detailedErr
 	}
 
@@ -405,25 +405,25 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	return func() error {
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
-			_, detailedMsg := volumeToMount.GenerateMsg("Entering MountVolume.WaitForAttach", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath))
+			detailedMsg := volumeToMount.GenerateMsgDetailed("Entering MountVolume.WaitForAttach", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath))
 			glog.Infof(detailedMsg)
 
 			devicePath, err := volumeAttacher.WaitForAttach(
 				volumeToMount.VolumeSpec, volumeToMount.DevicePath, waitForAttachTimeout)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
-				_, detailedErr := volumeToMount.GenerateError("MountVolume.WaitForAttach failed", err)
+				detailedErr := volumeToMount.GenerateErrorDetailed("MountVolume.WaitForAttach failed", err)
 				return detailedErr
 			}
 
-			_, detailedMsg = volumeToMount.GenerateMsg("MountVolume.WaitForAttach succeeded", "")
+			detailedMsg = volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", "")
 			glog.Infof(detailedMsg)
 
 			deviceMountPath, err :=
 				volumeAttacher.GetDeviceMountPath(volumeToMount.VolumeSpec)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
-				_, detailedErr := volumeToMount.GenerateError("MountVolume.GetDeviceMountPath failed", err)
+				detailedErr := volumeToMount.GenerateErrorDetailed("MountVolume.GetDeviceMountPath failed", err)
 				return detailedErr
 			}
 
@@ -439,7 +439,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				return detailedErr
 			}
 
-			_, detailedMsg = volumeToMount.GenerateMsg("MountVolume.MountDevice succeeded", fmt.Sprintf("device mount path %q", deviceMountPath))
+			detailedMsg = volumeToMount.GenerateMsgDetailed("MountVolume.MountDevice succeeded", fmt.Sprintf("device mount path %q", deviceMountPath))
 			glog.Infof(detailedMsg)
 
 			// Update actual state of world to reflect volume is globally mounted
@@ -447,7 +447,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				volumeToMount.VolumeName)
 			if markDeviceMountedErr != nil {
 				// On failure, return error. Caller will log and retry.
-				_, detailedErr := volumeToMount.GenerateError("MountVolume.MarkDeviceAsMounted failed", markDeviceMountedErr)
+				detailedErr := volumeToMount.GenerateErrorDetailed("MountVolume.MarkDeviceAsMounted failed", markDeviceMountedErr)
 				return detailedErr
 			}
 		}
@@ -472,7 +472,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			return detailedErr
 		}
 
-		_, detailedMsg := volumeToMount.GenerateMsg("MountVolume.SetUp succeeded", "")
+		detailedMsg := volumeToMount.GenerateMsgDetailed("MountVolume.SetUp succeeded", "")
 		glog.Infof(detailedMsg)
 
 		// Update actual state of world
@@ -485,7 +485,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			volumeToMount.VolumeGidValue)
 		if markVolMountedErr != nil {
 			// On failure, return error. Caller will log and retry.
-			_, detailedErr := volumeToMount.GenerateError("MountVolume.MarkVolumeAsMounted failed", markVolMountedErr)
+			detailedErr := volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeAsMounted failed", markVolMountedErr)
 			return detailedErr
 		}
 
@@ -500,14 +500,14 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginByName(volumeToUnmount.PluginName)
 	if err != nil || volumePlugin == nil {
-		_, detailedErr := volumeToUnmount.GenerateError("UnmountVolume.FindPluginByName failed", err)
+		detailedErr := volumeToUnmount.GenerateErrorDetailed("UnmountVolume.FindPluginByName failed", err)
 		return nil, detailedErr
 	}
 
 	volumeUnmounter, newUnmounterErr := volumePlugin.NewUnmounter(
 		volumeToUnmount.InnerVolumeSpecName, volumeToUnmount.PodUID)
 	if newUnmounterErr != nil {
-		_, detailedErr := volumeToUnmount.GenerateError("UnmountVolume.NewUnmounter failed", newUnmounterErr)
+		detailedErr := volumeToUnmount.GenerateErrorDetailed("UnmountVolume.NewUnmounter failed", newUnmounterErr)
 		return nil, detailedErr
 	}
 
@@ -516,7 +516,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		unmountErr := volumeUnmounter.TearDown()
 		if unmountErr != nil {
 			// On failure, return error. Caller will log and retry.
-			_, detailedErr := volumeToUnmount.GenerateError("UnmountVolume.TearDown failed", unmountErr)
+			detailedErr := volumeToUnmount.GenerateErrorDetailed("UnmountVolume.TearDown failed", unmountErr)
 			return detailedErr
 		}
 
@@ -535,7 +535,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 			volumeToUnmount.PodName, volumeToUnmount.VolumeName)
 		if markVolMountedErr != nil {
 			// On failure, just log and exit
-			_, detailedErr := volumeToUnmount.GenerateError("UnmountVolume.MarkVolumeAsUnmounted failed", markVolMountedErr)
+			detailedErr := volumeToUnmount.GenerateErrorDetailed("UnmountVolume.MarkVolumeAsUnmounted failed", markVolMountedErr)
 			glog.Errorf(detailedErr.Error())
 		}
 
@@ -551,19 +551,19 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 	attachableVolumePlugin, err :=
 		og.volumePluginMgr.FindAttachablePluginBySpec(deviceToDetach.VolumeSpec)
 	if err != nil || attachableVolumePlugin == nil {
-		_, detailedErr := deviceToDetach.GenerateError("UnmountDevice.FindAttachablePluginBySpec failed", err)
+		detailedErr := deviceToDetach.GenerateErrorDetailed("UnmountDevice.FindAttachablePluginBySpec failed", err)
 		return nil, detailedErr
 	}
 
 	volumeDetacher, err := attachableVolumePlugin.NewDetacher()
 	if err != nil {
-		_, detailedErr := deviceToDetach.GenerateError("UnmountDevice.NewDetacher failed", err)
+		detailedErr := deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDetacher failed", err)
 		return nil, detailedErr
 	}
 
 	volumeAttacher, err := attachableVolumePlugin.NewAttacher()
 	if err != nil {
-		_, detailedErr := deviceToDetach.GenerateError("UnmountDevice.NewAttacher failed", err)
+		detailedErr := deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewAttacher failed", err)
 		return nil, detailedErr
 	}
 
@@ -572,7 +572,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 			volumeAttacher.GetDeviceMountPath(deviceToDetach.VolumeSpec)
 		if err != nil {
 			// On failure, return error. Caller will log and retry.
-			_, detailedErr := deviceToDetach.GenerateError("GetDeviceMountPath failed", err)
+			detailedErr := deviceToDetach.GenerateErrorDetailed("GetDeviceMountPath failed", err)
 			return detailedErr
 		}
 		refs, err := attachableVolumePlugin.GetDeviceMountRefs(deviceMountPath)
@@ -581,14 +581,14 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 			if err == nil {
 				err = fmt.Errorf("The device mount path %q is still mounted by other references %v", deviceMountPath, refs)
 			}
-			_, detailedErr := deviceToDetach.GenerateError("GetDeviceMountRefs check failed", err)
+			detailedErr := deviceToDetach.GenerateErrorDetailed("GetDeviceMountRefs check failed", err)
 			return detailedErr
 		}
 		// Execute unmount
 		unmountDeviceErr := volumeDetacher.UnmountDevice(deviceMountPath)
 		if unmountDeviceErr != nil {
 			// On failure, return error. Caller will log and retry.
-			_, detailedErr := deviceToDetach.GenerateError("UnmountDevice failed", unmountDeviceErr)
+			detailedErr := deviceToDetach.GenerateErrorDetailed("UnmountDevice failed", unmountDeviceErr)
 			return detailedErr
 		}
 		// Before logging that UnmountDevice succeeded and moving on,
@@ -606,19 +606,19 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		} else {
 			deviceOpened, deviceOpenedErr = mounter.DeviceOpened(deviceToDetach.DevicePath)
 			if deviceOpenedErr != nil {
-				_, detailedErr := deviceToDetach.GenerateError("UnmountDevice.DeviceOpened failed", deviceOpenedErr)
+				detailedErr := deviceToDetach.GenerateErrorDetailed("UnmountDevice.DeviceOpened failed", deviceOpenedErr)
 				return detailedErr
 			}
 		}
 		// The device is still in use elsewhere. Caller will log and retry.
 		if deviceOpened {
-			_, detailedErr := deviceToDetach.GenerateError(
+			detailedErr := deviceToDetach.GenerateErrorDetailed(
 				"UnmountDevice failed",
 				fmt.Errorf("the device is in use when it was no longer expected to be in use"))
 			return detailedErr
 		}
 
-		_, detailedMsg := deviceToDetach.GenerateMsg("UnmountDevice succeeded", "")
+		detailedMsg := deviceToDetach.GenerateMsgDetailed("UnmountDevice succeeded", "")
 		glog.Infof(detailedMsg)
 
 		// Update actual state of world
@@ -626,7 +626,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 			deviceToDetach.VolumeName)
 		if markDeviceUnmountedErr != nil {
 			// On failure, return error. Caller will log and retry.
-			_, detailedErr := deviceToDetach.GenerateError("MarkDeviceAsUnmounted failed", markDeviceUnmountedErr)
+			detailedErr := deviceToDetach.GenerateErrorDetailed("MarkDeviceAsUnmounted failed", markDeviceUnmountedErr)
 			return detailedErr
 		}
 
@@ -648,7 +648,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 				volumeToMount.VolumeName, volumeToMount.VolumeSpec, nodeName, "" /* devicePath */)
 			if addVolumeNodeErr != nil {
 				// On failure, return error. Caller will log and retry.
-				_, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttachedByUniqueVolumeName failed", addVolumeNodeErr)
+				detailedErr := volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume.MarkVolumeAsAttachedByUniqueVolumeName failed", addVolumeNodeErr)
 				return detailedErr
 			}
 
@@ -662,7 +662,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			// periodically by kubelet, so it may take as much as 10 seconds
 			// before this clears.
 			// Issue #28141 to enable on demand status updates.
-			_, detailedErr := volumeToMount.GenerateError("Volume has not been added to the list of VolumesInUse in the node's volume status", nil)
+			detailedErr := volumeToMount.GenerateErrorDetailed("Volume has not been added to the list of VolumesInUse in the node's volume status", nil)
 			return detailedErr
 		}
 
@@ -670,13 +670,13 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		node, fetchErr := og.kubeClient.Core().Nodes().Get(string(nodeName), metav1.GetOptions{})
 		if fetchErr != nil {
 			// On failure, return error. Caller will log and retry.
-			_, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume failed fetching node from API server", fetchErr)
+			detailedErr := volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume failed fetching node from API server", fetchErr)
 			return detailedErr
 		}
 
 		if node == nil {
 			// On failure, return error. Caller will log and retry.
-			_, detailedErr := volumeToMount.GenerateError(
+			detailedErr := volumeToMount.GenerateErrorDetailed(
 				"VerifyControllerAttachedVolume failed",
 				fmt.Errorf("Node object retrieved from API server is nil"))
 			return detailedErr
@@ -686,12 +686,12 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			if attachedVolume.Name == volumeToMount.VolumeName {
 				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
 					v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
-				_, detailedMsg := volumeToMount.GenerateMsg("Controller attach succeeded", fmt.Sprintf("device path: %q", attachedVolume.DevicePath))
+				detailedMsg := volumeToMount.GenerateMsgDetailed("Controller attach succeeded", fmt.Sprintf("device path: %q", attachedVolume.DevicePath))
 				glog.Infof(detailedMsg)
 
 				if addVolumeNodeErr != nil {
 					// On failure, return error. Caller will log and retry.
-					_, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
+					detailedErr := volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
 					return detailedErr
 				}
 				return nil
@@ -699,7 +699,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		}
 
 		// Volume not attached, return error. Caller will log and retry.
-		_, detailedErr := volumeToMount.GenerateError("Volume not attached according to node status", nil)
+		detailedErr := volumeToMount.GenerateErrorDetailed("Volume not attached according to node status", nil)
 		return detailedErr
 	}, nil
 }
@@ -710,19 +710,19 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 	node, fetchErr := og.kubeClient.Core().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		if errors.IsNotFound(fetchErr) {
-			_, detailedMsg := volumeToDetach.GenerateMsg("Node not found on API server. DetachVolume will skip safe to detach check", "")
+			detailedMsg := volumeToDetach.GenerateMsgDetailed("Node not found on API server. DetachVolume will skip safe to detach check", "")
 			glog.Warningf(detailedMsg)
 			return nil
 		}
 
 		// On failure, return error. Caller will log and retry.
-		_, detailedErr := volumeToDetach.GenerateError("DetachVolume failed fetching node from API server", fetchErr)
+		detailedErr := volumeToDetach.GenerateErrorDetailed("DetachVolume failed fetching node from API server", fetchErr)
 		return detailedErr
 	}
 
 	if node == nil {
 		// On failure, return error. Caller will log and retry.
-		_, detailedErr := volumeToDetach.GenerateError(
+		detailedErr := volumeToDetach.GenerateErrorDetailed(
 			"DetachVolume failed fetching node from API server",
 			fmt.Errorf("node object retrieved from API server is nil"))
 		return detailedErr
@@ -730,7 +730,7 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 
 	for _, inUseVolume := range node.Status.VolumesInUse {
 		if inUseVolume == volumeToDetach.VolumeName {
-			_, detailedErr := volumeToDetach.GenerateError(
+			detailedErr := volumeToDetach.GenerateErrorDetailed(
 				"DetachVolume failed",
 				fmt.Errorf("volume is still in use by node, according to Node status"))
 			return detailedErr
@@ -738,7 +738,7 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 	}
 
 	// Volume is not marked as in use by node
-	_, detailedMsg := volumeToDetach.GenerateMsg("Verified volume is safe to detach", "")
+	detailedMsg := volumeToDetach.GenerateMsgDetailed("Verified volume is safe to detach", "")
 	glog.Infof(detailedMsg)
 	return nil
 }
