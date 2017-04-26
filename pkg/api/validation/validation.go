@@ -2011,6 +2011,19 @@ func validateOnlyAddedTolerations(newTolerations []api.Toleration, oldToleration
 	return allErrs
 }
 
+func ValidateHostMappings(hostMappings []api.HostMapping, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, hostMapping := range hostMappings {
+		if ip := net.ParseIP(hostMapping.IP); ip == nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("IP"), hostMapping.IP, "must be valid IP address"))
+		}
+		for _, hostname := range hostMapping.Names {
+			allErrs = append(allErrs, ValidateDNS1123Label(hostname, fldPath.Child("names"))...)
+		}
+	}
+	return allErrs
+}
+
 // ValidateTolerations tests if given tolerations have valid data.
 func ValidateTolerations(tolerations []api.Toleration, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
@@ -2110,6 +2123,10 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 
 	if len(spec.Tolerations) > 0 {
 		allErrs = append(allErrs, ValidateTolerations(spec.Tolerations, fldPath.Child("tolerations"))...)
+	}
+
+	if len(spec.HostMappings) > 0 {
+		allErrs = append(allErrs, ValidateHostMappings(spec.HostMappings, fldPath.Child("hostMappings"))...)
 	}
 
 	return allErrs

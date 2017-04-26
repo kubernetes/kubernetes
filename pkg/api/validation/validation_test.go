@@ -3202,6 +3202,13 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		{ // Populate HostMappings.
+			HostMappings:  []api.HostMapping{{IP: "12.34.56.78", Names: []string{"host1", "host2"}}},
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	for i := range successCases {
 		if errs := ValidatePodSpec(&successCases[i], field.NewPath("field")); len(errs) != 0 {
@@ -3267,6 +3274,18 @@ func TestValidatePodSpec(t *testing.T) {
 				HostNetwork: true,
 			},
 			HostMappings: []api.HostMapping{{IP: "12.34.56.78", Names: []string{"host1", "host2"}}},
+		},
+		"with hostMappings with invalid IP": {
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: false,
+			},
+			HostMappings: []api.HostMapping{{IP: "999.999.999.999", Names: []string{"host1", "host2"}}},
+		},
+		"with hostMappings with invalid hostname": {
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: false,
+			},
+			HostMappings: []api.HostMapping{{IP: "12.34.56.78", Names: []string{"@#$^#@#$"}}},
 		},
 		"bad supplementalGroups large than math.MaxInt32": {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
