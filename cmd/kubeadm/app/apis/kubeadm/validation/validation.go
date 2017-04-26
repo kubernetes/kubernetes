@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -238,4 +240,18 @@ func ValidateCloudProvider(provider string, fldPath *field.Path) field.ErrorList
 	}
 	allErrs = append(allErrs, field.Invalid(fldPath, provider, "cloudprovider not supported"))
 	return allErrs
+}
+
+func ValidateMixedArguments(flag *pflag.FlagSet) error {
+	if !flag.Lookup("config").Changed {
+		return nil
+	}
+
+	var err error
+	flag.VisitAll(func(f *pflag.Flag) {
+		if f.Changed && f.Name != "config" && !strings.HasPrefix(f.Name, "skip-") {
+			err = fmt.Errorf("can not mix '--config' with other arguments")
+		}
+	})
+	return err
 }
