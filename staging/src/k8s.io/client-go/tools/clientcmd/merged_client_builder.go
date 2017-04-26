@@ -22,7 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -145,7 +145,7 @@ func (config *DeferredLoadingClientConfig) Namespace() (string, bool, error) {
 
 	if len(ns) > 0 {
 		// if we got a non-default namespace from the kubeconfig, use it
-		if ns != api.NamespaceDefault {
+		if ns != v1.NamespaceDefault {
 			return ns, false, nil
 		}
 

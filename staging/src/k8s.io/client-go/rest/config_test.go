@@ -29,13 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/pkg/api/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/flowcontrol"
 
 	"github.com/stretchr/testify/assert"
-	_ "k8s.io/client-go/pkg/api/install"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
 func TestIsConfigTransportTLS(t *testing.T) {
@@ -141,13 +140,13 @@ func TestDefaultKubernetesUserAgent(t *testing.T) {
 
 func TestRESTClientRequires(t *testing.T) {
 	gvCopy := v1.SchemeGroupVersion
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{NegotiatedSerializer: api.Codecs}}); err == nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{NegotiatedSerializer: scheme.Codecs}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &gvCopy}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &gvCopy, NegotiatedSerializer: api.Codecs}}); err != nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &gvCopy, NegotiatedSerializer: scheme.Codecs}}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
