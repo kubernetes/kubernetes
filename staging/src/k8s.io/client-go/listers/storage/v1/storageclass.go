@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	storage "k8s.io/client-go/pkg/apis/storage"
 	v1 "k8s.io/client-go/pkg/apis/storage/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -62,7 +61,7 @@ func (s *storageClassLister) Get(name string) (*v1.StorageClass, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(storage.Resource("storageclass"), name)
+		return nil, errors.NewNotFound(v1.Resource("storageclass"), name)
 	}
 	return obj.(*v1.StorageClass), nil
 }
