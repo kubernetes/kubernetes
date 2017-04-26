@@ -17,14 +17,13 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
+	goflag "flag"
 	"os"
 
 	"k8s.io/apiserver/pkg/server/healthz"
-	"k8s.io/apiserver/pkg/util/flag"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/cmd/kube-proxy/app"
-	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
 	"k8s.io/kubernetes/pkg/version/verflag"
@@ -32,28 +31,19 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func init() {
-	healthz.DefaultHealthz()
-}
-
 func main() {
-	config := options.NewProxyConfig()
-	config.AddFlags(pflag.CommandLine)
-
-	flag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
+	healthz.DefaultHealthz()
+
+	command := app.NewProxyCommand()
+
+	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	verflag.PrintAndExitIfRequested()
 
-	s, err := app.NewProxyServerDefault(config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
-
-	if err = s.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	if err := command.Execute(); err != nil {
 		os.Exit(1)
 	}
 }

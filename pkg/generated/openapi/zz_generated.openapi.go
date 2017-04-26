@@ -12750,9 +12750,56 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/apis/certificates/v1beta1.CertificateSigningRequestCondition"},
 		},
+		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.ClientConnectionConfiguration": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ClientConnectionConfiguration contains details for constructing a client.",
+					Properties: map[string]spec.Schema{
+						"kubeconfig": {
+							SchemaProps: spec.SchemaProps{
+								Description: "KubeConfigFile is the path to a kubeconfig file.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"acceptContentTypes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AcceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the default value of 'application/json'. This field will control all connections to the server used by a particular client.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"contentType": {
+							SchemaProps: spec.SchemaProps{
+								Description: "ContentType is the content type used when sending data to the server from this client.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"qps": {
+							SchemaProps: spec.SchemaProps{
+								Description: "QPS controls the number of queries per second allowed for this connection.",
+								Type:        []string{"number"},
+								Format:      "float",
+							},
+						},
+						"burst": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Burst allows extra queries to accumulate when a client is exceeding its rate.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+					},
+					Required: []string{"kubeconfig", "acceptContentTypes", "contentType", "qps", "burst"},
+				},
+			},
+			Dependencies: []string{},
+		},
 		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeProxyConfiguration": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
+					Description: "KubeProxyConfiguration contains everything necessary to configure the Kubernetes proxy server.",
 					Properties: map[string]spec.Schema{
 						"kind": {
 							SchemaProps: spec.SchemaProps{
@@ -12768,16 +12815,16 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"bindAddress": {
+						"featureGates": {
 							SchemaProps: spec.SchemaProps{
-								Description: "bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)",
+								Description: "featureGates is a comma-separated list of key=value pairs that control which alpha/beta features are enabled.\n\ncomponents to use config files because local-up-cluster.sh only supports the --feature-gates flag right now, which is comma-separated key=value pairs.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
-						"clusterCIDR": {
+						"bindAddress": {
 							SchemaProps: spec.SchemaProps{
-								Description: "clusterCIDR is the CIDR range of the pods in the cluster. It is used to bridge traffic coming from outside of the cluster. If not provided, no off-cluster bridging will be performed.",
+								Description: "bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -12789,11 +12836,11 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"healthzPort": {
+						"clusterCIDR": {
 							SchemaProps: spec.SchemaProps{
-								Description: "healthzPort is the port to bind the health check server. Use 0 to disable.",
-								Type:        []string{"integer"},
-								Format:      "int32",
+								Description: "clusterCIDR is the CIDR range of the pods in the cluster. It is used to bridge traffic coming from outside of the cluster. If not provided, no off-cluster bridging will be performed.",
+								Type:        []string{"string"},
+								Format:      "",
 							},
 						},
 						"hostnameOverride": {
@@ -12803,44 +12850,16 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"iptablesMasqueradeBit": {
+						"clientConnection": {
 							SchemaProps: spec.SchemaProps{
-								Description: "iptablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT if using the pure iptables proxy mode. Values must be within the range [0, 31].",
-								Type:        []string{"integer"},
-								Format:      "int32",
+								Description: "clientConnection specifies the kubeconfig file and client connection settings for the proxy server to use when communicating with the apiserver.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.ClientConnectionConfiguration"),
 							},
 						},
-						"iptablesSyncPeriodSeconds": {
+						"iptables": {
 							SchemaProps: spec.SchemaProps{
-								Description: "iptablesSyncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.",
-								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
-							},
-						},
-						"iptablesMinSyncPeriodSeconds": {
-							SchemaProps: spec.SchemaProps{
-								Description: "iptablesMinSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').",
-								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
-							},
-						},
-						"kubeconfigPath": {
-							SchemaProps: spec.SchemaProps{
-								Description: "kubeconfigPath is the path to the kubeconfig file with authorization information (the master location is set by the master flag).",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"masqueradeAll": {
-							SchemaProps: spec.SchemaProps{
-								Description: "masqueradeAll tells kube-proxy to SNAT everything if using the pure iptables proxy mode.",
-								Type:        []string{"boolean"},
-								Format:      "",
-							},
-						},
-						"master": {
-							SchemaProps: spec.SchemaProps{
-								Description: "master is the address of the Kubernetes API server (overrides any value in kubeconfig)",
-								Type:        []string{"string"},
-								Format:      "",
+								Description: "iptables contains iptables-related configuration options.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeProxyIPTablesConfiguration"),
 							},
 						},
 						"oomScoreAdj": {
@@ -12877,41 +12896,103 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 							},
 						},
-						"conntrackMax": {
+						"conntrack": {
 							SchemaProps: spec.SchemaProps{
-								Description: "conntrackMax is the maximum number of NAT connections to track (0 to leave as-is).  This takes precedence over conntrackMaxPerCore and conntrackMin.",
-								Type:        []string{"integer"},
-								Format:      "int32",
+								Description: "conntrack contains conntrack-related configuration options.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeProxyConntrackConfiguration"),
 							},
 						},
-						"conntrackMaxPerCore": {
+						"configSyncPeriod": {
 							SchemaProps: spec.SchemaProps{
-								Description: "conntrackMaxPerCore is the maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrackMin).",
-								Type:        []string{"integer"},
-								Format:      "int32",
-							},
-						},
-						"conntrackMin": {
-							SchemaProps: spec.SchemaProps{
-								Description: "conntrackMin is the minimum value of connect-tracking records to allocate, regardless of conntrackMaxPerCore (set conntrackMaxPerCore=0 to leave the limit as-is).",
-								Type:        []string{"integer"},
-								Format:      "int32",
-							},
-						},
-						"conntrackTCPEstablishedTimeout": {
-							SchemaProps: spec.SchemaProps{
-								Description: "conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '2s').  Must be greater than 0.",
-								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
-							},
-						},
-						"conntrackTCPCloseWaitTimeout": {
-							SchemaProps: spec.SchemaProps{
-								Description: "conntrackTCPCloseWaitTimeout is how long an idle conntrack entry in CLOSE_WAIT state will remain in the conntrack table. (e.g. '60s'). Must be greater than 0 to set.",
+								Description: "configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater than 0.",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 							},
 						},
 					},
-					Required: []string{"bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "iptablesMinSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
+					Required: []string{"featureGates", "bindAddress", "healthzBindAddress", "clusterCIDR", "hostnameOverride", "clientConnection", "iptables", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrack", "configSyncPeriod"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.ClientConnectionConfiguration", "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeProxyConntrackConfiguration", "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeProxyIPTablesConfiguration"},
+		},
+		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeProxyConntrackConfiguration": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "KubeProxyConntrackConfiguration contains conntrack settings for the Kubernetes proxy server.",
+					Properties: map[string]spec.Schema{
+						"max": {
+							SchemaProps: spec.SchemaProps{
+								Description: "max is the maximum number of NAT connections to track (0 to leave as-is).  This takes precedence over conntrackMaxPerCore and conntrackMin.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"maxPerCore": {
+							SchemaProps: spec.SchemaProps{
+								Description: "maxPerCore is the maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrackMin).",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"min": {
+							SchemaProps: spec.SchemaProps{
+								Description: "min is the minimum value of connect-tracking records to allocate, regardless of conntrackMaxPerCore (set conntrackMaxPerCore=0 to leave the limit as-is).",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"tcpEstablishedTimeout": {
+							SchemaProps: spec.SchemaProps{
+								Description: "TCPEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '2s').  Must be greater than 0.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+							},
+						},
+						"tcpCloseWaitTimeout": {
+							SchemaProps: spec.SchemaProps{
+								Description: "TCPCloseWaitTimeout is how long an idle conntrack entry in CLOSE_WAIT state will remain in the conntrack table. (e.g. '60s'). Must be greater than 0 to set.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+							},
+						},
+					},
+					Required: []string{"max", "maxPerCore", "min", "tcpEstablishedTimeout", "tcpCloseWaitTimeout"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
+		},
+		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeProxyIPTablesConfiguration": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "KubeProxyIPTablesConfiguration contains iptables-related configuration details for the Kubernetes proxy server.",
+					Properties: map[string]spec.Schema{
+						"masqueradeBit": {
+							SchemaProps: spec.SchemaProps{
+								Description: "masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using the pure iptables proxy mode. Values must be within the range [0, 31].",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"masqueradeAll": {
+							SchemaProps: spec.SchemaProps{
+								Description: "masqueradeAll tells kube-proxy to SNAT everything if using the pure iptables proxy mode.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"syncPeriod": {
+							SchemaProps: spec.SchemaProps{
+								Description: "syncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+							},
+						},
+						"minSyncPeriod": {
+							SchemaProps: spec.SchemaProps{
+								Description: "minSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+							},
+						},
+					},
+					Required: []string{"masqueradeBit", "masqueradeAll", "syncPeriod", "minSyncPeriod"},
 				},
 			},
 			Dependencies: []string{

@@ -50,7 +50,6 @@ go_library(
         "//cmd/kube-controller-manager/app:go_default_library",
         "//cmd/kube-controller-manager/app/options:go_default_library",
         "//cmd/kube-proxy/app:go_default_library",
-        "//cmd/kube-proxy/app/options:go_default_library",
         "//cmd/kubelet/app:go_default_library",
         "//cmd/kubelet/app/options:go_default_library",
         "//federation/cmd/federation-apiserver/app:go_default_library",
