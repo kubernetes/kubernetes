@@ -21,14 +21,18 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
+	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 var fakeDns, _ = clouddns.NewFakeInterface() // No need to check for unsupported interfaces, as the fake interface supports everything that's required.
 var fakeDnsZones, _ = fakeDns.Zones()
+var fakeClient = &fakefedclientset.Clientset{}
 
 var fakeServiceController = ServiceController{
+	federationClient: fakeClient,
 	dns:              fakeDns,
 	dnsZones:         fakeDnsZones,
 	federationName:   "fed1",
@@ -68,6 +72,7 @@ func TestProcessEndpointUpdate(t *testing.T) {
 			},
 		},
 	}
+	RegisterFakeClusterGet(&fakeClient.Fake, &v1beta1.ClusterList{Items: []v1beta1.Cluster{*NewCluster(clusterName, v1.ConditionTrue)}})
 	tests := []struct {
 		name          string
 		cachedService *cachedService
@@ -121,6 +126,7 @@ func TestProcessEndpointDeletion(t *testing.T) {
 			},
 		},
 	}
+	RegisterFakeClusterGet(&fakeClient.Fake, &v1beta1.ClusterList{Items: []v1beta1.Cluster{*NewCluster(clusterName, v1.ConditionTrue)}})
 	tests := []struct {
 		name          string
 		cachedService *cachedService
