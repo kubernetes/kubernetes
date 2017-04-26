@@ -12784,7 +12784,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"healthzBindAddress": {
 							SchemaProps: spec.SchemaProps{
-								Description: "healthzBindAddress is the IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)",
+								Description: "healthzBindAddress is the IP address for the health check server to serve on, defaulting to 0.0.0.0",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -12841,6 +12841,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "master is the address of the Kubernetes API server (overrides any value in kubeconfig)",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"metricsBindAddress": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricsBindAddress is the IP address for the metrics server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metricsPort": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricsPort is the port to bind the metrics server. Use 0 to disable.",
+								Type:        []string{"integer"},
+								Format:      "int32",
 							},
 						},
 						"oomScoreAdj": {
@@ -12911,7 +12925,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "iptablesMinSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
+					Required: []string{"bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "iptablesMinSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "metricsBindAddress", "metricsPort", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
 				},
 			},
 			Dependencies: []string{

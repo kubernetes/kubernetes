@@ -73,6 +73,8 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
+	out.MetricsBindAddress = in.MetricsBindAddress
+	out.MetricsPort = in.MetricsPort
 	out.OOMScoreAdj = (*int32)(unsafe.Pointer(in.OOMScoreAdj))
 	out.Mode = componentconfig.ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
@@ -103,6 +105,8 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
+	out.MetricsBindAddress = in.MetricsBindAddress
+	out.MetricsPort = in.MetricsPort
 	out.OOMScoreAdj = (*int32)(unsafe.Pointer(in.OOMScoreAdj))
 	out.Mode = ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
