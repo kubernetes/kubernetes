@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 )
 
-func TestAzureTokenSourceFromCache(t *testing.T) {
+func TestAzureTokenSource(t *testing.T) {
 	fakeAccessToken := "fake token 1"
 	fakeSource := fakeTokenSource{
 		accessToken: fakeAccessToken,
@@ -19,8 +19,8 @@ func TestAzureTokenSourceFromCache(t *testing.T) {
 	cfg := make(map[string]string)
 	persiter := &fakePersister{cache: make(map[string]string)}
 	tokenCache := newAzureTokenCache()
-	cacheSource := newAzureTokenSourceFromCache(&fakeSource, tokenCache, cfg, persiter)
-	token, err := cacheSource.Token()
+	tokenSource := newAzureTokenSource(&fakeSource, tokenCache, cfg, persiter)
+	token, err := tokenSource.Token()
 	if err != nil {
 		t.Errorf("failed to retrieve the token form cache: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestAzureTokenSourceFromCache(t *testing.T) {
 	}
 
 	fakeSource.accessToken = "fake token 2"
-	token, err = cacheSource.Token()
+	token, err = tokenSource.Token()
 	if err != nil {
 		t.Errorf("failed to retrieve the cached token: %v", err)
 	}

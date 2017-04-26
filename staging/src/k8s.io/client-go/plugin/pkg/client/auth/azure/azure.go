@@ -83,7 +83,7 @@ func newAzureAuthProvider(_ string, cfg map[string]string, persister restclient.
 	if err != nil {
 		return nil, err
 	}
-	cacheSource := newAzureTokenSourceFromCache(ts, cache, cfg, persister)
+	cacheSource := newAzureTokenSource(ts, cache, cfg, persister)
 
 	return &azureAuthProvider{
 		tokenSource: cacheSource,
@@ -140,15 +140,15 @@ type tokenSource interface {
 	Token() (*azureToken, error)
 }
 
-type azureTokenSourceFromCache struct {
+type azureTokenSource struct {
 	source    tokenSource
 	cache     *azureTokenCache
 	cfg       map[string]string
 	persister restclient.AuthProviderConfigPersister
 }
 
-func newAzureTokenSourceFromCache(source tokenSource, cache *azureTokenCache, cfg map[string]string, persister restclient.AuthProviderConfigPersister) tokenSource {
-	return &azureTokenSourceFromCache{
+func newAzureTokenSource(source tokenSource, cache *azureTokenCache, cfg map[string]string, persister restclient.AuthProviderConfigPersister) tokenSource {
+	return &azureTokenSource{
 		source:    source,
 		cache:     cache,
 		cfg:       cfg,
@@ -159,7 +159,7 @@ func newAzureTokenSourceFromCache(source tokenSource, cache *azureTokenCache, cf
 // Token fetches a token from the cache of configuration if present otherwise
 // acquires a new token from the configured source. Automatically refreshes
 // the token if expired.
-func (ts *azureTokenSourceFromCache) Token() (*azureToken, error) {
+func (ts *azureTokenSource) Token() (*azureToken, error) {
 	var err error
 	token := ts.cache.getToken(azureTokenKey)
 	if token == nil {
@@ -192,7 +192,7 @@ func (ts *azureTokenSourceFromCache) Token() (*azureToken, error) {
 	return token, nil
 }
 
-func (ts *azureTokenSourceFromCache) retrieveTokenFromCfg() (*azureToken, error) {
+func (ts *azureTokenSource) retrieveTokenFromCfg() (*azureToken, error) {
 	accessToken := ts.cfg[cfgAccessToken]
 	if accessToken == "" {
 		return nil, fmt.Errorf("no access token in cfg: %s", cfgAccessToken)
@@ -241,7 +241,7 @@ func (ts *azureTokenSourceFromCache) retrieveTokenFromCfg() (*azureToken, error)
 	}, nil
 }
 
-func (ts *azureTokenSourceFromCache) storeTokenInCfg(token *azureToken) error {
+func (ts *azureTokenSource) storeTokenInCfg(token *azureToken) error {
 	newCfg := make(map[string]string)
 	newCfg[cfgAccessToken] = token.token.AccessToken
 	newCfg[cfgRefreshToken] = token.token.RefreshToken
@@ -260,7 +260,7 @@ func (ts *azureTokenSourceFromCache) storeTokenInCfg(token *azureToken) error {
 	return nil
 }
 
-func (ts *azureTokenSourceFromCache) refreshToken(token *azureToken) (*azureToken, error) {
+func (ts *azureTokenSource) refreshToken(token *azureToken) (*azureToken, error) {
 	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(token.tenantID)
 	if err != nil {
 		return nil, err
