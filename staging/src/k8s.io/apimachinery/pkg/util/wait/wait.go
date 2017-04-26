@@ -186,7 +186,9 @@ func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
 }
 
 func pollInternal(wait WaitFunc, condition ConditionFunc) error {
-	return WaitFor(wait, condition, NeverStop)
+	done := make(chan struct{})
+	defer close(done)
+	return WaitFor(wait, condition, done)
 }
 
 // PollImmediate tries a condition func until it returns true, an error, or the timeout
