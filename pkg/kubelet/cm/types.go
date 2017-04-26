@@ -17,9 +17,9 @@ limitations under the License.
 package cm
 
 import (
+	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 )
 
 // ResourceConfig holds information about all the supported cgroup resource parameters.

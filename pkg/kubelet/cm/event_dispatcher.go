@@ -20,19 +20,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"strings"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/golang/glog"
 	proto "github.com/golang/protobuf/proto"
+	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 )
 
 type EventDispatcherEventType int
@@ -349,28 +349,26 @@ func (ed *eventDispatcher) isolator(name string) *registeredIsolator {
 	return nil
 }
 
-
 //hugePageLimitsFromIsolationControl converts MapValue from isolator response into HugepageLimit structures
-func hugePageLimitsFromIsolationControl(ctrl *lifecycle.IsolationControl) ([]*libcontainerconfigs.HugepageLimit) {
+func hugePageLimitsFromIsolationControl(ctrl *lifecycle.IsolationControl) []*libcontainerconfigs.HugepageLimit {
 	out := []*libcontainerconfigs.HugepageLimit{}
 	if len(ctrl.MapValue) == 0 {
 		glog.Warningf("[%s] isolator response MapValue is empty, skipping", ctrl.Kind)
 		return out
 	}
-	for k,v := range ctrl.MapValue {
-		limit, err:= strconv.ParseUint(v,10,64)
+	for k, v := range ctrl.MapValue {
+		limit, err := strconv.ParseUint(v, 10, 64)
 		if err != nil {
 			glog.Warningf("Invalid value in isolation control [%s] response %s:%s, skipping", ctrl.Kind, k, v)
 			continue
 		}
-		hugePageLimit := &libcontainerconfigs.HugepageLimit {
+		hugePageLimit := &libcontainerconfigs.HugepageLimit{
 			Pagesize: k,
-			Limit:    limit }
-		out = append(out,hugePageLimit)
+			Limit:    limit}
+		out = append(out, hugePageLimit)
 	}
 	return out
 }
-
 
 // eventDispatcherNoop implements EventDispatcher interface.
 // It is a no-op implementation and basically does nothing
