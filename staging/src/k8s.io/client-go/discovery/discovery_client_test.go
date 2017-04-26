@@ -18,6 +18,7 @@ package discovery_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 
+	"github.com/go-openapi/spec"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -322,6 +324,81 @@ func TestGetSwaggerSchemaFail(t *testing.T) {
 	}
 	if err.Error() != expErr {
 		t.Errorf("expected an error, got %v", err)
+	}
+}
+
+var returnedOpenAPI = spec.Swagger{
+	SwaggerProps: spec.SwaggerProps{
+		Definitions: spec.Definitions{
+			"fake.type.1": spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Properties: map[string]spec.Schema{
+						"count": {
+							SchemaProps: spec.SchemaProps{
+								Type: []string{"integer"},
+							},
+						},
+					},
+				},
+			},
+			"fake.type.2": spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Properties: map[string]spec.Schema{
+						"count": {
+							SchemaProps: spec.SchemaProps{
+								Type: []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type: []string{"string"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+}
+
+func openapiSchemaFakeServer() (*httptest.Server, error) {
+	var sErr error
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != "/swagger.json" {
+			sErr = fmt.Errorf("Unexpected url %v", req.URL)
+		}
+		if req.Method != "GET" {
+			sErr = fmt.Errorf("Unexpected method %v", req.Method)
+		}
+
+		output, err := json.Marshal(returnedOpenAPI)
+		if err != nil {
+			sErr = err
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	return server, sErr
+}
+
+func TestGetOpenAPISchema(t *testing.T) {
+	server, err := openapiSchemaFakeServer()
+	if err != nil {
+		t.Errorf("unexpected error starting fake server: %v", err)
+	}
+	defer server.Close()
+
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	got, err := client.OpenAPISchema()
+	if err != nil {
+		t.Fatalf("unexpected error getting openapi: %v", err)
+	}
+	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
 	}
 }
 
