@@ -296,6 +296,22 @@ def start_master(etcd):
     set_state('kubernetes-master.components.started')
 
 
+@when('etcd.available')
+def etcd_data_change(etcd):
+    ''' Etcd scale events block master reconfiguration due to the
+        kubernetes-master.components.started state. We need a way to
+        handle these events consistenly only when the number of etcd
+        units has actually changed '''
+
+    # key off of the connection string
+    connection_string = etcd.get_connection_string()
+
+    # If the connection string changes, remove the started state to trigger
+    # handling of the master components
+    if data_changed('etcd-connect', connection_string):
+        remove_state('kubernetes-master.components.started')
+
+
 @when('kube-control.connected')
 @when('cdk-addons.configured')
 def send_cluster_dns_detail(kube_control):
