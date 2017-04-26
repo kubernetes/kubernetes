@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"fmt"
@@ -79,7 +79,7 @@ func CreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer, cmd *cobra.Co
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 	// fallback to the old generator if server does not support apps/v1beta1 deployments
 	if generatorName == cmdutil.DeploymentBasicAppsV1Beta1GeneratorName &&
-		!contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+		!cmdutil.Contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
 		fmt.Fprintf(cmdErr, "WARNING: New deployments generator specified (%s), but apps/v1beta1.Deployments are not available, falling back to the old one (%s).\n",
 			cmdutil.DeploymentBasicAppsV1Beta1GeneratorName, cmdutil.DeploymentBasicV1Beta1GeneratorName)
 		generatorName = cmdutil.DeploymentBasicV1Beta1GeneratorName

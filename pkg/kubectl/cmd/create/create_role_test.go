@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"bytes"
@@ -54,7 +54,7 @@ func TestCreateRole(t *testing.T) {
 	tf.Printer = printer
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = cmdtesting.DefaultClientConfig()
 
 	tests := map[string]struct {
 		verbs         string
@@ -157,7 +157,7 @@ func TestCreateRole(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Namespace = "test"
 
 	tests := map[string]struct {
@@ -304,10 +304,10 @@ func TestComplete(t *testing.T) {
 	roleName := "my-role"
 
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = cmdtesting.DefaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateRole(f, buf)

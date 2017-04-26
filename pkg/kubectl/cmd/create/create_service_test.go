@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"bytes"
@@ -26,29 +26,31 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
-func TestCreateNamespace(t *testing.T) {
-	namespaceObject := &api.Namespace{}
-	namespaceObject.Name = "my-namespace"
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+func TestCreateService(t *testing.T) {
+	service := &api.Service{}
+	service.Name = "my-service"
+	f, tf, codec, negSer := cmdtesting.NewAPIFactory()
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: negSer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, namespaceObject)}, nil
+			case p == "/namespaces/test/services" && m == "POST":
+				return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, service)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateNamespace(f, buf)
+	cmd := NewCmdCreateServiceClusterIP(f, buf)
 	cmd.Flags().Set("output", "name")
-	cmd.Run(cmd, []string{namespaceObject.Name})
-	expectedOutput := "namespace/" + namespaceObject.Name + "\n"
+	cmd.Flags().Set("tcp", "8080:8000")
+	cmd.Run(cmd, []string{service.Name})
+	expectedOutput := "service/" + service.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

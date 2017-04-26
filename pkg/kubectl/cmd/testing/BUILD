@@ -9,12 +9,16 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["fake.go"],
+    srcs = [
+        "fake.go",
+        "helpers.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
+        "//pkg/api/testing:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubectl:go_default_library",
