@@ -36,7 +36,7 @@ type KubeProxyConfiguration struct {
 	// no off-cluster bridging will be performed.
 	ClusterCIDR string
 	// healthzBindAddress is the IP address for the health check server to serve on,
-	// defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
+	// defaulting to 0.0.0.0
 	HealthzBindAddress string
 	// healthzPort is the port to bind the health check server. Use 0 to disable.
 	HealthzPort int32
@@ -58,6 +58,11 @@ type KubeProxyConfiguration struct {
 	MasqueradeAll bool
 	// master is the address of the Kubernetes API server (overrides any value in kubeconfig)
 	Master string
+	// metricsBindAddress is the IP address for the metrics server to serve on,
+	// defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
+	MetricsBindAddress string
+	// metricPort is the port to bind the metrics server. Use 0 to disable.
+	MetricsPort int32
 	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
 	// the range [-1000, 1000]
 	OOMScoreAdj *int32

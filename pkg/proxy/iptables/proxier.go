@@ -263,6 +263,7 @@ type Proxier struct {
 	portMapper     portOpener
 	recorder       record.EventRecorder
 	healthChecker  healthcheck.Server
+	healthzServer  healthcheck.HealthzUpdater
 }
 
 type localPort struct {
@@ -313,6 +314,7 @@ func NewProxier(ipt utiliptables.Interface,
 	hostname string,
 	nodeIP net.IP,
 	recorder record.EventRecorder,
+	healthzServer healthcheck.HealthzUpdater,
 ) (*Proxier, error) {
 	// check valid user input
 	if minSyncPeriod > syncPeriod {
@@ -376,6 +378,7 @@ func NewProxier(ipt utiliptables.Interface,
 		portMapper:       &listenPortOpener{},
 		recorder:         recorder,
 		healthChecker:    healthChecker,
+		healthzServer:    healthzServer,
 	}, nil
 }
 
@@ -475,12 +478,14 @@ func (proxier *Proxier) Sync() {
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
+	proxier.healthzServer.UpdateTimestamp()
 	t := time.NewTicker(proxier.syncPeriod)
 	defer t.Stop()
 	for {
 		<-t.C
 		glog.V(6).Infof("Periodic sync")
 		proxier.Sync()
+		proxier.healthzServer.UpdateTimestamp()
 	}
 }
 

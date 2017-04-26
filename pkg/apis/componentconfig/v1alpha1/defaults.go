@@ -63,10 +63,16 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 		obj.BindAddress = "0.0.0.0"
 	}
 	if obj.HealthzPort == 0 {
-		obj.HealthzPort = 10249
+		obj.HealthzPort = 10256
 	}
 	if obj.HealthzBindAddress == "" {
-		obj.HealthzBindAddress = "127.0.0.1"
+		obj.HealthzBindAddress = "0.0.0.0"
+	}
+	if obj.MetricsPort == 0 {
+		obj.MetricsPort = 10249
+	}
+	if obj.MetricsBindAddress == "" {
+		obj.MetricsBindAddress = "127.0.0.1"
 	}
 	if obj.OOMScoreAdj == nil {
 		temp := int32(qos.KubeProxyOOMScoreAdj)

@@ -44,6 +44,7 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/proxy/winuserspace"
@@ -73,6 +74,8 @@ type ProxyServer struct {
 	Recorder     record.EventRecorder
 	Conntracker  Conntracker // if nil, ignored
 	ProxyMode    string
+
+	healthzServer *healthcheck.HealthzServer
 }
 
 const (
@@ -98,17 +101,19 @@ func NewProxyServer(
 	recorder record.EventRecorder,
 	conntracker Conntracker,
 	proxyMode string,
+	healthzServer *healthcheck.HealthzServer,
 ) (*ProxyServer, error) {
 	return &ProxyServer{
-		Client:       client,
-		EventClient:  eventClient,
-		Config:       config,
-		IptInterface: iptInterface,
-		Proxier:      proxier,
-		Broadcaster:  broadcaster,
-		Recorder:     recorder,
-		Conntracker:  conntracker,
-		ProxyMode:    proxyMode,
+		Client:        client,
+		EventClient:   eventClient,
+		Config:        config,
+		IptInterface:  iptInterface,
+		Proxier:       proxier,
+		Broadcaster:   broadcaster,
+		Recorder:      recorder,
+		Conntracker:   conntracker,
+		ProxyMode:     proxyMode,
+		healthzServer: healthzServer,
 	}, nil
 }
 
@@ -218,6 +223,11 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
 
+	var healthzServer *healthcheck.HealthzServer
+	if config.HealthzPort > 0 {
+		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, config.HealthzPort, 2*config.IPTablesSyncPeriod.Duration)
+	}
+
 	var proxier proxy.ProxyProvider
 	var serviceEventHandler proxyconfig.ServiceHandler
 	// TODO: Migrate all handlers to ServiceHandler types and
@@ -244,6 +254,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			hostname,
 			getNodeIP(client, hostname),
 			recorder,
+			healthzServer,
 		)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
@@ -342,7 +353,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 
 	conntracker := realConntracker{}
 
-	return NewProxyServer(client, eventClient, config, iptInterface, proxier, eventBroadcaster, recorder, conntracker, proxyMode)
+	return NewProxyServer(client, eventClient, config, iptInterface, proxier, eventBroadcaster, recorder, conntracker, proxyMode, healthzServer)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
@@ -359,17 +370,22 @@ func (s *ProxyServer) Run() error {
 
 	s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
 
-	// Start up a webserver if requested
-	if s.Config.HealthzPort > 0 {
+	// Start up a healthz server if requested
+	if s.healthzServer != nil {
+		s.healthzServer.Run()
+	}
+
+	// Start up a metrics server if requested
+	if s.Config.MetricsPort > 0 {
 		http.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
 		http.Handle("/metrics", prometheus.Handler())
 		configz.InstallHandler(http.DefaultServeMux)
 		go wait.Until(func() {
-			err := http.ListenAndServe(s.Config.HealthzBindAddress+":"+strconv.Itoa(int(s.Config.HealthzPort)), nil)
+			err := http.ListenAndServe(s.Config.MetricsBindAddress+":"+strconv.Itoa(int(s.Config.MetricsPort)), nil)
 			if err != nil {
-				glog.Errorf("Starting health server failed: %v", err)
+				glog.Errorf("Starting metrics server failed: %v", err)
 			}
 		}, 5*time.Second, wait.NeverStop)
 	}

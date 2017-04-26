@@ -80,7 +80,7 @@ func NewHollowProxyOrDie(
 	go serviceConfig.Run(wait.NeverStop)
 	go informerFactory.Start(wait.NeverStop)
 
-	hollowProxy, err := proxyapp.NewProxyServer(client, eventClient, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil, "fake")
+	hollowProxy, err := proxyapp.NewProxyServer(client, eventClient, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil, "fake", nil)
 	if err != nil {
 		glog.Fatalf("Error while creating ProxyServer: %v\n", err)
 	}
