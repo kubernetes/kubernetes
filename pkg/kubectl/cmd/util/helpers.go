@@ -408,6 +408,15 @@ func AddValidateOptionFlags(cmd *cobra.Command, options *ValidateOptions) {
 	cmd.MarkFlagFilename("schema-cache-dir")
 }
 
+func AddOpenAPIFlags(cmd *cobra.Command) {
+	cmd.Flags().String("schema-cache-dir",
+		fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName),
+		fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'",
+			clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName),
+	)
+	cmd.MarkFlagFilename("schema-cache-dir")
+}
+
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, "Filename, directory, or URL to files "+usage)
 	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", options.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
