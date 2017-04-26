@@ -47,7 +47,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/util/clock"
@@ -1532,7 +1531,7 @@ func TestBody(t *testing.T) {
 	f.Close()
 	defer os.Remove(f.Name())
 
-	var nilObject *api.DeleteOptions
+	var nilObject *v1.DeleteOptions
 	typedObject := interface{}(nilObject)
 	c := testRESTClient(t, nil)
 	tests := []struct {

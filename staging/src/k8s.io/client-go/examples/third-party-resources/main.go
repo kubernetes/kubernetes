@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -91,7 +91,7 @@ func main() {
 
 	err = tprclient.Get().
 		Resource("examples").
-		Namespace(api.NamespaceDefault).
+		Namespace(v1.NamespaceDefault).
 		Name("example1").
 		Do().Into(&example)
 
@@ -111,7 +111,7 @@ func main() {
 			var result Example
 			err = tprclient.Post().
 				Resource("examples").
-				Namespace(api.NamespaceDefault).
+				Namespace(v1.NamespaceDefault).
 				Body(example).
 				Do().Into(&result)
 

@@ -22,7 +22,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
@@ -76,7 +75,7 @@ func TestRCNumber(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if e, a := "3", list.(*api.List).ResourceVersion; e != a {
+	if e, a := "3", list.(*v1.List).ResourceVersion; e != a {
 		t.Errorf("wanted %v, got %v", e, a)
 	}
 

@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
@@ -171,7 +170,7 @@ func (f *FakeControllerSource) List(options metav1.ListOptions) (runtime.Object,
 	if err != nil {
 		return nil, err
 	}
-	listObj := &api.List{}
+	listObj := &v1.List{}
 	if err := meta.SetList(listObj, list); err != nil {
 		return nil, err
 	}
