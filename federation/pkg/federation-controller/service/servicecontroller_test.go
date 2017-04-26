@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -29,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
@@ -42,64 +40,6 @@ import (
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 )
-
-func TestGetClusterConditionPredicate(t *testing.T) {
-	fakedns, _ := clouddns.NewFakeInterface() // No need to check for unsupported interfaces, as the fake interface supports everything that's required.
-	serviceController := ServiceController{
-		dns:          fakedns,
-		serviceCache: &serviceCache{fedServiceMap: make(map[string]*cachedService)},
-		clusterCache: &clusterClientCache{
-			rwlock:    sync.Mutex{},
-			clientMap: make(map[string]*clusterCache),
-		},
-		knownClusterSet: make(sets.String),
-	}
-
-	tests := []struct {
-		cluster           v1beta1.Cluster
-		expectAccept      bool
-		name              string
-		serviceController *ServiceController
-	}{
-		{
-			cluster:           v1beta1.Cluster{},
-			expectAccept:      false,
-			name:              "empty",
-			serviceController: &serviceController,
-		},
-		{
-			cluster: v1beta1.Cluster{
-				Status: v1beta1.ClusterStatus{
-					Conditions: []v1beta1.ClusterCondition{
-						{Type: v1beta1.ClusterReady, Status: v1.ConditionTrue},
-					},
-				},
-			},
-			expectAccept:      true,
-			name:              "basic",
-			serviceController: &serviceController,
-		},
-		{
-			cluster: v1beta1.Cluster{
-				Status: v1beta1.ClusterStatus{
-					Conditions: []v1beta1.ClusterCondition{
-						{Type: v1beta1.ClusterReady, Status: v1.ConditionFalse},
-					},
-				},
-			},
-			expectAccept:      false,
-			name:              "notready",
-			serviceController: &serviceController,
-		},
-	}
-	pred := getClusterConditionPredicate()
-	for _, test := range tests {
-		accept := pred(test.cluster)
-		if accept != test.expectAccept {
-			t.Errorf("Test failed for %s, expected %v, saw %v", test.name, test.expectAccept, accept)
-		}
-	}
-}
 
 const (
 	retryInterval = 100 * time.Millisecond
