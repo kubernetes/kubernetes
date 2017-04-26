@@ -14,19 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package daemonset
+package sync
 
 import (
 	"fmt"
 	"reflect"
 	"testing"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
+	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
@@ -38,12 +39,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	daemonsets string = "daemonsets"
-	clusters   string = "clusters"
-)
-
 func TestDaemonSetController(t *testing.T) {
+	daemonsets := "daemonsets"
+	clusters := "clusters"
+
 	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 
@@ -65,8 +64,8 @@ func TestDaemonSetController(t *testing.T) {
 	RegisterFakeList(daemonsets, &cluster2Client.Fake, &extensionsv1.DaemonSetList{Items: []extensionsv1.DaemonSet{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate(daemonsets, &cluster2Client.Fake, cluster2Watch)
 
-	daemonsetController := NewDaemonSetController(fakeClient)
-	informer := ToFederatedInformerForTestOnly(daemonsetController.daemonsetFederatedInformer)
+	daemonsetController := newFederationSyncController(fakeClient, federatedtypes.NewDaemonSetAdapter(fakeClient))
+	informer := ToFederatedInformerForTestOnly(daemonsetController.informer)
 	informer.SetClientFactory(func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
@@ -78,10 +77,7 @@ func TestDaemonSetController(t *testing.T) {
 		}
 	})
 
-	daemonsetController.clusterAvailableDelay = time.Second
-	daemonsetController.daemonsetReviewDelay = 50 * time.Millisecond
-	daemonsetController.smallDelay = 20 * time.Millisecond
-	daemonsetController.updateTimeout = 5 * time.Second
+	daemonsetController.minimizeLatency()
 
 	stop := make(chan struct{})
 	daemonsetController.Run(stop)
@@ -94,7 +90,9 @@ func TestDaemonSetController(t *testing.T) {
 		},
 		Spec: extensionsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: make(map[string]string),
+				MatchLabels: map[string]string{
+					"A": "xyz",
+				},
 			},
 		},
 	}
@@ -115,10 +113,14 @@ func TestDaemonSetController(t *testing.T) {
 	assert.True(t, daemonsetsEqual(daemonset1, *createdDaemonSet),
 		fmt.Sprintf("expected: %v, actual: %v", daemonset1, *createdDaemonSet))
 
+	daemonsetKey := types.NamespacedName{
+		Namespace: daemonset1.Namespace,
+		Name:      daemonset1.Name,
+	}.String()
 	// Wait for the daemonset to appear in the informer store
 	err := WaitForStoreUpdate(
-		daemonsetController.daemonsetFederatedInformer.GetTargetStore(),
-		cluster1.Name, getDaemonSetKey(daemonset1.Namespace, daemonset1.Name), wait.ForeverTestTimeout)
+		daemonsetController.informer.GetTargetStore(),
+		cluster1.Name, daemonsetKey, wait.ForeverTestTimeout)
 	assert.Nil(t, err, "daemonset should have appeared in the informer store")
 
 	// TODO: Re-enable this when we have fixed these flaky tests: https://github.com/kubernetes/kubernetes/issues/36540.
