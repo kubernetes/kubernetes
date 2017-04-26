@@ -71,18 +71,32 @@ func TestGetClusterConditionPredicate(t *testing.T) {
 			cluster: v1beta1.Cluster{
 				Status: v1beta1.ClusterStatus{
 					Conditions: []v1beta1.ClusterCondition{
-						{Type: v1beta1.ClusterReady, Status: v1.ConditionTrue},
+						{Type: v1beta1.ClusterOffline, Status: v1.ConditionTrue},
 					},
 				},
 			},
-			expectAccept:      true,
-			name:              "basic",
+			expectAccept:      false,
+			name:              "offline",
 			serviceController: &serviceController,
 		},
 		{
 			cluster: v1beta1.Cluster{
 				Status: v1beta1.ClusterStatus{
 					Conditions: []v1beta1.ClusterCondition{
+						{Type: v1beta1.ClusterOffline, Status: v1.ConditionFalse},
+						{Type: v1beta1.ClusterReady, Status: v1.ConditionTrue},
+					},
+				},
+			},
+			expectAccept:      true,
+			name:              "ready",
+			serviceController: &serviceController,
+		},
+		{
+			cluster: v1beta1.Cluster{
+				Status: v1beta1.ClusterStatus{
+					Conditions: []v1beta1.ClusterCondition{
+						{Type: v1beta1.ClusterOffline, Status: v1.ConditionFalse},
 						{Type: v1beta1.ClusterReady, Status: v1.ConditionFalse},
 					},
 				},

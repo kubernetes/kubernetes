@@ -106,7 +106,7 @@ func (self *ClusterClient) GetClusterHealthStatus() *federation_v1beta1.ClusterS
 		if !strings.EqualFold(string(body), "ok") {
 			clusterStatus.Conditions = append(clusterStatus.Conditions, newClusterNotReadyCondition, newNodeNotOfflineCondition)
 		} else {
-			clusterStatus.Conditions = append(clusterStatus.Conditions, newClusterReadyCondition)
+			clusterStatus.Conditions = append(clusterStatus.Conditions, newClusterReadyCondition, newNodeNotOfflineCondition)
 		}
 	}
 	return &clusterStatus
