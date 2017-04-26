@@ -297,6 +297,7 @@ def start_master(etcd):
 
 
 @when('kube-control.connected')
+@when('cdk-addons.configured')
 def send_cluster_dns_detail(kube_control):
     ''' Send cluster DNS info '''
     # Note that the DNS server doesn't necessarily exist at this point. We know
