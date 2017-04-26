@@ -32,7 +32,7 @@ import (
 func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 	dialAddr := netutil.CanonicalAddr(url)
 
-	dialer, _ := utilnet.Dialer(transport)
+	dialer, _ := utilnet.DialerFor(transport)
 
 	switch url.Scheme {
 	case "http":

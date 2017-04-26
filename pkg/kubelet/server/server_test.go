@@ -1119,7 +1119,7 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?c=ls&c=-a&" + api.ExecStdinParam + "=1"
 
-	upgradeRoundTripper := spdy.NewSpdyRoundTripper(nil)
+	upgradeRoundTripper := spdy.NewSpdyRoundTripper(nil, true)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	resp, err := c.Post(url, "", nil)
@@ -1304,7 +1304,7 @@ func testExecAttach(t *testing.T, verb string) {
 				return http.ErrUseLastResponse
 			}
 		} else {
-			upgradeRoundTripper = spdy.NewRoundTripper(nil)
+			upgradeRoundTripper = spdy.NewRoundTripper(nil, true)
 			c = &http.Client{Transport: upgradeRoundTripper}
 		}
 
@@ -1442,7 +1442,7 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/portForward/" + podNamespace + "/" + podName
 
-	upgradeRoundTripper := spdy.NewRoundTripper(nil)
+	upgradeRoundTripper := spdy.NewRoundTripper(nil, true)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	resp, err := c.Post(url, "", nil)
@@ -1552,11 +1552,20 @@ func TestServePortForward(t *testing.T) {
 			url = fmt.Sprintf("%s/portForward/%s/%s", fw.testHTTPServer.URL, podNamespace, podName)
 		}
 
-		upgradeRoundTripper := spdy.NewRoundTripper(nil)
-		c := &http.Client{Transport: upgradeRoundTripper}
-		// Don't follow redirects, since we want to inspect the redirect response.
-		c.CheckRedirect = func(*http.Request, []*http.Request) error {
-			return http.ErrUseLastResponse
+		var (
+			upgradeRoundTripper httpstream.UpgradeRoundTripper
+			c                   *http.Client
+		)
+
+		if len(test.responseLocation) > 0 {
+			c = &http.Client{}
+			// Don't follow redirects, since we want to inspect the redirect response.
+			c.CheckRedirect = func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			}
+		} else {
+			upgradeRoundTripper = spdy.NewRoundTripper(nil, true)
+			c = &http.Client{Transport: upgradeRoundTripper}
 		}
 
 		resp, err := c.Post(url, "", nil)
