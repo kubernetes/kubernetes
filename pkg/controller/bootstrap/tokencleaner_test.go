@@ -24,8 +24,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/pkg/api"
 	core "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func init() {

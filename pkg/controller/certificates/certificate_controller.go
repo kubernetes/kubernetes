@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -189,7 +189,7 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 	}
 
 	// need to operate on a copy so we don't mutate the csr in the shared cache
-	copy, err := api.Scheme.DeepCopy(csr)
+	copy, err := scheme.Scheme.DeepCopy(csr)
 	if err != nil {
 		return err
 	}
