@@ -94,7 +94,7 @@ func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
 	for _, job := range js {
 		parentUID, found := getParentUIDFromJob(job)
 		if !found {
-			glog.Errorf("Unable to get uid from job %s in namespace %s", job.Name, job.Namespace)
+			glog.V(4).Infof("Unable to get parent uid from job %s in namespace %s", job.Name, job.Namespace)
 			continue
 		}
 		jobsBySj[parentUID] = append(jobsBySj[parentUID], job)
