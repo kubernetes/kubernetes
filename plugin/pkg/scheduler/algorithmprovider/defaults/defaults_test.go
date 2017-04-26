@@ -33,7 +33,7 @@ func TestGetMaxVols(t *testing.T) {
 		{
 			rawMaxVols: "invalid",
 			expected:   defaultValue,
-			test:       "Unable to parse maxiumum PD volumes value, using default value",
+			test:       "Unable to parse maximum PD volumes value, using default value",
 		},
 		{
 			rawMaxVols: "-2",
