@@ -1909,6 +1909,16 @@ func validateHostNetwork(hostNetwork bool, containers []api.Container, fldPath *
 	return allErrors
 }
 
+func validateHostNetworkNoHostAliases(hostNetwork bool, hostAliases []api.HostAlias, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	if hostNetwork {
+		if len(hostAliases) > 0 {
+			allErrors = append(allErrors, field.Forbidden(fldPath, "`hostAliases` may not be set when `hostNetwork` is true"))
+		}
+	}
+	return allErrors
+}
+
 // validateImagePullSecrets checks to make sure the pull secrets are well
 // formed.  Right now, we only expect name to be set (it's the only field).  If
 // this ever changes and someone decides to set those fields, we'd like to
@@ -2401,6 +2411,7 @@ func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *a
 
 	if securityContext != nil {
 		allErrs = append(allErrs, validateHostNetwork(securityContext.HostNetwork, spec.Containers, specPath.Child("containers"))...)
+		allErrs = append(allErrs, validateHostNetworkNoHostAliases(securityContext.HostNetwork, spec.HostAliases, specPath)...)
 		if securityContext.FSGroup != nil {
 			for _, msg := range validation.IsValidGroupId(*securityContext.FSGroup) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("fsGroup"), *(securityContext.FSGroup), msg))
