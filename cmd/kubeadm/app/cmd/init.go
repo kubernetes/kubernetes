@@ -157,6 +157,10 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 		}
 	}
 
+	if len(cfg.CertificatesDir) == 0 {
+		cfg.CertificatesDir = path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.CertificatesDirName)
+	}
+
 	// Set defaults dynamically that the API group defaulting can't (by fetching information from the internet, looking up network interfaces, etc.)
 	err := setInitDynamicDefaults(cfg)
 	if err != nil {

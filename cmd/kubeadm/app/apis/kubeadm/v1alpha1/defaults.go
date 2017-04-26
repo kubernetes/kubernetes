@@ -30,8 +30,6 @@ const (
 	DefaultAPIBindPort       = 6443
 	DefaultDiscoveryBindPort = 9898
 	DefaultAuthorizationMode = "RBAC"
-	DefaultCACertPath        = "/etc/kubernetes/pki/ca.crt"
-	DefaultCertificatesDir   = "/etc/kubernetes/pki"
 	DefaultEtcdDataDir       = "/var/lib/etcd"
 )
 
@@ -60,10 +58,6 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.AuthorizationModes = []string{DefaultAuthorizationMode}
 	}
 
-	if obj.CertificatesDir == "" {
-		obj.CertificatesDir = DefaultCertificatesDir
-	}
-
 	if obj.TokenTTL == 0 {
 		obj.TokenTTL = constants.DefaultTokenDuration
 	}
@@ -74,9 +68,6 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 }
 
 func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
-	if obj.CACertPath == "" {
-		obj.CACertPath = DefaultCACertPath
-	}
 	if len(obj.TLSBootstrapToken) == 0 {
 		obj.TLSBootstrapToken = obj.Token
 	}

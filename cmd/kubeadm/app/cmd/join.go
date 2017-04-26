@@ -144,6 +144,10 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		}
 	}
 
+	if len(cfg.CACertPath) == 0 {
+		cfg.CACertPath = filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.CertificatesDirName, "ca.crt")
+	}
+
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks")
 

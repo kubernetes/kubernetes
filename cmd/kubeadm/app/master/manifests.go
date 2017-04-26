@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/client-go/pkg/api/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
@@ -74,7 +73,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		volumeMounts = append(volumeMounts, pkiVolumeMount())
 	}
 
-	if cfg.CertificatesDir != kubeadmapiext.DefaultCertificatesDir {
+	if !strings.HasPrefix(cfg.CertificatesDir, kubeadmapi.GlobalEnvParams.KubernetesDir) {
 		volumes = append(volumes, newVolume("certdir", cfg.CertificatesDir))
 		volumeMounts = append(volumeMounts, newVolumeMount("certdir", cfg.CertificatesDir))
 	}
@@ -135,7 +134,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		staticPodSpecs[etcd] = etcdPod
 	}
 
-	manifestsPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")
+	manifestsPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsDirName)
 	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
 		return fmt.Errorf("failed to create directory %q [%v]", manifestsPath, err)
 	}

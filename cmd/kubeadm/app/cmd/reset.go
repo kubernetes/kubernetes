@@ -26,7 +26,6 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -53,7 +52,7 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 	)
 
 	cmd.PersistentFlags().StringVar(
-		&certsDir, "cert-dir", kubeadmapiext.DefaultCertificatesDir,
+		&certsDir, "cert-dir", kubeadmconstants.CertificatesDirName,
 		"The path to the directory where the certificates are stored. If specified, clean this directory.",
 	)
 
@@ -118,7 +117,7 @@ func (r *Reset) Run(out io.Writer) error {
 
 	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
 	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd
-	etcdManifestPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests/etcd.yaml")
+	etcdManifestPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsDirName, "etcd.yaml")
 	if _, err := os.Stat(etcdManifestPath); err == nil {
 		dirsToClean = append(dirsToClean, "/var/lib/etcd")
 	} else {
@@ -166,7 +165,7 @@ func cleanDir(filePath string) error {
 // resetConfigDir is used to cleanup the files kubeadm writes in /etc/kubernetes/.
 func resetConfigDir(configPathDir, pkiPathDir string) {
 	dirsToClean := []string{
-		filepath.Join(configPathDir, "manifests"),
+		filepath.Join(configPathDir, kubeadmconstants.ManifestsDirName),
 		pkiPathDir,
 	}
 	fmt.Printf("[reset] Deleting contents of config directories: %v\n", dirsToClean)

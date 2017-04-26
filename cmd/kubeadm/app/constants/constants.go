@@ -25,7 +25,9 @@ import (
 
 const (
 	// KubernetesDir is the directory kubernetes owns for storing various configuration files
-	KubernetesDir = "/etc/kubernetes"
+	KubernetesDir       = "/etc/kubernetes"
+	CertificatesDirName = "pki"
+	ManifestsDirName    = "manifests"
 
 	CACertAndKeyBaseName = "ca"
 	CACertName           = "ca.crt"

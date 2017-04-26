@@ -22,7 +22,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -74,7 +73,7 @@ func NewCmdClientCerts(out io.Writer) *cobra.Command {
 }
 
 func addCommonFlags(cmd *cobra.Command, config *kubeconfigphase.BuildConfigProperties) {
-	cmd.Flags().StringVar(&config.CertDir, "cert-dir", kubeadmapiext.DefaultCertificatesDir, "The path to the directory where the certificates are.")
+	cmd.Flags().StringVar(&config.CertDir, "cert-dir", "", "The path to the directory where the certificates are.")
 	cmd.Flags().StringVar(&config.ClientName, "client-name", "", "The name of the client for which the KubeConfig file will be generated.")
 	cmd.Flags().StringVar(&config.APIServer, "server", "", "The location of the api server.")
 }

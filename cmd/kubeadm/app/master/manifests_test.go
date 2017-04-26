@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"reflect"
 	"sort"
 	"testing"
@@ -29,6 +30,7 @@ import (
 	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -84,7 +86,7 @@ func TestWriteStaticPodManifests(t *testing.T) {
 
 		// Below is dead code.
 		if rt.expectedAPIProbePort != 0 {
-			manifest, err := os.Open(kubeadmapi.GlobalEnvParams.KubernetesDir + "/manifests/kube-apiserver.yaml")
+			manifest, err := os.Open(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsDirName, "kube-apiserver.yaml"))
 			if err != nil {
 				t.Errorf("WriteStaticPodManifests: %v", err)
 				continue
