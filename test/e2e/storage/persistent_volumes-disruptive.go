@@ -245,24 +245,37 @@ func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, 
 	framework.DeletePodWithWait(f, c, server)
 }
 
-// kubeletCommand performs `start`, `restart`, or `stop` on the kubelet running on the node of the target pod.
+// kubeletCommand performs `start`, `restart`, or `stop` on the kubelet running on the node of the target pod and waits
+// for the desired statues..
+// - First issues the command via `systemctl`
+// - If `systemctl` returns code 127 (command not found), issues the command via `service`
+// - If `service` also returns 127, the test is aborted.
 // Allowed kubeletOps are `kStart`, `kStop`, and `kRestart`
 func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
+	systemctlCmd := fmt.Sprintf("su -c \"systemctl %s kubelet\"", string(kOp))
+	serviceCmd := fmt.Sprintf("su -c \"service kubelet %s\"", string(kOp))
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
-	sshResult, err := framework.SSH(fmt.Sprintf("sudo systemctl %s kubelet", string(kOp)), nodeIP, framework.TestContext.Provider)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error occured attempting to SSH to node %q", pod.Spec.NodeName))
+
+	framework.Logf("Attempting `%s`", systemctlCmd)
+	sshResult, err := framework.SSH(systemctlCmd, nodeIP, framework.TestContext.Provider)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	framework.LogSSHResult(sshResult)
-	if sshResult.Code != 0 {
-		framework.Logf("Restarting kubelet service via `systemctl` failed.  Attempting restart via `service`.")
-		sshResult, err = framework.SSH(fmt.Sprintf("sudo service kubelet %s", string(kOp)), nodeIP, framework.TestContext.Provider)
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error occured attempting to SSH to node %q", pod.Spec.NodeName))
+	if sshResult.Code == 127 /*"command not found"*/ {
+		framework.Logf("Command `%s` returned code <%d>: %q.", systemctlCmd, sshResult.Code, sshResult.Stderr)
+		framework.Logf("Attempting %s", serviceCmd)
+		sshResult, err = framework.SSH(serviceCmd, nodeIP, framework.TestContext.Provider)
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 		framework.LogSSHResult(sshResult)
-		if sshResult.Code != 0 {
-			framework.Logf("Restarting kubelet service via `service` failed.")
-			Expect(sshResult.Code).To(BeZero(), "Failed to run %q via ssh", string(kOp))
+		if sshResult.Code == 127 /*"command not found"*/ {
+			framework.Logf("Command `%s` returned code <%d>: %q.", serviceCmd, sshResult.Code, sshResult.Stderr)
+			Expect(sshResult.Code).To(BeZero(), fmt.Sprintf("Unable to [%s] kubelet.", string(kOp)))
+		} else if sshResult.Code != 0 {
+			Expect(err).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
 		}
+	} else if sshResult.Code != 0 {
+		Expect(err).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
 	}
 	// On restart, waiting for node NotReady prevents a race condition where the node takes a few moments to leave the
 	// Ready state which in turn short circuits WaitForNodeToBeReady()
