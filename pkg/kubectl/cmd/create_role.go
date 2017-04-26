@@ -207,11 +207,6 @@ func (c *CreateRoleOptions) Validate() error {
 		}
 	}
 
-	// validate resource names, can not apply resource names to multiple resources.
-	if len(c.ResourceNames) > 0 && len(c.Resources) > 1 {
-		return fmt.Errorf("resource name(s) can not be applied to multiple resources")
-	}
-
 	return nil
 }
 

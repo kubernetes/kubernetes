@@ -21,9 +21,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// MountOptionAnnotation defines mount option annotation used in PVs
-const MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
-
 // ValidatePersistentVolume validates PV object for plugin specific validation
 // We can put here validations which are specific to volume types.
 func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
@@ -50,9 +47,9 @@ func checkMountOption(pv *api.PersistentVolume) field.ErrorList {
 		return allErrs
 	}
 	// any other type if mount option is present lets return error
-	if _, ok := pv.Annotations[MountOptionAnnotation]; ok {
+	if _, ok := pv.Annotations[api.MountOptionAnnotation]; ok {
 		metaField := field.NewPath("metadata")
-		allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", MountOptionAnnotation), "may not specify mount options for this volume type"))
+		allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", api.MountOptionAnnotation), "may not specify mount options for this volume type"))
 	}
 	return allErrs
 }

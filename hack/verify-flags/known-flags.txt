@@ -311,6 +311,8 @@ heapster-port
 heapster-scheme
 heapster-service
 horizontal-pod-autoscaler-sync-period
+horizontal-pod-autoscaler-upscale-delay
+horizontal-pod-autoscaler-downscale-delay
 host-cluster-context
 host-ipc-sources
 hostname-override
@@ -646,6 +648,7 @@ since-time
 skip-generated-rewrite
 skip-munges
 skip-preflight-checks
+skip-token-print
 skip-unsafe
 sort-by
 source-file
