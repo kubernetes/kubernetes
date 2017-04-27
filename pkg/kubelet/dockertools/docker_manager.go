@@ -2371,7 +2371,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 		glog.V(4).Infof("Creating init container %+v in pod %v", container, format.Pod(pod))
 		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
 			startContainerResult.Fail(err, msg)
-			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
+			glog.V(3).Infof("container start failed: %v: %s", err, msg)
 			return
 		}
 
@@ -2409,7 +2409,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 		glog.V(4).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
 		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
 			startContainerResult.Fail(err, msg)
-			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
+			glog.V(3).Infof("container start failed: %v: %s", err, msg)
 			continue
 		}
 	}
