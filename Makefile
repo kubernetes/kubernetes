@@ -287,6 +287,8 @@ clean: clean_meta
 	build/make-clean.sh
 	rm -rf $(OUT_DIR)
 	rm -rf Godeps/_workspace # Just until we are sure it is gone
+	# TODO(thockin): Remove this when we call clean_generated.
+	rm -f pkg/generated/openapi/zz_generated.openapi.go
 endif
 
 define CLEAN_META_HELP_INFO
