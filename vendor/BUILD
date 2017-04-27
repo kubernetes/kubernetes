@@ -374,4 +374,4 @@ filegroup(
         "//vendor/vbom.ml/util/sortorder:all-srcs",
     ],
     tags = ["automanaged"],
-
+)
