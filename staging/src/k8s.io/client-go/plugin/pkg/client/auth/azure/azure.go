@@ -81,7 +81,7 @@ func newAzureAuthProvider(_ string, cfg map[string]string, persister restclient.
 	}
 	ts, err = newAzureTokenSourceDeviceCode(environment, cfg[cfgClientID], cfg[cfgTenantID], cfg[cfgApiserverID])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating a new azure token source for device code authentication: %v", err)
 	}
 	cacheSource := newAzureTokenSource(ts, cache, cfg, persister)
 
@@ -114,7 +114,7 @@ func (r *azureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	token, err := r.tokenSource.Token()
 	if err != nil {
 		glog.Errorf("Failed to acquire a token: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("acquiring a token for authorization header: %v", err)
 	}
 
 	// clone the request in order to avoid modifying the headers of the original request
@@ -167,26 +167,26 @@ func (ts *azureTokenSource) Token() (*azureToken, error) {
 		if err != nil {
 			token, err = ts.source.Token()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("acquiring a new fresh token: %v", err)
 			}
 		}
 		if !token.token.IsExpired() {
 			ts.cache.setToken(azureTokenKey, token)
 			err = ts.storeTokenInCfg(token)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("storing the token in configuration: %v", err)
 			}
 		}
 	}
 	if token.token.IsExpired() {
 		token, err = ts.refreshToken(token)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("refreshing the expired token: %v", err)
 		}
 		ts.cache.setToken(azureTokenKey, token)
 		err = ts.storeTokenInCfg(token)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("storing the refreshed token in configuration: %v", err)
 		}
 	}
 	return token, nil
@@ -249,7 +249,7 @@ func (ts *azureTokenSource) storeTokenInCfg(token *azureToken) error {
 
 	err := ts.persister.Persist(newCfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("persisting the configuration: %v", err)
 	}
 	ts.cfg = newCfg
 	return nil
@@ -258,7 +258,7 @@ func (ts *azureTokenSource) storeTokenInCfg(token *azureToken) error {
 func (ts *azureTokenSource) refreshToken(token *azureToken) (*azureToken, error) {
 	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(token.tenantID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("building the OAuth configuration for token refresh: %v", err)
 	}
 
 	callback := func(t azure.Token) error {
@@ -271,12 +271,11 @@ func (ts *azureTokenSource) refreshToken(token *azureToken) (*azureToken, error)
 		token.token,
 		callback)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating new service principal for token refresh: %v", err)
 	}
 
-	err = spt.Refresh()
-	if err != nil {
-		return nil, err
+	if err := spt.Refresh(); err != nil {
+		return nil, fmt.Errorf("refreshing token: %v", err)
 	}
 
 	return &azureToken{
@@ -314,19 +313,19 @@ func newAzureTokenSourceDeviceCode(environment azure.Environment, clientID strin
 func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
 	oauthConfig, err := ts.environment.OAuthConfigForTenant(ts.tenantID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("building the OAuth configuration for device code authentication: %v", err)
 	}
 	client := &autorest.Client{}
 	deviceCode, err := azure.InitiateDeviceAuth(client, *oauthConfig, ts.clientID, ts.apiserverID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("initialing the device code authentication: %v", err)
 	}
 
 	fmt.Println(*deviceCode.Message)
 
 	token, err := azure.WaitForUserCompletion(client, deviceCode)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Waiting for device code authentication to complete: %v", err)
 	}
 
 	return &azureToken{
