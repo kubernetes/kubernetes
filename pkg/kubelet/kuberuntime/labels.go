@@ -22,7 +22,9 @@ import (
 
 	"github.com/golang/glog"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -39,6 +41,8 @@ const (
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
 	containerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
 	containerPortsLabel                    = "io.kubernetes.container.ports"
+	containerTypeInit                      = "INIT"
+	containerTypeRegular                   = "REGULAR"
 )
 
 type labeledPodSandboxInfo struct {
@@ -56,6 +60,7 @@ type annotatedPodSandboxInfo struct {
 
 type labeledContainerInfo struct {
 	ContainerName string
+	ContainerType string
 	PodName       string
 	PodNamespace  string
 	PodUID        kubetypes.UID
@@ -94,12 +99,15 @@ func newPodAnnotations(pod *v1.Pod) map[string]string {
 }
 
 // newContainerLabels creates container labels from v1.Container and v1.Pod.
-func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string {
+func newContainerLabels(container *v1.Container, pod *v1.Pod, containerType string) map[string]string {
 	labels := map[string]string{}
 	labels[types.KubernetesPodNameLabel] = pod.Name
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	labels[types.KubernetesContainerNameLabel] = container.Name
+	if utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+		labels[types.KubernetesContainerTypeLabel] = containerType
+	}
 
 	return labels
 }
@@ -169,11 +177,16 @@ func getPodSandboxInfoFromAnnotations(annotations map[string]string) *annotatedP
 
 // getContainerInfoFromLabels gets labeledContainerInfo from labels.
 func getContainerInfoFromLabels(labels map[string]string) *labeledContainerInfo {
+	var containerType string
+	if utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+		containerType = getStringValueFromLabel(labels, types.KubernetesContainerTypeLabel)
+	}
 	return &labeledContainerInfo{
 		PodName:       getStringValueFromLabel(labels, types.KubernetesPodNameLabel),
 		PodNamespace:  getStringValueFromLabel(labels, types.KubernetesPodNamespaceLabel),
 		PodUID:        kubetypes.UID(getStringValueFromLabel(labels, types.KubernetesPodUIDLabel)),
 		ContainerName: getStringValueFromLabel(labels, types.KubernetesContainerNameLabel),
+		ContainerType: containerType,
 	}
 }
 
