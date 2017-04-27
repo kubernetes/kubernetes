@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package service contains code for syncing Kubernetes services,
-// and cloud DNS servers with the federated service registry.
-package service // import "k8s.io/kubernetes/federation/pkg/federation-controller/service"
+// Package openapi is a collection of libraries for fetching the openapi spec
+// from a Kubernetes server and then indexing the type definitions.
+// The openapi spec contains the object model definitions and extensions metadata
+// such as the patchStrategy and patchMergeKey for creating patches.
+package openapi

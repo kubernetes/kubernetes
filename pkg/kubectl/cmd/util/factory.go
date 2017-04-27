@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/swagger"
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -50,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -219,6 +221,8 @@ type ObjectMappingFactory interface {
 	Validator(validate bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
 	SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error)
+	// OpenAPISchema returns the schema openapi schema definiton
+	OpenAPISchema(cacheDir string) (*openapi.Resources, error)
 }
 
 // BuilderFactory holds the second level of factory methods.  These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
@@ -417,6 +421,7 @@ func writeSchemaFile(schemaData []byte, cacheDir, cacheFile, prefix, groupVersio
 	if _, err := io.Copy(tmpFile, bytes.NewBuffer(schemaData)); err != nil {
 		return err
 	}
+	glog.V(4).Infof("Writing swagger cache (dir %v) file %v (from %v)", cacheDir, cacheFile, tmpFile.Name())
 	if err := os.Link(tmpFile.Name(), cacheFile); err != nil {
 		// If we can't write due to file existing, or permission problems, keep going.
 		if os.IsExist(err) || os.IsPermission(err) {

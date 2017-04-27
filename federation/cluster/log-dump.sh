@@ -30,7 +30,12 @@ OUTPUT_DIR="${REPORT_DIR}/federation"
 
 # Dumps logs for all pods in a federation.
 function dump_federation_pod_logs() {
-  local -r federation_pod_names=($(kubectl get pods -l 'app=federated-cluster' --namespace=${FEDERATION_NAMESPACE} -o name))
+  local -r federation_pod_names_string="$(kubectl get pods -l 'app=federated-cluster' --namespace=${FEDERATION_NAMESPACE} -o name)"
+  if [[ -z "${federation_pod_names_string}" ]]; then
+    return
+  fi
+
+  local -r federation_pod_names=(${federation_pod_names_string})
   for pod_name in ${federation_pod_names[@]}; do
     # The API server pod has two containers
     if [[ "${pod_name}" == *apiserver* ]]; then
@@ -58,7 +63,12 @@ function dump_apiserver_pod_logs() {
 # TODO: This currently only grabs DNS pod logs from the host cluster. It should
 # grab those logs from all clusters in the federation.
 function dump_dns_pod_logs() {
-  local -r dns_pod_names=($(kubectl get pods -l 'k8s-app=kube-dns' --namespace=kube-system -o name))
+  local -r dns_pod_names_string="$(kubectl get pods -l 'k8s-app=kube-dns' --namespace=kube-system -o name)"
+  if [[ -z "${dns_pod_names_string}" ]]; then
+    return
+  fi
+
+  local -r dns_pod_names=(${dns_pod_names_string})
   local -r dns_pod_containers=(kubedns dnsmasq sidecar)
 
   for pod_name in ${dns_pod_names[@]}; do

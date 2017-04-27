@@ -274,8 +274,6 @@ kube::golang::set_platform_envs() {
       "linux/arm")
         export CGO_ENABLED=1
         export CC=arm-linux-gnueabihf-gcc
-        # Use a special edge version of golang since the stable golang version used for everything else doesn't work
-        export GOROOT=${K8S_EDGE_GOROOT}
         ;;
       "linux/arm64")
         export CGO_ENABLED=1
@@ -284,8 +282,6 @@ kube::golang::set_platform_envs() {
       "linux/ppc64le")
         export CGO_ENABLED=1
         export CC=powerpc64le-linux-gnu-gcc
-        # Use a special edge version of golang since the stable golang version used for everything else doesn't work
-        export GOROOT=${K8S_EDGE_GOROOT}
         ;;
       "linux/s390x")
         export CGO_ENABLED=1
@@ -487,13 +483,7 @@ kube::golang::build_binaries_for_platform() {
   local -a nonstatics=()
   local -a tests=()
 
-  # Temporary workaround while we have two GOROOT's (which we'll get rid of as soon as we upgrade to go1.8 for amd64 as well)
-  local GO=go
-  if [[ "${GOROOT}" == "${K8S_EDGE_GOROOT:-}" ]]; then
-    GO="${K8S_EDGE_GOROOT}/bin/go"
-  fi
-
-  V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-} GO=${GO}"
+  V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
 
   for binary in "${binaries[@]}"; do
     if [[ "${binary}" =~ ".test"$ ]]; then
@@ -513,7 +503,7 @@ kube::golang::build_binaries_for_platform() {
     kube::log::progress "    "
     for binary in "${statics[@]:+${statics[@]}}"; do
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
-      CGO_ENABLED=0 "${GO}" build -o "${outfile}" \
+      CGO_ENABLED=0 go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
@@ -522,7 +512,7 @@ kube::golang::build_binaries_for_platform() {
     done
     for binary in "${nonstatics[@]:+${nonstatics[@]}}"; do
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
-      "${GO}" build -o "${outfile}" \
+      go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
@@ -533,13 +523,13 @@ kube::golang::build_binaries_for_platform() {
   else
     # Use go install.
     if [[ "${#nonstatics[@]}" != 0 ]]; then
-      "${GO}" install "${goflags[@]:+${goflags[@]}}" \
+      go install "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${nonstatics[@]:+${nonstatics[@]}}"
     fi
     if [[ "${#statics[@]}" != 0 ]]; then
-      CGO_ENABLED=0 "${GO}" install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
+      CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${statics[@]:+${statics[@]}}"
@@ -572,13 +562,13 @@ kube::golang::build_binaries_for_platform() {
     # doing a staleness check on k8s.io/kubernetes/test/e2e package always
     # returns true (always stale). And that's why we need to install the
     # test package.
-    "${GO}" install "${goflags[@]:+${goflags[@]}}" \
+    go install "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${testpkg}"
 
     mkdir -p "$(dirname ${outfile})"
-    "${GO}" test -i -c \
+    go test -i -c \
       "${goflags[@]:+${goflags[@]}}" \
       -gcflags "${gogcflags}" \
       -ldflags "${goldflags}" \

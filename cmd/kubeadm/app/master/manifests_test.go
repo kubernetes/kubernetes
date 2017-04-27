@@ -330,11 +330,9 @@ func TestCertsVolumeMount(t *testing.T) {
 
 func TestK8sVolume(t *testing.T) {
 	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
 		expected api.Volume
 	}{
 		{
-			cfg: &kubeadmapi.MasterConfiguration{},
 			expected: api.Volume{
 				Name: "k8s",
 				VolumeSource: api.VolumeSource{
@@ -345,7 +343,7 @@ func TestK8sVolume(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := k8sVolume(rt.cfg)
+		actual := k8sVolume()
 		if actual.Name != rt.expected.Name {
 			t.Errorf(
 				"failed k8sVolume:\n\texpected: %s\n\t  actual: %s",

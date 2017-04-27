@@ -184,6 +184,7 @@ pkg/credentialprovider/aws
 pkg/fieldpath
 pkg/fields
 pkg/hyperkube
+pkg/kubectl/cmd/util/openapi
 pkg/kubelet/api
 pkg/kubelet/container
 pkg/kubelet/envvars
