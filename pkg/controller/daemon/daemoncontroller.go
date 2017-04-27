@@ -317,8 +317,16 @@ func (dsc *DaemonSetsController) addPod(obj interface{}) {
 // up. If the labels of the pod have changed we need to awaken both the old
 // and new set. old and cur must be *v1.Pod types.
 func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
-	curPod := cur.(*v1.Pod)
-	oldPod := old.(*v1.Pod)
+	curPod, ok := cur.(*v1.Pod)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("cur is not a pod"))
+		return
+	}
+	oldPod, ok := old.(*v1.Pod)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("old is not a pod"))
+		return
+	}
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
 		// Periodic resync will send update events for all known pods.
 		// Two different versions of the same pod will always have different RVs.
