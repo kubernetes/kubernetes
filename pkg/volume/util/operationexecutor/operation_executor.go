@@ -234,13 +234,21 @@ type VolumeToAttach struct {
 // GenerateMsgDetailed returns detailed msgs for volumes to attach
 func (volume *VolumeToAttach) GenerateMsgDetailed(prefixMsg, suffixMsg string) (detailedMsg string) {
 	detailedStr := fmt.Sprintf("(UniqueName: %q) from node %q", volume.VolumeName, volume.NodeName)
-	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, volume.VolumeSpec.Name(), detailedStr)
+	volumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeSpecName = volume.VolumeSpec.Name()
+	}
+	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, volumeSpecName, detailedStr)
 }
 
 // GenerateMsg returns simple and detailed msgs for volumes to attach
 func (volume *VolumeToAttach) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg, detailedMsg string) {
 	detailedStr := fmt.Sprintf("(UniqueName: %q) from node %q", volume.VolumeName, volume.NodeName)
-	return generateVolumeMsg(prefixMsg, suffixMsg, volume.VolumeSpec.Name(), detailedStr)
+	volumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeSpecName = volume.VolumeSpec.Name()
+	}
+	return generateVolumeMsg(prefixMsg, suffixMsg, volumeSpecName, detailedStr)
 }
 
 // GenerateErrorDetailed returns detailed errors for volumes to attach
@@ -298,13 +306,21 @@ type VolumeToMount struct {
 // GenerateMsgDetailed returns detailed msgs for volumes to mount
 func (volume *VolumeToMount) GenerateMsgDetailed(prefixMsg, suffixMsg string) (detailedMsg string) {
 	detailedStr := fmt.Sprintf("(UniqueName: %q) pod %q (UID: %q)", volume.VolumeName, volume.Pod.Name, volume.Pod.UID)
-	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, volume.VolumeSpec.Name(), detailedStr)
+	volumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeSpecName = volume.VolumeSpec.Name()
+	}
+	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, volumeSpecName, detailedStr)
 }
 
 // GenerateMsg returns simple and detailed msgs for volumes to mount
 func (volume *VolumeToMount) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg, detailedMsg string) {
 	detailedStr := fmt.Sprintf("(UniqueName: %q) pod %q (UID: %q)", volume.VolumeName, volume.Pod.Name, volume.Pod.UID)
-	return generateVolumeMsg(prefixMsg, suffixMsg, volume.VolumeSpec.Name(), detailedStr)
+	volumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeSpecName = volume.VolumeSpec.Name()
+	}
+	return generateVolumeMsg(prefixMsg, suffixMsg, volumeSpecName, detailedStr)
 }
 
 // GenerateErrorDetailed returns detailed errors for volumes to mount
@@ -343,21 +359,21 @@ type AttachedVolume struct {
 // GenerateMsgDetailed returns detailed msgs for attached volumes
 func (volume *AttachedVolume) GenerateMsgDetailed(prefixMsg, suffixMsg string) (detailedMsg string) {
 	detailedStr := fmt.Sprintf("(UniqueName: %q) on node %q", volume.VolumeName, volume.NodeName)
-	volumeVolumeSpecName := "nil"
+	volumeSpecName := "nil"
 	if volume.VolumeSpec != nil {
-		volumeVolumeSpecName = volume.VolumeSpec.Name()
+		volumeSpecName = volume.VolumeSpec.Name()
 	}
-	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, volumeVolumeSpecName, detailedStr)
+	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, volumeSpecName, detailedStr)
 }
 
 // GenerateMsg returns simple and detailed msgs for attached volumes
 func (volume *AttachedVolume) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg, detailedMsg string) {
 	detailedStr := fmt.Sprintf("(UniqueName: %q) on node %q", volume.VolumeName, volume.NodeName)
-	volumeVolumeSpecName := "nil"
+	volumeSpecName := "nil"
 	if volume.VolumeSpec != nil {
-		volumeVolumeSpecName = volume.VolumeSpec.Name()
+		volumeSpecName = volume.VolumeSpec.Name()
 	}
-	return generateVolumeMsg(prefixMsg, suffixMsg, volumeVolumeSpecName, detailedStr)
+	return generateVolumeMsg(prefixMsg, suffixMsg, volumeSpecName, detailedStr)
 }
 
 // GenerateErrorDetailed returns detailed errors for attached volumes
