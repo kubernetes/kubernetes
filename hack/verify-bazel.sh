@@ -20,7 +20,7 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-go get gopkg.in/mikedanese/gazel.v16/gazel
+go get gopkg.in/mikedanese/gazel.v17/gazel
 
 # Remove generated files prior to running gazel.
 # TODO(spxtr): Remove this line once Bazel is the only way to build.
