@@ -380,23 +380,22 @@ func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim v1.ResourceNam
 	for _, nodeReclaimFunc := range nodeReclaimFuncs {
 		// attempt to reclaim the pressured resource.
 		reclaimed, err := nodeReclaimFunc()
-		if err == nil {
-			// update our local observations based on the amount reported to have been reclaimed.
-			// note: this is optimistic, other things could have been still consuming the pressured resource in the interim.
-			signal := resourceToSignal[resourceToReclaim]
-			value, ok := observations[signal]
-			if !ok {
-				glog.Errorf("eviction manager: unable to find value associated with signal %v", signal)
-				continue
-			}
-			value.available.Add(*reclaimed)
+		if err != nil {
+			glog.Warningf("eviction manager: unexpected error when attempting to reduce %v pressure: %v", resourceToReclaim, err)
+		}
+		// update our local observations based on the amount reported to have been reclaimed.
+		// note: this is optimistic, other things could have been still consuming the pressured resource in the interim.
+		signal := resourceToSignal[resourceToReclaim]
+		value, ok := observations[signal]
+		if !ok {
+			glog.Errorf("eviction manager: unable to find value associated with signal %v", signal)
+			continue
+		}
+		value.available.Add(*reclaimed)
 
-			// evaluate all current thresholds to see if with adjusted observations, we think we have met min reclaim goals
-			if len(thresholdsMet(m.thresholdsMet, observations, true)) == 0 {
-				return true
-			}
-		} else {
-			glog.Errorf("eviction manager: unexpected error when attempting to reduce %v pressure: %v", resourceToReclaim, err)
+		// evaluate all current thresholds to see if with adjusted observations, we think we have met min reclaim goals
+		if len(thresholdsMet(m.thresholdsMet, observations, true)) == 0 {
+			return true
 		}
 	}
 	return false
