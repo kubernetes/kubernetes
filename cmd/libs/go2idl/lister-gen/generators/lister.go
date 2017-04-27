@@ -220,7 +220,7 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 
 	glog.V(5).Infof("processing type %v", t)
 	m := map[string]interface{}{
-		"Resource":   c.Universe.Function(types.Name{Package: g.internalGVPkg, Name: "Resource"}),
+		"Resource":   c.Universe.Function(types.Name{Package: t.Name.Package, Name: "Resource"}),
 		"type":       t,
 		"objectMeta": g.objectMeta,
 	}
