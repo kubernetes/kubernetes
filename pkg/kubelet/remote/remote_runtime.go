@@ -209,7 +209,11 @@ func (r *RemoteRuntimeService) StartContainer(containerID string) error {
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (r *RemoteRuntimeService) StopContainer(containerID string, timeout int64) error {
-	ctx, cancel := getContextWithTimeout(r.timeout)
+	ctx, cancel := getContextWithTimeout(time.Duration(timeout) * time.Second)
+	if timeout == 0 {
+		// Use default timeout if stop timeout is 0.
+		ctx, cancel = getContextWithTimeout(r.timeout)
+	}
 	defer cancel()
 
 	_, err := r.runtimeClient.StopContainer(ctx, &runtimeapi.StopContainerRequest{
