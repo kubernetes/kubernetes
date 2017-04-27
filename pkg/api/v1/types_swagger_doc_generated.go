@@ -773,6 +773,15 @@ func (LoadBalancerStatus) SwaggerDoc() map[string]string {
 	return map_LoadBalancerStatus
 }
 
+var map_LocalFsVolume = map[string]string{
+	"":     "LocalFsVolume represents a filesystem-based local volume",
+	"path": "The full path to the volume on the node",
+}
+
+func (LocalFsVolume) SwaggerDoc() map[string]string {
+	return map_LocalFsVolume
+}
+
 var map_LocalObjectReference = map[string]string{
 	"":     "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
 	"name": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
@@ -780,6 +789,16 @@ var map_LocalObjectReference = map[string]string{
 
 func (LocalObjectReference) SwaggerDoc() map[string]string {
 	return map_LocalObjectReference
+}
+
+var map_LocalVolumeSource = map[string]string{
+	"":         "LocalVolume represents a local volume accessible only from one node",
+	"nodeName": "NodeName represents the node that the volume is located at",
+	"fs":       "Fs represents a filesystem-based local volume",
+}
+
+func (LocalVolumeSource) SwaggerDoc() map[string]string {
+	return map_LocalVolumeSource
 }
 
 var map_NFSVolumeSource = map[string]string{
@@ -1137,6 +1156,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+	"localVolume":          "LocalVolume represents a local volume accessible only from one node",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {

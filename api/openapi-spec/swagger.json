@@ -39106,11 +39106,39 @@
      }
     }
    },
+   "io.k8s.kubernetes.pkg.api.v1.LocalFsVolume": {
+    "description": "LocalFsVolume represents a filesystem-based local volume",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "description": "The full path to the volume on the node",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.LocalObjectReference": {
     "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
     "properties": {
      "name": {
       "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.api.v1.LocalVolumeSource": {
+    "description": "LocalVolume represents a local volume accessible only from one node",
+    "required": [
+     "nodeName"
+    ],
+    "properties": {
+     "fs": {
+      "description": "Fs represents a filesystem-based local volume",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalFsVolume"
+     },
+     "nodeName": {
+      "description": "NodeName represents the node that the volume is located at",
       "type": "string"
      }
     }
@@ -39891,6 +39919,10 @@
      "iscsi": {
       "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. Provisioned by an admin.",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ISCSIVolumeSource"
+     },
+     "localVolume": {
+      "description": "LocalVolume represents a local volume accessible only from one node",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalVolumeSource"
      },
      "nfs": {
       "description": "NFS represents an NFS mount on the host. Provisioned by an admin. More info: http://kubernetes.io/docs/user-guide/volumes#nfs",

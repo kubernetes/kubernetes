@@ -18253,6 +18253,10 @@
       "$ref": "v1.ScaleIOVolumeSource",
       "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
      },
+     "localVolume": {
+      "$ref": "v1.LocalVolumeSource",
+      "description": "LocalVolume represents a local volume accessible only from one node"
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -18812,6 +18816,36 @@
      "readOnly": {
       "type": "boolean",
       "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
+   "v1.LocalVolumeSource": {
+    "id": "v1.LocalVolumeSource",
+    "description": "LocalVolume represents a local volume accessible only from one node",
+    "required": [
+     "nodeName"
+    ],
+    "properties": {
+     "nodeName": {
+      "type": "string",
+      "description": "NodeName represents the node that the volume is located at"
+     },
+     "fs": {
+      "$ref": "v1.LocalFsVolume",
+      "description": "Fs represents a filesystem-based local volume"
+     }
+    }
+   },
+   "v1.LocalFsVolume": {
+    "id": "v1.LocalFsVolume",
+    "description": "LocalFsVolume represents a filesystem-based local volume",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "The full path to the volume on the node"
      }
     }
    },

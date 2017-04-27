@@ -370,6 +370,9 @@ type PersistentVolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource
+	// LocalVolume represents a local volume accessible only from one node
+	// +optional
+	LocalVolume *LocalVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -1203,6 +1206,21 @@ type KeyToPath struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	Mode *int32
+}
+
+// LocalVolume represents a local volume accessible only from one node
+type LocalVolumeSource struct {
+	// NodeName represents the node that the volume is located at
+	NodeName string
+	// Fs represents a filesystem-based local volume
+	// +optional
+	Fs *LocalFsVolume
+}
+
+// LocalFsVolume represents a filesystem-based local volume
+type LocalFsVolume struct {
+	// The full path to the volume on the node
+	Path string
 }
 
 // ContainerPort represents a network port in a single container
