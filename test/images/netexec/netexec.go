@@ -343,7 +343,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Wrote upload to %s", UploadFile)
 	result["output"] = UploadFile
 	w.WriteHeader(http.StatusCreated)
-	bytes, err := json.Marshal(result)
+	bytes, _ := json.Marshal(result)
 	fmt.Fprintf(w, string(bytes))
 }
 
@@ -356,7 +356,7 @@ func hostNameHandler(w http.ResponseWriter, r *http.Request) {
 func startUDPServer(udpPort int) {
 	serverAddress, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", udpPort))
 	assertNoError(err)
-	serverConn, err := net.ListenUDP("udp", serverAddress)
+	serverConn, _ := net.ListenUDP("udp", serverAddress)
 	defer serverConn.Close()
 	buf := make([]byte, 1024)
 
