@@ -142,7 +142,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			&extensionsv1.ReplicaSet{},
 			controller.NoResyncPeriodFunc(),
 			fedutil.NewTriggerOnAllChanges(
-				func(obj runtime.Object) { frsc.deliverLocalReplicaSet(obj, replicaSetReviewDelay) },
+				func(obj runtime.Object) { frsc.deliverReplicaSetObj(obj, replicaSetReviewDelay) },
 			),
 		)
 	}
@@ -190,7 +190,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		&extensionsv1.ReplicaSet{},
 		controller.NoResyncPeriodFunc(),
 		fedutil.NewTriggerOnMetaAndSpecChanges(
-			func(obj runtime.Object) { frsc.deliverFedReplicaSetObj(obj, replicaSetReviewDelay) },
+			func(obj runtime.Object) { frsc.deliverReplicaSetObj(obj, replicaSetReviewDelay) },
 		),
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -307,29 +307,7 @@ func (frsc *ReplicaSetController) isSynced() bool {
 	return true
 }
 
-func (frsc *ReplicaSetController) deliverLocalReplicaSet(obj interface{}, duration time.Duration) {
-	key, err := controller.KeyFunc(obj)
-	if err != nil {
-		glog.Errorf("Couldn't get key for object %v: %v", obj, err)
-		return
-	}
-	namespace, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		glog.Errorf("Error splitting key for object %v: %v", obj, err)
-	}
-	_, err = frsc.replicaSetLister.ReplicaSets(namespace).Get(name)
-	switch {
-	case errors.IsNotFound(err):
-		// do nothing
-	case err != nil:
-		glog.Errorf("Couldn't get federation replicaset %v: %v", key, err)
-	default:
-		// ReplicaSet exists. Ignore ReplicaSets that exist only in local k8s
-		frsc.deliverReplicaSetByKey(key, duration, false)
-	}
-}
-
-func (frsc *ReplicaSetController) deliverFedReplicaSetObj(obj interface{}, delay time.Duration) {
+func (frsc *ReplicaSetController) deliverReplicaSetObj(obj interface{}, delay time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
