@@ -35,7 +35,7 @@ SHELL := /bin/bash
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.
 .PHONY: generated_files
-generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi
+generated_files: gen_conversion
 
 .PHONY: verify_generated_files
 verify_generated_files: verify_gen_deepcopy    \
@@ -222,7 +222,7 @@ RUN_GEN_DEEPCOPY =                                                          \
                 --v $(KUBE_VERBOSE)                                         \
                 --logtostderr                                               \
                 -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
-                --bounding-dirs $(PRJ_SRC_PATH)                             \
+                --bounding-dirs $(PRJ_SRC_PATH),k8s.io/api                             \
                 -O $(DEEPCOPY_BASENAME)                                     \
                 "$$@";                                                      \
         fi                                                                  \
