@@ -4,9 +4,9 @@ This example describes how to create Web frontend server, an auto-provisioned pe
 
 Demonstrated Kubernetes Concepts:
 
-* [Persistent Volumes](http://kubernetes.io/docs/user-guide/persistent-volumes/) to
+* [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) to
   define persistent disks (disk lifecycle not tied to the Pods).
-* [Services](http://kubernetes.io/docs/user-guide/services/) to enable Pods to
+* [Services](https://kubernetes.io/docs/concepts/services-networking/service/) to enable Pods to
   locate one another.
 
 ![alt text][nfs pv example]
@@ -14,7 +14,7 @@ Demonstrated Kubernetes Concepts:
 As illustrated above, two persistent volumes are used in this example:
 
 - Web frontend Pod uses a persistent volume based on NFS server, and
-- NFS server uses an auto provisioned [persistent volume](http://kubernetes.io/docs/user-guide/persistent-volumes/) from GCE PD or AWS EBS.
+- NFS server uses an auto provisioned [persistent volume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) from GCE PD or AWS EBS.
 
 Note, this example uses an NFS container that doesn't support NFSv4.
 
