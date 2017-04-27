@@ -458,7 +458,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 })
 
 func execCmd(args ...string) *exec.Cmd {
-	glog.Info("Executing: %s", strings.Join(args, " "))
+	glog.Infof("Executing: %s", strings.Join(args, " "))
 	return exec.Command(args[0], args[1:]...)
 }
 
@@ -627,8 +627,8 @@ func addNodePool(name string, machineType string, numNodes int) {
 		"--project="+framework.TestContext.CloudConfig.ProjectID,
 		"--zone="+framework.TestContext.CloudConfig.Zone,
 		"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
-	framework.ExpectNoError(err)
 	glog.Infof("Creating node-pool %s: %s", name, output)
+	framework.ExpectNoError(err)
 }
 
 func deleteNodePool(name string) {
