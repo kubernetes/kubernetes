@@ -16,27 +16,14 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Comment": "v7.2.3",
 			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Comment": "v7.2.3",
 			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Comment": "v7.2.3",
-			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
-		},
-		{
-			"ImportPath": "github.com/Azure/go-autorest/autorest/to",
-			"Comment": "v7.2.3",
-			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
-		},
-		{
-			"ImportPath": "github.com/Azure/go-autorest/autorest/validation",
-			"Comment": "v7.2.3",
 			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
@@ -82,6 +69,10 @@
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
+		},
+		{
+			"ImportPath": "github.com/dgrijalva/jwt-go",
+			"Rev": "01aeca54ebda6e0fbfafd0a524d234159c05ec20"
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/digest",
