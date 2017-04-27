@@ -323,16 +323,17 @@ func waitForIngressOrFail(clientset *kubeclientset.Clientset, namespace string, 
 	By(fmt.Sprintf("Fetching a federated ingress shard of ingress %q in namespace %q from cluster", ingress.Name, namespace))
 	var clusterIngress *v1beta1.Ingress
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
-		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
+		var get_err error
+		clusterIngress, get_err = clientset.Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
+		if (!present) && errors.IsNotFound(get_err) { // We want it gone, and it's gone.
 			By(fmt.Sprintf("Success: shard of federated ingress %q in namespace %q in cluster is absent", ingress.Name, namespace))
 			return true, nil // Success
 		}
-		if present && err == nil { // We want it present, and the Get succeeded, so we're all good.
+		if present && get_err == nil { // We want it present, and the Get succeeded, so we're all good.
 			By(fmt.Sprintf("Success: shard of federated ingress %q in namespace %q in cluster is present", ingress.Name, namespace))
 			return true, nil // Success
 		}
-		By(fmt.Sprintf("Ingress %q in namespace %q in cluster.  Found: %v, waiting for Found: %v, trying again in %s (err=%v)", ingress.Name, namespace, clusterIngress != nil && err == nil, present, framework.Poll, err))
+		By(fmt.Sprintf("Ingress %q in namespace %q in cluster.  Found: %v, waiting for Found: %v, trying again in %s (err=%v)", ingress.Name, namespace, clusterIngress != nil && get_err == nil, present, framework.Poll, get_err))
 		return false, nil
 	})
 	framework.ExpectNoError(err, "Failed to verify ingress %q in namespace %q in cluster: Present=%v", ingress.Name, namespace, present)
