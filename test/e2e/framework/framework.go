@@ -348,7 +348,7 @@ func (f *Framework) AfterEach() {
 					Logf(summaries[i].PrintHumanReadable())
 				} else {
 					// TODO: learn to extract test name and append it to the kind instead of timestamp.
-					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+now.Format(time.RFC3339)+".txt")
+					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+f.BaseName+"_"+now.Format(time.RFC3339)+".txt")
 					if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
 						Logf("Failed to write file %v with test performance data: %v", filePath, err)
 					}
@@ -361,7 +361,7 @@ func (f *Framework) AfterEach() {
 					Logf("Finished")
 				} else {
 					// TODO: learn to extract test name and append it to the kind instead of timestamp.
-					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+now.Format(time.RFC3339)+".json")
+					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+f.BaseName+"_"+now.Format(time.RFC3339)+".json")
 					if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
 						Logf("Failed to write file %v with test performance data: %v", filePath, err)
 					}
