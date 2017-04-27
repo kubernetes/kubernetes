@@ -327,11 +327,11 @@ func (f *Framework) AfterEach() {
 		// TODO: enable Scheduler and ControllerManager metrics grabbing when Master's Kubelet will be registered.
 		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, true, false, false, true)
 		if err != nil {
-			Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
+			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 		} else {
 			received, err := grabber.Grab()
 			if err != nil {
-				Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
+				Logf("MetricsGrabber failed to grab metrics (skipping metrics gathering): %v", err)
 			} else {
 				summaries = append(summaries, (*MetricsForE2E)(&received))
 			}
