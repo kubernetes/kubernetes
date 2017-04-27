@@ -307,11 +307,6 @@ func DefaultKubernetesUserAgent() string {
 // running inside a pod running on kubernetes. It will return an error if
 // called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
-	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
-	if len(host) == 0 || len(port) == 0 {
-		return nil, fmt.Errorf("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
-	}
-
 	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountTokenKey)
 	if err != nil {
 		return nil, err
@@ -324,12 +319,24 @@ func InClusterConfig() (*Config, error) {
 		tlsClientConfig.CAFile = rootCAFile
 	}
 
-	return &Config{
-		// TODO: switch to using cluster DNS.
-		Host:            "https://" + net.JoinHostPort(host, port),
+	config := &Config{
 		BearerToken:     string(token),
 		TLSClientConfig: tlsClientConfig,
-	}, nil
+	}
+
+	// Get the kubernetes service port using the SRV record. If that fails, fallback to use
+	// the environment variables.
+	if _, addresses, err := net.LookupSRV("https", "tcp", "kubernetes.default.svc"); err == nil && len(addresses) > 0 {
+		config.Host = fmt.Sprintf("https://kubernetes.default.svc:%d", addresses[0].Port)
+	} else {
+		host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
+		if len(host) == 0 || len(port) == 0 {
+			return nil, fmt.Errorf("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
+		}
+		config.Host = "https://" + net.JoinHostPort(host, port)
+	}
+
+	return config, nil
 }
 
 // IsConfigTransportTLS returns true if and only if the provided
