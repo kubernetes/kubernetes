@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"os/exec"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,6 +112,76 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			pidSets := sets.NewString(strings.Split(pids, " ")...)
 			if pidSets.Has(nginxPid) {
 				framework.Failf("nginx's pid should not be seen by non-hostpid containers")
+			}
+		})
+	})
+
+	Context("when creating a pod in the host IPC namespace", func() {
+		makeHostIPCPod := func(podName, image string, command []string, hostIPC bool) *v1.Pod {
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					HostIPC:       hostIPC,
+					Containers: []v1.Container{
+						{
+							Image:   image,
+							Name:    podName,
+							Command: command,
+						},
+					},
+				},
+			}
+		}
+		createAndWaitHostIPCPod := func(podName string, hostNetwork bool) {
+			podClient.Create(makeHostIPCPod(podName,
+				"gcr.io/google_containers/busybox:1.24",
+				[]string{"sh", "-c", "ipcs -m | awk '{print $2}'"},
+				hostNetwork,
+			))
+
+			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+		}
+
+		hostSharedMemoryID := ""
+		BeforeEach(func() {
+			output, err := exec.Command("sh", "-c", "ipcmk -M 1M | awk '{print $NF}'").Output()
+			if err != nil {
+				framework.Failf("Create shared memory on the host failed: %v", err)
+			}
+			hostSharedMemoryID = strings.TrimSpace(string(output))
+			framework.Logf("Got host shared memory ID %q", hostSharedMemoryID)
+		})
+
+		It("should show the shared memory ID in the host IPC containers", func() {
+			busyboxPodName := "busybox-hostipc-" + string(uuid.NewUUID())
+			createAndWaitHostIPCPod(busyboxPodName, true)
+			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
+			if err != nil {
+				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
+			}
+
+			podSharedMemoryIDs := strings.TrimSpace(logs)
+			framework.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, busyboxPodName)
+			if !strings.Contains(podSharedMemoryIDs, hostSharedMemoryID) {
+				framework.Failf("hostIPC container should show shared memory IDs on host")
+			}
+		})
+
+		It("should not show the shared memory ID in the non-hostIPC containers", func() {
+			busyboxPodName := "busybox-non-hostipc-" + string(uuid.NewUUID())
+			createAndWaitHostIPCPod(busyboxPodName, false)
+			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
+			if err != nil {
+				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
+			}
+
+			podSharedMemoryIDs := strings.TrimSpace(logs)
+			framework.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, busyboxPodName)
+			if strings.Contains(podSharedMemoryIDs, hostSharedMemoryID) {
+				framework.Failf("non-hostIPC container should not show shared memory IDs on host")
 			}
 		})
 	})
