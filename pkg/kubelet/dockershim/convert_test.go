@@ -22,7 +22,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/stretchr/testify/assert"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
 
 func TestConvertDockerStatusToRuntimeAPIState(t *testing.T) {

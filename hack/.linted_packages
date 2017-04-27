@@ -185,7 +185,7 @@ pkg/fieldpath
 pkg/fields
 pkg/hyperkube
 pkg/kubectl/cmd/util/openapi
-pkg/kubelet/apis/runtime
+pkg/kubelet/apis/cri
 pkg/kubelet/apis/stats
 pkg/kubelet/container
 pkg/kubelet/envvars

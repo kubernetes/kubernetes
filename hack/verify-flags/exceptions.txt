@@ -124,14 +124,14 @@ hack/test-update-storage-objects.sh:  local storage_media_type=${3:-""}
 hack/test-update-storage-objects.sh:  local storage_versions=${2:-""}
 hack/test-update-storage-objects.sh:  source_file=${test_data[0]}
 hack/test-update-storage-objects.sh:# source_file,resource,namespace,name,old_version,new_version
-pkg/kubelet/apis/runtime/v1alpha1/api.pb.go:	ContainerPort int32 `protobuf:"varint,2,opt,name=container_port,json=containerPort,proto3" json:"container_port,omitempty"`
-pkg/kubelet/apis/runtime/v1alpha1/api.pb.go:	OomScoreAdj int64 `protobuf:"varint,5,opt,name=oom_score_adj,json=oomScoreAdj,proto3" json:"oom_score_adj,omitempty"`
-pkg/kubelet/apis/runtime/v1alpha1/api.pb.go:	PodCidr string `protobuf:"bytes,1,opt,name=pod_cidr,json=podCidr,proto3" json:"pod_cidr,omitempty"`
-pkg/kubelet/apis/runtime/v1alpha1/api.pb.go:	RuntimeConfig *RuntimeConfig `protobuf:"bytes,1,opt,name=runtime_config,json=runtimeConfig" json:"runtime_config,omitempty"`
-pkg/kubelet/apis/runtime/v1alpha1/api.proto:    RuntimeConfig runtime_config = 1;
-pkg/kubelet/apis/runtime/v1alpha1/api.proto:    int32 container_port = 2;
-pkg/kubelet/apis/runtime/v1alpha1/api.proto:    int64 oom_score_adj = 5;
-pkg/kubelet/apis/runtime/v1alpha1/api.proto:    string pod_cidr = 1;
+pkg/kubelet/apis/cri/v1alpha1/api.pb.go:	ContainerPort int32 `protobuf:"varint,2,opt,name=container_port,json=containerPort,proto3" json:"container_port,omitempty"`
+pkg/kubelet/apis/cri/v1alpha1/api.pb.go:	OomScoreAdj int64 `protobuf:"varint,5,opt,name=oom_score_adj,json=oomScoreAdj,proto3" json:"oom_score_adj,omitempty"`
+pkg/kubelet/apis/cri/v1alpha1/api.pb.go:	PodCidr string `protobuf:"bytes,1,opt,name=pod_cidr,json=podCidr,proto3" json:"pod_cidr,omitempty"`
+pkg/kubelet/apis/cri/v1alpha1/api.pb.go:	RuntimeConfig *RuntimeConfig `protobuf:"bytes,1,opt,name=runtime_config,json=runtimeConfig" json:"runtime_config,omitempty"`
+pkg/kubelet/apis/cri/v1alpha1/api.proto:    RuntimeConfig runtime_config = 1;
+pkg/kubelet/apis/cri/v1alpha1/api.proto:    int32 container_port = 2;
+pkg/kubelet/apis/cri/v1alpha1/api.proto:    int64 oom_score_adj = 5;
+pkg/kubelet/apis/cri/v1alpha1/api.proto:    string pod_cidr = 1;
 pkg/kubelet/cm/container_manager_linux.go:		glog.V(3).Infof("Failed to apply oom_score_adj %d for pid %d: %v", oomScoreAdj, pid, err)
 pkg/kubelet/cm/container_manager_linux.go:	glog.V(5).Infof("attempting to apply oom_score_adj of %d to pid %d", oomScoreAdj, pid)
 pkg/kubelet/dockershim/docker_checkpoint.go:	ContainerPort *int32 `json:"container_port,omitempty"`

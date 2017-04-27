@@ -11,7 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = ["services.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/kubelet/apis/runtime/v1alpha1:go_default_library"],
+    deps = ["//pkg/kubelet/apis/cri/v1alpha1:go_default_library"],
 )
 
 filegroup(
@@ -25,8 +25,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubelet/apis/runtime/testing:all-srcs",
-        "//pkg/kubelet/apis/runtime/v1alpha1:all-srcs",
+        "//pkg/kubelet/apis/cri/testing:all-srcs",
+        "//pkg/kubelet/apis/cri/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -15,8 +15,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/kubelet/apis/runtime:go_default_library",
-        "//pkg/kubelet/apis/runtime/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/cri:go_default_library",
+        "//pkg/kubelet/apis/cri/v1alpha1:go_default_library",
         "//pkg/kubelet/dockershim:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/interrupt:go_default_library",
