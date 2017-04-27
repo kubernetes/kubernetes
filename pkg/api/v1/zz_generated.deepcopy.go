@@ -90,6 +90,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HTTPGetAction, InType: reflect.TypeOf(&HTTPGetAction{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HTTPHeader, InType: reflect.TypeOf(&HTTPHeader{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Handler, InType: reflect.TypeOf(&Handler{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HostMapping, InType: reflect.TypeOf(&HostMapping{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HostPathVolumeSource, InType: reflect.TypeOf(&HostPathVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ISCSIVolumeSource, InType: reflect.TypeOf(&ISCSIVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_KeyToPath, InType: reflect.TypeOf(&KeyToPath{})},
@@ -1174,6 +1175,20 @@ func DeepCopy_v1_Handler(in interface{}, out interface{}, c *conversion.Cloner) 
 			in, out := &in.TCPSocket, &out.TCPSocket
 			*out = new(TCPSocketAction)
 			**out = **in
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_HostMapping(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*HostMapping)
+		out := out.(*HostMapping)
+		*out = *in
+		if in.Names != nil {
+			in, out := &in.Names, &out.Names
+			*out = make([]string, len(*in))
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -2419,6 +2434,15 @@ func DeepCopy_v1_PodSpec(in interface{}, out interface{}, c *conversion.Cloner) 
 			*out = make([]Toleration, len(*in))
 			for i := range *in {
 				if err := DeepCopy_v1_Toleration(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		if in.HostMappings != nil {
+			in, out := &in.HostMappings, &out.HostMappings
+			*out = make([]HostMapping, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1_HostMapping(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
