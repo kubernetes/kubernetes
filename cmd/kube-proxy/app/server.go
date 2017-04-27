@@ -94,7 +94,7 @@ type Options struct {
 	// config is the proxy server's configuration object.
 	config *componentconfig.KubeProxyConfiguration
 
-	// THe fields below here are placeholders for flags that can't be directly mapped into
+	// The fields below here are placeholders for flags that can't be directly mapped into
 	// componentconfig.KubeProxyConfiguration.
 	//
 	// TODO remove these fields once the deprecated flags are removed.
