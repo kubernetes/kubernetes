@@ -88,11 +88,18 @@ func LoadBalancerSrcRanges() []string {
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
 func (gce *GCECloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	// For backword compatibility we had to fetch the loadBalancerName this way or else a simple assignment for service.Status.LoadBalancer.Name would be enough.
+	var loadBalancerName string
+	if len(service.Status.LoadBalancer.Name) > 0 {
+		loadBalancerName = service.Status.LoadBalancer.Name
+	} else {
+		loadBalancerName = cloudprovider.DeprecatedGetLoadBalancerName(service)
+	}
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, gce.region, loadBalancerName).Do()
 	if err == nil {
 		status := &v1.LoadBalancerStatus{}
 		status.Ingress = []v1.LoadBalancerIngress{{IP: fwd.IPAddress}}
+		status.Name = loadBalancerName
 
 		return status, true, nil
 	}
@@ -120,7 +127,8 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 		return nil, err
 	}
 
-	loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
+	loadBalancerName := gce.GetLoadBalancerName(apiService)
+
 	loadBalancerIP := apiService.Spec.LoadBalancerIP
 	ports := apiService.Spec.Ports
 	portStr := []string{}
@@ -390,6 +398,7 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 
 	status := &v1.LoadBalancerStatus{}
 	status.Ingress = []v1.LoadBalancerIngress{{IP: ipAddress}}
+	status.Name = loadBalancerName
 
 	return status, nil
 }
@@ -401,7 +410,14 @@ func (gce *GCECloud) UpdateLoadBalancer(clusterName string, service *v1.Service,
 		return err
 	}
 
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	// For backword compatibility we had to fetch the loadBalancerName this way or else a simple assignment for service.Status.LoadBalancer.Name would be enough.
+	var loadBalancerName string
+	if len(service.Status.LoadBalancer.Name) > 0 {
+		loadBalancerName = service.Status.LoadBalancer.Name
+	} else {
+		loadBalancerName = cloudprovider.DeprecatedGetLoadBalancerName(service)
+	}
+
 	pool, err := gce.service.TargetPools.Get(gce.projectID, gce.region, loadBalancerName).Do()
 	if err != nil {
 		return err
@@ -416,7 +432,14 @@ func (gce *GCECloud) UpdateLoadBalancer(clusterName string, service *v1.Service,
 
 // EnsureLoadBalancerDeleted is an implementation of LoadBalancer.EnsureLoadBalancerDeleted.
 func (gce *GCECloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	// For backword compatibility we had to fetch the loadBalancerName this way or else a simple assignment for service.Status.LoadBalancer.Name would be enough.
+	var loadBalancerName string
+	if len(service.Status.LoadBalancer.Name) > 0 {
+		loadBalancerName = service.Status.LoadBalancer.Name
+	} else {
+		loadBalancerName = cloudprovider.DeprecatedGetLoadBalancerName(service)
+	}
+
 	glog.V(2).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v)", clusterName, service.Namespace, service.Name, loadBalancerName,
 		gce.region)
 
@@ -612,6 +635,12 @@ func (gce *GCECloud) updateTargetPool(loadBalancerName string, existing sets.Str
 
 func (gce *GCECloud) targetPoolURL(name, region string) string {
 	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/targetPools/%s", gce.projectID, region, name)
+}
+
+func (gce *GCECloud) GetLoadBalancerName(service *v1.Service) string {
+	//GCE requires that the name of a load balancer starts with a lower case letter.
+	ret := service.Namespace[0:12] + "-" + service.Name[0:12] + "-" + string(service.UID)
+	return ret
 }
 
 func (gce *GCECloud) ensureHttpHealthCheck(name, path string, port int32) (hc *compute.HttpHealthCheck, err error) {

@@ -35,6 +35,13 @@ import (
 // ServiceAnnotationLoadBalancerInternal is the annotation used on the service
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/azure-load-balancer-internal"
 
+// GetLoadBalancerName returns the name of the load balancer based on the service UID.
+func (az *Cloud) GetLoadBalancerName(service *v1.Service) string {
+	ret := string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	return ret
+}
+
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
@@ -89,7 +96,7 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 func (az *Cloud) getPublicIPName(clusterName string, service *v1.Service) (string, error) {
 	loadBalancerIP := service.Spec.LoadBalancerIP
 	if len(loadBalancerIP) == 0 {
-		return fmt.Sprintf("%s-%s", clusterName, cloudprovider.GetLoadBalancerName(service)), nil
+		return fmt.Sprintf("%s-%s", clusterName, cloudprovider.DeprecatedGetLoadBalancerName(service)), nil
 	}
 
 	list, err := az.PublicIPAddressesClient.List(az.ResourceGroup)

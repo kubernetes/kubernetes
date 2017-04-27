@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -577,15 +576,17 @@ var _ = framework.KubeDescribe("Services", func() {
 				s.Spec.Type = v1.ServiceTypeLoadBalancer
 			})
 		}
-		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(tcpService))
-		if loadBalancerSupportsUDP {
-			serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(udpService))
-		}
 
 		By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
 		tcpService = jig.WaitForLoadBalancerOrFail(ns1, tcpService.Name, loadBalancerCreateTimeout)
 		jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
+
+		serviceLBNames = append(serviceLBNames, tcpService.Status.LoadBalancer.Name)
+		if loadBalancerSupportsUDP {
+			serviceLBNames = append(serviceLBNames, udpService.Status.LoadBalancer.Name)
+		}
+
 		if int(tcpService.Spec.Ports[0].NodePort) != tcpNodePort {
 			framework.Failf("TCP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", tcpNodePort, tcpService.Spec.Ports[0].NodePort)
 		}
@@ -1275,7 +1276,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 		jig := framework.NewServiceTestJig(cs, serviceName)
 
 		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true, nil)
-		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
+		serviceLBNames = append(serviceLBNames, svc.Status.LoadBalancer.Name)
 		healthCheckNodePort := int(service.GetServiceHealthCheckNodePort(svc))
 		if healthCheckNodePort == 0 {
 			framework.Failf("Service HealthCheck NodePort was not allocated")
@@ -1341,7 +1342,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 		nodes := jig.GetNodes(framework.MaxNodesForEndpointsTests)
 
 		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, false, nil)
-		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
+		serviceLBNames = append(serviceLBNames, svc.Status.LoadBalancer.Name)
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			Expect(cs.Core().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
@@ -1401,7 +1402,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 		nodes := jig.GetNodes(framework.MaxNodesForEndpointsTests)
 
 		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true, nil)
-		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
+		serviceLBNames = append(serviceLBNames, svc.Status.LoadBalancer.Name)
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			Expect(cs.Core().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
@@ -1452,7 +1453,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 		}
 
 		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true, nil)
-		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
+		serviceLBNames = append(serviceLBNames, svc.Status.LoadBalancer.Name)
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			Expect(cs.Core().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())

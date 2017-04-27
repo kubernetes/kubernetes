@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 
 	. "github.com/onsi/gomega"
@@ -52,7 +51,7 @@ func ConstructFirewallForLBService(svc *v1.Service, nodesTags []string) *compute
 		Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
-	fw.Name = MakeFirewallNameForLBService(cloudprovider.GetLoadBalancerName(svc))
+	fw.Name = MakeFirewallNameForLBService(svc.Status.LoadBalancer.Name)
 	fw.TargetTags = nodesTags
 	if svc.Spec.LoadBalancerSourceRanges == nil {
 		fw.SourceRanges = []string{"0.0.0.0/0"}

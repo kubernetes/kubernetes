@@ -121,10 +121,17 @@ func (f *FakeCloud) Routes() (cloudprovider.Routes, bool) {
 	return f, true
 }
 
+// GetLoadBalancerName is a stub implementation of LoadBalancer.GetLoadBalancerName
+func (f *FakeCloud) GetLoadBalancerName(service *v1.Service) string {
+	ret := string(service.UID)
+	return ret
+}
+
 // GetLoadBalancer is a stub implementation of LoadBalancer.GetLoadBalancer.
 func (f *FakeCloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	status := &v1.LoadBalancerStatus{}
 	status.Ingress = []v1.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
+	status.Name = service.Status.LoadBalancer.Name
 
 	return status, f.Exists, f.Err
 }
@@ -132,12 +139,14 @@ func (f *FakeCloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v
 // EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
 func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+	loadBalancerName := f.GetLoadBalancerName(service)
+
 	f.addCall("create")
 	if f.Balancers == nil {
 		f.Balancers = make(map[string]FakeBalancer)
 	}
 
-	name := cloudprovider.GetLoadBalancerName(service)
+	name := f.GetLoadBalancerName(service)
 	spec := service.Spec
 
 	zone, err := f.GetZone()
@@ -150,6 +159,7 @@ func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, 
 
 	status := &v1.LoadBalancerStatus{}
 	status.Ingress = []v1.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
+	status.Name = loadBalancerName
 
 	return status, f.Err
 }

@@ -767,6 +767,7 @@ func (LoadBalancerIngress) SwaggerDoc() map[string]string {
 var map_LoadBalancerStatus = map[string]string{
 	"":        "LoadBalancerStatus represents the status of a load-balancer.",
 	"ingress": "Ingress is a list containing ingress points for the load-balancer. Traffic intended for the service should be sent to these ingress points.",
+	"name":    "LoadBalancer Name.This field is added to point the load-balancer name which is required for cloud-provider specific changes. See #43173",
 }
 
 func (LoadBalancerStatus) SwaggerDoc() map[string]string {

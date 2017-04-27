@@ -129,7 +129,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/daemon:go_default_library",

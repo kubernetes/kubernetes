@@ -19,6 +19,7 @@ package cloudstack
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/xanzy/go-cloudstack/cloudstack"
@@ -37,6 +38,13 @@ type loadBalancer struct {
 	networkID string
 	projectID string
 	rules     map[string]*cloudstack.LoadBalancerRule
+}
+
+// GetLoadBalancerName returns the name of the load balancer based on the service UID.
+func (cs *CSCloud) GetLoadBalancerName(service *v1.Service) string {
+	ret := string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	return ret
 }
 
 // GetLoadBalancer returns whether the specified load balancer exists, and if so, what its status is.
@@ -241,7 +249,7 @@ func (cs *CSCloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Ser
 func (cs *CSCloud) getLoadBalancer(service *v1.Service) (*loadBalancer, error) {
 	lb := &loadBalancer{
 		CloudStackClient: cs.client,
-		name:             cloudprovider.GetLoadBalancerName(service),
+		name:             cloudprovider.DeprecatedGetLoadBalancerName(service),
 		projectID:        cs.projectID,
 		rules:            make(map[string]*cloudstack.LoadBalancerRule),
 	}

@@ -187,7 +187,7 @@ func getServiceName(service *v1.Service) string {
 
 // This returns a prefix for loadbalancer/security rules.
 func getRulePrefix(service *v1.Service) string {
-	return cloudprovider.GetLoadBalancerName(service)
+	return cloudprovider.DeprecatedGetLoadBalancerName(service)
 }
 
 func serviceOwnsRule(service *v1.Service, rule string) bool {
@@ -196,7 +196,7 @@ func serviceOwnsRule(service *v1.Service, rule string) bool {
 }
 
 func getFrontendIPConfigName(service *v1.Service) string {
-	return cloudprovider.GetLoadBalancerName(service)
+	return cloudprovider.DeprecatedGetLoadBalancerName(service)
 }
 
 // This returns the next available rule priority level for a given set of security rules.

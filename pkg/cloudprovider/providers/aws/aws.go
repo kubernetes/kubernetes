@@ -2698,7 +2698,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, fmt.Errorf("could not find any suitable subnets for creating the ELB")
 	}
 
-	loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
+	loadBalancerName := cloudprovider.DeprecatedGetLoadBalancerName(apiService)
 	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
 
 	// Create a security group for the load balancer
@@ -2790,9 +2790,16 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 	return status, nil
 }
 
+// GetLoadBalancerName returns the name of the load balancer based on the service UID.
+func (c *Cloud) GetLoadBalancerName(service *v1.Service) string {
+	ret := string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	return ret
+}
+
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
 func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := cloudprovider.DeprecatedGetLoadBalancerName(service)
 	lb, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return nil, false, err
@@ -3022,7 +3029,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 
 // EnsureLoadBalancerDeleted implements LoadBalancer.EnsureLoadBalancerDeleted.
 func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := cloudprovider.DeprecatedGetLoadBalancerName(service)
 	lb, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return err
@@ -3123,7 +3130,7 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 		return err
 	}
 
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := cloudprovider.DeprecatedGetLoadBalancerName(service)
 	lb, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return err
