@@ -5,7 +5,7 @@ func NewConsole(uid, gid int) (Console, error) {
 	return &windowsConsole{}, nil
 }
 
-// windowsConsole is a Windows psuedo TTY for use within a container.
+// windowsConsole is a Windows pseudo TTY for use within a container.
 type windowsConsole struct {
 }
 
