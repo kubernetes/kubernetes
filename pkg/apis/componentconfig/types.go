@@ -27,17 +27,17 @@ import (
 
 // ClientConnectionConfiguration contains details for constructing a client.
 type ClientConnectionConfiguration struct {
-	// KubeConfigFile is the path to a kubeconfig file.
+	// kubeConfigFile is the path to a kubeconfig file.
 	KubeConfigFile string
-	// AcceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the
+	// acceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the
 	// default value of 'application/json'. This field will control all connections to the server used by a particular
 	// client.
 	AcceptContentTypes string
-	// ContentType is the content type used when sending data to the server from this client.
+	// contentType is the content type used when sending data to the server from this client.
 	ContentType string
-	// QPS controls the number of queries per second allowed for this connection.
+	// qps controls the number of queries per second allowed for this connection.
 	QPS float32
-	// Burst allows extra queries to accumulate when a client is exceeding its rate.
+	// burst allows extra queries to accumulate when a client is exceeding its rate.
 	Burst int
 }
 
@@ -69,10 +69,10 @@ type KubeProxyConntrackConfiguration struct {
 	// min is the minimum value of connect-tracking records to allocate,
 	// regardless of conntrackMaxPerCore (set conntrackMaxPerCore=0 to leave the limit as-is).
 	Min int32
-	// TCPEstablishedTimeout is how long an idle TCP connection will be kept open
+	// tcpEstablishedTimeout is how long an idle TCP connection will be kept open
 	// (e.g. '2s').  Must be greater than 0.
 	TCPEstablishedTimeout metav1.Duration
-	// TCPCloseWaitTimeout is how long an idle conntrack entry
+	// tcpCloseWaitTimeout is how long an idle conntrack entry
 	// in CLOSE_WAIT state will remain in the conntrack
 	// table. (e.g. '60s'). Must be greater than 0 to set.
 	TCPCloseWaitTimeout metav1.Duration
