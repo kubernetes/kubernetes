@@ -66,7 +66,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	if err != nil {
 		return err
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("apps/v1beta1", "Deployment",
+	err = scheme.AddFieldLabelConversionFunc("apps/v1beta1", "Deployment",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace":
