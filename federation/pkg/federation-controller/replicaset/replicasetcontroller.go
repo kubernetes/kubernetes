@@ -138,7 +138,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			&extensionsv1.ReplicaSet{},
 			controller.NoResyncPeriodFunc(),
 			fedutil.NewTriggerOnAllChanges(
-				func(obj runtime.Object) { frsc.deliverLocalReplicaSet(obj, replicaSetReviewDelay) },
+				func(obj runtime.Object) { frsc.deliverReplicaSetObj(obj, replicaSetReviewDelay) },
 			),
 		)
 	}
@@ -164,7 +164,9 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		&extensionsv1.ReplicaSet{},
 		controller.NoResyncPeriodFunc(),
 		fedutil.NewTriggerOnMetaAndSpecChanges(
-			func(obj runtime.Object) { frsc.deliverFedReplicaSetObj(obj, replicaSetReviewDelay) }))
+			func(obj runtime.Object) { frsc.deliverFedReplicaSetObj(obj, replicaSetReviewDelay) },
+		),
+	)
 
 	frsc.fedUpdater = fedutil.NewFederatedUpdater(frsc.fedReplicaSetInformer, "replicaset", frsc.eventRecorder,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
@@ -255,25 +257,7 @@ func (frsc *ReplicaSetController) isSynced() bool {
 	return true
 }
 
-func (frsc *ReplicaSetController) deliverLocalReplicaSet(obj interface{}, duration time.Duration) {
-	key, err := controller.KeyFunc(obj)
-	if err != nil {
-		glog.Errorf("Couldn't get key for object %v: %v", obj, err)
-		return
-	}
-	_, exists, err := frsc.replicaSetStore.GetByKey(key)
-	switch {
-	case !exists:
-		// do nothing
-	case err != nil:
-		glog.Errorf("Couldn't get federation replicaset %v: %v", key, err)
-	default:
-		// ReplicaSet exists. Ignore ReplicaSets that exist only in local k8s
-		frsc.deliverReplicaSetByKey(key, duration, false)
-	}
-}
-
-func (frsc *ReplicaSetController) deliverFedReplicaSetObj(obj interface{}, delay time.Duration) {
+func (frsc *ReplicaSetController) deliverReplicaSetObj(obj interface{}, delay time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
@@ -457,7 +441,6 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 	if err != nil {
 		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in replicaset %s: %v",
 			frs.Name, err)
-		frsc.deliverReplicaSetByKey(key, 0, false)
 		return statusError, err
 	}
 	frs = updatedRsObj.(*extensionsv1.ReplicaSet)
@@ -554,7 +537,6 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 	}
 	err = frsc.fedUpdater.Update(operations, updateTimeout)
 	if err != nil {
-		glog.Errorf("Failed to execute updates for %s: %v", key, err)
 		return statusError, err
 	}
 
