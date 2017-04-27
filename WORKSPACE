@@ -31,8 +31,8 @@ debs = (
     ),
     (
         "libc_deb",
-        "6bbd506b171a9f29b09fde77e2749c0aa0c1439058df9d1a6408d464069b7dd6",
-        "http://ftp.us.debian.org/debian/pool/main/g/glibc/libc6_2.24-9_amd64.deb",
+        "372aac4a9ce9dbb26a08de0b9c41b0500ba019430295d29f39566483f5f32732",
+        "http://ftp.us.debian.org/debian/pool/main/g/glibc/libc6_2.24-10_amd64.deb",
     ),
     (
         "iptables_deb",
