@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
-	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -101,8 +100,7 @@ func TestServiceController(t *testing.T) {
 		}
 	}
 
-	fakedns, _ := clouddns.NewFakeInterface()
-	sc := New(fedClient, fakedns, "myfederation", "federation.example.com", "example.com", "")
+	sc := New(fedClient)
 	ToFederatedInformerForTestOnly(sc.federatedInformer).SetClientFactory(fedInformerClientFactory)
 	ToFederatedInformerForTestOnly(sc.endpointFederatedInformer).SetClientFactory(fedInformerClientFactory)
 	sc.clusterAvailableDelay = 100 * time.Millisecond
