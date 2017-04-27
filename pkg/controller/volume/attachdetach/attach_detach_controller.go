@@ -298,11 +298,13 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
 		// Newly added node is managed by controller, ensure all pods are up to date.
 		// Run in a separate goroutine so we don't block the node handler goroutine.
-		go adc.processPodsForNode(nodeName)
+		go adc.fetchAndProcessPodsForNode(nodeName)
 	}
 }
 
-func (adc *attachDetachController) processPodsForNode(nodeName types.NodeName) {
+// fetchAndProcessPodsForNode fetches all the pods for the node and processes them.
+// This is used for newly managed nodes to proactively handle any pods that might need volumes attached or detached.
+func (adc *attachDetachController) fetchAndProcessPodsForNode(nodeName types.NodeName) {
 	pods, err := adc.podLister.List(labels.Everything())
 	if err != nil {
 		glog.Errorf("podLister list failed: %v", err)
@@ -334,7 +336,7 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 			if !oldManaged {
 				// Node is newly managed by controller, ensure all pods are up to date.
 				// Run in a separate goroutine so we don't block the node handler goroutine.
-				go adc.processPodsForNode(nodeName)
+				go adc.fetchAndProcessPodsForNode(nodeName)
 			}
 		}
 	}
