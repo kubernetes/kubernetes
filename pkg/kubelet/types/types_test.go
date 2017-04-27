@@ -20,8 +20,82 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
+
+func TestConvertToTimestamp(t *testing.T) {
+	timestamp := "2017-02-17T15:34:49.830882016+08:00"
+	convertedTimeStamp := ConvertToTimestamp(timestamp).GetString()
+	assert.Equal(t, timestamp, convertedTimeStamp)
+}
+
+func TestLen(t *testing.T) {
+	var cases = []struct {
+		statuses SortedContainerStatuses
+		expected int
+	}{
+		{
+			statuses: SortedContainerStatuses{{Name: "first"}},
+			expected: 1,
+		},
+		{
+			statuses: SortedContainerStatuses{{Name: "first"}, {Name: "second"}},
+			expected: 2,
+		},
+	}
+	for _, data := range cases {
+		assert.Equal(t, data.expected, data.statuses.Len())
+	}
+}
+
+func TestSwap(t *testing.T) {
+	var cases = []struct {
+		statuses SortedContainerStatuses
+		expected SortedContainerStatuses
+	}{
+		{
+			statuses: SortedContainerStatuses{{Name: "first"}, {Name: "second"}},
+			expected: SortedContainerStatuses{{Name: "second"}, {Name: "first"}},
+		},
+	}
+	for _, data := range cases {
+		data.statuses.Swap(0, 1)
+		if !reflect.DeepEqual(data.statuses, data.expected) {
+			t.Errorf(
+				"failed Swap:\n\texpected: %v\n\t  actual: %v",
+				data.expected,
+				data.statuses,
+			)
+		}
+	}
+}
+
+func TestLess(t *testing.T) {
+	var cases = []struct {
+		statuses SortedContainerStatuses
+		expected bool
+	}{
+		{
+			statuses: SortedContainerStatuses{{Name: "first"}, {Name: "second"}},
+			expected: true,
+		},
+		{
+			statuses: SortedContainerStatuses{{Name: "second"}, {Name: "first"}},
+			expected: false,
+		},
+	}
+	for _, data := range cases {
+		actual := data.statuses.Less(0, 1)
+		if actual != data.expected {
+			t.Errorf(
+				"failed Less:\n\texpected: %t\n\t  actual: %t",
+				data.expected,
+				actual,
+			)
+		}
+	}
+}
 
 func TestSortInitContainerStatuses(t *testing.T) {
 	pod := v1.Pod{
