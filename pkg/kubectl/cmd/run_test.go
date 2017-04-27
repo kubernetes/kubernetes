@@ -337,7 +337,7 @@ func TestGenerateService(t *testing.T) {
 		}
 
 		buff := &bytes.Buffer{}
-		err := generateService(f, cmd, test.args, test.serviceGenerator, test.params, "namespace", buff)
+		_, err := generateService(f, cmd, test.args, test.serviceGenerator, test.params, "namespace", buff)
 		if test.expectErr {
 			if err == nil {
 				t.Error("unexpected non-error")
