@@ -112,23 +112,26 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 				return err
 			}
 		}
-		// if the Pod is not dirty do nothing
+		// if the Pod is not dirty, do nothing
 		if consistent {
 			return nil
 		}
 
 		attemptedUpdate = true
 		// commit the update, retrying on conflicts
-		_, err := spc.client.Core().Pods(set.Namespace).Update(pod)
-		if err == nil {
-			return nil
+		_, updateErr := spc.client.Core().Pods(set.Namespace).Update(pod)
+		if updateErr == nil {
+			return updateErr
 		}
-		updateErr := err
 
 		if updated, err := spc.podLister.Pods(set.Namespace).Get(pod.Name); err == nil {
 			// make a copy so we don't mutate the shared cache
 			if copy, err := api.Scheme.DeepCopy(updated); err == nil {
-				pod = copy.(*v1.Pod)
+				ok := false
+				pod, ok = copy.(*v1.Pod)
+				if !ok {
+					utilruntime.HandleError(fmt.Errorf("updated pod's kind error"))
+				}
 			} else {
 				utilruntime.HandleError(fmt.Errorf("error copying updated Pod: %v", err))
 			}
@@ -154,17 +157,19 @@ func (spc *realStatefulPodControl) UpdateStatefulSetStatus(set *apps.StatefulSet
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		set.Status.Replicas = replicas
 		set.Status.ObservedGeneration = &generation
-		_, err := spc.client.Apps().StatefulSets(set.Namespace).UpdateStatus(set)
-		if err == nil {
+		_, updateErr := spc.client.Apps().StatefulSets(set.Namespace).UpdateStatus(set)
+		if updateErr == nil {
 			return nil
 		}
-
-		updateErr := err
 
 		if updated, err := spc.setLister.StatefulSets(set.Namespace).Get(set.Name); err == nil {
 			// make a copy so we don't mutate the shared cache
 			if copy, err := api.Scheme.DeepCopy(updated); err == nil {
-				set = copy.(*apps.StatefulSet)
+				ok := false
+				set, ok = copy.(*apps.StatefulSet)
+				if !ok {
+					utilruntime.HandleError(fmt.Errorf("updated StatefulSet's kind error"))
+				}
 			} else {
 				utilruntime.HandleError(fmt.Errorf("error copying updated StatefulSet: %v", err))
 			}
