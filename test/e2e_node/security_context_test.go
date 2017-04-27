@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"os/exec"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,6 +112,77 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			pidSets := sets.NewString(strings.Split(pids, " ")...)
 			if pidSets.Has(nginxPid) {
 				framework.Failf("nginx's pid should not be seen by non-hostpid containers")
+			}
+		})
+	})
+
+	Context("when creating a pod in the host network namespace", func() {
+		makeHostNetworkPod := func(podName, image string, command []string, hostNetwork bool) *v1.Pod {
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					HostNetwork:   hostNetwork,
+					Containers: []v1.Container{
+						{
+							Image:   image,
+							Name:    podName,
+							Command: command,
+						},
+					},
+				},
+			}
+		}
+		listNetworkInterfaceCommand := []string{"sh", "-c", "awk '{print $1}' /proc/net/dev"}
+		createAndWaitHostNetworkPod := func(podName string, hostNetwork bool) {
+			podClient.Create(makeHostNetworkPod(podName,
+				"gcr.io/google_containers/busybox:1.24",
+				listNetworkInterfaceCommand,
+				hostNetwork,
+			))
+
+			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+		}
+
+		networkInterfaces := ""
+		BeforeEach(func() {
+			output, err := exec.Command(listNetworkInterfaceCommand[0], listNetworkInterfaceCommand[1:]...).Output()
+			if err != nil {
+				framework.Failf("Execute command %q failed: %v", listNetworkInterfaceCommand, err)
+			}
+			networkInterfaces = strings.TrimSpace(string(output))
+			framework.Logf("Got host network interfaces %q", networkInterfaces)
+		})
+
+		It("should show same network interfaces in the host network containers", func() {
+			busyboxPodName := "busybox-hostnetwork-" + string(uuid.NewUUID())
+			createAndWaitHostNetworkPod(busyboxPodName, true)
+			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
+			if err != nil {
+				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
+			}
+
+			podInterfaces := strings.TrimSpace(logs)
+			framework.Logf("Got network interfaces %q from pod %q", podInterfaces, busyboxPodName)
+			if podInterfaces != networkInterfaces {
+				framework.Failf("host-networked container should have same interfaces as host")
+			}
+		})
+
+		It("should show different network interfaces in the non-hostnetwork containers", func() {
+			busyboxPodName := "busybox-non-hostnetwork-" + string(uuid.NewUUID())
+			createAndWaitHostNetworkPod(busyboxPodName, false)
+			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
+			if err != nil {
+				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
+			}
+
+			podInterfaces := strings.TrimSpace(logs)
+			framework.Logf("Got network interfaces %q from pod %q", podInterfaces, busyboxPodName)
+			if podInterfaces == networkInterfaces {
+				framework.Failf("non-hostnetworked container should have different interfaces as host")
 			}
 		})
 	})
