@@ -20,6 +20,8 @@ import (
 	goflag "flag"
 	"os"
 
+	"github.com/spf13/pflag"
+
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
@@ -27,20 +29,22 @@ import (
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
 	"k8s.io/kubernetes/pkg/version/verflag"
-
-	"github.com/spf13/pflag"
 )
 
 func main() {
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
 	healthz.DefaultHealthz()
 
 	command := app.NewProxyCommand()
 
+	// TODO: once we switch everything over to Cobra commands, we can go back to calling
+	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
+	// normalize func and add the go flag set by hand.
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	// utilflag.InitFlags()
+	logs.InitLogs()
+	defer logs.FlushLogs()
+
 	verflag.PrintAndExitIfRequested()
 
 	if err := command.Execute(); err != nil {

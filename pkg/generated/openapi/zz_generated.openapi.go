@@ -12757,35 +12757,35 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"kubeconfig": {
 							SchemaProps: spec.SchemaProps{
-								Description: "KubeConfigFile is the path to a kubeconfig file.",
+								Description: "kubeConfigFile is the path to a kubeconfig file.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
 						"acceptContentTypes": {
 							SchemaProps: spec.SchemaProps{
-								Description: "AcceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the default value of 'application/json'. This field will control all connections to the server used by a particular client.",
+								Description: "acceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the default value of 'application/json'. This field will control all connections to the server used by a particular client.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
 						"contentType": {
 							SchemaProps: spec.SchemaProps{
-								Description: "ContentType is the content type used when sending data to the server from this client.",
+								Description: "contentType is the content type used when sending data to the server from this client.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
 						"qps": {
 							SchemaProps: spec.SchemaProps{
-								Description: "QPS controls the number of queries per second allowed for this connection.",
+								Description: "cps controls the number of queries per second allowed for this connection.",
 								Type:        []string{"number"},
 								Format:      "float",
 							},
 						},
 						"burst": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Burst allows extra queries to accumulate when a client is exceeding its rate.",
+								Description: "burst allows extra queries to accumulate when a client is exceeding its rate.",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
@@ -12943,13 +12943,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"tcpEstablishedTimeout": {
 							SchemaProps: spec.SchemaProps{
-								Description: "TCPEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '2s').  Must be greater than 0.",
+								Description: "tcpEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '2s').  Must be greater than 0.",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 							},
 						},
 						"tcpCloseWaitTimeout": {
 							SchemaProps: spec.SchemaProps{
-								Description: "TCPCloseWaitTimeout is how long an idle conntrack entry in CLOSE_WAIT state will remain in the conntrack table. (e.g. '60s'). Must be greater than 0 to set.",
+								Description: "tcpCloseWaitTimeout is how long an idle conntrack entry in CLOSE_WAIT state will remain in the conntrack table. (e.g. '60s'). Must be greater than 0 to set.",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 							},
 						},
