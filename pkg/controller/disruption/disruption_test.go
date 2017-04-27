@@ -165,6 +165,37 @@ func newPodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrString) (*pol
 	return pdb, pdbName
 }
 
+func newPodOwnedByRc(t *testing.T, name string, rc *v1.ReplicationController) (*v1.Pod, string) {
+	var controllerReference metav1.OwnerReference
+	var trueVar = true
+	controllerReference = metav1.OwnerReference{UID: rc.UID, APIVersion: "v1", Kind: "ReplicationController", Name: rc.Name, Controller: &trueVar}
+	pod, podName := newPod(t, name)
+	pod.OwnerReferences = []metav1.OwnerReference{controllerReference}
+
+	return pod, podName
+}
+
+func newPodOwnedByRs(t *testing.T, name string, rs *extensions.ReplicaSet) (*v1.Pod, string) {
+	var controllerReference metav1.OwnerReference
+	var trueVar = true
+	controllerReference = metav1.OwnerReference{UID: rs.UID, APIVersion: "v1beta1", Kind: "ReplicaSet", Name: rs.Name, Controller: &trueVar}
+	pod, podName := newPod(t, name)
+	pod.OwnerReferences = []metav1.OwnerReference{controllerReference}
+
+	return pod, podName
+}
+
+func newPodOwnedBySs(t *testing.T, name string, ss *apps.StatefulSet) (*v1.Pod, string) {
+	var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
+	var controllerReference metav1.OwnerReference
+	var trueVar = true
+	controllerReference = metav1.OwnerReference{UID: ss.UID, APIVersion: controllerKind.GroupVersion().String(), Kind: controllerKind.Kind, Name: ss.Name, Controller: &trueVar}
+	pod, podName := newPod(t, name)
+	pod.OwnerReferences = []metav1.OwnerReference{controllerReference}
+
+	return pod, podName
+}
+
 func newPod(t *testing.T, name string) (*v1.Pod, string) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
@@ -374,7 +405,7 @@ func TestReplicaSet(t *testing.T) {
 	rs, _ := newReplicaSet(t, 10)
 	add(t, dc.rsStore, rs)
 
-	pod, _ := newPod(t, "pod")
+	pod, _ := newPodOwnedByRs(t, "pod", rs)
 	add(t, dc.podStore, pod)
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 2, 10, map[string]metav1.Time{})
@@ -443,7 +474,7 @@ func TestReplicationController(t *testing.T) {
 	pods := []*v1.Pod{}
 
 	for i := int32(0); i < 3; i++ {
-		pod, _ := newPod(t, fmt.Sprintf("foobar %d", i))
+		pod, _ := newPodOwnedByRc(t, fmt.Sprintf("foobar %d", i), rc)
 		pods = append(pods, pod)
 		pod.Labels = labels
 		add(t, dc.podStore, pod)
@@ -531,7 +562,7 @@ func TestTwoControllers(t *testing.T) {
 
 	unavailablePods := collectionSize - minimumOne - 1
 	for i := int32(1); i <= collectionSize; i++ {
-		pod, _ := newPod(t, fmt.Sprintf("quux %d", i))
+		pod, _ := newPodOwnedByRc(t, fmt.Sprintf("quux %d", i), rc)
 		pods = append(pods, pod)
 		pod.Labels = rcLabels
 		if i <= unavailablePods {
@@ -564,7 +595,7 @@ func TestTwoControllers(t *testing.T) {
 	// By the end of this loop, the number of ready pods should be N+2 (hence minimumTwo+2).
 	unavailablePods = 2*collectionSize - (minimumTwo + 2) - unavailablePods
 	for i := int32(1); i <= collectionSize; i++ {
-		pod, _ := newPod(t, fmt.Sprintf("quuux %d", i))
+		pod, _ := newPodOwnedByRs(t, fmt.Sprintf("quuux %d", i), rs)
 		pods = append(pods, pod)
 		pod.Labels = dLabels
 		if i <= unavailablePods {
