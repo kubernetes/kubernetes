@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sort"
 
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 
@@ -101,7 +101,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 
 	// if the current number of replicas has changed update the statefulSets replicas
 	if set.Status.Replicas != int32(ready) || set.Status.ObservedGeneration == nil || set.Generation > *set.Status.ObservedGeneration {
-		obj, err := api.Scheme.Copy(set)
+		obj, err := scheme.Scheme.Copy(set)
 		if err != nil {
 			return fmt.Errorf("unable to copy set: %v", err)
 		}
@@ -152,7 +152,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 			continue
 		}
 		// Make a deep copy so we don't mutate the shared cache
-		copy, err := api.Scheme.DeepCopy(replicas[i])
+		copy, err := scheme.Scheme.DeepCopy(replicas[i])
 		if err != nil {
 			return err
 		}
