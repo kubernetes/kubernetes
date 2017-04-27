@@ -132,6 +132,13 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		if !isCreated(replicas[i]) {
 			return ssc.podControl.CreateStatefulPod(set, replicas[i])
 		}
+		// If we find a Pod that is currently terminating, we must wait until graceful deletion
+		// completes before we continue to make  progress.
+		if isTerminating(replicas[i]) {
+			glog.V(2).Infof("StatefulSet %s is waiting for Pod %s to Terminate",
+				set.Name, replicas[i].Name)
+			return nil
+		}
 		// If we have a Pod that has been created but is not running and ready we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Running and Ready.

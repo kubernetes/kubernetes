@@ -362,7 +362,6 @@ function kube::release::package_kube_manifests_tarball() {
   rm -rf "${release_stage}"
 
   mkdir -p "${release_stage}"
-  cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
 
@@ -475,6 +474,10 @@ EOF
   cp -R "${KUBE_ROOT}/federation/cluster" "${release_stage}/federation/"
   cp -R "${KUBE_ROOT}/federation/manifests" "${release_stage}/federation/"
   cp -R "${KUBE_ROOT}/federation/deploy" "${release_stage}/federation/"
+
+  # Include hack/lib as a dependency for the cluster/ scripts
+  mkdir -p "${release_stage}/hack"
+  cp -R "${KUBE_ROOT}/hack/lib" "${release_stage}/hack/"
 
   cp -R "${KUBE_ROOT}/examples" "${release_stage}/"
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"

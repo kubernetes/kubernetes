@@ -17,30 +17,27 @@ limitations under the License.
 package framework
 
 import (
-	"fmt"
 	"testing"
 
 	restclient "k8s.io/client-go/rest"
-	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	"k8s.io/kubernetes/federation/pkg/typeadapters"
+	"k8s.io/kubernetes/federation/pkg/federatedtypes"
+	synccontroller "k8s.io/kubernetes/federation/pkg/federation-controller/sync"
 )
 
-// ControllerFixture defines operations for managing a federation
-// controller.  Tests written to this interface can then target any
-// controller for which an implementation of this interface exists.
-type ControllerFixture interface {
-	TestFixture
-
-	SetUp(t *testing.T, testClient federationclientset.Interface, config *restclient.Config)
-
-	Kind() string
-
-	Adapter() typeadapters.FederatedTypeAdapter
+// ControllerFixture manages a federation controller for testing.
+type ControllerFixture struct {
+	stopChan chan struct{}
 }
 
-// SetUpControllerFixture configures the given resource fixture to target the provided api fixture
-func SetUpControllerFixture(t *testing.T, apiFixture *FederationAPIFixture, controllerFixture ControllerFixture) {
-	client := apiFixture.NewClient(fmt.Sprintf("test-%s", controllerFixture.Kind()))
-	config := apiFixture.NewConfig()
-	controllerFixture.SetUp(t, client, config)
+// NewControllerFixture initializes a new controller fixture
+func NewControllerFixture(t *testing.T, kind string, adapterFactory federatedtypes.AdapterFactory, config *restclient.Config) *ControllerFixture {
+	f := &ControllerFixture{
+		stopChan: make(chan struct{}),
+	}
+	synccontroller.StartFederationSyncController(kind, adapterFactory, config, f.stopChan, true)
+	return f
+}
+
+func (f *ControllerFixture) TearDown(t *testing.T) {
+	close(f.stopChan)
 }

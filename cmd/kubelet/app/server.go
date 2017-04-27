@@ -128,7 +128,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 // UnsecuredKubeletDeps returns a KubeletDeps suitable for being run, or an error if the server setup
 // is not valid.  It will not start any background processes, and does not include authentication/authorization
 func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error) {
-
 	// Initialize the TLS Options
 	tlsOptions, err := InitializeTLS(&s.KubeletFlags, &s.KubeletConfiguration)
 	if err != nil {
@@ -353,7 +352,6 @@ func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubele
 	} else {
 		glog.Warning("No api server defined - no events will be sent to API server.")
 	}
-
 }
 
 func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
@@ -812,7 +810,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.Kubele
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
-	k, err := builder(kubeCfg, kubeDeps, standaloneMode, kubeFlags.HostnameOverride, kubeFlags.NodeIP)
+	k, err := builder(kubeCfg, kubeDeps, standaloneMode, kubeFlags.HostnameOverride, kubeFlags.NodeIP, kubeFlags.DockershimRootDirectory)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -892,11 +890,11 @@ func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg 
 	}
 }
 
-func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, standaloneMode bool, hostnameOverride string, nodeIP string) (k kubelet.KubeletBootstrap, err error) {
+func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, standaloneMode bool, hostnameOverride, nodeIP, dockershimRootDir string) (k kubelet.KubeletBootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, standaloneMode, hostnameOverride, nodeIP)
+	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, standaloneMode, hostnameOverride, nodeIP, dockershimRootDir)
 	if err != nil {
 		return nil, err
 	}
@@ -936,7 +934,7 @@ func parseResourceList(m componentconfig.ConfigurationMap) (v1.ResourceList, err
 
 // RunDockershim only starts the dockershim in current process. This is only used for cri validate testing purpose
 // TODO(random-liu): Move this to a separate binary.
-func RunDockershim(c *componentconfig.KubeletConfiguration) error {
+func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir string) error {
 	// Create docker client.
 	dockerClient := dockertools.ConnectToDockerOrDie(c.DockerEndpoint, c.RuntimeRequestTimeout.Duration,
 		c.ImagePullProgressDeadline.Duration)
@@ -978,7 +976,7 @@ func RunDockershim(c *componentconfig.KubeletConfiguration) error {
 	}
 
 	ds, err := dockershim.NewDockerService(dockerClient, c.SeccompProfileRoot, c.PodInfraContainerImage,
-		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, dockerExecHandler)
+		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, dockerExecHandler, dockershimRootDir)
 	if err != nil {
 		return err
 	}

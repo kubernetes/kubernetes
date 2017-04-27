@@ -29,6 +29,10 @@ api-server-port
 api-server-port
 api-servers
 api-servers
+apiserver-count
+apiserver-count
+api-server-port
+api-servers
 api-server-service-type
 api-token
 api-version
@@ -80,6 +84,7 @@ cgroup-driver
 cgroup-root
 cgroups-per-qos
 chaos-chance
+cidr-allocator-type
 clean-start
 cleanup
 cleanup-iptables
@@ -93,6 +98,7 @@ clientset-only
 clientset-path
 cloud-config
 cloud-provider
+cloud-provider-gce-lb-src-cidrs
 cluster-cidr
 cluster-context
 cluster-dns
@@ -237,6 +243,7 @@ experimental-bootstrap-token-auth
 experimental-check-node-capabilities-before-mount
 experimental-cri
 experimental-dockershim
+experimental-dockershim-root-directory
 experimental-fail-swap-on
 experimental-kernel-memcg-notification
 experimental-keystone-ca-file
@@ -261,6 +268,7 @@ feature-gates
 federated-api-burst
 federated-api-qps
 federated-kube-context
+federation-config-from-cluster
 federation-name
 federation-system-namespace
 federation-upgrade-target
@@ -303,6 +311,8 @@ heapster-port
 heapster-scheme
 heapster-service
 horizontal-pod-autoscaler-sync-period
+horizontal-pod-autoscaler-upscale-delay
+horizontal-pod-autoscaler-downscale-delay
 host-cluster-context
 host-ipc-sources
 hostname-override
@@ -401,6 +411,8 @@ kube-master-url
 kube-reserved
 kube-reserved
 kube-reserved-cgroup
+kube-master-url
+kube-reserved
 kubernetes-anywhere-cluster
 kubernetes-anywhere-path
 kubernetes-anywhere-phase2-provider
@@ -636,6 +648,7 @@ since-time
 skip-generated-rewrite
 skip-munges
 skip-preflight-checks
+skip-token-print
 skip-unsafe
 sort-by
 source-file
@@ -691,6 +704,9 @@ use-service-account-credentials
 user-whitelist
 use-service-account-credentials
 use-service-account-credentials
+user-whitelist
+use-service-account-credentials
+use-taint-based-evictions
 verb
 verify-only
 versioned-clientset-package

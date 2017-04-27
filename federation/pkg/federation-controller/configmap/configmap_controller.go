@@ -175,9 +175,7 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 		})
 
 	configmapcontroller.deletionHelper = deletionhelper.NewDeletionHelper(
-		configmapcontroller.hasFinalizerFunc,
-		configmapcontroller.removeFinalizerFunc,
-		configmapcontroller.addFinalizerFunc,
+		configmapcontroller.updateConfigMap,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
 			configmap := obj.(*apiv1.ConfigMap)
@@ -192,50 +190,11 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 	return configmapcontroller
 }
 
-// hasFinalizerFunc returns true if the given object has the given finalizer in its ObjectMeta.
-func (configmapcontroller *ConfigMapController) hasFinalizerFunc(obj pkgruntime.Object, finalizer string) bool {
+// Sends the given updated object to apiserver.
+// Assumes that the given object is a configmap.
+func (configmapcontroller *ConfigMapController) updateConfigMap(obj pkgruntime.Object) (pkgruntime.Object, error) {
 	configmap := obj.(*apiv1.ConfigMap)
-	for i := range configmap.ObjectMeta.Finalizers {
-		if string(configmap.ObjectMeta.Finalizers[i]) == finalizer {
-			return true
-		}
-	}
-	return false
-}
-
-// removeFinalizerFunc removes the given finalizers from the given objects ObjectMeta. Assumes that the given object is a configmap.
-func (configmapcontroller *ConfigMapController) removeFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
-	configmap := obj.(*apiv1.ConfigMap)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range configmap.ObjectMeta.Finalizers {
-		if !deletionhelper.ContainsString(finalizers, configmap.ObjectMeta.Finalizers[i]) {
-			newFinalizers = append(newFinalizers, configmap.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	configmap.ObjectMeta.Finalizers = newFinalizers
-	configmap, err := configmapcontroller.federatedApiClient.Core().ConfigMaps(configmap.Namespace).Update(configmap)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizers %v from configmap %s: %v", finalizers, configmap.Name, err)
-	}
-	return configmap, nil
-}
-
-// addFinalizerFunc adds the given finalizer to the given objects ObjectMeta. Assumes that the given object is a configmap.
-func (configmapcontroller *ConfigMapController) addFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
-	configmap := obj.(*apiv1.ConfigMap)
-	configmap.ObjectMeta.Finalizers = append(configmap.ObjectMeta.Finalizers, finalizers...)
-	configmap, err := configmapcontroller.federatedApiClient.Core().ConfigMaps(configmap.Namespace).Update(configmap)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizers %v to configmap %s: %v", finalizers, configmap.Name, err)
-	}
-	return configmap, nil
+	return configmapcontroller.federatedApiClient.Core().ConfigMaps(configmap.Namespace).Update(configmap)
 }
 
 func (configmapcontroller *ConfigMapController) Run(stopChan <-chan struct{}) {
@@ -335,7 +294,7 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 	if configMap.DeletionTimestamp != nil {
 		if err := configmapcontroller.delete(configMap); err != nil {
 			glog.Errorf("Failed to delete %s: %v", configmap, err)
-			configmapcontroller.eventRecorder.Eventf(configMap, api.EventTypeNormal, "DeleteFailed",
+			configmapcontroller.eventRecorder.Eventf(configMap, api.EventTypeWarning, "DeleteFailed",
 				"ConfigMap delete failed: %v", err)
 			configmapcontroller.deliverConfigMap(configmap, 0, true)
 		}
@@ -410,7 +369,7 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 	}
 	err = configmapcontroller.federatedUpdater.UpdateWithOnError(operations, configmapcontroller.updateTimeout,
 		func(op util.FederatedOperation, operror error) {
-			configmapcontroller.eventRecorder.Eventf(configMap, api.EventTypeNormal, "UpdateInClusterFailed",
+			configmapcontroller.eventRecorder.Eventf(configMap, api.EventTypeWarning, "UpdateInClusterFailed",
 				"ConfigMap update in cluster %s failed: %v", op.ClusterName, operror)
 		})
 

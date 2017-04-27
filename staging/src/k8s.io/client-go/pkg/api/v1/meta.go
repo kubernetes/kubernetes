@@ -35,6 +35,8 @@ func (meta *ObjectMeta) GetUID() types.UID                   { return meta.UID }
 func (meta *ObjectMeta) SetUID(uid types.UID)                { meta.UID = uid }
 func (meta *ObjectMeta) GetResourceVersion() string          { return meta.ResourceVersion }
 func (meta *ObjectMeta) SetResourceVersion(version string)   { meta.ResourceVersion = version }
+func (meta *ObjectMeta) GetGeneration() int64                { return meta.Generation }
+func (meta *ObjectMeta) SetGeneration(generation int64)      { meta.Generation = generation }
 func (meta *ObjectMeta) GetSelfLink() string                 { return meta.SelfLink }
 func (meta *ObjectMeta) SetSelfLink(selfLink string)         { meta.SelfLink = selfLink }
 func (meta *ObjectMeta) GetCreationTimestamp() metav1.Time   { return meta.CreationTimestamp }
@@ -44,6 +46,10 @@ func (meta *ObjectMeta) SetCreationTimestamp(creationTimestamp metav1.Time) {
 func (meta *ObjectMeta) GetDeletionTimestamp() *metav1.Time { return meta.DeletionTimestamp }
 func (meta *ObjectMeta) SetDeletionTimestamp(deletionTimestamp *metav1.Time) {
 	meta.DeletionTimestamp = deletionTimestamp
+}
+func (meta *ObjectMeta) GetDeletionGracePeriodSeconds() *int64 { return meta.DeletionGracePeriodSeconds }
+func (meta *ObjectMeta) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds *int64) {
+	meta.DeletionGracePeriodSeconds = deletionGracePeriodSeconds
 }
 func (meta *ObjectMeta) GetLabels() map[string]string                 { return meta.Labels }
 func (meta *ObjectMeta) SetLabels(labels map[string]string)           { meta.Labels = labels }

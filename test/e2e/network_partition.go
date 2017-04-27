@@ -85,7 +85,7 @@ func podOnNode(podName, nodeName string, image string) *v1.Pod {
 }
 
 func newPodOnNode(c clientset.Interface, namespace, podName, nodeName string) error {
-	pod, err := c.Core().Pods(namespace).Create(podOnNode(podName, nodeName, serveHostnameImage))
+	pod, err := c.Core().Pods(namespace).Create(podOnNode(podName, nodeName, framework.ServeHostnameImage))
 	if err == nil {
 		framework.Logf("Created pod %s on node %s", pod.ObjectMeta.Name, nodeName)
 	} else {

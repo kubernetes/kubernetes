@@ -73,6 +73,10 @@ type KubeletFlags struct {
 	// NodeIP is IP address of the node.
 	// If set, kubelet will use this IP address for the node.
 	NodeIP string
+
+	// DockershimRootDirectory is the path to the dockershim root directory. Defaults to
+	// /var/lib/dockershim if unset. Exposed for integration testing (e.g. in OpenShift).
+	DockershimRootDirectory string
 }
 
 // KubeletServer encapsulates all of the parameters necessary for starting up
@@ -90,8 +94,9 @@ func NewKubeletServer() *KubeletServer {
 	api.Scheme.Convert(versioned, &config, nil)
 	return &KubeletServer{
 		KubeletFlags: KubeletFlags{
-			KubeConfig:        flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
-			RequireKubeConfig: false,
+			KubeConfig:              flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
+			RequireKubeConfig:       false,
+			DockershimRootDirectory: "/var/lib/dockershim",
 		},
 		KubeletConfiguration: config,
 	}
@@ -114,8 +119,8 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "<Warning: Experimental feature> Path to a kubeconfig file that will be used to get client certificate for kubelet. "+
 		"If the file specified by --kubeconfig does not exist, the bootstrap kubeconfig is used to request a client certificate from the API server. "+
-		"On success, a kubeconfig file referencing the generated key and obtained certificate is written to the path specified by --kubeconfig. "+
-		"The certificate and key file will be stored in the directory pointed by --cert-dir.")
+		"On success, a kubeconfig file referencing the generated client certificate and key is written to the path specified by --kubeconfig. "+
+		"The client certificate and key file will be stored in the directory pointed by --cert-dir.")
 
 	// DEPRECATED: Remove these flags at the beginning of 1.5.
 	fs.StringSliceVar(&f.APIServerList, "api-servers", []string{}, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
@@ -129,6 +134,9 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&f.HostnameOverride, "hostname-override", f.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 
 	fs.StringVar(&f.NodeIP, "node-ip", f.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
+
+	fs.StringVar(&f.DockershimRootDirectory, "experimental-dockershim-root-directory", f.DockershimRootDirectory, "Path to the dockershim root directory.")
+	fs.MarkHidden("experimental-dockershim-root-directory")
 }
 
 // addFlags adds flags for a specific componentconfig.KubeletConfiguration to the specified FlagSet
@@ -170,7 +178,7 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 
 	fs.StringVar(&c.TLSCertFile, "tls-cert-file", c.TLSCertFile, ""+
-		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
+		"File containing x509 Certificate used for serving HTTPS (with intermediate certs, if any, concatenated after server cert). "+
 		"If --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key "+
 		"are generated for the public address and saved to the directory passed to --cert-dir.")
 	fs.StringVar(&c.TLSPrivateKeyFile, "tls-private-key-file", c.TLSPrivateKeyFile, "File containing x509 private key matching --tls-cert-file.")

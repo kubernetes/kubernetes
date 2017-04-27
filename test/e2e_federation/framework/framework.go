@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/v1"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -227,5 +228,18 @@ func (f *Framework) GetUnderlyingFederatedContexts() []E2EContext {
 }
 
 func (f *Framework) GetRegisteredClusters() ClusterSlice {
-	return getRegisteredClusters(f)
+	if framework.TestContext.FederationConfigFromCluster {
+		return registeredClustersFromSecrets(f)
+	} else {
+		return registeredClustersFromConfig(f)
+	}
+}
+
+func (f *Framework) GetClusterClients() []kubeclientset.Interface {
+	clusters := f.GetRegisteredClusters()
+	var clusterClients []kubeclientset.Interface
+	for _, c := range clusters {
+		clusterClients = append(clusterClients, c.Clientset)
+	}
+	return clusterClients
 }

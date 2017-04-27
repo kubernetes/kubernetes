@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
 
 DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 
-source "${KUBE_ROOT}/cluster/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/logging.sh"
 # KUBE_RELEASE_VERSION_REGEX matches things like "v1.2.3" or "v1.2.3-alpha.4"
 #
@@ -308,17 +308,6 @@ function load-or-gen-kube-bearertoken() {
   fi
 }
 
-# Create a temp dir that'll be deleted at the end of this bash session.
-#
-# Vars set:
-#   KUBE_TEMP
-function ensure-temp-dir {
-  if [[ -z ${KUBE_TEMP-} ]]; then
-    export KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-    trap 'rm -rf "${KUBE_TEMP}"' EXIT
-  fi
-}
-
 # Get the master IP for the current-context in kubeconfig if one exists.
 #
 # Assumed vars:
@@ -461,8 +450,8 @@ function find-release-tars() {
 
   # This tarball is used by GCI, Ubuntu Trusty, and Container Linux.
   KUBE_MANIFESTS_TAR=
-  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "container-linux" ]] || \
-     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "container-linux" ]] ; then
+  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "container-linux" || "${MASTER_OS_DISTRIBUTION:-}" == "ubuntu" ]] || \
+     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "container-linux" || "${NODE_OS_DISTRIBUTION:-}" == "ubuntu" ]] ; then
     KUBE_MANIFESTS_TAR=$(find-tar kubernetes-manifests.tar.gz)
   fi
 }
@@ -598,7 +587,9 @@ function build-kube-env {
   local salt_tar_url=$SALT_TAR_URL
   local kube_manifests_tar_url="${KUBE_MANIFESTS_TAR_URL:-}"
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]] ; then
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]] || \
+     [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]] ; then
     # TODO: Support fallback .tar.gz settings on Container Linux
     server_binary_tar_url=$(split_csv "${SERVER_BINARY_TAR_URL}")
     salt_tar_url=$(split_csv "${SALT_TAR_URL}")
@@ -682,8 +673,8 @@ EOF
 TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
-  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "container-linux") ]] || \
-     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "container-linux") ]] ; then
+  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "container-linux") || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
+     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "container-linux") || "${NODE_OS_DISTRIBUTION}" = "ubuntu" ]] ; then
     cat >>$file <<EOF
 KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${kube_manifests_tar_url})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
@@ -734,6 +725,17 @@ EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
 EOF
   fi
+
+  if [ -n "${PROVIDER_VARS:-}" ]; then
+    local var_name
+    local var_value
+
+    for var_name in ${PROVIDER_VARS}; do
+      eval "local var_value=\$(yaml-quote \${${var_name}})"
+      echo "${var_name}: ${var_value}" >>$file
+    done
+  fi
+
   if [[ "${master}" == "true" ]]; then
     # Master-only env vars.
     cat >>$file <<EOF
@@ -896,38 +898,6 @@ function sha1sum-file() {
   fi
 }
 
-# Downloads cfssl into $1 directory
-#
-# Assumed vars:
-#   $1 (cfssl directory)
-#
-function download-cfssl {
-  mkdir -p "$1"
-  pushd "$1"
-
-  kernel=$(uname -s)
-  case "${kernel}" in
-    Linux)
-      curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
-      curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
-      ;;
-    Darwin)
-      curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
-      curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
-      ;;
-    *)
-      echo "Unknown, unsupported platform: ${kernel}." >&2
-      echo "Supported platforms: Linux, Darwin." >&2
-      exit 2
-  esac
-
-  chmod +x cfssl
-  chmod +x cfssljson
-
-  popd
-}
-
-
 # Create certificate pairs for the cluster.
 # $1: The public IP for the master.
 #
@@ -1018,12 +988,12 @@ function generate-certs {
     ./easyrsa --subject-alt-name="${SANS}" build-server-full "${MASTER_NAME}" nopass
     ./easyrsa build-client-full kube-apiserver nopass
 
-    download-cfssl "${KUBE_TEMP}/cfssl"
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
 
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the kubelet client cert with the correct groups
-    echo '{"CN":"kubelet","names":[{"O":"system:nodes"}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${KUBE_TEMP}/cfssl/cfssl" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${KUBE_TEMP}/cfssl/cfssljson" -bare kubelet
+    echo '{"CN":"kubelet","names":[{"O":"system:nodes"}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare kubelet
     mv "kubelet-key.pem" "pki/private/kubelet.key"
     mv "kubelet.pem" "pki/issued/kubelet.crt"
     rm -f "kubelet.csr"
@@ -1067,10 +1037,7 @@ function generate-etcd-cert() {
   mkdir -p "${cert_dir}"
   pushd "${cert_dir}"
 
-  if [ ! -x cfssl ] || [ ! -x cfssljson ]; then
-    echo "Download cfssl & cfssljson ..."
-    download-cfssl .
-  fi
+  kube::util::ensure-cfssl .
 
   if [ ! -r "ca-config.json" ]; then
     cat >ca-config.json <<EOF
@@ -1136,27 +1103,27 @@ EOF
   fi
 
   if [[ ! -r "ca.pem" || ! -r "ca-key.pem" ]]; then
-    ./cfssl gencert -initca ca-csr.json | ./cfssljson -bare ca -
+    ${CFSSL_BIN} gencert -initca ca-csr.json | ${CFSSLJSON_BIN} -bare ca -
   fi
 
   case "${type_cert}" in
     client)
       echo "Generate client certificates..."
       echo '{"CN":"client","hosts":["*"],"key":{"algo":"ecdsa","size":256}}' \
-       | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client - \
-       | ./cfssljson -bare "${prefix}"
+       | ${CFSSL_BIN} gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client - \
+       | ${CFSSLJSON_BIN} -bare "${prefix}"
       ;;
     server)
       echo "Generate server certificates..."
       echo '{"CN":"'${member_ip}'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
-       | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=server -hostname="${member_ip},127.0.0.1" - \
-       | ./cfssljson -bare "${prefix}"
+       | ${CFSSL_BIN} gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=server -hostname="${member_ip},127.0.0.1" - \
+       | ${CFSSLJSON_BIN} -bare "${prefix}"
       ;;
     peer)
       echo "Generate peer certificates..."
       echo '{"CN":"'${member_ip}'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
-       | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=peer -hostname="${member_ip},127.0.0.1" - \
-       | ./cfssljson -bare "${prefix}"
+       | ${CFSSL_BIN} gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=peer -hostname="${member_ip},127.0.0.1" - \
+       | ${CFSSLJSON_BIN} -bare "${prefix}"
       ;;
     *)
       echo "Unknow, unsupported etcd certs type: ${type_cert}" >&2

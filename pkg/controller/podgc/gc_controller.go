@@ -17,7 +17,6 @@ limitations under the License.
 package podgc
 
 import (
-	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 
 	"github.com/golang/glog"
@@ -71,12 +71,17 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 }
 
 func (gcc *PodGCController) Run(stop <-chan struct{}) {
-	if !cache.WaitForCacheSync(stop, gcc.podListerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	defer utilruntime.HandleCrash()
+
+	glog.Infof("Starting GC controller")
+	defer glog.Infof("Shutting down GC controller")
+
+	if !controller.WaitForCacheSync("GC", stop, gcc.podListerSynced) {
 		return
 	}
 
 	go wait.Until(gcc.gc, gcCheckPeriod, stop)
+
 	<-stop
 }
 

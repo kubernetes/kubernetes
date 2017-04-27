@@ -90,7 +90,7 @@ parameters:
 *  `aggregation_level`: specifies the number of chunks the volume would be distributed into, 0 indicates a non-aggregated volume (default: `0`)
 *  `ephemeral`: ephemeral storage [true/false] (default `false`)
 
-For a complete example refer ([Portworx Volume docs](../../volumes/portworx/README.md))
+For a complete example refer ([Portworx Volume docs](../volumes/portworx/README.md))
 
 #### GLUSTERFS
 
@@ -125,7 +125,7 @@ Example of a secret can be found in [glusterfs-provisioning-secret.yaml](gluster
 
 * `gidMin` + `gidMax` : The minimum and maximum value of GID range for the storage class. A unique value (GID) in this range ( gidMin-gidMax ) will be used for dynamically provisioned volumes. These are optional values. If not specified, the volume will be provisioned with a value between 2000-2147483647 which are defaults for gidMin and gidMax respectively.
 
-* `volumetype` : The volume type and it's parameters can be configured with this optional value. If the volume type is not mentioned, it's up to the provisioner to decide the volume type.
+* `volumetype` : The volume type and its parameters can be configured with this optional value. If the volume type is not mentioned, it's up to the provisioner to decide the volume type.
 For example:
   'Replica volume':
     `volumetype: replicate:3` where '3' is replica count.
@@ -134,7 +134,7 @@ For example:
   'Distribute volume':
     `volumetype: none`
 
-For available volume types and it's administration options refer: ([Administration Guide](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/3.1/html/Administration_Guide/part-Overview.html))
+For available volume types and its administration options refer: ([Administration Guide](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/3.1/html/Administration_Guide/part-Overview.html))
 
 Reference : ([How to configure Heketi](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
 

@@ -60,9 +60,6 @@ const (
 
 	defaultSeccompProfile = "unconfined"
 
-	// dockershimRootDir is the root directory for dockershim
-	dockershimRootDir = "/var/lib/dockershim"
-
 	// Internal docker labels used to identify whether a container is a sandbox
 	// or a regular container.
 	// TODO: This is not backward compatible with older containers. We will
@@ -150,9 +147,9 @@ var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPat
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler) (DockerService, error) {
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler, dockershimRootDir string) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
-	checkpointHandler, err := NewPersistentCheckpointHandler()
+	checkpointHandler, err := NewPersistentCheckpointHandler(dockershimRootDir)
 	if err != nil {
 		return nil, err
 	}

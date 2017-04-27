@@ -500,7 +500,7 @@ bazel-build:
 	@echo "$$BAZEL_BUILD_HELP_INFO"
 else
 bazel-build:
-	bazel build //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //examples/... //test/...
+	bazel build //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //examples/... //test/... //vendor/k8s.io/...
 endif
 
 
@@ -515,7 +515,7 @@ bazel-test:
 	@echo "$$BAZEL_TEST_HELP_INFO"
 else
 bazel-test:
-	bazel test --flaky_test_attempts=3 //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all
+	bazel test --flaky_test_attempts=3 //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all //vendor/k8s.io/...
 endif
 
 ifeq ($(PRINT_HELP),y)

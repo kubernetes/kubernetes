@@ -157,6 +157,7 @@ func (c *portForwardCommand) Stop() {
 	framework.TryKill(c.cmd)
 }
 
+// runPortForward runs port-forward, warning, this may need root functionality on some systems.
 func runPortForward(ns, podName string, port int) *portForwardCommand {
 	cmd := framework.KubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), podName, fmt.Sprintf(":%d", port))
 	// This is somewhat ugly but is the only way to retrieve the port that was picked
@@ -473,16 +474,16 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 
 	framework.KubeDescribe("With a server listening on 0.0.0.0", func() {
 		framework.KubeDescribe("that expects a client request", func() {
-			It("should support a client that connects, sends no data, and disconnects", func() {
+			It("should support a client that connects, sends NO DATA, and disconnects", func() {
 				doTestMustConnectSendNothing("0.0.0.0", f)
 			})
-			It("should support a client that connects, sends data, and disconnects", func() {
+			It("should support a client that connects, sends DATA, and disconnects", func() {
 				doTestMustConnectSendDisconnect("0.0.0.0", f)
 			})
 		})
 
-		framework.KubeDescribe("that expects no client request", func() {
-			It("should support a client that connects, sends data, and disconnects", func() {
+		framework.KubeDescribe("that expects NO client request", func() {
+			It("should support a client that connects, sends DATA, and disconnects", func() {
 				doTestConnectSendDisconnect("0.0.0.0", f)
 			})
 		})
@@ -492,18 +493,19 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 		})
 	})
 
+	// kubectl port-forward may need elevated privileges to do its job.
 	framework.KubeDescribe("With a server listening on localhost", func() {
 		framework.KubeDescribe("that expects a client request", func() {
-			It("should support a client that connects, sends no data, and disconnects [Conformance]", func() {
+			It("should support a client that connects, sends NO DATA, and disconnects", func() {
 				doTestMustConnectSendNothing("localhost", f)
 			})
-			It("should support a client that connects, sends data, and disconnects [Conformance]", func() {
+			It("should support a client that connects, sends DATA, and disconnects", func() {
 				doTestMustConnectSendDisconnect("localhost", f)
 			})
 		})
 
-		framework.KubeDescribe("that expects no client request", func() {
-			It("should support a client that connects, sends data, and disconnects [Conformance]", func() {
+		framework.KubeDescribe("that expects NO client request", func() {
+			It("should support a client that connects, sends DATA, and disconnects", func() {
 				doTestConnectSendDisconnect("localhost", f)
 			})
 		})

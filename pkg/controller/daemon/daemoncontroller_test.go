@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
@@ -332,9 +333,13 @@ func markPodsReady(store cache.Store) {
 	// mark pods as ready
 	for _, obj := range store.List() {
 		pod := obj.(*v1.Pod)
-		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-		v1.UpdatePodCondition(&pod.Status, &condition)
+		markPodReady(pod)
 	}
+}
+
+func markPodReady(pod *v1.Pod) {
+	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
+	podutil.UpdatePodCondition(&pod.Status, &condition)
 }
 
 // DaemonSets without node selectors should launch pods on every node.
@@ -1262,6 +1267,12 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 		newPod("non-matching-owned-0-", "node-0", simpleDaemonSetLabel2, ds),
 		newPod("non-matching-orphan-1-", "node-1", simpleDaemonSetLabel2, nil),
 		newPod("matching-owned-by-other-0-", "node-0", simpleDaemonSetLabel, ds2),
+		func() *v1.Pod {
+			pod := newPod("matching-owned-2-but-set-for-deletion", "node-2", simpleDaemonSetLabel, ds)
+			now := metav1.Now()
+			pod.DeletionTimestamp = &now
+			return pod
+		}(),
 	}
 	for _, pod := range ignoredPods {
 		manager.podStore.Add(pod)

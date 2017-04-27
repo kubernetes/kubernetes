@@ -93,7 +93,7 @@ var (
 	}
 )
 
-func NewCmdCompletion(f cmdutil.Factory, out io.Writer, boilerPlate string) *cobra.Command {
+func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	shells := []string{}
 	for s := range completion_shells {
 		shells = append(shells, s)

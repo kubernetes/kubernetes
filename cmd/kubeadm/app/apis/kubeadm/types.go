@@ -24,7 +24,6 @@ import (
 
 type EnvParams struct {
 	KubernetesDir    string
-	HostEtcdPath     string
 	HyperkubeImage   string
 	RepositoryPrefix string
 	EtcdImage        string
@@ -82,6 +81,8 @@ type Etcd struct {
 	CAFile    string
 	CertFile  string
 	KeyFile   string
+	DataDir   string
+	ExtraArgs map[string]string
 }
 
 type NodeConfiguration struct {

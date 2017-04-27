@@ -20,7 +20,7 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-go get gopkg.in/mikedanese/gazel.v14/gazel
+go get gopkg.in/mikedanese/gazel.v16/gazel
 
 for path in ${GOPATH//:/ }; do
   if [[ -e "${path}/bin/gazel" ]]; then

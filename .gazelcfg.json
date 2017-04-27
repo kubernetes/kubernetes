@@ -10,7 +10,10 @@
 		"./examples"
 	],
 	"SkippedPaths": [
-		"^_.*"
+		"^_.*",
+		"^staging.*",
+		"_vendor"
 	],
-	"AddSourcesRules": true
+	"AddSourcesRules": true,
+	"VendorMultipleBuildFiles": true
 }

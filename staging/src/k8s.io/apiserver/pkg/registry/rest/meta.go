@@ -23,16 +23,16 @@ import (
 )
 
 // FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
-func FillObjectMetaSystemFields(ctx genericapirequest.Context, meta *metav1.ObjectMeta) {
-	meta.CreationTimestamp = metav1.Now()
+func FillObjectMetaSystemFields(ctx genericapirequest.Context, meta metav1.Object) {
+	meta.SetCreationTimestamp(metav1.Now())
 	// allows admission controllers to assign a UID earlier in the request processing
 	// to support tracking resources pending creation.
 	uid, found := genericapirequest.UIDFrom(ctx)
 	if !found {
 		uid = uuid.NewUUID()
 	}
-	meta.UID = uid
-	meta.SelfLink = ""
+	meta.SetUID(uid)
+	meta.SetSelfLink("")
 }
 
 // ValidNamespace returns false if the namespace on the context differs from
@@ -40,10 +40,10 @@ func FillObjectMetaSystemFields(ctx genericapirequest.Context, meta *metav1.Obje
 // the context.
 //
 // TODO(sttts): move into pkg/genericapiserver/endpoints
-func ValidNamespace(ctx genericapirequest.Context, resource *metav1.ObjectMeta) bool {
+func ValidNamespace(ctx genericapirequest.Context, resource metav1.Object) bool {
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
-	if len(resource.Namespace) == 0 {
-		resource.Namespace = ns
+	if len(resource.GetNamespace()) == 0 {
+		resource.SetNamespace(ns)
 	}
-	return ns == resource.Namespace && ok
+	return ns == resource.GetNamespace() && ok
 }

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // ErrPodCompleted is returned by PodRunning or PodContainerRunning to indicate that
@@ -83,7 +84,7 @@ func PodRunningAndReady(event watch.Event) (bool, error) {
 		case v1.PodFailed, v1.PodSucceeded:
 			return false, ErrPodCompleted
 		case v1.PodRunning:
-			return v1.IsPodReady(t), nil
+			return podutil.IsPodReady(t), nil
 		}
 	}
 	return false, nil

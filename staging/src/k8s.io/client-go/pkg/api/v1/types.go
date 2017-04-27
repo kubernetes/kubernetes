@@ -431,14 +431,12 @@ type PersistentVolumeSource struct {
 }
 
 const (
-	// AlphaStorageClassAnnotation represents the previous alpha storage class
-	// annotation.  It's currently still used and will be held for backwards
-	// compatibility
-	AlphaStorageClassAnnotation = "volume.alpha.kubernetes.io/storage-class"
-
 	// BetaStorageClassAnnotation represents the beta/previous StorageClass annotation.
 	// It's currently still used and will be held for backwards compatibility
 	BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
+
+	// MountOptionAnnotation defines mount option annotation used in PVs
+	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
 )
 
 // +genclient=true
@@ -2859,20 +2857,9 @@ type ServiceSpec struct {
 	// will also accept traffic for this service.  These IPs are not managed by
 	// Kubernetes.  The user is responsible for ensuring that traffic arrives
 	// at a node with this IP.  A common example is external load-balancers
-	// that are not part of the Kubernetes system.  A previous form of this
-	// functionality exists as the deprecatedPublicIPs field.  When using this
-	// field, callers should also clear the deprecatedPublicIPs field.
+	// that are not part of the Kubernetes system.
 	// +optional
 	ExternalIPs []string `json:"externalIPs,omitempty" protobuf:"bytes,5,rep,name=externalIPs"`
-
-	// deprecatedPublicIPs is deprecated and replaced by the externalIPs field
-	// with almost the exact same semantics.  This field is retained in the v1
-	// API for compatibility until at least 8/20/2016.  It will be removed from
-	// any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are
-	// set, deprecatedPublicIPs is used.
-	// +k8s:conversion-gen=false
-	// +optional
-	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty" protobuf:"bytes,6,rep,name=deprecatedPublicIPs"`
 
 	// Supports "ClientIP" and "None". Used to maintain session affinity.
 	// Enable client IP based session affinity.
@@ -4426,3 +4413,18 @@ const (
 	// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
 	DefaultFailureDomains string = metav1.LabelHostname + "," + metav1.LabelZoneFailureDomain + "," + metav1.LabelZoneRegion
 )
+
+// Sysctl defines a kernel parameter to be set
+type Sysctl struct {
+	// Name of a property to set
+	Name string `protobuf:"bytes,1,opt,name=name"`
+	// Value of a property to set
+	Value string `protobuf:"bytes,2,opt,name=value"`
+}
+
+// NodeResources is an object for conveying resource information about a node.
+// see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
+type NodeResources struct {
+	// Capacity represents the available resources of a node
+	Capacity ResourceList `protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
+}

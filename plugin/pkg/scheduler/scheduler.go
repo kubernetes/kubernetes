@@ -235,7 +235,7 @@ func (sched *Scheduler) scheduleOne() {
 				glog.Errorf("scheduler cache ForgetPod failed: %v", err)
 			}
 			sched.config.Error(pod, err)
-			sched.config.Recorder.Eventf(pod, v1.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
+			sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "Binding rejected: %v", err)
 			sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
 				Type:   v1.PodScheduled,
 				Status: v1.ConditionFalse,

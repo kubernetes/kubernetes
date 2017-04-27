@@ -16,20 +16,9 @@ limitations under the License.
 
 package pod
 
-import "k8s.io/kubernetes/pkg/api"
-
-const (
-	// TODO: to be deleted after v1.3 is released. PodSpec has a dedicated Hostname field.
-	// The annotation value is a string specifying the hostname to be used for the pod e.g 'my-webserver-1'
-	PodHostnameAnnotation = "pod.beta.kubernetes.io/hostname"
-
-	// TODO: to be deleted after v1.3 is released. PodSpec has a dedicated Subdomain field.
-	// The annotation value is a string specifying the subdomain e.g. "my-web-service"
-	// If specified, on the pod itself, "<hostname>.my-web-service.<namespace>.svc.<cluster domain>" would resolve to
-	// the pod's IP.
-	// If there is a headless service named "my-web-service" in the same namespace as the pod, then,
-	// <hostname>.my-web-service.<namespace>.svc.<cluster domain>" would be resolved by the cluster DNS Server.
-	PodSubdomainAnnotation = "pod.beta.kubernetes.io/subdomain"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // VisitPodSecretNames invokes the visitor function with the name of every secret
@@ -113,4 +102,65 @@ func visitContainerSecretNames(container *api.Container, visitor func(string) bo
 		}
 	}
 	return true
+}
+
+// IsPodReady returns true if a pod is ready; false otherwise.
+func IsPodReady(pod *api.Pod) bool {
+	return IsPodReadyConditionTrue(pod.Status)
+}
+
+// IsPodReadyConditionTrue retruns true if a pod is ready; false otherwise.
+func IsPodReadyConditionTrue(status api.PodStatus) bool {
+	condition := GetPodReadyCondition(status)
+	return condition != nil && condition.Status == api.ConditionTrue
+}
+
+// GetPodReadyCondition extracts the pod ready condition from the given status and returns that.
+// Returns nil if the condition is not present.
+func GetPodReadyCondition(status api.PodStatus) *api.PodCondition {
+	_, condition := GetPodCondition(&status, api.PodReady)
+	return condition
+}
+
+// GetPodCondition extracts the provided condition from the given status and returns that.
+// Returns nil and -1 if the condition is not present, and the index of the located condition.
+func GetPodCondition(status *api.PodStatus, conditionType api.PodConditionType) (int, *api.PodCondition) {
+	if status == nil {
+		return -1, nil
+	}
+	for i := range status.Conditions {
+		if status.Conditions[i].Type == conditionType {
+			return i, &status.Conditions[i]
+		}
+	}
+	return -1, nil
+}
+
+// UpdatePodCondition updates existing pod condition or creates a new one. Sets LastTransitionTime to now if the
+// status has changed.
+// Returns true if pod condition has changed or has been added.
+func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool {
+	condition.LastTransitionTime = metav1.Now()
+	// Try to find this pod condition.
+	conditionIndex, oldCondition := GetPodCondition(status, condition.Type)
+
+	if oldCondition == nil {
+		// We are adding new pod condition.
+		status.Conditions = append(status.Conditions, *condition)
+		return true
+	}
+	// We are updating an existing condition, so we need to check if it has changed.
+	if condition.Status == oldCondition.Status {
+		condition.LastTransitionTime = oldCondition.LastTransitionTime
+	}
+
+	isEqual := condition.Status == oldCondition.Status &&
+		condition.Reason == oldCondition.Reason &&
+		condition.Message == oldCondition.Message &&
+		condition.LastProbeTime.Equal(oldCondition.LastProbeTime) &&
+		condition.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
+
+	status.Conditions[conditionIndex] = *condition
+	// Return true if one of the fields have changed.
+	return !isEqual
 }

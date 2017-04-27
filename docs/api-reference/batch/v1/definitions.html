@@ -2177,42 +2177,42 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">conditions</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Conditions represent the latest available observations of an object&#8217;s current state. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The latest available observations of an object&#8217;s current state. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_jobcondition">v1.JobCondition</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">startTime</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Represents time when the job was acknowledged by the job controller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">completionTime</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">active</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Active is the number of actively running pods.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The number of actively running pods.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">succeeded</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Succeeded is the number of pods which reached Phase Succeeded.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The number of pods which reached phase Succeeded.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">failed</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Failed is the number of pods which reached Phase Failed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The number of pods which reached phase Failed.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3364,14 +3364,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">spec</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Spec is a structure defining the expected behavior of a job. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specification of the desired behavior of a job. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_jobspec">v1.JobSpec</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">status</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Status is a structure describing current status of a job. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Current status of a job. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_jobstatus">v1.JobStatus</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3526,14 +3526,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_listmeta">v1.ListMeta</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Items is the list of Job.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">items is the list of Jobs.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_job">v1.Job</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4105,14 +4105,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">parallelism</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) &lt; .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) &lt; .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">completions</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4126,21 +4126,21 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">selector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: <a href="http://kubernetes.io/docs/user-guide/labels#label-selectors">http://kubernetes.io/docs/user-guide/labels#label-selectors</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A label query over pods that should match the pod count. Normally, the system sets this field for you. More info: <a href="http://kubernetes.io/docs/user-guide/labels#label-selectors">http://kubernetes.io/docs/user-guide/labels#label-selectors</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_labelselector">v1.LabelSelector</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">manualSelector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ManualSelector controls generation of pod labels and pod selectors. Leave <code>manualSelector</code> unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see <code>manualSelector=true</code> in jobs that were created with the old <code>extensions/v1beta1</code> API. More info: <a href="http://releases.k8s.io/HEAD/docs/design/selector-generation.md">http://releases.k8s.io/HEAD/docs/design/selector-generation.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">manualSelector controls generation of pod labels and pod selectors. Leave <code>manualSelector</code> unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see <code>manualSelector=true</code> in jobs that were created with the old <code>extensions/v1beta1</code> API. More info: <a href="http://releases.k8s.io/HEAD/docs/design/selector-generation.md">http://releases.k8s.io/HEAD/docs/design/selector-generation.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">template</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Template is the object that describes the pod that will be created when executing a job. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Describes the pod that will be created when executing a job. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_podtemplatespec">v1.PodTemplateSpec</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5533,7 +5533,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-04-05 12:45:07 UTC
+Last updated 2017-04-10 12:25:40 UTC
 </div>
 </div>
 </body>

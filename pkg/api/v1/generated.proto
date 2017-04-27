@@ -3647,20 +3647,9 @@ message ServiceSpec {
   // will also accept traffic for this service.  These IPs are not managed by
   // Kubernetes.  The user is responsible for ensuring that traffic arrives
   // at a node with this IP.  A common example is external load-balancers
-  // that are not part of the Kubernetes system.  A previous form of this
-  // functionality exists as the deprecatedPublicIPs field.  When using this
-  // field, callers should also clear the deprecatedPublicIPs field.
+  // that are not part of the Kubernetes system.
   // +optional
   repeated string externalIPs = 5;
-
-  // deprecatedPublicIPs is deprecated and replaced by the externalIPs field
-  // with almost the exact same semantics.  This field is retained in the v1
-  // API for compatibility until at least 8/20/2016.  It will be removed from
-  // any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are
-  // set, deprecatedPublicIPs is used.
-  // +k8s:conversion-gen=false
-  // +optional
-  repeated string deprecatedPublicIPs = 6;
 
   // Supports "ClientIP" and "None". Used to maintain session affinity.
   // Enable client IP based session affinity.
@@ -3700,9 +3689,12 @@ message ServiceStatus {
   optional LoadBalancerStatus loadBalancer = 1;
 }
 
+// Sysctl defines a kernel parameter to be set
 message Sysctl {
+  // Name of a property to set
   optional string name = 1;
 
+  // Value of a property to set
   optional string value = 2;
 }
 

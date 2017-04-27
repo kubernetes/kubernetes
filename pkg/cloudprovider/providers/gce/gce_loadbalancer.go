@@ -17,7 +17,9 @@ limitations under the License.
 package gce
 
 import (
+	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"sort"
 	"strconv"
@@ -34,6 +36,55 @@ import (
 	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v1"
 )
+
+type cidrs struct {
+	ipn   netsets.IPNet
+	isSet bool
+}
+
+var lbSrcRngsFlag cidrs
+
+func init() {
+	var err error
+	lbSrcRngsFlag.ipn, err = netsets.ParseIPNets([]string{"130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22", "35.191.0.0/16"}...)
+	if err != nil {
+		panic("Incorrect default GCE L7 source ranges")
+	}
+
+	flag.Var(&lbSrcRngsFlag, "cloud-provider-gce-lb-src-cidrs", "CIDRS opened in GCE firewall for LB traffic proxy & health checks")
+}
+
+// String is the method to format the flag's value, part of the flag.Value interface.
+func (c *cidrs) String() string {
+	return strings.Join(c.ipn.StringSlice(), ",")
+}
+
+// Set supports a value of CSV or the flag repeated multiple times
+func (c *cidrs) Set(value string) error {
+	// On first Set(), clear the original defaults
+	if !c.isSet {
+		c.isSet = true
+		c.ipn = make(netsets.IPNet)
+	} else {
+		return fmt.Errorf("GCE LB CIDRS have already been set")
+	}
+
+	for _, cidr := range strings.Split(value, ",") {
+		_, ipnet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return err
+		}
+
+		c.ipn.Insert(ipnet)
+	}
+	return nil
+}
+
+// LoadBalancerSrcRanges contains the ranges of ips used by the GCE load balancers (l4 & L7)
+// for proxying client requests and performing health checks.
+func LoadBalancerSrcRanges() []string {
+	return lbSrcRngsFlag.ipn.StringSlice()
+}
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
 func (gce *GCECloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {

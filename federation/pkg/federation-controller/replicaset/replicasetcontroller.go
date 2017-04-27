@@ -215,9 +215,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		})
 
 	frsc.deletionHelper = deletionhelper.NewDeletionHelper(
-		frsc.hasFinalizerFunc,
-		frsc.removeFinalizerFunc,
-		frsc.addFinalizerFunc,
+		frsc.updateReplicaSet,
 		// objNameFunc
 		func(obj runtime.Object) string {
 			replicaset := obj.(*extensionsv1.ReplicaSet)
@@ -232,52 +230,11 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	return frsc
 }
 
-// Returns true if the given object has the given finalizer in its ObjectMeta.
-func (frsc *ReplicaSetController) hasFinalizerFunc(obj runtime.Object, finalizer string) bool {
-	replicaset := obj.(*extensionsv1.ReplicaSet)
-	for i := range replicaset.ObjectMeta.Finalizers {
-		if string(replicaset.ObjectMeta.Finalizers[i]) == finalizer {
-			return true
-		}
-	}
-	return false
-}
-
-// Removes the finalizers from the given objects ObjectMeta.
+// Sends the given updated object to apiserver.
 // Assumes that the given object is a replicaset.
-func (frsc *ReplicaSetController) removeFinalizerFunc(obj runtime.Object, finalizers []string) (runtime.Object, error) {
+func (frsc *ReplicaSetController) updateReplicaSet(obj runtime.Object) (runtime.Object, error) {
 	replicaset := obj.(*extensionsv1.ReplicaSet)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range replicaset.ObjectMeta.Finalizers {
-		if !deletionhelper.ContainsString(finalizers, replicaset.ObjectMeta.Finalizers[i]) {
-			newFinalizers = append(newFinalizers, replicaset.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	replicaset.ObjectMeta.Finalizers = newFinalizers
-	replicaset, err := frsc.fedClient.Extensions().ReplicaSets(replicaset.Namespace).Update(replicaset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizers %v from replicaset %s: %v", finalizers, replicaset.Name, err)
-	}
-	return replicaset, nil
-}
-
-// Adds the given finalizers to the given objects ObjectMeta.
-// Assumes that the given object is a replicaset.
-func (frsc *ReplicaSetController) addFinalizerFunc(obj runtime.Object, finalizers []string) (runtime.Object, error) {
-	replicaset := obj.(*extensionsv1.ReplicaSet)
-	replicaset.ObjectMeta.Finalizers = append(replicaset.ObjectMeta.Finalizers, finalizers...)
-	replicaset, err := frsc.fedClient.Extensions().ReplicaSets(replicaset.Namespace).Update(replicaset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizers %v to replicaset %s: %v", finalizers, replicaset.Name, err)
-	}
-	return replicaset, nil
+	return frsc.fedClient.Extensions().ReplicaSets(replicaset.Namespace).Update(replicaset)
 }
 
 func (frsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {

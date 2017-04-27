@@ -23,9 +23,7 @@ import (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	return scheme.AddDefaultingFuncs(
-		SetDefaults_HorizontalPodAutoscaler,
-	)
+	return RegisterDefaults(scheme)
 }
 
 func SetDefaults_HorizontalPodAutoscaler(obj *HorizontalPodAutoscaler) {

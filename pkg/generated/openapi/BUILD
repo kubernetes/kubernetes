@@ -15,11 +15,11 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/go-openapi/spec",
-        "//vendor:k8s.io/apimachinery/pkg/api/resource",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/openapi",
-        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
+        "//vendor/github.com/go-openapi/spec:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/openapi:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
 )
 

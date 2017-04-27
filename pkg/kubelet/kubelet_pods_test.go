@@ -114,6 +114,49 @@ func TestMakeMounts(t *testing.T) {
 	assert.Equal(t, expectedMounts, mounts, "mounts of container %+v", container)
 }
 
+func TestHostsFileContent(t *testing.T) {
+	testCases := []struct {
+		hostIP          string
+		hostName        string
+		hostDomainName  string
+		expectedContent string
+	}{
+		{
+			"123.45.67.89",
+			"podFoo",
+			"",
+			`# Kubernetes-managed hosts file.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+123.45.67.89	podFoo
+`,
+		},
+		{
+			"203.0.113.1",
+			"podFoo",
+			"domainFoo",
+			`# Kubernetes-managed hosts file.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+203.0.113.1	podFoo.domainFoo	podFoo
+`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		actualContent := string(hostsFileContent(testCase.hostIP, testCase.hostName, testCase.hostDomainName))
+		assert.Equal(t, testCase.expectedContent, actualContent, "hosts file content not expected")
+	}
+}
+
 func TestRunInContainerNoSuchPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()

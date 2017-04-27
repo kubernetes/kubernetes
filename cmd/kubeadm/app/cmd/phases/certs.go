@@ -68,6 +68,8 @@ func NewCmdSelfSign() *cobra.Command {
 	cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, "The path where to save and store the certificates")
 	cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, "The subnet for the Services in the cluster.")
 	cmd.Flags().StringSliceVar(&cfg.APIServerCertSANs, "cert-altnames", []string{}, "Optional extra altnames to use for the API Server serving cert. Can be both IP addresses and dns names.")
+	cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address the API Server will advertise it's listening on. 0.0.0.0 means the default network interface's address.")
+
 	return cmd
 }
 
@@ -95,5 +97,7 @@ func validateArgs(config *kubeadmapi.MasterConfiguration) error {
 	allErrs = append(allErrs, validation.ValidateNetworking(&config.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, validation.ValidateAbsolutePath(config.CertificatesDir, field.NewPath("cert-dir"))...)
 	allErrs = append(allErrs, validation.ValidateAPIServerCertSANs(config.APIServerCertSANs, field.NewPath("cert-altnames"))...)
+	allErrs = append(allErrs, validation.ValidateIPFromString(config.API.AdvertiseAddress, field.NewPath("apiserver-advertise-address"))...)
+
 	return allErrs.ToAggregate()
 }

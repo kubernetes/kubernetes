@@ -74,12 +74,16 @@ func (stenographer *FakeStenographer) AnnounceAggregatedParallelRun(nodes int, s
 	stenographer.registerCall("AnnounceAggregatedParallelRun", nodes, succinct)
 }
 
-func (stenographer *FakeStenographer) AnnounceParallelRun(node int, nodes int, specsToRun int, totalSpecs int, succinct bool) {
-	stenographer.registerCall("AnnounceParallelRun", node, nodes, specsToRun, totalSpecs, succinct)
+func (stenographer *FakeStenographer) AnnounceParallelRun(node int, nodes int, succinct bool) {
+	stenographer.registerCall("AnnounceParallelRun", node, nodes, succinct)
 }
 
 func (stenographer *FakeStenographer) AnnounceNumberOfSpecs(specsToRun int, total int, succinct bool) {
 	stenographer.registerCall("AnnounceNumberOfSpecs", specsToRun, total, succinct)
+}
+
+func (stenographer *FakeStenographer) AnnounceTotalNumberOfSpecs(total int, succinct bool) {
+	stenographer.registerCall("AnnounceTotalNumberOfSpecs", total, succinct)
 }
 
 func (stenographer *FakeStenographer) AnnounceSpecRunCompletion(summary *types.SuiteSummary, succinct bool) {

@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/ref"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -54,6 +55,9 @@ import (
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
+
+// controllerKind contains the schema.GroupVersionKind for this controller type.
+var controllerKind = batchv2alpha1.SchemeGroupVersion.WithKind("CronJob")
 
 type CronJobController struct {
 	kubeClient clientset.Interface
@@ -101,21 +105,25 @@ func (jm *CronJobController) Run(stopCh <-chan struct{}) {
 
 // syncAll lists all the CronJobs and Jobs and reconciles them.
 func (jm *CronJobController) syncAll() {
-	sjl, err := jm.kubeClient.BatchV2alpha1().CronJobs(metav1.NamespaceAll).List(metav1.ListOptions{})
-	if err != nil {
-		glog.Errorf("Error listing cronjobs: %v", err)
-		return
-	}
-	sjs := sjl.Items
-	glog.V(4).Infof("Found %d cronjobs", len(sjs))
-
+	// List children (Jobs) before parents (CronJob).
+	// This guarantees that if we see any Job that got orphaned by the GC orphan finalizer,
+	// we must also see that the parent CronJob has non-nil DeletionTimestamp (see #42639).
+	// Note that this only works because we are NOT using any caches here.
 	jl, err := jm.kubeClient.BatchV1().Jobs(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
-		glog.Errorf("Error listing jobs")
+		utilruntime.HandleError(fmt.Errorf("can't list Jobs: %v", err))
 		return
 	}
 	js := jl.Items
 	glog.V(4).Infof("Found %d jobs", len(js))
+
+	sjl, err := jm.kubeClient.BatchV2alpha1().CronJobs(metav1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("can't list CronJobs: %v", err))
+		return
+	}
+	sjs := sjl.Items
+	glog.V(4).Infof("Found %d cronjobs", len(sjs))
 
 	jobsBySj := groupJobsByParent(js)
 	glog.V(4).Infof("Found %d groups", len(jobsBySj))
@@ -236,6 +244,18 @@ func syncOne(sj *batchv2alpha1.CronJob, js []batchv1.Job, now time.Time, jc jobC
 		return
 	}
 	*sj = *updatedSJ
+
+	if sj.DeletionTimestamp != nil {
+		// The CronJob is being deleted.
+		// Don't do anything other than updating status.
+		return
+	}
+
+	if err := adoptJobs(sj, js, jc); err != nil {
+		// This is fine. We will retry later.
+		// Adoption is only to advise other controllers. We don't rely on it.
+		glog.V(4).Infof("Unable to adopt Jobs for CronJob %v: %v", nameForLog, err)
+	}
 
 	if sj.Spec.Suspend != nil && *sj.Spec.Suspend {
 		glog.V(4).Infof("Not starting job for %s because it is suspended", nameForLog)
@@ -393,5 +413,5 @@ func deleteJob(sj *batchv2alpha1.CronJob, job *batchv1.Job, jc jobControlInterfa
 }
 
 func getRef(object runtime.Object) (*v1.ObjectReference, error) {
-	return v1.GetReference(api.Scheme, object)
+	return ref.GetReference(api.Scheme, object)
 }

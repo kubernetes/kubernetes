@@ -19,14 +19,13 @@ import (
 
 	"github.com/coreos/etcd/etcdserver"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
-	"github.com/coreos/pkg/capnslog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 )
 
 func init() {
-	grpclog.SetLogger(capnslog.NewPackageLogger("github.com/coreos/etcd/etcdserver", "v3rpc/grpc"))
+	grpclog.SetLogger(plog)
 }
 
 func Server(s *etcdserver.EtcdServer, tls *tls.Config) *grpc.Server {

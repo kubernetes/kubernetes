@@ -68,7 +68,7 @@ function updateGodepManifest() {
     GOPATH="${TMP_GOPATH}:${GOPATH}:${KUBE_ROOT}/staging" godep save ${V} ./... 2>&1 | sed 's/^/  /'
 
     echo "Rewriting Godeps.json to remove commits that don't really exist because we haven't pushed the prereqs yet"
-    go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" --client-go-import-path="k8s.io/${repo}"
+    go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" --override-import-path="k8s.io/${repo}"
 
     # commit so that following repos do not see this repo as dirty
     git add vendor >/dev/null

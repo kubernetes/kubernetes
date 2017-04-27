@@ -48,15 +48,12 @@ import (
 )
 
 const (
-	smallGroupSize       = 5
-	mediumGroupSize      = 30
-	bigGroupSize         = 250
-	smallGroupName       = "load-small"
-	mediumGroupName      = "load-medium"
-	bigGroupName         = "load-big"
-	smallGroupBatchSize  = 30
-	mediumGroupBatchSize = 5
-	bigGroupBatchSize    = 1
+	smallGroupSize  = 5
+	mediumGroupSize = 30
+	bigGroupSize    = 250
+	smallGroupName  = "load-small"
+	mediumGroupName = "load-medium"
+	bigGroupName    = "load-big"
 	// We start RCs/Services/pods/... in different namespace in this test.
 	// nodeCountPerNamespace determines how many namespaces we will be using
 	// depending on the number of nodes in the underlying cluster.
@@ -143,16 +140,16 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	loadTests := []Load{
 		// The container will consume 1 cpu and 512mb of memory.
 		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}, kind: api.Kind("ReplicationController")},
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController")},
 		// Tests for other resource types
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment")},
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: batch.Kind("Job")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: batch.Kind("Job")},
 		// Test scheduling when daemons are preset
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
 		// Test with secrets
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment"), secretsPerPod: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
 		// Special test case which randomizes created resources
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: randomKind},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind},
 	}
 
 	for _, testArg := range loadTests {

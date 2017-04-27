@@ -518,6 +518,8 @@ func (tc *testCase) runTest(t *testing.T) {
 	}
 
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
+	defaultUpscaleForbiddenWindow := 3 * time.Minute
+	defaultDownscaleForbiddenWindow := 5 * time.Minute
 
 	hpaController := NewHorizontalController(
 		eventClient.Core(),
@@ -526,6 +528,8 @@ func (tc *testCase) runTest(t *testing.T) {
 		replicaCalc,
 		informerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
 		controller.NoResyncPeriodFunc(),
+		defaultUpscaleForbiddenWindow,
+		defaultDownscaleForbiddenWindow,
 	)
 	hpaController.hpaListerSynced = alwaysReady
 

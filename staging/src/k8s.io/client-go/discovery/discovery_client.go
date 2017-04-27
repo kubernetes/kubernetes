@@ -25,6 +25,8 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 
+	"github.com/go-openapi/loads"
+	"github.com/go-openapi/spec"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,6 +49,7 @@ type DiscoveryInterface interface {
 	ServerResourcesInterface
 	ServerVersionInterface
 	SwaggerSchemaInterface
+	OpenAPISchemaInterface
 }
 
 // CachedDiscoveryInterface is a DiscoveryInterface with cache invalidation and freshness.
@@ -89,6 +92,12 @@ type ServerVersionInterface interface {
 type SwaggerSchemaInterface interface {
 	// SwaggerSchema retrieves and parses the swagger API schema the server supports.
 	SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error)
+}
+
+// OpenAPISchemaInterface has a method to retrieve the open API schema.
+type OpenAPISchemaInterface interface {
+	// OpenAPISchema retrieves and parses the swagger API schema the server supports.
+	OpenAPISchema() (*spec.Swagger, error)
 }
 
 // DiscoveryClient implements the functions that discover server-supported API groups,
@@ -332,6 +341,7 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 }
 
 // SwaggerSchema retrieves and parses the swagger API schema the server supports.
+// TODO: Replace usages with Open API.  Tracked in https://github.com/kubernetes/kubernetes/issues/44589
 func (d *DiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
 	if version.Empty() {
 		return nil, fmt.Errorf("groupVersion cannot be empty")
@@ -363,6 +373,21 @@ func (d *DiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.A
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &schema, nil
+}
+
+// OpenAPISchema fetches the open api schema using a rest client and parses the json.
+// Warning: this is very expensive (~1.2s)
+func (d *DiscoveryClient) OpenAPISchema() (*spec.Swagger, error) {
+	data, err := d.restClient.Get().AbsPath("/swagger.json").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	msg := json.RawMessage(data)
+	doc, err := loads.Analyzed(msg, "")
+	if err != nil {
+		return nil, err
+	}
+	return doc.Spec(), err
 }
 
 // withRetries retries the given recovery function in case the groups supported by the server change after ServerGroup() returns.

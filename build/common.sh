@@ -590,8 +590,8 @@ function kube::build::rsync_probe {
   return 1
 }
 
-# Start up the rsync container in the backgound.  This should be explicitly
-# stoped with kube::build::stop_rsyncd_container.
+# Start up the rsync container in the background. This should be explicitly
+# stopped with kube::build::stop_rsyncd_container.
 #
 # This will set the global var KUBE_RSYNC_ADDR to the effective port that the
 # rsync daemon can be reached out.

@@ -32,7 +32,6 @@ filegroup(
     "kube-apiserver",
     "kube-controller-manager",
     "kube-proxy",
-    "kube-aggregator",
 ]]
 
 deb_data(
@@ -113,11 +112,6 @@ k8s_deb(
         "iproute2",
     ],
     description = "Kubernetes Service Proxy",
-)
-
-k8s_deb(
-    name = "kube-aggregator",
-    description = "Kubernetes Federated API Server",
 )
 
 k8s_deb(

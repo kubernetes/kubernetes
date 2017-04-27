@@ -33,7 +33,8 @@ import (
 
 const apiNoun = "federation apiserver"
 
-func getRunOptions() *options.ServerRunOptions {
+// GetRunOptions returns the default run options that can be used to run a test federation apiserver.
+func GetRunOptions() *options.ServerRunOptions {
 	r := options.NewServerRunOptions()
 	r.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURLFromEnv()}
 	// Use a unique prefix to ensure isolation from other tests using the same etcd instance
@@ -49,15 +50,20 @@ type FederationAPIFixture struct {
 	stopChan chan struct{}
 }
 
+// SetUp runs federation apiserver with default run options.
 func (f *FederationAPIFixture) SetUp(t *testing.T) {
+	f.SetUpWithRunOptions(t, GetRunOptions())
+}
+
+// SetUpWithRunOptions runs federation apiserver with the given run options.
+// Uses default run options if runOptions is nil.
+func (f *FederationAPIFixture) SetUpWithRunOptions(t *testing.T, runOptions *options.ServerRunOptions) {
 	if f.stopChan != nil {
 		t.Fatal("SetUp() already called")
 	}
 	defer TearDownOnPanic(t, f)
 
 	f.stopChan = make(chan struct{})
-
-	runOptions := getRunOptions()
 
 	err := startServer(t, runOptions, f.stopChan)
 	if err != nil {

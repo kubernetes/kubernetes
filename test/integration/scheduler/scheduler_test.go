@@ -99,7 +99,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	policyConfigMap := v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
 		Data: map[string]string{
-			"scheduler-policy-config.json": `{
+			options.SchedulerPolicyConfigMapKey: `{
 			"kind" : "Policy",
 			"apiVersion" : "v1",
 			"predicates" : [

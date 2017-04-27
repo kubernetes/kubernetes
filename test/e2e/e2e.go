@@ -160,8 +160,24 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	// Dump the output of the nethealth containers only once per run
 	if framework.TestContext.DumpLogsOnFailure {
-		framework.Logf("Dumping network health container logs from all nodes")
-		framework.LogContainersInPodsWithLabels(c, metav1.NamespaceSystem, framework.ImagePullerLabels, "nethealth", framework.Logf)
+		logFunc := framework.Logf
+		if framework.TestContext.ReportDir != "" {
+			filePath := path.Join(framework.TestContext.ReportDir, "nethealth.txt")
+			file, err := os.Create(filePath)
+			if err != nil {
+				framework.Logf("Failed to create a file with network health data %v: %v\nPrinting to stdout", filePath, err)
+			} else {
+				defer file.Close()
+				if err = file.Chmod(0644); err != nil {
+					framework.Logf("Failed to chmod to 644 of %v: %v", filePath, err)
+				}
+				logFunc = framework.GetLogToFileFunc(file)
+				framework.Logf("Dumping network health container logs from all nodes to file %v", filePath)
+			}
+		} else {
+			framework.Logf("Dumping network health container logs from all nodes...")
+		}
+		framework.LogContainersInPodsWithLabels(c, metav1.NamespaceSystem, framework.ImagePullerLabels, "nethealth", logFunc)
 	}
 
 	// Reference common test to make the import valid.
