@@ -36,6 +36,13 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
+func newInstancesMetricContext(request string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"instances_" + request, unusedMetricLabel, unusedMetricLabel},
+	}
+}
+
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (gce *GCECloud) NodeAddresses(_ types.NodeName) ([]v1.NodeAddress, error) {
 	internalIP, err := metadata.Get("instance/network-interfaces/0/ip")
@@ -156,15 +163,22 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 					Value: &keyString,
 				})
 		}
-		op, err := gce.service.Projects.SetCommonInstanceMetadata(gce.projectID, project.CommonInstanceMetadata).Do()
+
+		mc := newInstancesMetricContext("add_ssh_key")
+		op, err := gce.service.Projects.SetCommonInstanceMetadata(
+			gce.projectID, project.CommonInstanceMetadata).Do()
+
 		if err != nil {
 			glog.Errorf("Could not Set Metadata: %v", err)
+			mc.Observe(err)
 			return false, nil
 		}
-		if err := gce.waitForGlobalOp(op); err != nil {
+
+		if err := gce.waitForGlobalOp(op, mc); err != nil {
 			glog.Errorf("Could not Set Metadata: %v", err)
 			return false, nil
 		}
+
 		glog.Infof("Successfully added sshKey to project metadata")
 		return true, nil
 	})
@@ -324,8 +338,7 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 	// Avoid changing behaviour when not managing multiple zones
 	for _, zone := range gce.managedZones {
 		name = canonicalizeInstanceName(name)
-		dc := contextWithNamespace(name, "gce_instance_list")
-		res, err := gce.service.Instances.Get(gce.projectID, zone, name).Context(dc).Do()
+		res, err := gce.service.Instances.Get(gce.projectID, zone, name).Do()
 		if err != nil {
 			glog.Errorf("getInstanceByName: failed to get instance %s; err: %v", name, err)
 

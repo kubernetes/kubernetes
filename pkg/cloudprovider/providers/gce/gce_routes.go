@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -28,6 +29,13 @@ import (
 	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v1"
 )
+
+func newRoutesMetricContext(request string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"routes_" + request, unusedMetricLabel, unusedMetricLabel},
+	}
+}
 
 func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	var routes []*cloudprovider.Route
@@ -80,6 +88,8 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 	if err != nil {
 		return err
 	}
+
+	mc := newRoutesMetricContext("create")
 	insertOp, err := gce.service.Routes.Insert(gce.projectID, &compute.Route{
 		Name:            routeName,
 		DestRange:       route.DestinationCIDR,
@@ -93,18 +103,19 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 			glog.Info("Route %v already exists.")
 			return nil
 		} else {
-			return err
+			return mc.Observe(err)
 		}
 	}
-	return gce.waitForGlobalOp(insertOp)
+	return gce.waitForGlobalOp(insertOp, mc)
 }
 
 func (gce *GCECloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
+	mc := newRoutesMetricContext("create")
 	deleteOp, err := gce.service.Routes.Delete(gce.projectID, route.Name).Do()
 	if err != nil {
-		return err
+		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(deleteOp)
+	return gce.waitForGlobalOp(deleteOp, mc)
 }
 
 func truncateClusterName(clusterName string) string {

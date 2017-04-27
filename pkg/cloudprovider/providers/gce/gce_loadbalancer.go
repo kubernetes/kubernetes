@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -42,7 +43,30 @@ type cidrs struct {
 	isSet bool
 }
 
-var lbSrcRngsFlag cidrs
+var (
+	lbSrcRngsFlag cidrs
+)
+
+func newLoadBalancerMetricContext(request, region string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"loadbalancer_" + request, region, unusedMetricLabel},
+	}
+}
+
+func newTargetPoolMetricContext(request, region string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"targetpool_" + request, region, unusedMetricLabel},
+	}
+}
+
+func newAddressMetricContext(request, region string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"address_" + request, region, unusedMetricLabel},
+	}
+}
 
 func init() {
 	var err error
@@ -106,6 +130,7 @@ func (gce *GCECloud) GetLoadBalancer(clusterName string, service *v1.Service) (*
 // Our load balancers in GCE consist of four separate GCE resources - a static
 // IP address, a firewall rule, a target pool, and a forwarding rule. This
 // function has to manage all of them.
+//
 // Due to an interesting series of design decisions, this handles both creating
 // new load balancers and updating existing load balancers, recognizing when
 // each is needed.
@@ -131,7 +156,8 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 	affinityType := apiService.Spec.SessionAffinity
 
 	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
-	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", loadBalancerName, gce.region, loadBalancerIP, portStr, hostNames, serviceName, apiService.Annotations)
+	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
+		loadBalancerName, gce.region, loadBalancerIP, portStr, hostNames, serviceName, apiService.Annotations)
 
 	// Check if the forwarding rule exists, and if so, what its IP is.
 	fwdRuleExists, fwdRuleNeedsUpdate, fwdRuleIP, err := gce.forwardingRuleNeedsUpdate(loadBalancerName, gce.region, loadBalancerIP, ports)
@@ -139,7 +165,8 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 		return nil, err
 	}
 	if !fwdRuleExists {
-		glog.Infof("Forwarding rule %v for Service %v/%v doesn't exist", loadBalancerName, apiService.Namespace, apiService.Name)
+		glog.V(2).Infof("Forwarding rule %v for Service %v/%v doesn't exist",
+			loadBalancerName, apiService.Namespace, apiService.Name)
 	}
 
 	// Make sure we know which IP address will be used and have properly reserved
@@ -454,8 +481,6 @@ func (gce *GCECloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.S
 	return nil
 }
 
-// XXX ----------
-
 func (gce *GCECloud) DeleteForwardingRule(name string) error {
 	region, err := GetGCERegion(gce.localZone)
 	if err != nil {
@@ -465,15 +490,18 @@ func (gce *GCECloud) DeleteForwardingRule(name string) error {
 }
 
 func (gce *GCECloud) deleteForwardingRule(name, region string) error {
+	mc := newForwardingRuleMetricContext("delete", region)
 	op, err := gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
+
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
 		glog.Infof("Forwarding rule %s already deleted. Continuing to delete other resources.", name)
 	} else if err != nil {
 		glog.Warningf("Failed to delete forwarding rule %s: got error %s.", name, err.Error())
-		return err
+		return mc.Observe(err)
 	} else {
-		if err := gce.waitForRegionOp(op, region); err != nil {
-			glog.Warningf("Failed waiting for forwarding rule %s to be deleted: got error %s.", name, err.Error())
+		if err := gce.waitForRegionOp(op, region, mc); err != nil {
+			glog.Warningf("Failed waiting for forwarding rule %s to be deleted: got error %s.",
+				name, err.Error())
 			return err
 		}
 	}
@@ -490,18 +518,22 @@ func (gce *GCECloud) DeleteTargetPool(name string, hc *compute.HttpHealthCheck) 
 }
 
 func (gce *GCECloud) deleteTargetPool(name, region string, hc *compute.HttpHealthCheck) error {
+	mc := newTargetPoolMetricContext("delete", region)
 	op, err := gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
+
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
 		glog.Infof("Target pool %s already deleted. Continuing to delete other resources.", name)
 	} else if err != nil {
 		glog.Warningf("Failed to delete target pool %s, got error %s.", name, err.Error())
-		return err
+		return mc.Observe(err)
 	} else {
-		if err := gce.waitForRegionOp(op, region); err != nil {
-			glog.Warningf("Failed waiting for target pool %s to be deleted: got error %s.", name, err.Error())
+		if err := gce.waitForRegionOp(op, region, mc); err != nil {
+			glog.Warningf("Failed waiting for target pool %s to be deleted: got error %s.",
+				name, err.Error())
 			return err
 		}
 	}
+
 	// Deletion of health checks is allowed only after the TargetPool reference is deleted
 	if hc != nil {
 		glog.Infof("Deleting health check %v", hc.Name)
@@ -546,12 +578,14 @@ func (gce *GCECloud) createTargetPool(name, serviceName, region string, hosts []
 		SessionAffinity: translateAffinityType(affinityType),
 		HealthChecks:    hcLinks,
 	}
+
+	mc := newTargetPoolMetricContext("insert", region)
 	op, err := gce.service.TargetPools.Insert(gce.projectID, region, pool).Do()
 	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-		return err
+		return mc.Observe(err)
 	}
 	if op != nil {
-		err = gce.waitForRegionOp(op, region)
+		err = gce.waitForRegionOp(op, region, mc)
 		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
 			return err
 		}
@@ -575,22 +609,25 @@ func (gce *GCECloud) updateTargetPool(loadBalancerName string, existing sets.Str
 
 	if len(toAdd) > 0 {
 		add := &compute.TargetPoolsAddInstanceRequest{Instances: toAdd}
+
+		mc := newTargetPoolMetricContext("update", gce.region)
 		op, err := gce.service.TargetPools.AddInstance(gce.projectID, gce.region, loadBalancerName, add).Do()
 		if err != nil {
-			return err
+			return mc.Observe(err)
 		}
-		if err := gce.waitForRegionOp(op, gce.region); err != nil {
+		if err := gce.waitForRegionOp(op, gce.region, mc); err != nil {
 			return err
 		}
 	}
 
 	if len(toRemove) > 0 {
+		mc := newTargetPoolMetricContext("delete", gce.region)
 		rm := &compute.TargetPoolsRemoveInstanceRequest{Instances: toRemove}
 		op, err := gce.service.TargetPools.RemoveInstance(gce.projectID, gce.region, loadBalancerName, rm).Do()
 		if err != nil {
-			return err
+			return mc.Observe(err)
 		}
-		if err := gce.waitForRegionOp(op, gce.region); err != nil {
+		if err := gce.waitForRegionOp(op, gce.region, mc); err != nil {
 			return err
 		}
 	}
@@ -866,12 +903,13 @@ func (gce *GCECloud) createForwardingRule(name, serviceName, region, ipAddress s
 		Target:      gce.targetPoolURL(name, region),
 	}
 
+	mc := newForwardingRuleMetricContext("create", region)
 	op, err := gce.service.ForwardingRules.Insert(gce.projectID, region, req).Do()
 	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-		return err
+		return mc.Observe(err)
 	}
 	if op != nil {
-		err = gce.waitForRegionOp(op, region)
+		err = gce.waitForRegionOp(op, region, mc)
 		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
 			return err
 		}
@@ -880,16 +918,17 @@ func (gce *GCECloud) createForwardingRule(name, serviceName, region, ipAddress s
 }
 
 func (gce *GCECloud) createFirewall(name, region, desc string, sourceRanges netsets.IPNet, ports []v1.ServicePort, hosts []*gceInstance) error {
+	mc := newFirewallMetricContext("create", region)
 	firewall, err := gce.firewallObject(name, region, desc, sourceRanges, ports, hosts)
 	if err != nil {
-		return err
+		return mc.Observe(err)
 	}
 	op, err := gce.service.Firewalls.Insert(gce.projectID, firewall).Do()
 	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-		return err
+		return mc.Observe(err)
 	}
 	if op != nil {
-		err = gce.waitForGlobalOp(op)
+		err = gce.waitForGlobalOp(op, mc)
 		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
 			return err
 		}
@@ -898,16 +937,17 @@ func (gce *GCECloud) createFirewall(name, region, desc string, sourceRanges nets
 }
 
 func (gce *GCECloud) updateFirewall(name, region, desc string, sourceRanges netsets.IPNet, ports []v1.ServicePort, hosts []*gceInstance) error {
+	mc := newFirewallMetricContext("update", region)
 	firewall, err := gce.firewallObject(name, region, desc, sourceRanges, ports, hosts)
 	if err != nil {
-		return err
+		return mc.Observe(err)
 	}
 	op, err := gce.service.Firewalls.Update(gce.projectID, makeFirewallName(name), firewall).Do()
 	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-		return err
+		return mc.Observe(err)
 	}
 	if op != nil {
-		err = gce.waitForGlobalOp(op)
+		err = gce.waitForGlobalOp(op, mc)
 		if err != nil {
 			return err
 		}
@@ -1065,19 +1105,23 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 		Name:        name,
 		Description: fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, serviceName),
 	}
+
 	if existingIP != "" {
 		addressObj.Address = existingIP
 	}
+
+	mc := newAddressMetricContext("create", region)
 	op, err := gce.service.Addresses.Insert(gce.projectID, region, addressObj).Do()
 	if err != nil {
 		if !isHTTPErrorCode(err, http.StatusConflict) {
-			return "", false, fmt.Errorf("error creating gce static IP address: %v", err)
+			return "", false, fmt.Errorf("error creating gce static IP address: %v",
+				mc.Observe(err))
 		}
 		// StatusConflict == the IP exists already.
 		existed = true
 	}
 	if op != nil {
-		err := gce.waitForRegionOp(op, region)
+		err := gce.waitForRegionOp(op, region, mc)
 		if err != nil {
 			if !isHTTPErrorCode(err, http.StatusConflict) {
 				return "", false, fmt.Errorf("error waiting for gce static IP address to be created: %v", err)
@@ -1096,15 +1140,17 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 }
 
 func (gce *GCECloud) deleteFirewall(name, region string) error {
+	mc := newFirewallMetricContext("delete", region)
 	fwName := makeFirewallName(name)
 	op, err := gce.service.Firewalls.Delete(gce.projectID, fwName).Do()
+
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
-		glog.Infof("Firewall %s already deleted. Continuing to delete other resources.", name)
+		glog.V(2).Infof("Firewall %s already deleted. Continuing to delete other resources.", name)
 	} else if err != nil {
 		glog.Warningf("Failed to delete firewall %s, got error %v", fwName, err)
-		return err
+		return mc.Observe(err)
 	} else {
-		if err := gce.waitForGlobalOp(op); err != nil {
+		if err := gce.waitForGlobalOp(op, mc); err != nil {
 			glog.Warningf("Failed waiting for Firewall %s to be deleted.  Got error: %v", fwName, err)
 			return err
 		}
@@ -1113,14 +1159,15 @@ func (gce *GCECloud) deleteFirewall(name, region string) error {
 }
 
 func (gce *GCECloud) deleteStaticIP(name, region string) error {
+	mc := newAddressMetricContext("delete", region)
 	op, err := gce.service.Addresses.Delete(gce.projectID, region, name).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
 		glog.Infof("Static IP address %s is not reserved", name)
 	} else if err != nil {
 		glog.Warningf("Failed to delete static IP address %s, got error %v", name, err)
-		return err
+		return mc.Observe(err)
 	} else {
-		if err := gce.waitForRegionOp(op, region); err != nil {
+		if err := gce.waitForRegionOp(op, region, mc); err != nil {
 			glog.Warningf("Failed waiting for address %s to be deleted, got error: %v", name, err)
 			return err
 		}
