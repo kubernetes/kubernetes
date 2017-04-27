@@ -481,6 +481,8 @@ type KubeletConfiguration struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool
+	// This flag, if set, makes hostPath volumes use rslave mount propagation.
+	ExperimentalEnableHostPathMountPropagation bool
 
 	/* following flags are meant for Node Allocatable */
 

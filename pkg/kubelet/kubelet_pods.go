@@ -173,11 +173,12 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		}
 
 		mounts = append(mounts, kubecontainer.Mount{
-			Name:           mount.Name,
-			ContainerPath:  containerPath,
-			HostPath:       hostPath,
-			ReadOnly:       mount.ReadOnly,
-			SELinuxRelabel: relabelVolume,
+			Name:             mount.Name,
+			ContainerPath:    containerPath,
+			HostPath:         hostPath,
+			ReadOnly:         mount.ReadOnly,
+			SELinuxRelabel:   relabelVolume,
+			NeedsPropagation: vol.Mounter.GetAttributes().NeedsPropagation,
 		})
 	}
 	if mountEtcHostsFile {

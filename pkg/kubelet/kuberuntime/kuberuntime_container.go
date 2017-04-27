@@ -254,10 +254,11 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 		v := opts.Mounts[idx]
 		selinuxRelabel := v.SELinuxRelabel && selinux.SELinuxEnabled()
 		mount := &runtimeapi.Mount{
-			HostPath:       v.HostPath,
-			ContainerPath:  v.ContainerPath,
-			Readonly:       v.ReadOnly,
-			SelinuxRelabel: selinuxRelabel,
+			HostPath:         v.HostPath,
+			ContainerPath:    v.ContainerPath,
+			Readonly:         v.ReadOnly,
+			SelinuxRelabel:   selinuxRelabel,
+			NeedsPropagation: v.NeedsPropagation,
 		}
 
 		volumeMounts = append(volumeMounts, mount)

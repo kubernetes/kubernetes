@@ -976,7 +976,7 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 	}
 
 	ds, err := dockershim.NewDockerService(dockerClient, c.SeccompProfileRoot, c.PodInfraContainerImage,
-		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, dockerExecHandler, dockershimRootDir)
+		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, dockerExecHandler, dockershimRootDir, c.ExperimentalEnableHostPathMountPropagation)
 	if err != nil {
 		return err
 	}

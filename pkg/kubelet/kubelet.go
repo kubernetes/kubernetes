@@ -553,7 +553,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			// Create and start the CRI shim running as a grpc server.
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
 			ds, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage,
-				streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver, dockerExecHandler, dockershimRootDir)
+				streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver, dockerExecHandler, dockershimRootDir, kubeCfg.ExperimentalEnableHostPathMountPropagation)
 			if err != nil {
 				return nil, err
 			}
@@ -652,6 +652,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				// runtime to set the flag instead.
 				klet.hairpinMode == componentconfig.HairpinVeth && kubeCfg.NetworkPluginName != "kubenet",
 				kubeCfg.SeccompProfileRoot,
+				kubeCfg.ExperimentalEnableHostPathMountPropagation,
 				kubeDeps.ContainerRuntimeOptions...,
 			)
 			klet.containerRuntime = runtime
