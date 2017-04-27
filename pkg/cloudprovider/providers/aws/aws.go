@@ -1545,6 +1545,20 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 		attachResponse, err := c.ec2.AttachVolume(request)
 		if err != nil {
 			attachEnded = true
+			if awsError, ok := err.(awserr.Error); ok {
+				if awsError.Code() == "VolumeInUse" {
+					info, err := disk.describeVolume()
+					if err == nil {
+						for _, a := range info.Attachments {
+							if a.VolumeId == nil || a.State == nil || a.InstanceId == nil {
+								continue
+							} else if *disk.awsID.awsString() == *a.VolumeId && *a.State == "attached" {
+								return "", fmt.Errorf("Error attaching EBS volume %q to instance %q: %v. The volume is currently attached to instance %q", disk.awsID, awsInstance.awsID, awsError, *a.InstanceId)
+							}
+						}
+					}
+				}
+			}
 			// TODO: Check if the volume was concurrently attached?
 			return "", fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", disk.awsID, awsInstance.awsID, err)
 		}
