@@ -4013,6 +4013,33 @@
       }
      }
     },
+    "patch": {
+     "description": "connect PATCH requests to proxy of Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PatchNamespacedPodProxy",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
     "parameters": [
      {
       "uniqueItems": true,
@@ -4190,6 +4217,33 @@
       "core_v1"
      ],
      "operationId": "connectCoreV1HeadNamespacedPodProxyWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "connect PATCH requests to proxy of Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PatchNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7270,6 +7324,33 @@
       }
      }
     },
+    "patch": {
+     "description": "connect PATCH requests to proxy of Service",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PatchNamespacedServiceProxy",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
     "parameters": [
      {
       "uniqueItems": true,
@@ -7447,6 +7528,33 @@
       "core_v1"
      ],
      "operationId": "connectCoreV1HeadNamespacedServiceProxyWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "connect PATCH requests to proxy of Service",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PatchNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8570,6 +8678,33 @@
       }
      }
     },
+    "patch": {
+     "description": "connect PATCH requests to proxy of Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PatchNodeProxy",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
     "parameters": [
      {
       "uniqueItems": true,
@@ -8739,6 +8874,33 @@
       "core_v1"
      ],
      "operationId": "connectCoreV1HeadNodeProxyWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "connect PATCH requests to proxy of Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PatchNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
