@@ -33,17 +33,10 @@ docker_build(
 )
 
 docker_build(
-    name = "busybox-libc",
+    name = "busybox-net",
     base = ":busybox",
     debs = [
         "@libc_deb//file",
-    ],
-)
-
-docker_build(
-    name = "busybox-net",
-    base = ":busybox-libc",
-    debs = [
         "@iptables_deb//file",
         "@iproute2_deb//file",
         "@libnetlink_deb//file",
@@ -53,15 +46,15 @@ docker_build(
 
 DOCKERIZED_BINARIES = {
     "kube-apiserver": {
-        "base": ":busybox-libc",
+        "base": ":busybox",
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": ":busybox-libc",
+        "base": ":busybox",
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": ":busybox-libc",
+        "base": ":busybox",
         "target": "//plugin/cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
