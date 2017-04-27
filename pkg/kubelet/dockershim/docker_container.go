@@ -230,21 +230,15 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 				path, realPath, containerID, err)
 		}
 	} else {
-		dockerLoggingDriver := ""
-		dockerInfo, err := ds.client.Info()
+		supported, err := IsCRISupportedLogDriver(ds.client)
 		if err != nil {
-			glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
-		} else {
-			dockerLoggingDriver = dockerInfo.LoggingDriver
-			glog.V(10).Infof("Docker logging driver is %s", dockerLoggingDriver)
+			glog.Errorf("Failed to check supported logging driver by CRI: %v", err)
 		}
 
-		for _, driver := range criSupportedLogDrivers {
-			if dockerLoggingDriver == driver {
-				glog.Errorf("Cannot create symbolic link because container log file doesn't exist!")
-			} else {
-				glog.V(5).Infof("Unsupported logging driver: %s", dockerLoggingDriver)
-			}
+		if supported {
+			glog.Errorf("Cannot create symbolic link because container log file doesn't exist!")
+		} else {
+			glog.V(5).Infof("Unsupported logging driver by CRI")
 		}
 	}
 
