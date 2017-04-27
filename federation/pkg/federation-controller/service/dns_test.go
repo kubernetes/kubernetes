@@ -50,13 +50,11 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		{
 			name: "ServiceWithSingleLBIngress",
 			service: v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "servicename",
-					Namespace: "servicenamespace",
-					Annotations: map[string]string{
-						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
-							AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
-							String()},
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+						AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+						AddEndpoints(cluster2Name, []string{}).
+						String()},
 				},
 			},
 			expected: []string{
@@ -73,10 +71,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			{
 				name: "withname",
 				service: v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "servicename",
-						Namespace: "servicenamespace",
-					},
+					ObjectMeta: metav1.ObjectMeta{},
 				},
 				expected: []string{
 					"example.com:"+globalDNSName+":A:180:[198.51.100.1]",
@@ -88,9 +83,11 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		{
 			name: "ServiceWithNoLBIngress",
 			service: v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "servicename",
-					Namespace: "servicenamespace",
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+						AddEndpoints(cluster1Name, []string{}).
+						AddEndpoints(cluster2Name, []string{}).
+						String()},
 				},
 			},
 			expected: []string{
@@ -103,14 +100,11 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		{
 			name: "ServiceWithMultipleLBIngress",
 			service: v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "servicename",
-					Namespace: "servicenamespace",
-					Annotations: map[string]string{
-						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
-							AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
-							AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
-							String()},
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+						AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+						AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
+						String()},
 				},
 			},
 			expected: []string{
@@ -124,14 +118,12 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		{
 			name: "ServiceWithLBIngressAndServiceDeleted",
 			service: v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "servicename",
-					Namespace:         "servicenamespace",
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+						AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+						AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
+						String()},
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
-					Annotations: map[string]string{
-						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
-							AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
-							String()},
 				},
 			},
 			expected: []string{
@@ -145,15 +137,12 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		{
 			name: "ServiceWithMultipleLBIngressAndOneLBIngressGettingRemoved",
 			service: v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "servicename",
-					Namespace: "servicenamespace",
-					Annotations: map[string]string{
-						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
-							AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
-							AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
-							RemoveEndpoint(cluster2Name, "198.51.200.1").
-							String()},
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+						AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+						AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
+						RemoveEndpoint(cluster2Name, "198.51.200.1").
+						String()},
 				},
 			},
 			expected: []string{
@@ -167,16 +156,13 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		{
 			name: "ServiceWithMultipleLBIngressAndAllLBIngressGettingRemoved",
 			service: v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "servicename",
-					Namespace: "servicenamespace",
-					Annotations: map[string]string{
-						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
-							AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
-							AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
-							RemoveEndpoint(cluster1Name, "198.51.100.1").
-							RemoveEndpoint(cluster2Name, "198.51.200.1").
-							String()},
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+						AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+						AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
+						RemoveEndpoint(cluster1Name, "198.51.100.1").
+						RemoveEndpoint(cluster2Name, "198.51.200.1").
+						String()},
 				},
 			},
 			expected: []string{
@@ -195,22 +181,30 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		}
 		fakeClient := &fakefedclientset.Clientset{}
 		RegisterFakeClusterGet(&fakeClient.Fake, &v1beta1.ClusterList{Items: []v1beta1.Cluster{*cluster1, *cluster2}})
-		serviceController := ServiceController{
+		d := ServiceDNSController{
 			federationClient: fakeClient,
 			dns:              fakedns,
 			dnsZones:         fakednsZones,
-			serviceDnsSuffix: "federation.example.com",
+			serviceDNSSuffix: "federation.example.com",
 			zoneName:         "example.com",
 			federationName:   "myfederation",
 		}
 
-		err := serviceController.ensureDnsRecords(cluster1Name, &test.service)
+		dnsZone, err := getDNSZone(d.zoneName, d.zoneID, d.dnsZones)
 		if err != nil {
-			t.Errorf("Test failed for %s, unexpected error %v", test.name, err)
+			t.Errorf("Test failed for %s, Get DNS Zone failed: %v", test.name, err)
 		}
-		err = serviceController.ensureDnsRecords(cluster2Name, &test.service)
+		d.dnsZone = dnsZone
+		test.service.Name = "servicename"
+		test.service.Namespace = "servicenamespace"
+
+		ingress, err := ParseFederatedServiceIngress(&test.service)
 		if err != nil {
-			t.Errorf("Test failed for %s, unexpected error %v", test.name, err)
+			t.Errorf("Error in parsing lb ingress for service %s/%s: %v", test.service.Namespace, test.service.Name, err)
+			return
+		}
+		for _, clusterIngress := range ingress.Items {
+			d.ensureDNSRecords(clusterIngress.Cluster, &test.service)
 		}
 
 		zones, err := fakednsZones.List()
