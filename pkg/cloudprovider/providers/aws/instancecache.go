@@ -171,7 +171,7 @@ func (c *instanceCache) refreshAll(previous *instanceCacheSnapshot) (*instanceCa
 		newEc2Filter("instance-state-name", "running"),
 	}
 
-	filters = c.cloud.addFilters(filters)
+	filters = c.cloud.tagging.addFilters(filters)
 	request := &ec2.DescribeInstancesInput{
 		Filters: filters,
 	}
@@ -292,7 +292,7 @@ func (c *instanceCache) findInstancesByNodeNames(cachePolicy *CachePolicy, nodeN
 func (c *instanceCache) GetInstanceByNodeName(cachePolicy *CachePolicy, nodeName types.NodeName) (*cachedInstance, error) {
 	if cachePolicy.Validity == 0 {
 		// In general, this is not safe because a new node can be replaced
-		glog.Warningf("Doing instance cached NodeName lookup without cache expiry")
+		glog.Warningf("Doing instance-cache NodeName lookup without cache expiry")
 	}
 
 	instances, err := c.findInstancesByNodeNames(cachePolicy, []types.NodeName{nodeName})
@@ -305,6 +305,29 @@ func (c *instanceCache) GetInstanceByNodeName(cachePolicy *CachePolicy, nodeName
 		return nil, cloudprovider.InstanceNotFound
 	}
 	return instance, nil
+}
+
+// GetInstancesByNodeNames looks up the instance in the current cached view of instances.  If the cached
+// view is invalid according to cachePolicy, or if any node name is not found, a full refresh will be triggered.
+func (c *instanceCache) GetInstancesByNodeName(cachePolicy *CachePolicy, nodeNames []types.NodeName) (map[types.NodeName]*cachedInstance, error) {
+	if cachePolicy.Validity == 0 {
+		// In general, this is not safe because a new node can be replaced
+		glog.Warningf("Doing instance-cache NodeName lookup without cache expiry")
+	}
+
+	instances, err := c.findInstancesByNodeNames(cachePolicy, nodeNames)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(instances) != len(nodeNames) {
+		for _, nodeName := range nodeNames {
+			if instances[nodeName] == nil {
+				return nil, cloudprovider.InstanceNotFound
+			}
+		}
+	}
+	return instances, nil
 }
 
 // findCachedInstancesByNodeNames does a lookup of the instances by node name, returning any that are found.

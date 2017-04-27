@@ -1472,7 +1472,7 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 	}
 
 	// Attaching volumes requires an up-to-date view, so don't go through the cache
-	info, err := c.getFullInstance(nodeName)
+	awsInstance, err := c.getFullInstance(nodeName)
 	if err != nil {
 		return "", fmt.Errorf("error finding instance %s: %v", nodeName, err)
 	}
@@ -1483,7 +1483,7 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
-	awsInstanceID := awsInstanceID(aws.StringValue(info.InstanceId))
+	awsInstanceID := awsInstanceID(aws.StringValue(awsInstance.InstanceId))
 
 	// mountDevice will hold the device where we should try to attach the disk
 	var mountDevice mountDevice
@@ -1501,7 +1501,7 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 		}
 	}()
 
-	mountDevice, alreadyAttached, err = c.getMountDevice(nodeName, info, volumeID, true)
+	mountDevice, alreadyAttached, err = c.getMountDevice(nodeName, awsInstance, volumeID, true)
 	if err != nil {
 		return "", err
 	}
@@ -1525,10 +1525,10 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 			// TODO: Check if the volume was concurrently attached?
 			return "", fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", volumeID, awsInstanceID, err)
 		}
-		if da, ok := c.deviceAllocators[awsInstance.nodeName]; ok {
+		if da, ok := c.deviceAllocators[nodeName]; ok {
 			da.Deprioritize(mountDevice)
 		}
-		glog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", disk.awsID, awsInstance.awsID, attachResponse)
+		glog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", volumeID, awsInstanceID, attachResponse)
 	}
 
 	attachment, err := c.waitForAttachmentStatus(volumeID, "attached")
@@ -1607,7 +1607,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 	if err != nil {
 		return "", err
 	}
-	if da, ok := c.deviceAllocators[awsInstance.nodeName]; ok {
+	if da, ok := c.deviceAllocators[nodeName]; ok {
 		da.Deprioritize(mountDevice)
 	}
 	if attachment != nil {
@@ -1786,15 +1786,13 @@ func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolume
 		return attached, nil
 	}
 
-	// Prebuild the attachment map, assuming that nothing is attached
+	// Build the attachment map, assuming that nothing is attached until we see an attachment
 	for nodeName, kubernetesVolumeIDs := range nodeDisks {
 		attached[nodeName] = make(map[KubernetesVolumeID]bool)
 
 		for _, kubernetesVolumeID := range kubernetesVolumeIDs {
 			attached[nodeName][kubernetesVolumeID] = false
 		}
-
-		nodeNames = append(nodeNames, nodeName)
 	}
 
 	// Query for all the AWS instances
@@ -1805,7 +1803,7 @@ func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolume
 
 	// TODO: Move validity duration to method argument
 	cachePolicy := &CachePolicy{Name: "DisksAreAttached", Validity: time.Second * 15}
-	instanceMap, err := c.instanceCache.GetInstancesByNodeNames(cachePolicy, nodeNames)
+	instanceMap, err := c.instanceCache.GetInstancesByNodeName(cachePolicy, nodeNames)
 	if err != nil {
 		// When there is an error fetching instance information
 		// it is safer to return nil and let volume information not be touched.
