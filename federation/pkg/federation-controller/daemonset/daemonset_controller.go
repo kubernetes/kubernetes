@@ -34,6 +34,7 @@ import (
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
@@ -380,6 +381,7 @@ func (daemonsetcontroller *DaemonSetController) reconcileDaemonSet(namespace str
 			})
 		} else {
 			clusterDaemonSet := clusterDaemonSetObj.(*extensionsv1.DaemonSet)
+			fedutil.SetDaemonSetDefaults(clusterDaemonSet, desiredDaemonSet.Spec.TemplateGeneration)
 
 			// Update existing daemonset, if needed.
 			if !util.ObjectMetaEquivalent(desiredDaemonSet.ObjectMeta, clusterDaemonSet.ObjectMeta) ||

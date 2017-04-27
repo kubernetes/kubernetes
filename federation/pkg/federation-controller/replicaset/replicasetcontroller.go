@@ -554,6 +554,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 			}
 		} else {
 			currentLrs := lrsObj.(*extensionsv1.ReplicaSet)
+			fedutil.SetReplicaSetDefaults(currentLrs)
 			// Update existing replica set, if needed.
 			if !fedutil.ObjectMetaAndSpecEquivalent(lrs, currentLrs) {
 				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "UpdateInCluster",

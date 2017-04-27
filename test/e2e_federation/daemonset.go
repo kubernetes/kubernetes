@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -260,6 +261,7 @@ func waitForDaemonSetOrFail(clientset *kubeclientset.Clientset, namespace string
 	framework.ExpectNoError(err, "Failed to verify daemonset %q in namespace %q in cluster: Present=%v", daemonset.Name, namespace, present)
 
 	if present && clusterDaemonSet != nil {
+		fedutil.SetDaemonSetDefaults(clusterDaemonSet, daemonset.Spec.TemplateGeneration)
 		Expect(util.ObjectMetaAndSpecEquivalent(clusterDaemonSet, daemonset))
 	}
 }
@@ -276,6 +278,7 @@ func waitForDaemonSetUpdateOrFail(clientset *kubeclientset.Clientset, namespace 
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		clusterDaemonSet, err := clientset.Extensions().DaemonSets(namespace).Get(daemonset.Name, metav1.GetOptions{})
 		if err == nil { // We want it present, and the Get succeeded, so we're all good.
+			fedutil.SetDaemonSetDefaults(clusterDaemonSet, daemonset.Spec.TemplateGeneration)
 			if util.ObjectMetaAndSpecEquivalent(clusterDaemonSet, daemonset) {
 				By(fmt.Sprintf("Success: shard of federated daemonset %q in namespace %q in cluster is updated", daemonset.Name, namespace))
 				return true, nil

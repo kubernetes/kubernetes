@@ -539,6 +539,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 			// TODO: Update only one deployment at a time if update strategy is rolling update.
 
 			currentLd := ldObj.(*extensionsv1.Deployment)
+			fedutil.SetDeploymentDefaults(currentLd)
 			// Update existing replica set, if needed.
 			if !fedutil.DeploymentEquivalent(ld, currentLd) {
 				fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "UpdateInCluster",

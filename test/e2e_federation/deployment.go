@@ -199,6 +199,7 @@ func waitForDeployment(c *fedclientset.Clientset, namespace string, deploymentNa
 				return false, err
 			}
 			if err == nil {
+				fedutil.SetDeploymentDefaults(dep)
 				if !verifyDeployment(fdep, dep) {
 					By(fmt.Sprintf("Deployment meta or spec not match for cluster %q:\n    federation: %v\n    cluster: %v", cluster.Name, fdep, dep))
 					return false, nil
