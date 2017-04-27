@@ -266,6 +266,9 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 	if err != nil {
 		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
+	if netnsPath == "" {
+		return nil, fmt.Errorf("Cannot find network namespace for the terminated container %q", id)
+	}
 
 	ip, err := network.GetPodIP(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
 	if err != nil {
