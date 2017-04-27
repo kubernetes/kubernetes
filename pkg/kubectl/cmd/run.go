@@ -88,6 +88,14 @@ var (
 		kubectl run pi --schedule="0/5 * * * ?" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`))
 )
 
+type RunObject struct {
+	Object  runtime.Object
+	Mapper  meta.RESTMapper
+	Mapping *meta.RESTMapping
+}
+
+var runObjectMap = map[string]*RunObject{}
+
 func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
@@ -271,6 +279,12 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		return err
 	}
 
+	runObjectMap[generatorName] = &RunObject{
+		Object:  obj,
+		Mapper:  mapper,
+		Mapping: mapping,
+	}
+
 	if cmdutil.GetFlagBool(cmd, "expose") {
 		serviceGenerator := cmdutil.GetFlagString(cmd, "service-generator")
 		if len(serviceGenerator) == 0 {
@@ -329,31 +343,33 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		}
 
 		if remove {
-			namespace, err = mapping.MetadataAccessor.Namespace(obj)
-			if err != nil {
-				return err
-			}
-			var name string
-			name, err = mapping.MetadataAccessor.Name(obj)
-			if err != nil {
-				return err
-			}
-			_, typer := f.Object()
-			r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
-				ContinueOnError().
-				NamespaceParam(namespace).DefaultNamespace().
-				ResourceNames(mapping.Resource, name).
-				Flatten().
-				Do()
-			// Note: we pass in "true" for the "quiet" parameter because
-			// ReadResult will only print one thing based on the "quiet"
-			// flag, and that's the "pod xxx deleted" message. If they
-			// asked for us to remove the pod (via --rm) then telling them
-			// its been deleted is unnecessary since that's what they asked
-			// for. We should only print something if the "rm" fails.
-			err = ReapResult(r, f, cmdOut, true, true, 0, -1, false, false, mapper, true)
-			if err != nil {
-				return err
+			for _, runObject := range runObjectMap {
+				namespace, err = runObject.Mapping.MetadataAccessor.Namespace(runObject.Object)
+				if err != nil {
+					return err
+				}
+				var name string
+				name, err = runObject.Mapping.MetadataAccessor.Name(runObject.Object)
+				if err != nil {
+					return err
+				}
+				_, typer := f.Object()
+				r := resource.NewBuilder(runObject.Mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+					ContinueOnError().
+					NamespaceParam(namespace).DefaultNamespace().
+					ResourceNames(runObject.Mapping.Resource, name).
+					Flatten().
+					Do()
+				// Note: we pass in "true" for the "quiet" parameter because
+				// ReadResult will only print one thing based on the "quiet"
+				// flag, and that's the "pod xxx deleted" message. If they
+				// asked for us to remove the pod (via --rm) then telling them
+				// its been deleted is unnecessary since that's what they asked
+				// for. We should only print something if the "rm" fails.
+				err = ReapResult(r, f, cmdOut, true, true, 0, -1, false, false, runObject.Mapper, true)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -560,6 +576,12 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 	obj, _, mapper, mapping, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "service-overrides"), namespace)
 	if err != nil {
 		return err
+	}
+
+	runObjectMap[serviceGenerator] = &RunObject{
+		Object:  obj,
+		Mapper:  mapper,
+		Mapping: mapping,
 	}
 
 	if cmdutil.GetFlagString(cmd, "output") != "" || cmdutil.GetDryRunFlag(cmd) {
