@@ -280,34 +280,46 @@ func (ed *eventDispatcher) Unregister(ctx context.Context, request *lifecycle.Un
 	return &lifecycle.UnregisterReply{}, nil
 }
 
-// Returns a pointer to an updated copy of the supplied resource config,
-// based on the isolation controls in the event reply. The original resource
-// config is not updated in-place.
-func ResourceConfigFromReply(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig {
-	// This is a safe copy; ResourceConfig contains only pointers to primitives.
-	updatedResources := &ResourceConfig{}
-	*updatedResources = *resources
+func isEventReplyValid(reply *lifecycle.EventReply) error {
+	if reply == nil {
+		return fmt.Errorf("nil EvenReply has been recieved")
+	}
+	if reply.Error != "" {
+		return fmt.Errorf("isolator has returned error: %s", reply.Error)
+	}
+	return nil
+}
+
+// Updates the supplied resource config in-placed based on the isolation controls in the event reply.
+func UpdateResourceConfigWithReply(reply *lifecycle.EventReply, resources *ResourceConfig) error {
+	if err := isEventReplyValid(reply); err != nil {
+		return err
+	}
 
 	for _, control := range reply.IsolationControls {
 		switch control.Kind {
 		case lifecycle.IsolationControl_CGROUP_CPUSET_CPUS:
-			updatedResources.CpusetCpus = &control.Value
+			resources.CpusetCpus = &control.Value
 		case lifecycle.IsolationControl_CGROUP_CPUSET_MEMS:
-			updatedResources.CpusetMems = &control.Value
+			resources.CpusetMems = &control.Value
 		case lifecycle.IsolationControl_CGROUP_HUGETLB_LIMIT:
 			//Append is used to cover case where there are multiple separate isolators, each for different
 			//page size. In case of conflicting replies, tha last one applied will "win"
-			updatedResources.HugetlbLimit = append(updatedResources.HugetlbLimit, hugePageLimitsFromIsolationControl(control)...)
+			resources.HugetlbLimit = append(resources.HugetlbLimit, hugePageLimitsFromIsolationControl(control)...)
 		default:
 			glog.Warningf("ignoring unknown isolation control kind [%s]", control.Kind)
 		}
 	}
-	return updatedResources
+	return nil
 }
 
 // Updates the supplied container config in-place based on the isolation
 // controls in the event reply.
-func UpdateContainerConfigWithReply(reply *lifecycle.EventReply, config *runtime.ContainerConfig) {
+func UpdateContainerConfigWithReply(reply *lifecycle.EventReply, config *runtime.ContainerConfig) error {
+	if err := isEventReplyValid(reply); err != nil {
+		return err
+	}
+
 	// Append environment variables to container config.
 	for _, control := range reply.IsolationControls {
 		switch control.Kind {
@@ -323,7 +335,7 @@ func UpdateContainerConfigWithReply(reply *lifecycle.EventReply, config *runtime
 
 	if config.Linux == nil {
 		glog.Infof("skipping Linux-only isolation settings")
-		return
+		return nil
 	}
 
 	// Apply linux-specific settings to container config.
@@ -335,9 +347,9 @@ func UpdateContainerConfigWithReply(reply *lifecycle.EventReply, config *runtime
 			config.Linux.Resources.CpusetMems = control.Value
 		default:
 			glog.Infof("encountered unknown isolation control kind: [%d]", control.Kind)
-			continue
 		}
 	}
+	return nil
 }
 
 func (ed *eventDispatcher) isolator(name string) *registeredIsolator {
@@ -381,7 +393,7 @@ type eventDispatcherNoop struct {
 var _ EventDispatcher = &eventDispatcherNoop{}
 
 func (ed *eventDispatcherNoop) PreStartPod(pod *v1.Pod, cgroupPath string) (*lifecycle.EventReply, error) {
-	return nil, nil
+	return &lifecycle.EventReply{}, nil
 }
 
 func (ed *eventDispatcherNoop) PostStopPod(cgroupPath string) error {
@@ -389,7 +401,7 @@ func (ed *eventDispatcherNoop) PostStopPod(cgroupPath string) error {
 }
 
 func (ed *eventDispatcherNoop) PreStartContainer(podName, containerName string) (*lifecycle.EventReply, error) {
-	return nil, nil
+	return &lifecycle.EventReply{}, nil
 }
 
 func (ed *eventDispatcherNoop) PostStopContainer(podName, containerName string) error {
@@ -397,7 +409,7 @@ func (ed *eventDispatcherNoop) PostStopContainer(podName, containerName string) 
 }
 
 func (ed *eventDispatcherNoop) Start(socketAddress string) {
-
+	glog.Info("Using eventDispatcherNoop")
 }
 
 func (ed *eventDispatcherNoop) GetEventChannel() chan EventDispatcherEvent {

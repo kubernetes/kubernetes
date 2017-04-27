@@ -96,8 +96,8 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 		}
 	}
 	// retrieve cgroupResources from replies from isolators and apply them on existing CgroupConfig
-	if reply != nil {
-		containerConfig.ResourceParameters = ResourceConfigFromReply(reply, containerConfig.ResourceParameters)
+	if err := UpdateResourceConfigWithReply(reply, containerConfig.ResourceParameters); err != nil {
+		return fmt.Errorf("failed to apply cgroupResources to existing CgroupConfig: %q", err.Error())
 	}
 
 	// Apply appropriate resource limits on the pod container

@@ -85,11 +85,11 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	if err != nil {
 		return "", fmt.Errorf("failed to collect isolator responses for container %q: %v", containerConfig.Metadata.Name, err)
 	}
-	if eventReply.Error != "" {
-		return "", fmt.Errorf("isolator returned error: %s", eventReply.Error)
-	}
+
 	// Apply aggregated isolator responses to the container create config.
-	containermanager.UpdateContainerConfigWithReply(eventReply, containerConfig)
+	if err := containermanager.UpdateContainerConfigWithReply(eventReply, containerConfig); err != nil {
+		return "", fmt.Errorf("failed to apply cgroupResources to existing containerConfig: %q", err.Error())
+	}
 
 	containerID, err := m.runtimeService.CreateContainer(podSandboxID, containerConfig, podSandboxConfig)
 	if err != nil {

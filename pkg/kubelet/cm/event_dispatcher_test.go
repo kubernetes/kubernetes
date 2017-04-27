@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	ctx "golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -114,21 +115,21 @@ func TestEventDispatcherNoop(t *testing.T) {
 	ed := eventDispatcherNoop{}
 	ed.Start(":0")
 
-	if ed.PostStopPod("/") != nil {
-		t.Error("PostStopPod for EventDispatcherNoop shouldn't return anything")
-	}
-	if reply, err := ed.PreStartPod(&v1.Pod{}, "/"); reply != nil || err != nil {
-		t.Error("PreStartPod for EventDispatcherNoop shouldn't return anything")
-	}
-	if ed.GetEventChannel() != nil {
-		t.Error("GetEventChannel for EventDispatcherNoop shouldn't return anything")
-	}
-	if ed.PostStopContainer("", "") != nil {
-		t.Error("PostStopContainer for EventDispatcherNoop shouldn't return anything")
-	}
-	if reply, err := ed.PreStartContainer("", ""); reply != nil || err != nil {
-		t.Error("PreStartContainer for EventDispatcherNoop shouldn't return anything")
-	}
+	assert.Nil(t, ed.GetEventChannel())
+
+	assert.Nil(t, ed.PostStopPod("/"))
+	reply, err := ed.PreStartPod(&v1.Pod{}, "/")
+	assert.Nil(t, err)
+	assert.EqualValues(t, &lifecycle.EventReply{}, reply)
+
+	reply, err = ed.PreStartPod(&v1.Pod{}, "/")
+	assert.Nil(t, err)
+	assert.EqualValues(t, &lifecycle.EventReply{}, reply)
+
+	reply, err = ed.PreStartContainer("", "")
+	assert.Nil(t, err)
+	assert.EqualValues(t, &lifecycle.EventReply{}, reply)
+	assert.Nil(t, ed.PostStopContainer("", ""))
 }
 
 func TestEventDispatcher_Register(t *testing.T) {
@@ -465,8 +466,10 @@ func TestEventDispatcher_PostStopContainer(t *testing.T) {
 
 func TestResourceConfigFromReplies(t *testing.T) {
 	testCases := []struct {
-		isolators []*lifecycle.IsolationControl
-		resources map[string]string
+		isNoopDispatcher bool
+		isolators        []*lifecycle.IsolationControl
+		resources        map[string]string
+		replyError       string
 	}{
 		{
 			isolators: []*lifecycle.IsolationControl{
@@ -478,6 +481,7 @@ func TestResourceConfigFromReplies(t *testing.T) {
 			resources: map[string]string{
 				"CpusetCpus": "5",
 			},
+			replyError: "",
 		},
 		{
 			isolators: []*lifecycle.IsolationControl{
@@ -498,6 +502,7 @@ func TestResourceConfigFromReplies(t *testing.T) {
 				"CpusetCpus": "2",
 				"CpusetMems": "3",
 			},
+			replyError: "",
 		},
 		{
 			isolators: []*lifecycle.IsolationControl{
@@ -518,15 +523,32 @@ func TestResourceConfigFromReplies(t *testing.T) {
 				"CpusetCpus": "2",
 				"CpusetMems": "3",
 			},
+			replyError: "",
+		},
+		{
+			replyError: "foo",
+		},
+		{
+			isNoopDispatcher: true,
 		},
 	}
 
 	for _, testCase := range testCases {
-		eventReply := &lifecycle.EventReply{
-			IsolationControls: testCase.isolators,
+		reply := &lifecycle.EventReply{}
+		if !testCase.isNoopDispatcher {
+			reply = &lifecycle.EventReply{
+				IsolationControls: testCase.isolators,
+				Error:             testCase.replyError,
+			}
 		}
-		output := ResourceConfigFromReply(eventReply, &ResourceConfig{})
-		reflectedStruct := reflect.ValueOf(output)
+
+		config := &ResourceConfig{}
+
+		err := UpdateResourceConfigWithReply(reply, config)
+		if testCase.replyError != "" {
+			assert.NotNil(t, err)
+		}
+		reflectedStruct := reflect.ValueOf(config)
 		for key, value := range testCase.resources {
 			data := reflect.Indirect(reflectedStruct).FieldByName(key).Interface().(*string)
 			if *data != value {
@@ -542,13 +564,25 @@ func TestResourceConfigFromReplies(t *testing.T) {
 func TestUpdateContainerConfigWithReply(t *testing.T) {
 
 	testCases := []struct {
-		isolationControls []*lifecycle.IsolationControl
-		passedEnvs        []*runtime.KeyValue
-		linuxContainerRes *runtime.LinuxContainerResources
 		expectedEnvs      []*runtime.KeyValue
 		expectedResources map[string]string
+		isNoopDispatcher  bool
+		isolationControls []*lifecycle.IsolationControl
+		linuxContainerRes *runtime.LinuxContainerResources
+		passedEnvs        []*runtime.KeyValue
+		replyError        string
 	}{
 		{
+			expectedEnvs: []*runtime.KeyValue{
+				{
+					Key:   "foo",
+					Value: "bar",
+				},
+			},
+			expectedResources: map[string]string{
+				"CpusetCpus": "1",
+				"CpusetMems": "5",
+			},
 			isolationControls: []*lifecycle.IsolationControl{
 				{
 					Kind:  lifecycle.IsolationControl_CGROUP_CPUSET_MEMS,
@@ -567,18 +601,22 @@ func TestUpdateContainerConfigWithReply(t *testing.T) {
 			},
 			linuxContainerRes: &runtime.LinuxContainerResources{},
 			passedEnvs:        []*runtime.KeyValue{},
+			replyError:        "",
+		},
+		{
 			expectedEnvs: []*runtime.KeyValue{
+				{
+					Key:   "bar",
+					Value: "foo",
+				},
 				{
 					Key:   "foo",
 					Value: "bar",
 				},
 			},
 			expectedResources: map[string]string{
-				"CpusetCpus": "1",
-				"CpusetMems": "5",
+				"CpusetMems": "7",
 			},
-		},
-		{
 			isolationControls: []*lifecycle.IsolationControl{
 				{
 					Kind:  lifecycle.IsolationControl_CGROUP_CPUSET_MEMS,
@@ -598,6 +636,9 @@ func TestUpdateContainerConfigWithReply(t *testing.T) {
 					Value: "foo",
 				},
 			},
+			replyError: "",
+		},
+		{
 			expectedEnvs: []*runtime.KeyValue{
 				{
 					Key:   "bar",
@@ -608,11 +649,6 @@ func TestUpdateContainerConfigWithReply(t *testing.T) {
 					Value: "bar",
 				},
 			},
-			expectedResources: map[string]string{
-				"CpusetMems": "7",
-			},
-		},
-		{
 			isolationControls: []*lifecycle.IsolationControl{
 				{
 					Kind:  lifecycle.IsolationControl_CGROUP_CPUSET_MEMS,
@@ -631,16 +667,13 @@ func TestUpdateContainerConfigWithReply(t *testing.T) {
 					Value: "foo",
 				},
 			},
-			expectedEnvs: []*runtime.KeyValue{
-				{
-					Key:   "bar",
-					Value: "foo",
-				},
-				{
-					Key:   "foo",
-					Value: "bar",
-				},
-			},
+			replyError: "",
+		},
+		{
+			replyError: "foo",
+		},
+		{
+			isNoopDispatcher: true,
 		},
 	}
 
@@ -654,15 +687,20 @@ func TestUpdateContainerConfigWithReply(t *testing.T) {
 			}
 		}
 
-		reply := &lifecycle.EventReply{
-			IsolationControls: testCase.isolationControls,
+		reply := &lifecycle.EventReply{}
+		if !testCase.isNoopDispatcher {
+			reply = &lifecycle.EventReply{
+				IsolationControls: testCase.isolationControls,
+				Error:             testCase.replyError,
+			}
 		}
 
-		UpdateContainerConfigWithReply(reply, config)
-		if !reflect.DeepEqual(config.Envs, testCase.expectedEnvs) {
-			t.Errorf("Obtained envs (%q) are not expected one (%q)",
-				config.Envs, testCase.expectedEnvs)
+		err := UpdateContainerConfigWithReply(reply, config)
+		if testCase.replyError != "" {
+			assert.NotNil(t, err)
 		}
+
+		assert.EqualValues(t, testCase.expectedEnvs, config.Envs)
 
 		if testCase.linuxContainerRes != nil {
 			reflectedStruct := reflect.ValueOf(config.Linux.Resources)
