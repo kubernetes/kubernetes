@@ -256,7 +256,6 @@ func (s *FederationSyncController) worker() {
 		namespacedName := item.Value.(*types.NamespacedName)
 		status := s.reconcile(*namespacedName)
 		s.workQueue.Done(item)
-
 		switch status {
 		case statusAllOK:
 			break
@@ -265,7 +264,7 @@ func (s *FederationSyncController) worker() {
 		case statusNeedsRecheck:
 			s.deliver(*namespacedName, s.reviewDelay, false)
 		case statusNotSynced:
-			s.deliver(*namespacedName, s.reviewDelay, false)
+			s.deliver(*namespacedName, s.clusterAvailableDelay, false)
 		}
 	}
 }
