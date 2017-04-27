@@ -343,13 +343,21 @@ type AttachedVolume struct {
 // GenerateMsgDetailed returns detailed msgs for attached volumes
 func (volume *AttachedVolume) GenerateMsgDetailed(prefixMsg, suffixMsg string) (detailedMsg string) {
 	detailedStr := fmt.Sprintf("(UniqueName: %q) on node %q", volume.VolumeName, volume.NodeName)
-	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, volume.VolumeSpec.Name(), detailedStr)
+	volumeVolumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeVolumeSpecName = volume.VolumeSpec.Name()
+	}
+	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, volumeVolumeSpecName, detailedStr)
 }
 
 // GenerateMsg returns simple and detailed msgs for attached volumes
 func (volume *AttachedVolume) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg, detailedMsg string) {
 	detailedStr := fmt.Sprintf("(UniqueName: %q) on node %q", volume.VolumeName, volume.NodeName)
-	return generateVolumeMsg(prefixMsg, suffixMsg, volume.VolumeSpec.Name(), detailedStr)
+	volumeVolumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeVolumeSpecName = volume.VolumeSpec.Name()
+	}
+	return generateVolumeMsg(prefixMsg, suffixMsg, volumeVolumeSpecName, detailedStr)
 }
 
 // GenerateErrorDetailed returns detailed errors for attached volumes
