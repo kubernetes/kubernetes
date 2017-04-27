@@ -4,16 +4,32 @@ licenses(["notice"])
 
 load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
 load("@io_kubernetes_build//defs:build.bzl", "gcs_upload")
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 go_prefix("k8s.io/kubernetes")
+
+filegroup(
+    name = "_binary-artifacts-and-hashes",
+    srcs = [
+        "//build:client-targets-and-hashes",
+        "//build:docker-artifacts-and-hashes",
+        "//build:node-targets-and-hashes",
+        "//build:server-targets-and-hashes",
+    ],
+    visibility = ["//visibility:private"],
+)
 
 gcs_upload(
     name = "ci-artifacts",
     data = [
-        "//build/debs",
-        "//build/release-tars",
+        ":_binary-artifacts-and-hashes",
+        "//build/release-tars:release-tars-and-hashes",
+        "//cluster/gce:gcs-release-artifacts-and-hashes",
     ],
+    upload_paths = {
+        "//:_binary-artifacts-and-hashes": "bin/linux/amd64",
+        "//build/release-tars:release-tars-and-hashes": "",
+        "//cluster/gce:gcs-release-artifacts-and-hashes": "extra/gce",
+    },
 )
 
 filegroup(
