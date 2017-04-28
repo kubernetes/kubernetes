@@ -130,9 +130,7 @@ func Test_getProxyMode(t *testing.T) {
 	}
 }
 
-// This test verifies that Proxy Server does not crash that means
-// Config and iptinterface are not nil when CleanupAndExit is true.
-// To avoid proxy crash: https://github.com/kubernetes/kubernetes/pull/14736
+// This test verifies that Proxy Server does not crash when CleanupAndExit is true.
 func TestProxyServerWithCleanupAndExit(t *testing.T) {
 	options := Options{
 		config: &componentconfig.KubeProxyConfiguration{
@@ -141,7 +139,7 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 		CleanupAndExit: true,
 	}
 
-	proxyserver, err := options.NewProxyServer()
+	proxyserver, err := NewProxyServer(options.config, options.CleanupAndExit, options.master)
 
 	assert.Nil(t, err)
 	assert.NotNil(t, proxyserver)

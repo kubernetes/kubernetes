@@ -99,7 +99,7 @@ type Options struct {
 	//
 	// TODO remove these fields once the deprecated flags are removed.
 
-	//master is used to override the kubeconfig's URL to the apiserver.
+	// master is used to override the kubeconfig's URL to the apiserver.
 	master string
 	// healthzPort is the port to be used by the healthz server.
 	healthzPort int32
@@ -151,6 +151,10 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 
 // Complete completes all the required options.
 func (o Options) Complete() error {
+	if len(o.ConfigFile) == 0 {
+		glog.Warning("WARNING: all flags other than --config and --cleanup-iptables are deprecated. Please begin using a config file ASAP.")
+		o.applyDeprecatedHealthzPortToConfig()
+	}
 	return nil
 }
 
@@ -164,20 +168,19 @@ func (o Options) Validate(args []string) error {
 }
 
 func (o Options) Run() error {
-	if len(o.ConfigFile) == 0 {
-		glog.Warning("WARNING: all flags other than --config and --cleanup-iptables are deprecated. Please begin using a config file ASAP.")
-		o.applyDeprecatedHealthzPortToConfig()
-	} else {
+	config := o.config
+
+	if len(o.ConfigFile) > 0 {
 		if c, err := loadConfigFromFile(o.ConfigFile); err != nil {
 			return err
 		} else {
-			o.config = c
+			config = c
 			// Make sure we apply the feature gate settings in the config file.
-			utilfeature.DefaultFeatureGate.Set(o.config.FeatureGates)
+			utilfeature.DefaultFeatureGate.Set(config.FeatureGates)
 		}
 	}
 
-	proxyServer, err := o.NewProxyServer()
+	proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.master)
 	if err != nil {
 		return err
 	}
@@ -340,19 +343,19 @@ func createClients(config componentconfig.ClientConnectionConfiguration, masterO
 }
 
 // NewProxyServer returns a new ProxyServer.
-func (o Options) NewProxyServer() (*ProxyServer, error) {
-	if o.config == nil {
+func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndExit bool, master string) (*ProxyServer, error) {
+	if config == nil {
 		return nil, errors.New("config is required")
 	}
 
 	if c, err := configz.New("componentconfig"); err == nil {
-		c.Set(o.config)
+		c.Set(config)
 	} else {
 		return nil, fmt.Errorf("unable to register configz: %s", err)
 	}
 
 	protocol := utiliptables.ProtocolIpv4
-	if net.ParseIP(o.config.BindAddress).To4() == nil {
+	if net.ParseIP(config.BindAddress).To4() == nil {
 		protocol = utiliptables.ProtocolIpv6
 	}
 
@@ -371,17 +374,17 @@ func (o Options) NewProxyServer() (*ProxyServer, error) {
 	}
 
 	// We omit creation of pretty much everything if we run in cleanup mode
-	if o.CleanupAndExit {
+	if cleanupAndExit {
 		return &ProxyServer{IptInterface: iptInterface}, nil
 	}
 
-	client, eventClient, err := createClients(o.config.ClientConnection, o.master)
+	client, eventClient, err := createClients(config.ClientConnection, master)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create event recorder
-	hostname := nodeutil.GetHostname(o.config.HostnameOverride)
+	hostname := nodeutil.GetHostname(config.HostnameOverride)
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
 
@@ -392,10 +395,10 @@ func (o Options) NewProxyServer() (*ProxyServer, error) {
 	var serviceHandler proxyconfig.ServiceConfigHandler
 	var endpointsEventHandler proxyconfig.EndpointsHandler
 
-	proxyMode := getProxyMode(string(o.config.Mode), iptInterface, iptables.LinuxKernelCompatTester{})
+	proxyMode := getProxyMode(string(config.Mode), iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")
-		if o.config.IPTables.MasqueradeBit == nil {
+		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
 			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
 		}
@@ -405,11 +408,11 @@ func (o Options) NewProxyServer() (*ProxyServer, error) {
 			iptInterface,
 			utilsysctl.New(),
 			execer,
-			o.config.IPTables.SyncPeriod.Duration,
-			o.config.IPTables.MinSyncPeriod.Duration,
-			o.config.IPTables.MasqueradeAll,
-			int(*o.config.IPTables.MasqueradeBit),
-			o.config.ClusterCIDR,
+			config.IPTables.SyncPeriod.Duration,
+			config.IPTables.MinSyncPeriod.Duration,
+			config.IPTables.MasqueradeAll,
+			int(*config.IPTables.MasqueradeBit),
+			config.ClusterCIDR,
 			hostname,
 			getNodeIP(client, hostname),
 			recorder,
@@ -434,12 +437,12 @@ func (o Options) NewProxyServer() (*ProxyServer, error) {
 			endpointsEventHandler = loadBalancer
 			proxierUserspace, err := winuserspace.NewProxier(
 				loadBalancer,
-				net.ParseIP(o.config.BindAddress),
+				net.ParseIP(config.BindAddress),
 				netshInterface,
-				*utilnet.ParsePortRangeOrDie(o.config.PortRange),
+				*utilnet.ParsePortRangeOrDie(config.PortRange),
 				// TODO @pires replace below with default values, if applicable
-				o.config.IPTables.SyncPeriod.Duration,
-				o.config.UDPIdleTimeout.Duration,
+				config.IPTables.SyncPeriod.Duration,
+				config.UDPIdleTimeout.Duration,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
@@ -456,13 +459,13 @@ func (o Options) NewProxyServer() (*ProxyServer, error) {
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxierUserspace, err := userspace.NewProxier(
 				loadBalancer,
-				net.ParseIP(o.config.BindAddress),
+				net.ParseIP(config.BindAddress),
 				iptInterface,
 				execer,
-				*utilnet.ParsePortRangeOrDie(o.config.PortRange),
-				o.config.IPTables.SyncPeriod.Duration,
-				o.config.IPTables.MinSyncPeriod.Duration,
-				o.config.UDPIdleTimeout.Duration,
+				*utilnet.ParsePortRangeOrDie(config.PortRange),
+				config.IPTables.SyncPeriod.Duration,
+				config.IPTables.MinSyncPeriod.Duration,
+				config.UDPIdleTimeout.Duration,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
@@ -497,14 +500,14 @@ func (o Options) NewProxyServer() (*ProxyServer, error) {
 		Proxier:                proxier,
 		Broadcaster:            eventBroadcaster,
 		Recorder:               recorder,
-		ConntrackConfiguration: o.config.Conntrack,
+		ConntrackConfiguration: config.Conntrack,
 		Conntracker:            &realConntracker{},
 		ProxyMode:              proxyMode,
 		NodeRef:                nodeRef,
-		HealthzBindAddress:     o.config.HealthzBindAddress,
-		OOMScoreAdj:            o.config.OOMScoreAdj,
-		ResourceContainer:      o.config.ResourceContainer,
-		ConfigSyncPeriod:       o.config.ConfigSyncPeriod.Duration,
+		HealthzBindAddress:     config.HealthzBindAddress,
+		OOMScoreAdj:            config.OOMScoreAdj,
+		ResourceContainer:      config.ResourceContainer,
+		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		ServiceEventHandler:    serviceEventHandler,
 		ServiceHandler:         serviceHandler,
 		EndpointsEventHandler:  endpointsEventHandler,
