@@ -27,9 +27,9 @@ import (
 	"github.com/renstrom/dedent"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/pkg/api"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // Server serves HTTP endpoints for each service name, with results

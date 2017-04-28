@@ -52,7 +52,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/auth:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
