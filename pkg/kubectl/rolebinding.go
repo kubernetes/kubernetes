@@ -147,7 +147,7 @@ func (s RoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	}
 	for _, sa := range sets.NewString(s.ServiceAccounts...).List() {
 		tokens := strings.Split(sa, ":")
-		if len(tokens) != 2 {
+		if len(tokens) != 2 || tokens[1] == "" {
 			return nil, fmt.Errorf("serviceaccount must be <namespace>:<name>")
 		}
 		roleBinding.Subjects = append(roleBinding.Subjects, rbac.Subject{
