@@ -21,12 +21,12 @@ limitations under the License.
 package v2alpha1
 
 import (
+	core_v1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	unsafe "unsafe"
 )
@@ -377,7 +377,7 @@ func Convert_v2alpha1_ResourceMetricSource_To_autoscaling_ResourceMetricSource(i
 }
 
 func autoConvert_autoscaling_ResourceMetricSource_To_v2alpha1_ResourceMetricSource(in *autoscaling.ResourceMetricSource, out *ResourceMetricSource, s conversion.Scope) error {
-	out.Name = api_v1.ResourceName(in.Name)
+	out.Name = core_v1.ResourceName(in.Name)
 	out.TargetAverageUtilization = (*int32)(unsafe.Pointer(in.TargetAverageUtilization))
 	out.TargetAverageValue = (*resource.Quantity)(unsafe.Pointer(in.TargetAverageValue))
 	return nil
@@ -401,7 +401,7 @@ func Convert_v2alpha1_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(i
 }
 
 func autoConvert_autoscaling_ResourceMetricStatus_To_v2alpha1_ResourceMetricStatus(in *autoscaling.ResourceMetricStatus, out *ResourceMetricStatus, s conversion.Scope) error {
-	out.Name = api_v1.ResourceName(in.Name)
+	out.Name = core_v1.ResourceName(in.Name)
 	out.CurrentAverageUtilization = (*int32)(unsafe.Pointer(in.CurrentAverageUtilization))
 	out.CurrentAverageValue = in.CurrentAverageValue
 	return nil

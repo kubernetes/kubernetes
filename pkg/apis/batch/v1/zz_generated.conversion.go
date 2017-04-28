@@ -21,6 +21,7 @@ limitations under the License.
 package v1
 
 import (
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -100,7 +101,7 @@ func Convert_v1_JobCondition_To_batch_JobCondition(in *JobCondition, out *batch.
 
 func autoConvert_batch_JobCondition_To_v1_JobCondition(in *batch.JobCondition, out *JobCondition, s conversion.Scope) error {
 	out.Type = JobConditionType(in.Type)
-	out.Status = api_v1.ConditionStatus(in.Status)
+	out.Status = core_v1.ConditionStatus(in.Status)
 	out.LastProbeTime = in.LastProbeTime
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason

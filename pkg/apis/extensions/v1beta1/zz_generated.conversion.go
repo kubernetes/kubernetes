@@ -21,6 +21,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -501,7 +502,7 @@ func Convert_v1beta1_DeploymentCondition_To_extensions_DeploymentCondition(in *D
 
 func autoConvert_extensions_DeploymentCondition_To_v1beta1_DeploymentCondition(in *extensions.DeploymentCondition, out *DeploymentCondition, s conversion.Scope) error {
 	out.Type = DeploymentConditionType(in.Type)
-	out.Status = api_v1.ConditionStatus(in.Status)
+	out.Status = core_v1.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -1104,7 +1105,7 @@ func Convert_v1beta1_NetworkPolicyPort_To_extensions_NetworkPolicyPort(in *Netwo
 }
 
 func autoConvert_extensions_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(in *extensions.NetworkPolicyPort, out *NetworkPolicyPort, s conversion.Scope) error {
-	out.Protocol = (*api_v1.Protocol)(unsafe.Pointer(in.Protocol))
+	out.Protocol = (*core_v1.Protocol)(unsafe.Pointer(in.Protocol))
 	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
 	return nil
 }
@@ -1247,9 +1248,9 @@ func Convert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec(i
 
 func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in *extensions.PodSecurityPolicySpec, out *PodSecurityPolicySpec, s conversion.Scope) error {
 	out.Privileged = in.Privileged
-	out.DefaultAddCapabilities = *(*[]api_v1.Capability)(unsafe.Pointer(&in.DefaultAddCapabilities))
-	out.RequiredDropCapabilities = *(*[]api_v1.Capability)(unsafe.Pointer(&in.RequiredDropCapabilities))
-	out.AllowedCapabilities = *(*[]api_v1.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
+	out.DefaultAddCapabilities = *(*[]core_v1.Capability)(unsafe.Pointer(&in.DefaultAddCapabilities))
+	out.RequiredDropCapabilities = *(*[]core_v1.Capability)(unsafe.Pointer(&in.RequiredDropCapabilities))
+	out.AllowedCapabilities = *(*[]core_v1.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
 	out.Volumes = *(*[]FSType)(unsafe.Pointer(&in.Volumes))
 	out.HostNetwork = in.HostNetwork
 	if in.HostPorts != nil {
@@ -1334,7 +1335,7 @@ func Convert_v1beta1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in *R
 
 func autoConvert_extensions_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(in *extensions.ReplicaSetCondition, out *ReplicaSetCondition, s conversion.Scope) error {
 	out.Type = ReplicaSetConditionType(in.Type)
-	out.Status = api_v1.ConditionStatus(in.Status)
+	out.Status = core_v1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -1537,7 +1538,7 @@ func Convert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions
 
 func autoConvert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *extensions.SELinuxStrategyOptions, out *SELinuxStrategyOptions, s conversion.Scope) error {
 	out.Rule = SELinuxStrategy(in.Rule)
-	out.SELinuxOptions = (*api_v1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
+	out.SELinuxOptions = (*core_v1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
 	return nil
 }
 

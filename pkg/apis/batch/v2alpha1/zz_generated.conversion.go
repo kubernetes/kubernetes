@@ -21,11 +21,11 @@ limitations under the License.
 package v2alpha1
 
 import (
+	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	batch_v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	unsafe "unsafe"
@@ -176,7 +176,7 @@ func Convert_v2alpha1_CronJobStatus_To_batch_CronJobStatus(in *CronJobStatus, ou
 }
 
 func autoConvert_batch_CronJobStatus_To_v2alpha1_CronJobStatus(in *batch.CronJobStatus, out *CronJobStatus, s conversion.Scope) error {
-	out.Active = *(*[]api_v1.ObjectReference)(unsafe.Pointer(&in.Active))
+	out.Active = *(*[]core_v1.ObjectReference)(unsafe.Pointer(&in.Active))
 	out.LastScheduleTime = (*v1.Time)(unsafe.Pointer(in.LastScheduleTime))
 	return nil
 }

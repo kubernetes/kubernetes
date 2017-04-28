@@ -24,9 +24,7 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	podtolerationrestriction "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
-	unsafe "unsafe"
 )
 
 func init() {
@@ -43,8 +41,30 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_Configuration_To_podtolerationrestriction_Configuration(in *Configuration, out *podtolerationrestriction.Configuration, s conversion.Scope) error {
-	out.Default = *(*[]api.Toleration)(unsafe.Pointer(&in.Default))
-	out.Whitelist = *(*[]api.Toleration)(unsafe.Pointer(&in.Whitelist))
+	if in.Default != nil {
+		in, out := &in.Default, &out.Default
+		*out = make([]api.Toleration, len(*in))
+		for i := range *in {
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Default = nil
+	}
+	if in.Whitelist != nil {
+		in, out := &in.Whitelist, &out.Whitelist
+		*out = make([]api.Toleration, len(*in))
+		for i := range *in {
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Whitelist = nil
+	}
 	return nil
 }
 
@@ -54,8 +74,30 @@ func Convert_v1alpha1_Configuration_To_podtolerationrestriction_Configuration(in
 }
 
 func autoConvert_podtolerationrestriction_Configuration_To_v1alpha1_Configuration(in *podtolerationrestriction.Configuration, out *Configuration, s conversion.Scope) error {
-	out.Default = *(*[]v1.Toleration)(unsafe.Pointer(&in.Default))
-	out.Whitelist = *(*[]v1.Toleration)(unsafe.Pointer(&in.Whitelist))
+	if in.Default != nil {
+		in, out := &in.Default, &out.Default
+		*out = make([]unnameable_Unsupported, len(*in))
+		for i := range *in {
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Default = nil
+	}
+	if in.Whitelist != nil {
+		in, out := &in.Whitelist, &out.Whitelist
+		*out = make([]unnameable_Unsupported, len(*in))
+		for i := range *in {
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Whitelist = nil
+	}
 	return nil
 }
 
