@@ -21,9 +21,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	reflect "reflect"
 )
 
@@ -169,6 +170,16 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		in := in.(*KubeletConfiguration)
 		out := out.(*KubeletConfiguration)
 		*out = *in
+		if in.ConfigTrialDuration != nil {
+			in, out := &in.ConfigTrialDuration, &out.ConfigTrialDuration
+			*out = new(v1.Duration)
+			**out = **in
+		}
+		if in.CrashLoopThreshold != nil {
+			in, out := &in.CrashLoopThreshold, &out.CrashLoopThreshold
+			*out = new(int32)
+			**out = **in
+		}
 		if in.EnableServer != nil {
 			in, out := &in.EnableServer, &out.EnableServer
 			*out = new(bool)
@@ -269,9 +280,9 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		}
 		if in.RegisterWithTaints != nil {
 			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
-			*out = make([]v1.Taint, len(*in))
+			*out = make([]api_v1.Taint, len(*in))
 			for i := range *in {
-				if err := v1.DeepCopy_v1_Taint(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := api_v1.DeepCopy_v1_Taint(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}

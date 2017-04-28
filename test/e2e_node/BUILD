@@ -35,6 +35,7 @@ go_library(
         "//pkg/kubelet/apis/cri/v1alpha1:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
+        "//pkg/kubelet/nodeconfig:go_default_library",
         "//pkg/kubelet/remote:go_default_library",
         "//pkg/metrics:go_default_library",
         "//pkg/util/procfs:go_default_library",

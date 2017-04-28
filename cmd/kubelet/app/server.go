@@ -29,6 +29,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -38,8 +39,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -76,6 +75,7 @@ import (
 	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	"k8s.io/kubernetes/pkg/kubelet/nodeconfig"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -181,106 +181,6 @@ func getKubeClient(s *options.KubeletServer) (*clientset.Clientset, error) {
 	return nil, err
 }
 
-// Tries to download the kubelet-<node-name> configmap from "kube-system" namespace via the API server and returns a JSON string or error
-func getRemoteKubeletConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (string, error) {
-	// TODO(mtaufen): should probably cache clientset and pass into this function rather than regenerate on every request
-	kubeClient, err := getKubeClient(s)
-	if err != nil {
-		return "", err
-	}
-
-	configmap, err := func() (*v1.ConfigMap, error) {
-		var nodename types.NodeName
-		hostname := nodeutil.GetHostname(s.HostnameOverride)
-
-		if kubeDeps != nil && kubeDeps.Cloud != nil {
-			instances, ok := kubeDeps.Cloud.Instances()
-			if !ok {
-				err = fmt.Errorf("failed to get instances from cloud provider, can't determine nodename")
-				return nil, err
-			}
-			nodename, err = instances.CurrentNodeName(hostname)
-			if err != nil {
-				err = fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
-				return nil, err
-			}
-			// look for kubelet-<node-name> configmap from "kube-system"
-			configmap, err := kubeClient.CoreV1Client.ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", nodename), metav1.GetOptions{})
-			if err != nil {
-				return nil, err
-			}
-			return configmap, nil
-		}
-		// No cloud provider yet, so can't get the nodename via Cloud.Instances().CurrentNodeName(hostname), try just using the hostname
-		configmap, err := kubeClient.CoreV1Client.ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", hostname), metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("cloud provider was nil, and attempt to use hostname to find config resulted in: %v", err)
-		}
-		return configmap, nil
-	}()
-	if err != nil {
-		return "", err
-	}
-
-	// When we create the KubeletConfiguration configmap, we put a json string
-	// representation of the config in a `kubelet.config` key.
-	jsonstr, ok := configmap.Data["kubelet.config"]
-	if !ok {
-		return "", fmt.Errorf("KubeletConfiguration configmap did not contain a value with key `kubelet.config`")
-	}
-
-	return jsonstr, nil
-}
-
-func startKubeletConfigSyncLoop(s *options.KubeletServer, currentKC string) {
-	glog.Infof("Starting Kubelet configuration sync loop")
-	go func() {
-		wait.PollInfinite(30*time.Second, func() (bool, error) {
-			glog.Infof("Checking API server for new Kubelet configuration.")
-			remoteKC, err := getRemoteKubeletConfig(s, nil)
-			if err == nil {
-				// Detect new config by comparing with the last JSON string we extracted.
-				if remoteKC != currentKC {
-					glog.Info("Found new Kubelet configuration via API server, restarting!")
-					os.Exit(0)
-				}
-			} else {
-				glog.Infof("Did not find a configuration for this Kubelet via API server: %v", err)
-			}
-			return false, nil // Always return (false, nil) so we poll forever.
-		})
-	}()
-}
-
-// Try to check for config on the API server, return that config if we get it, and start
-// a background thread that checks for updates to configs.
-func initKubeletConfigSync(s *options.KubeletServer) (*componentconfig.KubeletConfiguration, error) {
-	jsonstr, err := getRemoteKubeletConfig(s, nil)
-	if err == nil {
-		// We will compare future API server config against the config we just got (jsonstr):
-		startKubeletConfigSyncLoop(s, jsonstr)
-
-		// Convert json from API server to external type struct, and convert that to internal type struct
-		extKC := componentconfigv1alpha1.KubeletConfiguration{}
-		err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(jsonstr), &extKC)
-		if err != nil {
-			return nil, err
-		}
-		api.Scheme.Default(&extKC)
-		kc := componentconfig.KubeletConfiguration{}
-		err = api.Scheme.Convert(&extKC, &kc, nil)
-		if err != nil {
-			return nil, err
-		}
-		return &kc, nil
-	} else {
-		// Couldn't get a configuration from the API server yet.
-		// Restart as soon as anything comes back from the API server.
-		startKubeletConfigSyncLoop(s, "")
-		return nil, err
-	}
-}
-
 // Run runs the specified KubeletServer with the given KubeletDeps.  This should never exit.
 // The kubeDeps argument may be nil - if so, it is initialized from the settings on KubeletServer.
 // Otherwise, the caller is assumed to have set up the KubeletDeps object and a default one will
@@ -355,6 +255,24 @@ func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubele
 	}
 }
 
+// Returns the most likely identifer for the current Node
+func curNodeIdentifier(s *options.KubeletServer, kd *kubelet.KubeletDeps) (string, error) {
+	hostname := nodeutil.GetHostname(s.HostnameOverride)
+	if kd != nil && kd.Cloud != nil {
+		instances, ok := kd.Cloud.Instances()
+		if !ok {
+			err := fmt.Errorf("failed to get instances from cloud provider, can't determine nodename")
+			return "", err
+		}
+		nodename, err := instances.CurrentNodeName(hostname)
+		if err != nil {
+			return "", fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
+		}
+		return string(nodename), nil
+	}
+	return hostname, nil
+}
+
 func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	// TODO: this should be replaced by a --standalone flag
 	standaloneMode := (len(s.APIServerList) == 0 && !s.RequireKubeConfig)
@@ -385,36 +303,78 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 	// Register current configuration with /configz endpoint
 	cfgz, cfgzErr := initConfigz(&s.KubeletConfiguration)
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		// Look for config on the API server. If it exists, replace s.KubeletConfiguration
-		// with it and continue. initKubeletConfigSync also starts the background thread that checks for new config.
 
-		// Don't do dynamic Kubelet configuration in runonce mode
-		if s.RunOnce == false {
-			remoteKC, err := initKubeletConfigSync(s)
-			if err == nil {
-				// Update s (KubeletServer) with new config from API server
-				s.KubeletConfiguration = *remoteKC
-				// Ensure that /configz is up to date with the new config
-				if cfgzErr != nil {
-					glog.Errorf("was unable to register configz before due to %s, will not be able to set now", cfgzErr)
-				} else {
-					setConfigz(cfgz, &s.KubeletConfiguration)
-				}
-				// Update feature gates from the new config
-				err = utilfeature.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
-				if err != nil {
-					return err
-				}
-			} else {
-				glog.Errorf("failed to init dynamic Kubelet configuration sync: %v", err)
-			}
+	// launch nodeconfig controller if the dynamic config feature gate is enabled
+	dynamicConfigEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig)
+	if dynamicConfigEnabled {
+		// `dynamicConfigEnabled` indicates the feature gate, which is presently used to gate the whole controller
+		// eventually, this restriction will be reduced to only gating the "dynamic" part of the controller,
+		// which is why `dynamicConfigEnabled` is still included as part of the `useDynamicConfig` predicate.
+		useDynamicConfig := dynamicConfigEnabled && !standaloneMode && !s.RunOnce
+
+		flagCfg := &componentconfigv1alpha1.KubeletConfiguration{}
+		err = api.Scheme.Convert(&s.KubeletConfiguration, flagCfg, nil)
+		if err != nil {
+			return err
 		}
-	}
 
-	// Validate configuration.
-	if err := validateConfig(s); err != nil {
-		return err
+		// the NodeConfigDir must be specified to use the controller
+		if len(s.NodeConfigDir) == 0 {
+			return fmt.Errorf("--node-config-dir must be specified to use the node config controller")
+		}
+		// compute absolute path for NodeConfigDir, if necessary
+		var nodeConfigDir string
+		if s.NodeConfigDir[0] != '/' {
+			nodeConfigDir = filepath.Join(s.RootDirectory, s.NodeConfigDir)
+		} else {
+			nodeConfigDir = s.NodeConfigDir
+		}
+
+		var ncc *nodeconfig.NodeConfigController
+		if useDynamicConfig {
+			client, err := getKubeClient(s)
+			if err != nil {
+				return err
+			}
+			nodeID, err := curNodeIdentifier(s, kubeDeps)
+			if err != nil {
+				return err
+			}
+			ncc = nodeconfig.NewNodeConfigController(client, nodeID, nodeConfigDir, flagCfg)
+		} else {
+			// pass a nil client to disable fetching configuration dynamically
+			ncc = nodeconfig.NewNodeConfigController(nil, "", nodeConfigDir, flagCfg)
+		}
+
+		// when you run the controller, either you get back a valid config to use, or the Kubelet crashes because
+		// something was fatally wrong with the configuration. Non-fatal errors will be logged, but not returned from Run().
+		kcToUse := ncc.Run()
+
+		// Update s (KubeletServer) to any new config
+		kcToUseInternal := componentconfig.KubeletConfiguration{}
+		err := api.Scheme.Convert(kcToUse, &kcToUseInternal, nil)
+		if err != nil {
+			return err
+		}
+		s.KubeletConfiguration = kcToUseInternal
+
+		// Ensure that /configz is up to date with the new config
+		if cfgzErr != nil {
+			glog.Errorf("was unable to register configz before due to %s, will not be able to set now", cfgzErr)
+		} else {
+			setConfigz(cfgz, &s.KubeletConfiguration)
+		}
+
+		// Update feature gates from any new config
+		err = utilfeature.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Validate configuration using the old validation function.
+		if err := validateConfig(s); err != nil {
+			return err
+		}
 	}
 
 	if kubeDeps == nil {

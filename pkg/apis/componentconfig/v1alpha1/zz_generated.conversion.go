@@ -360,6 +360,12 @@ func Convert_componentconfig_KubeletAuthorization_To_v1alpha1_KubeletAuthorizati
 }
 
 func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfiguration(in *KubeletConfiguration, out *componentconfig.KubeletConfiguration, s conversion.Scope) error {
+	if err := v1.Convert_Pointer_v1_Duration_To_v1_Duration(&in.ConfigTrialDuration, &out.ConfigTrialDuration, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_Pointer_int32_To_int32(&in.CrashLoopThreshold, &out.CrashLoopThreshold, s); err != nil {
+		return err
+	}
 	out.PodManifestPath = in.PodManifestPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
@@ -540,6 +546,12 @@ func Convert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigurati
 }
 
 func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfiguration(in *componentconfig.KubeletConfiguration, out *KubeletConfiguration, s conversion.Scope) error {
+	if err := v1.Convert_v1_Duration_To_Pointer_v1_Duration(&in.ConfigTrialDuration, &out.ConfigTrialDuration, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_int32_To_Pointer_int32(&in.CrashLoopThreshold, &out.CrashLoopThreshold, s); err != nil {
+		return err
+	}
 	out.PodManifestPath = in.PodManifestPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency

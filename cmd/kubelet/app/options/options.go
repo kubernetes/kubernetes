@@ -81,6 +81,14 @@ type KubeletFlags struct {
 	// This flag, if set, sets the unique id of the instance that an external provider (i.e. cloudprovider)
 	// can use to identify a specific node
 	ProviderID string
+
+	// The nodeconfig controller will use this directory for checkpointing downloaded configurations,
+	// finding the (optional) init configuration, and recording miscellaneous information.
+	// The path may be absolute or relative; relative paths are under the Kubelet's RootDirectory.
+	// To use dynamic configuration, the DynamicKubeletConfig feature gate must be enabled.
+	// If dynamic configuration is enabled, this directory MUST be specified.
+	// TODO(mtaufen): Eventually, dynamic configuration will be on by default, and we will have to ease people into this feature.
+	NodeConfigDir string
 }
 
 // KubeletServer encapsulates all of the parameters necessary for starting up
@@ -142,6 +150,8 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&f.DockershimRootDirectory, "experimental-dockershim-root-directory", f.DockershimRootDirectory, "Path to the dockershim root directory.")
 	fs.StringVar(&f.ProviderID, "provider-id", f.ProviderID, "Unique identifier for identifying the node in a machine database, i.e cloudprovider")
 	fs.MarkHidden("experimental-dockershim-root-directory")
+
+	fs.StringVar(&f.NodeConfigDir, "node-config-dir", "", "The Kubelet's node configuration controller will use this directory for checkpointing downloaded configurations, finding the (optional) init configuration, and recording miscellaneous information.")
 }
 
 // addFlags adds flags for a specific componentconfig.KubeletConfiguration to the specified FlagSet
