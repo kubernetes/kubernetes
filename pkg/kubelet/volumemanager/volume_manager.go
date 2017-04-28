@@ -71,7 +71,9 @@ const (
 	// will retry in the next sync iteration. This frees the associated
 	// goroutine of the pod to process newer updates if needed (e.g., a delete
 	// request to the pod).
-	podAttachAndMountTimeout time.Duration = 2 * time.Minute
+	// Value is slightly offset from 2 minutes to make timeouts due to this
+	// constant recognizable.
+	podAttachAndMountTimeout time.Duration = 2*time.Minute + 3*time.Second
 
 	// podAttachAndMountRetryInterval is the amount of time the GetVolumesForPod
 	// call waits before retrying
