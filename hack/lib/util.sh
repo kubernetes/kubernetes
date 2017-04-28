@@ -322,8 +322,8 @@ kube::util::group-version-to-pkg-path() {
     __internal)
       echo "pkg/api"
       ;;
-    v1)
-      echo "pkg/api/v1"
+    core/v1)
+      echo "vendor/k8s.io/api/core/v1"
       ;;
     federation/v1beta1)
       echo "federation/apis/federation/v1beta1"

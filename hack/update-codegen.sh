@@ -44,6 +44,7 @@ for gv in "${GROUP_VERSIONS[@]}"; do
 	# add items, but strip off any leading apis/ you find to match command expectations
 	api_dir=$(kube::util::group-version-to-pkg-path "${gv}")
 	nopkg_dir=${api_dir#pkg/}
+	nopkg_dir=${nopkg_dir#vendor/k8s.io/api/}
 	pkg_dir=${nopkg_dir#apis/}
 
 	# skip groups that aren't being served, clients for these don't matter
@@ -63,7 +64,7 @@ ${clientgen} -t "$@"
 ${clientgen} --clientset-name="clientset" --input="${GV_DIRS_CSV}" "$@"
 # Clientgen for federation clientset.
 ${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/","batch/","autoscaling/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,extensions/Deployment,extensions/DaemonSet,api/ConfigMap,api/Event,batch/Job,autoscaling/HorizontalPodAutoscaler"   "$@"
-${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="api/v1/Service,api/v1/Namespace,extensions/v1beta1/ReplicaSet,api/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,api/v1/ConfigMap,api/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
+${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","core/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="core/v1/Service,core/v1/Namespace,extensions/v1beta1/ReplicaSet,core/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,core/v1/ConfigMap,core/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
 
 LISTERGEN_APIS=(
 pkg/api
@@ -76,6 +77,8 @@ $(
 
 LISTERGEN_APIS=(${LISTERGEN_APIS[@]/#/k8s.io/kubernetes/})
 LISTERGEN_APIS=$(IFS=,; echo "${LISTERGEN_APIS[*]}")
+# TODO: remove this hack when all apis are moved to k8s.io/api
+LISTERGEN_APIS=$(echo ${LISTERGEN_APIS} | sed "s|k8s.io/kubernetes/pkg/api/v1|k8s.io/api/core/v1|g")
 
 ${listergen} --input-dirs "${LISTERGEN_APIS}" "$@"
 
@@ -91,6 +94,8 @@ $(
 
 INFORMERGEN_APIS=(${INFORMERGEN_APIS[@]/#/k8s.io/kubernetes/})
 INFORMERGEN_APIS=$(IFS=,; echo "${INFORMERGEN_APIS[*]}")
+# TODO: remove this hack when all apis are moved to k8s.io/api
+INFORMERGEN_APIS=$(echo ${INFORMERGEN_APIS} | sed "s|k8s.io/kubernetes/pkg/api/v1|k8s.io/api/core/v1|g")
 ${informergen} \
   --input-dirs "${INFORMERGEN_APIS}" \
   --versioned-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/clientset \
