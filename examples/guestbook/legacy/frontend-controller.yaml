@@ -2,20 +2,8 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   name: frontend
-  # these labels can be applied automatically
-  # from the labels in the pod template if not set
-  # labels:
-    # app: guestbook
-    # tier: frontend
 spec:
-  # this replicas value is default
-  # modify it according to your case
   replicas: 3
-  # selector can be applied automatically
-  # from the labels in the pod template if not set
-  # selector:
-  #   app: guestbook
-  #   tier: frontend
   template:
     metadata:
       labels:
@@ -35,7 +23,7 @@ spec:
           # If your cluster config does not include a dns service, then to
           # instead access environment variables to find service host
           # info, comment out the 'value: dns' line above, and uncomment the
-          # line below.
+          # line below:
           # value: env
         ports:
         - containerPort: 80
