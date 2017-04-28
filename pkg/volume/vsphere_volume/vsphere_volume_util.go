@@ -19,6 +19,7 @@ package vsphere_volume
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,6 +36,27 @@ const (
 	checkSleepDuration = time.Second
 	diskByIDPath       = "/dev/disk/by-id/"
 	diskSCSIPrefix     = "wwn-0x"
+	diskformat         = "diskformat"
+	datastore          = "datastore"
+	Fstype             = "fstype"
+
+	HostFailuresToTolerateCapability    = "hostfailurestotolerate"
+	ForceProvisioningCapability         = "forceprovisioning"
+	CacheReservationCapability          = "cachereservation"
+	DiskStripesCapability               = "diskstripes"
+	ObjectSpaceReservationCapability    = "objectspacereservation"
+	IopsLimitCapability                 = "iopslimit"
+	HostFailuresToTolerateCapabilityMin = 0
+	HostFailuresToTolerateCapabilityMax = 3
+	ForceProvisioningCapabilityMin      = 0
+	ForceProvisioningCapabilityMax      = 1
+	CacheReservationCapabilityMin       = 0
+	CacheReservationCapabilityMax       = 100
+	DiskStripesCapabilityMin            = 1
+	DiskStripesCapabilityMax            = 12
+	ObjectSpaceReservationCapabilityMin = 0
+	ObjectSpaceReservationCapabilityMax = 100
+	IopsLimitCapabilityMin              = 0
 )
 
 var ErrProbeVolume = errors.New("Error scanning attached volumes")
@@ -52,10 +74,11 @@ func verifyDevicePath(path string) (string, error) {
 }
 
 // CreateVolume creates a vSphere volume.
-func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeKB int, err error) {
+func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeKB int, fstype string, err error) {
+
 	cloud, err := getCloudProvider(v.plugin.host.GetCloudProvider())
 	if err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 
 	capacity := v.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -73,27 +96,44 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPa
 	// the values to the cloud provider.
 	for parameter, value := range v.options.Parameters {
 		switch strings.ToLower(parameter) {
-		case "diskformat":
+		case diskformat:
 			volumeOptions.DiskFormat = value
-		case "datastore":
+		case datastore:
 			volumeOptions.Datastore = value
+		case Fstype:
+			fstype = value
+			glog.V(4).Infof("Setting fstype as %q", fstype)
+		case HostFailuresToTolerateCapability, ForceProvisioningCapability,
+			CacheReservationCapability, DiskStripesCapability,
+			ObjectSpaceReservationCapability, IopsLimitCapability:
+			capabilityData, err := validateVSANCapability(strings.ToLower(parameter), value)
+			if err != nil {
+				return "", 0, "", err
+			} else {
+				volumeOptions.StorageProfileData += capabilityData
+			}
+
 		default:
-			return "", 0, fmt.Errorf("invalid option %q for volume plugin %s", parameter, v.plugin.GetPluginName())
+			return "", 0, "", fmt.Errorf("invalid option %q for volume plugin %s", parameter, v.plugin.GetPluginName())
 		}
 	}
 
+	if volumeOptions.StorageProfileData != "" {
+		volumeOptions.StorageProfileData = "(" + volumeOptions.StorageProfileData + ")"
+	}
+	glog.V(1).Infof("StorageProfileData in vsphere volume %q", volumeOptions.StorageProfileData)
 	// TODO: implement PVC.Selector parsing
 	if v.options.PVC.Spec.Selector != nil {
-		return "", 0, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on vSphere")
+		return "", 0, "", fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on vSphere")
 	}
 
 	vmDiskPath, err = cloud.CreateVolume(volumeOptions)
 	if err != nil {
 		glog.V(2).Infof("Error creating vsphere volume: %v", err)
-		return "", 0, err
+		return "", 0, "", err
 	}
 	glog.V(2).Infof("Successfully created vsphere volume %s", name)
-	return vmDiskPath, volSizeKB, nil
+	return vmDiskPath, volSizeKB, fstype, nil
 }
 
 // DeleteVolume deletes a vSphere volume.
@@ -131,4 +171,72 @@ func getCloudProvider(cloud cloudprovider.Interface) (*vsphere.VSphere, error) {
 		return nil, errors.New("Invalid cloud provider: expected vSphere")
 	}
 	return vs, nil
+}
+
+// Validate the capability requirement for the user specified policy attributes.
+func validateVSANCapability(capabilityName string, capabilityValue string) (string, error) {
+	var capabilityData string
+	capabilityIntVal, ok := verifyCapabilityValueIsInteger(capabilityValue)
+	if !ok {
+		return "", fmt.Errorf("Invalid value for %s. The capabilityValue: %s must be a valid integer value", capabilityName, capabilityValue)
+	}
+	switch strings.ToLower(capabilityName) {
+	case HostFailuresToTolerateCapability:
+		if capabilityIntVal >= HostFailuresToTolerateCapabilityMin && capabilityIntVal <= HostFailuresToTolerateCapabilityMax {
+			capabilityData = " (\"hostFailuresToTolerate\" i" + capabilityValue + ")"
+		} else {
+			return "", fmt.Errorf(`Invalid value for hostFailuresToTolerate.
+				The default value is %d, minimum value is %d and maximum value is %d.`,
+				1, HostFailuresToTolerateCapabilityMin, HostFailuresToTolerateCapabilityMax)
+		}
+	case ForceProvisioningCapability:
+		if capabilityIntVal >= ForceProvisioningCapabilityMin && capabilityIntVal <= ForceProvisioningCapabilityMax {
+			capabilityData = " (\"forceProvisioning\" i" + capabilityValue + ")"
+		} else {
+			return "", fmt.Errorf(`Invalid value for forceProvisioning.
+				The value can be either %d or %d.`,
+				ForceProvisioningCapabilityMin, ForceProvisioningCapabilityMax)
+		}
+	case CacheReservationCapability:
+		if capabilityIntVal >= CacheReservationCapabilityMin && capabilityIntVal <= CacheReservationCapabilityMax {
+			capabilityData = " (\"cacheReservation\" i" + strconv.Itoa(capabilityIntVal*10000) + ")"
+		} else {
+			return "", fmt.Errorf(`Invalid value for cacheReservation.
+				The minimum percentage is %d and maximum percentage is %d.`,
+				CacheReservationCapabilityMin, CacheReservationCapabilityMax)
+		}
+	case DiskStripesCapability:
+		if capabilityIntVal >= DiskStripesCapabilityMin && capabilityIntVal <= DiskStripesCapabilityMax {
+			capabilityData = " (\"stripeWidth\" i" + capabilityValue + ")"
+		} else {
+			return "", fmt.Errorf(`Invalid value for diskStripes.
+				The minimum value is %d and maximum value is %d.`,
+				DiskStripesCapabilityMin, DiskStripesCapabilityMax)
+		}
+	case ObjectSpaceReservationCapability:
+		if capabilityIntVal >= ObjectSpaceReservationCapabilityMin && capabilityIntVal <= ObjectSpaceReservationCapabilityMax {
+			capabilityData = " (\"proportionalCapacity\" i" + capabilityValue + ")"
+		} else {
+			return "", fmt.Errorf(`Invalid value for ObjectSpaceReservation.
+				The minimum percentage is %d and maximum percentage is %d.`,
+				ObjectSpaceReservationCapabilityMin, ObjectSpaceReservationCapabilityMax)
+		}
+	case IopsLimitCapability:
+		if capabilityIntVal >= IopsLimitCapabilityMin {
+			capabilityData = " (\"iopsLimit\" i" + capabilityValue + ")"
+		} else {
+			return "", fmt.Errorf(`Invalid value for iopsLimit.
+				The value should be greater than %d.`, IopsLimitCapabilityMin)
+		}
+	}
+	return capabilityData, nil
+}
+
+// Verify if the capability value is of type integer.
+func verifyCapabilityValueIsInteger(capabilityValue string) (int, bool) {
+	i, err := strconv.Atoi(capabilityValue)
+	if err != nil {
+		return -1, false
+	}
+	return i, true
 }

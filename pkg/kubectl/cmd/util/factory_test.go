@@ -740,12 +740,12 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 		{
 			name:     "all-replacement",
 			arg:      "all",
-			expected: "pods,replicationcontrollers,services,statefulsets,horizontalpodautoscalers,jobs,deployments,replicasets",
+			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,deployments.extensions,replicasets.extensions",
 		},
 		{
 			name:     "alias-in-comma-separated-arg",
 			arg:      "all,secrets",
-			expected: "pods,replicationcontrollers,services,statefulsets,horizontalpodautoscalers,jobs,deployments,replicasets,secrets",
+			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,deployments.extensions,replicasets.extensions,secrets",
 		},
 	}
 
@@ -754,7 +754,7 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to create shortcut expander, err = %s", err.Error())
 	}
-	b := resource.NewBuilder(mapper, api.Scheme, fakeClient(), testapi.Default.Codec())
+	b := resource.NewBuilder(mapper, resource.LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec())
 
 	for _, test := range tests {
 		replaced := b.ReplaceAliases(test.arg)

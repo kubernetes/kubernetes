@@ -18,13 +18,30 @@ requires:
   kube-api-endpoint:
     interface: http
   kube-dns:
+    # kube-dns is deprecated. Its functionality has been rolled into the
+    # kube-control interface. The kube-dns relation will be removed in
+    # a future release.
     interface: kube-dns
+  kube-control:
+    interface: kube-control
 provides:
   cni:
     interface: kubernetes-cni
     scope: container
 resources:
-  kubernetes:
+  cni:
     type: file
-    filename: kubernetes.tar.gz
-    description: "An archive of kubernetes binaries for the worker."
+    filename: cni.tgz
+    description: CNI plugins
+  kubectl:
+    type: file
+    filename: kubectl.snap
+    description: kubectl snap
+  kubelet:
+    type: file
+    filename: kubelet.snap
+    description: kubelet snap
+  kube-proxy:
+    type: file
+    filename: kube-proxy.snap
+    description: kube-proxy snap

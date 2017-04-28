@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -97,6 +96,9 @@ const (
 	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
 	redisControllerFilename  = "redis-master-controller.json"
 	redisServiceFilename     = "redis-master-service.json"
+	nginxDeployment1Filename = "nginx-deployment1.yaml"
+	nginxDeployment2Filename = "nginx-deployment2.yaml"
+	nginxDeployment3Filename = "nginx-deployment3.yaml"
 )
 
 var (
@@ -580,7 +582,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 		It("should handle in-cluster config", func() {
 			By("adding rbac permissions")
-			// grant the view permission widely to allow inspection of the `invalid` namespace.
+			// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
 			framework.BindClusterRole(f.ClientSet.Rbac(), "view", f.Namespace.Name,
 				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
@@ -606,11 +608,70 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.Logf("copying %s to the %s pod", kubectlPath, simplePodName)
 			framework.RunKubectlOrDie("cp", kubectlPath, ns+"/"+simplePodName+":/tmp/")
 
+			// Build a kubeconfig file that will make use of the injected ca and token,
+			// but point at the DNS host and the default namespace
+			tmpDir, err := ioutil.TempDir("", "icc-override")
+			overrideKubeconfigName := "icc-override.kubeconfig"
+			framework.ExpectNoError(err)
+			defer func() { os.Remove(tmpDir) }()
+			framework.ExpectNoError(ioutil.WriteFile(filepath.Join(tmpDir, overrideKubeconfigName), []byte(`
+kind: Config
+apiVersion: v1
+clusters:
+- cluster:
+    api-version: v1
+    server: https://kubernetes.default.svc:443
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  name: kubeconfig-cluster
+contexts:
+- context:
+    cluster: kubeconfig-cluster
+    namespace: default
+    user: kubeconfig-user
+  name: kubeconfig-context
+current-context: kubeconfig-context
+users:
+- name: kubeconfig-user
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+`), os.FileMode(0755)))
+			framework.Logf("copying override kubeconfig to the %s pod", simplePodName)
+			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, overrideKubeconfigName), ns+"/"+simplePodName+":/tmp/")
+
+			framework.ExpectNoError(ioutil.WriteFile(filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), []byte(`
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: "configmap with namespace and invalid name"
+  namespace: configmap-namespace
+`), os.FileMode(0755)))
+			framework.ExpectNoError(ioutil.WriteFile(filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), []byte(`
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: "configmap without namespace and invalid name"
+`), os.FileMode(0755)))
+			framework.Logf("copying configmap manifests to the %s pod", simplePodName)
+			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
+			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
+
 			By("getting pods with in-cluster configs")
-			execOutput := framework.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods")
-			if matched, err := regexp.MatchString("nginx +1/1 +Running", execOutput); err != nil || !matched {
-				framework.Failf("Unexpected kubectl exec output: ", execOutput)
-			}
+			execOutput := framework.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --v=7 2>&1")
+			Expect(execOutput).To(MatchRegexp("nginx +1/1 +Running"))
+			Expect(execOutput).To(ContainSubstring("Using in-cluster namespace"))
+			Expect(execOutput).To(ContainSubstring("Using in-cluster configuration"))
+
+			By("creating an object containing a namespace with in-cluster config")
+			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-with-namespace.yaml --v=7 2>&1")
+			Expect(err).To(ContainSubstring("Using in-cluster namespace"))
+			Expect(err).To(ContainSubstring("Using in-cluster configuration"))
+			Expect(err).To(ContainSubstring(fmt.Sprintf("POST https://%s:%s/api/v1/namespaces/configmap-namespace/configmaps", inClusterHost, inClusterPort)))
+
+			By("creating an object not containing a namespace with in-cluster config")
+			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-without-namespace.yaml --v=7 2>&1")
+			Expect(err).To(ContainSubstring("Using in-cluster namespace"))
+			Expect(err).To(ContainSubstring("Using in-cluster configuration"))
+			Expect(err).To(ContainSubstring(fmt.Sprintf("POST https://%s:%s/api/v1/namespaces/%s/configmaps", inClusterHost, inClusterPort, f.Namespace.Name)))
 
 			By("trying to use kubectl with invalid token")
 			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
@@ -629,13 +690,17 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			Expect(err).To(ContainSubstring("GET http://invalid/api"))
 
 			By("trying to use kubectl with invalid namespace")
-			output, _ := framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --namespace=invalid --v=6 2>&1")
-			Expect(output).To(ContainSubstring("No resources found"))
-			Expect(output).ToNot(ContainSubstring("Using in-cluster namespace"))
-			Expect(output).To(ContainSubstring("Using in-cluster configuration"))
-			if matched, _ := regexp.MatchString(fmt.Sprintf("GET http[s]?://%s:%s/api/v1/namespaces/invalid/pods", inClusterHost, inClusterPort), output); !matched {
-				framework.Failf("Unexpected kubectl exec output: ", output)
-			}
+			execOutput = framework.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --namespace=invalid --v=6 2>&1")
+			Expect(execOutput).To(ContainSubstring("No resources found"))
+			Expect(execOutput).ToNot(ContainSubstring("Using in-cluster namespace"))
+			Expect(execOutput).To(ContainSubstring("Using in-cluster configuration"))
+			Expect(execOutput).To(MatchRegexp(fmt.Sprintf("GET http[s]?://%s:%s/api/v1/namespaces/invalid/pods", inClusterHost, inClusterPort)))
+
+			By("trying to use kubectl with kubeconfig")
+			execOutput = framework.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --kubeconfig=/tmp/"+overrideKubeconfigName+" --v=6 2>&1")
+			Expect(execOutput).ToNot(ContainSubstring("Using in-cluster namespace"))
+			Expect(execOutput).ToNot(ContainSubstring("Using in-cluster configuration"))
+			Expect(execOutput).To(ContainSubstring("GET https://kubernetes.default.svc:443/api/v1/namespaces/default/pods"))
 		})
 	})
 
@@ -685,6 +750,49 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				framework.Failf("port should keep the same")
 			}
 		})
+
+		It("apply set/view last-applied", func() {
+			deployment1Yaml := readTestFileOrDie(nginxDeployment1Filename)
+			deployment2Yaml := readTestFileOrDie(nginxDeployment2Filename)
+			deployment3Yaml := readTestFileOrDie(nginxDeployment3Filename)
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("deployment replicas number is 2")
+			framework.RunKubectlOrDieInput(string(deployment1Yaml[:]), "apply", "-f", "-", nsFlag)
+
+			By("check the last-applied matches expectations annotations")
+			output := framework.RunKubectlOrDieInput(string(deployment1Yaml[:]), "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
+			requiredString := "\"replicas\": 2"
+			if !strings.Contains(output, requiredString) {
+				framework.Failf("Missing %s in kubectl view-last-applied", requiredString)
+			}
+
+			By("apply file doesn't have replicas")
+			framework.RunKubectlOrDieInput(string(deployment2Yaml[:]), "apply", "set-last-applied", "-f", "-", nsFlag)
+
+			By("check last-applied has been updated, annotations doesn't replicas")
+			output = framework.RunKubectlOrDieInput(string(deployment1Yaml[:]), "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
+			requiredString = "\"replicas\": 2"
+			if strings.Contains(output, requiredString) {
+				framework.Failf("Missing %s in kubectl view-last-applied", requiredString)
+			}
+
+			By("scale set replicas to 3")
+			nginxDeploy := "nginx-deployment"
+			framework.RunKubectlOrDie("scale", "deployment", nginxDeploy, "--replicas=3", nsFlag)
+
+			By("apply file doesn't have replicas but image changed")
+			framework.RunKubectlOrDieInput(string(deployment3Yaml[:]), "apply", "-f", "-", nsFlag)
+
+			By("verify replicas still is 3 and image has been updated")
+			output = framework.RunKubectlOrDieInput(string(deployment3Yaml[:]), "get", "-f", "-", nsFlag, "-o", "json")
+			requiredItems := []string{"\"replicas\": 3", "nginx-slim:0.7"}
+			for _, item := range requiredItems {
+				if !strings.Contains(output, item) {
+					framework.Failf("Missing %s in kubectl apply", item)
+				}
+			}
+		})
 	})
 
 	framework.KubeDescribe("Kubectl cluster-info", func() {
@@ -732,7 +840,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 					{"Annotations:"},
 					{"Status:", "Running"},
 					{"IP:"},
-					{"Controllers:", "ReplicationController/redis-master"},
+					{"Created By:", "ReplicationController/redis-master"},
+					{"Controlled By:", "ReplicationController/redis-master"},
 					{"Image:", redisImage},
 					{"State:", "Running"},
 					{"QoS Class:", "BestEffort"},
@@ -741,7 +850,6 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			})
 
 			// Rc
-			output := framework.RunKubectlOrDie("describe", "rc", "redis-master", nsFlag)
 			requiredStrings := [][]string{
 				{"Name:", "redis-master"},
 				{"Namespace:", ns},
@@ -754,10 +862,10 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				{"Pod Template:"},
 				{"Image:", redisImage},
 				{"Events:"}}
-			checkOutput(output, requiredStrings)
+			checkKubectlOutputWithRetry(requiredStrings, "describe", "rc", "redis-master", nsFlag)
 
 			// Service
-			output = framework.RunKubectlOrDie("describe", "service", "redis-master", nsFlag)
+			output := framework.RunKubectlOrDie("describe", "service", "redis-master", nsFlag)
 			requiredStrings = [][]string{
 				{"Name:", "redis-master"},
 				{"Namespace:", ns},
@@ -1584,7 +1692,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 })
 
 // Checks whether the output split by line contains the required elements.
-func checkOutput(output string, required [][]string) {
+func checkOutputReturnError(output string, required [][]string) error {
 	outputLines := strings.Split(output, "\n")
 	currentLine := 0
 	for _, requirement := range required {
@@ -1592,14 +1700,40 @@ func checkOutput(output string, required [][]string) {
 			currentLine++
 		}
 		if currentLine == len(outputLines) {
-			framework.Failf("Failed to find %s in %s", requirement[0], output)
+			return fmt.Errorf("failed to find %s in %s", requirement[0], output)
 		}
 		for _, item := range requirement[1:] {
 			if !strings.Contains(outputLines[currentLine], item) {
-				framework.Failf("Failed to find %s in %s", item, outputLines[currentLine])
+				return fmt.Errorf("failed to find %s in %s", item, outputLines[currentLine])
 			}
 		}
 	}
+	return nil
+}
+
+func checkOutput(output string, required [][]string) {
+	err := checkOutputReturnError(output, required)
+	if err != nil {
+		framework.Failf("%v", err)
+	}
+}
+
+func checkKubectlOutputWithRetry(required [][]string, args ...string) {
+	var pollErr error
+	wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+		output := framework.RunKubectlOrDie(args...)
+		err := checkOutputReturnError(output, required)
+		if err != nil {
+			pollErr = err
+			return false, nil
+		}
+		pollErr = nil
+		return true, nil
+	})
+	if pollErr != nil {
+		framework.Failf("%v", pollErr)
+	}
+	return
 }
 
 func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {
@@ -1848,7 +1982,7 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 		if strings.Contains(data.Image, jpgExpected) {
 			return nil
 		} else {
-			return errors.New(fmt.Sprintf("data served up in container is inaccurate, %s didn't contain %s", data, jpgExpected))
+			return fmt.Errorf("data served up in container is inaccurate, %s didn't contain %s", data, jpgExpected)
 		}
 	}
 }

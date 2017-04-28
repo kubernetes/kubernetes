@@ -288,10 +288,10 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	// Set ReadyCondition.LastTransitionTime.
-	if _, readyCondition := v1.GetPodCondition(&status, v1.PodReady); readyCondition != nil {
+	if _, readyCondition := podutil.GetPodCondition(&status, v1.PodReady); readyCondition != nil {
 		// Need to set LastTransitionTime.
 		lastTransitionTime := metav1.Now()
-		_, oldReadyCondition := v1.GetPodCondition(&oldStatus, v1.PodReady)
+		_, oldReadyCondition := podutil.GetPodCondition(&oldStatus, v1.PodReady)
 		if oldReadyCondition != nil && readyCondition.Status == oldReadyCondition.Status {
 			lastTransitionTime = oldReadyCondition.LastTransitionTime
 		}
@@ -299,10 +299,10 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	// Set InitializedCondition.LastTransitionTime.
-	if _, initCondition := v1.GetPodCondition(&status, v1.PodInitialized); initCondition != nil {
+	if _, initCondition := podutil.GetPodCondition(&status, v1.PodInitialized); initCondition != nil {
 		// Need to set LastTransitionTime.
 		lastTransitionTime := metav1.Now()
-		_, oldInitCondition := v1.GetPodCondition(&oldStatus, v1.PodInitialized)
+		_, oldInitCondition := podutil.GetPodCondition(&oldStatus, v1.PodInitialized)
 		if oldInitCondition != nil && initCondition.Status == oldInitCondition.Status {
 			lastTransitionTime = oldInitCondition.LastTransitionTime
 		}
@@ -441,7 +441,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		// TODO: handle conflict as a retry, make that easier too.
 		pod, err = m.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
 		if err == nil {
-			glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
+			glog.V(3).Infof("Status for pod %q updated successfully: (%d, %+v)", format.Pod(pod), status.version, status.status)
 			m.apiStatusVersions[pod.UID] = status.version
 			if kubepod.IsMirrorPod(pod) {
 				// We don't handle graceful deletion of mirror pods.
@@ -484,7 +484,7 @@ func (m *manager) couldBeDeleted(uid types.UID, status v1.PodStatus) bool {
 // needsReconcile compares the given status with the status in the pod manager (which
 // in fact comes from apiserver), returns whether the status needs to be reconciled with
 // the apiserver. Now when pod status is inconsistent between apiserver and kubelet,
-// kubelet should forcibly send an update to reconclie the inconsistence, because kubelet
+// kubelet should forcibly send an update to reconcile the inconsistence, because kubelet
 // should be the source of truth of pod status.
 // NOTE(random-liu): It's simpler to pass in mirror pod uid and get mirror pod by uid, but
 // now the pod manager only supports getting mirror pod by static pod, so we have to pass

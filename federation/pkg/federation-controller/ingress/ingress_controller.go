@@ -255,7 +255,8 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			ingress := obj.(*extensionsv1beta1.Ingress)
 			glog.V(4).Infof("Attempting to delete Ingress: %v", ingress)
-			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &metav1.DeleteOptions{})
+			orphanDependents := false
+			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
 			return err
 		})
 
@@ -289,9 +290,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		})
 
 	ic.deletionHelper = deletionhelper.NewDeletionHelper(
-		ic.hasFinalizerFunc,
-		ic.removeFinalizerFunc,
-		ic.addFinalizerFunc,
+		ic.updateIngress,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
 			ingress := obj.(*extensionsv1beta1.Ingress)
@@ -305,52 +304,11 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	return ic
 }
 
-// Returns true if the given object has the given finalizer in its ObjectMeta.
-func (ic *IngressController) hasFinalizerFunc(obj pkgruntime.Object, finalizer string) bool {
+// Sends the given updated object to apiserver.
+// Assumes that the given object is an ingress.
+func (ic *IngressController) updateIngress(obj pkgruntime.Object) (pkgruntime.Object, error) {
 	ingress := obj.(*extensionsv1beta1.Ingress)
-	for i := range ingress.ObjectMeta.Finalizers {
-		if string(ingress.ObjectMeta.Finalizers[i]) == finalizer {
-			return true
-		}
-	}
-	return false
-}
-
-// Removes the finalizer from the given objects ObjectMeta.
-// Assumes that the given object is a ingress.
-func (ic *IngressController) removeFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
-	ingress := obj.(*extensionsv1beta1.Ingress)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range ingress.ObjectMeta.Finalizers {
-		if string(ingress.ObjectMeta.Finalizers[i]) != finalizer {
-			newFinalizers = append(newFinalizers, ingress.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	ingress.ObjectMeta.Finalizers = newFinalizers
-	ingress, err := ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Update(ingress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from ingress %s: %v", finalizer, ingress.Name, err)
-	}
-	return ingress, nil
-}
-
-// Adds the given finalizers to the given objects ObjectMeta.
-// Assumes that the given object is a ingress.
-func (ic *IngressController) addFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
-	ingress := obj.(*extensionsv1beta1.Ingress)
-	ingress.ObjectMeta.Finalizers = append(ingress.ObjectMeta.Finalizers, finalizers...)
-	ingress, err := ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Update(ingress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizers %v to ingress %s: %v", finalizers, ingress.Name, err)
-	}
-	return ingress, nil
+	return ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Update(ingress)
 }
 
 func (ic *IngressController) Run(stopChan <-chan struct{}) {
@@ -746,7 +704,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	if baseIngress.DeletionTimestamp != nil {
 		if err := ic.delete(baseIngress); err != nil {
 			glog.Errorf("Failed to delete %s: %v", ingress, err)
-			ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "DeleteFailed",
+			ic.eventRecorder.Eventf(baseIngress, api.EventTypeWarning, "DeleteFailed",
 				"Ingress delete failed: %v", err)
 			ic.deliverIngress(ingress, 0, true)
 		}
@@ -930,7 +888,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	}
 	glog.V(4).Infof("Calling federatedUpdater.Update() - operations: %v", operations)
 	err = ic.federatedIngressUpdater.UpdateWithOnError(operations, ic.updateTimeout, func(op util.FederatedOperation, operror error) {
-		ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "FailedClusterUpdate",
+		ic.eventRecorder.Eventf(baseIngress, api.EventTypeWarning, "FailedClusterUpdate",
 			"Ingress update in cluster %s failed: %v", op.ClusterName, operror)
 	})
 	if err != nil {

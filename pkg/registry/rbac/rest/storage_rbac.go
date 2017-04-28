@@ -55,6 +55,8 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
+const PostStartHookName = "rbac/bootstrap-roles"
+
 type RESTStorageProvider struct {
 	Authorizer authorizer.Authorizer
 }
@@ -123,7 +125,7 @@ func (p RESTStorageProvider) storage(version schema.GroupVersion, apiResourceCon
 }
 
 func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
-	return "rbac/bootstrap-roles", PostStartHook, nil
+	return PostStartHookName, PostStartHook, nil
 }
 
 func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {

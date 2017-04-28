@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
@@ -189,7 +189,7 @@ func (c *ConfigFactory) GetScheduledPodLister() corelisters.PodLister {
 	return c.scheduledPodLister
 }
 
-// TODO(harryz) need to update all the handlers here and below for equivalence cache
+// TODO(resouer) need to update all the handlers here and below for equivalence cache
 func (c *ConfigFactory) addPodToCache(obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
@@ -370,7 +370,8 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	}
 
 	f.Run()
-	algo := core.NewGenericScheduler(f.schedulerCache, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders)
+	// TODO(resouer) use equivalence cache instead of nil here when #36238 get merged
+	algo := core.NewGenericScheduler(f.schedulerCache, nil, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders)
 	podBackoff := util.CreateDefaultPodBackoff()
 	return &scheduler.Config{
 		SchedulerCache: f.schedulerCache,
@@ -582,10 +583,7 @@ type binder struct {
 // Bind just does a POST binding RPC.
 func (b *binder) Bind(binding *v1.Binding) error {
 	glog.V(3).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), binding.Namespace)
-	return b.Client.Core().RESTClient().Post().Namespace(genericapirequest.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
-	// TODO: use Pods interface for binding once clusters are upgraded
-	// return b.Pods(binding.Namespace).Bind(binding)
+	return b.Client.CoreV1().Pods(binding.Namespace).Bind(binding)
 }
 
 type podConditionUpdater struct {
@@ -594,7 +592,7 @@ type podConditionUpdater struct {
 
 func (p *podConditionUpdater) Update(pod *v1.Pod, condition *v1.PodCondition) error {
 	glog.V(2).Infof("Updating pod condition for %s/%s to (%s==%s)", pod.Namespace, pod.Name, condition.Type, condition.Status)
-	if v1.UpdatePodCondition(&pod.Status, condition) {
+	if podutil.UpdatePodCondition(&pod.Status, condition) {
 		_, err := p.Client.Core().Pods(pod.Namespace).UpdateStatus(pod)
 		return err
 	}

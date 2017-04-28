@@ -106,7 +106,7 @@ func TestDynamicClient(t *testing.T) {
 		t.Fatalf("expected one pod, got %d", len(unstructuredList.Items))
 	}
 
-	got, err := unstructuredToPod(unstructuredList.Items[0])
+	got, err := unstructuredToPod(&unstructuredList.Items[0])
 	if err != nil {
 		t.Fatalf("unexpected error converting Unstructured to v1.Pod: %v", err)
 	}

@@ -21,7 +21,6 @@ package v2alpha1
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	autoscaling "k8s.io/client-go/pkg/apis/autoscaling"
 	v2alpha1 "k8s.io/client-go/pkg/apis/autoscaling/v2alpha1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -89,7 +88,7 @@ func (s horizontalPodAutoscalerNamespaceLister) Get(name string) (*v2alpha1.Hori
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(autoscaling.Resource("horizontalpodautoscaler"), name)
+		return nil, errors.NewNotFound(v2alpha1.Resource("horizontalpodautoscaler"), name)
 	}
 	return obj.(*v2alpha1.HorizontalPodAutoscaler), nil
 }

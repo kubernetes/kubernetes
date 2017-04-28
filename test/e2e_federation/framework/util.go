@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -38,12 +37,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+const FederatedDefaultTestTimeout = 5 * time.Minute
+
 // Detects whether the federation namespace exists in the underlying cluster
 func SkipUnlessFederated(c clientset.Interface) {
-	federationNS := os.Getenv("FEDERATION_NAMESPACE")
-	if federationNS == "" {
-		federationNS = federationapi.FederationNamespaceSystem
-	}
+	federationNS := framework.FederationSystemNamespace()
 
 	_, err := c.Core().Namespaces().Get(federationNS, metav1.GetOptions{})
 	if err != nil {

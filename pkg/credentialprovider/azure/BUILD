@@ -15,11 +15,11 @@ go_library(
     deps = [
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/credentialprovider:go_default_library",
-        "//vendor:github.com/Azure/azure-sdk-for-go/arm/containerregistry",
-        "//vendor:github.com/Azure/go-autorest/autorest/azure",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:gopkg.in/yaml.v2",
+        "//vendor/github.com/Azure/azure-sdk-for-go/arm/containerregistry:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
 )
 
@@ -29,8 +29,8 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/Azure/azure-sdk-for-go/arm/containerregistry",
-        "//vendor:github.com/Azure/go-autorest/autorest/to",
+        "//vendor/github.com/Azure/azure-sdk-for-go/arm/containerregistry:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
     ],
 )
 

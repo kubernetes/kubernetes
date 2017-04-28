@@ -39,6 +39,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 
 	// install the clientgo image policy API for use with api registry
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
@@ -49,7 +50,7 @@ var (
 )
 
 func init() {
-	admission.RegisterPlugin("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
+	kubeapiserveradmission.Plugins.Register("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
 		newImagePolicyWebhook, err := NewImagePolicyWebhook(config)
 		if err != nil {
 			return nil, err

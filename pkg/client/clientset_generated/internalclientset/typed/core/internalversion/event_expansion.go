@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/ref"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -100,7 +101,7 @@ func (e *events) PatchWithEventNamespace(incompleteEvent *api.Event, data []byte
 // object must match this event's client namespace unless the event client
 // was made with the "" namespace.
 func (e *events) Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*api.EventList, error) {
-	ref, err := api.GetReference(scheme, objOrRef)
+	ref, err := ref.GetReference(scheme, objOrRef)
 	if err != nil {
 		return nil, err
 	}

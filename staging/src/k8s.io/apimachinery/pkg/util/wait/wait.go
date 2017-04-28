@@ -73,8 +73,10 @@ func NonSlidingUntil(f func(), period time.Duration, stopCh <-chan struct{}) {
 // Close stopCh to stop. f may not be invoked if stop channel is already
 // closed. Pass NeverStop to if you don't want it stop.
 func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding bool, stopCh <-chan struct{}) {
-	for {
+	var t *time.Timer
+	var sawTimeout bool
 
+	for {
 		select {
 		case <-stopCh:
 			return
@@ -86,9 +88,8 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding b
 			jitteredPeriod = Jitter(period, jitterFactor)
 		}
 
-		var t *time.Timer
 		if !sliding {
-			t = time.NewTimer(jitteredPeriod)
+			t = resetOrReuseTimer(t, jitteredPeriod, sawTimeout)
 		}
 
 		func() {
@@ -97,7 +98,7 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding b
 		}()
 
 		if sliding {
-			t = time.NewTimer(jitteredPeriod)
+			t = resetOrReuseTimer(t, jitteredPeriod, sawTimeout)
 		}
 
 		// NOTE: b/c there is no priority selection in golang
@@ -109,6 +110,7 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding b
 		case <-stopCh:
 			return
 		case <-t.C:
+			sawTimeout = true
 		}
 	}
 }
@@ -184,7 +186,9 @@ func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
 }
 
 func pollInternal(wait WaitFunc, condition ConditionFunc) error {
-	return WaitFor(wait, condition, NeverStop)
+	done := make(chan struct{})
+	defer close(done)
+	return WaitFor(wait, condition, done)
 }
 
 // PollImmediate tries a condition func until it returns true, an error, or the timeout
@@ -329,4 +333,17 @@ func poller(interval, timeout time.Duration) WaitFunc {
 
 		return ch
 	})
+}
+
+// resetOrReuseTimer avoids allocating a new timer if one is already in use.
+// Not safe for multiple threads.
+func resetOrReuseTimer(t *time.Timer, d time.Duration, sawTimeout bool) *time.Timer {
+	if t == nil {
+		return time.NewTimer(d)
+	}
+	if !t.Stop() && !sawTimeout {
+		<-t.C
+	}
+	t.Reset(d)
+	return t
 }

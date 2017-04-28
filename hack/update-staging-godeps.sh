@@ -51,7 +51,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 
 echo "Checking whether godeps are restored"
 if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
-  echo -e '\nRun 'godep restore' to download dependencies.' 1>&2
+  echo -e '\nExecute script 'hack/godep-restore.sh' to download dependencies.' 1>&2
   exit 1
 fi
 
@@ -68,7 +68,7 @@ function updateGodepManifest() {
     GOPATH="${TMP_GOPATH}:${GOPATH}:${KUBE_ROOT}/staging" godep save ${V} ./... 2>&1 | sed 's/^/  /'
 
     echo "Rewriting Godeps.json to remove commits that don't really exist because we haven't pushed the prereqs yet"
-    go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" --client-go-import-path="k8s.io/${repo}"
+    go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" --override-import-path="k8s.io/${repo}"
 
     # commit so that following repos do not see this repo as dirty
     git add vendor >/dev/null
@@ -99,7 +99,7 @@ for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
   updateGodepManifest "${repo}"
 
   if [ "${FAIL_ON_DIFF}" == true ]; then
-    diff --ignore-matching-lines='^\s*\"Comment\"' -u "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps" "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json"
+    diff --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\"' -u "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps" "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json"
   fi
   if [ "${DRY_RUN}" != true ]; then
     cp "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps"

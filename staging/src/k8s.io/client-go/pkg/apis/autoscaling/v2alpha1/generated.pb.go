@@ -62,7 +62,9 @@ var _ = math.Inf
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
-const _ = proto.GoGoProtoPackageIsVersion1
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
 func (m *CrossVersionObjectReference) Reset()      { *m = CrossVersionObjectReference{} }
 func (*CrossVersionObjectReference) ProtoMessage() {}
@@ -139,71 +141,71 @@ func init() {
 	proto.RegisterType((*ResourceMetricSource)(nil), "k8s.io.client-go.pkg.apis.autoscaling.v2alpha1.ResourceMetricSource")
 	proto.RegisterType((*ResourceMetricStatus)(nil), "k8s.io.client-go.pkg.apis.autoscaling.v2alpha1.ResourceMetricStatus")
 }
-func (m *CrossVersionObjectReference) Marshal() (data []byte, err error) {
+func (m *CrossVersionObjectReference) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *CrossVersionObjectReference) MarshalTo(data []byte) (int, error) {
+func (m *CrossVersionObjectReference) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Kind)))
-	i += copy(data[i:], m.Kind)
-	data[i] = 0x12
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Kind)))
+	i += copy(dAtA[i:], m.Kind)
+	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Name)))
-	i += copy(data[i:], m.Name)
-	data[i] = 0x1a
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i += copy(dAtA[i:], m.Name)
+	dAtA[i] = 0x1a
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.APIVersion)))
-	i += copy(data[i:], m.APIVersion)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.APIVersion)))
+	i += copy(dAtA[i:], m.APIVersion)
 	return i, nil
 }
 
-func (m *HorizontalPodAutoscaler) Marshal() (data []byte, err error) {
+func (m *HorizontalPodAutoscaler) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *HorizontalPodAutoscaler) MarshalTo(data []byte) (int, error) {
+func (m *HorizontalPodAutoscaler) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n1, err := m.ObjectMeta.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ObjectMeta.Size()))
+	n1, err := m.ObjectMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n1
-	data[i] = 0x12
+	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
-	n2, err := m.Spec.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.Spec.Size()))
+	n2, err := m.Spec.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n2
-	data[i] = 0x1a
+	dAtA[i] = 0x1a
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
-	n3, err := m.Status.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.Status.Size()))
+	n3, err := m.Status.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
@@ -211,35 +213,35 @@ func (m *HorizontalPodAutoscaler) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *HorizontalPodAutoscalerList) Marshal() (data []byte, err error) {
+func (m *HorizontalPodAutoscalerList) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *HorizontalPodAutoscalerList) MarshalTo(data []byte) (int, error) {
+func (m *HorizontalPodAutoscalerList) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n4, err := m.ListMeta.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ListMeta.Size()))
+	n4, err := m.ListMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n4
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
-			data[i] = 0x12
+			dAtA[i] = 0x12
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -249,43 +251,43 @@ func (m *HorizontalPodAutoscalerList) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *HorizontalPodAutoscalerSpec) Marshal() (data []byte, err error) {
+func (m *HorizontalPodAutoscalerSpec) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *HorizontalPodAutoscalerSpec) MarshalTo(data []byte) (int, error) {
+func (m *HorizontalPodAutoscalerSpec) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ScaleTargetRef.Size()))
-	n5, err := m.ScaleTargetRef.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ScaleTargetRef.Size()))
+	n5, err := m.ScaleTargetRef.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n5
 	if m.MinReplicas != nil {
-		data[i] = 0x10
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintGenerated(data, i, uint64(*m.MinReplicas))
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.MinReplicas))
 	}
-	data[i] = 0x18
+	dAtA[i] = 0x18
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.MaxReplicas))
+	i = encodeVarintGenerated(dAtA, i, uint64(m.MaxReplicas))
 	if len(m.Metrics) > 0 {
 		for _, msg := range m.Metrics {
-			data[i] = 0x22
+			dAtA[i] = 0x22
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -295,48 +297,48 @@ func (m *HorizontalPodAutoscalerSpec) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *HorizontalPodAutoscalerStatus) Marshal() (data []byte, err error) {
+func (m *HorizontalPodAutoscalerStatus) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *HorizontalPodAutoscalerStatus) MarshalTo(data []byte) (int, error) {
+func (m *HorizontalPodAutoscalerStatus) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if m.ObservedGeneration != nil {
-		data[i] = 0x8
+		dAtA[i] = 0x8
 		i++
-		i = encodeVarintGenerated(data, i, uint64(*m.ObservedGeneration))
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.ObservedGeneration))
 	}
 	if m.LastScaleTime != nil {
-		data[i] = 0x12
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.LastScaleTime.Size()))
-		n6, err := m.LastScaleTime.MarshalTo(data[i:])
+		i = encodeVarintGenerated(dAtA, i, uint64(m.LastScaleTime.Size()))
+		n6, err := m.LastScaleTime.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n6
 	}
-	data[i] = 0x18
+	dAtA[i] = 0x18
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.CurrentReplicas))
-	data[i] = 0x20
+	i = encodeVarintGenerated(dAtA, i, uint64(m.CurrentReplicas))
+	dAtA[i] = 0x20
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.DesiredReplicas))
+	i = encodeVarintGenerated(dAtA, i, uint64(m.DesiredReplicas))
 	if len(m.CurrentMetrics) > 0 {
 		for _, msg := range m.CurrentMetrics {
-			data[i] = 0x2a
+			dAtA[i] = 0x2a
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -346,50 +348,50 @@ func (m *HorizontalPodAutoscalerStatus) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *MetricSpec) Marshal() (data []byte, err error) {
+func (m *MetricSpec) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *MetricSpec) MarshalTo(data []byte) (int, error) {
+func (m *MetricSpec) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Type)))
-	i += copy(data[i:], m.Type)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Type)))
+	i += copy(dAtA[i:], m.Type)
 	if m.Object != nil {
-		data[i] = 0x12
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.Object.Size()))
-		n7, err := m.Object.MarshalTo(data[i:])
+		i = encodeVarintGenerated(dAtA, i, uint64(m.Object.Size()))
+		n7, err := m.Object.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n7
 	}
 	if m.Pods != nil {
-		data[i] = 0x1a
+		dAtA[i] = 0x1a
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.Pods.Size()))
-		n8, err := m.Pods.MarshalTo(data[i:])
+		i = encodeVarintGenerated(dAtA, i, uint64(m.Pods.Size()))
+		n8, err := m.Pods.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n8
 	}
 	if m.Resource != nil {
-		data[i] = 0x22
+		dAtA[i] = 0x22
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.Resource.Size()))
-		n9, err := m.Resource.MarshalTo(data[i:])
+		i = encodeVarintGenerated(dAtA, i, uint64(m.Resource.Size()))
+		n9, err := m.Resource.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
@@ -398,50 +400,50 @@ func (m *MetricSpec) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *MetricStatus) Marshal() (data []byte, err error) {
+func (m *MetricStatus) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *MetricStatus) MarshalTo(data []byte) (int, error) {
+func (m *MetricStatus) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Type)))
-	i += copy(data[i:], m.Type)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Type)))
+	i += copy(dAtA[i:], m.Type)
 	if m.Object != nil {
-		data[i] = 0x12
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.Object.Size()))
-		n10, err := m.Object.MarshalTo(data[i:])
+		i = encodeVarintGenerated(dAtA, i, uint64(m.Object.Size()))
+		n10, err := m.Object.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n10
 	}
 	if m.Pods != nil {
-		data[i] = 0x1a
+		dAtA[i] = 0x1a
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.Pods.Size()))
-		n11, err := m.Pods.MarshalTo(data[i:])
+		i = encodeVarintGenerated(dAtA, i, uint64(m.Pods.Size()))
+		n11, err := m.Pods.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n11
 	}
 	if m.Resource != nil {
-		data[i] = 0x22
+		dAtA[i] = 0x22
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.Resource.Size()))
-		n12, err := m.Resource.MarshalTo(data[i:])
+		i = encodeVarintGenerated(dAtA, i, uint64(m.Resource.Size()))
+		n12, err := m.Resource.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
@@ -450,37 +452,37 @@ func (m *MetricStatus) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ObjectMetricSource) Marshal() (data []byte, err error) {
+func (m *ObjectMetricSource) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ObjectMetricSource) MarshalTo(data []byte) (int, error) {
+func (m *ObjectMetricSource) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Target.Size()))
-	n13, err := m.Target.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.Target.Size()))
+	n13, err := m.Target.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n13
-	data[i] = 0x12
+	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.MetricName)))
-	i += copy(data[i:], m.MetricName)
-	data[i] = 0x1a
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.MetricName)))
+	i += copy(dAtA[i:], m.MetricName)
+	dAtA[i] = 0x1a
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.TargetValue.Size()))
-	n14, err := m.TargetValue.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.TargetValue.Size()))
+	n14, err := m.TargetValue.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
@@ -488,37 +490,37 @@ func (m *ObjectMetricSource) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ObjectMetricStatus) Marshal() (data []byte, err error) {
+func (m *ObjectMetricStatus) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ObjectMetricStatus) MarshalTo(data []byte) (int, error) {
+func (m *ObjectMetricStatus) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Target.Size()))
-	n15, err := m.Target.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.Target.Size()))
+	n15, err := m.Target.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n15
-	data[i] = 0x12
+	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.MetricName)))
-	i += copy(data[i:], m.MetricName)
-	data[i] = 0x1a
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.MetricName)))
+	i += copy(dAtA[i:], m.MetricName)
+	dAtA[i] = 0x1a
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.CurrentValue.Size()))
-	n16, err := m.CurrentValue.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.CurrentValue.Size()))
+	n16, err := m.CurrentValue.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
@@ -526,29 +528,29 @@ func (m *ObjectMetricStatus) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *PodsMetricSource) Marshal() (data []byte, err error) {
+func (m *PodsMetricSource) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *PodsMetricSource) MarshalTo(data []byte) (int, error) {
+func (m *PodsMetricSource) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.MetricName)))
-	i += copy(data[i:], m.MetricName)
-	data[i] = 0x12
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.MetricName)))
+	i += copy(dAtA[i:], m.MetricName)
+	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.TargetAverageValue.Size()))
-	n17, err := m.TargetAverageValue.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.TargetAverageValue.Size()))
+	n17, err := m.TargetAverageValue.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
@@ -556,29 +558,29 @@ func (m *PodsMetricSource) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *PodsMetricStatus) Marshal() (data []byte, err error) {
+func (m *PodsMetricStatus) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *PodsMetricStatus) MarshalTo(data []byte) (int, error) {
+func (m *PodsMetricStatus) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.MetricName)))
-	i += copy(data[i:], m.MetricName)
-	data[i] = 0x12
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.MetricName)))
+	i += copy(dAtA[i:], m.MetricName)
+	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.CurrentAverageValue.Size()))
-	n18, err := m.CurrentAverageValue.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.CurrentAverageValue.Size()))
+	n18, err := m.CurrentAverageValue.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
@@ -586,35 +588,35 @@ func (m *PodsMetricStatus) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ResourceMetricSource) Marshal() (data []byte, err error) {
+func (m *ResourceMetricSource) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ResourceMetricSource) MarshalTo(data []byte) (int, error) {
+func (m *ResourceMetricSource) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Name)))
-	i += copy(data[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i += copy(dAtA[i:], m.Name)
 	if m.TargetAverageUtilization != nil {
-		data[i] = 0x10
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintGenerated(data, i, uint64(*m.TargetAverageUtilization))
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.TargetAverageUtilization))
 	}
 	if m.TargetAverageValue != nil {
-		data[i] = 0x1a
+		dAtA[i] = 0x1a
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.TargetAverageValue.Size()))
-		n19, err := m.TargetAverageValue.MarshalTo(data[i:])
+		i = encodeVarintGenerated(dAtA, i, uint64(m.TargetAverageValue.Size()))
+		n19, err := m.TargetAverageValue.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
@@ -623,34 +625,34 @@ func (m *ResourceMetricSource) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ResourceMetricStatus) Marshal() (data []byte, err error) {
+func (m *ResourceMetricStatus) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ResourceMetricStatus) MarshalTo(data []byte) (int, error) {
+func (m *ResourceMetricStatus) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Name)))
-	i += copy(data[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i += copy(dAtA[i:], m.Name)
 	if m.CurrentAverageUtilization != nil {
-		data[i] = 0x10
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintGenerated(data, i, uint64(*m.CurrentAverageUtilization))
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.CurrentAverageUtilization))
 	}
-	data[i] = 0x1a
+	dAtA[i] = 0x1a
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.CurrentAverageValue.Size()))
-	n20, err := m.CurrentAverageValue.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.CurrentAverageValue.Size()))
+	n20, err := m.CurrentAverageValue.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
@@ -658,31 +660,31 @@ func (m *ResourceMetricStatus) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func encodeFixed64Generated(data []byte, offset int, v uint64) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
-	data[offset+4] = uint8(v >> 32)
-	data[offset+5] = uint8(v >> 40)
-	data[offset+6] = uint8(v >> 48)
-	data[offset+7] = uint8(v >> 56)
+func encodeFixed64Generated(dAtA []byte, offset int, v uint64) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
+	dAtA[offset+4] = uint8(v >> 32)
+	dAtA[offset+5] = uint8(v >> 40)
+	dAtA[offset+6] = uint8(v >> 48)
+	dAtA[offset+7] = uint8(v >> 56)
 	return offset + 8
 }
-func encodeFixed32Generated(data []byte, offset int, v uint32) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
+func encodeFixed32Generated(dAtA []byte, offset int, v uint32) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
 	return offset + 4
 }
-func encodeVarintGenerated(data []byte, offset int, v uint64) int {
+func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
-		data[offset] = uint8(v&0x7f | 0x80)
+		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
-	data[offset] = uint8(v)
+	dAtA[offset] = uint8(v)
 	return offset + 1
 }
 func (m *CrossVersionObjectReference) Size() (n int) {
@@ -1053,8 +1055,8 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *CrossVersionObjectReference) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *CrossVersionObjectReference) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1066,7 +1068,7 @@ func (m *CrossVersionObjectReference) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1094,7 +1096,7 @@ func (m *CrossVersionObjectReference) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1109,7 +1111,7 @@ func (m *CrossVersionObjectReference) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Kind = string(data[iNdEx:postIndex])
+			m.Kind = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -1123,7 +1125,7 @@ func (m *CrossVersionObjectReference) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1138,7 +1140,7 @@ func (m *CrossVersionObjectReference) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Name = string(data[iNdEx:postIndex])
+			m.Name = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -1152,7 +1154,7 @@ func (m *CrossVersionObjectReference) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1167,11 +1169,11 @@ func (m *CrossVersionObjectReference) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.APIVersion = string(data[iNdEx:postIndex])
+			m.APIVersion = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1190,8 +1192,8 @@ func (m *CrossVersionObjectReference) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *HorizontalPodAutoscaler) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1203,7 +1205,7 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1231,7 +1233,7 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1245,7 +1247,7 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ObjectMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1261,7 +1263,7 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1275,7 +1277,7 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.Spec.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Spec.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1291,7 +1293,7 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1305,13 +1307,13 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.Status.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Status.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1330,8 +1332,8 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *HorizontalPodAutoscalerList) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *HorizontalPodAutoscalerList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1343,7 +1345,7 @@ func (m *HorizontalPodAutoscalerList) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1371,7 +1373,7 @@ func (m *HorizontalPodAutoscalerList) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1385,7 +1387,7 @@ func (m *HorizontalPodAutoscalerList) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ListMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1401,7 +1403,7 @@ func (m *HorizontalPodAutoscalerList) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1416,13 +1418,13 @@ func (m *HorizontalPodAutoscalerList) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Items = append(m.Items, HorizontalPodAutoscaler{})
-			if err := m.Items[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1441,8 +1443,8 @@ func (m *HorizontalPodAutoscalerList) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *HorizontalPodAutoscalerSpec) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1454,7 +1456,7 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1482,7 +1484,7 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1496,7 +1498,7 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ScaleTargetRef.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ScaleTargetRef.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1512,7 +1514,7 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				v |= (int32(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1532,7 +1534,7 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.MaxReplicas |= (int32(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1551,7 +1553,7 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1566,13 +1568,13 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Metrics = append(m.Metrics, MetricSpec{})
-			if err := m.Metrics[len(m.Metrics)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Metrics[len(m.Metrics)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1591,8 +1593,8 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *HorizontalPodAutoscalerStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1604,7 +1606,7 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1632,7 +1634,7 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				v |= (int64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1652,7 +1654,7 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1669,7 +1671,7 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 			if m.LastScaleTime == nil {
 				m.LastScaleTime = &k8s_io_apimachinery_pkg_apis_meta_v1.Time{}
 			}
-			if err := m.LastScaleTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.LastScaleTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1685,7 +1687,7 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.CurrentReplicas |= (int32(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1704,7 +1706,7 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.DesiredReplicas |= (int32(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1723,7 +1725,7 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1738,13 +1740,13 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.CurrentMetrics = append(m.CurrentMetrics, MetricStatus{})
-			if err := m.CurrentMetrics[len(m.CurrentMetrics)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.CurrentMetrics[len(m.CurrentMetrics)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1763,8 +1765,8 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *MetricSpec) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *MetricSpec) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1776,7 +1778,7 @@ func (m *MetricSpec) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1804,7 +1806,7 @@ func (m *MetricSpec) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1819,7 +1821,7 @@ func (m *MetricSpec) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Type = MetricSourceType(data[iNdEx:postIndex])
+			m.Type = MetricSourceType(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -1833,7 +1835,7 @@ func (m *MetricSpec) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1850,7 +1852,7 @@ func (m *MetricSpec) Unmarshal(data []byte) error {
 			if m.Object == nil {
 				m.Object = &ObjectMetricSource{}
 			}
-			if err := m.Object.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Object.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1866,7 +1868,7 @@ func (m *MetricSpec) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1883,7 +1885,7 @@ func (m *MetricSpec) Unmarshal(data []byte) error {
 			if m.Pods == nil {
 				m.Pods = &PodsMetricSource{}
 			}
-			if err := m.Pods.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Pods.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1899,7 +1901,7 @@ func (m *MetricSpec) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1916,13 +1918,13 @@ func (m *MetricSpec) Unmarshal(data []byte) error {
 			if m.Resource == nil {
 				m.Resource = &ResourceMetricSource{}
 			}
-			if err := m.Resource.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Resource.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1941,8 +1943,8 @@ func (m *MetricSpec) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *MetricStatus) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *MetricStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1954,7 +1956,7 @@ func (m *MetricStatus) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1982,7 +1984,7 @@ func (m *MetricStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1997,7 +1999,7 @@ func (m *MetricStatus) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Type = MetricSourceType(data[iNdEx:postIndex])
+			m.Type = MetricSourceType(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -2011,7 +2013,7 @@ func (m *MetricStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2028,7 +2030,7 @@ func (m *MetricStatus) Unmarshal(data []byte) error {
 			if m.Object == nil {
 				m.Object = &ObjectMetricStatus{}
 			}
-			if err := m.Object.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Object.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -2044,7 +2046,7 @@ func (m *MetricStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2061,7 +2063,7 @@ func (m *MetricStatus) Unmarshal(data []byte) error {
 			if m.Pods == nil {
 				m.Pods = &PodsMetricStatus{}
 			}
-			if err := m.Pods.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Pods.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -2077,7 +2079,7 @@ func (m *MetricStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2094,13 +2096,13 @@ func (m *MetricStatus) Unmarshal(data []byte) error {
 			if m.Resource == nil {
 				m.Resource = &ResourceMetricStatus{}
 			}
-			if err := m.Resource.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Resource.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2119,8 +2121,8 @@ func (m *MetricStatus) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ObjectMetricSource) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ObjectMetricSource) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -2132,7 +2134,7 @@ func (m *ObjectMetricSource) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2160,7 +2162,7 @@ func (m *ObjectMetricSource) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2174,7 +2176,7 @@ func (m *ObjectMetricSource) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.Target.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Target.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -2190,7 +2192,7 @@ func (m *ObjectMetricSource) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2205,7 +2207,7 @@ func (m *ObjectMetricSource) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.MetricName = string(data[iNdEx:postIndex])
+			m.MetricName = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -2219,7 +2221,7 @@ func (m *ObjectMetricSource) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2233,13 +2235,13 @@ func (m *ObjectMetricSource) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.TargetValue.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.TargetValue.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2258,8 +2260,8 @@ func (m *ObjectMetricSource) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ObjectMetricStatus) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ObjectMetricStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -2271,7 +2273,7 @@ func (m *ObjectMetricStatus) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2299,7 +2301,7 @@ func (m *ObjectMetricStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2313,7 +2315,7 @@ func (m *ObjectMetricStatus) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.Target.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Target.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -2329,7 +2331,7 @@ func (m *ObjectMetricStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2344,7 +2346,7 @@ func (m *ObjectMetricStatus) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.MetricName = string(data[iNdEx:postIndex])
+			m.MetricName = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -2358,7 +2360,7 @@ func (m *ObjectMetricStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2372,13 +2374,13 @@ func (m *ObjectMetricStatus) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.CurrentValue.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.CurrentValue.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2397,8 +2399,8 @@ func (m *ObjectMetricStatus) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *PodsMetricSource) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *PodsMetricSource) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -2410,7 +2412,7 @@ func (m *PodsMetricSource) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2438,7 +2440,7 @@ func (m *PodsMetricSource) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2453,7 +2455,7 @@ func (m *PodsMetricSource) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.MetricName = string(data[iNdEx:postIndex])
+			m.MetricName = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -2467,7 +2469,7 @@ func (m *PodsMetricSource) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2481,13 +2483,13 @@ func (m *PodsMetricSource) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.TargetAverageValue.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.TargetAverageValue.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2506,8 +2508,8 @@ func (m *PodsMetricSource) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *PodsMetricStatus) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *PodsMetricStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -2519,7 +2521,7 @@ func (m *PodsMetricStatus) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2547,7 +2549,7 @@ func (m *PodsMetricStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2562,7 +2564,7 @@ func (m *PodsMetricStatus) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.MetricName = string(data[iNdEx:postIndex])
+			m.MetricName = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -2576,7 +2578,7 @@ func (m *PodsMetricStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2590,13 +2592,13 @@ func (m *PodsMetricStatus) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.CurrentAverageValue.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.CurrentAverageValue.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2615,8 +2617,8 @@ func (m *PodsMetricStatus) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ResourceMetricSource) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ResourceMetricSource) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -2628,7 +2630,7 @@ func (m *ResourceMetricSource) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2656,7 +2658,7 @@ func (m *ResourceMetricSource) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2671,7 +2673,7 @@ func (m *ResourceMetricSource) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Name = k8s_io_kubernetes_pkg_api_v1.ResourceName(data[iNdEx:postIndex])
+			m.Name = k8s_io_kubernetes_pkg_api_v1.ResourceName(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 0 {
@@ -2685,7 +2687,7 @@ func (m *ResourceMetricSource) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				v |= (int32(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2705,7 +2707,7 @@ func (m *ResourceMetricSource) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2722,13 +2724,13 @@ func (m *ResourceMetricSource) Unmarshal(data []byte) error {
 			if m.TargetAverageValue == nil {
 				m.TargetAverageValue = &k8s_io_apimachinery_pkg_api_resource.Quantity{}
 			}
-			if err := m.TargetAverageValue.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.TargetAverageValue.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2747,8 +2749,8 @@ func (m *ResourceMetricSource) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ResourceMetricStatus) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ResourceMetricStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -2760,7 +2762,7 @@ func (m *ResourceMetricStatus) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2788,7 +2790,7 @@ func (m *ResourceMetricStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2803,7 +2805,7 @@ func (m *ResourceMetricStatus) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Name = k8s_io_kubernetes_pkg_api_v1.ResourceName(data[iNdEx:postIndex])
+			m.Name = k8s_io_kubernetes_pkg_api_v1.ResourceName(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 0 {
@@ -2817,7 +2819,7 @@ func (m *ResourceMetricStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				v |= (int32(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2837,7 +2839,7 @@ func (m *ResourceMetricStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2851,13 +2853,13 @@ func (m *ResourceMetricStatus) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.CurrentAverageValue.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.CurrentAverageValue.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2876,8 +2878,8 @@ func (m *ResourceMetricStatus) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func skipGenerated(data []byte) (n int, err error) {
-	l := len(data)
+func skipGenerated(dAtA []byte) (n int, err error) {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		var wire uint64
@@ -2888,7 +2890,7 @@ func skipGenerated(data []byte) (n int, err error) {
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2906,7 +2908,7 @@ func skipGenerated(data []byte) (n int, err error) {
 					return 0, io.ErrUnexpectedEOF
 				}
 				iNdEx++
-				if data[iNdEx-1] < 0x80 {
+				if dAtA[iNdEx-1] < 0x80 {
 					break
 				}
 			}
@@ -2923,7 +2925,7 @@ func skipGenerated(data []byte) (n int, err error) {
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				length |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2946,7 +2948,7 @@ func skipGenerated(data []byte) (n int, err error) {
 					if iNdEx >= l {
 						return 0, io.ErrUnexpectedEOF
 					}
-					b := data[iNdEx]
+					b := dAtA[iNdEx]
 					iNdEx++
 					innerWire |= (uint64(b) & 0x7F) << shift
 					if b < 0x80 {
@@ -2957,7 +2959,7 @@ func skipGenerated(data []byte) (n int, err error) {
 				if innerWireType == 4 {
 					break
 				}
-				next, err := skipGenerated(data[start:])
+				next, err := skipGenerated(dAtA[start:])
 				if err != nil {
 					return 0, err
 				}
@@ -2981,9 +2983,13 @@ var (
 	ErrIntOverflowGenerated   = fmt.Errorf("proto: integer overflow")
 )
 
+func init() {
+	proto.RegisterFile("k8s.io/client-go/pkg/apis/autoscaling/v2alpha1/generated.proto", fileDescriptorGenerated)
+}
+
 var fileDescriptorGenerated = []byte{
 	// 1208 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xd4, 0x57, 0x5b, 0x6f, 0x1b, 0x45,
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x57, 0x5b, 0x6f, 0x1b, 0x45,
 	0x14, 0x8e, 0x2f, 0x49, 0xc3, 0x38, 0x37, 0x26, 0x55, 0xea, 0x26, 0xd4, 0x8e, 0xf6, 0xa9, 0x54,
 	0xb0, 0x4b, 0x4c, 0x41, 0x54, 0x08, 0xa1, 0xd8, 0x5c, 0x5a, 0x11, 0xa7, 0x61, 0x1a, 0x2a, 0x04,
 	0x48, 0x30, 0x59, 0x4f, 0x9c, 0x21, 0xde, 0x8b, 0x76, 0x66, 0xad, 0x26, 0x52, 0x25, 0x7e, 0x00,

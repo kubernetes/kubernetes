@@ -45,14 +45,14 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin(PluginName, func(config io.Reader) (admission.Interface, error) {
+	kubeapiserveradmission.Plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		plugin := NewPlugin(psp.NewSimpleStrategyFactory(), getMatchingPolicies, true)
 		return plugin, nil
 	})
 }
 
 // PSPMatchFn allows plugging in how PSPs are matched against user information.
-type PSPMatchFn func(lister extensionslisters.PodSecurityPolicyLister, user user.Info, sa user.Info, authz authorizer.Authorizer) ([]*extensions.PodSecurityPolicy, error)
+type PSPMatchFn func(lister extensionslisters.PodSecurityPolicyLister, user user.Info, sa user.Info, authz authorizer.Authorizer, namespace string) ([]*extensions.PodSecurityPolicy, error)
 
 // podSecurityPolicyPlugin holds state for and implements the admission plugin.
 type podSecurityPolicyPlugin struct {
@@ -130,7 +130,7 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 		saInfo = serviceaccount.UserInfo(a.GetNamespace(), pod.Spec.ServiceAccountName, "")
 	}
 
-	matchedPolicies, err := c.pspMatcher(c.lister, a.GetUserInfo(), saInfo, c.authz)
+	matchedPolicies, err := c.pspMatcher(c.lister, a.GetUserInfo(), saInfo, c.authz, a.GetNamespace())
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
@@ -279,7 +279,7 @@ func (c *podSecurityPolicyPlugin) createProvidersFromPolicies(psps []*extensions
 // TODO: this will likely need optimization since the initial implementation will
 // always query for authorization.  Needs scale testing and possibly checking against
 // a cache.
-func getMatchingPolicies(lister extensionslisters.PodSecurityPolicyLister, user user.Info, sa user.Info, authz authorizer.Authorizer) ([]*extensions.PodSecurityPolicy, error) {
+func getMatchingPolicies(lister extensionslisters.PodSecurityPolicyLister, user user.Info, sa user.Info, authz authorizer.Authorizer, namespace string) ([]*extensions.PodSecurityPolicy, error) {
 	matchedPolicies := make([]*extensions.PodSecurityPolicy, 0)
 
 	list, err := lister.List(labels.Everything())
@@ -288,8 +288,7 @@ func getMatchingPolicies(lister extensionslisters.PodSecurityPolicyLister, user 
 	}
 
 	for _, constraint := range list {
-		// if no user info exists then the API is being hit via the unsecured port. In this case authorize the request.
-		if user == nil || authorizedForPolicy(user, constraint, authz) || authorizedForPolicy(sa, constraint, authz) {
+		if authorizedForPolicy(user, namespace, constraint, authz) || authorizedForPolicy(sa, namespace, constraint, authz) {
 			matchedPolicies = append(matchedPolicies, constraint)
 		}
 	}
@@ -297,26 +296,26 @@ func getMatchingPolicies(lister extensionslisters.PodSecurityPolicyLister, user 
 	return matchedPolicies, nil
 }
 
-// authorizedForPolicy returns true if info is authorized to perform a "get" on policy.
-func authorizedForPolicy(info user.Info, policy *extensions.PodSecurityPolicy, authz authorizer.Authorizer) bool {
+// authorizedForPolicy returns true if info is authorized to perform the "use" verb on the policy resource.
+func authorizedForPolicy(info user.Info, namespace string, policy *extensions.PodSecurityPolicy, authz authorizer.Authorizer) bool {
 	if info == nil {
 		return false
 	}
-	attr := buildAttributes(info, policy)
+	attr := buildAttributes(info, namespace, policy)
 	allowed, reason, err := authz.Authorize(attr)
 	if err != nil {
-		glog.V(5).Infof("cannot authorized for policy: %v,%v", reason, err)
+		glog.V(5).Infof("cannot authorize for policy: %v,%v", reason, err)
 	}
 	return allowed
 }
 
 // buildAttributes builds an attributes record for a SAR based on the user info and policy.
-func buildAttributes(info user.Info, policy *extensions.PodSecurityPolicy) authorizer.Attributes {
-	// TODO consider checking against the namespace that the pod is being
-	// created in to allow per-namespace PSP definitions.
+func buildAttributes(info user.Info, namespace string, policy *extensions.PodSecurityPolicy) authorizer.Attributes {
+	// check against the namespace that the pod is being created in to allow per-namespace PSP grants.
 	attr := authorizer.AttributesRecord{
 		User:            info,
 		Verb:            "use",
+		Namespace:       namespace,
 		Name:            policy.Name,
 		APIGroup:        extensions.GroupName,
 		Resource:        "podsecuritypolicies",
@@ -328,13 +327,18 @@ func buildAttributes(info user.Info, policy *extensions.PodSecurityPolicy) autho
 // logProviders logs what providers were found for the pod as well as any errors that were encountered
 // while creating providers.
 func logProviders(pod *api.Pod, providers []psp.Provider, providerCreationErrs []error) {
+	for _, err := range providerCreationErrs {
+		glog.V(4).Infof("provider creation error: %v", err)
+	}
+
+	if len(providers) == 0 {
+		glog.V(4).Infof("unable to validate pod %s (generate: %s) against any provider.", pod.Name, pod.GenerateName)
+		return
+	}
+
 	names := make([]string, len(providers))
 	for i, p := range providers {
 		names[i] = p.GetPSPName()
 	}
-	glog.V(4).Infof("validating pod %s (generate: %s) against providers %s", pod.Name, pod.GenerateName, strings.Join(names, ","))
-
-	for _, err := range providerCreationErrs {
-		glog.V(4).Infof("provider creation error: %v", err)
-	}
+	glog.V(4).Infof("validating pod %s (generate: %s) against providers: %s", pod.Name, pod.GenerateName, strings.Join(names, ","))
 }

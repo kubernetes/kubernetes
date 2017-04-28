@@ -43,7 +43,7 @@ type ProxyREST struct {
 // Implement Connecter
 var _ = rest.Connecter(&ProxyREST{})
 
-var proxyMethods = []string{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"}
+var proxyMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 
 // New returns an empty service resource
 func (r *ProxyREST) New() runtime.Object {

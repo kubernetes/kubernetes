@@ -89,74 +89,6 @@ func TestControllerSync(t *testing.T) {
 				return nil
 			},
 		},
-		{
-			// addVolume with provisioned volume from Kubernetes 1.2. No "action"
-			// is expected - it should stay bound.
-			"5-5 - add bound volume from 1.2",
-			novolumes,
-			[]*v1.PersistentVolume{addVolumeAnnotation(newVolume("volume5-5", "1Gi", "uid5-5", "claim5-5", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty), pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)},
-			newClaimArray("claim5-5", "uid5-5", "1Gi", "", v1.ClaimPending, nil),
-			newClaimArray("claim5-5", "uid5-5", "1Gi", "volume5-5", v1.ClaimBound, nil, annBindCompleted, annBoundByController),
-			noevents, noerrors,
-			// Custom test function that generates a add event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-5", "1Gi", "uid5-5", "claim5-5", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty)
-				volume = addVolumeAnnotation(volume, pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)
-				reactor.addVolumeEvent(volume)
-				return nil
-			},
-		},
-		{
-			// updateVolume with provisioned volume from Kubernetes 1.2. No
-			// "action" is expected - it should stay bound.
-			"5-6 - update bound volume from 1.2",
-			[]*v1.PersistentVolume{addVolumeAnnotation(newVolume("volume5-6", "1Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty), pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)},
-			[]*v1.PersistentVolume{addVolumeAnnotation(newVolume("volume5-6", "1Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty), pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)},
-			newClaimArray("claim5-6", "uid5-6", "1Gi", "volume5-6", v1.ClaimBound, nil),
-			newClaimArray("claim5-6", "uid5-6", "1Gi", "volume5-6", v1.ClaimBound, nil, annBindCompleted),
-			noevents, noerrors,
-			// Custom test function that generates a add event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-6", "1Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty)
-				volume = addVolumeAnnotation(volume, pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)
-				reactor.modifyVolumeEvent(volume)
-				return nil
-			},
-		},
-		{
-			// addVolume with unprovisioned volume from Kubernetes 1.2. The
-			// volume should be deleted.
-			"5-7 - add unprovisioned volume from 1.2",
-			novolumes,
-			novolumes,
-			newClaimArray("claim5-7", "uid5-7", "1Gi", "", v1.ClaimPending, nil),
-			newClaimArray("claim5-7", "uid5-7", "1Gi", "", v1.ClaimPending, nil),
-			noevents, noerrors,
-			// Custom test function that generates a add event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-7", "1Gi", "uid5-7", "claim5-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty)
-				volume = addVolumeAnnotation(volume, pvProvisioningRequiredAnnotationKey, "yes")
-				reactor.addVolumeEvent(volume)
-				return nil
-			},
-		},
-		{
-			// updateVolume with unprovisioned volume from Kubernetes 1.2. The
-			// volume should be deleted.
-			"5-8 - update bound volume from 1.2",
-			novolumes,
-			novolumes,
-			newClaimArray("claim5-8", "uid5-8", "1Gi", "", v1.ClaimPending, nil),
-			newClaimArray("claim5-8", "uid5-8", "1Gi", "", v1.ClaimPending, nil),
-			noevents, noerrors,
-			// Custom test function that generates a add event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-8", "1Gi", "uid5-8", "claim5-8", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty)
-				volume = addVolumeAnnotation(volume, pvProvisioningRequiredAnnotationKey, "yes")
-				reactor.modifyVolumeEvent(volume)
-				return nil
-			},
-		},
 	}
 
 	for _, test := range tests {
@@ -172,7 +104,10 @@ func TestControllerSync(t *testing.T) {
 		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(watch.NewFake(), nil))
 
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		ctrl := newTestController(client, informers, true)
+		ctrl, err := newTestController(client, informers, true)
+		if err != nil {
+			t.Fatalf("Test %q construct persistent volume failed: %v", test.name, err)
+		}
 
 		reactor := newVolumeReactor(client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
 		for _, claim := range test.initialClaims {
@@ -204,7 +139,7 @@ func TestControllerSync(t *testing.T) {
 		glog.V(4).Infof("controller synced, starting test")
 
 		// Call the tested function
-		err := test.test(ctrl, reactor, test)
+		err = test.test(ctrl, reactor, test)
 		if err != nil {
 			t.Errorf("Test %q initial test call failed: %v", test.name, err)
 		}

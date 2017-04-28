@@ -35,12 +35,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against resource quotas.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
-		NewFunc:     func() runtime.Object { return &api.ResourceQuota{} },
-		NewListFunc: func() runtime.Object { return &api.ResourceQuotaList{} },
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*api.ResourceQuota).Name, nil
-		},
+		Copier:            api.Scheme,
+		NewFunc:           func() runtime.Object { return &api.ResourceQuota{} },
+		NewListFunc:       func() runtime.Object { return &api.ResourceQuotaList{} },
 		PredicateFunc:     resourcequota.MatchResourceQuota,
 		QualifiedResource: api.Resource("resourcequotas"),
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("resourcequotas"),

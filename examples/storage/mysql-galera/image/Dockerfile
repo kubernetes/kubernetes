@@ -25,7 +25,7 @@ ENV TERM linux
 RUN apt-get update 
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y perl --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
-RUN apt-key adv --keyserver keys.gnupg.net --recv-keys 1C4CBDCDCD2EFD2A
+RUN apt-key adv --keyserver keys.gnupg.net --recv-keys 8507EFA5
 
 RUN echo "deb http://repo.percona.com/apt trusty main" > /etc/apt/sources.list.d/percona.list
 RUN echo "deb-src http://repo.percona.com/apt trusty main" >> /etc/apt/sources.list.d/percona.list
@@ -39,7 +39,7 @@ RUN { \
                 echo percona-server-server-5.6 percona-server-server/data-dir select ''; \
                 echo percona-server-server-5.6 percona-server-server/root_password password ''; \
         } | debconf-set-selections \
-        && apt-get update && DEBIAN_FRONTEND=nointeractive apt-get install -y percona-xtradb-cluster-client-"${MYSQL_VERSION}" \ 
+        && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y percona-xtradb-cluster-client-"${MYSQL_VERSION}" \
            percona-xtradb-cluster-common-"${MYSQL_VERSION}" percona-xtradb-cluster-server-"${MYSQL_VERSION}" \
         && rm -rf /var/lib/apt/lists/* \
         && rm -rf /var/lib/mysql && mkdir -p /var/lib/mysql && chown -R mysql:mysql /var/lib/mysql 

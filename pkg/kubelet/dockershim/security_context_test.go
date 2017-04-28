@@ -306,6 +306,7 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 			expected: &dockercontainer.HostConfig{
 				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
 				IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
+				PidMode:     namespaceModeHost,
 			},
 		},
 	}

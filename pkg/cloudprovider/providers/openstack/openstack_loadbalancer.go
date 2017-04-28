@@ -828,19 +828,16 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 
 	status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
 
-	port, err := getPortByIP(lbaas.network, loadbalancer.VipAddress)
-	if err != nil {
-		return nil, fmt.Errorf("Error getting port for LB vip %s: %v", loadbalancer.VipAddress, err)
-	}
-	floatIP, err := getFloatingIPByPortID(lbaas.network, port.ID)
+	portID := loadbalancer.VipPortID
+	floatIP, err := getFloatingIPByPortID(lbaas.network, portID)
 	if err != nil && err != ErrNotFound {
-		return nil, fmt.Errorf("Error getting floating ip for port %s: %v", port.ID, err)
+		return nil, fmt.Errorf("Error getting floating ip for port %s: %v", portID, err)
 	}
 	if floatIP == nil && lbaas.opts.FloatingNetworkId != "" {
-		glog.V(4).Infof("Creating floating ip for loadbalancer %s port %s", loadbalancer.ID, port.ID)
+		glog.V(4).Infof("Creating floating ip for loadbalancer %s port %s", loadbalancer.ID, portID)
 		floatIPOpts := floatingips.CreateOpts{
 			FloatingNetworkID: lbaas.opts.FloatingNetworkId,
-			PortID:            port.ID,
+			PortID:            portID,
 		}
 		floatIP, err = floatingips.Create(lbaas.network, floatIPOpts).Extract()
 		if err != nil {
@@ -945,25 +942,15 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			return nil, err
 		}
 
-		// Get the port ID
-		port, err := getPortByIP(lbaas.network, loadbalancer.VipAddress)
-		if err != nil {
-			// cleanup what was created so far
-			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-			return nil, err
-		}
-
+		portID := loadbalancer.VipPortID
 		update_opts := neutronports.UpdateOpts{SecurityGroups: []string{lbSecGroup.ID}}
-
-		res := neutronports.Update(lbaas.network, port.ID, update_opts)
-
+		res := neutronports.Update(lbaas.network, portID, update_opts)
 		if res.Err != nil {
-			glog.Errorf("Error occured updating port: %s", port.ID)
+			glog.Errorf("Error occured updating port: %s", portID)
 			// cleanup what was created so far
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, res.Err
 		}
-
 	}
 
 	return status, nil
@@ -1129,12 +1116,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	}
 
 	if lbaas.opts.FloatingNetworkId != "" && loadbalancer != nil {
-		port, err := getPortByIP(lbaas.network, loadbalancer.VipAddress)
-		if err != nil {
-			return err
-		}
-
-		floatingIP, err := getFloatingIPByPortID(lbaas.network, port.ID)
+		portID := loadbalancer.VipPortID
+		floatingIP, err := getFloatingIPByPortID(lbaas.network, portID)
 		if err != nil && err != ErrNotFound {
 			return err
 		}

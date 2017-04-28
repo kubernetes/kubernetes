@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/server/mux"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	restclient "k8s.io/client-go/rest"
 )
@@ -85,11 +86,12 @@ func testGetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi
 func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, scheme)
 
-	config := NewConfig().WithSerializer(codecs)
+	config := NewConfig(codecs)
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
+	config.FallThroughHandler = mux.NewPathRecorderMux()
 
 	// TODO restore this test, but right now, eliminate our cycle
 	// config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, runtime.NewScheme())
@@ -200,7 +202,7 @@ func TestInstallAPIGroups(t *testing.T) {
 		groupPaths = append(groupPaths, APIGroupPrefix+"/"+api.GroupMeta.GroupVersion.Group) // /apis/<group>
 	}
 
-	server := httptest.NewServer(s.InsecureHandler)
+	server := httptest.NewServer(s.Handler)
 	defer server.Close()
 
 	for i := range apis {
@@ -334,14 +336,11 @@ func TestCustomHandlerChain(t *testing.T) {
 
 	var protected, called bool
 
-	config.BuildHandlerChainsFunc = func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler) {
+	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				protected = true
-				apiHandler.ServeHTTP(w, req)
-			}), http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				protected = false
-				apiHandler.ServeHTTP(w, req)
-			})
+			protected = true
+			apiHandler.ServeHTTP(w, req)
+		})
 	}
 	handler := http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
 		called = true
@@ -352,8 +351,8 @@ func TestCustomHandlerChain(t *testing.T) {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
 
-	s.HandlerContainer.NonSwaggerRoutes.Handle("/nonswagger", handler)
-	s.HandlerContainer.UnlistedRoutes.Handle("/secret", handler)
+	s.FallThroughHandler.Handle("/nonswagger", handler)
+	s.FallThroughHandler.Handle("/secret", handler)
 
 	type Test struct {
 		handler   http.Handler
@@ -363,8 +362,6 @@ func TestCustomHandlerChain(t *testing.T) {
 	for i, test := range []Test{
 		{s.Handler, "/nonswagger", true},
 		{s.Handler, "/secret", true},
-		{s.InsecureHandler, "/nonswagger", false},
-		{s.InsecureHandler, "/secret", false},
 	} {
 		protected, called = false, false
 
@@ -483,7 +480,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.InsecureHandler)
+	server := httptest.NewServer(master.Handler)
 	groupList, err := getGroupList(server)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -533,7 +530,7 @@ func TestDiscoveryOrdering(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.InsecureHandler)
+	server := httptest.NewServer(master.Handler)
 	groupList, err := getGroupList(server)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -130,6 +130,23 @@ type KubeSchedulerConfiguration struct {
 	FailureDomains string `json:"failureDomains"`
 	// leaderElection defines the configuration of leader election client.
 	LeaderElection LeaderElectionConfiguration `json:"leaderElection"`
+	// LockObjectNamespace defines the namespace of the lock object
+	LockObjectNamespace string `json:"lockObjectNamespace"`
+	// LockObjectName defines the lock object name
+	LockObjectName string `json:"lockObjectName"`
+	// PolicyConfigMapName is the name of the ConfigMap object that specifies
+	// the scheduler's policy config. If UseLegacyPolicyConfig is true, scheduler
+	// uses PolicyConfigFile. If UseLegacyPolicyConfig is false and
+	// PolicyConfigMapName is not empty, the ConfigMap object with this name must
+	// exist in PolicyConfigMapNamespace before scheduler initialization.
+	PolicyConfigMapName string `json:"policyConfigMapName"`
+	// PolicyConfigMapNamespace is the namespace where the above policy config map
+	// is located. If none is provided default system namespace ("kube-system")
+	// will be used.
+	PolicyConfigMapNamespace string `json:"policyConfigMapNamespace"`
+	// UseLegacyPolicyConfig tells the scheduler to ignore Policy ConfigMap and
+	// to use PolicyConfigFile if available.
+	UseLegacyPolicyConfig bool `json:"useLegacyPolicyConfig"`
 }
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -175,6 +192,12 @@ type LeaderElectionConfiguration struct {
 	RetryPeriod metav1.Duration `json:"retryPeriod"`
 }
 
+// A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
+// - its value will never, or cannot safely be changed during the lifetime of a node
+// - its value cannot be safely shared between nodes at the same time (e.g. a hostname)
+//   KubeletConfiguration is intended to be shared between nodes
+// In general, please try to avoid adding flags or configuration fields,
+// we already have a confusingly large amount of them.
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -221,9 +244,6 @@ type KubeletConfiguration struct {
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization `json:"authorization"`
-	// hostnameOverride is the hostname used to identify the kubelet instead
-	// of the actual hostname.
-	HostnameOverride string `json:"hostnameOverride"`
 	// podInfraContainerImage is the image whose network/ipc namespaces
 	// containers in each pod will use.
 	PodInfraContainerImage string `json:"podInfraContainerImage"`
@@ -449,9 +469,6 @@ type KubeletConfiguration struct {
 	// outOfDiskTransitionFrequency is duration for which the kubelet has to
 	// wait before transitioning out of out-of-disk node condition status.
 	OutOfDiskTransitionFrequency metav1.Duration `json:"outOfDiskTransitionFrequency"`
-	// nodeIP is IP address of the node. If set, kubelet will use this IP
-	// address for the node.
-	NodeIP string `json:"nodeIP"`
 	// nodeLabels to add when registering the node in the cluster.
 	NodeLabels map[string]string `json:"nodeLabels"`
 	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
@@ -506,6 +523,9 @@ type KubeletConfiguration struct {
 	// Enable Container Runtime Interface (CRI) integration.
 	// +optional
 	EnableCRI *bool `json:"enableCRI,omitempty"`
+	// Enable dockershim only mode.
+	// +optional
+	ExperimentalDockershim *bool `json:"experimentalDockershim,omitempty"`
 	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	ExperimentalFailSwapOn bool `json:"experimentalFailSwapOn,omitempty"`
@@ -600,3 +620,11 @@ type KubeletAnonymousAuthentication struct {
 	// Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.
 	Enabled *bool `json:"enabled"`
 }
+
+const (
+	// "kube-system" is the default scheduler lock object namespace
+	SchedulerDefaultLockObjectNamespace string = "kube-system"
+
+	// "kube-scheduler" is the default scheduler lock object name
+	SchedulerDefaultLockObjectName = "kube-scheduler"
+)

@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/flag"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -53,8 +55,9 @@ type HollowNodeConfig struct {
 }
 
 const (
-	maxPods     = 110
-	podsPerCore = 0
+	maxPods            = 110
+	podsPerCore        = 0
+	configResyncPeriod = 15 * time.Minute
 )
 
 var knownMorphs = sets.NewString("kubelet", "proxy")
@@ -135,11 +138,12 @@ func main() {
 
 		iptInterface := fakeiptables.NewFake()
 
-		serviceConfig := proxyconfig.NewServiceConfig()
+		informerFactory := informers.NewSharedInformerFactory(internalClientset, configResyncPeriod)
+		serviceConfig := proxyconfig.NewServiceConfig(informerFactory.Core().InternalVersion().Services(), configResyncPeriod)
 		serviceConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
 
-		endpointsConfig := proxyconfig.NewEndpointsConfig()
-		endpointsConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
+		endpointsConfig := proxyconfig.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), configResyncPeriod)
+		endpointsConfig.RegisterEventHandler(&kubemark.FakeProxyHandler{})
 
 		eventClient, err := clientgoclientset.NewForConfig(clientConfig)
 		if err != nil {
@@ -152,6 +156,7 @@ func main() {
 			eventClient,
 			endpointsConfig,
 			serviceConfig,
+			informerFactory,
 			iptInterface,
 			eventBroadcaster,
 			recorder,

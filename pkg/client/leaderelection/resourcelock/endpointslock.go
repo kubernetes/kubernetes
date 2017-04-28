@@ -35,6 +35,7 @@ type EndpointsLock struct {
 	e             *v1.Endpoints
 }
 
+// Get returns the election record from a Endpoints Annotation
 func (el *EndpointsLock) Get() (*LeaderElectionRecord, error) {
 	var record LeaderElectionRecord
 	var err error

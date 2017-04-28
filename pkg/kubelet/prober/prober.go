@@ -168,8 +168,12 @@ func (pb *prober) runProbe(p *v1.Probe, pod *v1.Pod, status v1.PodStatus, contai
 		if err != nil {
 			return probe.Unknown, "", err
 		}
-		glog.V(4).Infof("TCP-Probe PodIP: %v, Port: %v, Timeout: %v", status.PodIP, port, timeout)
-		return pb.tcp.Probe(status.PodIP, port, timeout)
+		host := p.TCPSocket.Host
+		if host == "" {
+			host = status.PodIP
+		}
+		glog.V(4).Infof("TCP-Probe Host: %v, Port: %v, Timeout: %v", host, port, timeout)
+		return pb.tcp.Probe(host, port, timeout)
 	}
 	glog.Warningf("Failed to find probe builder for container: %v", container)
 	return probe.Unknown, "", fmt.Errorf("Missing probe handler for %s:%s", format.Pod(pod), container.Name)

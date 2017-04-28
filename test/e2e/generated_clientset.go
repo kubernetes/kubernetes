@@ -324,7 +324,9 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		observeCreation(w)
 
 		By("deleting the cronJob")
-		if err := cronJobClient.Delete(cronJob.Name, nil); err != nil {
+		// Use DeletePropagationBackground so the CronJob is really gone when the call returns.
+		propagationPolicy := metav1.DeletePropagationBackground
+		if err := cronJobClient.Delete(cronJob.Name, &metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
 			framework.Failf("Failed to delete cronJob: %v", err)
 		}
 

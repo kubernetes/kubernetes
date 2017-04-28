@@ -89,7 +89,6 @@ spec:
         - --dns-port=10053
         - --config-dir=/kube-dns-config
         - --v=2
-        __PILLAR__FEDERATIONS__DOMAIN__MAP__
         env:
         - name: PROMETHEUS_PORT
           value: "10055"

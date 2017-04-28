@@ -1,7 +1,13 @@
+approvers:
+- childsb
+- jsafrane
+- saad-ali
 reviewers:
+- childsb
 - saad-ali
 - jsafrane
 - jingxu97
 - pmorie
 - justinsb
 - rootfs
+- gnufied

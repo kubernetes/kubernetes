@@ -209,6 +209,8 @@ type ObjectMeta struct {
 	// then an entry in this list will point to this controller, with the controller field set to true.
 	// There cannot be more than one managing controller.
 	// +optional
+	// +patchMergeKey=uid
+	// +patchStrategy=merge
 	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty" patchStrategy:"merge" patchMergeKey:"uid" protobuf:"bytes,13,rep,name=ownerReferences"`
 
 	// Must be empty before the object is deleted from the registry. Each entry
@@ -216,6 +218,7 @@ type ObjectMeta struct {
 	// from the list. If the deletionTimestamp of the object is non-nil, entries
 	// in this list can only be removed.
 	// +optional
+	// +patchStrategy=merge
 	Finalizers []string `json:"finalizers,omitempty" patchStrategy:"merge" protobuf:"bytes,14,rep,name=finalizers"`
 
 	// The name of the cluster which the object belongs to.
@@ -682,8 +685,12 @@ type GroupVersionForDiscovery struct {
 
 // APIResource specifies the name of a resource and whether it is namespaced.
 type APIResource struct {
-	// name is the name of the resource.
+	// name is the plural name of the resource.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely.
+	// The singularName is more correct for reporting status on a single item and both singular and plural are allowed
+	// from the kubectl CLI interface.
+	SingularName string `json:"singularName" protobuf:"bytes,6,opt,name=singularName"`
 	// namespaced indicates if a resource is namespaced or not.
 	Namespaced bool `json:"namespaced" protobuf:"varint,2,opt,name=namespaced"`
 	// kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
@@ -769,6 +776,8 @@ type LabelSelector struct {
 // relates the key and values.
 type LabelSelectorRequirement struct {
 	// key is the label key that the selector applies to.
+	// +patchMergeKey=key
+	// +patchStrategy=merge
 	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
 	// operator represents a key's relationship to a set of values.
 	// Valid operators ard In, NotIn, Exists and DoesNotExist.

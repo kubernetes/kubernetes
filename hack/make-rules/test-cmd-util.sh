@@ -66,6 +66,7 @@ static="static"
 storageclass="storageclass"
 subjectaccessreviews="subjectaccessreviews"
 thirdpartyresources="thirdpartyresources"
+daemonsets="daemonsets"
 
 
 # Stops the running kubectl proxy, if there is one.
@@ -223,6 +224,48 @@ setup() {
   kube::log::status "Setup complete"
 }
 
+########################################################
+# Kubectl version (--short, --client, --output) #
+########################################################
+run_kubectl_version_tests() {
+  kube::log::status "Testing kubectl version"
+  TEMP="${KUBE_TEMP}"
+
+  # create version files, one for the client, one for the server.
+  # these are the files we will use to ensure that the remainder output is correct
+  kube::test::version::object_to_file "Client" "" "${TEMP}/client_version_test"
+  kube::test::version::object_to_file "Server" "" "${TEMP}/server_version_test"
+
+  kube::log::status "Testing kubectl version: check client only output matches expected output"
+  kube::test::version::object_to_file "Client" "--client" "${TEMP}/client_only_version_test"
+  kube::test::version::object_to_file "Client" "--client" "${TEMP}/server_client_only_version_test"
+  kube::test::version::diff_assert "${TEMP}/client_version_test" "eq" "${TEMP}/client_only_version_test" "the flag '--client' shows correct client info"
+  kube::test::version::diff_assert "${TEMP}/server_version_test" "ne" "${TEMP}/server_client_only_version_test" "the flag '--client' correctly has no server version info"
+  
+  kube::log::status "Testing kubectl version: verify json output"
+  kube::test::version::json_client_server_object_to_file "" "clientVersion" "${TEMP}/client_json_version_test"
+  kube::test::version::json_client_server_object_to_file "" "serverVersion" "${TEMP}/server_json_version_test"
+  kube::test::version::diff_assert "${TEMP}/client_version_test" "eq" "${TEMP}/client_json_version_test" "--output json has correct client info"
+  kube::test::version::diff_assert "${TEMP}/server_version_test" "eq" "${TEMP}/server_json_version_test" "--output json has correct server info"
+
+  kube::log::status "Testing kubectl version: verify json output using additional --client flag does not contain serverVersion"
+  kube::test::version::json_client_server_object_to_file "--client" "clientVersion" "${TEMP}/client_only_json_version_test"
+  kube::test::version::json_client_server_object_to_file "--client" "serverVersion" "${TEMP}/server_client_only_json_version_test"
+  kube::test::version::diff_assert "${TEMP}/client_version_test" "eq" "${TEMP}/client_only_json_version_test" "--client --output json has correct client info"
+  kube::test::version::diff_assert "${TEMP}/server_version_test" "ne" "${TEMP}/server_client_only_json_version_test" "--client --output json has no server info"
+  
+  kube::log::status "Testing kubectl version: compare json output using additional --short flag"
+  kube::test::version::json_client_server_object_to_file "--short" "clientVersion" "${TEMP}/client_short_json_version_test"
+  kube::test::version::json_client_server_object_to_file "--short" "serverVersion" "${TEMP}/server_short_json_version_test"
+  kube::test::version::diff_assert "${TEMP}/client_version_test" "eq" "${TEMP}/client_short_json_version_test" "--short --output client json info is equal to non short result"
+  kube::test::version::diff_assert "${TEMP}/server_version_test" "eq" "${TEMP}/server_short_json_version_test" "--short --output server json info is equal to non short result"
+
+  kube::log::status "Testing kubectl version: compare json output with yaml output"
+  kube::test::version::json_object_to_file "" "${TEMP}/client_server_json_version_test"
+  kube::test::version::yaml_object_to_file "" "${TEMP}/client_server_yaml_version_test"
+  kube::test::version::diff_assert "${TEMP}/client_server_json_version_test" "eq" "${TEMP}/client_server_yaml_version_test" "--output json/yaml has identical information"
+}
+
 # Runs all pod related tests.
 run_pod_tests() {
   kube::log::status "Testing kubectl(v1:pods)"
@@ -245,7 +288,7 @@ run_pod_tests() {
   kube::test::get_object_jsonpath_assert 'pod/valid-pod' "{$id_field}" 'valid-pod'
   kube::test::get_object_jsonpath_assert 'pods/valid-pod' "{$id_field}" 'valid-pod'
   # Describe command should print detailed information
-  kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image:" "Node:" "Labels:" "Status:" "Controllers"
+  kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image:" "Node:" "Labels:" "Status:"
   # Describe command should print events information by default
   kube::test::describe_object_events_assert pods 'valid-pod'
   # Describe command should not print events information when show-events=false
@@ -253,7 +296,7 @@ run_pod_tests() {
   # Describe command should print events information when show-events=true
   kube::test::describe_object_events_assert pods 'valid-pod' true
   # Describe command (resource only) should print detailed information
-  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Controllers"
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:"
 
   # Describe command should print events information by default
   kube::test::describe_resource_events_assert pods
@@ -417,15 +460,15 @@ run_pod_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
-  kubectl create -f examples/storage/redis/redis-proxy.yaml "${kube_flags[@]}"
-  # Post-condition: valid-pod and redis-proxy PODs are created
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-proxy:valid-pod:'
+  kubectl create -f examples/storage/redis/redis-master.yaml "${kube_flags[@]}"
+  # Post-condition: valid-pod and redis-master PODs are created
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:valid-pod:'
 
   ### Delete multiple PODs at once
-  # Pre-condition: valid-pod and redis-proxy PODs exist
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-proxy:valid-pod:'
+  # Pre-condition: valid-pod and redis-master PODs exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:valid-pod:'
   # Command
-  kubectl delete pods valid-pod redis-proxy "${kube_flags[@]}" --grace-period=0 --force # delete multiple pods at once
+  kubectl delete pods valid-pod redis-master "${kube_flags[@]}" --grace-period=0 --force # delete multiple pods at once
   # Post-condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -740,12 +783,12 @@ __EOF__
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml "${kube_flags[@]}"
-  # Post-condition: valid-pod and redis-proxy PODs exist
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:redis-proxy:'
+  # Post-condition: redis-master and valid-pod PODs exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:valid-pod:'
 
   ### Delete two PODs from 1 yaml file
-  # Pre-condition: redis-master and redis-proxy PODs exist
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:redis-proxy:'
+  # Pre-condition: redis-master and valid-pod PODs exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:valid-pod:'
   # Command
   kubectl delete -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml "${kube_flags[@]}"
   # Post-condition: no PODs exist
@@ -1041,6 +1084,8 @@ run_kubectl_run_tests() {
   kubectl run pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
   # Post-Condition: Job "pi" is created
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  # Describe command (resource only) should print detailed information
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Created By"
   # Clean up
   kubectl delete jobs pi "${kube_flags[@]}"
   # Post-condition: no pods exist.
@@ -1199,14 +1244,14 @@ run_kubectl_get_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml "${kube_flags[@]}"
-  # Post-condition: PODs redis-master and redis-proxy exist
+  # Post-condition: PODs redis-master and valid-pod exist
 
   # Check that all items in the list are printed
   output_message=$(kubectl get -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml -o jsonpath="{..metadata.name}" "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" "redis-master redis-proxy"
+  kube::test::if_has_string "${output_message}" "redis-master valid-pod"
 
   # cleanup
-  kubectl delete pods redis-master redis-proxy "${kube_flags[@]}"
+  kubectl delete pods redis-master valid-pod "${kube_flags[@]}"
 }
 
 run_kubectl_request_timeout_tests() {
@@ -1826,6 +1871,9 @@ run_secrets_test() {
   kubectl delete secret test-secret --namespace=test-secrets
 
   ### Create a docker-registry secret in a specific namespace
+  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+    kube::test::wait_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
+  fi
   # Pre-condition: no SECRET exists
   kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -1838,6 +1886,9 @@ run_secrets_test() {
   kubectl delete secret test-secret --namespace=test-secrets
 
   ### Create a tls secret
+  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+    kube::test::wait_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
+  fi
   # Pre-condition: no SECRET exists
   kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -1872,6 +1923,9 @@ __EOF__
   kubectl delete secret secret-string-data --namespace=test-secrets
 
   ### Create a secret using output flags
+  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+    kube::test::wait_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
+  fi
   # Pre-condition: no secret exists
   kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -2324,6 +2378,10 @@ run_deployment_tests() {
   kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
   output_message=$(kubectl get deployment.apps -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'apps/v1beta1'
+  # Describe command (resource only) should print detailed information
+  kube::test::describe_resource_assert rs "Name:" "Pod Template:" "Labels:" "Selector:" "Controlled By" "Replicas:" "Pods Status:" "Volumes:"
+  # Describe command (resource only) should print detailed information
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Created By" "Controlled By"
   # Clean up
   kubectl delete deployment test-nginx-apps "${kube_flags[@]}"
 
@@ -2504,6 +2562,8 @@ run_rs_tests() {
   kube::test::describe_resource_events_assert rs false
   # Describe command should print events information when show-events=true
   kube::test::describe_resource_events_assert rs true
+  # Describe command (resource only) should print detailed information
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Created By" "Controlled By"
 
   ### Scale replica set frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
@@ -2575,6 +2635,22 @@ run_rs_tests() {
     # Clean up
     kubectl delete rs frontend "${kube_flags[@]}"
   fi
+}
+
+run_daemonset_tests() {
+  kube::log::status "Testing kubectl(v1:daemonsets)"
+
+  ### Create a rolling update DaemonSet
+  # Pre-condition: no DaemonSet exists
+  kube::test::get_object_assert daemonsets "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl apply -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
+  # Template Generation should be 1
+  kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '1'
+  kubectl apply -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
+  # Template Generation should stay 1
+  kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '1'
+  kubectl delete -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
 }
 
 run_multi_resources_tests() {
@@ -2801,6 +2877,7 @@ runTests() {
   deployment_second_image_field="(index .spec.template.spec.containers 1).image"
   change_cause_annotation='.*kubernetes.io/change-cause.*'
   pdb_min_available=".spec.minAvailable"
+  template_generation_field=".spec.templateGeneration"
 
   # Make sure "default" namespace exists.
   if kube::test::if_supports_resource "${namespaces}" ; then
@@ -2818,6 +2895,11 @@ runTests() {
     # Require the service to exist (either we created it or the API server did)
     kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
   fi
+
+  #########################
+  # Kubectl version #
+  #########################
+  run_kubectl_version_tests
 
   # Passing no arguments to create is an error
   ! kubectl create
@@ -2934,20 +3016,47 @@ runTests() {
     kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:'
   fi
 
+  ########
+  # Role #
+  ########
   if kube::test::if_supports_resource "${roles}" ; then
-    kubectl create "${kube_flags[@]}" role pod-admin --verb=* --resource=pods
-    kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
-    kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
-    kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
-    kubectl create "${kube_flags[@]}" role resource-reader --verb=get,list --resource=pods,deployments.extensions
-    kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:get:list:'
-    kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:deployments:'
-    kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':extensions:'
-  	kubectl create "${kube_flags[@]}" role resourcename-reader --verb=get,list --resource=pods --resource-name=foo
-    kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
-    kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
-    kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
-    kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.resourceNames}}{{.}}:{{end}}{{end}}" 'foo:'
+      # Create Role from command (only resource)
+      kubectl create "${kube_flags[@]}" role pod-admin --verb=* --resource=pods
+      kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
+      kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
+      kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+      output_message=$(! kubectl create "${kube_flags[@]}" role invalid-pod-admin --verb=* --resource=invalid-resource 2>&1)
+      kube::test::if_has_string "${output_message}" "the server doesn't have a resource type \"invalid-resource\""
+      # Create Role from command (resource + group)
+      kubectl create "${kube_flags[@]}" role group-reader --verb=get,list --resource=deployments.extensions
+      kube::test::get_object_assert role/group-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
+      kube::test::get_object_assert role/group-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'deployments:'
+      kube::test::get_object_assert role/group-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" 'extensions:'
+      output_message=$(! kubectl create "${kube_flags[@]}" role invalid-group --verb=get,list --resource=deployments.invalid-group 2>&1)
+      kube::test::if_has_string "${output_message}" "the server doesn't have a resource type \"deployments\" in group \"invalid-group\""
+      # Create Role from command (resource / subresource)
+      kubectl create "${kube_flags[@]}" role subresource-reader --verb=get,list --resource=pods/status
+      kube::test::get_object_assert role/subresource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
+      kube::test::get_object_assert role/subresource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods/status:'
+      kube::test::get_object_assert role/subresource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+      # Create Role from command (resource + group / subresource)
+      kubectl create "${kube_flags[@]}" role group-subresource-reader --verb=get,list --resource=replicasets.extensions/scale
+      kube::test::get_object_assert role/group-subresource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
+      kube::test::get_object_assert role/group-subresource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'replicasets/scale:'
+      kube::test::get_object_assert role/group-subresource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" 'extensions:'
+      output_message=$(! kubectl create "${kube_flags[@]}" role invalid-group --verb=get,list --resource=rs.invalid-group/scale 2>&1)
+      kube::test::if_has_string "${output_message}" "the server doesn't have a resource type \"rs\" in group \"invalid-group\""
+      # Create Role from command (resource + resourcename)
+      kubectl create "${kube_flags[@]}" role resourcename-reader --verb=get,list --resource=pods --resource-name=foo
+      kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
+      kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
+      kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+      kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.resourceNames}}{{.}}:{{end}}{{end}}" 'foo:'
+      # Create Role from command (multi-resources)
+      kubectl create "${kube_flags[@]}" role resource-reader --verb=get,list --resource=pods/status,deployments.extensions
+      kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:get:list:'
+      kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods/status:deployments:'
+      kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':extensions:'
   fi
 
   #########################
@@ -2958,7 +3067,7 @@ runTests() {
   output_message=$(kubectl get --raw=/api/v1)
 
   ## test if a short name is exported during discovery
-  kube::test::if_has_string "${output_message}" '{"name":"configmaps","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
+  kube::test::if_has_string "${output_message}" '{"name":"configmaps","singularName":"","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
 
   ###########################
   # POD creation / deletion #
@@ -3182,6 +3291,14 @@ runTests() {
     run_service_tests
   fi
 
+
+  ##################
+  # DaemonSets     #
+  ##################
+
+  if kube::test::if_supports_resource "${daemonsets}" ; then
+    run_daemonset_tests
+  fi
 
   ###########################
   # Replication controllers #

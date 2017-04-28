@@ -5269,6 +5269,36 @@
      },
      {
       "type": "string",
+      "method": "PATCH",
+      "summary": "connect PATCH requests to proxy of Node",
+      "nickname": "connectPatchNodeProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
       "method": "DELETE",
       "summary": "connect DELETE requests to proxy of Node",
       "nickname": "connectDeleteNodeProxy",
@@ -5444,6 +5474,44 @@
       "method": "PUT",
       "summary": "connect PUT requests to proxy of Node",
       "nickname": "connectPutNodeProxyWithPath",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to node.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PATCH",
+      "summary": "connect PATCH requests to proxy of Node",
+      "nickname": "connectPatchNodeProxyWithPath",
       "parameters": [
        {
         "type": "string",
@@ -9479,6 +9547,44 @@
      },
      {
       "type": "string",
+      "method": "PATCH",
+      "summary": "connect PATCH requests to proxy of Pod",
+      "nickname": "connectPatchNamespacedPodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to pod.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
       "method": "DELETE",
       "summary": "connect DELETE requests to proxy of Pod",
       "nickname": "connectDeleteNamespacedPodProxy",
@@ -9694,6 +9800,52 @@
       "method": "PUT",
       "summary": "connect PUT requests to proxy of Pod",
       "nickname": "connectPutNamespacedPodProxyWithPath",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the URL path to use for the current proxy request to pod.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PATCH",
+      "summary": "connect PATCH requests to proxy of Pod",
+      "nickname": "connectPatchNamespacedPodProxyWithPath",
       "parameters": [
        {
         "type": "string",
@@ -15910,6 +16062,44 @@
      },
      {
       "type": "string",
+      "method": "PATCH",
+      "summary": "connect PATCH requests to proxy of Service",
+      "nickname": "connectPatchNamespacedServiceProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
       "method": "DELETE",
       "summary": "connect DELETE requests to proxy of Service",
       "nickname": "connectDeleteNamespacedServiceProxy",
@@ -16125,6 +16315,52 @@
       "method": "PUT",
       "summary": "connect PUT requests to proxy of Service",
       "nickname": "connectPutNamespacedServiceProxyWithPath",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PATCH",
+      "summary": "connect PATCH requests to proxy of Service",
+      "nickname": "connectPatchNamespacedServiceProxyWithPath",
       "parameters": [
        {
         "type": "string",
@@ -16804,7 +17040,7 @@
      },
      "data": {
       "type": "object",
-      "description": "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot."
+      "description": "Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'."
      }
     }
    },
@@ -18242,6 +18478,18 @@
        "type": "string"
       },
       "description": "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260)."
+     },
+     "chapAuthDiscovery": {
+      "type": "boolean",
+      "description": "whether support iSCSI Discovery CHAP authentication"
+     },
+     "chapAuthSession": {
+      "type": "boolean",
+      "description": "whether support iSCSI Session CHAP authentication"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "CHAP secret for iSCSI target and initiator authentication"
      }
     }
    },
@@ -19380,7 +19628,7 @@
     "properties": {
      "fieldRef": {
       "$ref": "v1.ObjectFieldSelector",
-      "description": "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.podIP."
+      "description": "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP."
      },
      "resourceFieldRef": {
       "$ref": "v1.ResourceFieldSelector",
@@ -19580,6 +19828,10 @@
      "port": {
       "type": "string",
       "description": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
+     },
+     "host": {
+      "type": "string",
+      "description": "Optional: Host name to connect to, defaults to the pod IP."
      }
     }
    },
@@ -20582,7 +20834,7 @@
      },
      "data": {
       "type": "object",
-      "description": "Data contains the secret data. Each key must be a valid DNS_SUBDOMAIN or leading dot followed by valid DNS_SUBDOMAIN. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4"
+      "description": "Data contains the secret data. Each key must consist of alphanumeric characters, '-', '_' or '.'. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4"
      },
      "stringData": {
       "type": "object",
@@ -20740,14 +20992,7 @@
       "items": {
        "type": "string"
       },
-      "description": "externalIPs is a list of IP addresses for which nodes in the cluster will also accept traffic for this service.  These IPs are not managed by Kubernetes.  The user is responsible for ensuring that traffic arrives at a node with this IP.  A common example is external load-balancers that are not part of the Kubernetes system.  A previous form of this functionality exists as the deprecatedPublicIPs field.  When using this field, callers should also clear the deprecatedPublicIPs field."
-     },
-     "deprecatedPublicIPs": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      },
-      "description": "deprecatedPublicIPs is deprecated and replaced by the externalIPs field with almost the exact same semantics.  This field is retained in the v1 API for compatibility until at least 8/20/2016.  It will be removed from any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are set, deprecatedPublicIPs is used."
+      "description": "externalIPs is a list of IP addresses for which nodes in the cluster will also accept traffic for this service.  These IPs are not managed by Kubernetes.  The user is responsible for ensuring that traffic arrives at a node with this IP.  A common example is external load-balancers that are not part of the Kubernetes system."
      },
      "sessionAffinity": {
       "type": "string",
@@ -20872,6 +21117,7 @@
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",
+     "singularName",
      "namespaced",
      "kind",
      "verbs"
@@ -20879,7 +21125,11 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "name is the name of the resource."
+      "description": "name is the plural name of the resource."
+     },
+     "singularName": {
+      "type": "string",
+      "description": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface."
      },
      "namespaced": {
       "type": "boolean",

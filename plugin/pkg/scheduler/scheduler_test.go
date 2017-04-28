@@ -97,6 +97,13 @@ func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister) (string, 
 	return es.machine, es.err
 }
 
+func (es mockScheduler) Predicates() map[string]algorithm.FitPredicate {
+	return nil
+}
+func (es mockScheduler) Prioritizers() []algorithm.PriorityConfig {
+	return nil
+}
+
 func TestScheduler(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(t.Logf).Stop()
@@ -480,6 +487,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister schedulertesting.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate) (*Scheduler, chan *v1.Binding, chan error) {
 	algo := core.NewGenericScheduler(
 		scache,
+		nil,
 		predicateMap,
 		algorithm.EmptyMetadataProducer,
 		[]algorithm.PriorityConfig{},
@@ -510,6 +518,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister schedulertesting.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
 	algo := core.NewGenericScheduler(
 		scache,
+		nil,
 		predicateMap,
 		algorithm.EmptyMetadataProducer,
 		[]algorithm.PriorityConfig{},

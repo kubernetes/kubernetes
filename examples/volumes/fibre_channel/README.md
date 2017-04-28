@@ -39,6 +39,35 @@ CONTAINER ID        IMAGE                                  COMMAND             C
 2948683253f7        gcr.io/google_containers/pause:0.8.0   "/pause"            12 minutes ago      Up 12 minutes                           k8s_POD.7be6d81d_fcpd_default_4024318f-4121-11e5-a294-e839352ddd54_8d9dd7bf       
 ```
 
+## Multipath
+
+To leverage multiple paths for block storage, it is important to perform the
+multipath configuration on the host.
+If your distribution does not provide `/etc/multipath.conf`, then you can
+either use the following minimalistic one:
+
+    defaults {
+        find_multipaths yes
+        user_friendly_names yes
+    }
+
+or create a new one by running:
+
+    $ mpathconf --enable
+
+Finally you'll need to ensure to start or reload and enable multipath:
+
+    $ systemctl enable multipathd.service
+    $ systemctl restart multipathd.service
+
+**Note:** Any change to `multipath.conf` or enabling multipath can lead to
+inaccessible block devices, because they'll be claimed by multipath and
+exposed as a device in /dev/mapper/*.
+
+Some additional informations about multipath can be found in the
+[iSCSI documentation](../iscsi/README.md)
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/fibre_channel/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

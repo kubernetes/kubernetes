@@ -50,7 +50,7 @@ var (
 
 		` + expose_resources)
 
-	expose_example = templates.Examples(`
+	expose_example = templates.Examples(i18n.T(`
 		# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 		kubectl expose rc nginx --port=80 --target-port=8000
 
@@ -70,7 +70,7 @@ var (
 		kubectl expose rs nginx --port=80 --target-port=8000
 
 		# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000.
-		kubectl expose deployment nginx --port=80 --target-port=8000`)
+		kubectl expose deployment nginx --port=80 --target-port=8000`))
 )
 
 func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -101,7 +101,7 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("port", "", i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
 	cmd.Flags().String("type", "", i18n.T("Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'."))
 	cmd.Flags().String("load-balancer-ip", "", i18n.T("IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."))
-	cmd.Flags().String("selector", "", "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.")
+	cmd.Flags().String("selector", "", i18n.T("A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)"))
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
 	cmd.Flags().String("container-port", "", i18n.T("Synonym for --target-port"))
 	cmd.Flags().MarkDeprecated("container-port", "--container-port will be removed in the future, please use --target-port instead")
@@ -127,7 +127,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	}
 
 	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -231,7 +231,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 		if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
 			codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
-			object, err = cmdutil.Merge(codec, object, inline, mapping.GroupVersionKind.Kind)
+			object, err = cmdutil.Merge(codec, object, inline)
 			if err != nil {
 				return err
 			}

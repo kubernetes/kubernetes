@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
@@ -218,9 +219,13 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
 
 	var proxier proxy.ProxyProvider
-	var endpointsHandler proxyconfig.EndpointsConfigHandler
+	var serviceEventHandler proxyconfig.ServiceHandler
+	// TODO: Migrate all handlers to ServiceHandler types and
+	// get rid of this one.
+	var serviceHandler proxyconfig.ServiceConfigHandler
+	var endpointsEventHandler proxyconfig.EndpointsHandler
 
-	proxyMode := getProxyMode(string(config.Mode), client.Core().Nodes(), hostname, iptInterface, iptables.LinuxKernelCompatTester{})
+	proxyMode := getProxyMode(string(config.Mode), iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")
 		if config.IPTablesMasqueradeBit == nil {
@@ -244,22 +249,20 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
 		proxier = proxierIPTables
-		endpointsHandler = proxierIPTables
+		serviceEventHandler = proxierIPTables
+		endpointsEventHandler = proxierIPTables
 		// No turning back. Remove artifacts that might still exist from the userspace Proxier.
 		glog.V(0).Info("Tearing down userspace rules.")
 		userspace.CleanupLeftovers(iptInterface)
 	} else {
 		glog.V(0).Info("Using userspace Proxier.")
-
-		var proxierUserspace proxy.ProxyProvider
-
 		if runtime.GOOS == "windows" {
 			// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
 			// our config.EndpointsConfigHandler.
 			loadBalancer := winuserspace.NewLoadBalancerRR()
-			// set EndpointsConfigHandler to our loadBalancer
-			endpointsHandler = loadBalancer
-			proxierUserspace, err = winuserspace.NewProxier(
+			// set EndpointsHandler to our loadBalancer
+			endpointsEventHandler = loadBalancer
+			proxierUserspace, err := winuserspace.NewProxier(
 				loadBalancer,
 				net.ParseIP(config.BindAddress),
 				netshInterface,
@@ -268,13 +271,18 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 				config.IPTablesSyncPeriod.Duration,
 				config.UDPIdleTimeout.Duration,
 			)
+			if err != nil {
+				glog.Fatalf("Unable to create proxier: %v", err)
+			}
+			serviceHandler = proxierUserspace
+			proxier = proxierUserspace
 		} else {
 			// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
 			// our config.EndpointsConfigHandler.
 			loadBalancer := userspace.NewLoadBalancerRR()
 			// set EndpointsConfigHandler to our loadBalancer
-			endpointsHandler = loadBalancer
-			proxierUserspace, err = userspace.NewProxier(
+			endpointsEventHandler = loadBalancer
+			proxierUserspace, err := userspace.NewProxier(
 				loadBalancer,
 				net.ParseIP(config.BindAddress),
 				iptInterface,
@@ -284,11 +292,12 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 				config.IPTablesMinSyncPeriod.Duration,
 				config.UDPIdleTimeout.Duration,
 			)
+			if err != nil {
+				glog.Fatalf("Unable to create proxier: %v", err)
+			}
+			serviceHandler = proxierUserspace
+			proxier = proxierUserspace
 		}
-		if err != nil {
-			glog.Fatalf("Unable to create proxier: %v", err)
-		}
-		proxier = proxierUserspace
 		// Remove artifacts from the pure-iptables Proxier, if not on Windows.
 		if runtime.GOOS != "windows" {
 			glog.V(0).Info("Tearing down pure-iptables proxy rules.")
@@ -301,22 +310,28 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		iptInterface.AddReloadFunc(proxier.Sync)
 	}
 
+	informerFactory := informers.NewSharedInformerFactory(client, config.ConfigSyncPeriod)
+
 	// Create configs (i.e. Watches for Services and Endpoints)
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
-	serviceConfig := proxyconfig.NewServiceConfig()
-	serviceConfig.RegisterHandler(proxier)
+	serviceConfig := proxyconfig.NewServiceConfig(informerFactory.Core().InternalVersion().Services(), config.ConfigSyncPeriod)
+	if serviceHandler != nil {
+		serviceConfig.RegisterHandler(serviceHandler)
+	}
+	if serviceEventHandler != nil {
+		serviceConfig.RegisterEventHandler(serviceEventHandler)
+	}
+	go serviceConfig.Run(wait.NeverStop)
 
-	endpointsConfig := proxyconfig.NewEndpointsConfig()
-	endpointsConfig.RegisterHandler(endpointsHandler)
+	endpointsConfig := proxyconfig.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), config.ConfigSyncPeriod)
+	endpointsConfig.RegisterEventHandler(endpointsEventHandler)
+	go endpointsConfig.Run(wait.NeverStop)
 
-	proxyconfig.NewSourceAPI(
-		client.Core().RESTClient(),
-		config.ConfigSyncPeriod,
-		serviceConfig.Channel("api"),
-		endpointsConfig.Channel("api"),
-	)
+	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those
+	// functions must configure their shared informer event handlers first.
+	go informerFactory.Start(wait.NeverStop)
 
 	config.NodeRef = &clientv1.ObjectReference{
 		Kind:      "Node",
@@ -427,19 +442,15 @@ func getConntrackMax(config *options.ProxyServerConfig) (int, error) {
 	return 0, nil
 }
 
-type nodeGetter interface {
-	Get(hostname string, options metav1.GetOptions) (*api.Node, error)
-}
-
-func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
+func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
 	if proxyMode == proxyModeUserspace {
 		return proxyModeUserspace
-	} else if proxyMode == proxyModeIPTables {
-		return tryIPTablesProxy(iptver, kcompat)
-	} else if proxyMode != "" {
-		glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
-		return tryIPTablesProxy(iptver, kcompat)
 	}
+
+	if proxyMode != "" && proxyMode != proxyModeIPTables {
+		glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
+	}
+
 	return tryIPTablesProxy(iptver, kcompat)
 }
 

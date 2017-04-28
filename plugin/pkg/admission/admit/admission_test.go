@@ -18,12 +18,34 @@ package admit
 
 import (
 	"testing"
+
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
 )
 
-func TestAdmission(t *testing.T) {
+func TestAdmissionNonNilAttribute(t *testing.T) {
+	handler := NewAlwaysAdmit()
+	err := handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "namespace", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, nil))
+	if err != nil {
+		t.Errorf("Unexpected error returned from admission handler")
+	}
+}
+
+func TestAdmissionNilAttribute(t *testing.T) {
 	handler := NewAlwaysAdmit()
 	err := handler.Admit(nil)
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
+	}
+}
+
+func TestHandles(t *testing.T) {
+	handler := NewAlwaysAdmit()
+	tests := []admission.Operation{admission.Create, admission.Connect, admission.Update, admission.Delete}
+
+	for _, test := range tests {
+		if !handler.Handles(test) {
+			t.Errorf("Expected handling all operations, including: %v", test)
+		}
 	}
 }

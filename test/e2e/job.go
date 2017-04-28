@@ -26,8 +26,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	"fmt"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 var _ = framework.KubeDescribe("Job", func() {
@@ -105,5 +108,59 @@ var _ = framework.KubeDescribe("Job", func() {
 		_, err = framework.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("should adopt matching orphans and release non-matching pods", func() {
+		By("Creating a job")
+		job := framework.NewTestJob("notTerminate", "adopt-release", v1.RestartPolicyNever, parallelism, completions)
+		// Replace job with the one returned from Create() so it has the UID.
+		// Save Kind since it won't be populated in the returned job.
+		kind := job.Kind
+		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		Expect(err).NotTo(HaveOccurred())
+		job.Kind = kind
+
+		By("Ensuring active pods == parallelism")
+		err = framework.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Orphaning one of the Job's Pods")
+		pods, err := framework.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pods.Items).To(HaveLen(int(parallelism)))
+		pod := pods.Items[0]
+		f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
+			pod.OwnerReferences = nil
+		})
+
+		By("Checking that the Job readopts the Pod")
+		Expect(framework.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "adopted", framework.JobTimeout,
+			func(pod *v1.Pod) (bool, error) {
+				controllerRef := controller.GetControllerOf(pod)
+				if controllerRef == nil {
+					return false, nil
+				}
+				if controllerRef.Kind != job.Kind || controllerRef.Name != job.Name || controllerRef.UID != job.UID {
+					return false, fmt.Errorf("pod has wrong controllerRef: got %v, want %v", controllerRef, job)
+				}
+				return true, nil
+			},
+		)).To(Succeed(), "wait for pod %q to be readopted", pod.Name)
+
+		By("Removing the labels from the Job's Pod")
+		f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
+			pod.Labels = nil
+		})
+
+		By("Checking that the Job releases the Pod")
+		Expect(framework.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "released", framework.JobTimeout,
+			func(pod *v1.Pod) (bool, error) {
+				controllerRef := controller.GetControllerOf(pod)
+				if controllerRef != nil {
+					return false, nil
+				}
+				return true, nil
+			},
+		)).To(Succeed(), "wait for pod %q to be released", pod.Name)
 	})
 })

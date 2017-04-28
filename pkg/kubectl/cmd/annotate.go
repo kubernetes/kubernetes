@@ -75,7 +75,7 @@ var (
 
 		` + valid_resources)
 
-	annotate_example = templates.Examples(`
+	annotate_example = templates.Examples(i18n.T(`
     # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
     # If the same annotation is set multiple times, only the last value will be applied
     kubectl annotate pods foo description='my frontend'
@@ -94,7 +94,7 @@ var (
 
     # Update pod 'foo' by removing an annotation named 'description' if it exists.
     # Does not require the --overwrite flag.
-    kubectl annotate pods foo description-`)
+    kubectl annotate pods foo description-`))
 )
 
 func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -117,7 +117,7 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    annotate_long,
 		Example: annotate_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := options.Complete(f, out, cmd, args); err != nil {
+			if err := options.Complete(out, cmd, args); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
 			if err := options.Validate(); err != nil {
@@ -144,7 +144,7 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 // Complete adapts from the command line args and factory to the data required.
-func (o *AnnotateOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
+func (o *AnnotateOptions) Complete(out io.Writer, cmd *cobra.Command, args []string) (err error) {
 	o.out = out
 	o.local = cmdutil.GetFlagBool(cmd, "local")
 	o.overwrite = cmdutil.GetFlagBool(cmd, "overwrite")
@@ -190,7 +190,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 	if err != nil {
 		return err
 	}
-	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).

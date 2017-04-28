@@ -60,11 +60,11 @@ import (
 )
 
 // setUp is a convience function for setting up for (most) tests.
-func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, api.Scheme)
 
 	config := &Config{
-		GenericConfig:           genericapiserver.NewConfig().WithSerializer(api.Codecs),
+		GenericConfig:           genericapiserver.NewConfig(api.Codecs),
 		APIResourceConfigSource: DefaultAPIResourceConfigSource(),
 		APIServerServicePort:    443,
 		MasterCount:             1,
@@ -101,16 +101,11 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 		TLSClientConfig: &tls.Config{},
 	})
 
-	master, err := config.Complete().New()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return master, server, *config, assert.New(t)
+	return server, *config, assert.New(t)
 }
 
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	_, etcdserver, config, assert := setUp(t)
+	etcdserver, config, assert := setUp(t)
 
 	master, err := config.Complete().New()
 	if err != nil {
@@ -136,7 +131,7 @@ func limitedAPIResourceConfigSource() *serverstorage.ResourceConfig {
 
 // newLimitedMaster only enables the core group, the extensions group, the batch group, and the autoscaling group.
 func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	_, etcdserver, config, assert := setUp(t)
+	etcdserver, config, assert := setUp(t)
 	config.APIResourceConfigSource = limitedAPIResourceConfigSource()
 	master, err := config.Complete().New()
 	if err != nil {
@@ -153,7 +148,7 @@ func TestVersion(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", "/version", nil)
 	resp := httptest.NewRecorder()
-	s.GenericAPIServer.InsecureHandler.ServeHTTP(resp, req)
+	s.GenericAPIServer.Handler.ServeHTTP(resp, req)
 	if resp.Code != 200 {
 		t.Fatalf("expected http 200, got: %d", resp.Code)
 	}

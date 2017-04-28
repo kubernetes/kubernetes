@@ -17,6 +17,8 @@ limitations under the License.
 package cronjob
 
 import (
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func TestGetJobFromTemplate(t *testing.T) {
@@ -163,35 +166,19 @@ func TestGroupJobsByParent(t *testing.T) {
 
 	{
 		// Case 1: There are no jobs and scheduledJobs
-		sjs := []batchv2alpha1.CronJob{}
 		js := []batchv1.Job{}
-		jobsBySj := groupJobsByParent(sjs, js)
+		jobsBySj := groupJobsByParent(js)
 		if len(jobsBySj) != 0 {
 			t.Errorf("Wrong number of items in map")
 		}
 	}
 
 	{
-		// Case 2: there is one controller with no job.
-		sjs := []batchv2alpha1.CronJob{
-			{ObjectMeta: metav1.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
-		}
-		js := []batchv1.Job{}
-		jobsBySj := groupJobsByParent(sjs, js)
-		if len(jobsBySj) != 0 {
-			t.Errorf("Wrong number of items in map")
-		}
-	}
-
-	{
-		// Case 3: there is one controller with one job it created.
-		sjs := []batchv2alpha1.CronJob{
-			{ObjectMeta: metav1.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
-		}
+		// Case 2: there is one controller with one job it created.
 		js := []batchv1.Job{
 			{ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "x", Annotations: createdBy1}},
 		}
-		jobsBySj := groupJobsByParent(sjs, js)
+		jobsBySj := groupJobsByParent(js)
 
 		if len(jobsBySj) != 1 {
 			t.Errorf("Wrong number of items in map")
@@ -206,7 +193,7 @@ func TestGroupJobsByParent(t *testing.T) {
 	}
 
 	{
-		// Case 4: Two namespaces, one has two jobs from one controller, other has 3 jobs from two controllers.
+		// Case 3: Two namespaces, one has two jobs from one controller, other has 3 jobs from two controllers.
 		// There are also two jobs with no created-by annotation.
 		js := []batchv1.Job{
 			{ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "x", Annotations: createdBy1}},
@@ -217,13 +204,8 @@ func TestGroupJobsByParent(t *testing.T) {
 			{ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "y", Annotations: createdBy3}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "d", Namespace: "y", Annotations: noCreatedBy}},
 		}
-		sjs := []batchv2alpha1.CronJob{
-			{ObjectMeta: metav1.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "f", Namespace: "x", UID: uid2}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "g", Namespace: "y", UID: uid3}},
-		}
 
-		jobsBySj := groupJobsByParent(sjs, js)
+		jobsBySj := groupJobsByParent(js)
 
 		if len(jobsBySj) != 3 {
 			t.Errorf("Wrong number of items in map")
@@ -387,5 +369,35 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 			t.Errorf("unexpected error")
 		}
 	}
+}
 
+func TestAdoptJobs(t *testing.T) {
+	sj := cronJob()
+	controllerRef := newControllerRef(&sj)
+	jc := &fakeJobControl{}
+	jobs := []batchv1.Job{newJob("uid0"), newJob("uid1")}
+	jobs[0].OwnerReferences = nil
+	jobs[0].Name = "job0"
+	jobs[1].OwnerReferences = []metav1.OwnerReference{*controllerRef}
+	jobs[1].Name = "job1"
+
+	if err := adoptJobs(&sj, jobs, jc); err != nil {
+		t.Errorf("adoptJobs() error: %v", err)
+	}
+	if got, want := len(jc.PatchJobName), 1; got != want {
+		t.Fatalf("len(PatchJobName) = %v, want %v", got, want)
+	}
+	if got, want := jc.PatchJobName[0], "job0"; got != want {
+		t.Errorf("PatchJobName = %v, want %v", got, want)
+	}
+	if got, want := len(jc.Patches), 1; got != want {
+		t.Fatalf("len(Patches) = %v, want %v", got, want)
+	}
+	patch := &batchv1.Job{}
+	if err := json.Unmarshal(jc.Patches[0], patch); err != nil {
+		t.Fatalf("Unmarshal error: %v", err)
+	}
+	if got, want := controller.GetControllerOf(patch), controllerRef; !reflect.DeepEqual(got, want) {
+		t.Errorf("ControllerRef = %#v, want %#v", got, want)
+	}
 }

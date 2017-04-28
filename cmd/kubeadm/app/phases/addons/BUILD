@@ -20,12 +20,12 @@ go_library(
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/images:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/client-go/kubernetes",
-        "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/v1",
-        "//vendor:k8s.io/client-go/pkg/apis/extensions/v1beta1",
+        "//pkg/api:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/apis/extensions/v1beta1:go_default_library",
     ],
 )
 

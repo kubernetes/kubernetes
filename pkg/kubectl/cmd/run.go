@@ -21,9 +21,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/spf13/cobra"
-
 	"github.com/docker/distribution/reference"
+	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -49,12 +48,12 @@ import (
 )
 
 var (
-	run_long = templates.LongDesc(`
+	run_long = templates.LongDesc(i18n.T(`
 		Create and run a particular image, possibly replicated.
 
-		Creates a deployment or job to manage the created container(s).`)
+		Creates a deployment or job to manage the created container(s).`))
 
-	run_example = templates.Examples(`
+	run_example = templates.Examples(i18n.T(`
 		# Start a single instance of nginx.
 		kubectl run nginx --image=nginx
 
@@ -86,7 +85,7 @@ var (
 		kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'
 
 		# Start the cron job to compute π to 2000 places and print it out every 5 minutes.
-		kubectl run pi --schedule="0/5 * * * ?" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`)
+		kubectl run pi --schedule="0/5 * * * ?" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`))
 )
 
 func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
@@ -108,6 +107,7 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 	return cmd
 }
 
@@ -147,6 +147,11 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 	// Let kubectl run follow rules for `--`, see #13004 issue
 	if len(args) == 0 || argsLenAtDash == 0 {
 		return cmdutil.UsageError(cmd, "NAME is required for run")
+	}
+
+	timeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)
+	if err != nil {
+		return cmdutil.UsageError(cmd, err.Error())
 	}
 
 	// validate image name
@@ -287,8 +292,8 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 				TTY:   tty,
 				Quiet: quiet,
 			},
-
-			CommandName: cmd.Parent().CommandPath() + " attach",
+			GetPodTimeout: timeout,
+			CommandName:   cmd.Parent().CommandPath() + " attach",
 
 			Attach: &DefaultRemoteAttach{},
 		}
@@ -304,11 +309,11 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		}
 		opts.PodClient = clientset.Core()
 
-		attachablePod, err := f.AttachablePodForObject(obj)
+		attachablePod, err := f.AttachablePodForObject(obj, opts.GetPodTimeout)
 		if err != nil {
 			return err
 		}
-		err = handleAttachPod(f, clientset.Core(), attachablePod.Namespace, attachablePod.Name, opts, quiet)
+		err = handleAttachPod(f, clientset.Core(), attachablePod.Namespace, attachablePod.Name, opts)
 		if err != nil {
 			return err
 		}
@@ -317,7 +322,7 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		leaveStdinOpen := cmdutil.GetFlagBool(cmd, "leave-stdin-open")
 		waitForExitCode := !leaveStdinOpen && restartPolicy == api.RestartPolicyNever
 		if waitForExitCode {
-			pod, err = waitForPodTerminated(clientset.Core(), attachablePod.Namespace, attachablePod.Name, opts.Out, quiet)
+			pod, err = waitForPodTerminated(clientset.Core(), attachablePod.Namespace, attachablePod.Name)
 			if err != nil {
 				return err
 			}
@@ -334,7 +339,7 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 				return err
 			}
 			_, typer := f.Object()
-			r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+			r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 				ContinueOnError().
 				NamespaceParam(namespace).DefaultNamespace().
 				ResourceNames(mapping.Resource, name).
@@ -408,13 +413,15 @@ func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition 
 		ev, err := watch.Until(0, w, func(ev watch.Event) (bool, error) {
 			return exitCondition(ev)
 		})
-		result = ev.Object.(*api.Pod)
+		if ev != nil {
+			result = ev.Object.(*api.Pod)
+		}
 		return err
 	})
 	return result, err
 }
 
-func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
+func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string) (*api.Pod, error) {
 	pod, err := waitForPod(podClient, ns, name, conditions.PodRunningAndReady)
 
 	// fix generic not found error with empty name in PodRunningAndReady
@@ -425,7 +432,7 @@ func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string, out io.
 	return pod, err
 }
 
-func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
+func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string) (*api.Pod, error) {
 	pod, err := waitForPod(podClient, ns, name, conditions.PodCompleted)
 
 	// fix generic not found error with empty name in PodCompleted
@@ -436,8 +443,8 @@ func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string, out 
 	return pod, err
 }
 
-func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions, quiet bool) error {
-	pod, err := waitForPodRunning(podClient, ns, name, opts.Out, quiet)
+func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions) error {
+	pod, err := waitForPodRunning(podClient, ns, name)
 	if err != nil && err != conditions.ErrPodCompleted {
 		return err
 	}
@@ -446,7 +453,7 @@ func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, nam
 		return err
 	}
 	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
-		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName})
+		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
 		if err != nil {
 			return err
 		}
@@ -467,7 +474,7 @@ func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, nam
 	stderr := opts.Err
 	if err := opts.Run(); err != nil {
 		fmt.Fprintf(stderr, "Error attaching, falling back to logs: %v\n", err)
-		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName})
+		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
 		if err != nil {
 			return err
 		}
@@ -556,7 +563,14 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 	}
 
 	if cmdutil.GetFlagString(cmd, "output") != "" || cmdutil.GetDryRunFlag(cmd) {
-		return f.PrintObject(cmd, mapper, obj, out)
+		err := f.PrintObject(cmd, mapper, obj, out)
+		if err != nil {
+			return err
+		}
+		if cmdutil.GetFlagString(cmd, "output") == "yaml" {
+			fmt.Fprintln(out, "---")
+		}
+		return nil
 	}
 	cmdutil.PrintSuccess(mapper, false, out, mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
 
@@ -584,7 +598,7 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 
 	if len(overrides) > 0 {
 		codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
-		obj, err = cmdutil.Merge(codec, obj, overrides, groupVersionKind.Kind)
+		obj, err = cmdutil.Merge(codec, obj, overrides)
 		if err != nil {
 			return nil, "", nil, nil, err
 		}

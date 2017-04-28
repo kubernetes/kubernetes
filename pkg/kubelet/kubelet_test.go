@@ -79,6 +79,7 @@ func init() {
 
 const (
 	testKubeletHostname = "127.0.0.1"
+	testKubeletHostIP   = "127.0.0.1"
 
 	testReservationCPU    = "200m"
 	testReservationMemory = "100M"
@@ -166,7 +167,31 @@ func newTestKubeletWithImageList(
 	kubelet.masterServiceNamespace = metav1.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.nodeLister = testNodeLister{}
-	kubelet.nodeInfo = testNodeInfo{}
+	kubelet.nodeInfo = testNodeInfo{
+		nodes: []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: string(kubelet.nodeName),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:    v1.NodeReady,
+							Status:  v1.ConditionTrue,
+							Reason:  "Ready",
+							Message: "Node ready",
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: testKubeletHostIP,
+						},
+					},
+				},
+			},
+		},
+	}
 	kubelet.recorder = fakeRecorder
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)

@@ -21,9 +21,9 @@ go_library(
     srcs = ["kubeconfig.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:k8s.io/client-go/kubernetes",
-        "//vendor:k8s.io/client-go/tools/clientcmd",
-        "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
     ],
 )
 

@@ -61,8 +61,13 @@ message APIGroupList {
 
 // APIResource specifies the name of a resource and whether it is namespaced.
 message APIResource {
-  // name is the name of the resource.
+  // name is the plural name of the resource.
   optional string name = 1;
+
+  // singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely.
+  // The singularName is more correct for reporting status on a single item and both singular and plural are allowed
+  // from the kubectl CLI interface.
+  optional string singularName = 6;
 
   // namespaced indicates if a resource is namespaced or not.
   optional bool namespaced = 2;
@@ -244,6 +249,8 @@ message LabelSelector {
 // relates the key and values.
 message LabelSelectorRequirement {
   // key is the label key that the selector applies to.
+  // +patchMergeKey=key
+  // +patchStrategy=merge
   optional string key = 1;
 
   // operator represents a key's relationship to a set of values.
@@ -440,6 +447,8 @@ message ObjectMeta {
   // then an entry in this list will point to this controller, with the controller field set to true.
   // There cannot be more than one managing controller.
   // +optional
+  // +patchMergeKey=uid
+  // +patchStrategy=merge
   repeated OwnerReference ownerReferences = 13;
 
   // Must be empty before the object is deleted from the registry. Each entry
@@ -447,6 +456,7 @@ message ObjectMeta {
   // from the list. If the deletionTimestamp of the object is non-nil, entries
   // in this list can only be removed.
   // +optional
+  // +patchStrategy=merge
   repeated string finalizers = 14;
 
   // The name of the cluster which the object belongs to.

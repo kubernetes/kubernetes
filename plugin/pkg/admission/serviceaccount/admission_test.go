@@ -25,9 +25,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -847,5 +849,61 @@ func TestMultipleReferencedSecrets(t *testing.T) {
 	}
 	if name := pod.Spec.Volumes[0].Name; name != token1 {
 		t.Errorf("expected first referenced secret to be mounted, got %q", name)
+	}
+}
+
+func newSecret(secretType api.SecretType, namespace, name, serviceAccountName, serviceAccountUID string) *api.Secret {
+	return &api.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+			Annotations: map[string]string{
+				api.ServiceAccountNameKey: serviceAccountName,
+				api.ServiceAccountUIDKey:  serviceAccountUID,
+			},
+		},
+		Type: secretType,
+	}
+}
+
+func TestGetServiceAccountTokens(t *testing.T) {
+	admit := NewServiceAccount()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	admit.secretLister = corelisters.NewSecretLister(indexer)
+
+	ns := "namespace"
+	serviceAccountUID := "12345"
+
+	sa := &api.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      DefaultServiceAccountName,
+			Namespace: ns,
+			UID:       types.UID(serviceAccountUID),
+		},
+	}
+
+	nonSATokenSecret := newSecret(api.SecretTypeDockercfg, ns, "nonSATokenSecret", DefaultServiceAccountName, serviceAccountUID)
+	indexer.Add(nonSATokenSecret)
+
+	differentSAToken := newSecret(api.SecretTypeServiceAccountToken, ns, "differentSAToken", "someOtherSA", "someOtherUID")
+	indexer.Add(differentSAToken)
+
+	matchingSAToken := newSecret(api.SecretTypeServiceAccountToken, ns, "matchingSAToken", DefaultServiceAccountName, serviceAccountUID)
+	indexer.Add(matchingSAToken)
+
+	tokens, err := admit.getServiceAccountTokens(sa)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(tokens) != 1 {
+		names := make([]string, 0, len(tokens))
+		for _, token := range tokens {
+			names = append(names, token.Name)
+		}
+		t.Fatalf("expected only 1 token, got %v", names)
+	}
+	if e, a := matchingSAToken.Name, tokens[0].Name; e != a {
+		t.Errorf("expected token %s, got %s", e, a)
 	}
 }

@@ -72,16 +72,16 @@ const (
 )
 
 var (
-	apply_long = templates.LongDesc(`
+	apply_long = templates.LongDesc(i18n.T(`
 		Apply a configuration to a resource by filename or stdin.
-		This resource will be created if it doesn't exist yet.
+		The resource name must be specified. This resource will be created if it doesn't exist yet.
 		To use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.
 
 		JSON and YAML formats are accepted.
 
-		Alpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.`)
+		Alpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.`))
 
-	apply_example = templates.Examples(`
+	apply_example = templates.Examples(i18n.T(`
 		# Apply the configuration in pod.json to a pod.
 		kubectl apply -f ./pod.json
 
@@ -93,7 +93,7 @@ var (
 		kubectl apply --prune -f manifest.yaml -l app=nginx
 
 		# Apply the configuration in manifest.yaml and delete all the other configmaps that are not in the file.
-		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`)
+		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`))
 )
 
 func NewCmdApply(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
@@ -122,7 +122,7 @@ func NewCmdApply(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "Only relevant during a force apply. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
-	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
+	cmd.Flags().Bool("all", false, "select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArray("prune-whitelist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
@@ -205,7 +205,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		}
 	}
 
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().

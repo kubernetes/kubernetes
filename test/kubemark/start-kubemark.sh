@@ -74,7 +74,7 @@ EOF
 # Generate certs/keys for CA, master, kubelet and kubecfg, and tokens for kubelet
 # and kubeproxy.
 function generate-pki-config {
-  ensure-temp-dir
+  kube::util::ensure-temp-dir
   gen-kube-bearertoken
   gen-kube-basicauth
   create-certs ${MASTER_IP}

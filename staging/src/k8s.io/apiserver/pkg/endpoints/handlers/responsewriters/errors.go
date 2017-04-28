@@ -52,6 +52,10 @@ func forbiddenMessage(attributes authorizer.Attributes) string {
 		username = user.GetName()
 	}
 
+	if !attributes.IsResourceRequest() {
+		return fmt.Sprintf("User %q cannot %s path %q.", username, attributes.GetVerb(), attributes.GetPath())
+	}
+
 	resource := attributes.GetResource()
 	if group := attributes.GetAPIGroup(); len(group) > 0 {
 		resource = resource + "." + group

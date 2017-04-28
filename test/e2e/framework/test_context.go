@@ -18,6 +18,7 @@ package framework
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -27,6 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
+
+const defaultHost = "http://127.0.0.1:8080"
 
 type TestContextType struct {
 	KubeConfig         string
@@ -55,6 +58,8 @@ type TestContextType struct {
 	GCEUpgradeScript         string
 	PrometheusPushGateway    string
 	ContainerRuntime         string
+	ContainerRuntimeEndpoint string
+	ImageServiceEndpoint     string
 	MasterOSDistro           string
 	NodeOSDistro             string
 	VerifyServiceAccount     bool
@@ -90,6 +95,8 @@ type TestContextType struct {
 	FederatedKubeContext string
 	// Federation control plane version to upgrade to while doing upgrade tests
 	FederationUpgradeTarget string
+	// Whether configuration for accessing federation member clusters should be sourced from the host cluster
+	FederationConfigFromCluster bool
 
 	// Viper-only parameters.  These will in time replace all flags.
 
@@ -127,6 +134,7 @@ type NodeTestContextType struct {
 type CloudConfig struct {
 	ProjectID         string
 	Zone              string
+	MultiZone         bool
 	Cluster           string
 	MasterName        string
 	NodeInstanceGroup string
@@ -159,12 +167,15 @@ func RegisterCommonFlags() {
 	flag.BoolVar(&TestContext.DeleteNamespace, "delete-namespace", true, "If true tests will delete namespace after completion. It is only designed to make debugging easier, DO NOT turn it off by default.")
 	flag.BoolVar(&TestContext.DeleteNamespaceOnFailure, "delete-namespace-on-failure", true, "If true, framework will delete test namespace on failure. Used only during test debugging.")
 	flag.IntVar(&TestContext.AllowedNotReadyNodes, "allowed-not-ready-nodes", 0, "If non-zero, framework will allow for that many non-ready nodes when checking for all ready nodes.")
-	flag.StringVar(&TestContext.Host, "host", "http://127.0.0.1:8080", "The host, or apiserver, to connect to")
+
+	flag.StringVar(&TestContext.Host, "host", "", fmt.Sprintf("The host, or apiserver, to connect to. Will default to %s if this argument and --kubeconfig are not set", defaultHost))
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flag.StringVar(&TestContext.FeatureGates, "feature-gates", "", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
 	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/rkt/remote).")
+	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "", "The container runtime endpoint of cluster VM instances.")
+	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 }
 
 // Register flags specific to the cluster e2e test suite.
@@ -174,6 +185,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
 	flag.StringVar(&TestContext.KubeAPIContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType used to communicate with apiserver")
 	flag.StringVar(&TestContext.FederatedKubeContext, "federated-kube-context", "e2e-federation", "kubeconfig context for federation.")
+	flag.BoolVar(&TestContext.FederationConfigFromCluster, "federation-config-from-cluster", false, "whether to source configuration for member clusters from the hosting cluster.")
 
 	flag.StringVar(&TestContext.KubeVolumeDir, "volume-dir", "/var/lib/kubelet", "Path to the directory containing the kubelet volumes.")
 	flag.StringVar(&TestContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
@@ -190,6 +202,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
 	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
+	flag.BoolVar(&cloudConfig.MultiZone, "gce-multizone", false, "If true, start GCE cloud provider with multizone support.")
 	flag.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
 	flag.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws. If there is more than one group: comma separated list of groups.")
 	flag.StringVar(&cloudConfig.Network, "network", "e2e", "The cloud provider network for this e2e cluster.")
@@ -225,16 +238,6 @@ func RegisterNodeFlags() {
 	flag.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 }
 
-// overwriteFlagsWithViperConfig finds and writes values to flags using viper as input.
-func overwriteFlagsWithViperConfig() {
-	viperFlagSetter := func(f *flag.Flag) {
-		if viper.IsSet(f.Name) {
-			f.Value.Set(viper.GetString(f.Name))
-		}
-	}
-	flag.VisitAll(viperFlagSetter)
-}
-
 // ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.
 func ViperizeFlags() {
 
@@ -253,4 +256,15 @@ func ViperizeFlags() {
 
 	// TODO Consider wether or not we want to use overwriteFlagsWithViperConfig().
 	viper.Unmarshal(&TestContext)
+
+	AfterReadingAllFlags(&TestContext)
+}
+
+// AfterReadingAllFlags makes changes to the context after all flags
+// have been read.
+func AfterReadingAllFlags(t *TestContextType) {
+	// Only set a default host if one won't be supplied via kubeconfig
+	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
+		t.Host = defaultHost
+	}
 }

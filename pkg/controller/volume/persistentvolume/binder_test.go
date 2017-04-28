@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 )
 
 // Test single call to syncClaim and syncVolume methods.
@@ -254,11 +254,32 @@ func TestSync(t *testing.T) {
 			// unbound, but does not match the selector. Check it gets bound
 			// and no annBoundByController is set.
 			"2-8 - claim prebound to unbound volume that does not match the selector",
-			newVolumeArray("volume2-3", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classEmpty),
-			newVolumeArray("volume2-3", "1Gi", "uid2-3", "claim2-3", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, annBoundByController),
-			withLabelSelector(labels, newClaimArray("claim2-3", "uid2-3", "1Gi", "volume2-3", v1.ClaimPending, nil)),
-			withLabelSelector(labels, newClaimArray("claim2-3", "uid2-3", "1Gi", "volume2-3", v1.ClaimBound, nil, annBindCompleted)),
+			newVolumeArray("volume2-8", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classEmpty),
+			newVolumeArray("volume2-8", "1Gi", "uid2-8", "claim2-8", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, annBoundByController),
+			withLabelSelector(labels, newClaimArray("claim2-8", "uid2-8", "1Gi", "volume2-8", v1.ClaimPending, nil)),
+			withLabelSelector(labels, newClaimArray("claim2-8", "uid2-8", "1Gi", "volume2-8", v1.ClaimBound, nil, annBindCompleted)),
 			noevents, noerrors, testSyncClaim,
+		},
+		{
+			// syncClaim with claim pre-bound to a PV that exists and is
+			// unbound, but its size is smaller than requested.
+			//Check that the claim status is reset to Pending
+			"2-9 - claim prebound to unbound volume that size is smaller than requested",
+			newVolumeArray("volume2-9", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classEmpty),
+			newVolumeArray("volume2-9", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classEmpty),
+			newClaimArray("claim2-9", "uid2-9", "2Gi", "volume2-9", v1.ClaimBound, nil),
+			newClaimArray("claim2-9", "uid2-9", "2Gi", "volume2-9", v1.ClaimPending, nil),
+			[]string{"Warning VolumeMismatch"}, noerrors, testSyncClaim,
+		},
+		{
+			// syncClaim with claim pre-bound to a PV that exists and is
+			// unbound, but its class does not match. Check that the claim status is reset to Pending
+			"2-10 - claim prebound to unbound volume that class is different",
+			newVolumeArray("volume2-10", "1Gi", "1", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classGold),
+			newVolumeArray("volume2-10", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classGold),
+			newClaimArray("claim2-10", "uid2-10", "1Gi", "volume2-10", v1.ClaimBound, nil),
+			newClaimArray("claim2-10", "uid2-10", "1Gi", "volume2-10", v1.ClaimPending, nil),
+			[]string{"Warning VolumeMismatch"}, noerrors, testSyncClaim,
 		},
 
 		// [Unit test set 3] Syncing bound claim
