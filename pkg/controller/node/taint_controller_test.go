@@ -31,6 +31,8 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 )
 
+var timeForControllerToProgress = 500 * time.Millisecond
+
 func createNoExecuteTaint(index int) v1.Taint {
 	return v1.Taint{
 		Key:       "testTaint" + fmt.Sprintf("%v", index),
@@ -154,7 +156,7 @@ func TestCreatePod(t *testing.T) {
 		controller.taintedNodes = item.taintedNodes
 		controller.PodUpdated(nil, item.pod)
 		// wait a bit
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(timeForControllerToProgress)
 
 		podDeleted := false
 		for _, action := range fakeClientset.Actions() {
@@ -180,7 +182,7 @@ func TestDeletePod(t *testing.T) {
 	}
 	controller.PodUpdated(testutil.NewPod("pod1", "node1"), nil)
 	// wait a bit to see if nothing will panic
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(timeForControllerToProgress)
 	close(stopCh)
 }
 
@@ -242,10 +244,10 @@ func TestUpdatePod(t *testing.T) {
 
 		controller.PodUpdated(nil, item.prevPod)
 		fakeClientset.ClearActions()
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(timeForControllerToProgress)
 		controller.PodUpdated(item.prevPod, item.newPod)
 		// wait a bit
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(timeForControllerToProgress)
 		if item.additionalSleep > 0 {
 			time.Sleep(item.additionalSleep)
 		}
@@ -304,7 +306,7 @@ func TestCreateNode(t *testing.T) {
 		go controller.Run(stopCh)
 		controller.NodeUpdated(nil, item.node)
 		// wait a bit
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(timeForControllerToProgress)
 
 		podDeleted := false
 		for _, action := range fakeClientset.Actions() {
@@ -330,7 +332,7 @@ func TestDeleteNode(t *testing.T) {
 	go controller.Run(stopCh)
 	controller.NodeUpdated(testutil.NewNode("node1"), nil)
 	// wait a bit to see if nothing will panic
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(timeForControllerToProgress)
 	controller.taintedNodesLock.Lock()
 	if _, ok := controller.taintedNodes["node1"]; ok {
 		t.Error("Node should have been deleted from taintedNodes list")
@@ -425,7 +427,7 @@ func TestUpdateNode(t *testing.T) {
 		go controller.Run(stopCh)
 		controller.NodeUpdated(item.oldNode, item.newNode)
 		// wait a bit
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(timeForControllerToProgress)
 		if item.additionalSleep > 0 {
 			time.Sleep(item.additionalSleep)
 		}
