@@ -368,6 +368,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	}
 
 	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out, err))
+	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
 	cmds.AddCommand(NewCmdOptions())
