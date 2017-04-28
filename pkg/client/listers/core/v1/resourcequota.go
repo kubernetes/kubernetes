@@ -19,11 +19,10 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/api/core/v1"
 )
 
 // ResourceQuotaLister helps list ResourceQuotas.
@@ -89,7 +88,7 @@ func (s resourceQuotaNamespaceLister) Get(name string) (*v1.ResourceQuota, error
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("resourcequota"), name)
+		return nil, errors.NewNotFound(v1.Resource("resourcequota"), name)
 	}
 	return obj.(*v1.ResourceQuota), nil
 }

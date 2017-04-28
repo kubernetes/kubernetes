@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 )
 
@@ -89,7 +88,7 @@ func (s roleNamespaceLister) Get(name string) (*v1alpha1.Role, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(rbac.Resource("role"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("role"), name)
 	}
 	return obj.(*v1alpha1.Role), nil
 }

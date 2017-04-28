@@ -19,12 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/api/core/v1"
 )
 
 // NamespaceLister helps list Namespaces.
@@ -62,7 +61,7 @@ func (s *namespaceLister) Get(name string) (*v1.Namespace, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("namespace"), name)
+		return nil, errors.NewNotFound(v1.Resource("namespace"), name)
 	}
 	return obj.(*v1.Namespace), nil
 }

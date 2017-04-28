@@ -19,11 +19,10 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/api/core/v1"
 )
 
 // ServiceLister helps list Services.
@@ -89,7 +88,7 @@ func (s serviceNamespaceLister) Get(name string) (*v1.Service, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("service"), name)
+		return nil, errors.NewNotFound(v1.Resource("service"), name)
 	}
 	return obj.(*v1.Service), nil
 }
