@@ -21,11 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	unsafe "unsafe"
-
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
+	unsafe "unsafe"
 )
 
 func init() {

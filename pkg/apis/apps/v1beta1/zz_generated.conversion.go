@@ -21,15 +21,14 @@ limitations under the License.
 package v1beta1
 
 import (
-	unsafe "unsafe"
-
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -130,7 +129,7 @@ func autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *StatefulSet
 		return err
 	}
 	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	out.VolumeClaimTemplates = *(*[]api.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
@@ -143,10 +142,10 @@ func autoConvert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.Statef
 		return err
 	}
 	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := k8s_api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	out.VolumeClaimTemplates = *(*[]api_v1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
+	out.VolumeClaimTemplates = *(*[]core_v1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
 	out.ServiceName = in.ServiceName
 	return nil
 }
