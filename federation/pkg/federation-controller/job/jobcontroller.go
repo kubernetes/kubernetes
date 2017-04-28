@@ -17,7 +17,6 @@ limitations under the License.
 package job
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/planner"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/replicapreferences"
 	"k8s.io/kubernetes/pkg/api"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -65,21 +65,6 @@ var (
 	backoffInitial          = 5 * time.Second
 	backoffMax              = 1 * time.Minute
 )
-
-func parseFedJobReference(frs *batchv1.Job) (*fed.FederatedReplicaSetPreferences, error) {
-	if frs.Annotations == nil {
-		return nil, nil
-	}
-	frsPrefString, found := frs.Annotations[FedJobPreferencesAnnotation]
-	if !found {
-		return nil, nil
-	}
-	var frsPref fed.FederatedReplicaSetPreferences
-	if err := json.Unmarshal([]byte(frsPrefString), &frsPref); err != nil {
-		return nil, err
-	}
-	return &frsPref, nil
-}
 
 type JobController struct {
 	fedClient fedclientset.Interface
@@ -113,8 +98,8 @@ func NewJobController(fedClient fedclientset.Interface) *JobController {
 		clusterDeliverer: fedutil.NewDelayingDeliverer(),
 		jobWorkQueue:     workqueue.New(),
 		jobBackoff:       flowcontrol.NewBackOff(backoffInitial, backoffMax),
-		defaultPlanner: planner.NewPlanner(&fed.FederatedReplicaSetPreferences{
-			Clusters: map[string]fed.ClusterReplicaSetPreferences{
+		defaultPlanner: planner.NewPlanner(&fed.ReplicaAllocationPreferences{
+			Clusters: map[string]fed.ClusterPreferences{
 				"*": {Weight: 1},
 			},
 		}),
@@ -164,7 +149,7 @@ func NewJobController(fedClient fedclientset.Interface) *JobController {
 		),
 	)
 
-	fjc.fedUpdater = fedutil.NewFederatedUpdater(fjc.fedJobInformer,
+	fjc.fedUpdater = fedutil.NewFederatedUpdater(fjc.fedJobInformer, "job", updateTimeout, fjc.eventRecorder,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*batchv1.Job)
 			_, err := client.Batch().Jobs(rs.Namespace).Create(rs)
@@ -188,8 +173,6 @@ func NewJobController(fedClient fedclientset.Interface) *JobController {
 			job := obj.(*batchv1.Job)
 			return job.Name
 		},
-		updateTimeout,
-		fjc.eventRecorder,
 		fjc.fedJobInformer,
 		fjc.fedUpdater,
 	)
@@ -336,7 +319,7 @@ type scheduleResult struct {
 
 func (fjc *JobController) schedule(fjob *batchv1.Job, clusters []*fedv1.Cluster) map[string]scheduleResult {
 	plnr := fjc.defaultPlanner
-	frsPref, err := parseFedJobReference(fjob)
+	frsPref, err := replicapreferences.GetAllocationPreferences(fjob, FedJobPreferencesAnnotation)
 	if err != nil {
 		glog.Warningf("Invalid job specific preference, use default. rs: %v, err: %v", fjob, err)
 	}
@@ -529,10 +512,7 @@ func (fjc *JobController) reconcileJob(key string) (reconciliationStatus, error)
 			glog.V(4).Infof("operation[%d]: %s, %s/%s/%s, %d", i, op.Type, op.ClusterName, job.Namespace, job.Name, *job.Spec.Parallelism)
 		}
 	}
-	err = fjc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
-		fjc.eventRecorder.Eventf(fjob, api.EventTypeNormal, "FailedUpdateInCluster", "Job update in cluster %s failed: %v", op.ClusterName, operror)
-		glog.Errorf("Failed to execute updates for %s %s/%s: %v", op.Type, op.ClusterName, key, operror)
-	})
+	err = fjc.fedUpdater.Update(operations)
 	if err != nil {
 		return statusError, err
 	}

@@ -185,8 +185,10 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, jobcontroller.ControllerName, jobcontroller.RequiredResources, true) {
+		glog.V(3).Infof("Loading client config for job controller %q", jobcontroller.UserAgentName)
 		jobClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, jobcontroller.UserAgentName))
 		jobController := jobcontroller.NewJobController(jobClientset)
+		glog.V(3).Infof("Running job controller")
 		go jobController.Run(s.ConcurrentJobSyncs, wait.NeverStop)
 	}
 
