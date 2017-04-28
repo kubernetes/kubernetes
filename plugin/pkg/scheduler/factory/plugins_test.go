@@ -39,3 +39,22 @@ func TestAlgorithmNameValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestPriorityOverFlow(t *testing.T) {
+	var a, b int
+	a = 5000
+	b = MaxInt
+	if !checkOverFlow(a, b) {
+		t.Errorf("Expected Overflow")
+	}
+	a = MaxInt
+	b = 5000
+	if !checkOverFlow(a, b) {
+		t.Errorf("Expected Overflow")
+	}
+	a = MaxInt
+	b = MaxInt
+	if !checkOverFlow(a, b) {
+		t.Errorf("Expected Overflow")
+	}
+}
