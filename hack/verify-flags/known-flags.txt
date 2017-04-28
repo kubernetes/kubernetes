@@ -97,6 +97,7 @@ clientset-name
 clientset-only
 clientset-path
 cloud-config
+cloud-config-file
 cloud-provider
 cloud-provider-gce-lb-src-cidrs
 cluster-cidr
