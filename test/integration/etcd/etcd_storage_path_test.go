@@ -22,9 +22,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"mime"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -395,7 +397,10 @@ const testNamespace = "etcdstoragepathtestnamespace"
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func TestEtcdStoragePath(t *testing.T) {
-	client, kvClient, mapper := startRealMasterOrDie(t)
+	certDir, _ := ioutil.TempDir("", "test-integration-etcd")
+	defer os.RemoveAll(certDir)
+
+	client, kvClient, mapper := startRealMasterOrDie(t, certDir)
 	defer func() {
 		dumpEtcdKVOnFailure(t, kvClient)
 	}()
@@ -522,7 +527,7 @@ func TestEtcdStoragePath(t *testing.T) {
 	}
 }
 
-func startRealMasterOrDie(t *testing.T) (*allClient, clientv3.KV, meta.RESTMapper) {
+func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV, meta.RESTMapper) {
 	_, defaultServiceClusterIPRange, err := net.ParseCIDR("10.0.0.0/24")
 	if err != nil {
 		t.Fatal(err)
@@ -535,6 +540,7 @@ func startRealMasterOrDie(t *testing.T) (*allClient, clientv3.KV, meta.RESTMappe
 		for {
 			kubeAPIServerOptions := options.NewServerRunOptions()
 			kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
+			kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURLFromEnv()}
 			kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // TODO use protobuf?
 			kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
