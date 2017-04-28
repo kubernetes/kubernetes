@@ -35,7 +35,7 @@ SHELL := /bin/bash
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.
 .PHONY: generated_files
-generated_files: gen_openapi
+generated_files: gen_deepcopy 
 #generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi
 
 .PHONY: verify_generated_files
