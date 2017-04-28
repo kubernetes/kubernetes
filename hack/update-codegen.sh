@@ -77,6 +77,8 @@ $(
 
 LISTERGEN_APIS=(${LISTERGEN_APIS[@]/#/k8s.io/kubernetes/})
 LISTERGEN_APIS=$(IFS=,; echo "${LISTERGEN_APIS[*]}")
+# TODO: remove this hack when all apis are moved to k8s.io/api
+LISTERGEN_APIS=$(echo ${LISTERGEN_APIS} | sed "s|k8s.io/kubernetes/pkg/api/v1|k8s.io/api/core/v1|g")
 
 ${listergen} --input-dirs "${LISTERGEN_APIS}" "$@"
 
@@ -92,6 +94,8 @@ $(
 
 INFORMERGEN_APIS=(${INFORMERGEN_APIS[@]/#/k8s.io/kubernetes/})
 INFORMERGEN_APIS=$(IFS=,; echo "${INFORMERGEN_APIS[*]}")
+# TODO: remove this hack when all apis are moved to k8s.io/api
+INFORMERGEN_APIS=$(echo ${INFORMERGEN_APIS} | sed "s|k8s.io/kubernetes/pkg/api/v1|k8s.io/api/core/v1|g")
 ${informergen} \
   --input-dirs "${INFORMERGEN_APIS}" \
   --versioned-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/clientset \
