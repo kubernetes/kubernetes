@@ -72,12 +72,14 @@ type Config struct {
 	CertificateStore Store
 	// BootstrapCertificatePEM is the certificate data that will be returned
 	// from the Manager if the CertificateStore doesn't have any cert/key pairs
-	// currently available. If the CertificateStore does have a cert/key pair,
-	// this will be ignored. If the bootstrap cert/key pair are used, they will
-	// be rotated at the first opportunity, possibly well in advance of
-	// expiring. This is intended to allow the first boot of a component to be
-	// initialized using a generic, multi-use cert/key pair which will be
-	// quickly replaced with a unique cert/key pair.
+	// currently available and has not yet had a chance to get a new cert/key
+	// pair from the API. If the CertificateStore does have a cert/key pair,
+	// this will be ignored. If there is no cert/key pair available in the
+	// CertificateStore, as soon as Start is called, it will request a new
+	// cert/key pair from the CertificateSigningRequestClient. This is intended
+	// to allow the first boot of a component to be initialized using a
+	// generic, multi-use cert/key pair which will be quickly replaced with a
+	// unique cert/key pair.
 	BootstrapCertificatePEM []byte
 	// BootstrapKeyPEM is the key data that will be returned from the Manager
 	// if the CertificateStore doesn't have any cert/key pairs currently
@@ -144,8 +146,10 @@ func NewManager(config *Config) (Manager, error) {
 	return &m, nil
 }
 
-// Current returns the currently selected certificate from the
-// certificate manager.
+// Current returns the currently selected certificate from the certificate
+// manager. This can be nil if the manager was initialized without a
+// certificate and has not yet received one from the
+// CertificateSigningRequestClient.
 func (m *manager) Current() *tls.Certificate {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
@@ -164,6 +168,11 @@ func (m *manager) Start() {
 	}
 
 	glog.V(2).Infof("Certificate rotation is enabled.")
+
+	err := m.rotateCerts()
+	if err != nil {
+		glog.Errorf("Could not rotate certificates: %v", err)
+	}
 	go wait.Forever(func() {
 		for range time.Tick(syncPeriod) {
 			err := m.rotateCerts()
@@ -189,7 +198,7 @@ func getCurrentCertificateOrBootstrap(
 	}
 
 	if bootstrapCertificatePEM == nil || bootstrapKeyPEM == nil {
-		return nil, false, fmt.Errorf("no cert/key available and no bootstrap cert/key to fall back to")
+		return nil, true, nil
 	}
 
 	bootstrapCert, err := tls.X509KeyPair(bootstrapCertificatePEM, bootstrapKeyPEM)
@@ -213,6 +222,10 @@ func getCurrentCertificateOrBootstrap(
 func (m *manager) shouldRotate() bool {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
+	if m.cert == nil {
+		return true
+	}
+
 	notAfter := m.cert.Leaf.NotAfter
 	totalDuration := float64(notAfter.Sub(m.cert.Leaf.NotBefore))
 
@@ -291,6 +304,7 @@ func (m *manager) generateCSR() (csrPEM []byte, keyPEM []byte, err error) {
 // k8s.io/kubernetes/pkg/kubelet/util/csr/csr.go, changing only the package that
 // CertificateSigningRequestInterface and KeyUsage are imported from.
 func requestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, usages []certificates.KeyUsage) (certData []byte, err error) {
+	glog.Infof("Requesting new certificate.")
 	req, err := client.Create(&certificates.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
 		TypeMeta:   metav1.TypeMeta{Kind: "CertificateSigningRequest"},
