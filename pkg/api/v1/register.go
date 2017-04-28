@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//TODO: this file is going to be moved to k8s.io/api
+
 package v1
 
 import (
@@ -34,22 +36,11 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
-	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
-	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
-	SchemeBuilder      runtime.SchemeBuilder
-	localSchemeBuilder = &SchemeBuilder
-	AddToScheme        = localSchemeBuilder.AddToScheme
+	SchemeBuilder runtime.SchemeBuilder
 )
 
-func init() {
-	// We only register manually written functions here. The registration of the
-	// generated functions takes place in the generated files. The separation
-	// makes the code compile even when the generated files are missing.
-	localSchemeBuilder.Register(addKnownTypes, addDefaultingFuncs, addConversionFuncs, addFastPathConversionFuncs)
-}
-
 // Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) error {
+func AddKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},
