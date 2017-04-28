@@ -40,6 +40,8 @@ type RoleBindingGeneratorV1 struct {
 	Groups []string
 	// ServiceAccounts to derive the roleBinding from in namespace:name format(optional)
 	ServiceAccounts []string
+	// DefaultNamespace for ServiceAccounts
+	DefaultNamespace string
 }
 
 // Ensure it supports the generator pattern that uses parameter injection.
@@ -147,13 +149,17 @@ func (s RoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	}
 	for _, sa := range sets.NewString(s.ServiceAccounts...).List() {
 		tokens := strings.Split(sa, ":")
-		if len(tokens) != 2 {
+		if len(tokens) != 2 || tokens[1] == "" {
 			return nil, fmt.Errorf("serviceaccount must be <namespace>:<name>")
+		}
+		namespace := tokens[0]
+		if len(namespace) == 0 {
+			namespace = s.DefaultNamespace
 		}
 		roleBinding.Subjects = append(roleBinding.Subjects, rbac.Subject{
 			Kind:      rbac.ServiceAccountKind,
 			APIGroup:  "",
-			Namespace: tokens[0],
+			Namespace: namespace,
 			Name:      tokens[1],
 		})
 	}

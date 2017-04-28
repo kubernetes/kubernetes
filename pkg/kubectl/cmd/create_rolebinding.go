@@ -66,16 +66,21 @@ func CreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, 
 	if err != nil {
 		return err
 	}
+	namespace, _, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.RoleBindingV1GeneratorName:
 		generator = &kubectl.RoleBindingGeneratorV1{
-			Name:            name,
-			ClusterRole:     cmdutil.GetFlagString(cmd, "clusterrole"),
-			Role:            cmdutil.GetFlagString(cmd, "role"),
-			Users:           cmdutil.GetFlagStringArray(cmd, "user"),
-			Groups:          cmdutil.GetFlagStringArray(cmd, "group"),
-			ServiceAccounts: cmdutil.GetFlagStringArray(cmd, "serviceaccount"),
+			Name:             name,
+			ClusterRole:      cmdutil.GetFlagString(cmd, "clusterrole"),
+			Role:             cmdutil.GetFlagString(cmd, "role"),
+			Users:            cmdutil.GetFlagStringArray(cmd, "user"),
+			Groups:           cmdutil.GetFlagStringArray(cmd, "group"),
+			ServiceAccounts:  cmdutil.GetFlagStringArray(cmd, "serviceaccount"),
+			DefaultNamespace: namespace,
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
