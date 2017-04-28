@@ -3338,6 +3338,11 @@ func ValidateNode(node *api.Node) field.ErrorList {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "externalID"), ""))
 	}
 
+	// Only allow Node.Spec.ConfigSource to be set if the DynamicKubeletConfig feature gate is enabled
+	if node.Spec.ConfigSource != nil && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "configSource"), "configSource may only be set if the DynamicKubeletConfig feature gate is enabled)"))
+	}
+
 	// TODO(rjnagal): Ignore PodCIDR till its completely implemented.
 	return allErrs
 }
@@ -3365,7 +3370,7 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
 
-	// Validte no duplicate addresses in node status.
+	// Validate no duplicate addresses in node status.
 	addresses := make(map[api.NodeAddress]bool)
 	for i, address := range node.Status.Addresses {
 		if _, ok := addresses[address]; ok {
@@ -3398,10 +3403,16 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	}
 	oldNode.Spec.Taints = node.Spec.Taints
 
+	// Allow updates to Node.Spec.ConfigSource if DynamicKubeletConfig feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		oldNode.Spec.ConfigSource = node.Spec.ConfigSource
+	}
+
+	// We made allowed changes to oldNode, and now we compare oldNode to node. Any remaining differences indicate changes to protected fields.
 	// TODO: Add a 'real' error type for this error and provide print actual diffs.
 	if !apiequality.Semantic.DeepEqual(oldNode, node) {
 		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
-		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels, taints or capacity"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels, taints, or capacity (or configSource, if the DynamicKubeletConfig feature gate is enabled)"))
 	}
 
 	return allErrs

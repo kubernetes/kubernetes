@@ -31,15 +31,15 @@ import (
 
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
 // or returns an error.
-func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg *componentconfig.KubeletConfiguration, nodeName types.NodeName, ips []net.IP, hostnames []string) (Manager, error) {
+func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg *componentconfig.KubeletConfiguration, nodeName types.NodeName, ips []net.IP, hostnames []string, certDirectory string) (Manager, error) {
 	var certSigningRequestClient clientcertificates.CertificateSigningRequestInterface
 	if kubeClient != nil && kubeClient.Certificates() != nil {
 		certSigningRequestClient = kubeClient.Certificates().CertificateSigningRequests()
 	}
 	certificateStore, err := NewFileStore(
 		"kubelet-server",
-		kubeCfg.CertDirectory,
-		kubeCfg.CertDirectory,
+		certDirectory,
+		certDirectory,
 		kubeCfg.TLSCertFile,
 		kubeCfg.TLSPrivateKeyFile)
 	if err != nil {
