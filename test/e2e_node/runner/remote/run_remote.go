@@ -41,7 +41,7 @@ import (
 	"github.com/pborman/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	compute "google.golang.org/api/compute/v1"
+	compute "google.golang.org/api/compute/v0_beta"
 )
 
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
@@ -100,6 +100,15 @@ type ImageConfig struct {
 	Images map[string]GCEImage `json:"images"`
 }
 
+type Accelerator struct {
+	Type  string `json:"type,omitempty"`
+	Count int    `json:"count, omitempty"`
+}
+
+type Resources struct {
+	Accelerators []Accelerator `json:"nvidia_gpus,omitempty"`
+}
+
 type GCEImage struct {
 	Image      string `json:"image, omitempty"`
 	Project    string `json:"project"`
@@ -109,7 +118,8 @@ type GCEImage struct {
 	// If the number of existing previous images is lesser than what is desired, the test will use that is available.
 	PreviousImages int `json:"previous_images, omitempty"`
 
-	Machine string `json:"machine, omitempty"`
+	Machine   string `json:"machine, omitempty"`
+	Resources Resources
 	// This test is for benchmark (no limit verification, more result log, node name has format 'machine-image-uuid') if 'Tests' is non-empty.
 	Tests []string `json:"tests, omitempty"`
 }
@@ -119,11 +129,12 @@ type internalImageConfig struct {
 }
 
 type internalGCEImage struct {
-	image    string
-	project  string
-	metadata *compute.Metadata
-	machine  string
-	tests    []string
+	image     string
+	project   string
+	resources Resources
+	metadata  *compute.Metadata
+	machine   string
+	tests     []string
 }
 
 // parseFlags parse subcommands and flags
@@ -514,6 +525,22 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			},
 		},
 	}
+
+	for _, accelerator := range imageConfig.resources.Accelerators {
+		if i.GuestAccelerators == nil {
+			i.GuestAccelerators = []*compute.AcceleratorConfig{}
+			i.Scheduling = &compute.Scheduling{
+				OnHostMaintenance: "TERMINATE",
+				AutomaticRestart:  true,
+			}
+		}
+		ac := &compute.AcceleratorConfig{
+			AcceleratorCount: accelerator.Count,
+			AcceleratorType:  accelerator.Type,
+		}
+		i.GuestAccelerators = append(i.GuestAccelerators, ac)
+	}
+
 	i.Metadata = imageConfig.metadata
 	op, err := computeService.Instances.Insert(*project, *zone, i).Do()
 	if err != nil {
