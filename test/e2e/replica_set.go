@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -41,7 +42,7 @@ func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageNa
 			Name: rsName,
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Replicas: &replicas,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: rsPodLabels,
@@ -77,87 +78,81 @@ var _ = framework.KubeDescribe("ReplicaSet", func() {
 	f := framework.NewDefaultFramework("replicaset")
 
 	It("should serve a basic image on each replica with a public image [Conformance]", func() {
-		ReplicaSetServeImageOrFail(f, "basic", "gcr.io/google_containers/serve_hostname:v1.4")
+		testReplicaSetServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})
 
 	It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
 		framework.SkipUnlessProviderIs("gce", "gke")
 
-		ReplicaSetServeImageOrFail(f, "private", "gcr.io/k8s-authenticated-test/serve_hostname:v1.4")
+		testReplicaSetServeImageOrFail(f, "private", "gcr.io/k8s-authenticated-test/serve_hostname:v1.4")
 	})
 
 	It("should surface a failure condition on a common issue like exceeded quota", func() {
-		rsConditionCheck(f)
+		testReplicaSetConditionCheck(f)
+	})
+
+	It("should adopt matching pods on creation", func() {
+		testRSAdoptMatchingOrphans(f)
+	})
+
+	It("should release no longer matching pods", func() {
+		testRSReleaseControlledNotMatching(f)
 	})
 })
 
 // A basic test to check the deployment of an image using a ReplicaSet. The
 // image serves its hostname which is checked for each replica.
-func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image string) {
+func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image string) {
 	name := "my-hostname-" + test + "-" + string(uuid.NewUUID())
-	replicas := int32(2)
+	replicas := int32(1)
 
 	// Create a ReplicaSet for a service that serves its hostname.
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
-	By(fmt.Sprintf("Creating ReplicaSet %s", name))
-	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(&extensions.ReplicaSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: extensions.ReplicaSetSpec{
-			Replicas: func(i int32) *int32 { return &i }(replicas),
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
-				"name": name,
-			}},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"name": name},
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  name,
-							Image: image,
-							Ports: []v1.ContainerPort{{ContainerPort: 9376}},
-						},
-					},
-				},
-			},
-		},
-	})
+	framework.Logf("Creating ReplicaSet %s", name)
+	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image)
+	newRS.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
+	_, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(newRS)
 	Expect(err).NotTo(HaveOccurred())
-	// Cleanup the ReplicaSet when we are done.
-	defer func() {
-		// Resize the ReplicaSet to zero to get rid of pods.
-		if err := framework.DeleteReplicaSet(f.ClientSet, f.InternalClientset, f.Namespace.Name, rs.Name); err != nil {
-			framework.Logf("Failed to cleanup ReplicaSet %v: %v.", rs.Name, err)
-		}
-	}()
 
-	// List the pods, making sure we observe all the replicas.
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-
+	// Check that pods for the new RS were created.
+	// TODO: Maybe switch PodsCreated to just check owner references.
 	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicas)
 	Expect(err).NotTo(HaveOccurred())
 
-	By("Ensuring each pod is running")
-
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
+	framework.Logf("Ensuring a pod for ReplicaSet %q is running", name)
+	running := int32(0)
 	for _, pod := range pods.Items {
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
 		err = f.WaitForPodRunning(pod.Name)
+		if err != nil {
+			updatePod, getErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+			if getErr == nil {
+				err = fmt.Errorf("Pod %q never run (phase: %s, conditions: %+v): %v", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
+			} else {
+				err = fmt.Errorf("Pod %q never run: %v", pod.Name, err)
+			}
+		}
 		Expect(err).NotTo(HaveOccurred())
+		framework.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
+		running++
+	}
+
+	// Sanity check
+	if running != replicas {
+		Expect(fmt.Errorf("unexpected number of running pods: %+v", pods.Items)).NotTo(HaveOccurred())
 	}
 
 	// Verify that something is listening.
-	By("Trying to dial each unique pod")
+	framework.Logf("Trying to dial the pod")
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	err = wait.Poll(retryInterval, retryTimeout, framework.PodProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
 	if err != nil {
 		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
@@ -168,7 +163,7 @@ func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image strin
 // 2. Create a replica set that wants to run 3 pods.
 // 3. Check replica set conditions for a ReplicaFailure condition.
 // 4. Scale down the replica set and observe the condition is gone.
-func rsConditionCheck(f *framework.Framework) {
+func testReplicaSetConditionCheck(f *framework.Framework) {
 	c := f.ClientSet
 	namespace := f.Namespace.Name
 	name := "condition-test"
@@ -247,5 +242,98 @@ func rsConditionCheck(f *framework.Framework) {
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("rs controller never removed the failure condition for rs %q: %#v", name, conditions)
 	}
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func testRSAdoptMatchingOrphans(f *framework.Framework) {
+	name := "pod-adoption"
+	By(fmt.Sprintf("Given a Pod with a 'name' label %s is created", name))
+	p := f.PodClient().CreateSync(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"name": name,
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  name,
+					Image: nginxImageName,
+				},
+			},
+		},
+	})
+
+	By("When a replicaset with a matching selector is created")
+	replicas := int32(1)
+	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, nginxImageName)
+	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
+	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(rsSt)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Then the orphan pod is adopted")
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		// The Pod p should either be adopted or deleted by the ReplicaSet
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		Expect(err).NotTo(HaveOccurred())
+		for _, owner := range p2.OwnerReferences {
+			if *owner.Controller && owner.UID == rs.UID {
+				// pod adopted
+				return true, nil
+			}
+		}
+		// pod still not adopted
+		return false, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func testRSReleaseControlledNotMatching(f *framework.Framework) {
+	name := "pod-release"
+	By("Given a ReplicaSet is created")
+	replicas := int32(1)
+	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, nginxImageName)
+	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
+	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(rsSt)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("When the matched label of one of its pods change")
+	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, rs.Name, replicas)
+	Expect(err).NotTo(HaveOccurred())
+
+	p := pods.Items[0]
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		pod.Labels = map[string]string{"name": "not-matching-name"}
+		_, err = f.ClientSet.Core().Pods(f.Namespace.Name).Update(pod)
+		if err != nil && errors.IsConflict(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Then the pod is released")
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		for _, owner := range p2.OwnerReferences {
+			if *owner.Controller && owner.UID == rs.UID {
+				// pod still belonging to the replicaset
+				return false, nil
+			}
+		}
+		// pod already released
+		return true, nil
+	})
 	Expect(err).NotTo(HaveOccurred())
 }

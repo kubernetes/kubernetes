@@ -45,6 +45,8 @@
 		LeaseRevokeResponse
 		LeaseKeepAliveRequest
 		LeaseKeepAliveResponse
+		LeaseTimeToLiveRequest
+		LeaseTimeToLiveResponse
 		Member
 		MemberAddRequest
 		MemberAddResponse
@@ -113,26 +115,28 @@ var _ = math.Inf
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
-const _ = proto.ProtoPackageIsVersion1
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 type Request struct {
-	ID               uint64 `protobuf:"varint,1,opt,name=ID,json=iD" json:"ID"`
-	Method           string `protobuf:"bytes,2,opt,name=Method,json=method" json:"Method"`
-	Path             string `protobuf:"bytes,3,opt,name=Path,json=path" json:"Path"`
-	Val              string `protobuf:"bytes,4,opt,name=Val,json=val" json:"Val"`
-	Dir              bool   `protobuf:"varint,5,opt,name=Dir,json=dir" json:"Dir"`
-	PrevValue        string `protobuf:"bytes,6,opt,name=PrevValue,json=prevValue" json:"PrevValue"`
-	PrevIndex        uint64 `protobuf:"varint,7,opt,name=PrevIndex,json=prevIndex" json:"PrevIndex"`
-	PrevExist        *bool  `protobuf:"varint,8,opt,name=PrevExist,json=prevExist" json:"PrevExist,omitempty"`
-	Expiration       int64  `protobuf:"varint,9,opt,name=Expiration,json=expiration" json:"Expiration"`
-	Wait             bool   `protobuf:"varint,10,opt,name=Wait,json=wait" json:"Wait"`
-	Since            uint64 `protobuf:"varint,11,opt,name=Since,json=since" json:"Since"`
-	Recursive        bool   `protobuf:"varint,12,opt,name=Recursive,json=recursive" json:"Recursive"`
-	Sorted           bool   `protobuf:"varint,13,opt,name=Sorted,json=sorted" json:"Sorted"`
-	Quorum           bool   `protobuf:"varint,14,opt,name=Quorum,json=quorum" json:"Quorum"`
-	Time             int64  `protobuf:"varint,15,opt,name=Time,json=time" json:"Time"`
-	Stream           bool   `protobuf:"varint,16,opt,name=Stream,json=stream" json:"Stream"`
-	Refresh          *bool  `protobuf:"varint,17,opt,name=Refresh,json=refresh" json:"Refresh,omitempty"`
+	ID               uint64 `protobuf:"varint,1,opt,name=ID" json:"ID"`
+	Method           string `protobuf:"bytes,2,opt,name=Method" json:"Method"`
+	Path             string `protobuf:"bytes,3,opt,name=Path" json:"Path"`
+	Val              string `protobuf:"bytes,4,opt,name=Val" json:"Val"`
+	Dir              bool   `protobuf:"varint,5,opt,name=Dir" json:"Dir"`
+	PrevValue        string `protobuf:"bytes,6,opt,name=PrevValue" json:"PrevValue"`
+	PrevIndex        uint64 `protobuf:"varint,7,opt,name=PrevIndex" json:"PrevIndex"`
+	PrevExist        *bool  `protobuf:"varint,8,opt,name=PrevExist" json:"PrevExist,omitempty"`
+	Expiration       int64  `protobuf:"varint,9,opt,name=Expiration" json:"Expiration"`
+	Wait             bool   `protobuf:"varint,10,opt,name=Wait" json:"Wait"`
+	Since            uint64 `protobuf:"varint,11,opt,name=Since" json:"Since"`
+	Recursive        bool   `protobuf:"varint,12,opt,name=Recursive" json:"Recursive"`
+	Sorted           bool   `protobuf:"varint,13,opt,name=Sorted" json:"Sorted"`
+	Quorum           bool   `protobuf:"varint,14,opt,name=Quorum" json:"Quorum"`
+	Time             int64  `protobuf:"varint,15,opt,name=Time" json:"Time"`
+	Stream           bool   `protobuf:"varint,16,opt,name=Stream" json:"Stream"`
+	Refresh          *bool  `protobuf:"varint,17,opt,name=Refresh" json:"Refresh,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
 
@@ -142,8 +146,8 @@ func (*Request) ProtoMessage()               {}
 func (*Request) Descriptor() ([]byte, []int) { return fileDescriptorEtcdserver, []int{0} }
 
 type Metadata struct {
-	NodeID           uint64 `protobuf:"varint,1,opt,name=NodeID,json=nodeID" json:"NodeID"`
-	ClusterID        uint64 `protobuf:"varint,2,opt,name=ClusterID,json=clusterID" json:"ClusterID"`
+	NodeID           uint64 `protobuf:"varint,1,opt,name=NodeID" json:"NodeID"`
+	ClusterID        uint64 `protobuf:"varint,2,opt,name=ClusterID" json:"ClusterID"`
 	XXX_unrecognized []byte `json:"-"`
 }
 
@@ -156,182 +160,182 @@ func init() {
 	proto.RegisterType((*Request)(nil), "etcdserverpb.Request")
 	proto.RegisterType((*Metadata)(nil), "etcdserverpb.Metadata")
 }
-func (m *Request) Marshal() (data []byte, err error) {
+func (m *Request) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *Request) MarshalTo(data []byte) (int, error) {
+func (m *Request) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0x8
+	dAtA[i] = 0x8
 	i++
-	i = encodeVarintEtcdserver(data, i, uint64(m.ID))
-	data[i] = 0x12
+	i = encodeVarintEtcdserver(dAtA, i, uint64(m.ID))
+	dAtA[i] = 0x12
 	i++
-	i = encodeVarintEtcdserver(data, i, uint64(len(m.Method)))
-	i += copy(data[i:], m.Method)
-	data[i] = 0x1a
+	i = encodeVarintEtcdserver(dAtA, i, uint64(len(m.Method)))
+	i += copy(dAtA[i:], m.Method)
+	dAtA[i] = 0x1a
 	i++
-	i = encodeVarintEtcdserver(data, i, uint64(len(m.Path)))
-	i += copy(data[i:], m.Path)
-	data[i] = 0x22
+	i = encodeVarintEtcdserver(dAtA, i, uint64(len(m.Path)))
+	i += copy(dAtA[i:], m.Path)
+	dAtA[i] = 0x22
 	i++
-	i = encodeVarintEtcdserver(data, i, uint64(len(m.Val)))
-	i += copy(data[i:], m.Val)
-	data[i] = 0x28
+	i = encodeVarintEtcdserver(dAtA, i, uint64(len(m.Val)))
+	i += copy(dAtA[i:], m.Val)
+	dAtA[i] = 0x28
 	i++
 	if m.Dir {
-		data[i] = 1
+		dAtA[i] = 1
 	} else {
-		data[i] = 0
+		dAtA[i] = 0
 	}
 	i++
-	data[i] = 0x32
+	dAtA[i] = 0x32
 	i++
-	i = encodeVarintEtcdserver(data, i, uint64(len(m.PrevValue)))
-	i += copy(data[i:], m.PrevValue)
-	data[i] = 0x38
+	i = encodeVarintEtcdserver(dAtA, i, uint64(len(m.PrevValue)))
+	i += copy(dAtA[i:], m.PrevValue)
+	dAtA[i] = 0x38
 	i++
-	i = encodeVarintEtcdserver(data, i, uint64(m.PrevIndex))
+	i = encodeVarintEtcdserver(dAtA, i, uint64(m.PrevIndex))
 	if m.PrevExist != nil {
-		data[i] = 0x40
+		dAtA[i] = 0x40
 		i++
 		if *m.PrevExist {
-			data[i] = 1
+			dAtA[i] = 1
 		} else {
-			data[i] = 0
+			dAtA[i] = 0
 		}
 		i++
 	}
-	data[i] = 0x48
+	dAtA[i] = 0x48
 	i++
-	i = encodeVarintEtcdserver(data, i, uint64(m.Expiration))
-	data[i] = 0x50
+	i = encodeVarintEtcdserver(dAtA, i, uint64(m.Expiration))
+	dAtA[i] = 0x50
 	i++
 	if m.Wait {
-		data[i] = 1
+		dAtA[i] = 1
 	} else {
-		data[i] = 0
+		dAtA[i] = 0
 	}
 	i++
-	data[i] = 0x58
+	dAtA[i] = 0x58
 	i++
-	i = encodeVarintEtcdserver(data, i, uint64(m.Since))
-	data[i] = 0x60
+	i = encodeVarintEtcdserver(dAtA, i, uint64(m.Since))
+	dAtA[i] = 0x60
 	i++
 	if m.Recursive {
-		data[i] = 1
+		dAtA[i] = 1
 	} else {
-		data[i] = 0
+		dAtA[i] = 0
 	}
 	i++
-	data[i] = 0x68
+	dAtA[i] = 0x68
 	i++
 	if m.Sorted {
-		data[i] = 1
+		dAtA[i] = 1
 	} else {
-		data[i] = 0
+		dAtA[i] = 0
 	}
 	i++
-	data[i] = 0x70
+	dAtA[i] = 0x70
 	i++
 	if m.Quorum {
-		data[i] = 1
+		dAtA[i] = 1
 	} else {
-		data[i] = 0
+		dAtA[i] = 0
 	}
 	i++
-	data[i] = 0x78
+	dAtA[i] = 0x78
 	i++
-	i = encodeVarintEtcdserver(data, i, uint64(m.Time))
-	data[i] = 0x80
+	i = encodeVarintEtcdserver(dAtA, i, uint64(m.Time))
+	dAtA[i] = 0x80
 	i++
-	data[i] = 0x1
+	dAtA[i] = 0x1
 	i++
 	if m.Stream {
-		data[i] = 1
+		dAtA[i] = 1
 	} else {
-		data[i] = 0
+		dAtA[i] = 0
 	}
 	i++
 	if m.Refresh != nil {
-		data[i] = 0x88
+		dAtA[i] = 0x88
 		i++
-		data[i] = 0x1
+		dAtA[i] = 0x1
 		i++
 		if *m.Refresh {
-			data[i] = 1
+			dAtA[i] = 1
 		} else {
-			data[i] = 0
+			dAtA[i] = 0
 		}
 		i++
 	}
 	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
+		i += copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	return i, nil
 }
 
-func (m *Metadata) Marshal() (data []byte, err error) {
+func (m *Metadata) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *Metadata) MarshalTo(data []byte) (int, error) {
+func (m *Metadata) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0x8
+	dAtA[i] = 0x8
 	i++
-	i = encodeVarintEtcdserver(data, i, uint64(m.NodeID))
-	data[i] = 0x10
+	i = encodeVarintEtcdserver(dAtA, i, uint64(m.NodeID))
+	dAtA[i] = 0x10
 	i++
-	i = encodeVarintEtcdserver(data, i, uint64(m.ClusterID))
+	i = encodeVarintEtcdserver(dAtA, i, uint64(m.ClusterID))
 	if m.XXX_unrecognized != nil {
-		i += copy(data[i:], m.XXX_unrecognized)
+		i += copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	return i, nil
 }
 
-func encodeFixed64Etcdserver(data []byte, offset int, v uint64) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
-	data[offset+4] = uint8(v >> 32)
-	data[offset+5] = uint8(v >> 40)
-	data[offset+6] = uint8(v >> 48)
-	data[offset+7] = uint8(v >> 56)
+func encodeFixed64Etcdserver(dAtA []byte, offset int, v uint64) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
+	dAtA[offset+4] = uint8(v >> 32)
+	dAtA[offset+5] = uint8(v >> 40)
+	dAtA[offset+6] = uint8(v >> 48)
+	dAtA[offset+7] = uint8(v >> 56)
 	return offset + 8
 }
-func encodeFixed32Etcdserver(data []byte, offset int, v uint32) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
+func encodeFixed32Etcdserver(dAtA []byte, offset int, v uint32) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
 	return offset + 4
 }
-func encodeVarintEtcdserver(data []byte, offset int, v uint64) int {
+func encodeVarintEtcdserver(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
-		data[offset] = uint8(v&0x7f | 0x80)
+		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
-	data[offset] = uint8(v)
+	dAtA[offset] = uint8(v)
 	return offset + 1
 }
 func (m *Request) Size() (n int) {
@@ -392,8 +396,8 @@ func sovEtcdserver(x uint64) (n int) {
 func sozEtcdserver(x uint64) (n int) {
 	return sovEtcdserver(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (m *Request) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *Request) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -405,7 +409,7 @@ func (m *Request) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -433,7 +437,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.ID |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -452,7 +456,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -467,7 +471,7 @@ func (m *Request) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Method = string(data[iNdEx:postIndex])
+			m.Method = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -481,7 +485,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -496,7 +500,7 @@ func (m *Request) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Path = string(data[iNdEx:postIndex])
+			m.Path = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
@@ -510,7 +514,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -525,7 +529,7 @@ func (m *Request) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Val = string(data[iNdEx:postIndex])
+			m.Val = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 5:
 			if wireType != 0 {
@@ -539,7 +543,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				v |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -559,7 +563,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -574,7 +578,7 @@ func (m *Request) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.PrevValue = string(data[iNdEx:postIndex])
+			m.PrevValue = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 7:
 			if wireType != 0 {
@@ -588,7 +592,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.PrevIndex |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -607,7 +611,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				v |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -628,7 +632,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.Expiration |= (int64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -647,7 +651,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				v |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -667,7 +671,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.Since |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -686,7 +690,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				v |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -706,7 +710,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				v |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -726,7 +730,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				v |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -746,7 +750,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.Time |= (int64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -765,7 +769,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				v |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -785,7 +789,7 @@ func (m *Request) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				v |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -796,7 +800,7 @@ func (m *Request) Unmarshal(data []byte) error {
 			m.Refresh = &b
 		default:
 			iNdEx = preIndex
-			skippy, err := skipEtcdserver(data[iNdEx:])
+			skippy, err := skipEtcdserver(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -806,7 +810,7 @@ func (m *Request) Unmarshal(data []byte) error {
 			if (iNdEx + skippy) > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
 			iNdEx += skippy
 		}
 	}
@@ -816,8 +820,8 @@ func (m *Request) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *Metadata) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *Metadata) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -829,7 +833,7 @@ func (m *Metadata) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -857,7 +861,7 @@ func (m *Metadata) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.NodeID |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -876,7 +880,7 @@ func (m *Metadata) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.ClusterID |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -885,7 +889,7 @@ func (m *Metadata) Unmarshal(data []byte) error {
 			}
 		default:
 			iNdEx = preIndex
-			skippy, err := skipEtcdserver(data[iNdEx:])
+			skippy, err := skipEtcdserver(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -895,7 +899,7 @@ func (m *Metadata) Unmarshal(data []byte) error {
 			if (iNdEx + skippy) > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
 			iNdEx += skippy
 		}
 	}
@@ -905,8 +909,8 @@ func (m *Metadata) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func skipEtcdserver(data []byte) (n int, err error) {
-	l := len(data)
+func skipEtcdserver(dAtA []byte) (n int, err error) {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		var wire uint64
@@ -917,7 +921,7 @@ func skipEtcdserver(data []byte) (n int, err error) {
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -935,7 +939,7 @@ func skipEtcdserver(data []byte) (n int, err error) {
 					return 0, io.ErrUnexpectedEOF
 				}
 				iNdEx++
-				if data[iNdEx-1] < 0x80 {
+				if dAtA[iNdEx-1] < 0x80 {
 					break
 				}
 			}
@@ -952,7 +956,7 @@ func skipEtcdserver(data []byte) (n int, err error) {
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				length |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -975,7 +979,7 @@ func skipEtcdserver(data []byte) (n int, err error) {
 					if iNdEx >= l {
 						return 0, io.ErrUnexpectedEOF
 					}
-					b := data[iNdEx]
+					b := dAtA[iNdEx]
 					iNdEx++
 					innerWire |= (uint64(b) & 0x7F) << shift
 					if b < 0x80 {
@@ -986,7 +990,7 @@ func skipEtcdserver(data []byte) (n int, err error) {
 				if innerWireType == 4 {
 					break
 				}
-				next, err := skipEtcdserver(data[start:])
+				next, err := skipEtcdserver(dAtA[start:])
 				if err != nil {
 					return 0, err
 				}
@@ -1010,32 +1014,32 @@ var (
 	ErrIntOverflowEtcdserver   = fmt.Errorf("proto: integer overflow")
 )
 
+func init() { proto.RegisterFile("etcdserver.proto", fileDescriptorEtcdserver) }
+
 var fileDescriptorEtcdserver = []byte{
-	// 404 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x5c, 0x92, 0x41, 0x6e, 0x13, 0x31,
-	0x14, 0x86, 0xe3, 0xc4, 0x99, 0x64, 0x4c, 0x81, 0x62, 0x45, 0xe8, 0xa9, 0x42, 0x43, 0x14, 0xb1,
-	0xc8, 0x0a, 0xee, 0x50, 0xd2, 0x45, 0x24, 0x8a, 0x4a, 0x8a, 0xca, 0xda, 0x64, 0x1e, 0x8d, 0xa5,
-	0xcc, 0x78, 0x6a, 0xbf, 0x19, 0x72, 0x03, 0xae, 0xc0, 0x91, 0xb2, 0xe4, 0x04, 0x08, 0xc2, 0x45,
-	0x90, 0x3d, 0x9d, 0x60, 0xba, 0xb3, 0xbe, 0xff, 0xf7, 0xef, 0xdf, 0xf6, 0x13, 0xa7, 0x48, 0xeb,
-	0xdc, 0xa1, 0x6d, 0xd0, 0xbe, 0xae, 0xac, 0x21, 0x23, 0x4f, 0xfe, 0x91, 0xea, 0xf3, 0xd9, 0xe4,
-	0xd6, 0xdc, 0x9a, 0x20, 0xbc, 0xf1, 0xab, 0xd6, 0x33, 0xfb, 0xc6, 0xc5, 0x68, 0x85, 0x77, 0x35,
-	0x3a, 0x92, 0x13, 0xd1, 0x5f, 0x2e, 0x80, 0x4d, 0xd9, 0x9c, 0x9f, 0xf3, 0xfd, 0xcf, 0x97, 0xbd,
-	0x55, 0x5f, 0x2f, 0xe4, 0x0b, 0x91, 0x5c, 0x22, 0x6d, 0x4c, 0x0e, 0xfd, 0x29, 0x9b, 0xa7, 0xf7,
-	0x4a, 0x52, 0x04, 0x26, 0x41, 0xf0, 0x2b, 0x45, 0x1b, 0x18, 0x44, 0x1a, 0xaf, 0x14, 0x6d, 0xe4,
-	0x73, 0x31, 0xb8, 0x51, 0x5b, 0xe0, 0x91, 0x30, 0x68, 0xd4, 0xd6, 0xf3, 0x85, 0xb6, 0x30, 0x9c,
-	0xb2, 0xf9, 0xb8, 0xe3, 0xb9, 0xb6, 0x72, 0x26, 0xd2, 0x2b, 0x8b, 0xcd, 0x8d, 0xda, 0xd6, 0x08,
-	0x49, 0xb4, 0x2b, 0xad, 0x3a, 0xdc, 0x79, 0x96, 0x65, 0x8e, 0x3b, 0x18, 0x45, 0x45, 0x83, 0x27,
-	0xe0, 0xce, 0x73, 0xb1, 0xd3, 0x8e, 0x60, 0x7c, 0x3c, 0x85, 0xb5, 0x9e, 0x80, 0xe5, 0x2b, 0x21,
-	0x2e, 0x76, 0x95, 0xb6, 0x8a, 0xb4, 0x29, 0x21, 0x9d, 0xb2, 0xf9, 0xe0, 0x3e, 0x48, 0xe0, 0x91,
-	0xfb, 0xbb, 0x7d, 0x52, 0x9a, 0x40, 0x44, 0x55, 0xf9, 0x57, 0xa5, 0x49, 0x9e, 0x89, 0xe1, 0xb5,
-	0x2e, 0xd7, 0x08, 0x8f, 0xa2, 0x0e, 0x43, 0xe7, 0x91, 0x3f, 0x7f, 0x85, 0xeb, 0xda, 0x3a, 0xdd,
-	0x20, 0x9c, 0x44, 0x5b, 0x53, 0xdb, 0x61, 0xff, 0xa6, 0xd7, 0xc6, 0x12, 0xe6, 0xf0, 0x38, 0x32,
-	0x24, 0x2e, 0x30, 0xaf, 0x7e, 0xa8, 0x8d, 0xad, 0x0b, 0x78, 0x12, 0xab, 0x77, 0x81, 0xf9, 0x56,
-	0x1f, 0x75, 0x81, 0xf0, 0x34, 0x6a, 0xcd, 0x49, 0x17, 0x6d, 0x2a, 0x59, 0x54, 0x05, 0x9c, 0xfe,
-	0x97, 0x1a, 0x98, 0xcc, 0xfc, 0x47, 0x7f, 0xb1, 0xe8, 0x36, 0xf0, 0x2c, 0x7a, 0x95, 0x91, 0x6d,
-	0xe1, 0xec, 0x9d, 0x18, 0x5f, 0x22, 0xa9, 0x5c, 0x91, 0xf2, 0x49, 0xef, 0x4d, 0x8e, 0x0f, 0xa6,
-	0x21, 0x29, 0x03, 0xf3, 0x37, 0x7c, 0xbb, 0xad, 0x1d, 0xa1, 0x5d, 0x2e, 0xc2, 0x50, 0x1c, 0x7f,
-	0x61, 0xdd, 0xe1, 0xf3, 0xc9, 0xfe, 0x77, 0xd6, 0xdb, 0x1f, 0x32, 0xf6, 0xe3, 0x90, 0xb1, 0x5f,
-	0x87, 0x8c, 0x7d, 0xff, 0x93, 0xf5, 0xfe, 0x06, 0x00, 0x00, 0xff, 0xff, 0x80, 0x62, 0xfc, 0x40,
-	0xa4, 0x02, 0x00, 0x00,
+	// 380 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x5c, 0xd2, 0xdd, 0x6e, 0xda, 0x30,
+	0x14, 0x07, 0x70, 0x0c, 0xe1, 0xcb, 0x63, 0x1b, 0xb3, 0xd0, 0x74, 0x84, 0xa6, 0x2c, 0x42, 0xbb,
+	0xc8, 0xd5, 0xf6, 0x0e, 0x2c, 0x5c, 0x44, 0x2a, 0x15, 0x0d, 0x15, 0xbd, 0x76, 0xc9, 0x29, 0x58,
+	0x02, 0x4c, 0x1d, 0x07, 0xf1, 0x06, 0x7d, 0x85, 0x3e, 0x12, 0x97, 0x7d, 0x82, 0xaa, 0xa5, 0x2f,
+	0x52, 0x39, 0x24, 0xc4, 0xed, 0x5d, 0xf4, 0xfb, 0x9f, 0x1c, 0x1f, 0x7f, 0xd0, 0x2e, 0xea, 0x79,
+	0x9c, 0xa0, 0xda, 0xa1, 0xfa, 0xbb, 0x55, 0x52, 0x4b, 0xd6, 0x29, 0x65, 0x7b, 0xdb, 0xef, 0x2d,
+	0xe4, 0x42, 0x66, 0xc1, 0x3f, 0xf3, 0x75, 0xaa, 0x19, 0x3c, 0x38, 0xb4, 0x19, 0xe1, 0x7d, 0x8a,
+	0x89, 0x66, 0x3d, 0x5a, 0x0d, 0x03, 0x20, 0x1e, 0xf1, 0x9d, 0xa1, 0x73, 0x78, 0xfe, 0x5d, 0x89,
+	0xaa, 0x61, 0xc0, 0x7e, 0xd1, 0xc6, 0x18, 0xf5, 0x52, 0xc6, 0x50, 0xf5, 0x88, 0xdf, 0xce, 0x93,
+	0xdc, 0x18, 0x50, 0x67, 0xc2, 0xf5, 0x12, 0x6a, 0x56, 0x96, 0x09, 0xfb, 0x49, 0x6b, 0x33, 0xbe,
+	0x02, 0xc7, 0x0a, 0x0c, 0x18, 0x0f, 0x84, 0x82, 0xba, 0x47, 0xfc, 0x56, 0xe1, 0x81, 0x50, 0x6c,
+	0x40, 0xdb, 0x13, 0x85, 0xbb, 0x19, 0x5f, 0xa5, 0x08, 0x0d, 0xeb, 0xaf, 0x92, 0x8b, 0x9a, 0x70,
+	0x13, 0xe3, 0x1e, 0x9a, 0xd6, 0xa0, 0x25, 0x17, 0x35, 0xa3, 0xbd, 0x48, 0x34, 0xb4, 0xce, 0xab,
+	0x90, 0xa8, 0x64, 0xf6, 0x87, 0xd2, 0xd1, 0x7e, 0x2b, 0x14, 0xd7, 0x42, 0x6e, 0xa0, 0xed, 0x11,
+	0xbf, 0x96, 0x37, 0xb2, 0xdc, 0xec, 0xed, 0x86, 0x0b, 0x0d, 0xd4, 0x1a, 0x35, 0x13, 0xd6, 0xa7,
+	0xf5, 0xa9, 0xd8, 0xcc, 0x11, 0xbe, 0x58, 0x33, 0x9c, 0xc8, 0xac, 0x1f, 0xe1, 0x3c, 0x55, 0x89,
+	0xd8, 0x21, 0x74, 0xac, 0x5f, 0x4b, 0x36, 0x67, 0x3a, 0x95, 0x4a, 0x63, 0x0c, 0x5f, 0xad, 0x82,
+	0xdc, 0x4c, 0x7a, 0x95, 0x4a, 0x95, 0xae, 0xe1, 0x9b, 0x9d, 0x9e, 0xcc, 0x4c, 0x75, 0x2d, 0xd6,
+	0x08, 0xdf, 0xad, 0xa9, 0x33, 0xc9, 0xba, 0x6a, 0x85, 0x7c, 0x0d, 0xdd, 0x0f, 0x5d, 0x33, 0x63,
+	0xae, 0xb9, 0xe8, 0x3b, 0x85, 0xc9, 0x12, 0x7e, 0x58, 0xa7, 0x52, 0xe0, 0xe0, 0x82, 0xb6, 0xc6,
+	0xa8, 0x79, 0xcc, 0x35, 0x37, 0x9d, 0x2e, 0x65, 0x8c, 0x9f, 0x5e, 0x43, 0x6e, 0x66, 0x87, 0xff,
+	0x57, 0x69, 0xa2, 0x51, 0x85, 0x41, 0xf6, 0x28, 0xce, 0xb7, 0x70, 0xe6, 0x61, 0xef, 0xf0, 0xea,
+	0x56, 0x0e, 0x47, 0x97, 0x3c, 0x1d, 0x5d, 0xf2, 0x72, 0x74, 0xc9, 0xe3, 0x9b, 0x5b, 0x79, 0x0f,
+	0x00, 0x00, 0xff, 0xff, 0xee, 0x40, 0xba, 0xd6, 0xa4, 0x02, 0x00, 0x00,
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,21 +24,21 @@ KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
 
 DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 
-source "${KUBE_ROOT}/cluster/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/logging.sh"
 # KUBE_RELEASE_VERSION_REGEX matches things like "v1.2.3" or "v1.2.3-alpha.4"
 #
 # NOTE This must match the version_regex in build/common.sh
 # kube::release::parse_and_validate_release_version()
-KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha)\\.(0|[1-9][0-9]*))?$"
-KUBE_RELEASE_VERSION_DASHED_REGEX="v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)(-(beta|alpha)-(0|[1-9][0-9]*))?"
+KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha|rc)\\.(0|[1-9][0-9]*))?$"
+KUBE_RELEASE_VERSION_DASHED_REGEX="v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)(-(beta|alpha|rc)-(0|[1-9][0-9]*))?"
 
 # KUBE_CI_VERSION_REGEX matches things like "v1.2.3-alpha.4.56+abcdefg" This
 #
 # NOTE This must match the version_regex in build/common.sh
 # kube::release::parse_and_validate_ci_version()
-KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
-KUBE_CI_VERSION_DASHED_REGEX="^v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(beta|alpha)-(0|[1-9][0-9]*)(-(0|[1-9][0-9]*)\\+[-0-9a-z]*)?"
+KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha|rc)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+KUBE_CI_VERSION_DASHED_REGEX="^v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(beta|alpha|rc)-(0|[1-9][0-9]*)(-(0|[1-9][0-9]*)\\+[-0-9a-z]*)?"
 
 # Generate kubeconfig data for the created cluster.
 # Assumed vars:
@@ -308,17 +308,6 @@ function load-or-gen-kube-bearertoken() {
   fi
 }
 
-# Create a temp dir that'll be deleted at the end of this bash session.
-#
-# Vars set:
-#   KUBE_TEMP
-function ensure-temp-dir {
-  if [[ -z ${KUBE_TEMP-} ]]; then
-    export KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-    trap 'rm -rf "${KUBE_TEMP}"' EXIT
-  fi
-}
-
 # Get the master IP for the current-context in kubeconfig if one exists.
 #
 # Assumed vars:
@@ -461,8 +450,8 @@ function find-release-tars() {
 
   # This tarball is used by GCI, Ubuntu Trusty, and Container Linux.
   KUBE_MANIFESTS_TAR=
-  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "container-linux" ]] || \
-     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "container-linux" ]] ; then
+  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "container-linux" || "${MASTER_OS_DISTRIBUTION:-}" == "ubuntu" ]] || \
+     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "container-linux" || "${NODE_OS_DISTRIBUTION:-}" == "ubuntu" ]] ; then
     KUBE_MANIFESTS_TAR=$(find-tar kubernetes-manifests.tar.gz)
   fi
 }
@@ -517,8 +506,8 @@ function stage-images() {
     local docker_tag="$(cat ${temp_dir}/kubernetes/server/bin/${binary}.docker_tag)"
     (
       "${docker_cmd[@]}" load -i "${temp_dir}/kubernetes/server/bin/${binary}.tar"
-	  docker rmi "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}" || true
-	  "${docker_cmd[@]}" tag "gcr.io/google_containers/${binary}:${docker_tag}" "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
+      "${docker_cmd[@]}" rmi "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}" 2>/dev/null || true
+      "${docker_cmd[@]}" tag "gcr.io/google_containers/${binary}:${docker_tag}" "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
       "${docker_push_cmd[@]}" push "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
     ) &> "${temp_dir}/${binary}-push.log" &
   done
@@ -598,7 +587,9 @@ function build-kube-env {
   local salt_tar_url=$SALT_TAR_URL
   local kube_manifests_tar_url="${KUBE_MANIFESTS_TAR_URL:-}"
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]] ; then
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]] || \
+     [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]] ; then
     # TODO: Support fallback .tar.gz settings on Container Linux
     server_binary_tar_url=$(split_csv "${SERVER_BINARY_TAR_URL}")
     salt_tar_url=$(split_csv "${SALT_TAR_URL}")
@@ -682,8 +673,8 @@ EOF
 TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
-  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "container-linux") ]] || \
-     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "container-linux") ]] ; then
+  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "container-linux") || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
+     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "container-linux") || "${NODE_OS_DISTRIBUTION}" = "ubuntu" ]] ; then
     cat >>$file <<EOF
 KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${kube_manifests_tar_url})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
@@ -734,6 +725,17 @@ EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
 EOF
   fi
+
+  if [ -n "${PROVIDER_VARS:-}" ]; then
+    local var_name
+    local var_value
+
+    for var_name in ${PROVIDER_VARS}; do
+      eval "local var_value=\$(yaml-quote \${${var_name}})"
+      echo "${var_name}: ${var_value}" >>$file
+    done
+  fi
+
   if [[ "${master}" == "true" ]]; then
     # Master-only env vars.
     cat >>$file <<EOF
@@ -871,11 +873,6 @@ EOF
 FEDERATION: $(yaml-quote ${FEDERATION})
 EOF
   fi
-  if [ -n "${FEDERATIONS_DOMAIN_MAP:-}" ]; then
-    cat >>$file <<EOF
-FEDERATIONS_DOMAIN_MAP: $(yaml-quote ${FEDERATIONS_DOMAIN_MAP})
-EOF
-  fi
   if [ -n "${FEDERATION_NAME:-}" ]; then
     cat >>$file <<EOF
 FEDERATION_NAME: $(yaml-quote ${FEDERATION_NAME})
@@ -900,38 +897,6 @@ function sha1sum-file() {
     shasum -a1 "$1" | awk '{ print $1 }'
   fi
 }
-
-# Downloads cfssl into ${KUBE_TEMP}/cfssl directory
-#
-# Assumed vars:
-#   KUBE_TEMP: temporary directory
-#
-function download-cfssl {
-  mkdir -p "${KUBE_TEMP}/cfssl"
-  pushd "${KUBE_TEMP}/cfssl"
-
-  kernel=$(uname -s)
-  case "${kernel}" in
-    Linux)
-      curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
-      curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
-      ;;
-    Darwin)
-      curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
-      curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
-      ;;
-    *)
-      echo "Unknown, unsupported platform: ${kernel}." >&2
-      echo "Supported platforms: Linux, Darwin." >&2
-      exit 2
-  esac
-
-  chmod +x cfssl
-  chmod +x cfssljson
-
-  popd
-}
-
 
 # Create certificate pairs for the cluster.
 # $1: The public IP for the master.
@@ -1023,12 +988,12 @@ function generate-certs {
     ./easyrsa --subject-alt-name="${SANS}" build-server-full "${MASTER_NAME}" nopass
     ./easyrsa build-client-full kube-apiserver nopass
 
-    download-cfssl
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
 
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the kubelet client cert with the correct groups
-    echo '{"CN":"kubelet","names":[{"O":"system:nodes"}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${KUBE_TEMP}/cfssl/cfssl" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${KUBE_TEMP}/cfssl/cfssljson" -bare kubelet
+    echo '{"CN":"kubelet","names":[{"O":"system:nodes"}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare kubelet
     mv "kubelet-key.pem" "pki/private/kubelet.key"
     mv "kubelet.pem" "pki/issued/kubelet.crt"
     rm -f "kubelet.csr"
@@ -1044,6 +1009,129 @@ function generate-certs {
     echo "=== Failed to generate certificates: Aborting ===" >&2
     exit 2
   }
+}
+
+# Run the cfssl command to generates certificate files for etcd service, the
+# certificate files will save in $1 directory.
+#
+# Optional vars:
+#   GEN_ETCD_CA_CERT (CA cert encode with base64 and ZIP compression)
+#   GEN_ETCD_CA_KEY (CA key encode with base64)
+#
+# If GEN_ETCD_CA_CERT or GEN_ETCD_CA_KEY is not specified, it will generates certs for CA.
+#
+# Args:
+#   $1 (the directory that certificate files to save)
+#   $2 (the ip of etcd member)
+#   $3 (the type of etcd certificates, must be one of client, server, peer)
+#   $4 (the prefix of the certificate filename, default is $3)
+function generate-etcd-cert() {
+  local cert_dir=${1}
+  local member_ip=${2}
+  local type_cert=${3}
+  local prefix=${4:-"${type_cert}"}
+
+  local GEN_ETCD_CA_CERT=${GEN_ETCD_CA_CERT:-}
+  local GEN_ETCD_CA_KEY=${GEN_ETCD_CA_KEY:-}
+
+  mkdir -p "${cert_dir}"
+  pushd "${cert_dir}"
+
+  kube::util::ensure-cfssl .
+
+  if [ ! -r "ca-config.json" ]; then
+    cat >ca-config.json <<EOF
+{
+    "signing": {
+        "default": {
+            "expiry": "43800h"
+        },
+        "profiles": {
+            "server": {
+                "expiry": "43800h",
+                "usages": [
+                    "signing",
+                    "key encipherment",
+                    "server auth"
+                ]
+            },
+            "client": {
+                "expiry": "43800h",
+                "usages": [
+                    "signing",
+                    "key encipherment",
+                    "client auth"
+                ]
+            },
+            "peer": {
+                "expiry": "43800h",
+                "usages": [
+                    "signing",
+                    "key encipherment",
+                    "server auth",
+                    "client auth"
+                ]
+            }
+        }
+    }
+}
+EOF
+  fi
+
+  if [ ! -r "ca-csr.json" ]; then
+    cat >ca-csr.json <<EOF
+{
+    "CN": "Kubernetes",
+    "key": {
+        "algo": "ecdsa",
+        "size": 256
+    },
+    "names": [
+        {
+            "C": "US",
+            "L": "CA",
+            "O": "kubernetes.io"
+        }
+    ]
+}
+EOF
+  fi
+
+  if [[ -n "${GEN_ETCD_CA_CERT}" && -n "${GEN_ETCD_CA_KEY}" ]]; then
+    echo "${ca_cert}" | base64 --decode | gunzip > ca.pem
+    echo "${ca_key}" | base64 --decode > ca-key.pem
+  fi
+
+  if [[ ! -r "ca.pem" || ! -r "ca-key.pem" ]]; then
+    ${CFSSL_BIN} gencert -initca ca-csr.json | ${CFSSLJSON_BIN} -bare ca -
+  fi
+
+  case "${type_cert}" in
+    client)
+      echo "Generate client certificates..."
+      echo '{"CN":"client","hosts":["*"],"key":{"algo":"ecdsa","size":256}}' \
+       | ${CFSSL_BIN} gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client - \
+       | ${CFSSLJSON_BIN} -bare "${prefix}"
+      ;;
+    server)
+      echo "Generate server certificates..."
+      echo '{"CN":"'${member_ip}'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
+       | ${CFSSL_BIN} gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=server -hostname="${member_ip},127.0.0.1" - \
+       | ${CFSSLJSON_BIN} -bare "${prefix}"
+      ;;
+    peer)
+      echo "Generate peer certificates..."
+      echo '{"CN":"'${member_ip}'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
+       | ${CFSSL_BIN} gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=peer -hostname="${member_ip},127.0.0.1" - \
+       | ${CFSSLJSON_BIN} -bare "${prefix}"
+      ;;
+    *)
+      echo "Unknow, unsupported etcd certs type: ${type_cert}" >&2
+      echo "Supported type: client, server, peer" >&2
+      exit 2
+  esac
+
+  popd
 }
 
 #
@@ -1148,4 +1236,14 @@ function verify-kube-binaries() {
     exit 1
   fi
   "${get_binaries_script}"
+}
+
+# Run pushd without stack output
+function pushd() {
+  command pushd $@ > /dev/null
+}
+
+# Run popd without stack output
+function popd() {
+  command popd $@ > /dev/null
 }

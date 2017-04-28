@@ -36,10 +36,14 @@ function run_kube_apiserver() {
   # Admission Controllers to invoke prior to persisting objects in cluster
   ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ResourceQuota"
 
+  # Include RBAC (to exercise bootstrapping), and AlwaysAllow to allow all actions
+  AUTHORIZATION_MODE="RBAC,AlwaysAllow"
+
   "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
     --address="127.0.0.1" \
     --public-address-override="127.0.0.1" \
     --port="${API_PORT}" \
+    --authorization-mode="${AUTHORIZATION_MODE}" \
     --admission-control="${ADMISSION_CONTROL}" \
     --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
     --public-address-override="127.0.0.1" \

@@ -28,10 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/ref"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -86,12 +89,12 @@ func getParentUIDFromJob(j batchv1.Job) (types.UID, bool) {
 
 // groupJobsByParent groups jobs into a map keyed by the job parent UID (e.g. scheduledJob).
 // It has no receiver, to facilitate testing.
-func groupJobsByParent(sjs []batchv2alpha1.CronJob, js []batchv1.Job) map[types.UID][]batchv1.Job {
+func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
 	jobsBySj := make(map[types.UID][]batchv1.Job)
 	for _, job := range js {
 		parentUID, found := getParentUIDFromJob(job)
 		if !found {
-			glog.Errorf("Unable to get uid from job %s in namespace %s", job.Name, job.Namespace)
+			glog.V(4).Infof("Unable to get parent uid from job %s in namespace %s", job.Name, job.Namespace)
 			continue
 		}
 		jobsBySj[parentUID] = append(jobsBySj[parentUID], job)
@@ -179,6 +182,19 @@ func getRecentUnmetScheduleTimes(sj batchv2alpha1.CronJob, now time.Time) ([]tim
 	return starts, nil
 }
 
+func newControllerRef(sj *batchv2alpha1.CronJob) *metav1.OwnerReference {
+	blockOwnerDeletion := true
+	isController := true
+	return &metav1.OwnerReference{
+		APIVersion:         controllerKind.GroupVersion().String(),
+		Kind:               controllerKind.Kind,
+		Name:               sj.Name,
+		UID:                sj.UID,
+		BlockOwnerDeletion: &blockOwnerDeletion,
+		Controller:         &isController,
+	}
+}
+
 // XXX unit test this
 
 // getJobFromTemplate makes a Job from a CronJob
@@ -198,9 +214,10 @@ func getJobFromTemplate(sj *batchv2alpha1.CronJob, scheduledTime time.Time) (*ba
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:      labels,
-			Annotations: annotations,
-			Name:        name,
+			Labels:          labels,
+			Annotations:     annotations,
+			Name:            name,
+			OwnerReferences: []metav1.OwnerReference{*newControllerRef(sj)},
 		},
 	}
 	if err := api.Scheme.Convert(&sj.Spec.JobTemplate.Spec, &job.Spec, nil); err != nil {
@@ -216,7 +233,7 @@ func getTimeHash(scheduledTime time.Time) int64 {
 
 // makeCreatedByRefJson makes a json string with an object reference for use in "created-by" annotation value
 func makeCreatedByRefJson(object runtime.Object) (string, error) {
-	createdByRef, err := v1.GetReference(api.Scheme, object)
+	createdByRef, err := ref.GetReference(api.Scheme, object)
 	if err != nil {
 		return "", fmt.Errorf("unable to get controller reference: %v", err)
 	}
@@ -265,4 +282,42 @@ func (o byJobStartTime) Less(i, j int) bool {
 	}
 
 	return (*o[i].Status.StartTime).Before(*o[j].Status.StartTime)
+}
+
+// adoptJobs applies missing ControllerRefs to Jobs created by a CronJob.
+//
+// This should only happen if the Jobs were created by an older version of the
+// CronJob controller, since from now on we add ControllerRef upon creation.
+//
+// CronJob doesn't do actual adoption because it doesn't use label selectors to
+// find its Jobs. However, we should apply ControllerRef for potential
+// server-side cascading deletion, and to advise other controllers we own these
+// objects.
+func adoptJobs(sj *batchv2alpha1.CronJob, js []batchv1.Job, jc jobControlInterface) error {
+	var errs []error
+	controllerRef := newControllerRef(sj)
+	controllerRefJSON, err := json.Marshal(controllerRef)
+	if err != nil {
+		return fmt.Errorf("can't adopt Jobs: failed to marshal ControllerRef %#v: %v", controllerRef, err)
+	}
+
+	for i := range js {
+		job := &js[i]
+		controllerRef := controller.GetControllerOf(job)
+		if controllerRef != nil {
+			continue
+		}
+		controllerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[%s],"uid":"%s"}}`,
+			controllerRefJSON, job.UID)
+		updatedJob, err := jc.PatchJob(job.Namespace, job.Name, types.StrategicMergePatchType, []byte(controllerRefPatch))
+		if err != nil {
+			// If there's a ResourceVersion or other error, don't bother retrying.
+			// We will just try again on a subsequent CronJob sync.
+			errs = append(errs, err)
+			continue
+		}
+		// Save it back to the array for later consumers.
+		js[i] = *updatedJob
+	}
+	return utilerrors.NewAggregate(errs)
 }

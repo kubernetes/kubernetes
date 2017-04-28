@@ -34,10 +34,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
-	storageinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/storage/v1beta1"
+	storageinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/storage/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -56,7 +56,6 @@ import (
 type ControllerParameters struct {
 	KubeClient                clientset.Interface
 	SyncPeriod                time.Duration
-	AlphaProvisioner          vol.ProvisionableVolumePlugin
 	VolumePlugins             []vol.VolumePlugin
 	Cloud                     cloudprovider.Interface
 	ClusterName               string
@@ -68,7 +67,7 @@ type ControllerParameters struct {
 }
 
 // NewController creates a new PersistentVolume controller
-func NewController(p ControllerParameters) *PersistentVolumeController {
+func NewController(p ControllerParameters) (*PersistentVolumeController, error) {
 	eventRecorder := p.EventRecorder
 	if eventRecorder == nil {
 		broadcaster := record.NewBroadcaster()
@@ -87,16 +86,12 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 		clusterName:                   p.ClusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
-		alphaProvisioner:              p.AlphaProvisioner,
 		claimQueue:                    workqueue.NewNamed("claims"),
 		volumeQueue:                   workqueue.NewNamed("volumes"),
 	}
 
-	controller.volumePluginMgr.InitPlugins(p.VolumePlugins, controller)
-	if controller.alphaProvisioner != nil {
-		if err := controller.alphaProvisioner.Init(controller); err != nil {
-			glog.Errorf("PersistentVolumeController: error initializing alpha provisioner plugin: %v", err)
-		}
+	if err := controller.volumePluginMgr.InitPlugins(p.VolumePlugins, controller); err != nil {
+		return nil, fmt.Errorf("Could not initialize volume plugins for PersistentVolume Controller: %v", err)
 	}
 
 	p.VolumeInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -123,7 +118,7 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 
 	controller.classLister = p.ClassInformer.Lister()
 	controller.classListerSynced = p.ClassInformer.Informer().HasSynced
-	return controller
+	return controller, nil
 }
 
 // initializeCaches fills all controller caches with initial data from etcd in
@@ -136,16 +131,14 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeLister corelister
 		return
 	}
 	for _, volume := range volumeList {
-		// Ignore template volumes from kubernetes 1.2
-		deleted := ctrl.upgradeVolumeFrom1_2(volume)
-		if !deleted {
-			clone, err := api.Scheme.DeepCopy(volume)
-			if err != nil {
-				glog.Errorf("error cloning volume %q: %v", volume.Name, err)
-				continue
-			}
-			volumeClone := clone.(*v1.PersistentVolume)
-			ctrl.storeVolumeUpdate(volumeClone)
+		clone, err := api.Scheme.DeepCopy(volume)
+		if err != nil {
+			glog.Errorf("error cloning volume %q: %v", volume.Name, err)
+			continue
+		}
+		volumeClone := clone.(*v1.PersistentVolume)
+		if _, err = ctrl.storeVolumeUpdate(volumeClone); err != nil {
+			glog.Errorf("error updating volume cache: %v", err)
 		}
 	}
 
@@ -161,7 +154,9 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeLister corelister
 			continue
 		}
 		claimClone := clone.(*v1.PersistentVolumeClaim)
-		ctrl.storeClaimUpdate(claimClone)
+		if _, err = ctrl.storeClaimUpdate(claimClone); err != nil {
+			glog.Errorf("error updating claim cache: %v", err)
+		}
 	}
 	glog.V(4).Infof("controller initialized")
 }
@@ -192,11 +187,6 @@ func (ctrl *PersistentVolumeController) storeClaimUpdate(claim interface{}) (boo
 // updateVolume runs in worker thread and handles "volume added",
 // "volume updated" and "periodic sync" events.
 func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume) {
-	if deleted := ctrl.upgradeVolumeFrom1_2(volume); deleted {
-		// volume deleted
-		return
-	}
-
 	// Store the new volume version in the cache and do not process it if this
 	// is an old version.
 	new, err := ctrl.storeVolumeUpdate(volume)
@@ -274,19 +264,23 @@ func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeCl
 
 // Run starts all of this controller's control loops
 func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
-	glog.V(1).Infof("starting PersistentVolumeController")
-	if !cache.WaitForCacheSync(stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for volume caches to sync"))
+	defer utilruntime.HandleCrash()
+	defer ctrl.claimQueue.ShutDown()
+	defer ctrl.volumeQueue.ShutDown()
+
+	glog.Infof("Starting persistent volume controller")
+	defer glog.Infof("Shutting down peristent volume controller")
+
+	if !controller.WaitForCacheSync("persistent volume", stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced) {
 		return
 	}
+
 	ctrl.initializeCaches(ctrl.volumeLister, ctrl.claimLister)
+
 	go wait.Until(ctrl.volumeWorker, time.Second, stopCh)
 	go wait.Until(ctrl.claimWorker, time.Second, stopCh)
 
 	<-stopCh
-
-	ctrl.claimQueue.ShutDown()
-	ctrl.volumeQueue.ShutDown()
 }
 
 // volumeWorker processes items from volumeQueue. It must run only once,
@@ -404,48 +398,10 @@ func (ctrl *PersistentVolumeController) claimWorker() {
 	}
 }
 
-const (
-	// these pair of constants are used by the provisioner in Kubernetes 1.2.
-	pvProvisioningRequiredAnnotationKey    = "volume.experimental.kubernetes.io/provisioning-required"
-	pvProvisioningCompletedAnnotationValue = "volume.experimental.kubernetes.io/provisioning-completed"
-)
-
-// upgradeVolumeFrom1_2 updates PV from Kubernetes 1.2 to 1.3 and newer. In 1.2,
-// we used template PersistentVolume instances for dynamic provisioning. In 1.3
-// and later, these template (and not provisioned) instances must be removed to
-// make the controller to provision a new PV.
-// It returns true if the volume was deleted.
-// TODO: remove this function when upgrade from 1.2 becomes unsupported.
-func (ctrl *PersistentVolumeController) upgradeVolumeFrom1_2(volume *v1.PersistentVolume) bool {
-	annValue, found := volume.Annotations[pvProvisioningRequiredAnnotationKey]
-	if !found {
-		// The volume is not template
-		return false
-	}
-	if annValue == pvProvisioningCompletedAnnotationValue {
-		// The volume is already fully provisioned. The new controller will
-		// ignore this annotation and it will obey its ReclaimPolicy, which is
-		// likely to delete the volume when appropriate claim is deleted.
-		return false
-	}
-	glog.V(2).Infof("deleting unprovisioned template volume %q from Kubernetes 1.2.", volume.Name)
-	err := ctrl.kubeClient.Core().PersistentVolumes().Delete(volume.Name, nil)
-	if err != nil {
-		glog.Errorf("cannot delete unprovisioned template volume %q: %v", volume.Name, err)
-	}
-	// Remove from local cache
-	err = ctrl.volumes.store.Delete(volume)
-	if err != nil {
-		glog.Errorf("cannot remove volume %q from local cache: %v", volume.Name, err)
-	}
-
-	return true
-}
-
 // setClaimProvisioner saves
 // claim.Annotations[annStorageProvisioner] = class.Provisioner
 func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.PersistentVolumeClaim, class *storage.StorageClass) (*v1.PersistentVolumeClaim, error) {
-	if val, ok := claim.Annotations[annDynamicallyProvisioned]; ok && val == class.Provisioner {
+	if val, ok := claim.Annotations[annStorageProvisioner]; ok && val == class.Provisioner {
 		// annotation is already set, nothing to do
 		return claim, nil
 	}

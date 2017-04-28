@@ -180,6 +180,13 @@ func (v *OVirtCloud) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, e
 	}, nil
 }
 
+// NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (v *OVirtCloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+	return []v1.NodeAddress{}, errors.New("unimplemented")
+}
+
 // mapNodeNameToInstanceName maps from a k8s NodeName to an ovirt instance name (the hostname)
 // This is a simple string cast
 func mapNodeNameToInstanceName(nodeName types.NodeName) string {
@@ -206,6 +213,13 @@ func (v *OVirtCloud) InstanceID(nodeName types.NodeName) (string, error) {
 	// TODO: define a way to identify the provider instance to complete
 	// the format <provider_instance_id>/<instance_id>.
 	return "/" + instance.UUID, err
+}
+
+// InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (v *OVirtCloud) InstanceTypeByProviderID(providerID string) (string, error) {
+	return "", errors.New("unimplemented")
 }
 
 // InstanceType returns the type of the specified instance.

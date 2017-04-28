@@ -160,7 +160,14 @@ func getPrimaryIPConfig(nic network.Interface) (*network.InterfaceIPConfiguratio
 	return nil, fmt.Errorf("failed to determine the determine primary ipconfig. nicname=%q", *nic.Name)
 }
 
-func getLoadBalancerName(clusterName string) string {
+// For a load balancer, all frontend ip should reference either a subnet or publicIpAddress.
+// Thus Azure do not allow mixed type (public and internal) load balancer.
+// So we'd have a separate name for internal load balancer.
+func getLoadBalancerName(clusterName string, isInternal bool) string {
+	if isInternal {
+		return fmt.Sprintf("%s-internal", clusterName)
+	}
+
 	return clusterName
 }
 
@@ -190,10 +197,6 @@ func serviceOwnsRule(service *v1.Service, rule string) bool {
 
 func getFrontendIPConfigName(service *v1.Service) string {
 	return cloudprovider.GetLoadBalancerName(service)
-}
-
-func getPublicIPName(clusterName string, service *v1.Service) string {
-	return fmt.Sprintf("%s-%s", clusterName, cloudprovider.GetLoadBalancerName(service))
 }
 
 // This returns the next available rule priority level for a given set of security rules.

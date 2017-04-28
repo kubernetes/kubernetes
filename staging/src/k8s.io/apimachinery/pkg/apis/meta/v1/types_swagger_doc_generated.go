@@ -49,12 +49,13 @@ func (APIGroupList) SwaggerDoc() map[string]string {
 }
 
 var map_APIResource = map[string]string{
-	"":           "APIResource specifies the name of a resource and whether it is namespaced.",
-	"name":       "name is the name of the resource.",
-	"namespaced": "namespaced indicates if a resource is namespaced or not.",
-	"kind":       "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
-	"verbs":      "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
-	"shortNames": "shortNames is a list of suggested short names of the resource.",
+	"":             "APIResource specifies the name of a resource and whether it is namespaced.",
+	"name":         "name is the plural name of the resource.",
+	"singularName": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
+	"namespaced":   "namespaced indicates if a resource is namespaced or not.",
+	"kind":         "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
+	"verbs":        "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
+	"shortNames":   "shortNames is a list of suggested short names of the resource.",
 }
 
 func (APIResource) SwaggerDoc() map[string]string {

@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd/etcdserver/api", "v3rpc")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "etcdserver/api/v3rpc")
 
 	// Max operations per txn list. For example, Txn.Success can have at most 128 operations,
 	// and Txn.Failure can have at most 128 operations.
@@ -56,7 +56,7 @@ func (s *kvServer) Range(ctx context.Context, r *pb.RangeRequest) (*pb.RangeResp
 		plog.Panic("unexpected nil resp.Header")
 	}
 	s.hdr.fill(resp.Header)
-	return resp, err
+	return resp, nil
 }
 
 func (s *kvServer) Put(ctx context.Context, r *pb.PutRequest) (*pb.PutResponse, error) {
@@ -73,7 +73,7 @@ func (s *kvServer) Put(ctx context.Context, r *pb.PutRequest) (*pb.PutResponse, 
 		plog.Panic("unexpected nil resp.Header")
 	}
 	s.hdr.fill(resp.Header)
-	return resp, err
+	return resp, nil
 }
 
 func (s *kvServer) DeleteRange(ctx context.Context, r *pb.DeleteRangeRequest) (*pb.DeleteRangeResponse, error) {
@@ -90,7 +90,7 @@ func (s *kvServer) DeleteRange(ctx context.Context, r *pb.DeleteRangeRequest) (*
 		plog.Panic("unexpected nil resp.Header")
 	}
 	s.hdr.fill(resp.Header)
-	return resp, err
+	return resp, nil
 }
 
 func (s *kvServer) Txn(ctx context.Context, r *pb.TxnRequest) (*pb.TxnResponse, error) {
@@ -107,7 +107,7 @@ func (s *kvServer) Txn(ctx context.Context, r *pb.TxnRequest) (*pb.TxnResponse, 
 		plog.Panic("unexpected nil resp.Header")
 	}
 	s.hdr.fill(resp.Header)
-	return resp, err
+	return resp, nil
 }
 
 func (s *kvServer) Compact(ctx context.Context, r *pb.CompactionRequest) (*pb.CompactionResponse, error) {

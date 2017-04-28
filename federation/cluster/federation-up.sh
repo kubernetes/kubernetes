@@ -29,14 +29,13 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 # For `kube::log::status` function since it already sources
 # "${KUBE_ROOT}/cluster/lib/logging.sh" and DEFAULT_KUBECONFIG
 source "${KUBE_ROOT}/cluster/common.sh"
-# For $FEDERATION_NAME, $FEDERATION_KUBE_CONTEXT, $HOST_CLUSTER_CONTEXT,
-# $KUBEDNS_CONFIGMAP_NAME, $KUBEDNS_CONFIGMAP_NAMESPACE and
-# $KUBEDNS_FEDERATION_FLAG.
+# For $FEDERATION_NAME, $FEDERATION_NAMESPACE, $FEDERATION_KUBE_CONTEXT,
+# $HOST_CLUSTER_CONTEXT, $KUBEDNS_CONFIGMAP_NAME,
+# $KUBEDNS_CONFIGMAP_NAMESPACE and $KUBEDNS_FEDERATION_FLAG.
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
 DNS_ZONE_NAME="${FEDERATION_DNS_ZONE_NAME:-}"
 DNS_PROVIDER="${FEDERATION_DNS_PROVIDER:-google-clouddns}"
-FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
 
 # get_version returns the version in KUBERNETES_RELEASE or defaults to the
 # value in the federation `versions` file.
@@ -86,6 +85,7 @@ function init() {
   timeout --signal=INT --kill-after=1m 20m \
       "${KUBE_ROOT}/federation/develop/kubefed.sh" init \
       "${FEDERATION_NAME}" \
+      --federation-system-namespace=${FEDERATION_NAMESPACE} \
       --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
       --dns-zone-name="${DNS_ZONE_NAME}" \
       --dns-provider="${DNS_PROVIDER}" \
@@ -105,8 +105,9 @@ function join_clusters() {
 
     "${KUBE_ROOT}/federation/develop/kubefed.sh" join \
         "${context}" \
+        --federation-system-namespace=${FEDERATION_NAMESPACE} \
         --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
-        --context="${FEDERATION_NAME}" \
+        --context="${FEDERATION_KUBE_CONTEXT}" \
         --secret-name="${context//_/-}"    # Replace "_" by "-"
   done
 }

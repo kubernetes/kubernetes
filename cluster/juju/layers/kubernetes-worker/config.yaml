@@ -11,3 +11,23 @@ options:
     description: |
       Labels can be used to organize and to select subsets of nodes in the
       cluster. Declare node labels in key=value format, separated by spaces.
+  allow-privileged:
+    type: string
+    default: "auto"
+    description: |
+      Allow privileged containers to run on worker nodes. Supported values are
+      "true", "false", and "auto". If "true", kubelet will run in privileged
+      mode by default. If "false", kubelet will never run in privileged mode.
+      If "auto", kubelet will not run in privileged mode by default, but will
+      switch to privileged mode if gpu hardware is detected.
+  channel:
+    type: string
+    default: "stable"
+    description: |
+      Snap channel to install Kubernetes worker services from
+  require-manual-upgrade:
+    type: boolean
+    default: true
+    description: |
+      When true, worker services will not be upgraded until the user triggers
+      it manually by running the upgrade action.

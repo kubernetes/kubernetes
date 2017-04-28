@@ -55,7 +55,9 @@ func (a *APIServer) Start() error {
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
-		err := apiserver.Run(config)
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+		err := apiserver.Run(config, stopCh)
 		if err != nil {
 			errCh <- fmt.Errorf("run apiserver error: %v", err)
 		}

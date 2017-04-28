@@ -20,7 +20,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -253,7 +255,11 @@ func TestPodSecrets(t *testing.T) {
 				VolumeSource: v1.VolumeSource{
 					ScaleIO: &v1.ScaleIOVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef"}}}}},
+							Name: "Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef"}}}}, {
+				VolumeSource: v1.VolumeSource{
+					ISCSI: &v1.ISCSIVolumeSource{
+						SecretRef: &v1.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.ISCSI.SecretRef"}}}}},
 		},
 	}
 	extractedNames := sets.NewString()
@@ -282,6 +288,7 @@ func TestPodSecrets(t *testing.T) {
 		"Spec.Volumes[*].VolumeSource.Secret",
 		"Spec.Volumes[*].VolumeSource.Secret.SecretName",
 		"Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef",
+		"Spec.Volumes[*].VolumeSource.ISCSI.SecretRef",
 	)
 	secretPaths := collectSecretPaths(t, nil, "", reflect.TypeOf(&v1.Pod{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)
@@ -336,4 +343,59 @@ func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.
 	}
 
 	return secretPaths
+}
+
+func newPod(now metav1.Time, ready bool, beforeSec int) *v1.Pod {
+	conditionStatus := v1.ConditionFalse
+	if ready {
+		conditionStatus = v1.ConditionTrue
+	}
+	return &v1.Pod{
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{
+					Type:               v1.PodReady,
+					LastTransitionTime: metav1.NewTime(now.Time.Add(-1 * time.Duration(beforeSec) * time.Second)),
+					Status:             conditionStatus,
+				},
+			},
+		},
+	}
+}
+
+func TestIsPodAvailable(t *testing.T) {
+	now := metav1.Now()
+	tests := []struct {
+		pod             *v1.Pod
+		minReadySeconds int32
+		expected        bool
+	}{
+		{
+			pod:             newPod(now, false, 0),
+			minReadySeconds: 0,
+			expected:        false,
+		},
+		{
+			pod:             newPod(now, true, 0),
+			minReadySeconds: 1,
+			expected:        false,
+		},
+		{
+			pod:             newPod(now, true, 0),
+			minReadySeconds: 0,
+			expected:        true,
+		},
+		{
+			pod:             newPod(now, true, 51),
+			minReadySeconds: 50,
+			expected:        true,
+		},
+	}
+
+	for i, test := range tests {
+		isAvailable := IsPodAvailable(test.pod, test.minReadySeconds, now)
+		if isAvailable != test.expected {
+			t.Errorf("[tc #%d] expected available pod: %t, got: %t", i, test.expected, isAvailable)
+		}
+	}
 }

@@ -18,16 +18,24 @@ package gce
 
 import (
 	"net/http"
+	"time"
 
 	compute "google.golang.org/api/compute/v1"
 )
 
-// GlobalForwardingRule management
+func newForwardingRuleMetricContext(request, region string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"forwardingrule_" + request, region, unusedMetricLabel},
+	}
+}
 
 // CreateGlobalForwardingRule creates and returns a
 // GlobalForwardingRule that points to the given TargetHttp(s)Proxy.
 // targetProxyLink is the SelfLink of a TargetHttp(s)Proxy.
 func (gce *GCECloud) CreateGlobalForwardingRule(targetProxyLink, ip, name, portRange string) (*compute.ForwardingRule, error) {
+	mc := newForwardingRuleMetricContext("create", "")
+
 	rule := &compute.ForwardingRule{
 		Name:       name,
 		IPAddress:  ip,
@@ -37,34 +45,47 @@ func (gce *GCECloud) CreateGlobalForwardingRule(targetProxyLink, ip, name, portR
 	}
 	op, err := gce.service.GlobalForwardingRules.Insert(gce.projectID, rule).Do()
 	if err != nil {
+		mc.Observe(err)
 		return nil, err
 	}
-	if err = gce.waitForGlobalOp(op); err != nil {
+	if err = gce.waitForGlobalOp(op, mc); err != nil {
 		return nil, err
 	}
+
 	return gce.GetGlobalForwardingRule(name)
 }
 
 // SetProxyForGlobalForwardingRule links the given TargetHttp(s)Proxy with the given GlobalForwardingRule.
 // targetProxyLink is the SelfLink of a TargetHttp(s)Proxy.
 func (gce *GCECloud) SetProxyForGlobalForwardingRule(fw *compute.ForwardingRule, targetProxyLink string) error {
-	op, err := gce.service.GlobalForwardingRules.SetTarget(gce.projectID, fw.Name, &compute.TargetReference{Target: targetProxyLink}).Do()
+	mc := newForwardingRuleMetricContext("set_proxy", "")
+
+	op, err := gce.service.GlobalForwardingRules.SetTarget(
+		gce.projectID, fw.Name, &compute.TargetReference{Target: targetProxyLink}).Do()
 	if err != nil {
+		mc.Observe(err)
 		return err
 	}
-	return gce.waitForGlobalOp(op)
+
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // DeleteGlobalForwardingRule deletes the GlobalForwardingRule by name.
 func (gce *GCECloud) DeleteGlobalForwardingRule(name string) error {
+	mc := newForwardingRuleMetricContext("delete", "")
+
 	op, err := gce.service.GlobalForwardingRules.Delete(gce.projectID, name).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
+			mc.Observe(nil)
 			return nil
 		}
+
+		mc.Observe(err)
 		return err
 	}
-	return gce.waitForGlobalOp(op)
+
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // GetGlobalForwardingRule returns the GlobalForwardingRule by name.

@@ -18,7 +18,6 @@ import (
 	"io"
 
 	"github.com/coreos/etcd/etcdserver"
-	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/lease"
 	"golang.org/x/net/context"
@@ -35,20 +34,27 @@ func NewLeaseServer(s *etcdserver.EtcdServer) pb.LeaseServer {
 
 func (ls *LeaseServer) LeaseGrant(ctx context.Context, cr *pb.LeaseGrantRequest) (*pb.LeaseGrantResponse, error) {
 	resp, err := ls.le.LeaseGrant(ctx, cr)
-	if err == lease.ErrLeaseExists {
-		return nil, rpctypes.ErrGRPCLeaseExist
-	}
+
 	if err != nil {
-		return nil, err
+		return nil, togRPCError(err)
 	}
 	ls.hdr.fill(resp.Header)
-	return resp, err
+	return resp, nil
 }
 
 func (ls *LeaseServer) LeaseRevoke(ctx context.Context, rr *pb.LeaseRevokeRequest) (*pb.LeaseRevokeResponse, error) {
 	resp, err := ls.le.LeaseRevoke(ctx, rr)
 	if err != nil {
-		return nil, rpctypes.ErrGRPCLeaseNotFound
+		return nil, togRPCError(err)
+	}
+	ls.hdr.fill(resp.Header)
+	return resp, nil
+}
+
+func (ls *LeaseServer) LeaseTimeToLive(ctx context.Context, rr *pb.LeaseTimeToLiveRequest) (*pb.LeaseTimeToLiveResponse, error) {
+	resp, err := ls.le.LeaseTimeToLive(ctx, rr)
+	if err != nil {
+		return nil, togRPCError(err)
 	}
 	ls.hdr.fill(resp.Header)
 	return resp, nil

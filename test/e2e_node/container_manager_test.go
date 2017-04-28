@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -93,7 +94,13 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 			})
 			Context("", func() {
 				It("pod infra containers oom-score-adj should be -998 and best effort container's should be 1000", func() {
-					var err error
+					// Take a snapshot of existing pause processes. These were
+					// created before this test, and may not be infra
+					// containers. They should be excluded from the test.
+					existingPausePIDs, err := getPidsForProcess("pause", "")
+					Expect(err).To(BeNil(), "failed to list all pause processes on the node")
+					existingPausePIDSet := sets.NewInt(existingPausePIDs...)
+
 					podClient := f.PodClient()
 					podName := "besteffort" + string(uuid.NewUUID())
 					podClient.Create(&v1.Pod{
@@ -103,7 +110,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
 								{
-									Image: "gcr.io/google_containers/serve_hostname:v1.4",
+									Image: framework.ServeHostnameImage,
 									Name:  podName,
 								},
 							},
@@ -117,6 +124,10 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 							return fmt.Errorf("failed to get list of pause pids: %v", err)
 						}
 						for _, pid := range pausePids {
+							if existingPausePIDSet.Has(pid) {
+								// Not created by this test. Ignore it.
+								continue
+							}
 							if err := validateOOMScoreAdjSetting(pid, -998); err != nil {
 								return err
 							}

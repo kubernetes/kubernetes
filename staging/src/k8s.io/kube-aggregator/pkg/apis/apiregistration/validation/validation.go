@@ -27,10 +27,10 @@ import (
 	discoveryapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
 )
 
-func ValidateAPIService(apiServer *discoveryapi.APIService) field.ErrorList {
-	requiredName := apiServer.Spec.Version + "." + apiServer.Spec.Group
+func ValidateAPIService(apiService *discoveryapi.APIService) field.ErrorList {
+	requiredName := apiService.Spec.Version + "." + apiService.Spec.Group
 
-	allErrs := validation.ValidateObjectMeta(&apiServer.ObjectMeta, false,
+	allErrs := validation.ValidateObjectMeta(&apiService.ObjectMeta, false,
 		func(name string, prefix bool) []string {
 			if minimalFailures := path.IsValidPathSegmentName(name); len(minimalFailures) > 0 {
 				return minimalFailures
@@ -45,33 +45,42 @@ func ValidateAPIService(apiServer *discoveryapi.APIService) field.ErrorList {
 		field.NewPath("metadata"))
 
 	// in this case we allow empty group
-	if len(apiServer.Spec.Group) == 0 && apiServer.Spec.Version != "v1" {
+	if len(apiService.Spec.Group) == 0 && apiService.Spec.Version != "v1" {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "group"), "only v1 may have an empty group and it better be legacy kube"))
 	}
-	if len(apiServer.Spec.Group) > 0 {
-		for _, errString := range utilvalidation.IsDNS1123Subdomain(apiServer.Spec.Group) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "group"), apiServer.Spec.Group, errString))
+	if len(apiService.Spec.Group) > 0 {
+		for _, errString := range utilvalidation.IsDNS1123Subdomain(apiService.Spec.Group) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "group"), apiService.Spec.Group, errString))
 		}
 	}
 
-	for _, errString := range utilvalidation.IsDNS1035Label(apiServer.Spec.Version) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "version"), apiServer.Spec.Version, errString))
+	for _, errString := range utilvalidation.IsDNS1035Label(apiService.Spec.Version) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "version"), apiService.Spec.Version, errString))
 	}
 
-	if apiServer.Spec.Priority <= 0 || apiServer.Spec.Priority > 1000 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "priority"), apiServer.Spec.Priority, "priority must be positive and less than 1000"))
+	if apiService.Spec.Priority <= 0 || apiService.Spec.Priority > 1000 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "priority"), apiService.Spec.Priority, "priority must be positive and less than 1000"))
 
 	}
 
-	if len(apiServer.Spec.Service.Namespace) == 0 {
+	if apiService.Spec.Service == nil {
+		if len(apiService.Spec.CABundle) != 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "caBundle"), fmt.Sprintf("%d bytes", len(apiService.Spec.CABundle)), "local APIServices may not have a caBundle"))
+		}
+		if apiService.Spec.InsecureSkipTLSVerify {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "insecureSkipTLSVerify"), apiService.Spec.InsecureSkipTLSVerify, "local APIServices may not have insecureSkipTLSVerify"))
+		}
+		return allErrs
+	}
+
+	if len(apiService.Spec.Service.Namespace) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "service", "namespace"), ""))
 	}
-	if len(apiServer.Spec.Service.Name) == 0 {
+	if len(apiService.Spec.Service.Name) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "service", "name"), ""))
 	}
-
-	if apiServer.Spec.InsecureSkipTLSVerify && len(apiServer.Spec.CABundle) > 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "insecureSkipTLSVerify"), apiServer.Spec.InsecureSkipTLSVerify, "may not be true if caBundle is present"))
+	if apiService.Spec.InsecureSkipTLSVerify && len(apiService.Spec.CABundle) > 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "insecureSkipTLSVerify"), apiService.Spec.InsecureSkipTLSVerify, "may not be true if caBundle is present"))
 	}
 
 	return allErrs

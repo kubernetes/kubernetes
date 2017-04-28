@@ -22,7 +22,7 @@ KUBE_PROMPT_FOR_UPDATE=${KUBE_PROMPT_FOR_UPDATE:-"n"}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gke/${KUBE_CONFIG_FILE:-config-default.sh}"
 source "${KUBE_ROOT}/cluster/common.sh"
-source "${KUBE_ROOT}/cluster/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 
 function with-retry() {
   local retry_limit=$1
@@ -142,7 +142,7 @@ function kube-up() {
   # Make the specified network if we need to.
   if ! "${GCLOUD}" compute networks --project "${PROJECT}" describe "${NETWORK}" &>/dev/null; then
     echo "Creating new network: ${NETWORK}" >&2
-    with-retry 3 "${GCLOUD}" compute networks create "${NETWORK}" --project="${PROJECT}" --range "${NETWORK_RANGE}"
+    with-retry 3 "${GCLOUD}" compute networks create "${NETWORK}" --project="${PROJECT}" --mode=auto
   else
     echo "... Using network: ${NETWORK}" >&2
   fi

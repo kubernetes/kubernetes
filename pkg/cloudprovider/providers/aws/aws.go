@@ -40,6 +40,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -392,6 +393,10 @@ type CloudConfig struct {
 		// on a different aws account, on a different cloud provider or on-premise.
 		// If the flag is set also the KubernetesClusterTag must be provided
 		VPC string
+		// SubnetID enables using a specific subnet to use for ELB's
+		SubnetID string
+		// RouteTableID enables using a specific RouteTable
+		RouteTableID string
 
 		// KubernetesClusterTag is the legacy cluster id we'll use to identify our cluster resources
 		KubernetesClusterTag string
@@ -531,7 +536,7 @@ func stringPointerArray(orig []string) []*string {
 }
 
 // isNilOrEmpty returns true if the value is nil or ""
-// Deprecated: prefer aws.StringValue(x) == "" (and elimination of this check altogether whrere possible)
+// Deprecated: prefer aws.StringValue(x) == "" (and elimination of this check altogether where possible)
 func isNilOrEmpty(s *string) bool {
 	return s == nil || *s == ""
 }
@@ -567,10 +572,11 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 	// Instances are paged
 	results := []*ec2.Instance{}
 	var nextToken *string
-
+	requestTime := time.Now()
 	for {
 		response, err := s.ec2.DescribeInstances(request)
 		if err != nil {
+			recordAwsMetric("describe_instance", 0, err)
 			return nil, fmt.Errorf("error listing AWS instances: %v", err)
 		}
 
@@ -584,7 +590,8 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 		}
 		request.NextToken = nextToken
 	}
-
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("describe_instance", timeTaken, nil)
 	return results, nil
 }
 
@@ -599,22 +606,31 @@ func (s *awsSdkEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsIn
 }
 
 func (s *awsSdkEC2) AttachVolume(request *ec2.AttachVolumeInput) (*ec2.VolumeAttachment, error) {
-	return s.ec2.AttachVolume(request)
+	requestTime := time.Now()
+	resp, err := s.ec2.AttachVolume(request)
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("attach_volume", timeTaken, err)
+	return resp, err
 }
 
 func (s *awsSdkEC2) DetachVolume(request *ec2.DetachVolumeInput) (*ec2.VolumeAttachment, error) {
-	return s.ec2.DetachVolume(request)
+	requestTime := time.Now()
+	resp, err := s.ec2.DetachVolume(request)
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("detach_volume", timeTaken, err)
+	return resp, err
 }
 
 func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.Volume, error) {
 	// Volumes are paged
 	results := []*ec2.Volume{}
 	var nextToken *string
-
+	requestTime := time.Now()
 	for {
 		response, err := s.ec2.DescribeVolumes(request)
 
 		if err != nil {
+			recordAwsMetric("describe_volume", 0, err)
 			return nil, fmt.Errorf("error listing AWS volumes: %v", err)
 		}
 
@@ -626,16 +642,25 @@ func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.V
 		}
 		request.NextToken = nextToken
 	}
-
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("describe_volume", timeTaken, nil)
 	return results, nil
 }
 
-func (s *awsSdkEC2) CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volume, err error) {
-	return s.ec2.CreateVolume(request)
+func (s *awsSdkEC2) CreateVolume(request *ec2.CreateVolumeInput) (*ec2.Volume, error) {
+	requestTime := time.Now()
+	resp, err := s.ec2.CreateVolume(request)
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("create_volume", timeTaken, err)
+	return resp, err
 }
 
 func (s *awsSdkEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (*ec2.DeleteVolumeOutput, error) {
-	return s.ec2.DeleteVolume(request)
+	requestTime := time.Now()
+	resp, err := s.ec2.DeleteVolume(request)
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("delete_volume", timeTaken, err)
+	return resp, err
 }
 
 func (s *awsSdkEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
@@ -664,7 +689,11 @@ func (s *awsSdkEC2) RevokeSecurityGroupIngress(request *ec2.RevokeSecurityGroupI
 }
 
 func (s *awsSdkEC2) CreateTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
-	return s.ec2.CreateTags(request)
+	requestTime := time.Now()
+	resp, err := s.ec2.CreateTags(request)
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("create_tags", timeTaken, err)
+	return resp, err
 }
 
 func (s *awsSdkEC2) DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error) {
@@ -689,6 +718,7 @@ func (s *awsSdkEC2) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttribute
 }
 
 func init() {
+	registerMetrics()
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		creds := credentials.NewChainCredentials(
 			[]credentials.Provider{
@@ -817,13 +847,14 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
 	}
 
-	if cfg.Global.VPC != "" && cfg.Global.KubernetesClusterTag != "" {
+	if cfg.Global.VPC != "" && cfg.Global.SubnetID != "" && (cfg.Global.KubernetesClusterTag != "" || cfg.Global.KubernetesClusterID != "") {
 		// When the master is running on a different AWS account, cloud provider or on-premise
 		// build up a dummy instance and use the VPC from the nodes account
-		glog.Info("Master is configured to run on a AWS account, different cloud provider or on-premise")
+		glog.Info("Master is configured to run on a different AWS account, different cloud provider or on-premise")
 		awsCloud.selfAWSInstance = &awsInstance{
 			nodeName: "master-dummy",
 			vpcID:    cfg.Global.VPC,
+			subnetID: cfg.Global.SubnetID,
 		}
 		awsCloud.vpcID = cfg.Global.VPC
 	} else {
@@ -976,6 +1007,13 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	return addresses, nil
 }
 
+// NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (c *Cloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+	return []v1.NodeAddress{}, errors.New("unimplemented")
+}
+
 // ExternalID returns the cloud provider ID of the node with the specified nodeName (deprecated).
 func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
 	if c.selfAWSInstance.nodeName == nodeName {
@@ -1006,6 +1044,13 @@ func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
 		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %v", nodeName, err)
 	}
 	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceId), nil
+}
+
+// InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (c *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
+	return "", errors.New("unimplemented")
 }
 
 // InstanceType returns the type of the node with the specified nodeName.
@@ -1262,9 +1307,13 @@ func (c *Cloud) getMountDevice(
 		// we want device names with two significant characters, starting with /dev/xvdbb
 		// the allowed range is /dev/xvd[b-c][a-z]
 		// http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
-		deviceAllocator = NewDeviceAllocator(0)
+		deviceAllocator = NewDeviceAllocator()
 		c.deviceAllocators[i.nodeName] = deviceAllocator
 	}
+	// We need to lock deviceAllocator to prevent possible race with Deprioritize function
+	deviceAllocator.Lock()
+	defer deviceAllocator.Unlock()
+
 	chosen, err := deviceAllocator.GetNext(deviceMappings)
 	if err != nil {
 		glog.Warningf("Could not assign a mount device.  mappings=%v, error: %v", deviceMappings, err)
@@ -1525,7 +1574,9 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 			// TODO: Check if the volume was concurrently attached?
 			return "", fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", disk.awsID, awsInstance.awsID, err)
 		}
-
+		if da, ok := c.deviceAllocators[awsInstance.nodeName]; ok {
+			da.Deprioritize(mountDevice)
+		}
 		glog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", disk.awsID, awsInstance.awsID, attachResponse)
 	}
 
@@ -1601,6 +1652,9 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 	attachment, err := disk.waitForAttachmentStatus("detached")
 	if err != nil {
 		return "", err
+	}
+	if da, ok := c.deviceAllocators[awsInstance.nodeName]; ok {
+		da.Deprioritize(mountDevice)
 	}
 	if attachment != nil {
 		// We expect it to be nil, it is (maybe) interesting if it is not
@@ -3308,4 +3362,13 @@ func setNodeDisk(
 		nodeDiskMap[nodeName] = volumeMap
 	}
 	volumeMap[volumeID] = check
+}
+
+func recordAwsMetric(actionName string, timeTaken float64, err error) {
+	if err != nil {
+		awsApiErrorMetric.With(prometheus.Labels{"request": actionName}).Inc()
+	} else {
+		awsApiMetric.With(prometheus.Labels{"request": actionName}).Observe(timeTaken)
+	}
+
 }

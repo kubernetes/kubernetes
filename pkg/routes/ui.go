@@ -27,8 +27,8 @@ const dashboardPath = "/api/v1/namespaces/kube-system/services/kubernetes-dashbo
 // UIRediect redirects /ui to the kube-ui proxy path.
 type UIRedirect struct{}
 
-func (r UIRedirect) Install(c *mux.APIContainer) {
-	c.NonSwaggerRoutes.HandleFunc("/ui/", func(w http.ResponseWriter, r *http.Request) {
+func (r UIRedirect) Install(c *mux.PathRecorderMux) {
+	c.HandleFunc("/ui/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, dashboardPath, http.StatusTemporaryRedirect)
 	})
 }

@@ -201,8 +201,11 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 type fakeAzureSvc struct{}
 
-func (s *fakeAzureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secretName, shareName string) (string, string, error) {
+func (s *fakeAzureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secretName string) (string, string, error) {
 	return "name", "key", nil
+}
+func (s *fakeAzureSvc) SetAzureCredentials(host volume.VolumeHost, nameSpace, accountName, accountKey string) (string, error) {
+	return "secret", nil
 }
 
 func TestMounterAndUnmounterTypeAssert(t *testing.T) {

@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
@@ -42,6 +43,7 @@ import (
 )
 
 type HollowKubelet struct {
+	KubeletFlags         *options.KubeletFlags
 	KubeletConfiguration *componentconfig.KubeletConfiguration
 	KubeletDeps          *kubelet.KubeletDeps
 }
@@ -58,7 +60,7 @@ func NewHollowKubelet(
 	// -----------------
 	// Static config
 	// -----------------
-	c := GetHollowKubeletConfig(nodeName, kubeletPort, kubeletReadOnlyPort, maxPods, podsPerCore)
+	f, c := GetHollowKubeletConfig(nodeName, kubeletPort, kubeletReadOnlyPort, maxPods, podsPerCore)
 
 	// -----------------
 	// Injected objects
@@ -80,6 +82,7 @@ func NewHollowKubelet(
 	}
 
 	return &HollowKubelet{
+		KubeletFlags:         f,
 		KubeletConfiguration: c,
 		KubeletDeps:          d,
 	}
@@ -87,7 +90,7 @@ func NewHollowKubelet(
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	kubeletapp.RunKubelet(hk.KubeletConfiguration, hk.KubeletDeps, false, false)
+	kubeletapp.RunKubelet(hk.KubeletFlags, hk.KubeletConfiguration, hk.KubeletDeps, false, false)
 	select {}
 }
 
@@ -98,12 +101,18 @@ func GetHollowKubeletConfig(
 	kubeletPort int,
 	kubeletReadOnlyPort int,
 	maxPods int,
-	podsPerCore int) *componentconfig.KubeletConfiguration {
+	podsPerCore int) (*options.KubeletFlags, *componentconfig.KubeletConfiguration) {
 
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
 	manifestFilePath := utils.MakeTempDirOrDie("manifest", testRootDir)
 	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 
+	// Flags struct
+	f := &options.KubeletFlags{
+		HostnameOverride: nodeName,
+	}
+
+	// Config struct
 	// Do the external -> internal conversion to make sure that defaults
 	// are set for fields not overridden in NewHollowKubelet.
 	tmp := &v1alpha1.KubeletConfiguration{}
@@ -111,7 +120,6 @@ func GetHollowKubeletConfig(
 	c := &componentconfig.KubeletConfiguration{}
 	api.Scheme.Convert(tmp, c, nil)
 
-	c.HostnameOverride = nodeName
 	c.RootDirectory = testRootDir
 	c.ManifestURL = ""
 	c.Address = "0.0.0.0" /* bind address */
@@ -166,6 +174,6 @@ func GetHollowKubeletConfig(
 	//                have actually wanted the default).
 	//                The default will be present in the KubeletConfiguration contstructed above.
 
-	return c
+	return f, c
 
 }

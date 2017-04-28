@@ -55,13 +55,7 @@ var (
 )
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
-	RegisterDefaults(scheme)
-	return scheme.AddDefaultingFuncs(
-		SetDefaults_KubeProxyConfiguration,
-		SetDefaults_KubeSchedulerConfiguration,
-		SetDefaults_LeaderElectionConfiguration,
-		SetDefaults_KubeletConfiguration,
-	)
+	return RegisterDefaults(scheme)
 }
 
 func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
@@ -157,6 +151,15 @@ func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
 	}
 	if obj.FailureDomains == "" {
 		obj.FailureDomains = api.DefaultFailureDomains
+	}
+	if obj.LockObjectNamespace == "" {
+		obj.LockObjectNamespace = SchedulerDefaultLockObjectNamespace
+	}
+	if obj.LockObjectName == "" {
+		obj.LockObjectName = SchedulerDefaultLockObjectName
+	}
+	if obj.PolicyConfigMapNamespace == "" {
+		obj.PolicyConfigMapNamespace = api.NamespaceSystem
 	}
 }
 
@@ -267,7 +270,8 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.ImageMinimumGCAge = metav1.Duration{Duration: 2 * time.Minute}
 	}
 	if obj.ImageGCHighThresholdPercent == nil {
-		temp := int32(90)
+		// default is below docker's default dm.min_free_space of 90%
+		temp := int32(85)
 		obj.ImageGCHighThresholdPercent = &temp
 	}
 	if obj.ImageGCLowThresholdPercent == nil {
@@ -410,6 +414,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.EnableCRI == nil {
 		obj.EnableCRI = boolVar(true)
+	}
+	if obj.ExperimentalDockershim == nil {
+		obj.ExperimentalDockershim = boolVar(false)
 	}
 }
 

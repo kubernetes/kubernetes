@@ -36,7 +36,7 @@ $ kubectl stop -f path/to/resources
 ### Options
 
 ```
-      --all[=false]: [-all] to select all the specified resources.
+      --all[=false]: select all resources in the namespace of the specified resource types.
   -f, --filename=[]: Filename, directory, or URL to file of resource(s) to be stopped.
       --grace-period=-1: Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.
       --ignore-not-found[=false]: Treat "resource not found" as a successful stop.
@@ -50,7 +50,7 @@ $ kubectl stop -f path/to/resources
 ```
       --alsologtostderr[=false]: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
-      --certificate-authority="": Path to a cert. file for the certificate authority.
+      --certificate-authority="": Path to a cert file for the certificate authority.
       --client-certificate="": Path to a client certificate file for TLS.
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use

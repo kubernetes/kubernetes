@@ -21,7 +21,6 @@ package v1
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -89,7 +88,7 @@ func (s secretNamespaceLister) Get(name string) (*v1.Secret, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("secret"), name)
+		return nil, errors.NewNotFound(v1.Resource("secret"), name)
 	}
 	return obj.(*v1.Secret), nil
 }

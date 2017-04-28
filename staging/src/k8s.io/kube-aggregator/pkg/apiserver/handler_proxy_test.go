@@ -83,11 +83,6 @@ func TestProxyHandler(t *testing.T) {
 	targetServer := httptest.NewTLSServer(target)
 	defer targetServer.Close()
 
-	handler := &proxyHandler{}
-
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
 	tests := map[string]struct {
 		user       user.Info
 		path       string
@@ -105,6 +100,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
+					Service: &apiregistration.ServiceReference{},
 					Group:   "foo",
 					Version: "v1",
 				},
@@ -121,6 +117,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
+					Service:               &apiregistration.ServiceReference{},
 					Group:                 "foo",
 					Version:               "v1",
 					InsecureSkipTLSVerify: true,
@@ -146,6 +143,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
+					Service: &apiregistration.ServiceReference{},
 					Group:   "foo",
 					Version: "v1",
 				},
@@ -156,43 +154,53 @@ func TestProxyHandler(t *testing.T) {
 
 	for name, tc := range tests {
 		target.Reset()
-		handler.contextMapper = &fakeRequestContextMapper{user: tc.user}
-		handler.removeAPIService()
-		if tc.apiService != nil {
-			handler.updateAPIService(tc.apiService)
-			handler.destinationHost = targetServer.Listener.Addr().String()
-		}
 
-		resp, err := http.Get(server.URL + tc.path)
-		if err != nil {
-			t.Errorf("%s: %v", name, err)
-			continue
-		}
-		if e, a := tc.expectedStatusCode, resp.StatusCode; e != a {
-			body, _ := httputil.DumpResponse(resp, true)
-			t.Logf("%s: %v", name, string(body))
-			t.Errorf("%s: expected %v, got %v", name, e, a)
-			continue
-		}
-		bytes, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Errorf("%s: %v", name, err)
-			continue
-		}
-		if !strings.Contains(string(bytes), tc.expectedBody) {
-			t.Errorf("%s: expected %q, got %q", name, tc.expectedBody, string(bytes))
-			continue
-		}
+		func() {
+			handler := &proxyHandler{
+				localDelegate: http.NewServeMux(),
+			}
+			handler.contextMapper = &fakeRequestContextMapper{user: tc.user}
+			server := httptest.NewServer(handler)
+			defer server.Close()
 
-		if e, a := tc.expectedCalled, target.called; e != a {
-			t.Errorf("%s: expected %v, got %v", name, e, a)
-			continue
-		}
-		// this varies every test
-		delete(target.headers, "X-Forwarded-Host")
-		if e, a := tc.expectedHeaders, target.headers; !reflect.DeepEqual(e, a) {
-			t.Errorf("%s: expected %v, got %v", name, e, a)
-			continue
-		}
+			if tc.apiService != nil {
+				handler.updateAPIService(tc.apiService, tc.apiService.Spec.Service.Name+"."+tc.apiService.Spec.Service.Namespace+".svc")
+				curr := handler.handlingInfo.Load().(proxyHandlingInfo)
+				curr.destinationHost = targetServer.Listener.Addr().String()
+				handler.handlingInfo.Store(curr)
+			}
+
+			resp, err := http.Get(server.URL + tc.path)
+			if err != nil {
+				t.Errorf("%s: %v", name, err)
+				return
+			}
+			if e, a := tc.expectedStatusCode, resp.StatusCode; e != a {
+				body, _ := httputil.DumpResponse(resp, true)
+				t.Logf("%s: %v", name, string(body))
+				t.Errorf("%s: expected %v, got %v", name, e, a)
+				return
+			}
+			bytes, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("%s: %v", name, err)
+				return
+			}
+			if !strings.Contains(string(bytes), tc.expectedBody) {
+				t.Errorf("%s: expected %q, got %q", name, tc.expectedBody, string(bytes))
+				return
+			}
+
+			if e, a := tc.expectedCalled, target.called; e != a {
+				t.Errorf("%s: expected %v, got %v", name, e, a)
+				return
+			}
+			// this varies every test
+			delete(target.headers, "X-Forwarded-Host")
+			if e, a := tc.expectedHeaders, target.headers; !reflect.DeepEqual(e, a) {
+				t.Errorf("%s: expected %v, got %v", name, e, a)
+				return
+			}
+		}()
 	}
 }

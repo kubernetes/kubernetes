@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/swagger"
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -50,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -189,6 +191,8 @@ type ObjectMappingFactory interface {
 	// Returns interfaces for dealing with arbitrary
 	// runtime.Unstructured. This performs API calls to discover types.
 	UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error)
+	// Returns interface for expanding categories like `all`.
+	CategoryExpander() resource.CategoryExpander
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
 	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -198,7 +202,7 @@ type ObjectMappingFactory interface {
 	Describer(mapping *meta.RESTMapping) (printers.Describer, error)
 
 	// LogsForObject returns a request for the logs associated with the provided object
-	LogsForObject(object, options runtime.Object) (*restclient.Request, error)
+	LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
 	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
 	Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 	// Returns a Reaper for gracefully shutting down resources.
@@ -211,12 +215,14 @@ type ObjectMappingFactory interface {
 	StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error)
 
 	// AttachablePodForObject returns the pod to which to attach given an object.
-	AttachablePodForObject(object runtime.Object) (*api.Pod, error)
+	AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error)
 
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
 	SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error)
+	// OpenAPISchema returns the schema openapi schema definiton
+	OpenAPISchema(cacheDir string) (*openapi.Resources, error)
 }
 
 // BuilderFactory holds the second level of factory methods.  These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
@@ -415,6 +421,7 @@ func writeSchemaFile(schemaData []byte, cacheDir, cacheFile, prefix, groupVersio
 	if _, err := io.Copy(tmpFile, bytes.NewBuffer(schemaData)); err != nil {
 		return err
 	}
+	glog.V(4).Infof("Writing swagger cache (dir %v) file %v (from %v)", cacheDir, cacheFile, tmpFile.Name())
 	if err := os.Link(tmpFile.Name(), cacheFile); err != nil {
 		// If we can't write due to file existing, or permission problems, keep going.
 		if os.IsExist(err) || os.IsPermission(err) {

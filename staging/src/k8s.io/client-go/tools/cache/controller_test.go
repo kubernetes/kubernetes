@@ -307,13 +307,13 @@ func TestUpdate(t *testing.T) {
 	// asynchronous, there are a lot of valid possibilities.
 	type pair struct{ from, to string }
 	allowedTransitions := map[pair]bool{
-		pair{FROM, TO}: true,
+		{FROM, TO}: true,
 
 		// Because a resync can happen when we've already observed one
 		// of the above but before the item is deleted.
-		pair{TO, TO}: true,
+		{TO, TO}: true,
 		// Because a resync could happen before we observe an update.
-		pair{FROM, FROM}: true,
+		{FROM, FROM}: true,
 	}
 
 	pod := func(name, check string, final bool) *v1.Pod {

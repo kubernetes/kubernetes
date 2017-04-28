@@ -190,6 +190,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"spec.restartPolicy",
 				"spec.serviceAccountName",
 				"status.phase",
+				"status.hostIP",
 				"status.podIP":
 				return label, value, nil
 				// This is for backwards compatibility with old v1 clients which send spec.host
@@ -644,15 +645,6 @@ func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 	return nil
 }
 
-func Convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
-	if err := autoConvert_api_ServiceSpec_To_v1_ServiceSpec(in, out, s); err != nil {
-		return err
-	}
-	// Publish both externalIPs and deprecatedPublicIPs fields in v1.
-	out.DeprecatedPublicIPs = in.ExternalIPs
-	return nil
-}
-
 func Convert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.Scope) error {
 	if err := autoConvert_v1_Secret_To_api_Secret(in, out, s); err != nil {
 		return err
@@ -668,17 +660,6 @@ func Convert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.S
 		}
 	}
 
-	return nil
-}
-
-func Convert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
-	if err := autoConvert_v1_ServiceSpec_To_api_ServiceSpec(in, out, s); err != nil {
-		return err
-	}
-	// Prefer the legacy deprecatedPublicIPs field, if provided.
-	if len(in.DeprecatedPublicIPs) > 0 {
-		out.ExternalIPs = in.DeprecatedPublicIPs
-	}
 	return nil
 }
 

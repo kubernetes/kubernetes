@@ -107,9 +107,23 @@ class FlagManager:
             if strict:
                 self.data.pop('{}-strict'.format(key))
             else:
-                self.data.pop('key')
+                self.data.pop(key)
+            self.__save()
         except KeyError:
             pass
+
+    def get(self, key, default=None):
+        """Return the value for ``key``, or the default if ``key`` doesn't exist.
+
+        """
+        return self.data.get(key, default)
+
+    def destroy_all(self):
+        '''
+        Destructively removes all data from the FlagManager.
+        '''
+        self.data.clear()
+        self.__save()
 
     def to_s(self):
         '''

@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
+	"k8s.io/kubernetes/pkg/util/system"
 
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -103,6 +104,10 @@ func (m *MetricsForE2E) PrintHumanReadable() string {
 func (m *MetricsForE2E) PrintJSON() string {
 	m.filterMetrics()
 	return PrettyPrintJSON(*m)
+}
+
+func (m *MetricsForE2E) SummaryKind() string {
+	return "MetricsForE2E"
 }
 
 var InterestingApiServerMetrics = []string{
@@ -335,7 +340,7 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 	var data string
 	var masterRegistered = false
 	for _, node := range nodes.Items {
-		if strings.HasSuffix(node.Name, "master") {
+		if system.IsMasterNode(node.Name) {
 			masterRegistered = true
 		}
 	}
@@ -490,17 +495,6 @@ func LogSuspiciousLatency(latencyData []PodLatencyData, latencyDataLag []PodLate
 	}
 	Logf("Approx throughput: %v pods/min",
 		float64(nodeCount)/(latencyDataLag[len(latencyDataLag)-1].Latency.Minutes()))
-}
-
-// testMaximumLatencyValue verifies the highest latency value is less than or equal to
-// the given time.Duration. Since the arrays are sorted we are looking at the last
-// element which will always be the highest. If the latency is higher than the max Failf
-// is called.
-func testMaximumLatencyValue(latencies []PodLatencyData, max time.Duration, name string) {
-	highestLatency := latencies[len(latencies)-1]
-	if !(highestLatency.Latency <= max) {
-		Failf("%s were not all under %s: %#v", name, max.String(), latencies)
-	}
 }
 
 func PrintLatencies(latencies []PodLatencyData, header string) {

@@ -194,7 +194,7 @@ function run-heat-script() {
     else
       rgx="publicURL: (.+)$"
     fi
-    SWIFT_SERVER_URL=$(openstack catalog show object-store --format value | egrep -o "$rgx" | cut -d" " -f2)
+    SWIFT_SERVER_URL=$(openstack catalog show object-store --format value | egrep -o "$rgx" | cut -d" " -f2 | head -n 1)
   fi
   local swift_repo_url="${SWIFT_SERVER_URL}/kubernetes"
 
@@ -233,6 +233,7 @@ function run-heat-script() {
       --parameter https_proxy="${HTTPS_PROXY}" \
       --parameter socks_proxy="${SOCKS_PROXY}" \
       --parameter no_proxy="${NO_PROXY}" \
+      --parameter assign_floating_ip="${ASSIGN_FLOATING_IP}" \
       --template kubecluster.yaml \
       ${STACK_NAME}
     )

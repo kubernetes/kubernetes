@@ -48,7 +48,7 @@ import (
 // It is incremented whenever an incompatibility between the generated code and
 // the grpc package is introduced; the generated code references
 // a constant, grpc.SupportPackageIsVersionN (where N is generatedCodeVersion).
-const generatedCodeVersion = 3
+const generatedCodeVersion = 4
 
 // Paths for packages used by code generated in this file,
 // relative to the import_prefix of the generator.Generator.
@@ -254,7 +254,7 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 		g.P("},")
 	}
 	g.P("},")
-	g.P("Metadata: ", file.VarName(), ",")
+	g.P("Metadata: \"", file.GetName(), "\",")
 	g.P("}")
 	g.P()
 }

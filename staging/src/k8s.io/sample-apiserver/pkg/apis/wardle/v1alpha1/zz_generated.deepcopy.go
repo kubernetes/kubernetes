@@ -65,8 +65,10 @@ func DeepCopy_v1alpha1_FlunderList(in interface{}, out interface{}, c *conversio
 			in, out := &in.Items, &out.Items
 			*out = make([]Flunder, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1alpha1_Flunder(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*Flunder)
 				}
 			}
 		}

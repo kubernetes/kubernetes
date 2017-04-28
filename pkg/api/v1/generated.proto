@@ -245,6 +245,8 @@ message ComponentStatus {
 
   // List of component conditions observed
   // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
   repeated ComponentCondition conditions = 2;
 }
 
@@ -267,7 +269,7 @@ message ConfigMap {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Data contains the configuration data.
-  // Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.
+  // Each key must consist of alphanumeric characters, '-', '_' or '.'.
   // +optional
   map<string, string> data = 2;
 }
@@ -415,6 +417,8 @@ message Container {
   // accessible from the network.
   // Cannot be updated.
   // +optional
+  // +patchMergeKey=containerPort
+  // +patchStrategy=merge
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
@@ -429,6 +433,8 @@ message Container {
   // List of environment variables to set in the container.
   // Cannot be updated.
   // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
   repeated EnvVar env = 7;
 
   // Compute Resources required by this container.
@@ -440,6 +446,8 @@ message Container {
   // Pod volumes to mount into the container's filesystem.
   // Cannot be updated.
   // +optional
+  // +patchMergeKey=mountPath
+  // +patchStrategy=merge
   repeated VolumeMount volumeMounts = 9;
 
   // Periodic probe of container liveness.
@@ -899,7 +907,7 @@ message EnvVar {
 // EnvVarSource represents a source for the value of an EnvVar.
 message EnvVarSource {
   // Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations,
-  // spec.nodeName, spec.serviceAccountName, status.podIP.
+  // spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.
   // +optional
   optional ObjectFieldSelector fieldRef = 1;
 
@@ -1227,6 +1235,18 @@ message ISCSIVolumeSource {
   // is other than default (typically TCP ports 860 and 3260).
   // +optional
   repeated string portals = 7;
+
+  // whether support iSCSI Discovery CHAP authentication
+  // +optional
+  optional bool chapAuthDiscovery = 8;
+
+  // whether support iSCSI Session CHAP authentication
+  // +optional
+  optional bool chapAuthSession = 11;
+
+  // CHAP secret for iSCSI target and initiator authentication
+  // +optional
+  optional LocalObjectReference secretRef = 10;
 }
 
 // Maps a string key to a path within a volume.
@@ -1591,6 +1611,8 @@ message NodeSelector {
 // that relates the key and values.
 message NodeSelectorRequirement {
   // The label key that the selector applies to.
+  // +patchMergeKey=key
+  // +patchStrategy=merge
   optional string key = 1;
 
   // Represents a key's relationship to a set of values.
@@ -1658,12 +1680,16 @@ message NodeStatus {
   // Conditions is an array of current observed node conditions.
   // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-condition
   // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
   repeated NodeCondition conditions = 4;
 
   // List of addresses reachable to the node.
   // Queried from cloud provider, if available.
   // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-addresses
   // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
   repeated NodeAddress addresses = 5;
 
   // Endpoints of daemons running on the Node.
@@ -1869,6 +1895,8 @@ message ObjectMeta {
   // then an entry in this list will point to this controller, with the controller field set to true.
   // There cannot be more than one managing controller.
   // +optional
+  // +patchMergeKey=uid
+  // +patchStrategy=merge
   repeated k8s.io.apimachinery.pkg.apis.meta.v1.OwnerReference ownerReferences = 13;
 
   // Must be empty before the object is deleted from the registry. Each entry
@@ -1876,6 +1904,7 @@ message ObjectMeta {
   // from the list. If the deletionTimestamp of the object is non-nil, entries
   // in this list can only be removed.
   // +optional
+  // +patchStrategy=merge
   repeated string finalizers = 14;
 
   // The name of the cluster which the object belongs to.
@@ -2562,6 +2591,8 @@ message PodSpec {
   // List of volumes that can be mounted by containers belonging to the pod.
   // More info: http://kubernetes.io/docs/user-guide/volumes
   // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
   repeated Volume volumes = 1;
 
   // List of initialization containers belonging to the pod.
@@ -2577,6 +2608,8 @@ message PodSpec {
   // Init containers cannot currently be added or removed.
   // Cannot be updated.
   // More info: http://kubernetes.io/docs/user-guide/containers
+  // +patchMergeKey=name
+  // +patchStrategy=merge
   repeated Container initContainers = 20;
 
   // List of containers belonging to the pod.
@@ -2584,6 +2617,8 @@ message PodSpec {
   // There must be at least one container in a Pod.
   // Cannot be updated.
   // More info: http://kubernetes.io/docs/user-guide/containers
+  // +patchMergeKey=name
+  // +patchStrategy=merge
   repeated Container containers = 2;
 
   // Restart policy for all containers within the pod.
@@ -2672,6 +2707,8 @@ message PodSpec {
   // in the case of docker, only DockerConfig type secrets are honored.
   // More info: http://kubernetes.io/docs/user-guide/images#specifying-imagepullsecrets-on-a-pod
   // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
   repeated LocalObjectReference imagePullSecrets = 15;
 
   // Specifies the hostname of the Pod
@@ -2709,6 +2746,8 @@ message PodStatus {
   // Current service state of pod.
   // More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
   // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
   repeated PodCondition conditions = 2;
 
   // A human readable message indicating details about why the pod is in this condition.
@@ -3107,6 +3146,8 @@ message ReplicationControllerStatus {
 
   // Represents the latest available observations of a replication controller's current state.
   // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
   repeated ReplicationControllerCondition conditions = 6;
 }
 
@@ -3265,11 +3306,10 @@ message Secret {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Data contains the secret data. Each key must be a valid DNS_SUBDOMAIN
-  // or leading dot followed by valid DNS_SUBDOMAIN.
-  // The serialized form of the secret data is a base64 encoded string,
-  // representing the arbitrary (possibly non-string) data value here.
-  // Described in https://tools.ietf.org/html/rfc4648#section-4
+  // Data contains the secret data. Each key must consist of alphanumeric
+  // characters, '-', '_' or '.'. The serialized form of the secret data is a
+  // base64 encoded string, representing the arbitrary (possibly non-string)
+  // data value here. Described in https://tools.ietf.org/html/rfc4648#section-4
   // +optional
   map<string, bytes> data = 2;
 
@@ -3469,6 +3509,8 @@ message ServiceAccount {
   // Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount.
   // More info: http://kubernetes.io/docs/user-guide/secrets
   // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
   repeated ObjectReference secrets = 2;
 
   // ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images
@@ -3559,6 +3601,8 @@ message ServiceProxyOptions {
 message ServiceSpec {
   // The list of ports that are exposed by this service.
   // More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies
+  // +patchMergeKey=port
+  // +patchStrategy=merge
   repeated ServicePort ports = 1;
 
   // Route service traffic to pods with label keys and values matching this
@@ -3603,20 +3647,9 @@ message ServiceSpec {
   // will also accept traffic for this service.  These IPs are not managed by
   // Kubernetes.  The user is responsible for ensuring that traffic arrives
   // at a node with this IP.  A common example is external load-balancers
-  // that are not part of the Kubernetes system.  A previous form of this
-  // functionality exists as the deprecatedPublicIPs field.  When using this
-  // field, callers should also clear the deprecatedPublicIPs field.
+  // that are not part of the Kubernetes system.
   // +optional
   repeated string externalIPs = 5;
-
-  // deprecatedPublicIPs is deprecated and replaced by the externalIPs field
-  // with almost the exact same semantics.  This field is retained in the v1
-  // API for compatibility until at least 8/20/2016.  It will be removed from
-  // any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are
-  // set, deprecatedPublicIPs is used.
-  // +k8s:conversion-gen=false
-  // +optional
-  repeated string deprecatedPublicIPs = 6;
 
   // Supports "ClientIP" and "None". Used to maintain session affinity.
   // Enable client IP based session affinity.
@@ -3656,9 +3689,12 @@ message ServiceStatus {
   optional LoadBalancerStatus loadBalancer = 1;
 }
 
+// Sysctl defines a kernel parameter to be set
 message Sysctl {
+  // Name of a property to set
   optional string name = 1;
 
+  // Value of a property to set
   optional string value = 2;
 }
 
@@ -3668,12 +3704,18 @@ message TCPSocketAction {
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 1;
+
+  // Optional: Host name to connect to, defaults to the pod IP.
+  // +optional
+  optional string host = 2;
 }
 
 // The node this Taint is attached to has the effect "effect" on
 // any pod that that does not tolerate the Taint.
 message Taint {
   // Required. The taint key to be applied to a node.
+  // +patchMergeKey=key
+  // +patchStrategy=merge
   optional string key = 1;
 
   // Required. The taint value corresponding to the taint key.
@@ -3697,6 +3739,8 @@ message Toleration {
   // Key is the taint key that the toleration applies to. Empty means match all taint keys.
   // If the key is empty, operator must be Exists; this combination means to match all values and all keys.
   // +optional
+  // +patchMergeKey=key
+  // +patchStrategy=merge
   optional string key = 1;
 
   // Operator represents a key's relationship to the value.

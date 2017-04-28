@@ -116,7 +116,12 @@ pushd "${KUBE_ROOT}" 2>&1 > /dev/null
     echo "If you're seeing this locally, run the below command to fix your Godeps.json:"
     echo "patch -p0 < godepdiff.patch"
     echo "(The above output can be saved as godepdiff.patch if you're not running this locally)"
+    echo "(The patch file should also be exported as a build artifact if run through CI)"
     KEEP_TMP=true
+    if [[ -f godepdiff.patch && -d "${ARTIFACTS_DIR:-}" ]]; then
+      echo "Copying patch to artifacts.."
+      cp godepdiff.patch "${ARTIFACTS_DIR:-}/"
+    fi
     ret=1
   fi
 
@@ -128,7 +133,12 @@ pushd "${KUBE_ROOT}" 2>&1 > /dev/null
     echo "If you're seeing this locally, run the below command to fix your directories:"
     echo "patch -p0 < vendordiff.patch"
     echo "(The above output can be saved as godepdiff.patch if you're not running this locally)"
+    echo "(The patch file should also be exported as a build artifact if run through CI)"
     KEEP_TMP=true
+    if [[ -f vendordiff.patch && -d "${ARTIFACTS_DIR:-}" ]]; then
+      echo "Copying patch to artifacts.."
+      cp vendordiff.patch "${ARTIFACTS_DIR:-}/"
+    fi
     ret=1
   fi
 popd 2>&1 > /dev/null

@@ -33,10 +33,7 @@ import (
 )
 
 const (
-	UserAgentName           = "Cluster-Controller"
-	KubeAPIQPS              = 20.0
-	KubeAPIBurst            = 30
-	KubeconfigSecretDataKey = "kubeconfig"
+	UserAgentName = "Cluster-Controller"
 )
 
 type ClusterClient struct {

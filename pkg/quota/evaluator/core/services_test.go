@@ -67,6 +67,23 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				api.ResourceServices:              resource.MustParse("1"),
 			},
 		},
+		"loadbalancer_ports": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Port: 27443,
+						},
+					},
+				},
+			},
+			usage: api.ResourceList{
+				api.ResourceServicesNodePorts:     resource.MustParse("1"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				api.ResourceServices:              resource.MustParse("1"),
+			},
+		},
 		"clusterip": {
 			service: &api.Service{
 				Spec: api.ServiceSpec{

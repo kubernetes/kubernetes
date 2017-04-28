@@ -21,15 +21,18 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 	"text/tabwriter"
 
+	"github.com/fatih/camelcase"
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
@@ -201,8 +204,51 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	}
 
 	if _, err := meta.Accessor(obj); err == nil {
+		// we don't recognize this type, but we can still attempt to print some reasonable information about.
+		unstructured, ok := obj.(runtime.Unstructured)
+		if !ok {
+			return fmt.Errorf("error: unknown type %#v", obj)
+		}
+
+		content := unstructured.UnstructuredContent()
+
+		// we'll elect a few more fields to print depending on how much columns are already taken
+		maxDiscoveredFieldsToPrint := 3
+		maxDiscoveredFieldsToPrint = maxDiscoveredFieldsToPrint - len(h.options.ColumnLabels)
+		if h.options.WithNamespace { // where's my ternary
+			maxDiscoveredFieldsToPrint--
+		}
+		if h.options.ShowLabels {
+			maxDiscoveredFieldsToPrint--
+		}
+		if maxDiscoveredFieldsToPrint < 0 {
+			maxDiscoveredFieldsToPrint = 0
+		}
+
+		var discoveredFieldNames []string                    // we want it predictable so this will be used to sort
+		ignoreIfDiscovered := []string{"kind", "apiVersion"} // these are already covered
+		for field, value := range content {
+			if slice.ContainsString(ignoreIfDiscovered, field, nil) {
+				continue
+			}
+			switch value.(type) {
+			case map[string]interface{}:
+				// just simpler types
+				continue
+			}
+			discoveredFieldNames = append(discoveredFieldNames, field)
+		}
+		sort.Strings(discoveredFieldNames)
+		if len(discoveredFieldNames) > maxDiscoveredFieldsToPrint {
+			discoveredFieldNames = discoveredFieldNames[:maxDiscoveredFieldsToPrint]
+		}
+
 		if !h.options.NoHeaders && t != h.lastType {
 			headers := []string{"NAME", "KIND"}
+			for _, discoveredField := range discoveredFieldNames {
+				fieldAsHeader := strings.ToUpper(strings.Join(camelcase.Split(discoveredField), " "))
+				headers = append(headers, fieldAsHeader)
+			}
 			headers = append(headers, formatLabelHeaders(h.options.ColumnLabels)...)
 			// LABELS is always the last column.
 			headers = append(headers, formatShowLabelsHeader(h.options.ShowLabels, t)...)
@@ -213,13 +259,8 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 			h.lastType = t
 		}
 
-		// we don't recognize this type, but we can still attempt to print some reasonable information about.
-		unstructured, ok := obj.(runtime.Unstructured)
-		if !ok {
-			return fmt.Errorf("error: unknown type %#v", obj)
-		}
 		// if the error isn't nil, report the "I don't recognize this" error
-		if err := printUnstructured(unstructured, w, h.options); err != nil {
+		if err := printUnstructured(unstructured, w, discoveredFieldNames, h.options); err != nil {
 			return err
 		}
 		return nil
@@ -230,7 +271,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 }
 
 // TODO: this method assumes the meta/v1 server API, so should be refactored out of this package
-func printUnstructured(unstructured runtime.Unstructured, w io.Writer, options PrintOptions) error {
+func printUnstructured(unstructured runtime.Unstructured, w io.Writer, additionalFields []string, options PrintOptions) error {
 	metadata, err := meta.Accessor(unstructured)
 	if err != nil {
 		return err
@@ -258,10 +299,25 @@ func printUnstructured(unstructured runtime.Unstructured, w io.Writer, options P
 			kind = kind + "." + version.Version + "." + version.Group
 		}
 	}
+
 	name := formatResourceName(options.Kind, metadata.GetName(), options.WithKind)
 
 	if _, err := fmt.Fprintf(w, "%s\t%s", name, kind); err != nil {
 		return err
+	}
+	for _, field := range additionalFields {
+		if value, ok := content[field]; ok {
+			var formattedValue string
+			switch typedValue := value.(type) {
+			case []interface{}:
+				formattedValue = fmt.Sprintf("%d item(s)", len(typedValue))
+			default:
+				formattedValue = fmt.Sprintf("%v", value)
+			}
+			if _, err := fmt.Fprintf(w, "\t%s", formattedValue); err != nil {
+				return err
+			}
+		}
 	}
 	if _, err := fmt.Fprint(w, appendLabels(metadata.GetLabels(), options.ColumnLabels)); err != nil {
 		return err

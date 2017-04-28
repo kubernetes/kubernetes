@@ -1,5 +1,5 @@
 # This file should be overwritten by ./config-to-secret.sh
-# This file is in place to statisfy the kubernetes documentation tests.
+# This file is in place to satisfy the kubernetes documentation tests.
 
 # apiVersion: v1
 # kind: Secret

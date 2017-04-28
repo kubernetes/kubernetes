@@ -27,12 +27,15 @@ go_library(
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/authorizer:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apiserver/pkg/server",
-        "//vendor:k8s.io/apiserver/pkg/server/options",
-        "//vendor:k8s.io/apiserver/pkg/util/flag",
+        "//pkg/kubeapiserver/server:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/pborman/uuid:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/options:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
     ],
 )
 
@@ -54,5 +57,5 @@ go_test(
     srcs = ["storage_versions_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/runtime/schema"],
+    deps = ["//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library"],
 )

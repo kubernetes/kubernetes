@@ -40,13 +40,28 @@ const tagOptional = "optional"
 
 // Known values for the tag.
 const (
-	tagValueTrue       = "true"
-	tagValueFalse      = "false"
-	tagExtensionPrefix = "x-kubernetes-"
+	tagValueTrue               = "true"
+	tagValueFalse              = "false"
+	tagExtensionPrefix         = "x-kubernetes-"
+	tagPatchStrategy           = "patchStrategy"
+	tagPatchMergeKey           = "patchMergeKey"
+	patchStrategyExtensionName = "patch-strategy"
+	patchMergeKeyExtensionName = "patch-merge-key"
 )
 
 func getOpenAPITagValue(comments []string) []string {
 	return types.ExtractCommentTags("+", comments)[tagName]
+}
+
+func getSingleTagsValue(comments []string, tag string) (string, error) {
+	tags, ok := types.ExtractCommentTags("+", comments)[tag]
+	if !ok || len(tags) == 0 {
+		return "", nil
+	}
+	if len(tags) > 1 {
+		return "", fmt.Errorf("Multiple values are not allowed for tag %s", tag)
+	}
+	return tags[0], nil
 }
 
 func hasOpenAPITagValue(comments []string, value string) bool {
@@ -235,6 +250,10 @@ func getJsonTags(m *types.Member) []string {
 	return strings.Split(jsonTag, ",")
 }
 
+func getPatchTags(m *types.Member) (string, string) {
+	return reflect.StructTag(m.Tags).Get(tagPatchMergeKey), reflect.StructTag(m.Tags).Get(tagPatchStrategy)
+}
+
 func getReferableName(m *types.Member) string {
 	jsonTags := getJsonTags(m)
 	if len(jsonTags) > 0 {
@@ -308,7 +327,7 @@ func (g openAPITypeWriter) generateMembers(t *types.Type, required []string) ([]
 		if !hasOptionalTag(&m) {
 			required = append(required, name)
 		}
-		if err = g.generateProperty(&m); err != nil {
+		if err = g.generateProperty(&m, t); err != nil {
 			return required, err
 		}
 	}
@@ -336,7 +355,11 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		if len(required) > 0 {
 			g.Do("Required: []string{\"$.$\"},\n", strings.Join(required, "\",\""))
 		}
-		g.Do("},\n},\n", nil)
+		g.Do("},\n", nil)
+		if err := g.generateExtensions(t.CommentLines); err != nil {
+			return err
+		}
+		g.Do("},\n", nil)
 		g.Do("Dependencies: []string{\n", args)
 		// Map order is undefined, sort them or we may get a different file generated each time.
 		keys := []string{}
@@ -353,34 +376,70 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 			}
 			g.Do("\"$.$\",", k)
 		}
-		g.Do("},\n", nil)
-		if err := g.generateExtensions(t.CommentLines); err != nil {
-			return err
-		}
-		g.Do("},\n", nil)
+		g.Do("},\n},\n", nil)
 	}
 	return nil
 }
 
 func (g openAPITypeWriter) generateExtensions(CommentLines []string) error {
 	tagValues := getOpenAPITagValue(CommentLines)
-	anyExtension := false
+	type NameValue struct {
+		Name, Value string
+	}
+	extensions := []NameValue{}
 	for _, val := range tagValues {
 		if strings.HasPrefix(val, tagExtensionPrefix) {
-			if !anyExtension {
-				g.Do("spec.VendorExtensible: {\nExtensions: spec.Extensions{\n", nil)
-				anyExtension = true
-			}
 			parts := strings.SplitN(val, ":", 2)
 			if len(parts) != 2 {
 				return fmt.Errorf("Invalid extension value: %v", val)
 			}
-			g.Do("\"$.$\": ", parts[0])
-			g.Do("\"$.$\",\n", parts[1])
+			extensions = append(extensions, NameValue{parts[0], parts[1]})
 		}
 	}
-	if anyExtension {
-		g.Do("},\n},\n", nil)
+	patchMergeKeyTag, err := getSingleTagsValue(CommentLines, tagPatchMergeKey)
+	if err != nil {
+		return err
+	}
+	if len(patchMergeKeyTag) > 0 {
+		extensions = append(extensions, NameValue{tagExtensionPrefix + patchMergeKeyExtensionName, patchMergeKeyTag})
+	}
+	patchStrategyTag, err := getSingleTagsValue(CommentLines, tagPatchStrategy)
+	if err != nil {
+		return err
+	}
+	if len(patchStrategyTag) > 0 {
+		extensions = append(extensions, NameValue{tagExtensionPrefix + patchStrategyExtensionName, patchStrategyTag})
+	}
+	if len(extensions) == 0 {
+		return nil
+	}
+	g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
+	for _, extension := range extensions {
+		g.Do("\"$.$\": ", extension.Name)
+		g.Do("\"$.$\",\n", extension.Value)
+	}
+	g.Do("},\n},\n", nil)
+	return nil
+}
+
+// TODO(#44005): Move this validation outside of this generator (probably to policy verifier)
+func (g openAPITypeWriter) validatePatchTags(m *types.Member, parent *types.Type) error {
+	patchMergeKeyStructTag, patchStrategyStructTag := getPatchTags(m)
+	patchMergeKeyCommentTag, err := getSingleTagsValue(m.CommentLines, tagPatchMergeKey)
+	if err != nil {
+		return err
+	}
+	patchStrategyCommentTag, err := getSingleTagsValue(m.CommentLines, tagPatchStrategy)
+	if err != nil {
+		return err
+	}
+	if patchMergeKeyStructTag != patchMergeKeyCommentTag {
+		return fmt.Errorf("patchMergeKey in comment and struct tags should match for member (%s) of (%s)",
+			m.Name, parent.Name.String())
+	}
+	if patchStrategyStructTag != patchStrategyCommentTag {
+		return fmt.Errorf("patchStrategy in comment and struct tags should match for member (%s) of (%s)",
+			m.Name, parent.Name.String())
 	}
 	return nil
 }
@@ -428,10 +487,13 @@ func (g openAPITypeWriter) generateDescription(CommentLines []string) {
 	}
 }
 
-func (g openAPITypeWriter) generateProperty(m *types.Member) error {
+func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type) error {
 	name := getReferableName(m)
 	if name == "" {
 		return nil
+	}
+	if err := g.validatePatchTags(m, parent); err != nil {
+		return err
 	}
 	g.Do("\"$.$\": {\n", name)
 	if err := g.generateExtensions(m.CommentLines); err != nil {

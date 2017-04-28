@@ -173,7 +173,7 @@ func (ComponentStatusList) SwaggerDoc() map[string]string {
 var map_ConfigMap = map[string]string{
 	"":         "ConfigMap holds configuration data for pods to consume.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"data":     "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.",
+	"data":     "Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'.",
 }
 
 func (ConfigMap) SwaggerDoc() map[string]string {
@@ -481,7 +481,7 @@ func (EnvVar) SwaggerDoc() map[string]string {
 
 var map_EnvVarSource = map[string]string{
 	"":                 "EnvVarSource represents a source for the value of an EnvVar.",
-	"fieldRef":         "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.podIP.",
+	"fieldRef":         "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.",
 	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
 	"configMapKeyRef":  "Selects a key of a ConfigMap.",
 	"secretKeyRef":     "Selects a key of a secret in the pod's namespace",
@@ -650,14 +650,17 @@ func (HostPathVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_ISCSIVolumeSource = map[string]string{
-	"":               "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
-	"targetPortal":   "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
-	"iqn":            "Target iSCSI Qualified Name.",
-	"lun":            "iSCSI target lun number.",
-	"iscsiInterface": "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.",
-	"fsType":         "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#iscsi",
-	"readOnly":       "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
-	"portals":        "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"":                  "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
+	"targetPortal":      "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"iqn":               "Target iSCSI Qualified Name.",
+	"lun":               "iSCSI target lun number.",
+	"iscsiInterface":    "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.",
+	"fsType":            "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#iscsi",
+	"readOnly":          "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+	"portals":           "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"chapAuthDiscovery": "whether support iSCSI Discovery CHAP authentication",
+	"chapAuthSession":   "whether support iSCSI Session CHAP authentication",
+	"secretRef":         "CHAP secret for iSCSI target and initiator authentication",
 }
 
 func (ISCSIVolumeSource) SwaggerDoc() map[string]string {
@@ -900,6 +903,15 @@ var map_NodeProxyOptions = map[string]string{
 
 func (NodeProxyOptions) SwaggerDoc() map[string]string {
 	return map_NodeProxyOptions
+}
+
+var map_NodeResources = map[string]string{
+	"":         "NodeResources is an object for conveying resource information about a node. see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.",
+	"Capacity": "Capacity represents the available resources of a node",
+}
+
+func (NodeResources) SwaggerDoc() map[string]string {
+	return map_NodeResources
 }
 
 var map_NodeSelector = map[string]string{
@@ -1662,7 +1674,7 @@ func (ScaleIOVolumeSource) SwaggerDoc() map[string]string {
 var map_Secret = map[string]string{
 	"":           "Secret holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.",
 	"metadata":   "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"data":       "Data contains the secret data. Each key must be a valid DNS_SUBDOMAIN or leading dot followed by valid DNS_SUBDOMAIN. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4",
+	"data":       "Data contains the secret data. Each key must consist of alphanumeric characters, '-', '_' or '.'. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4",
 	"stringData": "stringData allows specifying non-binary secret data in string form. It is provided as a write-only convenience method. All keys and values are merged into the data field on write, overwriting any existing values. It is never output when reading from the API.",
 	"type":       "Used to facilitate programmatic handling of secret data.",
 }
@@ -1816,8 +1828,7 @@ var map_ServiceSpec = map[string]string{
 	"selector":                 "Route service traffic to pods with label keys and values matching this selector. If empty or not present, the service is assumed to have an external process managing its endpoints, which Kubernetes will not modify. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: http://kubernetes.io/docs/user-guide/services#overview",
 	"clusterIP":                "clusterIP is the IP address of the service and is usually assigned randomly by the master. If an address is specified manually and is not in use by others, it will be allocated to the service; otherwise, creation of the service will fail. This field can not be changed through updates. Valid values are \"None\", empty string (\"\"), or a valid IP address. \"None\" can be specified for headless services when proxying is not required. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies",
 	"type":                     "type determines how the Service is exposed. Defaults to ClusterIP. Valid options are ExternalName, ClusterIP, NodePort, and LoadBalancer. \"ExternalName\" maps to the specified externalName. \"ClusterIP\" allocates a cluster-internal IP address for load-balancing to endpoints. Endpoints are determined by the selector or if that is not specified, by manual construction of an Endpoints object. If clusterIP is \"None\", no virtual IP is allocated and the endpoints are published as a set of endpoints rather than a stable IP. \"NodePort\" builds on ClusterIP and allocates a port on every node which routes to the clusterIP. \"LoadBalancer\" builds on NodePort and creates an external load-balancer (if supported in the current cloud) which routes to the clusterIP. More info: http://kubernetes.io/docs/user-guide/services#overview",
-	"externalIPs":              "externalIPs is a list of IP addresses for which nodes in the cluster will also accept traffic for this service.  These IPs are not managed by Kubernetes.  The user is responsible for ensuring that traffic arrives at a node with this IP.  A common example is external load-balancers that are not part of the Kubernetes system.  A previous form of this functionality exists as the deprecatedPublicIPs field.  When using this field, callers should also clear the deprecatedPublicIPs field.",
-	"deprecatedPublicIPs":      "deprecatedPublicIPs is deprecated and replaced by the externalIPs field with almost the exact same semantics.  This field is retained in the v1 API for compatibility until at least 8/20/2016.  It will be removed from any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are set, deprecatedPublicIPs is used.",
+	"externalIPs":              "externalIPs is a list of IP addresses for which nodes in the cluster will also accept traffic for this service.  These IPs are not managed by Kubernetes.  The user is responsible for ensuring that traffic arrives at a node with this IP.  A common example is external load-balancers that are not part of the Kubernetes system.",
 	"sessionAffinity":          "Supports \"ClientIP\" and \"None\". Used to maintain session affinity. Enable client IP based session affinity. Must be ClientIP or None. Defaults to None. More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies",
 	"loadBalancerIP":           "Only applies to Service Type: LoadBalancer LoadBalancer will get created with the IP specified in this field. This feature depends on whether the underlying cloud-provider supports specifying the loadBalancerIP when a load balancer is created. This field will be ignored if the cloud-provider does not support the feature.",
 	"loadBalancerSourceRanges": "If specified and supported by the platform, this will restrict traffic through the cloud-provider load-balancer will be restricted to the specified client IPs. This field will be ignored if the cloud-provider does not support the feature.\" More info: http://kubernetes.io/docs/user-guide/services-firewalls",
@@ -1837,9 +1848,20 @@ func (ServiceStatus) SwaggerDoc() map[string]string {
 	return map_ServiceStatus
 }
 
+var map_Sysctl = map[string]string{
+	"":      "Sysctl defines a kernel parameter to be set",
+	"Name":  "Name of a property to set",
+	"Value": "Value of a property to set",
+}
+
+func (Sysctl) SwaggerDoc() map[string]string {
+	return map_Sysctl
+}
+
 var map_TCPSocketAction = map[string]string{
 	"":     "TCPSocketAction describes an action based on opening a socket",
 	"port": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+	"host": "Optional: Host name to connect to, defaults to the pod IP.",
 }
 
 func (TCPSocketAction) SwaggerDoc() map[string]string {

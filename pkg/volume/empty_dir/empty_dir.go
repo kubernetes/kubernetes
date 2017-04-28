@@ -329,11 +329,9 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
-	tmpDir, err := volume.RenameDirectory(dir, ed.volName+".deleting~")
-	if err != nil {
-		return err
-	}
-	err = os.RemoveAll(tmpDir)
+	// Renaming the directory is not required anymore because the operation executor
+	// now handles duplicate operations on the same volume
+	err := os.RemoveAll(dir)
 	if err != nil {
 		return err
 	}

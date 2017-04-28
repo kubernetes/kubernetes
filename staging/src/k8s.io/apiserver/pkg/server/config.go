@@ -91,9 +91,12 @@ type Config struct {
 	EnableSwaggerUI bool
 	EnableIndex     bool
 	EnableProfiling bool
+	EnableDiscovery bool
 	// Requires generic profiling enabled
 	EnableContentionProfiling bool
 	EnableMetrics             bool
+
+	DisabledPostStartHooks sets.String
 
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
@@ -107,12 +110,16 @@ type Config struct {
 	// Will default to a value based on secure serving info and available ipv4 IPs.
 	ExternalAddress string
 
+	// FallThroughHandler is the final HTTP handler in the chain.  If it is nil, one will be created for you.
+	// It comes after all filters and the API handling
+	FallThroughHandler *mux.PathRecorderMux
+
 	//===========================================================================
 	// Fields you probably don't care about changing
 	//===========================================================================
 
-	// BuildHandlerChainsFunc allows you to build custom handler chains by decorating the apiHandler.
-	BuildHandlerChainsFunc func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler)
+	// BuildHandlerChainFunc allows you to build custom handler chains by decorating the apiHandler.
+	BuildHandlerChainFunc func(apiHandler http.Handler, c *Config) (secure http.Handler)
 	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses DiscoveryAddresses
@@ -147,10 +154,6 @@ type Config struct {
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc genericfilters.LongRunningRequestCheck
 
-	// InsecureServingInfo is required to serve http.  HTTP does NOT include authentication or authorization.
-	// You shouldn't be using this.  It makes sig-auth sad.
-	InsecureServingInfo *ServingInfo
-
 	//===========================================================================
 	// values below here are targets for removal
 	//===========================================================================
@@ -164,16 +167,12 @@ type Config struct {
 	PublicAddress net.IP
 }
 
-type ServingInfo struct {
+type SecureServingInfo struct {
 	// BindAddress is the ip:port to serve on
 	BindAddress string
 	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
 	// "tcp4", and "tcp6".
 	BindNetwork string
-}
-
-type SecureServingInfo struct {
-	ServingInfo
 
 	// Cert is the main server cert which is used if SNI does not match. Cert must be non-nil and is
 	// allowed to be in SNICerts.
@@ -188,17 +187,28 @@ type SecureServingInfo struct {
 
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA *x509.CertPool
+
+	// MinTLSVersion optionally overrides the minimum TLS version supported.
+	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
+	MinTLSVersion uint16
+
+	// CipherSuites optionally overrides the list of allowed cipher suites for the server.
+	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
+	CipherSuites []uint16
 }
 
 // NewConfig returns a Config struct with the default values
-func NewConfig() *Config {
+func NewConfig(codecs serializer.CodecFactory) *Config {
 	return &Config{
+		Serializer:                  codecs,
 		ReadWritePort:               443,
 		RequestContextMapper:        apirequest.NewRequestContextMapper(),
-		BuildHandlerChainsFunc:      DefaultBuildHandlerChain,
+		BuildHandlerChainFunc:       DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
+		DisabledPostStartHooks:      sets.NewString(),
 		HealthzChecks:               []healthz.HealthzChecker{healthz.PingHealthz},
 		EnableIndex:                 true,
+		EnableDiscovery:             true,
 		EnableProfiling:             true,
 		MaxRequestsInFlight:         400,
 		MaxMutatingRequestsInFlight: 200,
@@ -208,11 +218,6 @@ func NewConfig() *Config {
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
 	}
-}
-
-func (c *Config) WithSerializer(codecs serializer.CodecFactory) *Config {
-	c.Serializer = codecs
-	return c
 }
 
 func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, scheme *runtime.Scheme) *openapicommon.Config {
@@ -337,6 +342,9 @@ func (c *Config) Complete() completedConfig {
 		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		c.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorizer)
 	}
+	if c.FallThroughHandler == nil {
+		c.FallThroughHandler = mux.NewPathRecorderMux()
+	}
 
 	return completedConfig{c}
 }
@@ -369,12 +377,23 @@ func (c *Config) SkipComplete() completedConfig {
 //   auth, then the caller should create a handler for those endpoints, which delegates the
 //   any unhandled paths to "Handler".
 func (c completedConfig) New() (*GenericAPIServer, error) {
+	s, err := c.constructServer()
+	if err != nil {
+		return nil, err
+	}
+
+	return c.buildHandlers(s, nil)
+}
+
+func (c completedConfig) constructServer() (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
 	if c.LoopbackClientConfig == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.LoopbackClientConfig == nil")
 	}
+
+	handlerContainer := mux.NewAPIContainer(http.NewServeMux(), c.Serializer, c.FallThroughHandler)
 
 	s := &GenericAPIServer{
 		discoveryAddresses:     c.DiscoveryAddresses,
@@ -386,21 +405,67 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 
 		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
 
-		SecureServingInfo:   c.SecureServingInfo,
-		InsecureServingInfo: c.InsecureServingInfo,
-		ExternalAddress:     c.ExternalAddress,
+		SecureServingInfo: c.SecureServingInfo,
+		ExternalAddress:   c.ExternalAddress,
 
 		apiGroupsForDiscovery: map[string]metav1.APIGroup{},
+
+		HandlerContainer:   handlerContainer,
+		FallThroughHandler: c.FallThroughHandler,
+
+		listedPathProvider: routes.ListedPathProviders{handlerContainer, c.FallThroughHandler},
 
 		swaggerConfig: c.SwaggerConfig,
 		openAPIConfig: c.OpenAPIConfig,
 
-		postStartHooks: map[string]postStartHookEntry{},
-		healthzChecks:  c.HealthzChecks,
+		postStartHooks:         map[string]postStartHookEntry{},
+		disabledPostStartHooks: c.DisabledPostStartHooks,
+
+		healthzChecks: c.HealthzChecks,
 	}
 
-	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
+	return s, nil
+}
 
+// NewWithDelegate creates a new server which logically combines the handling chain with the passed server.
+func (c completedConfig) NewWithDelegate(delegationTarget DelegationTarget) (*GenericAPIServer, error) {
+	// some pieces of the delegationTarget take precendence.  Callers should already have ensured that these
+	// were wired correctly.  Documenting them here.
+	// c.RequestContextMapper = delegationTarget.RequestContextMapper()
+
+	s, err := c.constructServer()
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range delegationTarget.PostStartHooks() {
+		s.postStartHooks[k] = v
+	}
+
+	for _, delegateCheck := range delegationTarget.HealthzChecks() {
+		skip := false
+		for _, existingCheck := range c.HealthzChecks {
+			if existingCheck.Name() == delegateCheck.Name() {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+
+		s.healthzChecks = append(s.healthzChecks, delegateCheck)
+	}
+
+	s.listedPathProvider = routes.ListedPathProviders{s.listedPathProvider, delegationTarget}
+
+	// use the UnprotectedHandler from the delegation target to ensure that we don't attempt to double authenticator, authorize,
+	// or some other part of the filter chain in delegation cases.
+	return c.buildHandlers(s, delegationTarget.UnprotectedHandler())
+}
+
+// buildHandlers builds our handling chain
+func (c completedConfig) buildHandlers(s *GenericAPIServer, delegate http.Handler) (*GenericAPIServer, error) {
 	if s.openAPIConfig != nil {
 		if s.openAPIConfig.Info == nil {
 			s.openAPIConfig.Info = &spec.Info{}
@@ -414,59 +479,58 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		}
 	}
 
-	s.installAPI(c.Config)
+	installAPI(s, c.Config, delegate)
 
-	s.Handler, s.InsecureHandler = c.BuildHandlerChainsFunc(s.HandlerContainer.ServeMux, c.Config)
+	s.Handler = c.BuildHandlerChainFunc(s.HandlerContainer.ServeMux, c.Config)
 
 	return s, nil
 }
 
-func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insecure http.Handler) {
-	generic := func(handler http.Handler) http.Handler {
-		handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
-		handler = genericfilters.WithPanicRecovery(handler, c.RequestContextMapper)
-		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
-		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
-		handler = genericapifilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
-		handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
-		return handler
-	}
-	audit := func(handler http.Handler) http.Handler {
-		return genericapifilters.WithAudit(handler, c.RequestContextMapper, c.AuditWriter)
-	}
-	protect := func(handler http.Handler) http.Handler {
-		handler = genericapifilters.WithAuthorization(handler, c.RequestContextMapper, c.Authorizer)
-		handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
-		handler = audit(handler) // before impersonation to read original user
-		handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, genericapifilters.Unauthorized(c.SupportsBasicAuth))
-		return handler
-	}
-
-	return generic(protect(apiHandler)), generic(audit(apiHandler))
+func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
+	handler := genericapifilters.WithAuthorization(apiHandler, c.RequestContextMapper, c.Authorizer)
+	handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
+	handler = genericapifilters.WithAudit(handler, c.RequestContextMapper, c.AuditWriter)
+	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, genericapifilters.Unauthorized(c.SupportsBasicAuth))
+	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
+	handler = genericfilters.WithPanicRecovery(handler)
+	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
+	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
+	handler = genericapifilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
+	handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
+	return handler
 }
 
-func (s *GenericAPIServer) installAPI(c *Config) {
-	if c.EnableIndex {
-		routes.Index{}.Install(s.HandlerContainer)
+func installAPI(s *GenericAPIServer, c *Config, delegate http.Handler) {
+	switch {
+	case c.EnableIndex:
+		routes.Index{}.Install(s.listedPathProvider, c.FallThroughHandler, delegate)
+
+	case delegate != nil:
+		// if we have a delegate, allow it to handle everything that's unmatched even if
+		// the index is disabled.
+		s.FallThroughHandler.UnlistedHandleFunc("/", delegate.ServeHTTP)
 	}
 	if c.SwaggerConfig != nil && c.EnableSwaggerUI {
-		routes.SwaggerUI{}.Install(s.HandlerContainer)
+		routes.SwaggerUI{}.Install(s.FallThroughHandler)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.HandlerContainer)
+		routes.Profiling{}.Install(s.FallThroughHandler)
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}
 	if c.EnableMetrics {
 		if c.EnableProfiling {
-			routes.MetricsWithReset{}.Install(s.HandlerContainer)
+			routes.MetricsWithReset{}.Install(s.FallThroughHandler)
 		} else {
-			routes.DefaultMetrics{}.Install(s.HandlerContainer)
+			routes.DefaultMetrics{}.Install(s.FallThroughHandler)
 		}
 	}
 	routes.Version{Version: c.Version}.Install(s.HandlerContainer)
-	s.HandlerContainer.Add(s.DynamicApisDiscovery())
+
+	if c.EnableDiscovery {
+		s.HandlerContainer.Add(s.DynamicApisDiscovery())
+	}
 }
 
 func NewRequestInfoResolver(c *Config) *apirequest.RequestInfoFactory {

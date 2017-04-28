@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/emicklei/go-restful/swagger"
@@ -46,6 +47,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -53,6 +55,14 @@ import (
 
 type ring1Factory struct {
 	clientAccessFactory ClientAccessFactory
+
+	// openAPIGetter loads and caches openapi specs
+	openAPIGetter openAPIGetter
+}
+
+type openAPIGetter struct {
+	once   sync.Once
+	getter openapi.Getter
 }
 
 func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMappingFactory {
@@ -103,6 +113,20 @@ func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectType
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
 	expander, err := NewShortcutExpander(mapper, discoveryClient)
 	return expander, typer, err
+}
+
+func (f *ring1Factory) CategoryExpander() resource.CategoryExpander {
+	var categoryExpander resource.CategoryExpander
+	categoryExpander = resource.LegacyCategoryExpander
+	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
+	if err == nil {
+		// wrap with discovery based filtering
+		categoryExpander, err = resource.NewDiscoveryFilteredExpander(categoryExpander, discoveryClient)
+		// you only have an error on missing discoveryClient, so this shouldn't fail.  Check anyway.
+		CheckErr(err)
+	}
+
+	return categoryExpander
 }
 
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
@@ -208,7 +232,7 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 	return printersinternal.GenericDescriberFor(mapping, dynamicClient, eventsClient), nil
 }
 
-func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
+func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
 	clientset, err := f.clientAccessFactory.ClientSetForVersion(nil)
 	if err != nil {
 		return nil, err
@@ -265,7 +289,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclien
 	}
 
 	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
-	pod, numPods, err := GetFirstPod(clientset.Core(), namespace, selector, 20*time.Second, sortBy)
+	pod, numPods, err := GetFirstPod(clientset.Core(), namespace, selector, timeout, sortBy)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +349,7 @@ func (f *ring1Factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusVi
 	return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
 }
 
-func (f *ring1Factory) AttachablePodForObject(object runtime.Object) (*api.Pod, error) {
+func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {
 	clientset, err := f.clientAccessFactory.ClientSetForVersion(nil)
 	if err != nil {
 		return nil, err
@@ -374,7 +398,7 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object) (*api.Pod, 
 	}
 
 	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector, 1*time.Minute, sortBy)
+	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector, timeout, sortBy)
 	return pod, err
 }
 
@@ -412,4 +436,42 @@ func (f *ring1Factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiD
 		return nil, err
 	}
 	return discovery.SwaggerSchema(version)
+}
+
+// OpenAPISchema returns metadata and structural information about Kubernetes object definitions.
+// Will try to cache the data to a local file.  Cache is written and read from a
+// file created with ioutil.TempFile and obeys the expiration semantics of that file.
+// The cache location is a function of the client and server versions so that the open API
+// schema will be cached separately for different client / server combinations.
+// Note, the cache will not be invalidated if the server changes its open API schema without
+// changing the server version.
+func (f *ring1Factory) OpenAPISchema(cacheDir string) (*openapi.Resources, error) {
+	discovery, err := f.clientAccessFactory.DiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// Lazily initialize the OpenAPIGetter once
+	f.openAPIGetter.once.Do(func() {
+		// Get the server version for caching the openapi spec
+		versionString := ""
+		version, err := discovery.ServerVersion()
+		if err != nil {
+			// Cache the result under the server version
+			versionString = version.String()
+		}
+
+		// Get the cache directory for caching the openapi spec
+		cacheDir, err = substituteUserHome(cacheDir)
+		if err != nil {
+			// Don't cache the result if we couldn't substitute the home directory
+			cacheDir = ""
+		}
+
+		// Create the caching OpenAPIGetter
+		f.openAPIGetter.getter = openapi.NewOpenAPIGetter(cacheDir, versionString, discovery)
+	})
+
+	// Delegate to the OpenAPIGetter
+	return f.openAPIGetter.getter.Get()
 }

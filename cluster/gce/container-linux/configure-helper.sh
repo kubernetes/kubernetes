@@ -619,10 +619,15 @@ function start-kube-proxy {
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
   fi
+  local container_env=""
+  if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
+    container_env="env:\n    - name: KUBE_CACHE_MUTATION_DETECTOR\n    value: \"${ENABLE_CACHE_MUTATION_DETECTOR}\""
+  fi
   sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" ${src_file}
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" ${src_file}
   sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" ${src_file}
   sed -i -e "s@{{params}}@${params}@g" ${src_file}
+  sed -i -e "s@{{container_env}}@${container_env}@g" ${src_file}
   sed -i -e "s@{{ cpurequest }}@100m@g" ${src_file}
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" ${src_file}
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
@@ -891,7 +896,7 @@ function start-kube-apiserver {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
 
   # Enable ABAC mode unless the user explicitly opts out with ENABLE_LEGACY_ABAC=false
-  if [[ "${ENABLE_LEGACY_ABAC:-}" != "false" ]]; then  
+  if [[ "${ENABLE_LEGACY_ABAC:-}" != "false" ]]; then
     echo "Warning: Enabling legacy ABAC policy. All service accounts will have superuser API access. Set ENABLE_LEGACY_ABAC=false to disable this."
     # Create the ABAC file if it doesn't exist yet, or if we have a KUBE_USER set (to ensure the right user is given permissions)
     if [[ -n "${KUBE_USER:-}" || ! -e /etc/srv/kubernetes/abac-authz-policy.jsonl ]]; then
@@ -991,6 +996,10 @@ function start-kube-controller-manager {
   fi
   if [[ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]]; then
     params+=" --terminated-pod-gc-threshold=${TERMINATED_POD_GC_THRESHOLD}"
+  fi
+  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
+    params+=" --cidr-allocator-type=CloudAllocator"
+    params+=" --configure-cloud-routes=false"
   fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
@@ -1113,6 +1122,7 @@ function start-kube-addons {
   # Set up manifests of other addons.
   if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "google" ]] || \
+     [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "standalone" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "googleinfluxdb" ]]; then
     local -r file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
@@ -1158,20 +1168,6 @@ function start-kube-addons {
     if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
       setup-addon-manifests "addons" "dns-horizontal-autoscaler"
     fi
-
-    if [[ "${FEDERATION:-}" == "true" ]]; then
-      local federations_domain_map="${FEDERATIONS_DOMAIN_MAP:-}"
-      if [[ -z "${federations_domain_map}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
-        federations_domain_map="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
-      fi
-      if [[ -n "${federations_domain_map}" ]]; then
-        sed -i -e "s@{{ *pillar\['federations_domain_map'\] *}}@- --federations=${federations_domain_map}@g" "${dns_controller_file}"
-      else
-        sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_controller_file}"
-      fi
-    else
-      sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_controller_file}"
-    fi
   fi
   if [[ "${ENABLE_CLUSTER_REGISTRY:-}" == "true" ]]; then
     setup-addon-manifests "addons" "registry"
@@ -1185,9 +1181,6 @@ function start-kube-addons {
     sed -i -e "s@{{ *pillar\['cluster_registry_disk_size'\] *}}@${CLUSTER_REGISTRY_DISK_SIZE}@g" "${registry_pvc_file}"
     sed -i -e "s@{{ *pillar\['cluster_registry_disk_name'\] *}}@${CLUSTER_REGISTRY_DISK}@g" "${registry_pvc_file}"
   fi
-  # TODO(piosz): figure out how to not run fluentd-es pod from fluentd daemon set on master.
-  #              Running fluentd-es on the master is pointless, as it can't communicate
-  #              with elasticsearch from there in the default configuration.
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" ]] && \
      [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]]; then
@@ -1215,17 +1208,6 @@ function start-kube-addons {
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
-}
-
-# Starts a fluentd static pod for logging for gcp in case master is not registered.
-function start-fluentd-static-pod {
-  echo "Start fluentd pod"
-  if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
-     [[ "${LOGGING_DESTINATION:-}" == "gcp" ]] && \
-     [[ "${KUBERNETES_MASTER:-}" == "true" ]] && \
-     [[ "${REGISTER_MASTER_KUBELET:-false}" == "false" ]]; then
-    cp "${KUBE_HOME}/kube-manifests/kubernetes/fluentd-gcp.yaml" /etc/kubernetes/manifests/
-  fi
 }
 
 # Starts an image-puller - used in test clusters.
@@ -1390,7 +1372,6 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   start-cluster-autoscaler
   start-lb-controller
   start-rescheduler
-  start-fluentd-static-pod
 else
   start-kube-proxy
   # Kube-registry-proxy.

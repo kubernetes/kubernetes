@@ -28,7 +28,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -419,17 +418,6 @@ func MaxUnavailable(deployment extensions.Deployment) int32 {
 	return maxUnavailable
 }
 
-// MaxUnavailableInternal returns the maximum unavailable pods a rolling deployment can take.
-// TODO: remove the duplicate
-func MaxUnavailableInternal(deployment internalextensions.Deployment) int32 {
-	if !(deployment.Spec.Strategy.Type == internalextensions.RollingUpdateDeploymentStrategyType) || deployment.Spec.Replicas == 0 {
-		return int32(0)
-	}
-	// Error caught by validation
-	_, maxUnavailable, _ := ResolveFenceposts(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, &deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
-	return maxUnavailable
-}
-
 // MinAvailable returns the minimum available pods of a given deployment
 func MinAvailable(deployment *extensions.Deployment) int32 {
 	if !IsRollingUpdate(deployment) {
@@ -503,34 +491,7 @@ func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	podList, err := ListPods(deployment, rsList, podListFromClient(c))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList, podList)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	newRS, err := FindNewReplicaSet(deployment, rsList)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return oldRSes, allOldRSes, newRS, nil
-}
-
-// GetAllReplicaSetsV15 is a compatibility function that emulates the behavior
-// from v1.5.x (list matching objects by selector) except that it leaves out
-// objects that are explicitly marked as being controlled by something else.
-func GetAllReplicaSetsV15(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, *extensions.ReplicaSet, error) {
-	rsList, err := ListReplicaSetsV15(deployment, rsListFromClient(c))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	podList, err := ListPodsV15(deployment, rsList, podListFromClient(c))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList, podList)
+	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -548,28 +509,13 @@ func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 	if err != nil {
 		return nil, nil, err
 	}
-	podList, err := ListPods(deployment, rsList, podListFromClient(c))
-	if err != nil {
-		return nil, nil, err
-	}
-	return FindOldReplicaSets(deployment, rsList, podList)
+	return FindOldReplicaSets(deployment, rsList)
 }
 
 // GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
 // Returns nil if the new replica set doesn't exist yet.
 func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
 	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
-	if err != nil {
-		return nil, err
-	}
-	return FindNewReplicaSet(deployment, rsList)
-}
-
-// GetNewReplicaSetV15 is a compatibility function that emulates the behavior
-// from v1.5.x (list matching objects by selector) except that it leaves out
-// objects that are explicitly marked as being controlled by something else.
-func GetNewReplicaSetV15(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
-	rsList, err := ListReplicaSetsV15(deployment, rsListFromClient(c))
 	if err != nil {
 		return nil, err
 	}
@@ -583,7 +529,7 @@ func rsListFromClient(c clientset.Interface) rsListFunc {
 		if err != nil {
 			return nil, err
 		}
-		ret := []*extensions.ReplicaSet{}
+		var ret []*extensions.ReplicaSet
 		for i := range rsList.Items {
 			ret = append(ret, &rsList.Items[i])
 		}
@@ -630,10 +576,9 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([
 	return owned, nil
 }
 
-// ListReplicaSetsV15 is a compatibility function that emulates the behavior
-// from v1.5.x (list matching objects by selector) except that it leaves out
-// objects that are explicitly marked as being controlled by something else.
-func ListReplicaSetsV15(deployment *extensions.Deployment, getRSList rsListFunc) ([]*extensions.ReplicaSet, error) {
+// ListReplicaSetsInternal is ListReplicaSets for internalextensions.
+// TODO: Remove the duplicate when call sites are updated to ListReplicaSets.
+func ListReplicaSetsInternal(deployment *internalextensions.Deployment, getRSList func(string, metav1.ListOptions) ([]*internalextensions.ReplicaSet, error)) ([]*internalextensions.ReplicaSet, error) {
 	namespace := deployment.Namespace
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
@@ -644,45 +589,13 @@ func ListReplicaSetsV15(deployment *extensions.Deployment, getRSList rsListFunc)
 	if err != nil {
 		return nil, err
 	}
-	// Since this function maintains compatibility with v1.5, the objects we want
-	// do not necessarily have ControllerRefs pointing to us.
-	// However, we can at least avoid interfering with other controllers that do
-	// use ControllerRef.
-	filtered := make([]*extensions.ReplicaSet, 0, len(all))
-	for _, rs := range all {
-		controllerRef := controller.GetControllerOf(rs)
-		if controllerRef != nil && controllerRef.UID != deployment.UID {
-			continue
-		}
-		filtered = append(filtered, rs)
-	}
-	return filtered, nil
-}
-
-// ListReplicaSetsInternalV15 is ListReplicaSetsV15 for internalextensions.
-// TODO: Remove the duplicate when call sites are updated to ListReplicaSetsV15.
-func ListReplicaSetsInternalV15(deployment *internalextensions.Deployment, getRSList func(string, metav1.ListOptions) ([]*internalextensions.ReplicaSet, error)) ([]*internalextensions.ReplicaSet, error) {
-	namespace := deployment.Namespace
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	options := metav1.ListOptions{LabelSelector: selector.String()}
-	all, err := getRSList(namespace, options)
-	if err != nil {
-		return nil, err
-	}
-	// Since this function maintains compatibility with v1.5, the objects we want
-	// do not necessarily have ControllerRefs pointing to us.
-	// However, we can at least avoid interfering with other controllers that do
-	// use ControllerRef.
+	// Only include those whose ControllerRef matches the Deployment.
 	filtered := make([]*internalextensions.ReplicaSet, 0, len(all))
 	for _, rs := range all {
 		controllerRef := controller.GetControllerOf(rs)
-		if controllerRef != nil && controllerRef.UID != deployment.UID {
-			continue
+		if controllerRef != nil && controllerRef.UID == deployment.UID {
+			filtered = append(filtered, rs)
 		}
-		filtered = append(filtered, rs)
 	}
 	return filtered, nil
 }
@@ -719,41 +632,6 @@ func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet
 		}
 	}
 	return owned, nil
-}
-
-// ListPodsV15 is a compatibility function that emulates the behavior
-// from v1.5.x (list matching objects by selector) except that it leaves out
-// objects that are explicitly marked as being controlled by something else.
-func ListPodsV15(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, getPodList podListFunc) (*v1.PodList, error) {
-	namespace := deployment.Namespace
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	options := metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err := getPodList(namespace, options)
-	if err != nil {
-		return nil, err
-	}
-	// Since this function maintains compatibility with v1.5, the objects we want
-	// do not necessarily have ControllerRefs pointing to one of our ReplicaSets.
-	// However, we can at least avoid interfering with other controllers that do
-	// use ControllerRef.
-	rsMap := make(map[types.UID]bool, len(rsList))
-	for _, rs := range rsList {
-		rsMap[rs.UID] = true
-	}
-	filtered := make([]v1.Pod, 0, len(podList.Items))
-	for i := range podList.Items {
-		pod := &podList.Items[i]
-		controllerRef := controller.GetControllerOf(pod)
-		if controllerRef != nil && !rsMap[controllerRef.UID] {
-			continue
-		}
-		filtered = append(filtered, *pod)
-	}
-	podList.Items = filtered
-	return podList, nil
 }
 
 // EqualIgnoreHash returns true if two given podTemplateSpec are equal, ignoring the diff in value of Labels[pod-template-hash]
@@ -794,44 +672,24 @@ func FindNewReplicaSet(deployment *extensions.Deployment, rsList []*extensions.R
 	return nil, nil
 }
 
-// FindOldReplicaSets returns the old replica sets targeted by the given Deployment, with the given PodList and slice of RSes.
+// FindOldReplicaSets returns the old replica sets targeted by the given Deployment, with the given slice of RSes.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, podList *v1.PodList) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
-	// Find all pods whose labels match deployment.Spec.Selector, and corresponding replica sets for pods in podList.
-	// All pods and replica sets are labeled with pod-template-hash to prevent overlapping
-	oldRSs := map[string]*extensions.ReplicaSet{}
-	allOldRSs := map[string]*extensions.ReplicaSet{}
-	requiredRSs := []*extensions.ReplicaSet{}
-	allRSs := []*extensions.ReplicaSet{}
+func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+	var requiredRSs []*extensions.ReplicaSet
+	var allRSs []*extensions.ReplicaSet
 	newRS, err := FindNewReplicaSet(deployment, rsList)
 	if err != nil {
-		return requiredRSs, allRSs, err
+		return nil, nil, err
 	}
-	for _, pod := range podList.Items {
-		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
-		for _, rs := range rsList {
-			rsLabelsSelector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
-			if err != nil {
-				return nil, nil, fmt.Errorf("invalid label selector: %v", err)
-			}
-			// Filter out new replica set
-			if newRS != nil && rs.UID == newRS.UID {
-				continue
-			}
-			// TODO: If there are no pods for a deployment, we will never return old replica sets....!
-			allOldRSs[rs.ObjectMeta.Name] = rs
-			if rsLabelsSelector.Matches(podLabelsSelector) {
-				oldRSs[rs.ObjectMeta.Name] = rs
-			}
+	for _, rs := range rsList {
+		// Filter out new replica set
+		if newRS != nil && rs.UID == newRS.UID {
+			continue
 		}
-	}
-	for key := range oldRSs {
-		value := oldRSs[key]
-		requiredRSs = append(requiredRSs, value)
-	}
-	for key := range allOldRSs {
-		value := allOldRSs[key]
-		allRSs = append(allRSs, value)
+		allRSs = append(allRSs, rs)
+		if *(rs.Spec.Replicas) != 0 {
+			requiredRSs = append(requiredRSs, rs)
+		}
 	}
 	return requiredRSs, allRSs, nil
 }
@@ -860,9 +718,12 @@ func WaitForPodsHashPopulated(c extensionslisters.ReplicaSetLister, desiredGener
 }
 
 // LabelPodsWithHash labels all pods in the given podList with the new hash label.
-// The returned bool value can be used to tell if all pods are actually labeled.
 func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister corelisters.PodLister, namespace, name, hash string) error {
 	for _, pod := range podList.Items {
+		// Ignore inactive Pods.
+		if !controller.IsPodActive(&pod) {
+			continue
+		}
 		// Only label the pod that doesn't already have the new hash
 		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
 			_, err := UpdatePodWithRetries(c.Core().Pods(namespace), podLister, pod.Namespace, pod.Name,
@@ -967,12 +828,12 @@ func IsRollingUpdate(deployment *extensions.Deployment) bool {
 	return deployment.Spec.Strategy.Type == extensions.RollingUpdateDeploymentStrategyType
 }
 
-// DeploymentComplete considers a deployment to be complete once its desired replicas equals its
-// updatedReplicas, no old pods are running, and it doesn't violate minimum availability.
+// DeploymentComplete considers a deployment to be complete once all of its desired replicas
+// are updated and available, and no old pods are running.
 func DeploymentComplete(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	return newStatus.UpdatedReplicas == *(deployment.Spec.Replicas) &&
 		newStatus.Replicas == *(deployment.Spec.Replicas) &&
-		newStatus.AvailableReplicas >= *(deployment.Spec.Replicas)-MaxUnavailable(*deployment) &&
+		newStatus.AvailableReplicas == *(deployment.Spec.Replicas) &&
 		newStatus.ObservedGeneration >= deployment.Generation
 }
 
@@ -1059,7 +920,8 @@ func NewRSNewReplicas(deployment *extensions.Deployment, allRSs []*extensions.Re
 
 // IsSaturated checks if the new replica set is saturated by comparing its size with its deployment size.
 // Both the deployment and the replica set have to believe this replica set can own all of the desired
-// replicas in the deployment and the annotation helps in achieving that.
+// replicas in the deployment and the annotation helps in achieving that. All pods of the ReplicaSet
+// need to be available.
 func IsSaturated(deployment *extensions.Deployment, rs *extensions.ReplicaSet) bool {
 	if rs == nil {
 		return false
@@ -1069,7 +931,9 @@ func IsSaturated(deployment *extensions.Deployment, rs *extensions.ReplicaSet) b
 	if err != nil {
 		return false
 	}
-	return *(rs.Spec.Replicas) == *(deployment.Spec.Replicas) && int32(desired) == *(deployment.Spec.Replicas)
+	return *(rs.Spec.Replicas) == *(deployment.Spec.Replicas) &&
+		int32(desired) == *(deployment.Spec.Replicas) &&
+		rs.Status.AvailableReplicas == *(deployment.Spec.Replicas)
 }
 
 // WaitForObservedDeployment polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.

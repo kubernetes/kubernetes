@@ -66,6 +66,9 @@ var (
 		# Check to see if I can list deployments in my current namespace
 		kubectl auth can-i list deployments.extensions
 
+		# Check to see if I can do everything in my current namespace ("*" means all)
+		kubectl auth can-i '*' '*'
+
 		# Check to see if I can get the job named "bar" in namespace "foo"
 		kubectl auth can-i list jobs.batch/bar -n foo`)
 )
@@ -87,11 +90,9 @@ func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 
 			allowed, err := o.RunAccessCheck()
 			if err == nil {
-				return
-			}
-
-			if o.Quiet && !allowed {
-				os.Exit(1)
+				if o.Quiet && !allowed {
+					os.Exit(1)
+				}
 			}
 
 			cmdutil.CheckErr(err)
@@ -104,12 +105,16 @@ func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 }
 
 func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
+	if o.Quiet {
+		o.Out = ioutil.Discard
+	}
+
 	switch len(args) {
 	case 2:
 		resourceTokens := strings.SplitN(args[1], "/", 2)
 		restMapper, _ := f.Object()
 		o.Verb = args[0]
-		o.Resource = resourceFor(restMapper, resourceTokens[0])
+		o.Resource = o.resourceFor(restMapper, resourceTokens[0])
 		if len(resourceTokens) > 1 {
 			o.ResourceName = resourceTokens[1]
 		}
@@ -130,10 +135,6 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	if o.Quiet {
-		o.Out = ioutil.Discard
 	}
 
 	return nil
@@ -178,7 +179,11 @@ func (o *CanIOptions) RunAccessCheck() (bool, error) {
 	return response.Status.Allowed, nil
 }
 
-func resourceFor(mapper meta.RESTMapper, resourceArg string) schema.GroupVersionResource {
+func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) schema.GroupVersionResource {
+	if resourceArg == "*" {
+		return schema.GroupVersionResource{Resource: resourceArg}
+	}
+
 	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(strings.ToLower(resourceArg))
 	gvr := schema.GroupVersionResource{}
 	if fullySpecifiedGVR != nil {
@@ -188,6 +193,11 @@ func resourceFor(mapper meta.RESTMapper, resourceArg string) schema.GroupVersion
 		var err error
 		gvr, err = mapper.ResourceFor(groupResource.WithVersion(""))
 		if err != nil {
+			if len(groupResource.Group) == 0 {
+				fmt.Fprintf(o.Err, "Warning: the server doesn't have a resource type '%s'\n", groupResource.Resource)
+			} else {
+				fmt.Fprintf(o.Err, "Warning: the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group)
+			}
 			return schema.GroupVersionResource{Resource: resourceArg}
 		}
 	}

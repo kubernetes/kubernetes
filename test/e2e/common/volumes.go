@@ -37,309 +37,19 @@ limitations under the License.
  * and checks, that Kubernetes can use it as a volume.
  */
 
+// GlusterFS test is duplicated from test/e2e/volumes.go.  Any changes made there
+// should be duplicated here
+
 package common
 
 import (
-	"fmt"
-	"os/exec"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
-
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
-
-// Configuration of one tests. The test consist of:
-// - server pod - runs serverImage, exports ports[]
-// - client pod - does not need any special configuration
-type VolumeTestConfig struct {
-	namespace string
-	// Prefix of all pods. Typically the test name.
-	prefix string
-	// Name of container image for the server pod.
-	serverImage string
-	// Ports to export from the server pod. TCP only.
-	serverPorts []int
-	// Arguments to pass to the container image.
-	serverArgs []string
-	// Volumes needed to be mounted to the server container from the host
-	// map <host (source) path> -> <container (dst.) path>
-	volumes map[string]string
-}
-
-// Starts a container specified by config.serverImage and exports all
-// config.serverPorts from it. The returned pod should be used to get the server
-// IP address and create appropriate VolumeSource.
-func startVolumeServer(f *framework.Framework, config VolumeTestConfig) *v1.Pod {
-	podClient := f.PodClient()
-
-	portCount := len(config.serverPorts)
-	serverPodPorts := make([]v1.ContainerPort, portCount)
-
-	for i := 0; i < portCount; i++ {
-		portName := fmt.Sprintf("%s-%d", config.prefix, i)
-
-		serverPodPorts[i] = v1.ContainerPort{
-			Name:          portName,
-			ContainerPort: int32(config.serverPorts[i]),
-			Protocol:      v1.ProtocolTCP,
-		}
-	}
-
-	volumeCount := len(config.volumes)
-	volumes := make([]v1.Volume, volumeCount)
-	mounts := make([]v1.VolumeMount, volumeCount)
-
-	i := 0
-	for src, dst := range config.volumes {
-		mountName := fmt.Sprintf("path%d", i)
-		volumes[i].Name = mountName
-		volumes[i].VolumeSource.HostPath = &v1.HostPathVolumeSource{
-			Path: src,
-		}
-
-		mounts[i].Name = mountName
-		mounts[i].ReadOnly = false
-		mounts[i].MountPath = dst
-
-		i++
-	}
-
-	By(fmt.Sprint("creating ", config.prefix, " server pod"))
-	privileged := new(bool)
-	*privileged = true
-	serverPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.prefix + "-server",
-			Labels: map[string]string{
-				"role": config.prefix + "-server",
-			},
-		},
-
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  config.prefix + "-server",
-					Image: config.serverImage,
-					SecurityContext: &v1.SecurityContext{
-						Privileged: privileged,
-					},
-					Args:         config.serverArgs,
-					Ports:        serverPodPorts,
-					VolumeMounts: mounts,
-				},
-			},
-			Volumes: volumes,
-		},
-	}
-	serverPod = podClient.CreateSync(serverPod)
-
-	By("locating the server pod")
-	pod, err := podClient.Get(serverPod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Cannot locate the server pod %v: %v", serverPod.Name, err)
-
-	By("sleeping a bit to give the server time to start")
-	time.Sleep(20 * time.Second)
-	return pod
-}
-
-// Clean both server and client pods.
-func volumeTestCleanup(f *framework.Framework, config VolumeTestConfig) {
-	By(fmt.Sprint("cleaning the environment after ", config.prefix))
-
-	defer GinkgoRecover()
-
-	podClient := f.PodClient()
-
-	err := podClient.Delete(config.prefix+"-client", nil)
-	if err != nil {
-		// Log the error before failing test: if the test has already failed,
-		// framework.ExpectNoError() won't print anything to logs!
-		glog.Warningf("Failed to delete client pod: %v", err)
-		framework.ExpectNoError(err, "Failed to delete client pod: %v", err)
-	}
-
-	if config.serverImage != "" {
-		if err := f.WaitForPodTerminated(config.prefix+"-client", ""); !apierrs.IsNotFound(err) {
-			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
-		}
-		// See issue #24100.
-		// Prevent umount errors by making sure making sure the client pod exits cleanly *before* the volume server pod exits.
-		By("sleeping a bit so client can stop and unmount")
-		time.Sleep(20 * time.Second)
-
-		err = podClient.Delete(config.prefix+"-server", nil)
-		if err != nil {
-			glog.Warningf("Failed to delete server pod: %v", err)
-			framework.ExpectNoError(err, "Failed to delete server pod: %v", err)
-		}
-	}
-}
-
-// Start a client pod using given VolumeSource (exported by startVolumeServer())
-// and check that the pod sees the data from the server pod.
-func testVolumeClient(f *framework.Framework, config VolumeTestConfig, volume v1.VolumeSource, fsGroup *int64, expectedContent string) {
-	By(fmt.Sprint("starting ", config.prefix, " client"))
-	clientPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.prefix + "-client",
-			Labels: map[string]string{
-				"role": config.prefix + "-client",
-			},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:       config.prefix + "-client",
-					Image:      "gcr.io/google_containers/busybox:1.24",
-					WorkingDir: "/opt",
-					// An imperative and easily debuggable container which reads vol contents for
-					// us to scan in the tests or by eye.
-					// We expect that /opt is empty in the minimal containers which we use in this test.
-					Command: []string{
-						"/bin/sh",
-						"-c",
-						"while true ; do cat /opt/index.html ; sleep 2 ; ls -altrh /opt/  ; sleep 2 ; done ",
-					},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      config.prefix + "-volume",
-							MountPath: "/opt/",
-						},
-					},
-				},
-			},
-			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: &v1.SELinuxOptions{
-					Level: "s0:c0,c1",
-				},
-			},
-			Volumes: []v1.Volume{
-				{
-					Name:         config.prefix + "-volume",
-					VolumeSource: volume,
-				},
-			},
-		},
-	}
-	podClient := f.PodClient()
-
-	if fsGroup != nil {
-		clientPod.Spec.SecurityContext.FSGroup = fsGroup
-	}
-	clientPod = podClient.CreateSync(clientPod)
-
-	By("Checking that text file contents are perfect.")
-	result := f.ExecCommandInPod(clientPod.Name, "cat", "/opt/index.html")
-	var err error
-	if !strings.Contains(result, expectedContent) {
-		err = fmt.Errorf("Failed to find \"%s\", last result: \"%s\"", expectedContent, result)
-	}
-	Expect(err).NotTo(HaveOccurred(), "failed: finding the contents of the mounted file.")
-
-	if fsGroup != nil {
-
-		By("Checking fsGroup is correct.")
-		_, err := framework.LookForStringInPodExec(config.namespace, clientPod.Name, []string{"ls", "-ld", "/opt"}, strconv.Itoa(int(*fsGroup)), time.Minute)
-		Expect(err).NotTo(HaveOccurred(), "failed: getting the right priviliges in the file %v", int(*fsGroup))
-	}
-}
-
-// Insert index.html with given content into given volume. It does so by
-// starting and auxiliary pod which writes the file there.
-// The volume must be writable.
-func injectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.VolumeSource, content string) {
-	By(fmt.Sprint("starting ", config.prefix, " injector"))
-	podClient := client.Core().Pods(config.namespace)
-
-	injectPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.prefix + "-injector",
-			Labels: map[string]string{
-				"role": config.prefix + "-injector",
-			},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    config.prefix + "-injector",
-					Image:   "gcr.io/google_containers/busybox:1.24",
-					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", "echo '" + content + "' > /mnt/index.html && chmod o+rX /mnt /mnt/index.html"},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      config.prefix + "-volume",
-							MountPath: "/mnt",
-						},
-					},
-				},
-			},
-			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: &v1.SELinuxOptions{
-					Level: "s0:c0,c1",
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-			Volumes: []v1.Volume{
-				{
-					Name:         config.prefix + "-volume",
-					VolumeSource: volume,
-				},
-			},
-		},
-	}
-
-	defer func() {
-		podClient.Delete(config.prefix+"-injector", nil)
-	}()
-
-	injectPod, err := podClient.Create(injectPod)
-	framework.ExpectNoError(err, "Failed to create injector pod: %v", err)
-	err = framework.WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-func deleteCinderVolume(name string) error {
-	// Try to delete the volume for several seconds - it takes
-	// a while for the plugin to detach it.
-	var output []byte
-	var err error
-	timeout := time.Second * 120
-
-	framework.Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		output, err = exec.Command("cinder", "delete", name).CombinedOutput()
-		if err == nil {
-			framework.Logf("Cinder volume %s deleted", name)
-			return nil
-		} else {
-			framework.Logf("Failed to delete volume %s: %v", name, err)
-		}
-	}
-	framework.Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
-	return err
-}
 
 // These tests need privileged containers, which are disabled by default.  Run
 // the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
@@ -351,12 +61,13 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	clean := true
 	// filled in BeforeEach
 	var namespace *v1.Namespace
+	var c clientset.Interface
 
 	BeforeEach(func() {
-		if !isTestEnabled(f.ClientSet) {
-			framework.Skipf("NFS tests are not supported for this distro")
-		}
+		framework.SkipUnlessNodeOSDistroIs("gci")
+
 		namespace = f.Namespace
+		c = f.ClientSet
 	})
 
 	////////////////////////////////////////////////////////////////////////
@@ -365,61 +76,75 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 
 	framework.KubeDescribe("NFSv4", func() {
 		It("should be mountable for NFSv4 [Volume]", func() {
-			config := VolumeTestConfig{
-				namespace:   namespace.Name,
-				prefix:      "nfs",
-				serverImage: "gcr.io/google_containers/volume-nfs:0.8",
-				serverPorts: []int{2049},
+
+			config := framework.VolumeTestConfig{
+				Namespace:   namespace.Name,
+				Prefix:      "nfs",
+				ServerImage: framework.NfsServerImage,
+				ServerPorts: []int{2049},
 			}
 
 			defer func() {
 				if clean {
-					volumeTestCleanup(f, config)
+					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-			pod := startVolumeServer(f, config)
+
+			pod := framework.StartVolumeServer(c, config)
 			serverIP := pod.Status.PodIP
 			framework.Logf("NFS server IP address: %v", serverIP)
 
-			volume := v1.VolumeSource{
-				NFS: &v1.NFSVolumeSource{
-					Server:   serverIP,
-					Path:     "/",
-					ReadOnly: true,
+			tests := []framework.VolumeTest{
+				{
+					Volume: v1.VolumeSource{
+						NFS: &v1.NFSVolumeSource{
+							Server:   serverIP,
+							Path:     "/",
+							ReadOnly: true,
+						},
+					},
+					File:            "index.html",
+					ExpectedContent: "Hello from NFS!",
 				},
 			}
+
 			// Must match content of test/images/volumes-tester/nfs/index.html
-			testVolumeClient(f, config, volume, nil, "Hello from NFS!")
+			framework.TestVolumeClient(c, config, nil, tests)
 		})
 	})
 
 	framework.KubeDescribe("NFSv3", func() {
 		It("should be mountable for NFSv3 [Volume]", func() {
-			config := VolumeTestConfig{
-				namespace:   namespace.Name,
-				prefix:      "nfs",
-				serverImage: "gcr.io/google_containers/volume-nfs:0.8",
-				serverPorts: []int{2049},
+			config := framework.VolumeTestConfig{
+				Namespace:   namespace.Name,
+				Prefix:      "nfs",
+				ServerImage: framework.NfsServerImage,
+				ServerPorts: []int{2049},
 			}
 
 			defer func() {
 				if clean {
-					volumeTestCleanup(f, config)
+					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-			pod := startVolumeServer(f, config)
+			pod := framework.StartVolumeServer(c, config)
 			serverIP := pod.Status.PodIP
 			framework.Logf("NFS server IP address: %v", serverIP)
-
-			volume := v1.VolumeSource{
-				NFS: &v1.NFSVolumeSource{
-					Server:   serverIP,
-					Path:     "/exports",
-					ReadOnly: true,
+			tests := []framework.VolumeTest{
+				{
+					Volume: v1.VolumeSource{
+						NFS: &v1.NFSVolumeSource{
+							Server:   serverIP,
+							Path:     "/exports",
+							ReadOnly: true,
+						},
+					},
+					File:            "index.html",
+					ExpectedContent: "Hello from NFS!",
 				},
 			}
 			// Must match content of test/images/volume-tester/nfs/index.html
-			testVolumeClient(f, config, volume, nil, "Hello from NFS!")
+			framework.TestVolumeClient(c, config, nil, tests)
 		})
 	})
 
@@ -429,19 +154,20 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 
 	framework.KubeDescribe("GlusterFS", func() {
 		It("should be mountable [Volume]", func() {
-			config := VolumeTestConfig{
-				namespace:   namespace.Name,
-				prefix:      "gluster",
-				serverImage: "gcr.io/google_containers/volume-gluster:0.2",
-				serverPorts: []int{24007, 24008, 49152},
+			config := framework.VolumeTestConfig{
+				Namespace:   namespace.Name,
+				Prefix:      "gluster",
+				ServerImage: framework.GlusterfsServerImage,
+				ServerPorts: []int{24007, 24008, 49152},
 			}
 
 			defer func() {
 				if clean {
-					volumeTestCleanup(f, config)
+					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-			pod := startVolumeServer(f, config)
+
+			pod := framework.StartVolumeServer(c, config)
 			serverIP := pod.Status.PodIP
 			framework.Logf("Gluster server IP address: %v", serverIP)
 
@@ -452,7 +178,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 					APIVersion: "v1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name: config.prefix + "-server",
+					Name: config.Prefix + "-server",
 				},
 				Subsets: []v1.EndpointSubset{
 					{
@@ -472,11 +198,11 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 				},
 			}
 
-			endClient := f.ClientSet.Core().Endpoints(config.namespace)
+			endClient := f.ClientSet.CoreV1().Endpoints(config.Namespace)
 
 			defer func() {
 				if clean {
-					endClient.Delete(config.prefix+"-server", nil)
+					endClient.Delete(config.Prefix+"-server", nil)
 				}
 			}()
 
@@ -484,46 +210,22 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 				framework.Failf("Failed to create endpoints for Gluster server: %v", err)
 			}
 
-			volume := v1.VolumeSource{
-				Glusterfs: &v1.GlusterfsVolumeSource{
-					EndpointsName: config.prefix + "-server",
-					// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
-					Path:     "test_vol",
-					ReadOnly: true,
+			tests := []framework.VolumeTest{
+				{
+					Volume: v1.VolumeSource{
+						Glusterfs: &v1.GlusterfsVolumeSource{
+							EndpointsName: config.Prefix + "-server",
+							// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
+							Path:     "test_vol",
+							ReadOnly: true,
+						},
+					},
+					File: "index.html",
+					// Must match content of test/images/volumes-tester/gluster/index.html
+					ExpectedContent: "Hello from GlusterFS!",
 				},
 			}
-			// Must match content of test/images/volumes-tester/gluster/index.html
-			testVolumeClient(f, config, volume, nil, "Hello from GlusterFS!")
+			framework.TestVolumeClient(c, config, nil, tests)
 		})
 	})
 })
-
-func isTestEnabled(c clientset.Interface) bool {
-	// Enable the test on node e2e if the node image is GCI.
-	nodeName := framework.TestContext.NodeName
-	if nodeName != "" {
-		if strings.Contains(nodeName, "-gci-dev-") {
-			gciVersionRe := regexp.MustCompile("-gci-dev-([0-9]+)-")
-			matches := gciVersionRe.FindStringSubmatch(framework.TestContext.NodeName)
-			if len(matches) == 2 {
-				version, err := strconv.Atoi(matches[1])
-				if err != nil {
-					glog.Errorf("Error parsing GCI version from NodeName %q: %v", nodeName, err)
-					return false
-				}
-				return version >= 54
-			}
-		}
-		return false
-	}
-
-	// For cluster e2e test, because nodeName is empty, retrieve the node objects from api server
-	// and check their images. Only run NFS and GlusterFS tests if nodes are using GCI image for now.
-	nodes := framework.GetReadySchedulableNodesOrDie(c)
-	for _, node := range nodes.Items {
-		if !strings.Contains(node.Status.NodeInfo.OSImage, "Container-Optimized OS") {
-			return false
-		}
-	}
-	return true
-}

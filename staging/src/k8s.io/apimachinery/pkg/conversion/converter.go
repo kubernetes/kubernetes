@@ -66,12 +66,6 @@ type Converter struct {
 	// source field name and type to look for.
 	structFieldSources map[typeNamePair][]typeNamePair
 
-	// Map from a type to a function which applies defaults.
-	defaultingFuncs map[reflect.Type]reflect.Value
-
-	// Similar to above, but function is stored as interface{}.
-	defaultingInterfaces map[reflect.Type]interface{}
-
 	// Map from an input type to a function which can apply a key name mapping
 	inputFieldMappingFuncs map[reflect.Type]FieldMappingFunc
 
@@ -93,8 +87,6 @@ func NewConverter(nameFn NameFunc) *Converter {
 		conversionFuncs:          NewConversionFuncs(),
 		generatedConversionFuncs: NewConversionFuncs(),
 		ignoredConversions:       make(map[typePair]struct{}),
-		defaultingFuncs:          make(map[reflect.Type]reflect.Value),
-		defaultingInterfaces:     make(map[reflect.Type]interface{}),
 		nameFunc:                 nameFn,
 		structFieldDests:         make(map[typeNamePair][]typeNamePair),
 		structFieldSources:       make(map[typeNamePair][]typeNamePair),
@@ -151,10 +143,6 @@ type Scope interface {
 	// DefaultConvert performs the default conversion, without calling a conversion func
 	// on the current stack frame. This makes it safe to call from a conversion func.
 	DefaultConvert(src, dest interface{}, flags FieldMatchingFlags) error
-
-	// If registered, returns a function applying defaults for objects of a given type.
-	// Used for automatically generating conversion functions.
-	DefaultingInterface(inType reflect.Type) (interface{}, bool)
 
 	// SrcTags and DestTags contain the struct tags that src and dest had, respectively.
 	// If the enclosing object was not a struct, then these will contain no tags, of course.
@@ -267,11 +255,6 @@ func (s scopeStack) describe() string {
 		}
 	}
 	return desc
-}
-
-func (s *scope) DefaultingInterface(inType reflect.Type) (interface{}, bool) {
-	value, found := s.converter.defaultingInterfaces[inType]
-	return value, found
 }
 
 // Formats src & dest as indices for printing.
@@ -430,35 +413,6 @@ func (c *Converter) SetStructFieldCopy(srcFieldType interface{}, srcFieldName st
 	return nil
 }
 
-// RegisterDefaultingFunc registers a value-defaulting func with the Converter.
-// defaultingFunc must take one parameter: a pointer to the input type.
-//
-// Example:
-// c.RegisterDefaultingFunc(
-//         func(in *v1.Pod) {
-//                 // defaulting logic...
-//          })
-func (c *Converter) RegisterDefaultingFunc(defaultingFunc interface{}) error {
-	fv := reflect.ValueOf(defaultingFunc)
-	ft := fv.Type()
-	if ft.Kind() != reflect.Func {
-		return fmt.Errorf("expected func, got: %v", ft)
-	}
-	if ft.NumIn() != 1 {
-		return fmt.Errorf("expected one 'in' param, got: %v", ft)
-	}
-	if ft.NumOut() != 0 {
-		return fmt.Errorf("expected zero 'out' params, got: %v", ft)
-	}
-	if ft.In(0).Kind() != reflect.Ptr {
-		return fmt.Errorf("expected pointer arg for 'in' param 0, got: %v", ft)
-	}
-	inType := ft.In(0).Elem()
-	c.defaultingFuncs[inType] = fv
-	c.defaultingInterfaces[inType] = defaultingFunc
-	return nil
-}
-
 // RegisterInputDefaults registers a field name mapping function, used when converting
 // from maps to structs. Inputs to the conversion methods are checked for this type and a mapping
 // applied automatically if the input matches in. A set of default flags for the input conversion
@@ -596,15 +550,6 @@ func (c *Converter) callCustom(sv, dv, custom reflect.Value, scope *scope) error
 // one is registered.
 func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	dt, st := dv.Type(), sv.Type()
-	// Apply default values.
-	if fv, ok := c.defaultingFuncs[st]; ok {
-		if c.Debug != nil {
-			c.Debug.Logf("Applying defaults for '%v'", st)
-		}
-		args := []reflect.Value{sv.Addr()}
-		fv.Call(args)
-	}
-
 	pair := typePair{st, dt}
 
 	// ignore conversions of this type

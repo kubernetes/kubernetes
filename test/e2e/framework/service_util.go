@@ -1057,7 +1057,7 @@ func StartServeHostnameService(c clientset.Interface, internalClient internalcli
 	config := testutils.RCConfig{
 		Client:               c,
 		InternalClient:       internalClient,
-		Image:                "gcr.io/google_containers/serve_hostname:v1.4",
+		Image:                ServeHostnameImage,
 		Name:                 name,
 		Namespace:            ns,
 		PollInterval:         3 * time.Second,

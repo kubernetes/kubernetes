@@ -33,6 +33,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -42,16 +43,16 @@ import (
 )
 
 var (
-	rollingUpdate_long = templates.LongDesc(`
+	rollingUpdate_long = templates.LongDesc(i18n.T(`
 		Perform a rolling update of the given ReplicationController.
 
 		Replaces the specified replication controller with a new replication controller by updating one pod at a time to use the
 		new PodTemplate. The new-controller.json must specify the same namespace as the
 		existing replication controller and overwrite at least one (common) label in its replicaSelector.
 
-		![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)`)
+		![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)`))
 
-	rollingUpdate_example = templates.Examples(`
+	rollingUpdate_example = templates.Examples(i18n.T(`
 		# Update pods of frontend-v1 using new replication controller data in frontend-v2.json.
 		kubectl rolling-update frontend-v1 -f frontend-v2.json
 
@@ -66,7 +67,7 @@ var (
 		kubectl rolling-update frontend --image=image:v2
 
 		# Abort and reverse an existing rollout in progress (from frontend-v1 to frontend-v2).
-		kubectl rolling-update frontend-v1 frontend-v2 --rollback`)
+		kubectl rolling-update frontend-v1 frontend-v2 --rollback`))
 )
 
 var (
@@ -205,7 +206,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 			return err
 		}
 
-		request := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+		request := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 			Schema(schema).
 			NamespaceParam(cmdNamespace).DefaultNamespace().
 			FilenameParam(enforceNamespace, &resource.FilenameOptions{Recursive: false, Filenames: []string{filename}}).
@@ -278,7 +279,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 		}
 		// Update the existing replication controller with pointers to the 'next' controller
 		// and adding the <deploymentKey> label if necessary to distinguish it from the 'next' controller.
-		oldHash, err := api.HashObject(oldRc, codec)
+		oldHash, err := helper.HashObject(oldRc, codec)
 		if err != nil {
 			return err
 		}

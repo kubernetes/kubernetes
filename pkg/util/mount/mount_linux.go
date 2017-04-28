@@ -386,7 +386,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 				return mountErr
 			} else {
 				// Block device is formatted with unexpected filesystem, let the user know
-				return fmt.Errorf("failed to mount the volume as %q, it's already formatted with %q. Mount error: %v", fstype, existingFormat, mountErr)
+				return fmt.Errorf("failed to mount the volume as %q, it already contains %s. Mount error: %v", fstype, existingFormat, mountErr)
 			}
 		}
 	}
@@ -395,19 +395,33 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 
 // diskLooksUnformatted uses 'lsblk' to see if the given disk is unformated
 func (mounter *SafeFormatAndMount) getDiskFormat(disk string) (string, error) {
-	args := []string{"-nd", "-o", "FSTYPE", disk}
+	args := []string{"-n", "-o", "FSTYPE", disk}
 	cmd := mounter.Runner.Command("lsblk", args...)
 	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
 	dataOut, err := cmd.CombinedOutput()
-	output := strings.TrimSpace(string(dataOut))
-
-	// TODO (#13212): check if this disk has partitions and return false, and
-	// an error if so.
+	output := string(dataOut)
+	glog.V(4).Infof("Output: %q", output)
 
 	if err != nil {
 		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
 		return "", err
 	}
 
-	return strings.TrimSpace(output), nil
+	// Split lsblk output into lines. Unformatted devices should contain only
+	// "\n". Beware of "\n\n", that's a device with one empty partition.
+	output = strings.TrimSuffix(output, "\n") // Avoid last empty line
+	lines := strings.Split(output, "\n")
+	if lines[0] != "" {
+		// The device is formatted
+		return lines[0], nil
+	}
+
+	if len(lines) == 1 {
+		// The device is unformatted and has no dependent devices
+		return "", nil
+	}
+
+	// The device has dependent devices, most probably partitions (LVM, LUKS
+	// and MD RAID are reported as FSTYPE and caught above).
+	return "unknown data, probably partitions", nil
 }

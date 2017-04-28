@@ -50,7 +50,6 @@ pkg_tar(
 pkg_tar(
     name = "salt-manifests",
     files = [
-        "salt/fluentd-gcp/fluentd-gcp.yaml",
         "salt/kube-proxy/kube-proxy.manifest",
         "salt/kube-registry-proxy/kube-registry-proxy.yaml",
     ],

@@ -187,7 +187,7 @@ type KubeletBootstrap interface {
 }
 
 // create and initialize a Kubelet instance
-type KubeletBuilder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, standaloneMode bool) (KubeletBootstrap, error)
+type KubeletBuilder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, standaloneMode bool, hostnameOverride, nodeIP, dockershimRootDir string) (KubeletBootstrap, error)
 
 // KubeletDeps is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
@@ -282,7 +282,7 @@ func getRuntimeAndImageServices(config *componentconfig.KubeletConfiguration) (i
 
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
-func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, standaloneMode bool) (*Kubelet, error) {
+func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, standaloneMode bool, hostnameOverride, nodeIP, dockershimRootDir string) (*Kubelet, error) {
 	if kubeCfg.RootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", kubeCfg.RootDirectory)
 	}
@@ -302,7 +302,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		}
 	}
 
-	hostname := nodeutil.GetHostname(kubeCfg.HostnameOverride)
+	hostname := nodeutil.GetHostname(hostnameOverride)
 	// Query the cloud provider for our node name, default to hostname
 	nodeName := types.NodeName(hostname)
 	if kubeDeps.Cloud != nil {
@@ -462,7 +462,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		cpuCFSQuota:       kubeCfg.CPUCFSQuota,
 		daemonEndpoints:   daemonEndpoints,
 		containerManager:  kubeDeps.ContainerManager,
-		nodeIP:            net.ParseIP(kubeCfg.NodeIP),
+		nodeIP:            net.ParseIP(nodeIP),
 		clock:             clock.RealClock{},
 		outOfDiskTransitionFrequency:            kubeCfg.OutOfDiskTransitionFrequency.Duration,
 		enableCustomMetrics:                     kubeCfg.EnableCustomMetrics,
@@ -553,7 +553,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			// Create and start the CRI shim running as a grpc server.
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
 			ds, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage,
-				streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver, dockerExecHandler)
+				streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver, dockerExecHandler, dockershimRootDir)
 			if err != nil {
 				return nil, err
 			}
@@ -568,10 +568,15 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				// The unix socket for kubelet <-> dockershim communication.
 				ep = "/var/run/dockershim.sock"
 			)
-			kubeCfg.RemoteRuntimeEndpoint, kubeCfg.RemoteImageEndpoint = ep, ep
+			if len(kubeCfg.RemoteRuntimeEndpoint) == 0 {
+				kubeCfg.RemoteRuntimeEndpoint = ep
+			}
+			if len(kubeCfg.RemoteImageEndpoint) == 0 {
+				kubeCfg.RemoteImageEndpoint = ep
+			}
 
 			glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-			server := dockerremote.NewDockerServer(ep, ds)
+			server := dockerremote.NewDockerServer(kubeCfg.RemoteRuntimeEndpoint, ds)
 			if err := server.Start(); err != nil {
 				return nil, err
 			}
@@ -1159,17 +1164,22 @@ func (kl *Kubelet) StartGarbageCollection() {
 		}
 	}, ContainerGCPeriod, wait.NeverStop)
 
-	loggedImageGCFailure := false
+	prevImageGCFailed := false
 	go wait.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
-			glog.Errorf("Image garbage collection failed: %v", err)
-			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.ImageGCFailed, err.Error())
-			loggedImageGCFailure = true
+			if prevImageGCFailed {
+				glog.Errorf("Image garbage collection failed multiple times in a row: %v", err)
+				// Only create an event for repeated failures
+				kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.ImageGCFailed, err.Error())
+			} else {
+				glog.Errorf("Image garbage collection failed once. Stats initialization may not have completed yet: %v", err)
+			}
+			prevImageGCFailed = true
 		} else {
 			var vLevel glog.Level = 4
-			if loggedImageGCFailure {
+			if prevImageGCFailed {
 				vLevel = 1
-				loggedImageGCFailure = false
+				prevImageGCFailed = false
 			}
 
 			glog.V(vLevel).Infof("Image garbage collection succeeded")
@@ -1241,6 +1251,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	if kl.kubeClient == nil {
 		glog.Warning("No api server defined - no node status update will be sent.")
 	}
+
 	if err := kl.initializeModules(); err != nil {
 		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
 		glog.Error(err)
@@ -1551,16 +1562,12 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Fetch the pull secrets for the pod
-	pullSecrets, err := kl.getPullSecretsForPod(pod)
-	if err != nil {
-		glog.Errorf("Unable to get pull secrets for pod %q: %v", format.Pod(pod), err)
-		return err
-	}
+	pullSecrets := kl.getPullSecretsForPod(pod)
 
 	// Call the container runtime's SyncPod callback
 	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
-	if err = result.Error(); err != nil {
+	if err := result.Error(); err != nil {
 		return err
 	}
 
@@ -2053,7 +2060,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 	}
 	// Only check specific conditions when runtime integration type is cri,
 	// because the old integration doesn't populate any runtime condition.
-	if kl.kubeletConfiguration.EnableCRI {
+	if kl.kubeletConfiguration.EnableCRI && kl.kubeletConfiguration.ContainerRuntime != "rkt" {
 		if s == nil {
 			glog.Errorf("Container runtime status is nil")
 			return

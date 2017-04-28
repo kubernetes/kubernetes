@@ -89,6 +89,8 @@ message ClusterSpec {
   // This is to help clients reach servers in the most network-efficient way possible.
   // Clients can use the appropriate server address as per the CIDR that they match.
   // In case of multiple matches, clients should use the longest matching CIDR.
+  // +patchMergeKey=clientCIDR
+  // +patchStrategy=merge
   repeated ServerAddressByClientCIDR serverAddressByClientCIDRs = 1;
 
   // Name of the secret containing kubeconfig to access this cluster.

@@ -1,36 +1,38 @@
 git_repository(
     name = "io_bazel_rules_go",
-    commit = "7828452850597b52b49ec603b23f8ad2bcb22aed",
+    commit = "805fd1566500997379806373feb05e138a4dfe28",
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
 git_repository(
     name = "io_kubernetes_build",
-    commit = "685f15b90b454af3086ab071fdea1b6db213d1fb",
+    commit = "684e550a2f006dbe3cf3b3d481d3f19217b228f7",
     remote = "https://github.com/kubernetes/repo-infra.git",
 )
 
 git_repository(
     name = "io_bazel",
-    commit = "3b29803eb528ff525c7024190ffbf4b08c598cf2",
+    commit = "1fe52dd4b2d77a740648bc1509b68acae49deffc",
     remote = "https://github.com/ixdy/bazel.git",
 )
 
 load("@io_bazel_rules_go//go:def.bzl", "go_repositories")
 
-go_repositories()
+go_repositories(
+    go_version = "1.8.1",
+)
 
 # for building docker base images
 debs = (
     (
         "busybox_deb",
-        "f262cc9cf893740bb70c3dd01da9429b858c94be696badd4a702e0a8c7f6f80b",
-        "http://ftp.us.debian.org/debian/pool/main/b/busybox/busybox-static_1.22.0-19+b1_amd64.deb",
+        "7465567f5e5255188b1d004d7081066cd79f77a5c18a5d418d27966d698e0bef",
+        "http://ftp.us.debian.org/debian/pool/main/b/busybox/busybox-static_1.22.0-19+b2_amd64.deb",
     ),
     (
         "libc_deb",
-        "6bbd506b171a9f29b09fde77e2749c0aa0c1439058df9d1a6408d464069b7dd6",
-        "http://ftp.us.debian.org/debian/pool/main/g/glibc/libc6_2.24-9_amd64.deb",
+        "372aac4a9ce9dbb26a08de0b9c41b0500ba019430295d29f39566483f5f32732",
+        "http://ftp.us.debian.org/debian/pool/main/g/glibc/libc6_2.24-10_amd64.deb",
     ),
     (
         "iptables_deb",

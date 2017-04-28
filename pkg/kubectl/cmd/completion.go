@@ -44,7 +44,7 @@ const defaultBoilerPlate = `
 `
 
 var (
-	completion_long = templates.LongDesc(`
+	completion_long = templates.LongDesc(i18n.T(`
 		Output shell completion code for the specified shell (bash or zsh).
 		The shell code must be evalutated to provide interactive
 		completion of kubectl commands.  This can be done by sourcing it from
@@ -60,12 +60,15 @@ var (
 
 		    $ source $(brew --prefix)/etc/bash_completion
 
-		Note for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2`)
+		Note for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2`))
 
-	completion_example = templates.Examples(`
+	completion_example = templates.Examples(i18n.T(`
 		# Install bash completion on a Mac using homebrew
 		brew install bash-completion
-		printf "\n# Bash completion support\nsource $(brew --prefix)/etc/bash_completion\n" >> $HOME/.bash_profile
+		printf "
+# Bash completion support
+source $(brew --prefix)/etc/bash_completion
+" >> $HOME/.bash_profile
 		source $HOME/.bash_profile
 
 		# Load the kubectl completion code for bash into the current shell
@@ -73,11 +76,14 @@ var (
 
 		# Write bash completion code to a file and source if from .bash_profile
 		kubectl completion bash > ~/.kube/completion.bash.inc
-		printf "\n# Kubectl shell completion\nsource '$HOME/.kube/completion.bash.inc'\n" >> $HOME/.bash_profile
+		printf "
+# Kubectl shell completion
+source '$HOME/.kube/completion.bash.inc'
+" >> $HOME/.bash_profile
 		source $HOME/.bash_profile
 
 		# Load the kubectl completion code for zsh[1] into the current shell
-		source <(kubectl completion zsh)`)
+		source <(kubectl completion zsh)`))
 )
 
 var (
@@ -87,7 +93,7 @@ var (
 	}
 )
 
-func NewCmdCompletion(f cmdutil.Factory, out io.Writer, boilerPlate string) *cobra.Command {
+func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	shells := []string{}
 	for s := range completion_shells {
 		shells = append(shells, s)

@@ -135,7 +135,7 @@ coreos:
         --token-auth-file=/var/lib/kube-apiserver/known_tokens.csv \
         --v=2 \
         --service-account-key-file=/var/run/kubernetes/kube-serviceaccount.key \
-        --service-account-lookup=false \
+        --service-account-lookup=true \
         --admission-control=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,DefaultTolerationSeconds,ResourceQuota
         Restart=always
         RestartSec=5

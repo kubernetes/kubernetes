@@ -31,6 +31,7 @@ MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
+NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 KUBE_APISERVER_REQUEST_TIMEOUT=300
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
@@ -78,8 +79,13 @@ INITIAL_ETCD_CLUSTER="${MASTER_NAME}"
 ETCD_QUORUM_READ="${ENABLE_ETCD_QUORUM_READ:-false}"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 NODE_TAG="${INSTANCE_PREFIX}-minion"
-CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.180.0.0/14}"
+
+CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.100.0.0/14}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
+# NODE_IP_RANGE is used when ENABLE_IP_ALIASES=true. It is the primary range in
+# the subnet and is the range used for node instance IPs.
+NODE_IP_RANGE="${NODE_IP_RANGE:-10.40.0.0/22}"
+
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
 # Optional: set feature gates
@@ -106,6 +112,7 @@ ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 #   none           - No cluster monitoring setup
 #   influxdb       - Heapster, InfluxDB, and Grafana
 #   google         - Heapster, Google Cloud Monitoring, and Google Cloud Logging
+#   stackdriver    - Heapster, Google Cloud Monitoring (schema container), and Google Cloud Logging
 #   googleinfluxdb - Enable influxdb and google (except GCM)
 #   standalone     - Heapster only. Metrics available via Heapster REST API.
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
@@ -196,6 +203,25 @@ fi
 # Optional: Enable Rescheduler
 ENABLE_RESCHEDULER="${KUBE_ENABLE_RESCHEDULER:-true}"
 
+# Optional: Enable allocation of pod IPs using IP aliases.
+#
+# ALPHA FEATURE.
+#
+# IP_ALIAS_SIZE is the size of the podCIDR allocated to a node.
+# IP_ALIAS_SUBNETWORK is the subnetwork to allocate from. If empty, a
+#   new subnetwork will be created for the cluster.
+ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-false}
+if [ ${ENABLE_IP_ALIASES} = true ]; then
+  # Size of ranges allocated to each node. gcloud alpha supports only /32 and /24.
+  IP_ALIAS_SIZE=${KUBE_GCE_IP_ALIAS_SIZE:-/24}
+  IP_ALIAS_SUBNETWORK=${KUBE_GCE_IP_ALIAS_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-default}
+  # NODE_IP_RANGE is used when ENABLE_IP_ALIASES=true. It is the primary range in
+  # the subnet and is the range used for node instance IPs.
+  NODE_IP_RANGE="${NODE_IP_RANGE:-10.40.0.0/22}"
+  # Add to the provider custom variables.
+  PROVIDER_VARS="${PROVIDER_VARS} ENABLE_IP_ALIASES"
+fi
+
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
 ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota}"
 
@@ -242,15 +268,9 @@ SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 
 # Optional: Enable legacy ABAC policy that makes all service accounts superusers.
-if [[ "${E2E_UPGRADE_TEST:-}" == "true" ]]; then
-  # Enable (match the regular default) when running upgrade tests (E2E_UPGRADE_TEST=true is set by upgrade CI jobs).
-  # This ensures the combination of legacy ABAC and default RBAC policies work properly for upgrade scenarios.
-  ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-true}" # true, false
-else
-  # Disable by default when running regular e2e tests.
-  # This ensures default RBAC policies alone are sufficient for e2e tests from 1.6+
-  ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-false}" # true, false
-fi
+# Disabling this by default in tests ensures default RBAC policies are sufficient from 1.6+
+# Upgrade test jobs that go from a version < 1.6 to a version >= 1.6 should override this to be true.
+ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-false}" # true, false
 
 # TODO(dawn1107): Remove this once the flag is built into CVM image.
 # Kernel panic upon soft lockup issue

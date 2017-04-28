@@ -23,6 +23,7 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 
 	// add the kubernetes feature gates
@@ -36,9 +37,10 @@ type ServerRunOptions struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptions
-	InsecureServing         *genericoptions.ServingOptions
+	InsecureServing         *kubeoptions.InsecureServingOptions
 	Audit                   *genericoptions.AuditLogOptions
 	Features                *genericoptions.FeatureOptions
+	Admission               *genericoptions.AdmissionOptions
 	Authentication          *kubeoptions.BuiltInAuthenticationOptions
 	Authorization           *kubeoptions.BuiltInAuthorizationOptions
 	CloudProvider           *kubeoptions.CloudProviderOptions
@@ -54,9 +56,10 @@ func NewServerRunOptions() *ServerRunOptions {
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
 		Etcd:                 genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, api.Scheme, nil)),
 		SecureServing:        kubeoptions.NewSecureServingOptions(),
-		InsecureServing:      genericoptions.NewInsecureServingOptions(),
+		InsecureServing:      kubeoptions.NewInsecureServingOptions(),
 		Audit:                genericoptions.NewAuditLogOptions(),
 		Features:             genericoptions.NewFeatureOptions(),
+		Admission:            genericoptions.NewAdmissionOptions(&kubeapiserveradmission.Plugins),
 		Authentication:       kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
 		Authorization:        kubeoptions.NewBuiltInAuthorizationOptions(),
 		CloudProvider:        kubeoptions.NewCloudProviderOptions(),
@@ -84,6 +87,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	s.CloudProvider.AddFlags(fs)
 	s.StorageSerialization.AddFlags(fs)
 	s.APIEnablement.AddFlags(fs)
+	s.Admission.AddFlags(fs)
 
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events. Default is 1h.")

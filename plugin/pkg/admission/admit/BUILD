@@ -12,7 +12,10 @@ go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apiserver/pkg/admission"],
+    deps = [
+        "//pkg/kubeapiserver/admission:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
+    ],
 )
 
 go_test(
@@ -20,6 +23,10 @@ go_test(
     srcs = ["admission_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
+    ],
 )
 
 filegroup(

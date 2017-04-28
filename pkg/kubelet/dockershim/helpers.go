@@ -28,7 +28,7 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -217,7 +217,7 @@ func getNetworkNamespace(c *dockertypes.ContainerJSON) string {
 func getSysctlsFromAnnotations(annotations map[string]string) (map[string]string, error) {
 	var results map[string]string
 
-	sysctls, unsafeSysctls, err := v1.SysctlsFromPodAnnotations(annotations)
+	sysctls, unsafeSysctls, err := v1helper.SysctlsFromPodAnnotations(annotations)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +271,7 @@ func getUserFromImageUser(imageUser string) (*int64, string) {
 }
 
 // See #33189. If the previous attempt to create a sandbox container name FOO
-// failed due to "device or resource busy", it is possbile that docker did
+// failed due to "device or resource busy", it is possible that docker did
 // not clean up properly and has inconsistent internal state. Docker would
 // not report the existence of FOO, but would complain if user wants to
 // create a new container named FOO. To work around this, we parse the error
@@ -280,7 +280,7 @@ func getUserFromImageUser(imageUser string) (*int64, string) {
 // See #40443. Sometimes even removal may fail with "no such container" error.
 // In that case we have to create the container with a randomized name.
 // TODO(random-liu): Remove this work around after docker 1.11 is deprecated.
-// TODO(#33189): Monitor the tests to see if the fix is sufficent.
+// TODO(#33189): Monitor the tests to see if the fix is sufficient.
 func recoverFromCreationConflictIfNeeded(client dockertools.DockerInterface, createConfig dockertypes.ContainerCreateConfig, err error) (*dockertypes.ContainerCreateResponse, error) {
 	matches := conflictRE.FindStringSubmatch(err.Error())
 	if len(matches) != 2 {

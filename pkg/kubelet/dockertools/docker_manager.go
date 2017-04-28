@@ -52,6 +52,8 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	dockersecurity "k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext"
@@ -73,7 +75,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/selinux"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/util/tail"
-	"k8s.io/kubernetes/pkg/util/term"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -748,7 +749,7 @@ func (dm *DockerManager) runContainer(
 
 	// Set sysctls if requested
 	if container.Name == PodInfraContainerName {
-		sysctls, unsafeSysctls, err := v1.SysctlsFromPodAnnotations(pod.Annotations)
+		sysctls, unsafeSysctls, err := v1helper.SysctlsFromPodAnnotations(pod.Annotations)
 		if err != nil {
 			dm.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToCreateContainer, "Failed to create docker container %q of pod %q with error: %v", container.Name, format.Pod(pod), err)
 			return kubecontainer.ContainerID{}, err
@@ -1297,7 +1298,7 @@ func (d *dockerExitError) ExitStatus() int {
 }
 
 // ExecInContainer runs the command inside the container identified by containerID.
-func (dm *DockerManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
+func (dm *DockerManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	if dm.execHandler == nil {
 		return errors.New("unable to exec without an exec handler")
 	}
@@ -1313,16 +1314,16 @@ func (dm *DockerManager) ExecInContainer(containerID kubecontainer.ContainerID, 
 	return dm.execHandler.ExecInContainer(dm.client, container, cmd, stdin, stdout, stderr, tty, resize, timeout)
 }
 
-func (dm *DockerManager) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (dm *DockerManager) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	return AttachContainer(dm.client, containerID.ID, stdin, stdout, stderr, tty, resize)
 }
 
 // Temporarily export this function to share with dockershim.
 // TODO: clean this up.
-func AttachContainer(client DockerInterface, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func AttachContainer(client DockerInterface, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	// Have to start this before the call to client.AttachToContainer because client.AttachToContainer is a blocking
 	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
-	kubecontainer.HandleResizing(resize, func(size term.Size) {
+	kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
 		client.ResizeContainerTTY(containerID, int(size.Height), int(size.Width))
 	})
 
@@ -1886,7 +1887,6 @@ type versionInfo struct {
 // -1: older than expected version
 // 0 : same version
 func (dm *DockerManager) checkDockerAPIVersion(expectedVersion string) (int, error) {
-
 	value, err := dm.versionCache.Get(dm.machineInfo.MachineID)
 	if err != nil {
 		return 0, err
@@ -2371,7 +2371,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 		glog.V(4).Infof("Creating init container %+v in pod %v", container, format.Pod(pod))
 		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
 			startContainerResult.Fail(err, msg)
-			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
+			glog.V(3).Infof("container start failed: %v: %s", err, msg)
 			return
 		}
 
@@ -2409,7 +2409,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 		glog.V(4).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
 		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
 			startContainerResult.Fail(err, msg)
-			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
+			glog.V(3).Infof("container start failed: %v: %s", err, msg)
 			continue
 		}
 	}

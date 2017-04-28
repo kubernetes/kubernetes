@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -50,15 +51,15 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
-	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
+	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/limitwriter"
-	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -170,8 +171,8 @@ type HostInterface interface {
 	GetRunningPods() ([]*v1.Pod, error)
 	GetPodByName(namespace, name string) (*v1.Pod, bool)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
-	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error
-	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error
+	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
+	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
 	GetKubeletContainerLogs(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	PortForward(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error
@@ -184,8 +185,8 @@ type HostInterface interface {
 	ImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
-	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommand.Options) (*url.URL, error)
-	GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommand.Options) (*url.URL, error)
+	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
+	GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
 }
 
@@ -612,7 +613,7 @@ func getPortForwardRequestParams(req *restful.Request) portForwardRequestParams 
 // getAttach handles requests to attach to a container.
 func (s *Server) getAttach(request *restful.Request, response *restful.Response) {
 	params := getExecRequestParams(request)
-	streamOpts, err := remotecommand.NewOptions(request.Request)
+	streamOpts, err := remotecommandserver.NewOptions(request.Request)
 	if err != nil {
 		utilruntime.HandleError(err)
 		response.WriteError(http.StatusBadRequest, err)
@@ -635,7 +636,7 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 		return
 	}
 
-	remotecommand.ServeAttach(response.ResponseWriter,
+	remotecommandserver.ServeAttach(response.ResponseWriter,
 		request.Request,
 		s.host,
 		podFullName,
@@ -643,14 +644,14 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 		params.containerName,
 		streamOpts,
 		s.host.StreamingConnectionIdleTimeout(),
-		remotecommand.DefaultStreamCreationTimeout,
-		remotecommand.SupportedStreamingProtocols)
+		remotecommandconsts.DefaultStreamCreationTimeout,
+		remotecommandconsts.SupportedStreamingProtocols)
 }
 
 // getExec handles requests to run a command inside a container.
 func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	params := getExecRequestParams(request)
-	streamOpts, err := remotecommand.NewOptions(request.Request)
+	streamOpts, err := remotecommandserver.NewOptions(request.Request)
 	if err != nil {
 		utilruntime.HandleError(err)
 		response.WriteError(http.StatusBadRequest, err)
@@ -673,7 +674,7 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	remotecommand.ServeExec(response.ResponseWriter,
+	remotecommandserver.ServeExec(response.ResponseWriter,
 		request.Request,
 		s.host,
 		podFullName,
@@ -682,8 +683,8 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		params.cmd,
 		streamOpts,
 		s.host.StreamingConnectionIdleTimeout(),
-		remotecommand.DefaultStreamCreationTimeout,
-		remotecommand.SupportedStreamingProtocols)
+		remotecommandconsts.DefaultStreamCreationTimeout,
+		remotecommandconsts.SupportedStreamingProtocols)
 }
 
 // getRun handles requests to run a command inside a container.
@@ -757,7 +758,7 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		params.podUID,
 		portForwardOptions,
 		s.host.StreamingConnectionIdleTimeout(),
-		remotecommand.DefaultStreamCreationTimeout,
+		remotecommandconsts.DefaultStreamCreationTimeout,
 		portforward.SupportedProtocols)
 }
 

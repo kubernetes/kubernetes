@@ -1,7 +1,9 @@
 #!/bin/sh
 set -ux
 
-alias kubectl="kubectl --kubeconfig=/srv/kubernetes/config"
+export PATH=$PATH:/snap/bin
+
+alias kubectl="kubectl --kubeconfig=/root/cdk/kubeconfig"
 
 kubectl cluster-info > $DEBUG_SCRIPT_DIR/cluster-info
 kubectl cluster-info dump > $DEBUG_SCRIPT_DIR/cluster-info-dump
