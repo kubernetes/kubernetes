@@ -356,6 +356,15 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 					"1.5Gi",
 					nil,
 				},
+				{
+					"Azure disk volume with empty sku and location",
+					[]string{"azure"},
+					"kubernetes.io/azure-disk",
+					map[string]string{},
+					"1Gi",
+					"1Gi",
+					nil,
+				},
 			}
 
 			var betaTest *storageClassTest
@@ -463,7 +472,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			// not being deleted.
 			// NOTE:  Polls until no PVs are detected, times out at 5 minutes.
 
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 
 			const raceAttempts int = 100
 			var residualPVs []*v1.PersistentVolume
@@ -561,7 +570,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by changing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
 			test := storageClassTest{
 				name:      "default",
@@ -592,7 +601,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by removing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
 			test := storageClassTest{
 				name:      "default",
@@ -753,6 +762,8 @@ func getDefaultPluginName() string {
 		return "kubernetes.io/cinder"
 	case framework.ProviderIs("vsphere"):
 		return "kubernetes.io/vsphere-volume"
+	case framework.ProviderIs("azure"):
+		return "kubernetes.io/azure-disk"
 	}
 	return ""
 }
