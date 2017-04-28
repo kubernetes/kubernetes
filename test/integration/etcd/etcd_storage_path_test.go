@@ -22,9 +22,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"mime"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -531,10 +533,14 @@ func startRealMasterOrDie(t *testing.T) (*allClient, clientv3.KV, meta.RESTMappe
 	kubeClientConfigValue := atomic.Value{}
 	storageConfigValue := atomic.Value{}
 
+	certDir, _ := ioutil.TempDir("", "test-integration-etcd")
+	defer os.RemoveAll(certDir)
+
 	go func() {
 		for {
 			kubeAPIServerOptions := options.NewServerRunOptions()
 			kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
+			kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURLFromEnv()}
 			kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // TODO use protobuf?
 			kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
