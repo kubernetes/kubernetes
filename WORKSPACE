@@ -26,8 +26,8 @@ go_repositories(
 debs = (
     (
         "busybox_deb",
-        "7465567f5e5255188b1d004d7081066cd79f77a5c18a5d418d27966d698e0bef",
-        "http://ftp.us.debian.org/debian/pool/main/b/busybox/busybox-static_1.22.0-19+b2_amd64.deb",
+        "5f81f140777454e71b9e5bfdce9c89993de5ddf4a7295ea1cfda364f8f630947",
+        "http://ftp.us.debian.org/debian/pool/main/b/busybox/busybox-static_1.22.0-19+b3_amd64.deb",
     ),
     (
         "libc_deb",
