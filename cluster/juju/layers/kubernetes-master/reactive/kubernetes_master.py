@@ -810,7 +810,7 @@ def setup_tokens(token, username, user):
         stream.write('{0},{1},{2}'.format(token, username, user))
 
 
-@retry(times=2, delay_secs=20)
+@retry(times=3, delay_secs=10)
 def all_kube_system_pods_running():
     ''' Check pod status in the kube-system namespace. Returns True if all
     pods are running, False otherwise. '''
