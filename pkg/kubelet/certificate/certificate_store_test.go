@@ -229,7 +229,7 @@ func TestLoadCertKeyBlocksPartialFile(t *testing.T) {
 	}()
 
 	pairFile := filepath.Join(dir, "kubelet-pair.pem")
-	if err := ioutil.WriteFile(pairFile, []byte(certificateData), 0600); err != nil {
+	if err := ioutil.WriteFile(pairFile, storeCertData.certificatePEM, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", pairFile, err)
 	}
 
@@ -250,7 +250,9 @@ func TestLoadCertKeyBlocks(t *testing.T) {
 	}()
 
 	pairFile := filepath.Join(dir, "kubelet-pair.pem")
-	if err := ioutil.WriteFile(pairFile, []byte(certificateData+"\n"+privateKeyData), 0600); err != nil {
+	data := append(storeCertData.certificatePEM, []byte("\n")...)
+	data = append(data, storeCertData.keyPEM...)
+	if err := ioutil.WriteFile(pairFile, data, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", pairFile, err)
 	}
 
@@ -278,7 +280,9 @@ func TestLoadFile(t *testing.T) {
 	}()
 
 	pairFile := filepath.Join(dir, "kubelet-pair.pem")
-	if err := ioutil.WriteFile(pairFile, []byte(certificateData+"\n"+privateKeyData), 0600); err != nil {
+	data := append(storeCertData.certificatePEM, []byte("\n")...)
+	data = append(data, storeCertData.keyPEM...)
+	if err := ioutil.WriteFile(pairFile, data, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", pairFile, err)
 	}
 
@@ -306,11 +310,11 @@ func TestUpdateNoRotation(t *testing.T) {
 		}
 	}()
 	keyFile := filepath.Join(dir, "kubelet.key")
-	if err := ioutil.WriteFile(keyFile, []byte(privateKeyData), 0600); err != nil {
+	if err := ioutil.WriteFile(keyFile, storeCertData.keyPEM, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", keyFile, err)
 	}
 	certFile := filepath.Join(dir, "kubelet.crt")
-	if err := ioutil.WriteFile(certFile, []byte(certificateData), 0600); err != nil {
+	if err := ioutil.WriteFile(certFile, storeCertData.certificatePEM, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", certFile, err)
 	}
 
@@ -319,7 +323,7 @@ func TestUpdateNoRotation(t *testing.T) {
 		t.Fatalf("Got %v while creating a new store.", err)
 	}
 
-	cert, err := s.Update([]byte(certificateData), []byte(privateKeyData))
+	cert, err := s.Update(storeCertData.certificatePEM, storeCertData.keyPEM)
 	if err != nil {
 		t.Errorf("Got %v while updating certificate store.", err)
 	}
@@ -340,11 +344,11 @@ func TestUpdateRotation(t *testing.T) {
 		}
 	}()
 	keyFile := filepath.Join(dir, "kubelet.key")
-	if err := ioutil.WriteFile(keyFile, []byte(privateKeyData), 0600); err != nil {
+	if err := ioutil.WriteFile(keyFile, storeCertData.keyPEM, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", keyFile, err)
 	}
 	certFile := filepath.Join(dir, "kubelet.crt")
-	if err := ioutil.WriteFile(certFile, []byte(certificateData), 0600); err != nil {
+	if err := ioutil.WriteFile(certFile, storeCertData.certificatePEM, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", certFile, err)
 	}
 
@@ -353,7 +357,7 @@ func TestUpdateRotation(t *testing.T) {
 		t.Fatalf("Got %v while creating a new store.", err)
 	}
 
-	cert, err := s.Update([]byte(certificateData), []byte(privateKeyData))
+	cert, err := s.Update(storeCertData.certificatePEM, storeCertData.keyPEM)
 	if err != nil {
 		t.Fatalf("Got %v while updating certificate store.", err)
 	}
@@ -374,11 +378,11 @@ func TestUpdateWithBadCertKeyData(t *testing.T) {
 		}
 	}()
 	keyFile := filepath.Join(dir, "kubelet.key")
-	if err := ioutil.WriteFile(keyFile, []byte(privateKeyData), 0600); err != nil {
+	if err := ioutil.WriteFile(keyFile, storeCertData.keyPEM, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", keyFile, err)
 	}
 	certFile := filepath.Join(dir, "kubelet.crt")
-	if err := ioutil.WriteFile(certFile, []byte(certificateData), 0600); err != nil {
+	if err := ioutil.WriteFile(certFile, storeCertData.certificatePEM, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", certFile, err)
 	}
 
@@ -387,7 +391,7 @@ func TestUpdateWithBadCertKeyData(t *testing.T) {
 		t.Fatalf("Got %v while creating a new store.", err)
 	}
 
-	cert, err := s.Update([]byte{0, 0}, []byte(privateKeyData))
+	cert, err := s.Update([]byte{0, 0}, storeCertData.keyPEM)
 	if err == nil {
 		t.Fatalf("Got no error while updating certificate store with invalid data.")
 	}
@@ -408,7 +412,9 @@ func TestCurrentPairFile(t *testing.T) {
 		}
 	}()
 	pairFile := filepath.Join(dir, prefix+"-pair.pem")
-	if err := ioutil.WriteFile(pairFile, []byte(certificateData+"\n"+privateKeyData), 0600); err != nil {
+	data := append(storeCertData.certificatePEM, []byte("\n")...)
+	data = append(data, storeCertData.keyPEM...)
+	if err := ioutil.WriteFile(pairFile, data, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", pairFile, err)
 	}
 	currentFile := filepath.Join(dir, prefix+"-current.pem")
@@ -445,11 +451,11 @@ func TestCurrentCertKeyFiles(t *testing.T) {
 		}
 	}()
 	certFile := filepath.Join(dir, "kubelet.crt")
-	if err := ioutil.WriteFile(certFile, []byte(certificateData), 0600); err != nil {
+	if err := ioutil.WriteFile(certFile, storeCertData.certificatePEM, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", certFile, err)
 	}
 	keyFile := filepath.Join(dir, "kubelet.key")
-	if err := ioutil.WriteFile(keyFile, []byte(privateKeyData), 0600); err != nil {
+	if err := ioutil.WriteFile(keyFile, storeCertData.keyPEM, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", keyFile, err)
 	}
 
