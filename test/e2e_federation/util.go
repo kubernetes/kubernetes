@@ -120,6 +120,36 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 	}
 	By(fmt.Sprintf("Creating federated service %q in namespace %q", name, namespace))
 
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: v1.ServiceSpec{
+			Selector: FederatedServiceLabels,
+			Type:     v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{
+				{
+					Name:       "http",
+					Protocol:   v1.ProtocolTCP,
+					Port:       80,
+					TargetPort: intstr.FromInt(8080),
+				},
+			},
+			SessionAffinity: v1.ServiceAffinityNone,
+		},
+	}
+
+	By(fmt.Sprintf("Trying to create service %q in namespace %q", service.Name, namespace))
+	return clientset.Services(namespace).Create(service)
+}
+
+func createLBService(clientset *fedclientset.Clientset, namespace, name string) (*v1.Service, error) {
+	if clientset == nil || len(namespace) == 0 {
+		return nil, fmt.Errorf("Internal error: invalid parameters passed to createService: clientset: %v, namespace: %v", clientset, namespace)
+	}
+	By(fmt.Sprintf("Creating federated service (type: load balancer) %q in namespace %q", name, namespace))
+
 	// Tests can be run in parallel, so we need a different nodePort for
 	// each test.
 	// We add 1 to FederatedSvcNodePortLast because IntnRange's range end
@@ -133,7 +163,7 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 		},
 		Spec: v1.ServiceSpec{
 			Selector: FederatedServiceLabels,
-			Type:     "LoadBalancer",
+			Type:     v1.ServiceTypeLoadBalancer,
 			Ports: []v1.ServicePort{
 				{
 					Name:       "http",
@@ -146,6 +176,7 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 			SessionAffinity: v1.ServiceAffinityNone,
 		},
 	}
+
 	By(fmt.Sprintf("Trying to create service %q in namespace %q", service.Name, namespace))
 	return clientset.Services(namespace).Create(service)
 }
@@ -154,6 +185,13 @@ func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name stri
 	service, err := createService(clientset, namespace, name)
 	framework.ExpectNoError(err, "Creating service %q in namespace %q", service.Name, namespace)
 	By(fmt.Sprintf("Successfully created federated service %q in namespace %q", name, namespace))
+	return service
+}
+
+func createLBServiceOrFail(clientset *fedclientset.Clientset, namespace, name string) *v1.Service {
+	service, err := createLBService(clientset, namespace, name)
+	framework.ExpectNoError(err, "Creating service %q in namespace %q", service.Name, namespace)
+	By(fmt.Sprintf("Successfully created federated service (type: load balancer) %q in namespace %q", name, namespace))
 	return service
 }
 
@@ -209,9 +247,11 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 		if err != nil {
 			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q: %v", service.Name, namespace, name, err)
 		}
-		err = cleanupServiceShardLoadBalancer(name, cSvc, fedframework.FederatedDefaultTestTimeout)
-		if err != nil {
-			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", service.Name, namespace, name)
+		if service.Spec.Type == v1.ServiceTypeLoadBalancer {
+			err = cleanupServiceShardLoadBalancer(name, cSvc, fedframework.FederatedDefaultTestTimeout)
+			if err != nil {
+				framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q, err: %v", service.Name, namespace, name, err)
+			}
 		}
 	}
 }
