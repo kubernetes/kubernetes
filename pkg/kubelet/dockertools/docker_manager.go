@@ -440,12 +440,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		status.State = kubecontainer.ContainerStateRunning
 		status.StartedAt = startedAt
 		if containerProvidesPodIP(dockerName.ContainerName) {
-			ip, err = dm.determineContainerIP(podNamespace, podName, iResult)
-			// Kubelet doesn't handle the network error scenario
-			if err != nil {
-				status.State = kubecontainer.ContainerStateUnknown
-				status.Message = fmt.Sprintf("Network error: %#v", err)
-			}
+			ip, _ = dm.determineContainerIP(podNamespace, podName, iResult)
 		}
 		return &status, ip, nil
 	}
