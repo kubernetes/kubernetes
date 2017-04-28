@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/golang/glog"
@@ -78,7 +79,7 @@ func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("www-prefix", "P", "/static/", "Prefix to serve static files under, if static file directory is specified.")
 	cmd.Flags().StringP("api-prefix", "", "/", "Prefix to serve the proxied API under.")
 	cmd.Flags().String("accept-paths", kubectl.DefaultPathAcceptRE, "Regular expression for paths that the proxy should accept.")
-	cmd.Flags().String("reject-paths", kubectl.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject.")
+	cmd.Flags().String("reject-paths", kubectl.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject. Paths specified here will be rejected even accepted by --accept-paths.")
 	cmd.Flags().String("accept-hosts", kubectl.DefaultHostAcceptRE, "Regular expression for hosts that the proxy should accept.")
 	cmd.Flags().String("reject-methods", kubectl.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject.")
 	cmd.Flags().IntP("port", "p", defaultPort, "The port on which to run the proxy. Set to 0 to pick a random port.")
@@ -106,6 +107,15 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	if !strings.HasSuffix(staticPrefix, "/") {
 		staticPrefix += "/"
 	}
+	staticDir := cmdutil.GetFlagString(cmd, "www")
+	if staticDir != "" {
+		fileInfo, err := os.Stat(staticDir)
+		if err != nil {
+			glog.Warning("Failed to stat static file directory "+staticDir+": ", err)
+		} else if !fileInfo.IsDir() {
+			glog.Warning("Static file directory " + staticDir + " is not a directory")
+		}
+	}
 
 	apiProxyPrefix := cmdutil.GetFlagString(cmd, "api-prefix")
 	if !strings.HasSuffix(apiProxyPrefix, "/") {
@@ -123,7 +133,7 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		filter = nil
 	}
 
-	server, err := kubectl.NewProxyServer(cmdutil.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, filter, clientConfig)
+	server, err := kubectl.NewProxyServer(staticDir, apiProxyPrefix, staticPrefix, filter, clientConfig)
 
 	// Separate listening from serving so we can report the bound port
 	// when it is chosen by os (eg: port == 0)
