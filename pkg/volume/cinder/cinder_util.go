@@ -25,11 +25,10 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/volume"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 )
 
 type CinderDiskUtil struct{}
@@ -181,18 +180,18 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 		}
 	}
 
-	volume_id, volume_az, errr := cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
+	volumeId, volumeAZ, errr := cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
 	if errr != nil {
 		glog.V(2).Infof("Error creating cinder volume: %v", errr)
 		return "", 0, nil, errr
 	}
-	glog.V(2).Infof("Successfully created cinder volume %s", volume_id)
+	glog.V(2).Infof("Successfully created cinder volume %s", volumeId)
 
 	// these are needed that pod is spawning to same AZ
 	labels = make(map[string]string)
-	labels[metav1.LabelZoneFailureDomain] = volume_az
+	labels[metav1.LabelZoneFailureDomain] = volumeAZ
 
-	return volume_id, volSizeGB, labels, nil
+	return volumeId, volSizeGB, labels, nil
 }
 
 func probeAttachedVolume() error {

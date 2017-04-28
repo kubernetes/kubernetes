@@ -33,7 +33,6 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/golang/glog"
-
 )
 
 type volumeService interface {

@@ -31,6 +31,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {
@@ -403,6 +404,10 @@ type disksAreAttachedCall struct {
 	ret         error
 }
 
+func (testcase *testcase) GetAllZones() (sets.String, error) {
+	return sets.NewString(), errors.New("Not implemented")
+}
+
 func (testcase *testcase) AttachDisk(instanceID string, diskName string) (string, error) {
 	expected := &testcase.attach
 
@@ -506,8 +511,8 @@ func (testcase *testcase) ShouldTrustDevicePath() bool {
 	return true
 }
 
-func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, err error) {
-	return "", errors.New("Not implemented")
+func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, zone string, err error) {
+	return "", "", errors.New("Not implemented")
 }
 
 func (testcase *testcase) GetDevicePath(diskId string) string {
