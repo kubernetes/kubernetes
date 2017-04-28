@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/oauth2/google"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/common"
@@ -48,7 +49,7 @@ var (
 	}
 
 	pollFrequency = time.Second * 5
-	pollTimeout   = time.Minute * 7
+	pollTimeout   = time.Minute * 20
 
 	rcName            = "resource-consumer"
 	replicas          = 1
@@ -79,22 +80,38 @@ var _ = framework.KubeDescribe("Stackdriver Monitoring", func() {
 
 		rc.WaitForReplicas(replicas)
 
-		pollingFunction := checkForMetrics(projectId, gcmService, time.Now())
-		framework.ExpectNoError(wait.Poll(pollFrequency, pollTimeout, pollingFunction))
+		metricsMap := map[string]bool{}
+		pollingFunction := checkForMetrics(projectId, gcmService, time.Now(), metricsMap)
+		err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
+		if err != nil {
+			for metric, found := range metricsMap {
+				if !found {
+					glog.Infof("Missing metric %v\n", metric)
+				}
+			}
+		}
+		framework.ExpectNoError(err)
 	})
 })
 
-func checkForMetrics(projectId string, gcmService *gcm.Service, start time.Time) func() (bool, error) {
+func checkForMetrics(projectId string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool) func() (bool, error) {
 	return func() (bool, error) {
 		// TODO: list which metrics are missing in case of failure
 		counter := 0
 		correctUtilization := false
+		for _, metric := range stackdriverMetrics {
+			metricsMap[metric] = false
+		}
 		for _, metric := range stackdriverMetrics {
 			// TODO: check only for metrics from this cluster
 			ts, err := fetchTimeSeries(projectId, gcmService, metric, start, time.Now())
 			framework.ExpectNoError(err)
 			if len(ts) > 0 {
 				counter = counter + 1
+				metricsMap[metric] = true
+				glog.Infof("Received %v timeseries for metric %v\n", len(ts), metric)
+			} else {
+				glog.Infof("No timeseries for metric %v\n", metric)
 			}
 
 			var sum float64 = 0
@@ -111,7 +128,10 @@ func checkForMetrics(projectId string, gcmService *gcm.Service, start time.Time)
 						}
 					}
 					sum = sum + *max.Value.DoubleValue
+					glog.Infof("Received %v points for metric %v\n",
+						len(t.Points), metric)
 				}
+				glog.Infof("Most recent cpu/utilization sum: %v\n", sum)
 				if math.Abs(sum*float64(cpuLimit)-float64(cpuUsed)) > tolerance*float64(cpuUsed) {
 					return false, nil
 				} else {
