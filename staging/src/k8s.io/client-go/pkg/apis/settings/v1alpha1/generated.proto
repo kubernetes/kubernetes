@@ -74,3 +74,11 @@ message PodPresetSpec {
   repeated k8s.io.kubernetes.pkg.api.v1.VolumeMount volumeMounts = 5;
 }
 
+message PodPresetTemplateSpec {
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // +optional
+  optional PodPresetSpec spec = 2;
+}
+

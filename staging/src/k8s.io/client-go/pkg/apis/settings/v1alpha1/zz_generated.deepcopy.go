@@ -39,6 +39,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodPreset, InType: reflect.TypeOf(&PodPreset{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodPresetList, InType: reflect.TypeOf(&PodPresetList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodPresetSpec, InType: reflect.TypeOf(&PodPresetSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodPresetTemplateSpec, InType: reflect.TypeOf(&PodPresetTemplateSpec{})},
 	)
 }
 
@@ -118,6 +119,23 @@ func DeepCopy_v1alpha1_PodPresetSpec(in interface{}, out interface{}, c *convers
 			in, out := &in.VolumeMounts, &out.VolumeMounts
 			*out = make([]api_v1.VolumeMount, len(*in))
 			copy(*out, *in)
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_PodPresetTemplateSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PodPresetTemplateSpec)
+		out := out.(*PodPresetTemplateSpec)
+		*out = *in
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
+			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		}
+		if err := DeepCopy_v1alpha1_PodPresetSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
 		}
 		return nil
 	}
