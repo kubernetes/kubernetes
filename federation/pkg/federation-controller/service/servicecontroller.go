@@ -113,7 +113,7 @@ type ServiceController struct {
 // New returns a new service controller to keep DNS provider service resources
 // (like Kubernetes Services and DNS server records for service discovery) in sync with the registry.
 func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
-	federationName, serviceDnsSuffix, zoneName string, zoneID string) *ServiceController {
+	federationName, serviceDnsSuffix, zoneName string, zoneID string) (*ServiceController, error) {
 	broadcaster := record.NewBroadcaster()
 	// federationClient event is not supported yet
 	// broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
@@ -248,7 +248,11 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		s.federatedUpdater,
 	)
 
-	return s
+	if err := s.init(); err != nil {
+		return nil, err
+	}
+
+	return s, nil
 }
 
 // Sends the given updated object to apiserver.
@@ -269,10 +273,7 @@ func (s *ServiceController) updateService(obj pkgruntime.Object) (pkgruntime.Obj
 
 // It's an error to call Run() more than once for a given ServiceController
 // object.
-func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
-	if err := s.init(); err != nil {
-		return err
-	}
+func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	s.federatedInformer.Start()
 	s.endpointFederatedInformer.Start()
@@ -297,7 +298,6 @@ func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
 		s.objectDeliverer.Stop()
 		s.clusterDeliverer.Stop()
 	}()
-	return nil
 }
 
 func (s *ServiceController) init() error {

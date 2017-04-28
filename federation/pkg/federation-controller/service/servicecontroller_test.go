@@ -102,7 +102,10 @@ func TestServiceController(t *testing.T) {
 	}
 
 	fakedns, _ := clouddns.NewFakeInterface()
-	sc := New(fedClient, fakedns, "myfederation", "federation.example.com", "example.com", "")
+	sc, err := New(fedClient, fakedns, "myfederation", "federation.example.com", "example.com", "")
+	if err != nil {
+		t.Fatalf("Failed to new service controller: %v", err)
+	}
 	ToFederatedInformerForTestOnly(sc.federatedInformer).SetClientFactory(fedInformerClientFactory)
 	ToFederatedInformerForTestOnly(sc.endpointFederatedInformer).SetClientFactory(fedInformerClientFactory)
 	sc.clusterAvailableDelay = 100 * time.Millisecond

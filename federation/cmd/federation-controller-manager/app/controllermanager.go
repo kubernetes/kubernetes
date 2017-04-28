@@ -143,11 +143,12 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		}
 		glog.Infof("Loading client config for service controller %q", servicecontroller.UserAgentName)
 		scClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.UserAgentName))
-		servicecontroller := servicecontroller.New(scClientset, dns, s.FederationName, s.ServiceDnsSuffix, s.ZoneName, s.ZoneID)
-		glog.Infof("Running service controller")
-		if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
-			glog.Fatalf("Failed to start service controller: %v", err)
+		serviceController, err := servicecontroller.New(scClientset, dns, s.FederationName, s.ServiceDnsSuffix, s.ZoneName, s.ZoneID)
+		if err != nil {
+			glog.Fatalf("Failed to new service controller: %v", err)
 		}
+		glog.Infof("Running service controller")
+		go serviceController.Run(s.ConcurrentServiceSyncs, stopChan)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, namespacecontroller.ControllerName, namespacecontroller.RequiredResources, true) {
@@ -155,7 +156,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "namespace-controller"))
 		namespaceController := namespacecontroller.NewNamespaceController(nsClientset, dynamic.NewDynamicClientPool(restclient.AddUserAgent(restClientCfg, "namespace-controller")))
 		glog.Infof("Running namespace controller")
-		namespaceController.Run(wait.NeverStop)
+		go namespaceController.Run(stopChan)
 	}
 
 	for kind, federatedType := range federatedtypes.FederatedTypes() {
@@ -167,14 +168,14 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	if controllerEnabled(s.Controllers, serverResources, replicasetcontroller.ControllerName, replicasetcontroller.RequiredResources, true) {
 		replicaSetClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, replicasetcontroller.UserAgentName))
 		replicaSetController := replicasetcontroller.NewReplicaSetController(replicaSetClientset)
-		go replicaSetController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
+		go replicaSetController.Run(s.ConcurrentReplicaSetSyncs, stopChan)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, deploymentcontroller.ControllerName, deploymentcontroller.RequiredResources, true) {
 		deploymentClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, deploymentcontroller.UserAgentName))
 		deploymentController := deploymentcontroller.NewDeploymentController(deploymentClientset)
 		// TODO: rename s.ConcurentReplicaSetSyncs
-		go deploymentController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
+		go deploymentController.Run(s.ConcurrentReplicaSetSyncs, stopChan)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, ingresscontroller.ControllerName, ingresscontroller.RequiredResources, true) {
@@ -182,7 +183,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		ingClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "ingress-controller"))
 		ingressController := ingresscontroller.NewIngressController(ingClientset)
 		glog.Infof("Running ingress controller")
-		ingressController.Run(wait.NeverStop)
+		go ingressController.Run(stopChan)
 	}
 
 	select {}
