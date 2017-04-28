@@ -254,6 +254,7 @@ pkg/util/netsh
 pkg/util/rand
 pkg/util/runtime
 pkg/util/sets
+pkg/util/sets/types
 pkg/util/tail
 pkg/util/validation
 pkg/util/validation/field
