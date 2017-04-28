@@ -505,7 +505,7 @@ func (nc *NodeController) onNodeDelete(originalObj interface{}) {
 			glog.Errorf("Received unexpected object: %v", obj)
 			return
 		}
-		node, ok = deletedState.Obj.(*v1.Node)
+		_, ok = deletedState.Obj.(*v1.Node)
 		if !ok {
 			glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
 			return
