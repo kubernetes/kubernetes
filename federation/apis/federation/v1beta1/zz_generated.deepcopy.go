@@ -21,12 +21,11 @@ limitations under the License.
 package v1beta1
 
 import (
-	reflect "reflect"
-
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	reflect "reflect"
 )
 
 func init() {
@@ -107,7 +106,7 @@ func DeepCopy_v1beta1_ClusterSpec(in interface{}, out interface{}, c *conversion
 		}
 		if in.SecretRef != nil {
 			in, out := &in.SecretRef, &out.SecretRef
-			*out = new(api_v1.LocalObjectReference)
+			*out = new(core_v1.LocalObjectReference)
 			**out = **in
 		}
 		return nil

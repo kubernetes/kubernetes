@@ -21,13 +21,12 @@ limitations under the License.
 package v2alpha1
 
 import (
-	reflect "reflect"
-
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	batch_v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	reflect "reflect"
 )
 
 func init() {
@@ -124,7 +123,7 @@ func DeepCopy_v2alpha1_CronJobStatus(in interface{}, out interface{}, c *convers
 		*out = *in
 		if in.Active != nil {
 			in, out := &in.Active, &out.Active
-			*out = make([]api_v1.ObjectReference, len(*in))
+			*out = make([]core_v1.ObjectReference, len(*in))
 			copy(*out, *in)
 		}
 		if in.LastScheduleTime != nil {
