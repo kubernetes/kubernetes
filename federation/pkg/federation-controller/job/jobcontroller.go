@@ -164,7 +164,7 @@ func NewJobController(fedClient fedclientset.Interface) *JobController {
 		),
 	)
 
-	fjc.fedUpdater = fedutil.NewFederatedUpdater(fjc.fedJobInformer,
+	fjc.fedUpdater = fedutil.NewFederatedUpdater(fjc.fedJobInformer, "job", fjc.eventRecorder,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*batchv1.Job)
 			_, err := client.Batch().Jobs(rs.Namespace).Create(rs)
@@ -189,7 +189,6 @@ func NewJobController(fedClient fedclientset.Interface) *JobController {
 			return job.Name
 		},
 		updateTimeout,
-		fjc.eventRecorder,
 		fjc.fedJobInformer,
 		fjc.fedUpdater,
 	)
@@ -529,10 +528,7 @@ func (fjc *JobController) reconcileJob(key string) (reconciliationStatus, error)
 			glog.V(4).Infof("operation[%d]: %s, %s/%s/%s, %d", i, op.Type, op.ClusterName, job.Namespace, job.Name, *job.Spec.Parallelism)
 		}
 	}
-	err = fjc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
-		fjc.eventRecorder.Eventf(fjob, api.EventTypeNormal, "FailedUpdateInCluster", "Job update in cluster %s failed: %v", op.ClusterName, operror)
-		glog.Errorf("Failed to execute updates for %s %s/%s: %v", op.Type, op.ClusterName, key, operror)
-	})
+	err = fjc.fedUpdater.Update(operations, updateTimeout)
 	if err != nil {
 		return statusError, err
 	}
