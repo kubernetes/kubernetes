@@ -325,7 +325,8 @@ func (f *Framework) AfterEach() {
 	if TestContext.GatherMetricsAfterTest {
 		By("Gathering metrics")
 		// TODO: enable Scheduler and ControllerManager metrics grabbing when Master's Kubelet will be registered.
-		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, true, false, false, true)
+		collectKubeletMetrics := ! ProviderIs("kubemark")
+		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, collectKubeletMetrics, false, false, true)
 		if err != nil {
 			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 		} else {
