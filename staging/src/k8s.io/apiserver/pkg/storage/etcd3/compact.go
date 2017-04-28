@@ -157,5 +157,10 @@ func compact(ctx context.Context, client *clientv3.Client, t, rev int64) (int64,
 		return curTime, curRev, err
 	}
 	glog.Infof("etcd: compacted rev (%d), endpoints (%v)", rev, client.Endpoints())
+	for _, endpoint := range client.Endpoints() {
+		if _, err = client.Maintenance.Defragment(ctx, endpoint); err != nil {
+			glog.Errorf("etcd: defragmentation failed for %s: %v", endpoint, err)
+		}
+	}
 	return curTime, curRev, nil
 }
