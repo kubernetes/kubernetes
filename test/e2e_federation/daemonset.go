@@ -245,7 +245,8 @@ func waitForDaemonSetOrFail(clientset *kubeclientset.Clientset, namespace string
 	By(fmt.Sprintf("Fetching a federated daemonset shard of daemonset %q in namespace %q from cluster", daemonset.Name, namespace))
 	var clusterDaemonSet *v1beta1.DaemonSet
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterDaemonSet, err := clientset.Extensions().DaemonSets(namespace).Get(daemonset.Name, metav1.GetOptions{})
+		var err error
+		clusterDaemonSet, err = clientset.Extensions().DaemonSets(namespace).Get(daemonset.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
 			By(fmt.Sprintf("Success: shard of federated daemonset %q in namespace %q in cluster is absent", daemonset.Name, namespace))
 			return true, nil // Success
