@@ -97,7 +97,7 @@ func initNFSserverPod(c clientset.Interface, ns string) *v1.Pod {
 	})
 }
 
-var _ = framework.KubeDescribe("PersistentVolumes [Volume]", func() {
+var _ = framework.KubeDescribe("PersistentVolumes [Feature:Volumes]", func() {
 
 	// global vars for the Context()s and It()'s below
 	f := framework.NewDefaultFramework("pv")
