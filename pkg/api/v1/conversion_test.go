@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestPodLogOptions(t *testing.T) {
@@ -210,7 +211,7 @@ func TestResourceListConversion(t *testing.T) {
 
 		// defaulting is a separate step from conversion that is applied when reading from the API or from etcd.
 		// perform that step explicitly.
-		v1.SetDefaults_ResourceList(&test.input)
+		k8s_api_v1.SetDefaults_ResourceList(&test.input)
 
 		err := api.Scheme.Convert(&test.input, &output, nil)
 		if err != nil {
