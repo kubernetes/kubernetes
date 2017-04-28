@@ -16,8 +16,12 @@ limitations under the License.
 
 package v1
 
+import (
+	"k8s.io/api/core/v1"
+)
+
 var (
-	localSchemeBuilder = &SchemeBuilder
+	localSchemeBuilder = &v1.SchemeBuilder
 	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
@@ -25,5 +29,5 @@ func init() {
 	// We only register manually written functions here. The registration of the
 	// generated functions takes place in the generated files. The separation
 	// makes the code compile even when the generated files are missing.
-	localSchemeBuilder.Register(AddKnownTypes, addDefaultingFuncs, addConversionFuncs, addFastPathConversionFuncs)
+	localSchemeBuilder.Register(v1.AddKnownTypes, addDefaultingFuncs, addConversionFuncs, addFastPathConversionFuncs)
 }
