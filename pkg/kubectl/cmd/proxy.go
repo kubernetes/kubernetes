@@ -32,8 +32,8 @@ import (
 )
 
 var (
-	default_port = 8001
-	proxy_long   = templates.LongDesc(i18n.T(`
+	defaultPort = 8001
+	proxyLong   = templates.LongDesc(i18n.T(`
 		To proxy all of the kubernetes api and nothing else, use:
 
 		    $ kubectl proxy --api-prefix=/
@@ -50,7 +50,7 @@ var (
 
 		The above lets you 'curl localhost:8001/custom/api/v1/pods'`))
 
-	proxy_example = templates.Examples(i18n.T(`
+	proxyExample = templates.Examples(i18n.T(`
 		# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
 		kubectl proxy --port=8011 --www=./local/www/
 
@@ -67,8 +67,8 @@ func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
 		Short:   i18n.T("Run a proxy to the Kubernetes API server"),
-		Long:    proxy_long,
-		Example: proxy_example,
+		Long:    proxyLong,
+		Example: proxyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunProxy(f, out, cmd)
 			cmdutil.CheckErr(err)
@@ -81,7 +81,7 @@ func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("reject-paths", kubectl.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject.")
 	cmd.Flags().String("accept-hosts", kubectl.DefaultHostAcceptRE, "Regular expression for hosts that the proxy should accept.")
 	cmd.Flags().String("reject-methods", kubectl.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject.")
-	cmd.Flags().IntP("port", "p", default_port, "The port on which to run the proxy. Set to 0 to pick a random port.")
+	cmd.Flags().IntP("port", "p", defaultPort, "The port on which to run the proxy. Set to 0 to pick a random port.")
 	cmd.Flags().StringP("address", "", "127.0.0.1", "The IP address on which to serve on.")
 	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
 	cmd.Flags().StringP("unix-socket", "u", "", "Unix socket on which to run the proxy.")
@@ -93,7 +93,7 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	port := cmdutil.GetFlagInt(cmd, "port")
 	address := cmdutil.GetFlagString(cmd, "address")
 
-	if port != default_port && path != "" {
+	if port != defaultPort && path != "" {
 		return errors.New("Don't specify both --unix-socket and --port")
 	}
 
