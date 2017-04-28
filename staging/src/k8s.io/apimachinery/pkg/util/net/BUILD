@@ -19,10 +19,7 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-    ],
+    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 
 go_library(
