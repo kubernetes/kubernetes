@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -84,6 +85,13 @@ type GCEDisk struct {
 	Type string
 }
 
+func newDiskMetricContext(request, zone string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"disk_" + request, unusedMetricLabel, zone},
+	}
+}
+
 func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOnly bool) error {
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	instance, err := gce.getInstanceByName(instanceName)
@@ -99,13 +107,16 @@ func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOn
 		readWrite = "READ_ONLY"
 	}
 	attachedDisk := gce.convertDiskToAttachedDisk(disk, readWrite)
-	dc := contextWithNamespace(diskName, "gce_attach_disk")
-	attachOp, err := gce.service.Instances.AttachDisk(gce.projectID, disk.Zone, instance.Name, attachedDisk).Context(dc).Do()
+
+	mc := newDiskMetricContext("attach", instance.Zone)
+	attachOp, err := gce.service.Instances.AttachDisk(
+		gce.projectID, disk.Zone, instance.Name, attachedDisk).Do()
+
 	if err != nil {
-		return err
+		return mc.Observe(err)
 	}
 
-	return gce.waitForZoneOp(attachOp, disk.Zone)
+	return gce.waitForZoneOp(attachOp, disk.Zone, mc)
 }
 
 func (gce *GCECloud) DetachDisk(devicePath string, nodeName types.NodeName) error {
@@ -123,13 +134,14 @@ func (gce *GCECloud) DetachDisk(devicePath string, nodeName types.NodeName) erro
 
 		return fmt.Errorf("error getting instance %q", instanceName)
 	}
-	dc := contextWithNamespace(devicePath, "gce_detach_disk")
-	detachOp, err := gce.service.Instances.DetachDisk(gce.projectID, inst.Zone, inst.Name, devicePath).Context(dc).Do()
+
+	mc := newDiskMetricContext("detach", inst.Zone)
+	detachOp, err := gce.service.Instances.DetachDisk(gce.projectID, inst.Zone, inst.Name, devicePath).Do()
 	if err != nil {
-		return err
+		return mc.Observe(err)
 	}
 
-	return gce.waitForZoneOp(detachOp, inst.Zone)
+	return gce.waitForZoneOp(detachOp, inst.Zone, mc)
 }
 
 func (gce *GCECloud) DiskIsAttached(diskName string, nodeName types.NodeName) (bool, error) {
@@ -193,7 +205,9 @@ func (gce *GCECloud) DisksAreAttached(diskNames []string, nodeName types.NodeNam
 // CreateDisk creates a new Persistent Disk, with the specified name &
 // size, in the specified zone. It stores specified tags encoded in
 // JSON in Description field.
-func (gce *GCECloud) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
+func (gce *GCECloud) CreateDisk(
+	name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
+
 	// Do not allow creation of PDs in zones that are not managed. Such PDs
 	// then cannot be deleted by DeleteDisk.
 	isManaged := false
@@ -228,13 +242,14 @@ func (gce *GCECloud) CreateDisk(name string, diskType string, zone string, sizeG
 		Description: tagsStr,
 		Type:        diskTypeUri,
 	}
-	dc := contextWithNamespace(name, "gce_disk_insert")
-	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Context(dc).Do()
+
+	mc := newDiskMetricContext("create", zone)
+	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Do()
 	if err != nil {
-		return err
+		return mc.Observe(err)
 	}
 
-	err = gce.waitForZoneOp(createOp, zone)
+	err = gce.waitForZoneOp(createOp, zone, mc)
 	if isGCEError(err, "alreadyExists") {
 		glog.Warningf("GCE PD %q already exists, reusing", name)
 		return nil
@@ -304,8 +319,7 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 // Returns a GCEDisk for the disk, if it is found in the specified zone.
 // If not found, returns (nil, nil)
 func (gce *GCECloud) findDiskByName(diskName string, zone string) (*GCEDisk, error) {
-	dc := contextWithNamespace(diskName, "gce_list_disk")
-	disk, err := gce.service.Disks.Get(gce.projectID, zone, diskName).Context(dc).Do()
+	disk, err := gce.service.Disks.Get(gce.projectID, zone, diskName).Do()
 	if err == nil {
 		d := &GCEDisk{
 			Zone: lastComponent(disk.Zone),
@@ -390,13 +404,14 @@ func (gce *GCECloud) doDeleteDisk(diskToDelete string) error {
 		return err
 	}
 
-	dc := contextWithNamespace(diskToDelete, "gce_disk_delete")
-	deleteOp, err := gce.service.Disks.Delete(gce.projectID, disk.Zone, disk.Name).Context(dc).Do()
+	mc := newDiskMetricContext("delete", disk.Zone)
+
+	deleteOp, err := gce.service.Disks.Delete(gce.projectID, disk.Zone, disk.Name).Do()
 	if err != nil {
-		return err
+		return mc.Observe(err)
 	}
 
-	return gce.waitForZoneOp(deleteOp, disk.Zone)
+	return gce.waitForZoneOp(deleteOp, disk.Zone, mc)
 }
 
 // Converts a Disk resource to an AttachedDisk resource.

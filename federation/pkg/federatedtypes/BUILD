@@ -11,6 +11,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "adapter.go",
+        "configmap.go",
+        "daemonset.go",
         "registry.go",
         "secret.go",
     ],
@@ -19,6 +21,7 @@ go_library(
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

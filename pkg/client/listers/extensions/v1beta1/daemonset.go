@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
@@ -89,7 +88,7 @@ func (s daemonSetNamespaceLister) Get(name string) (*v1beta1.DaemonSet, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(extensions.Resource("daemonset"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("daemonset"), name)
 	}
 	return obj.(*v1beta1.DaemonSet), nil
 }

@@ -44,7 +44,7 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Feature:Stackdr
 		loggingDuration := 10 * time.Minute
 		linesPerSecond := 1000 * nodeCount
 		linesPerPod := linesPerSecond * int(loggingDuration.Seconds()) / podCount
-		ingestionTimeout := 30 * time.Minute
+		ingestionTimeout := 60 * time.Minute
 
 		By("Running logs generator pods")
 		pods := []*loggingPod{}
@@ -84,7 +84,7 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Feature:Stackdr
 		jobDuration := 1 * time.Minute
 		linesPerPodPerSecond := 100
 		testDuration := 10 * time.Minute
-		ingestionTimeout := 30 * time.Minute
+		ingestionTimeout := 60 * time.Minute
 
 		podRunDelay := time.Duration(int64(jobDuration) / int64(maxPodCount))
 		podRunCount := int(testDuration.Seconds())/int(podRunDelay.Seconds()) - 1

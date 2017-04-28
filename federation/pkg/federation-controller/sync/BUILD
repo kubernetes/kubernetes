@@ -51,7 +51,11 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["secret_controller_test.go"],
+    srcs = [
+        "configmap_controller_test.go",
+        "daemonset_controller_test.go",
+        "secret_controller_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
@@ -62,6 +66,7 @@ go_test(
         "//federation/pkg/federation-controller/util/deletionhelper:go_default_library",
         "//federation/pkg/federation-controller/util/test:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

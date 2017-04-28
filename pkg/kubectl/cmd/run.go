@@ -563,7 +563,14 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 	}
 
 	if cmdutil.GetFlagString(cmd, "output") != "" || cmdutil.GetDryRunFlag(cmd) {
-		return f.PrintObject(cmd, mapper, obj, out)
+		err := f.PrintObject(cmd, mapper, obj, out)
+		if err != nil {
+			return err
+		}
+		if cmdutil.GetFlagString(cmd, "output") == "yaml" {
+			fmt.Fprintln(out, "---")
+		}
+		return nil
 	}
 	cmdutil.PrintSuccess(mapper, false, out, mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
 

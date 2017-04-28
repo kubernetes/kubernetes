@@ -1,18 +1,18 @@
 git_repository(
     name = "io_bazel_rules_go",
-    commit = "d57a2abc3b16a3904c159794f0f0a52cf6f061a7",
+    commit = "805fd1566500997379806373feb05e138a4dfe28",
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
 git_repository(
     name = "io_kubernetes_build",
-    commit = "685f15b90b454af3086ab071fdea1b6db213d1fb",
+    commit = "684e550a2f006dbe3cf3b3d481d3f19217b228f7",
     remote = "https://github.com/kubernetes/repo-infra.git",
 )
 
 git_repository(
     name = "io_bazel",
-    commit = "3b29803eb528ff525c7024190ffbf4b08c598cf2",
+    commit = "1fe52dd4b2d77a740648bc1509b68acae49deffc",
     remote = "https://github.com/ixdy/bazel.git",
 )
 
@@ -31,8 +31,8 @@ debs = (
     ),
     (
         "libc_deb",
-        "6bbd506b171a9f29b09fde77e2749c0aa0c1439058df9d1a6408d464069b7dd6",
-        "http://ftp.us.debian.org/debian/pool/main/g/glibc/libc6_2.24-9_amd64.deb",
+        "372aac4a9ce9dbb26a08de0b9c41b0500ba019430295d29f39566483f5f32732",
+        "http://ftp.us.debian.org/debian/pool/main/g/glibc/libc6_2.24-10_amd64.deb",
     ),
     (
         "iptables_deb",

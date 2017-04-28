@@ -15,7 +15,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/imagepolicy:go_default_library",
         "//pkg/apis/imagepolicy/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
