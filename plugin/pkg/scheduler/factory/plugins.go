@@ -87,6 +87,9 @@ var (
 
 const (
 	DefaultProvider = "DefaultProvider"
+	MaxUint         = ^uint(0)
+	MaxInt          = int(MaxUint >> 1)
+	MaxPriority     = 10
 )
 
 type AlgorithmProviderConfig struct {
@@ -356,7 +359,21 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]al
 			})
 		}
 	}
+	var totalPriority int
+	for _, config := range configs {
+		// Checks for overflow and returns errors.
+		// TODO: Need to check overflow for weight*MaxPriority.
+		if checkIntegerOverFlow(totalPriority, config.Weight*MaxPriority) {
+			return nil, fmt.Errorf("Total priority of priority functions has overflown")
+		}
+		totalPriority += config.Weight * MaxPriority
+	}
 	return configs, nil
+}
+
+// checkIntegerOverFlow checks if totalPriority can overflow after adding it with weight.
+func checkIntegerOverFlow(totalPriority int, weight int) bool {
+	return totalPriority == MaxInt || weight == MaxInt || totalPriority > MaxInt-weight
 }
 
 var validName = regexp.MustCompile("^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])$")

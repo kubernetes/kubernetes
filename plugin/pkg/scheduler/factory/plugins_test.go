@@ -39,3 +39,26 @@ func TestAlgorithmNameValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestPriorityOverFlow(t *testing.T) {
+	if !checkIntegerOverFlow(5000, MaxInt) {
+		t.Errorf("Expected Overflow")
+	}
+	if !checkIntegerOverFlow(MaxInt, 5000) {
+		t.Errorf("Expected Overflow")
+	}
+	if !checkIntegerOverFlow(MaxInt, MaxInt) {
+		t.Errorf("Expected Overflow")
+	}
+	if !checkIntegerOverFlow(MaxInt-3, 6) {
+		t.Errorf("Expected Overflow")
+	}
+	// Overflow shouldn't happen.
+	if checkIntegerOverFlow(6, MaxInt-7) {
+		t.Errorf("Did not expect Overflow")
+	}
+	// Overflow shouldn't happen.
+	if checkIntegerOverFlow(5, 6) {
+		t.Errorf("Did not expect Overflow")
+	}
+}
