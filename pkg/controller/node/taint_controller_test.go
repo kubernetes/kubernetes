@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/controller/node/testutil"
 
-	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clienttesting "k8s.io/client-go/testing"
 )
@@ -481,6 +480,8 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 	}
 
 	for _, item := range testCases {
+		t.Logf("Starting testcase %q", item.description)
+
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
 		sort.Sort(item.expectedDeleteTimes)
@@ -489,19 +490,24 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 		go controller.Run(stopCh)
 		controller.NodeUpdated(item.oldNode, item.newNode)
 
-		sleptAlready := time.Duration(0)
+		startedAt := time.Now()
 		for i := range item.expectedDeleteTimes {
-			var increment time.Duration
 			if i == 0 || item.expectedDeleteTimes[i-1].timestamp != item.expectedDeleteTimes[i].timestamp {
+				// compute a grace duration to give controller time to process updates. Choose big
+				// enough intervals in the test cases above to avoid flakes.
+				var increment time.Duration
 				if i == len(item.expectedDeleteTimes)-1 || item.expectedDeleteTimes[i+1].timestamp == item.expectedDeleteTimes[i].timestamp {
-					increment = 200 * time.Millisecond
+					increment = 500 * time.Millisecond
 				} else {
 					increment = ((item.expectedDeleteTimes[i+1].timestamp - item.expectedDeleteTimes[i].timestamp) / time.Duration(2))
 				}
-				sleepTime := item.expectedDeleteTimes[i].timestamp - sleptAlready + increment
-				glog.Infof("Sleeping for %v", sleepTime)
+
+				sleepTime := item.expectedDeleteTimes[i].timestamp - time.Since(startedAt) + increment
+				if sleepTime < 0 {
+					sleepTime = 0
+				}
+				t.Logf("Sleeping for %v", sleepTime)
 				time.Sleep(sleepTime)
-				sleptAlready = item.expectedDeleteTimes[i].timestamp + increment
 			}
 
 			for delay, podName := range item.expectedDeleteTimes[i].names {
@@ -509,7 +515,7 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 				for _, action := range fakeClientset.Actions() {
 					deleteAction, ok := action.(clienttesting.DeleteActionImpl)
 					if !ok {
-						glog.Infof("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
+						t.Logf("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
 						continue
 					}
 					if deleteAction.GetResource().Resource != "pods" {
@@ -526,7 +532,7 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 			for _, action := range fakeClientset.Actions() {
 				deleteAction, ok := action.(clienttesting.DeleteActionImpl)
 				if !ok {
-					glog.Infof("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
+					t.Logf("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
 					continue
 				}
 				if deleteAction.GetResource().Resource != "pods" {
