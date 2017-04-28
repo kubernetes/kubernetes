@@ -29,8 +29,8 @@ func ValidatePolicy(policy schedulerapi.Policy) error {
 	var validationErrors []error
 
 	for _, priority := range policy.Priorities {
-		if priority.Weight <= 0 {
-			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it", priority.Name))
+		if priority.Weight <= 0 || priority.Weight >= schedulerapi.MaxWeight {
+			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it or it has overflown", priority.Name))
 		}
 	}
 
