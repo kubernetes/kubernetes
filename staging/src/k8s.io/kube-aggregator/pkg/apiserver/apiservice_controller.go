@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/golang/glog"
@@ -96,7 +97,12 @@ func (c *APIServiceRegistrationController) sync(key string) error {
 		return err
 	}
 
-	c.apiHandlerManager.AddAPIService(apiService, c.getDestinationHost(apiService))
+	host := c.getDestinationHost(apiService)
+	if len(host) > 0 {
+		c.apiHandlerManager.AddAPIService(apiService, host)
+	} else {
+		c.apiHandlerManager.RemoveAPIService(key)
+	}
 	return nil
 }
 
@@ -110,16 +116,27 @@ func (c *APIServiceRegistrationController) getDestinationHost(apiService *apireg
 	if err != nil {
 		return destinationHost
 	}
-	switch {
+	switch service.Spec.Type {
 	// use IP from a clusterIP for these service types
-	case service.Spec.Type == v1.ServiceTypeClusterIP,
-		service.Spec.Type == v1.ServiceTypeNodePort,
-		service.Spec.Type == v1.ServiceTypeLoadBalancer:
-		return service.Spec.ClusterIP
+	case v1.ServiceTypeClusterIP, v1.ServiceTypeNodePort, v1.ServiceTypeLoadBalancer:
+		if service.Spec.ClusterIP == v1.ClusterIPNone {
+			return ""
+		}
+		destinationHost = service.Spec.ClusterIP
+	case v1.ServiceTypeExternalName:
+		destinationHost = service.Spec.ExternalName
+		if len(destinationHost) == 0 {
+			return ""
+		}
+	}
+
+	port := int32(443)
+	if len(service.Spec.Ports) > 0 {
+		port = service.Spec.Ports[0].Port
 	}
 
 	// return the normal DNS name by default
-	return destinationHost
+	return net.JoinHostPort(destinationHost, fmt.Sprintf("%d", port))
 }
 
 func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}) {

@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
@@ -36,7 +37,7 @@ func TestGetDestinationHost(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "cluster ip",
+			name: "cluster ip without ports",
 			services: []*v1.Service{
 				{
 					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
@@ -56,7 +57,34 @@ func TestGetDestinationHost(t *testing.T) {
 				},
 			},
 
-			expected: "hit",
+			expected: "hit:443",
+		},
+		{
+			name: "cluster ip",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
+					Spec: v1.ServiceSpec{
+						Type:      v1.ServiceTypeClusterIP,
+						ClusterIP: "hit",
+						Ports: []v1.ServicePort{
+							{Port: 8443, TargetPort: intstr.FromInt(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+						},
+					},
+				},
+			},
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1."},
+				Spec: apiregistration.APIServiceSpec{
+					Service: &apiregistration.ServiceReference{
+						Namespace: "one",
+						Name:      "alfa",
+					},
+				},
+			},
+
+			expected: "hit:8443",
 		},
 		{
 			name: "loadbalancer",
@@ -66,6 +94,10 @@ func TestGetDestinationHost(t *testing.T) {
 					Spec: v1.ServiceSpec{
 						Type:      v1.ServiceTypeLoadBalancer,
 						ClusterIP: "lb",
+						Ports: []v1.ServicePort{
+							{Port: 8443, TargetPort: intstr.FromInt(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+						},
 					},
 				},
 			},
@@ -79,7 +111,7 @@ func TestGetDestinationHost(t *testing.T) {
 				},
 			},
 
-			expected: "lb",
+			expected: "lb:8443",
 		},
 		{
 			name: "node port",
@@ -89,6 +121,10 @@ func TestGetDestinationHost(t *testing.T) {
 					Spec: v1.ServiceSpec{
 						Type:      v1.ServiceTypeNodePort,
 						ClusterIP: "np",
+						Ports: []v1.ServicePort{
+							{Port: 8443, TargetPort: intstr.FromInt(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+						},
 					},
 				},
 			},
@@ -102,7 +138,34 @@ func TestGetDestinationHost(t *testing.T) {
 				},
 			},
 
-			expected: "np",
+			expected: "np:8443",
+		},
+		{
+			name: "external name",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
+					Spec: v1.ServiceSpec{
+						Type:         v1.ServiceTypeExternalName,
+						ExternalName: "foo.bar.com",
+						Ports: []v1.ServicePort{
+							{Port: 8443, TargetPort: intstr.FromInt(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+						},
+					},
+				},
+			},
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1."},
+				Spec: apiregistration.APIServiceSpec{
+					Service: &apiregistration.ServiceReference{
+						Namespace: "one",
+						Name:      "alfa",
+					},
+				},
+			},
+
+			expected: "foo.bar.com:8443",
 		},
 		{
 			name: "missing service",
@@ -116,7 +179,7 @@ func TestGetDestinationHost(t *testing.T) {
 				},
 			},
 
-			expected: "alfa.one.svc",
+			expected: "alfa.one.svc", // defaulting to 443 due to https:// prefix
 		},
 	}
 
