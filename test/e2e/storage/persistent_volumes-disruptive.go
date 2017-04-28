@@ -18,6 +18,7 @@ package storage
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -70,6 +71,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 		// Start the NFS server pod.
 		framework.Logf("[BeforeEach] Creating NFS Server Pod")
 		nfsServerPod = initNFSserverPod(c, ns)
+		framework.Logf("NFS server Pod %q created on Node %q", nfsServerPod.Name, nfsServerPod.Spec.NodeName)
 		framework.Logf("[BeforeEach] Configuring PersistentVolume")
 		nfsServerIP = nfsServerPod.Status.PodIP
 		Expect(nfsServerIP).NotTo(BeEmpty())
@@ -160,7 +162,7 @@ func testKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 	kubeletCommand(kRestart, c, clientPod)
 
 	By("Testing that written file is accessible.")
-	out, err = podExec(clientPod, "cat "+file)
+	out, err = podExec(clientPod, fmt.Sprintf("cat %s", file))
 	Expect(err).NotTo(HaveOccurred())
 	framework.Logf(out)
 	framework.Logf("Volume mount detected on pod %s and written file %s is readable post-restart.", clientPod.Name, file)
@@ -188,12 +190,12 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 	By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
 	err = c.Core().Pods(clientPod.Namespace).Delete(clientPod.Name, &metav1.DeleteOptions{})
 	Expect(err).NotTo(HaveOccurred())
+	By("Starting the kubelet and waiting for pod to delete.")
+	kubeletCommand(kStart, c, clientPod)
 	err = f.WaitForPodTerminated(clientPod.Name, "")
 	if !apierrs.IsNotFound(err) && err != nil {
 		Expect(err).NotTo(HaveOccurred(), "Expected pod to terminate.")
 	}
-	By("Starting the kubelet")
-	kubeletCommand(kStart, c, clientPod)
 
 	By("Expecting the volume mount not to be found.")
 	result, err = framework.SSH(fmt.Sprintf("mount | grep %s", clientPod.UID), nodeIP, framework.TestContext.Provider)
@@ -248,12 +250,13 @@ func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, 
 // kubeletCommand performs `start`, `restart`, or `stop` on the kubelet running on the node of the target pod and waits
 // for the desired statues..
 // - First issues the command via `systemctl`
-// - If `systemctl` returns code 127 (command not found), issues the command via `service`
-// - If `service` also returns 127, the test is aborted.
+// - If `systemctl` returns stderr "command not found, issues the command via `service`
+// - If `service` also returns stderr "command not found", the test is aborted.
 // Allowed kubeletOps are `kStart`, `kStop`, and `kRestart`
+// TODO return error instead of handling internally
 func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
-	systemctlCmd := fmt.Sprintf("su -c \"systemctl %s kubelet\"", string(kOp))
-	serviceCmd := fmt.Sprintf("su -c \"service kubelet %s\"", string(kOp))
+	systemctlCmd := fmt.Sprintf("sudo systemctl %s kubelet", string(kOp))
+	serviceCmd := fmt.Sprintf("sudo service kubelet %s", string(kOp))
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
@@ -262,19 +265,21 @@ func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	sshResult, err := framework.SSH(systemctlCmd, nodeIP, framework.TestContext.Provider)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	framework.LogSSHResult(sshResult)
-	if sshResult.Code == 127 /*"command not found"*/ {
+	if strings.Contains(sshResult.Stderr, "command not found") /*"command not found"*/ {
 		framework.Logf("Command `%s` returned code <%d>: %q.", systemctlCmd, sshResult.Code, sshResult.Stderr)
 		framework.Logf("Attempting %s", serviceCmd)
 		sshResult, err = framework.SSH(serviceCmd, nodeIP, framework.TestContext.Provider)
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 		framework.LogSSHResult(sshResult)
-		if sshResult.Code == 127 /*"command not found"*/ {
+		if strings.Contains(sshResult.Stderr, "command not found") /*"command not found"*/ {
 			framework.Logf("Command `%s` returned code <%d>: %q.", serviceCmd, sshResult.Code, sshResult.Stderr)
 			Expect(sshResult.Code).To(BeZero(), fmt.Sprintf("Unable to [%s] kubelet.", string(kOp)))
 		} else if sshResult.Code != 0 {
+			// Error other than "command not found"
 			Expect(err).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
 		}
 	} else if sshResult.Code != 0 {
+		// Error other than "command not found"
 		Expect(err).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
 	}
 	// On restart, waiting for node NotReady prevents a race condition where the node takes a few moments to leave the
