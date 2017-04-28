@@ -594,7 +594,12 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 	}
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	sw.Do("func init() {\n", nil)
-	sw.Do("SchemeBuilder.Register(RegisterConversions)\n", nil)
+	// TODO: this is a hack, after all apis are moved, we should always use localSchemeBuilder
+	if g.typesPackage == g.outputPackage {
+		sw.Do("SchemeBuilder.Register(RegisterConversions)\n", nil)
+	} else {
+		sw.Do("localSchemeBuilder.Register(RegisterConversions)\n", nil)
+	}
 	sw.Do("}\n", nil)
 
 	scheme := c.Universe.Type(types.Name{Package: runtimePackagePath, Name: "Scheme"})
