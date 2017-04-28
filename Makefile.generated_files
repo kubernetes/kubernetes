@@ -224,7 +224,7 @@ RUN_GEN_DEEPCOPY =                                                          \
                 --v $(KUBE_VERBOSE)                                         \
                 --logtostderr                                               \
                 -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
-                --bounding-dirs $(PRJ_SRC_PATH)                             \
+                --bounding-dirs $(PRJ_SRC_PATH),"k8s.io/api"                \
                 -O $(DEEPCOPY_BASENAME)                                     \
                 "$$@";                                                      \
         fi                                                                  \
