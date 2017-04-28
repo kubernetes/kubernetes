@@ -61,6 +61,9 @@ func versionToPath(gvPath string, group string, version string) (path string) {
 	// special case for the core group
 	if group == "api" {
 		path = filepath.Join(*basePath, "../api", version)
+	} else if group == "core" {
+		// TODO: remove this hack after the api types are all moved to k8s.io/api
+		path = filepath.Join("k8s.io/api", group, version)
 	} else {
 		path = filepath.Join(*basePath, gvPath, group, version)
 	}

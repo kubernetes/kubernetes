@@ -44,6 +44,7 @@ for gv in "${GROUP_VERSIONS[@]}"; do
 	# add items, but strip off any leading apis/ you find to match command expectations
 	api_dir=$(kube::util::group-version-to-pkg-path "${gv}")
 	nopkg_dir=${api_dir#pkg/}
+	nopkg_dir=${nopkg_dir#vendor/k8s.io/api/}
 	pkg_dir=${nopkg_dir#apis/}
 
 	# skip groups that aren't being served, clients for these don't matter
@@ -63,7 +64,7 @@ ${clientgen} -t "$@"
 ${clientgen} --clientset-name="clientset" --input="${GV_DIRS_CSV}" "$@"
 # Clientgen for federation clientset.
 ${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/","batch/","autoscaling/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,extensions/Deployment,extensions/DaemonSet,api/ConfigMap,api/Event,batch/Job,autoscaling/HorizontalPodAutoscaler"   "$@"
-${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="api/v1/Service,api/v1/Namespace,extensions/v1beta1/ReplicaSet,api/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,api/v1/ConfigMap,api/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
+${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","core/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="core/v1/Service,core/v1/Namespace,extensions/v1beta1/ReplicaSet,core/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,core/v1/ConfigMap,core/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
 
 LISTERGEN_APIS=(
 pkg/api
