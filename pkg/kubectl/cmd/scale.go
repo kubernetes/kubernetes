@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	scale_long = templates.LongDesc(i18n.T(`
+	scaleLong = templates.LongDesc(i18n.T(`
 		Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job.
 
 		Scale also allows users to specify one or more preconditions for the scale action.
@@ -40,7 +40,7 @@ var (
 		scale is attempted, and it is guaranteed that the precondition holds true when the
 		scale is sent to the server.`))
 
-	scale_example = templates.Examples(i18n.T(`
+	scaleExample = templates.Examples(i18n.T(`
 		# Scale a replicaset named 'foo' to 3.
 		kubectl scale --replicas=3 rs/foo
 
@@ -69,8 +69,8 @@ func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		// resize is deprecated
 		Aliases: []string{"resize"},
 		Short:   i18n.T("Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"),
-		Long:    scale_long,
-		Example: scale_example,
+		Long:    scaleLong,
+		Example: scaleExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"

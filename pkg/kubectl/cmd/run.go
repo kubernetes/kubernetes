@@ -48,12 +48,12 @@ import (
 )
 
 var (
-	run_long = templates.LongDesc(i18n.T(`
+	runLong = templates.LongDesc(i18n.T(`
 		Create and run a particular image, possibly replicated.
 
 		Creates a deployment or job to manage the created container(s).`))
 
-	run_example = templates.Examples(i18n.T(`
+	runExample = templates.Examples(i18n.T(`
 		# Start a single instance of nginx.
 		kubectl run nginx --image=nginx
 
@@ -94,8 +94,8 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 		// run-container is deprecated
 		Aliases: []string{"run-container"},
 		Short:   i18n.T("Run a particular image on the cluster"),
-		Long:    run_long,
-		Example: run_example,
+		Long:    runLong,
+		Example: runExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
 			err := Run(f, cmdIn, cmdOut, cmdErr, cmd, args, argsLenAtDash)
