@@ -26,31 +26,37 @@ debs = (
         "busybox_deb",
         "5f81f140777454e71b9e5bfdce9c89993de5ddf4a7295ea1cfda364f8f630947",
         "http://ftp.us.debian.org/debian/pool/main/b/busybox/busybox-static_1.22.0-19+b3_amd64.deb",
+        "https://storage.googleapis.com/kubernetes-release/debs/busybox-static_1.22.0-19+b3_amd64.deb",
     ),
     (
         "libc_deb",
         "372aac4a9ce9dbb26a08de0b9c41b0500ba019430295d29f39566483f5f32732",
         "http://ftp.us.debian.org/debian/pool/main/g/glibc/libc6_2.24-10_amd64.deb",
+        "https://storage.googleapis.com/kubernetes-release/debs/libc6_2.24-10_amd64.deb",
     ),
     (
         "iptables_deb",
         "7747388a97ba71fede302d70361c81d486770a2024185514c18b5d8eab6aaf4e",
         "http://ftp.us.debian.org/debian/pool/main/i/iptables/iptables_1.4.21-2+b1_amd64.deb",
+        "https://storage.googleapis.com/kubernetes-release/debs/iptables_1.4.21-2+b1_amd64.deb",
     ),
     (
         "libnetlink_deb",
         "5d486022cd9e047e9afbb1617cf4519c0decfc3d2c1fad7e7fe5604943dbbf37",
         "http://ftp.us.debian.org/debian/pool/main/libn/libnfnetlink/libnfnetlink0_1.0.1-3_amd64.deb",
+        "https://storage.googleapis.com/kubernetes-release/debs/libnfnetlink0_1.0.1-3_amd64.deb",
     ),
     (
         "libxtables_deb",
         "6783f316af4cbf3ada8b9a2b7bb5f53a87c0c2575c1903ce371fdbd45d3626c6",
         "http://ftp.us.debian.org/debian/pool/main/i/iptables/libxtables10_1.4.21-2+b1_amd64.deb",
+        "https://storage.googleapis.com/kubernetes-release/debs/libxtables10_1.4.21-2+b1_amd64.deb",
     ),
     (
         "iproute2_deb",
         "3ce9cb1d03a2a1359cbdd4f863b15d0c906096bf713e8eb688149da2f4e350bc",
         "http://ftp.us.debian.org/debian/pool/main/i/iproute2/iproute_3.16.0-2_all.deb",
+        "https://storage.googleapis.com/kubernetes-release/debs/iproute_3.16.0-2_all.deb",
     ),
 )
 
@@ -58,7 +64,7 @@ debs = (
     name = name,
     sha256 = sha256,
     url = url,
-) for name, sha256, url in debs]
+) for name, sha256, origin, url in debs]
 
 http_file(
     name = "kubernetes_cni",
