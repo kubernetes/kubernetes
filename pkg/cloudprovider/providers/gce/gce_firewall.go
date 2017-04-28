@@ -17,7 +17,7 @@ limitations under the License.
 package gce
 
 import (
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 
 	compute "google.golang.org/api/compute/v1"

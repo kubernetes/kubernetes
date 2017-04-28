@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 )

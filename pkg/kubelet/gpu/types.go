@@ -16,7 +16,7 @@ limitations under the License.
 
 package gpu
 
-import "k8s.io/kubernetes/pkg/api/v1"
+import "k8s.io/api/core/v1"
 
 // GPUManager manages GPUs on a local node.
 // Implementations are expected to be thread safe.

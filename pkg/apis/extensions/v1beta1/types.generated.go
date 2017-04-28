@@ -29,7 +29,7 @@ import (
 	pkg1_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkg2_types "k8s.io/apimachinery/pkg/types"
 	pkg5_intstr "k8s.io/apimachinery/pkg/util/intstr"
-	pkg4_v1 "k8s.io/kubernetes/pkg/api/v1"
+	pkg4_v1 "k8s.io/api/core/v1"
 	"reflect"
 	"runtime"
 	time "time"

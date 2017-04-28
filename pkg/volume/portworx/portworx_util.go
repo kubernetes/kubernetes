@@ -23,7 +23,7 @@ import (
 	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
 	osdspec "github.com/libopenstorage/openstorage/api/spec"
 	osdvolume "github.com/libopenstorage/openstorage/volume"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
 )
 

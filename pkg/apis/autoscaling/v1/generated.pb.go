@@ -51,7 +51,7 @@ import math "math"
 import k8s_io_apimachinery_pkg_api_resource "k8s.io/apimachinery/pkg/api/resource"
 import k8s_io_apimachinery_pkg_apis_meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-import k8s_io_kubernetes_pkg_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+import k8s_io_kubernetes_pkg_api_v1 "k8s.io/api/core/v1"
 
 import strings "strings"
 import reflect "reflect"

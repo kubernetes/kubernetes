@@ -20,7 +20,7 @@ import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/scheme"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 type CoreV1Interface interface {

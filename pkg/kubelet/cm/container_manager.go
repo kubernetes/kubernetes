@@ -19,7 +19,7 @@ package cm
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 

@@ -29,6 +29,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/ugorji/go/codec"
 
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
@@ -43,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
@@ -81,11 +82,11 @@ func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.Replica
 	}
 
 	intermediate2 := &v1.ReplicationController{}
-	if err := v1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
+	if err := k8s_api_v1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
 		return err
 	}
 
-	return v1.Convert_v1_ReplicationController_To_api_ReplicationController(intermediate2, out, s)
+	return k8s_api_v1.Convert_v1_ReplicationController_To_api_ReplicationController(intermediate2, out, s)
 }
 
 func TestSetControllerConversion(t *testing.T) {

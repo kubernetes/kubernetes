@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"

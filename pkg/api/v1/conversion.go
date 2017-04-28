@@ -17,10 +17,11 @@ limitations under the License.
 package v1
 
 import (
-"k8s.io/api/core/v1"
 	"encoding/json"
 	"fmt"
 	"reflect"
+
+	"k8s.io/api/core/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"

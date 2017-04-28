@@ -33,6 +33,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -45,7 +46,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
@@ -282,13 +283,13 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels
 	for i := range podList.Items {
 		pod := podList.Items[i]
 		externalPod := &v1.Pod{}
-		v1.Convert_api_Pod_To_v1_Pod(&pod, externalPod, nil)
+		k8s_api_v1.Convert_api_Pod_To_v1_Pod(&pod, externalPod, nil)
 		pods = append(pods, externalPod)
 	}
 	if len(pods) > 0 {
 		sort.Sort(sortBy(pods))
 		internalPod := &api.Pod{}
-		v1.Convert_v1_Pod_To_api_Pod(pods[0], internalPod, nil)
+		k8s_api_v1.Convert_v1_Pod_To_api_Pod(pods[0], internalPod, nil)
 		return internalPod, len(podList.Items), nil
 	}
 

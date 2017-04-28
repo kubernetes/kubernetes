@@ -33,7 +33,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/parsers"

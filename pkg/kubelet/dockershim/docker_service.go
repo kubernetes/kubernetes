@@ -26,7 +26,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"

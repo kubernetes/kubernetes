@@ -22,7 +22,7 @@ package v1alpha1
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -39,53 +39,53 @@ func SetObjectDefaults_PodPreset(in *PodPreset) {
 		a := &in.Spec.Env[i]
 		if a.ValueFrom != nil {
 			if a.ValueFrom.FieldRef != nil {
-				v1.SetDefaults_ObjectFieldSelector(a.ValueFrom.FieldRef)
+				k8s_api_v1.SetDefaults_ObjectFieldSelector(a.ValueFrom.FieldRef)
 			}
 		}
 	}
 	for i := range in.Spec.Volumes {
 		a := &in.Spec.Volumes[i]
-		v1.SetDefaults_Volume(a)
+		k8s_api_v1.SetDefaults_Volume(a)
 		if a.VolumeSource.Secret != nil {
-			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			k8s_api_v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			k8s_api_v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 		}
 		if a.VolumeSource.RBD != nil {
-			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			k8s_api_v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
 		if a.VolumeSource.DownwardAPI != nil {
-			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
+			k8s_api_v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
 				b := &a.VolumeSource.DownwardAPI.Items[j]
 				if b.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					k8s_api_v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
 				}
 			}
 		}
 		if a.VolumeSource.ConfigMap != nil {
-			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			k8s_api_v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			k8s_api_v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 		if a.VolumeSource.Projected != nil {
-			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			k8s_api_v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
 				b := &a.VolumeSource.Projected.Sources[j]
 				if b.DownwardAPI != nil {
 					for k := range b.DownwardAPI.Items {
 						c := &b.DownwardAPI.Items[k]
 						if c.FieldRef != nil {
-							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							k8s_api_v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
 						}
 					}
 				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			k8s_api_v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 }

@@ -28,7 +28,7 @@ import (
 	"os/exec"
 
 	. "github.com/onsi/ginkgo"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 

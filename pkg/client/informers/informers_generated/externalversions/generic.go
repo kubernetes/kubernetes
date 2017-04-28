@@ -22,7 +22,7 @@ import (
 	"fmt"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	api_v1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"

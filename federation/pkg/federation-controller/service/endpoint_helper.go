@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	cache "k8s.io/client-go/tools/cache"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"

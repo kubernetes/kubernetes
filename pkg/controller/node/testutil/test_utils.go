@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/util/clock"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
