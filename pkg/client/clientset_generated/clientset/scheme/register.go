@@ -17,11 +17,11 @@ limitations under the License.
 package scheme
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	corev1 "k8s.io/kubernetes/pkg/api/v1"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	authenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
@@ -65,7 +65,6 @@ func init() {
 // After this, RawExtensions in Kubernetes types will serialize kube-aggregator types
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
-	corev1.AddToScheme(scheme)
 	appsv1beta1.AddToScheme(scheme)
 	authenticationv1.AddToScheme(scheme)
 	authenticationv1beta1.AddToScheme(scheme)
@@ -76,6 +75,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	batchv1.AddToScheme(scheme)
 	batchv2alpha1.AddToScheme(scheme)
 	certificatesv1beta1.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
 	extensionsv1beta1.AddToScheme(scheme)
 	policyv1beta1.AddToScheme(scheme)
 	rbacv1beta1.AddToScheme(scheme)

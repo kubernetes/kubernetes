@@ -17,13 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	core "k8s.io/api/core/install"
 	announced "k8s.io/apimachinery/pkg/apimachinery/announced"
 	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	core "k8s.io/kubernetes/pkg/api/install"
 	apps "k8s.io/kubernetes/pkg/apis/apps/install"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication/install"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization/install"
@@ -52,13 +52,13 @@ func init() {
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
-	core.Install(groupFactoryRegistry, registry, scheme)
 	apps.Install(groupFactoryRegistry, registry, scheme)
 	authentication.Install(groupFactoryRegistry, registry, scheme)
 	authorization.Install(groupFactoryRegistry, registry, scheme)
 	autoscaling.Install(groupFactoryRegistry, registry, scheme)
 	batch.Install(groupFactoryRegistry, registry, scheme)
 	certificates.Install(groupFactoryRegistry, registry, scheme)
+	core.Install(groupFactoryRegistry, registry, scheme)
 	extensions.Install(groupFactoryRegistry, registry, scheme)
 	policy.Install(groupFactoryRegistry, registry, scheme)
 	rbac.Install(groupFactoryRegistry, registry, scheme)
