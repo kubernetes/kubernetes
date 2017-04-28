@@ -183,18 +183,23 @@ def setup_leader_authentication():
     api_opts.add('basic-auth-file', basic_auth)
     api_opts.add('token-auth-file', known_tokens)
     hookenv.status_set('maintenance', 'Rendering authentication templates.')
-    if not os.path.isfile(basic_auth):
-        setup_basic_auth('admin', 'admin', 'admin')
-    if not os.path.isfile(known_tokens):
-        setup_tokens(None, 'admin', 'admin')
-        setup_tokens(None, 'kubelet', 'kubelet')
-        setup_tokens(None, 'kube_proxy', 'kube_proxy')
-    # Generate the default service account token key
-    os.makedirs('/root/cdk', exist_ok=True)
-    if not os.path.isfile(service_key):
-        cmd = ['openssl', 'genrsa', '-out', service_key,
-               '2048']
-        check_call(cmd)
+
+    keys = [service_key, basic_auth, known_tokens]
+    # Try first to fetch data from an old leadership broadcast.
+    if not get_keys_from_leader(keys):
+        if not os.path.isfile(basic_auth):
+            setup_basic_auth('admin', 'admin', 'admin')
+        if not os.path.isfile(known_tokens):
+            setup_tokens(None, 'admin', 'admin')
+            setup_tokens(None, 'kubelet', 'kubelet')
+            setup_tokens(None, 'kube_proxy', 'kube_proxy')
+        # Generate the default service account token key
+        os.makedirs('/root/cdk', exist_ok=True)
+        if not os.path.isfile(service_key):
+            cmd = ['openssl', 'genrsa', '-out', service_key,
+                   '2048']
+            check_call(cmd)
+
     api_opts.add('service-account-key-file', service_key)
     controller_opts.add('service-account-private-key-file', service_key)
 
@@ -223,14 +228,37 @@ def setup_non_leader_authentication():
     basic_auth = '/root/cdk/basic_auth.csv'
     known_tokens = '/root/cdk/known_tokens.csv'
 
+    hookenv.status_set('maintenance', 'Rendering authentication templates.')
+
+    keys = [service_key, basic_auth, known_tokens]
+    if not get_keys_from_leader(keys):
+        # the keys were not retrieved. Non-leaders have to retry.
+        return
+
+    api_opts.add('--basic-auth-file', basic_auth)
+    api_opts.add('--token-auth-file', known_tokens)
+    api_opts.add('--service-cluster-ip-range', service_cidr())
+    api_opts.add('--service-account-key-file', service_key)
+    controller_opts.add('--service-account-private-key-file', service_key)
+
+    set_state('authentication.setup')
+
+
+def get_keys_from_leader(keys):
+    """
+    Gets the broadcasted keys from the leader and stores them in
+    the corresponding files.
+
+    Args:
+        keys: list of keys. Keys are actually files on the FS.
+
+    Returns: True if all key were fetched, False if not.
+
+    """
     # This races with other codepaths, and seems to require being created first
     # This block may be extracted later, but for now seems to work as intended
     os.makedirs('/root/cdk', exist_ok=True)
 
-    hookenv.status_set('maintenance', 'Rendering authentication templates.')
-
-    # Set an array for looping logic
-    keys = [service_key, basic_auth, known_tokens]
     for k in keys:
         # If the path does not exist, assume we need it
         if not os.path.exists(k):
@@ -241,7 +269,7 @@ def setup_non_leader_authentication():
                 msg = "Waiting on leaders crypto keys."
                 hookenv.status_set('waiting', msg)
                 hookenv.log('Missing content for file {}'.format(k))
-                return
+                return False
             # Write out the file and move on to the next item
             with open(k, 'w+') as fp:
                 fp.write(contents)
@@ -252,6 +280,7 @@ def setup_non_leader_authentication():
     controller_opts.add('service-account-private-key-file', service_key)
 
     set_state('authentication.setup')
+    return True
 
 
 @when('kubernetes-master.snaps.installed')
@@ -805,8 +834,8 @@ def setup_tokens(token, username, user):
     if not token:
         alpha = string.ascii_letters + string.digits
         token = ''.join(random.SystemRandom().choice(alpha) for _ in range(32))
-    with open(known_tokens, 'w') as stream:
-        stream.write('{0},{1},{2}'.format(token, username, user))
+    with open(known_tokens, 'a') as stream:
+        stream.write('{0},{1},{2}\n'.format(token, username, user))
 
 
 def all_kube_system_pods_running():
