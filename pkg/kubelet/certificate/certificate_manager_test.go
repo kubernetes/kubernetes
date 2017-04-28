@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"fmt"
 	"strings"
 	"testing"
@@ -85,6 +86,31 @@ ZmHPzY9Uq1p/QTR/uOcCIQDLTkfBkLHm0UKeobbO/fSm6ZflhyBRDINy4FvwmZMt
 wQIgYV/tmQJeIh91q3wBepFQOClFykG8CTMoDUol/YyNqUkCIHfp6Rr7fGL3JIMq
 QQgf9DCK8SPZqq8DYXjdan0kKBJBAiEAyDb+07o2gpggo8BYUKSaiRCiyXfaq87f
 eVqgpBq/QN4=
+-----END RSA PRIVATE KEY-----`)
+var apiServerCertData = newCertificateData(
+	`-----BEGIN CERTIFICATE-----
+MIICRzCCAfGgAwIBAgIJAIydTIADd+yqMA0GCSqGSIb3DQEBCwUAMH4xCzAJBgNV
+BAYTAkdCMQ8wDQYDVQQIDAZMb25kb24xDzANBgNVBAcMBkxvbmRvbjEYMBYGA1UE
+CgwPR2xvYmFsIFNlY3VyaXR5MRYwFAYDVQQLDA1JVCBEZXBhcnRtZW50MRswGQYD
+VQQDDBJ0ZXN0LWNlcnRpZmljYXRlLTIwIBcNMTcwNDI2MjMyNDU4WhgPMjExNzA0
+MDIyMzI0NThaMH4xCzAJBgNVBAYTAkdCMQ8wDQYDVQQIDAZMb25kb24xDzANBgNV
+BAcMBkxvbmRvbjEYMBYGA1UECgwPR2xvYmFsIFNlY3VyaXR5MRYwFAYDVQQLDA1J
+VCBEZXBhcnRtZW50MRswGQYDVQQDDBJ0ZXN0LWNlcnRpZmljYXRlLTIwXDANBgkq
+hkiG9w0BAQEFAANLADBIAkEAuiRet28DV68Dk4A8eqCaqgXmymamUEjW/DxvIQqH
+3lbhtm8BwSnS9wUAajSLSWiq3fci2RbRgaSPjUrnbOHCLQIDAQABo1AwTjAdBgNV
+HQ4EFgQU0vhI4OPGEOqT+VAWwxdhVvcmgdIwHwYDVR0jBBgwFoAU0vhI4OPGEOqT
++VAWwxdhVvcmgdIwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQsFAANBALNeJGDe
+nV5cXbp9W1bC12Tc8nnNXn4ypLE2JTQAvyp51zoZ8hQoSnRVx/VCY55Yu+br8gQZ
++tW+O/PoE7B3tuY=
+-----END CERTIFICATE-----`, `-----BEGIN RSA PRIVATE KEY-----
+MIIBVgIBADANBgkqhkiG9w0BAQEFAASCAUAwggE8AgEAAkEAuiRet28DV68Dk4A8
+eqCaqgXmymamUEjW/DxvIQqH3lbhtm8BwSnS9wUAajSLSWiq3fci2RbRgaSPjUrn
+bOHCLQIDAQABAkEArDR1g9IqD3aUImNikDgAngbzqpAokOGyMoxeavzpEaFOgCzi
+gi7HF7yHRmZkUt8CzdEvnHSqRjFuaaB0gGA+AQIhAOc8Z1h8ElLRSqaZGgI3jCTp
+Izx9HNY//U5NGrXD2+ttAiEAzhOqkqI4+nDab7FpiD7MXI6fO549mEXeVBPvPtsS
+OcECIQCIfkpOm+ZBBpO3JXaJynoqK4gGI6ALA/ik6LSUiIlfPQIhAISjd9hlfZME
+bDQT1r8Q3Gx+h9LRqQeHgPBQ3F5ylqqBAiBaJ0hkYvrIdWxNlcLqD3065bJpHQ4S
+WQkuZUQN1M/Xvg==
 -----END RSA PRIVATE KEY-----`)
 
 func newCertificateData(certificatePEM string, keyPEM string) *certificateData {
@@ -290,8 +316,8 @@ func TestGetCurrentCertificateOrBootstrap(t *testing.T) {
 			nil,
 			nil,
 			nil,
-			false,
-			"no cert/key available and no bootstrap cert/key to fall back to",
+			true,
+			"",
 		},
 	}
 
@@ -310,10 +336,7 @@ func TestGetCurrentCertificateOrBootstrap(t *testing.T) {
 					t.Errorf("Got certificate %v, wanted %v", certResult, tc.expectedCert)
 				}
 			} else {
-				if len(certResult.Certificate) != len(tc.expectedCert.Certificate) {
-					t.Errorf("Got %d certificates, wanted %d", len(certResult.Certificate), len(tc.expectedCert.Certificate))
-				}
-				if !bytes.Equal(certResult.Certificate[0], tc.expectedCert.Certificate[0]) {
+				if !certificatesEqual(certResult, tc.expectedCert) {
 					t.Errorf("Got certificate %v, wanted %v", certResult, tc.expectedCert)
 				}
 			}
@@ -333,6 +356,94 @@ func TestGetCurrentCertificateOrBootstrap(t *testing.T) {
 	}
 }
 
+func TestInitializeOtherRESTClients(t *testing.T) {
+	var nilCertificate = &certificateData{}
+	testCases := []struct {
+		description             string
+		storeCert               *certificateData
+		bootstrapCert           *certificateData
+		apiCert                 *certificateData
+		expectedCertBeforeStart *certificateData
+		expectedCertAfterStart  *certificateData
+	}{
+		{
+			description:             "No current certificate, no bootstrap certificate",
+			storeCert:               nilCertificate,
+			bootstrapCert:           nilCertificate,
+			apiCert:                 apiServerCertData,
+			expectedCertBeforeStart: nilCertificate,
+			expectedCertAfterStart:  apiServerCertData,
+		},
+		{
+			description:             "No current certificate, bootstrap certificate",
+			storeCert:               nilCertificate,
+			bootstrapCert:           bootstrapCertData,
+			apiCert:                 apiServerCertData,
+			expectedCertBeforeStart: bootstrapCertData,
+			expectedCertAfterStart:  apiServerCertData,
+		},
+		{
+			description:             "Current certificate, no bootstrap certificate",
+			storeCert:               storeCertData,
+			bootstrapCert:           nilCertificate,
+			apiCert:                 apiServerCertData,
+			expectedCertBeforeStart: storeCertData,
+			expectedCertAfterStart:  storeCertData,
+		},
+		{
+			description:             "Current certificate, bootstrap certificate",
+			storeCert:               storeCertData,
+			bootstrapCert:           bootstrapCertData,
+			apiCert:                 apiServerCertData,
+			expectedCertBeforeStart: storeCertData,
+			expectedCertAfterStart:  storeCertData,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			certificateStore := &fakeStore{
+				cert: tc.storeCert.certificate,
+			}
+
+			certificateManager, err := NewManager(&Config{
+				Template: &x509.CertificateRequest{
+					Subject: pkix.Name{
+						Organization: []string{"system:nodes"},
+						CommonName:   "system:node:fake-node-name",
+					},
+				},
+				Usages: []certificates.KeyUsage{
+					certificates.UsageDigitalSignature,
+					certificates.UsageKeyEncipherment,
+					certificates.UsageClientAuth,
+				},
+				CertificateStore:        certificateStore,
+				BootstrapCertificatePEM: tc.bootstrapCert.certificatePEM,
+				BootstrapKeyPEM:         tc.bootstrapCert.keyPEM,
+				CertificateSigningRequestClient: &fakeClient{
+					certificatePEM: tc.apiCert.certificatePEM,
+				},
+			})
+			if err != nil {
+				t.Errorf("Got %v, wanted no error.", err)
+			}
+
+			certificate := certificateManager.Current()
+			if !certificatesEqual(certificate, tc.expectedCertBeforeStart.certificate) {
+				t.Errorf("Got %v, wanted %v", certificateString(certificate), certificateString(tc.expectedCertBeforeStart.certificate))
+			}
+
+			certificateManager.Start()
+
+			certificate = certificateManager.Current()
+			if !certificatesEqual(certificate, tc.expectedCertAfterStart.certificate) {
+				t.Errorf("Got %v, wanted %v", certificateString(certificate), certificateString(tc.expectedCertAfterStart.certificate))
+			}
+		})
+	}
+}
+
 type fakeClientFailureType int
 
 const (
@@ -344,16 +455,17 @@ const (
 
 type fakeClient struct {
 	certificatesclient.CertificateSigningRequestInterface
-	failureType fakeClientFailureType
+	failureType    fakeClientFailureType
+	certificatePEM []byte
 }
 
 func (c fakeClient) Create(*certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
 	if c.failureType == createError {
 		return nil, fmt.Errorf("Create error")
 	}
-	csr := certificates.CertificateSigningRequest{}
-	csr.UID = "fake-uid"
-	return &csr, nil
+	csrReply := certificates.CertificateSigningRequest{}
+	csrReply.UID = "fake-uid"
+	return &csrReply, nil
 }
 
 func (c fakeClient) Watch(opts v1.ListOptions) (watch.Interface, error) {
@@ -361,12 +473,14 @@ func (c fakeClient) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		return nil, fmt.Errorf("Watch error")
 	}
 	return &fakeWatch{
-		failureType: c.failureType,
+		failureType:    c.failureType,
+		certificatePEM: c.certificatePEM,
 	}, nil
 }
 
 type fakeWatch struct {
-	failureType fakeClientFailureType
+	failureType    fakeClientFailureType
+	certificatePEM []byte
 }
 
 func (w *fakeWatch) Stop() {
@@ -389,7 +503,7 @@ func (w *fakeWatch) ResultChan() <-chan watch.Event {
 			Conditions: []certificates.CertificateSigningRequestCondition{
 				condition,
 			},
-			Certificate: []byte(storeCertData.certificatePEM),
+			Certificate: []byte(w.certificatePEM),
 		},
 	}
 	csr.UID = "fake-uid"
@@ -418,6 +532,19 @@ func (s *fakeStore) Current() (*tls.Certificate, error) {
 // pair the 'current' pair, that will be returned by future calls to
 // Current().
 func (s *fakeStore) Update(certPEM, keyPEM []byte) (*tls.Certificate, error) {
+	// In order to make the mocking work, whenever a cert/key pair is passed in
+	// to be updated in the mock store, assume that the certificate manager
+	// generated the key, and then asked the mock CertificateSigningRequest API
+	// to sign it, then the faked API returned a canned response. The canned
+	// signing response will not match the generated key. In order to make
+	// things work out, search here for the correct matching key and use that
+	// instead of the passed in key. That way this file of test code doesn't
+	// have to implement an actual certificate signing process.
+	for _, tc := range []*certificateData{storeCertData, bootstrapCertData, apiServerCertData} {
+		if bytes.Equal(tc.certificatePEM, certPEM) {
+			keyPEM = tc.keyPEM
+		}
+	}
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
 		return nil, err
@@ -429,4 +556,29 @@ func (s *fakeStore) Update(certPEM, keyPEM []byte) (*tls.Certificate, error) {
 		NotAfter:  now.Add(24 * time.Hour),
 	}
 	return s.cert, nil
+}
+
+func certificatesEqual(c1 *tls.Certificate, c2 *tls.Certificate) bool {
+	if c1 == nil || c2 == nil {
+		return c1 == c2
+	}
+	if len(c1.Certificate) != len(c2.Certificate) {
+		return false
+	}
+	for i := 0; i < len(c1.Certificate); i++ {
+		if !bytes.Equal(c1.Certificate[i], c2.Certificate[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func certificateString(c *tls.Certificate) string {
+	if c == nil {
+		return "certificate == nil"
+	}
+	if c.Leaf == nil {
+		return "certificate.Leaf == nil"
+	}
+	return c.Leaf.Subject.CommonName
 }
