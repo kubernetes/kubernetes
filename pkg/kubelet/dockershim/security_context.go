@@ -19,7 +19,9 @@ package dockershim
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
+	"github.com/blang/semver"
 	dockercontainer "github.com/docker/engine-api/types/container"
 
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -123,6 +125,7 @@ func modifyContainerNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, sandbox
 	if nsOpts != nil {
 		hostNetwork = nsOpts.HostNetwork
 	}
+	hostConfig.PidMode = dockercontainer.PidMode(fmt.Sprintf("container:%v", sandboxID))
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
 	modifyHostNetworkOptionForContainer(hostNetwork, sandboxID, hostConfig)
 }
@@ -170,5 +173,21 @@ func modifyHostNetworkOptionForContainer(hostNetwork bool, sandboxID string, hc 
 
 	if hostNetwork {
 		hc.UTSMode = namespaceModeHost
+	}
+}
+
+// modifyPIDNamespaceOverrides implements two temporary overrides for the default PID namespace sharing for Docker:
+//     1. Docker engine prior to API Version 1.24 doesn't support attaching to another container's
+//        PID namespace, and it didn't stabilize until 1.26. This check can be removed when Kubernetes'
+//        minimum Docker version is at least 1.13.1 (API version 1.26).
+//     2. The administrator has overridden the default behavior by means of a kubelet flag. This is an
+//        "escape hatch" to return to previous behavior of isolated namespaces and should be removed once
+//        no longer needed.
+func modifyPIDNamespaceOverrides(disableSharedPID bool, version *semver.Version, hc *dockercontainer.HostConfig) {
+	if !strings.HasPrefix(string(hc.PidMode), "container:") {
+		return
+	}
+	if disableSharedPID || version.LT(semver.Version{Major: 1, Minor: 26}) {
+		hc.PidMode = ""
 	}
 }
