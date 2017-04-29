@@ -1909,6 +1909,16 @@ func validateHostNetwork(hostNetwork bool, containers []api.Container, fldPath *
 	return allErrors
 }
 
+func validateHostNetworkNoHostAliases(hostNetwork bool, hostAliases []api.HostAlias, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	if hostNetwork {
+		if len(hostAliases) > 0 {
+			allErrors = append(allErrors, field.Forbidden(fldPath, "may not be set when `hostNetwork` is true"))
+		}
+	}
+	return allErrors
+}
+
 // validateImagePullSecrets checks to make sure the pull secrets are well
 // formed.  Right now, we only expect name to be set (it's the only field).  If
 // this ever changes and someone decides to set those fields, we'd like to
@@ -1998,6 +2008,19 @@ func validateOnlyAddedTolerations(newTolerations []api.Toleration, oldToleration
 	}
 
 	allErrs = append(allErrs, ValidateTolerations(newTolerations, fldPath)...)
+	return allErrs
+}
+
+func ValidateHostAliases(hostAliases []api.HostAlias, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, hostAlias := range hostAliases {
+		if ip := net.ParseIP(hostAlias.IP); ip == nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), hostAlias.IP, "must be valid IP address"))
+		}
+		for _, hostname := range hostAlias.Hostnames {
+			allErrs = append(allErrs, ValidateDNS1123Label(hostname, fldPath.Child("hostnames"))...)
+		}
+	}
 	return allErrs
 }
 
@@ -2100,6 +2123,10 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 
 	if len(spec.Tolerations) > 0 {
 		allErrs = append(allErrs, ValidateTolerations(spec.Tolerations, fldPath.Child("tolerations"))...)
+	}
+
+	if len(spec.HostAliases) > 0 {
+		allErrs = append(allErrs, ValidateHostAliases(spec.HostAliases, fldPath.Child("hostAliases"))...)
 	}
 
 	return allErrs
@@ -2401,6 +2428,7 @@ func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *a
 
 	if securityContext != nil {
 		allErrs = append(allErrs, validateHostNetwork(securityContext.HostNetwork, spec.Containers, specPath.Child("containers"))...)
+		allErrs = append(allErrs, validateHostNetworkNoHostAliases(securityContext.HostNetwork, spec.HostAliases, specPath)...)
 		if securityContext.FSGroup != nil {
 			for _, msg := range validation.IsValidGroupId(*securityContext.FSGroup) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("fsGroup"), *(securityContext.FSGroup), msg))
