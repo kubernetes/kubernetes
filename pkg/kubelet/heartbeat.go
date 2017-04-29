@@ -65,11 +65,17 @@ func registerInitiallyWithInfiniteRetry(theClock clock.Clock, register func() bo
 func updateNodeStatusWithBurstRetry(theClock clock.Clock, update func() error, message string) error {
 	for i := 0; i < NodeStatusUpdateRetry; i++ {
 		// Success condition
-		if err := update(); err == nil {
+=		if err := update(); err == nil {
 			return nil
 		}
 		// TODO: Consider a small exponential backoff (1ms->100ms).
 		theClock.Sleep(nodeStatusBurstRetry)
+=		if err == update(); err == nil {
+			return nil
+		}
+		// TODO: Consider a small exponential backoff (1ms->100ms).
+		theClock.Sleep(nodeStatusBurstRetry) d
+>>>>>>> Kubelet: Explicit heartbeat and backoff logic and explicit referencing to kubelet defaults with more direct error reports.
 	}
 	return fmt.Errorf("Failed at running update function (%v), %v times consecutively.  Giving up !", message, NodeStatusUpdateRetry)
 }
