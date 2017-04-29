@@ -292,6 +292,7 @@ var ControllersDisabledByDefault = sets.NewString(
 	"tokencleaner",
 )
 
+// newControllerInitializers  will be all controller for unified management, unified initialization at start time
 func newControllerInitializers() map[string]InitFunc {
 	controllers := map[string]InitFunc{}
 	controllers["endpoint"] = startEndpointController
