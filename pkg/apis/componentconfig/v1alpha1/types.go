@@ -321,7 +321,7 @@ type KubeletConfiguration struct {
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout"`
-	// nodeStatusUpdateFrequency is the frequency that kubelet posts node
+	// NodeStatusUpdateFrequency is the frequency that kubelet posts node
 	// status to master. Note: be cautious when changing the constant, it
 	// must work with nodeMonitorGracePeriod in nodecontroller.
 	NodeStatusUpdateFrequency metav1.Duration `json:"nodeStatusUpdateFrequency"`

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,14 +38,15 @@ const (
 // This module externalizes logic for heartbeating and retrying of communication with the API server.
 // It is intended to externalize functionality that other components (like the controller) may depend on
 
-// registerInitiallyWithInfiniteRetry continually attempts to register, returning an error if it ever gives up.
-// We retry infinitely because registration is a prerequisite to proper kubelet functioning.
-func registerInitiallyWithInfiniteRetry(theClock clock.Clock, register func() bool) error {
+// registerInitiallyWithInfiniteRetry continually runs a function until it succeeds, backing off
+// using specific timings we set for initial registration flow.  Specifically designed for initial registration,
+//  externalized to make timing policy easily maintainable.
+func registerInitiallyWithInfiniteRetry(theClock clock.Clock, register func() bool, message string) error {
 	try := 0
 	step := 100 * time.Millisecond
 	complete := false
 	for !complete {
-		glog.Infof("Attempting to register the apiserver (attempt %v)", try)
+		glog.Infof("Attempting to run registration function (%v) (attempt %v)", message, try)
 		try = try + 1
 		theClock.Sleep(step)
 		step = step * 2
@@ -54,21 +55,20 @@ func registerInitiallyWithInfiniteRetry(theClock clock.Clock, register func() bo
 		}
 		complete = register()
 	}
-	glog.Infof("Succesfully registered with API server after %v tries.", try)
+	glog.Infof("Succesfully completed registeration function (%v) after %v tries.", message, try)
 	return nil
 }
 
-// updateNodeStatusWithRetry retries to update Node status several times in a short burst.  We don't have
-// a traditional backoff here because we want to implement a heartbeat style for communication, controlled via
-// the kubelet's sync loop.  This may change in the future.
-func updateNodeStatusWithRetry(theClock clock.Clock, update func() error) error {
+// updateNodeStatusWithBurstRetry runs a function several times with burst retries.  Specifically designed for
+// node status updates, externalized to make timing policy easily maintainable.
+func updateNodeStatusWithBurstRetry(theClock clock.Clock, update func() error, message string) error {
 	for i := 0; i < NodeStatusUpdateRetry; i++ {
 		if err := update(); err != nil {
-			// TODO: Considering to put some small exponential backoff (1ms->100ms)
+			// TODO: Consider a small exponential backoff (1ms->100ms).
 			theClock.Sleep(nodeStatusBurstRetry)
 		} else {
 			return nil
 		}
 	}
-	return fmt.Errorf("Failed at updating status %v times consecutively.  Giving up !", NodeStatusUpdateRetry)
+	return fmt.Errorf("Failed at running update function (%v), %v times consecutively.  Giving up !", message, NodeStatusUpdateRetry)
 }
