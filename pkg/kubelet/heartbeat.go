@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,32 +21,34 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
 	"k8s.io/client-go/util/clock"
 )
 
 const (
 	// These constants should be reviewed and updated very carefully.
-	// nodeStatusUpdateRetry the normal default for how many times kubelet retries when posting node status failed.
-	// this constant is a convention that is expected to be depended on externaly by other components.
+
+	// NodeStatusUpdateRetry is how many times the kubelet retries to post its node status after a failed attempt.
 	NodeStatusUpdateRetry      = 5
 	nodeRegistrationMaxBackoff = 7 * time.Second
 
 	// Less critical constants subject to change.
+
 	nodeStatusBurstRetry = 5 * time.Millisecond
 )
 
-// This module externalizes logic for heartbeating and retrying of communication with the API server.
-// It is intended to externalize functionality that other components (like the controller) may depend on
+// This module encapsulates logic for heartbeating and retrying of communication with the API server.
 
-// registerInitiallyWithInfiniteRetry continually attempts to register, returning an error if it ever gives up.
-// We retry infinitely because registration is a prerequisite to proper kubelet functioning.
-func registerInitiallyWithInfiniteRetry(theClock clock.Clock, register func() bool) error {
+// registerInitiallyWithInfiniteRetry continually runs a function until it succeeds, backing off
+// using specific timings we set for initial registration flow.  Specifically designed for initial registration,
+// but lives here to make timing policy easily transparent.
+func registerInitiallyWithInfiniteRetry(theClock clock.Clock, register func() bool, message string) error {
 	try := 0
 	step := 100 * time.Millisecond
 	complete := false
 	for !complete {
-		glog.Infof("Attempting to register the apiserver (attempt %v)", try)
 		try = try + 1
+		glog.Infof("Attempting to run registration function (%v) (attempt %v)", message, try)
 		theClock.Sleep(step)
 		step = step * 2
 		if step >= nodeRegistrationMaxBackoff {
@@ -54,21 +56,20 @@ func registerInitiallyWithInfiniteRetry(theClock clock.Clock, register func() bo
 		}
 		complete = register()
 	}
-	glog.Infof("Succesfully registered with API server after %v tries.", try)
+	glog.Infof("Succesfully completed registeration function (%v) after %v tries.", message, try)
 	return nil
 }
 
-// updateNodeStatusWithRetry retries to update Node status several times in a short burst.  We don't have
-// a traditional backoff here because we want to implement a heartbeat style for communication, controlled via
-// the kubelet's sync loop.  This may change in the future.
-func updateNodeStatusWithRetry(theClock clock.Clock, update func() error) error {
+// updateNodeStatusWithBurstRetry runs a function several times with burst retries.  Specifically designed for
+// node status updates, externalized to make timing policy easily maintainable.
+func updateNodeStatusWithBurstRetry(theClock clock.Clock, update func() error, message string) error {
 	for i := 0; i < NodeStatusUpdateRetry; i++ {
-		if err := update(); err != nil {
-			// TODO: Considering to put some small exponential backoff (1ms->100ms)
-			theClock.Sleep(nodeStatusBurstRetry)
-		} else {
+		// Success condition
+		if err := update(); err == nil {
 			return nil
 		}
+		// TODO: Consider a small exponential backoff (1ms->100ms).
+		theClock.Sleep(nodeStatusBurstRetry)
 	}
-	return fmt.Errorf("Failed at updating status %v times consecutively.  Giving up !", NodeStatusUpdateRetry)
+	return fmt.Errorf("Failed at running update function (%v), %v times consecutively.  Giving up !", message, NodeStatusUpdateRetry)
 }

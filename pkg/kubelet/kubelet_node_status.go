@@ -23,7 +23,6 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -53,36 +52,35 @@ const (
 	maxNamesPerImageInNodeStatus = 5
 )
 
-// registerWithApiServer registers the node with the cluster master. It is safe
+// registerWithApiServerWithRetry registers the node with the cluster master. It is safe
 // to call multiple times, but not concurrently (kl.registrationCompleted is
 // not locked).
-func (kl *Kubelet) registerWithApiServer() {
+func (kl *Kubelet) registerWithApiServerWithRetry() {
 	if kl.registrationCompleted {
 		return
 	}
-	step := 100 * time.Millisecond
 
-	for {
-		time.Sleep(step)
-		step = step * 2
-		if step >= 7*time.Second {
-			step = 7 * time.Second
-		}
+	var completedNode *v1.Node = nil
 
-		node, err := kl.initialNode()
-		if err != nil {
-			glog.Errorf("Unable to construct v1.Node object for kubelet: %v", err)
-			continue
-		}
+	registerInitiallyWithInfiniteRetry(kl.clock,
+		func() bool {
+			// Possible error can happen when querying cloud info, so may need retrying.
+			node, err := kl.tryPopulateInitialNodeData()
+			if err != nil {
+				glog.Errorf("unable to construct v1.Node object for kubelet: %v", err)
+				return false
+			} else {
+				completedNode = node
+				return true
+			}
+		}, "populate initial node with metadata")
 
-		glog.Infof("Attempting to register node %s", node.Name)
-		registered := kl.tryRegisterWithApiServer(node)
-		if registered {
-			glog.Infof("Successfully registered node %s", node.Name)
-			kl.registrationCompleted = true
-			return
-		}
-	}
+	registerInitiallyWithInfiniteRetry(kl.clock,
+		func() bool {
+			// Once node is created, try to register.  Again, this might need to be retried.
+			glog.Infof("Attempting to register node %s", completedNode.Name)
+			return kl.tryRegisterWithApiServer(completedNode)
+		}, "register with API Server")
 }
 
 // tryRegisterWithApiServer makes an attempt to register the given node with
@@ -186,9 +184,11 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 	return true
 }
 
-// initialNode constructs the initial v1.Node for this Kubelet, incorporating node
+// tryPopulateInitialNodeData constructs the initial v1.Node for this Kubelet, incorporating node
 // labels, information from the cloud provider, and Kubelet configuration.
-func (kl *Kubelet) initialNode() (*v1.Node, error) {
+// Note that the information content may be acquired from external sources here, so failure
+// is entirely possible, and retry may be necessary.
+func (kl *Kubelet) tryPopulateInitialNodeData() (*v1.Node, error) {
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
@@ -312,28 +312,15 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 	if kl.registerNode {
 		// This will exit immediately if it doesn't need to do anything.
-		kl.registerWithApiServer()
+		kl.registerWithApiServerWithRetry()
 	}
-	if err := kl.updateNodeStatus(); err != nil {
+	if err := kl.updateNodeStatusWithRetry(); err != nil {
 		glog.Errorf("Unable to update node status: %v", err)
 	}
 }
 
-// updateNodeStatus updates node status to master with retries.
-func (kl *Kubelet) updateNodeStatus() error {
-	for i := 0; i < nodeStatusUpdateRetry; i++ {
-		if err := kl.tryUpdateNodeStatus(i); err != nil {
-			glog.Errorf("Error updating node status, will retry: %v", err)
-		} else {
-			return nil
-		}
-	}
-	return fmt.Errorf("update node status exceeds retry count")
-}
-
-// tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
-// is set, this function will also confirm that cbr0 is configured correctly.
-func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
+// updateNodeStatusWithRetry updates node status to master with retries.
+func (kl *Kubelet) updateNodeStatusWithRetry() error {
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
 	// To reduce the load on etcd, we are serving GET operations from
@@ -341,9 +328,17 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	// seem to cause more conflict - the delays are pretty small).
 	// If it result in a conflict, all retries are served directly from etcd.
 	opts := metav1.GetOptions{}
-	if tryNumber == 0 {
-		util.FromApiserverCache(&opts)
-	}
+	util.FromApiserverCache(&opts)
+	err := updateNodeStatusWithBurstRetry(kl.clock, func() error {
+		return kl.tryUpdateNodeStatus(opts)
+	}, "update node status with the master")
+
+	return err
+}
+
+// tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
+// is set, this function will also confirm that cbr0 is configured correctly.
+func (kl *Kubelet) tryUpdateNodeStatus(opts metav1.GetOptions) error {
 	node, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName), opts)
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
