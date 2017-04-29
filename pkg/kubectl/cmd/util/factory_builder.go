@@ -48,7 +48,10 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 }
 
 func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error) {
-	mapper, typer := f.objectMappingFactory.Object()
+	mapper, typer, err := f.objectMappingFactory.UnstructuredObject()
+	if err != nil {
+		return nil, false, err
+	}
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
 	return PrinterForCommand(cmd, mapper, typer, decoders)

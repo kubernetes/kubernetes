@@ -1362,6 +1362,8 @@ __EOF__
   kubectl "${kube_flags[@]}" get foos/test -o "jsonpath={.someField}"          --allow-missing-template-keys=false
   kubectl "${kube_flags[@]}" get foos      -o "go-template={{range .items}}{{.someField}}{{end}}" --allow-missing-template-keys=false
   kubectl "${kube_flags[@]}" get foos/test -o "go-template={{.someField}}"                        --allow-missing-template-keys=false
+  output_message=$(kubectl get foos/test -o name)
+  kube::test::if_has_string "${output_message}" 'foos/test'
 
   # Test patching
   kube::log::status "Testing ThirdPartyResource patching"
