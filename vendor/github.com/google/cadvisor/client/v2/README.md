@@ -46,7 +46,7 @@ This method returns the cAdvisor version.
 client.Attributes()
 ```
 
-This method returns a [cadvisor/info/v2/Attributes](../../info/v2/machine.go#L24) struct with all the fields filled in. Attributes includes hardware attributes (as returned by MachineInfo) as well as software attributes (eg. software versions). Here is an example return value:
+This method returns a [cadvisor/info/v2/Attributes](../../info/v2/machine.go#L24) struct with all the fields filled in. Attributes includes hardware attributes (as returned by MachineInfo) as well as software attributes (e.g. software versions). Here is an example return value:
 
 ```
 (*v2.Attributes)({

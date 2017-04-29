@@ -28,7 +28,7 @@ import (
 )
 
 // Command is just that, a command for your application.
-// eg.  'go run' ... 'run' is the command. Cobra requires
+// e.g.  'go run' ... 'run' is the command. Cobra requires
 // you to define the usage and description as part of your command
 // definition to ensure usability.
 type Command struct {

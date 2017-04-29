@@ -765,7 +765,7 @@ func (m *manager) GetProcessList(containerName string, options v2.RequestOptions
 	if len(conts) != 1 {
 		return nil, fmt.Errorf("Expected the request to match only one container")
 	}
-	// TODO(rjnagal): handle count? Only if we can do count by type (eg. top 5 cpu users)
+	// TODO(rjnagal): handle count? Only if we can do count by type (e.g. top 5 cpu users)
 	ps := []v2.ProcessInfo{}
 	for _, cont := range conts {
 		ps, err = cont.GetProcessList(m.cadvisorContainer, m.inHostNamespace)
