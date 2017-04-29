@@ -99,6 +99,12 @@ function ensure-local-ssds() {
   done
 }
 
+# Install nvidia drivers if required
+function install-nvidia-driver() {
+    modprobe configs
+    docker run --privileged -e "LAKITU_KERNEL_SHA1=2fdf6034a0fae9794d80e4d218e237771224ba8f" -v /etc/os-release:/etc/os-release --net=host --pid=host -v /proc/sysrq-trigger:/sysrq gcr.io/google_containers/cos-nvidia-driver-install@sha256:7cd08897baad6cfbdecd5901a64634b249c70f42e77dd57f80559603cfb9121f
+}
+
 # Installs logrotate configuration files
 function setup-logrotate() {
   mkdir -p /etc/logrotate.d/
@@ -1543,6 +1549,7 @@ create-dirs
 setup-kubelet-dir
 ensure-local-ssds
 setup-logrotate
+install-nvidia-driver
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   mount-master-pd
   create-node-pki
