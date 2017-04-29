@@ -30,9 +30,9 @@ const (
 	// successive error results in a wait 2x times the previous.
 	initialDurationBeforeRetry time.Duration = 500 * time.Millisecond
 
-	// maxDurationBeforeRetry is the maximum amount of time that
-	// durationBeforeRetry will grow to due to exponential backoff.
-	maxDurationBeforeRetry time.Duration = 2 * time.Minute
+	// defaultMaxDurationBeforeRetry is the default maximum amount of time
+	// that durationBeforeRetry will grow to due to exponential backoff.
+	defaultMaxDurationBeforeRetry time.Duration = 2 * time.Minute
 )
 
 // ExponentialBackoff contains the last occurrence of an error and the duration
@@ -41,6 +41,10 @@ type ExponentialBackoff struct {
 	lastError           error
 	lastErrorTime       time.Time
 	durationBeforeRetry time.Duration
+
+	// MaxDurationBeforeRetry is the maximum amount of time that
+	// durationBeforeRetry will grow to due to exponential backoff.
+	MaxDurationBeforeRetry time.Duration
 }
 
 // SafeToRetry returns an error if the durationBeforeRetry period for the given
@@ -57,6 +61,11 @@ func (expBackoff *ExponentialBackoff) Update(err *error) {
 	if expBackoff.durationBeforeRetry == 0 {
 		expBackoff.durationBeforeRetry = initialDurationBeforeRetry
 	} else {
+		maxDurationBeforeRetry := defaultMaxDurationBeforeRetry
+		if expBackoff.MaxDurationBeforeRetry != 0 {
+			maxDurationBeforeRetry = expBackoff.MaxDurationBeforeRetry
+		}
+
 		expBackoff.durationBeforeRetry = 2 * expBackoff.durationBeforeRetry
 		if expBackoff.durationBeforeRetry > maxDurationBeforeRetry {
 			expBackoff.durationBeforeRetry = maxDurationBeforeRetry

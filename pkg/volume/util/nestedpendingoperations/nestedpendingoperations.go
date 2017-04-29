@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/volume/util/types"
+	"time"
 )
 
 const (
@@ -56,6 +57,10 @@ type NestedPendingOperations interface {
 	// executing operations allowing a new operation to be started with the
 	// volumeName without error.
 	Run(volumeName v1.UniqueVolumeName, podName types.UniquePodName, operationFunc func() error) error
+
+	// Same as Run, but with a custom value for maxDurationBeforeRetry in
+	// exponential backoff
+	RunWithMaxDurationBeforeRetry(volumeName v1.UniqueVolumeName, podName types.UniquePodName, maxDurationBeforeRetry time.Duration, operationFunc func() error) error
 
 	// Wait blocks until all operations are completed. This is typically
 	// necessary during tests - the test should wait until all operations finish
@@ -95,6 +100,14 @@ func (grm *nestedPendingOperations) Run(
 	volumeName v1.UniqueVolumeName,
 	podName types.UniquePodName,
 	operationFunc func() error) error {
+	return grm.RunWithMaxDurationBeforeRetry(volumeName, podName, 0 /* maxDurationBeforeRetry */, operationFunc)
+}
+
+func (grm *nestedPendingOperations) RunWithMaxDurationBeforeRetry(
+	volumeName v1.UniqueVolumeName,
+	podName types.UniquePodName,
+	maxDurationBeforeRetry time.Duration,
+	operationFunc func() error) error {
 	grm.lock.Lock()
 	defer grm.lock.Unlock()
 	opExists, previousOpIndex := grm.isOperationExists(volumeName, podName)
@@ -123,7 +136,9 @@ func (grm *nestedPendingOperations) Run(
 				operationPending: true,
 				volumeName:       volumeName,
 				podName:          podName,
-				expBackoff:       exponentialbackoff.ExponentialBackoff{},
+				expBackoff: exponentialbackoff.ExponentialBackoff{
+					MaxDurationBeforeRetry: maxDurationBeforeRetry,
+				},
 			})
 	}
 

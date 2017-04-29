@@ -35,6 +35,15 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
+const (
+	// The default maxDurationBeforeRetry of 2 minutes is too high for the
+	// VerifyControllerAttachedVolume as some cloud provider may actually
+	// need much longer then a few seconds for attachment. The default backoff
+	// here would result in unnecessary delays of up to 2 minutes even if
+	// attachment already succeeded
+	verifyControllerAttachedVolumetMaxDurationBeforeRetry time.Duration = 10 * time.Second
+)
+
 // OperationExecutor defines a set of operations for attaching, detaching,
 // mounting, or unmounting a volume that are executed with a NewNestedPendingOperations which
 // prevents more than one operation from being triggered on the same volume.
@@ -551,8 +560,8 @@ func (oe *operationExecutor) VerifyControllerAttachedVolume(
 		return err
 	}
 
-	return oe.pendingOperations.Run(
-		volumeToMount.VolumeName, "" /* podName */, verifyControllerAttachedVolumeFunc)
+	return oe.pendingOperations.RunWithMaxDurationBeforeRetry(
+		volumeToMount.VolumeName, "" /* podName */, verifyControllerAttachedVolumetMaxDurationBeforeRetry, verifyControllerAttachedVolumeFunc)
 }
 
 // TODO: this is a workaround for the unmount device issue caused by gci mounter.
