@@ -40,7 +40,9 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	}
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(storageapiv1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[storageapiv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
-		apiGroupInfo.GroupMeta.GroupVersion = storageapiv1.SchemeGroupVersion
+		// DO NOT set the preferred discovery version to v1 until Kubernetes 1.7.
+		// 1.5 clients, which don't know about v1 storageclasses, will have problems.
+		//apiGroupInfo.GroupMeta.GroupVersion = storageapiv1.SchemeGroupVersion
 	}
 
 	return apiGroupInfo, true
