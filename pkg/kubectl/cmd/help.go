@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
-var help_long = templates.LongDesc(i18n.T(`
+var helpLong = templates.LongDesc(i18n.T(`
 	Help provides help for any command in the application.
 	Simply type kubectl help [path to command] for full details.`))
 
@@ -33,7 +33,7 @@ func NewCmdHelp() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "help [command] | STRING_TO_SEARCH",
 		Short: i18n.T("Help about any command"),
-		Long:  help_long,
+		Long:  helpLong,
 
 		Run: RunHelp,
 	}

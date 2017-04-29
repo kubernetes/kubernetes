@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	stop_long = templates.LongDesc(i18n.T(`
+	stopLong = templates.LongDesc(i18n.T(`
 		Deprecated: Gracefully shut down a resource by name or filename.
 
 		The stop command is deprecated, all its functionalities are covered by delete command.
@@ -37,7 +37,7 @@ var (
 		Attempts to shut down and delete a resource that supports graceful termination.
 		If the resource is scalable it will be scaled to 0 before deletion.`))
 
-	stop_example = templates.Examples(i18n.T(`
+	stopExample = templates.Examples(i18n.T(`
 		# Shut down foo.
 		kubectl stop replicationcontroller foo
 
@@ -57,8 +57,8 @@ func NewCmdStop(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:        "stop (-f FILENAME | TYPE (NAME | -l label | --all))",
 		Short:      i18n.T("Deprecated: Gracefully shut down a resource by name or filename"),
-		Long:       stop_long,
-		Example:    stop_example,
+		Long:       stopLong,
+		Example:    stopExample,
 		Deprecated: fmt.Sprintf("use %q instead.", "delete"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))

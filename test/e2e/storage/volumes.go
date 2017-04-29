@@ -686,4 +686,54 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
+	////////////////////////////////////////////////////////////////////////
+	// Azure Disk
+	////////////////////////////////////////////////////////////////////////
+	framework.KubeDescribe("Azure Disk [Feature:Volumes]", func() {
+		It("should be mountable [Slow]", func() {
+			framework.SkipUnlessProviderIs("azure")
+			config := framework.VolumeTestConfig{
+				Namespace: namespace.Name,
+				Prefix:    "azure",
+			}
+
+			By("creating a test azure disk volume")
+			volumeName, err := framework.CreatePDWithRetry()
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				framework.DeletePDWithRetry(volumeName)
+			}()
+
+			defer func() {
+				if clean {
+					framework.Logf("Running volumeTestCleanup")
+					framework.VolumeTestCleanup(f, config)
+				}
+			}()
+			fsType := "ext4"
+			readOnly := false
+			diskName := volumeName[(strings.LastIndex(volumeName, "/") + 1):]
+			tests := []framework.VolumeTest{
+				{
+					Volume: v1.VolumeSource{
+						AzureDisk: &v1.AzureDiskVolumeSource{
+							DiskName:    diskName,
+							DataDiskURI: volumeName,
+							FSType:      &fsType,
+							ReadOnly:    &readOnly,
+						},
+					},
+					File: "index.html",
+					// Randomize index.html to make sure we don't see the
+					// content from previous test runs.
+					ExpectedContent: "Hello from Azure from namespace " + volumeName,
+				},
+			}
+
+			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
+
+			fsGroup := int64(1234)
+			framework.TestVolumeClient(cs, config, &fsGroup, tests)
+		})
+	})
 })

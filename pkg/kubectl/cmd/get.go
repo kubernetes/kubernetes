@@ -52,7 +52,7 @@ var (
 	get_long = templates.LongDesc(`
 		Display one or many resources.
 
-		` + valid_resources + `
+		` + validResources + `
 
 		This command will hide resources that have completed, such as pods that are
 		in the Succeeded or Failed phases. You can see the full results for any
@@ -175,7 +175,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	}
 
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
-		fmt.Fprint(errOut, "You must specify the type of resource to get. ", valid_resources)
+		fmt.Fprint(errOut, "You must specify the type of resource to get. ", validResources)
 
 		fullCmdName := cmd.Parent().CommandPath()
 		usageString := "Required resource not specified."

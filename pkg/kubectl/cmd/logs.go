@@ -38,7 +38,7 @@ import (
 )
 
 var (
-	logs_example = templates.Examples(i18n.T(`
+	logsExample = templates.Examples(i18n.T(`
 		# Return snapshot logs from pod nginx with only one container
 		kubectl logs nginx
 
@@ -94,7 +94,7 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use:     "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]",
 		Short:   i18n.T("Print the logs for a container in a pod"),
 		Long:    "Print the logs for a container in a pod or specified resource. If the pod has only one container, the container name is optional.",
-		Example: logs_example,
+		Example: logsExample,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if len(os.Args) > 1 && os.Args[1] == "log" {
 				printDeprecationWarning("logs", "log")

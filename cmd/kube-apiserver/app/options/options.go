@@ -137,7 +137,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// arrange these text blocks sensibly. Grrr.
 
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
-		"Amount of time to retain events. Default is 1h.")
+		"Amount of time to retain events.")
 
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged,
 		"If true, allow privileged containers.")

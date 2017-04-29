@@ -24,7 +24,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # TODO(spxtr): Remove this line once Bazel is the only way to build.
 rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
 
-go get -u gopkg.in/mikedanese/gazel.v16/gazel
+go get -u gopkg.in/mikedanese/gazel.v17/gazel
 
 for path in ${GOPATH//:/ }; do
   if [[ -e "${path}/bin/gazel" ]]; then

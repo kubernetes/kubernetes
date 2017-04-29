@@ -97,6 +97,7 @@ clientset-name
 clientset-only
 clientset-path
 cloud-config
+cloud-config-file
 cloud-provider
 cloud-provider-gce-lb-src-cidrs
 cluster-cidr
@@ -244,6 +245,7 @@ experimental-check-node-capabilities-before-mount
 experimental-cri
 experimental-dockershim
 experimental-dockershim-root-directory
+experimental-docker-enable-shared-pid
 experimental-fail-swap-on
 experimental-kernel-memcg-notification
 experimental-keystone-ca-file
