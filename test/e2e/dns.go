@@ -321,10 +321,10 @@ var _ = framework.KubeDescribe("DNS", func() {
 			"kubernetes.default",
 			"kubernetes.default.svc",
 			"kubernetes.default.svc.cluster.local",
-			"google.com",
 		}
 		// Added due to #8512. This is critical for GCE and GKE deployments.
 		if framework.ProviderIs("gce", "gke") {
+			namesToResolve = append(namesToResolve, "google.com")
 			namesToResolve = append(namesToResolve, "metadata")
 		}
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name)
