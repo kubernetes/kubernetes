@@ -2609,6 +2609,13 @@
        "$ref": "v1.Toleration"
       },
       "description": "If specified, the pod's tolerations."
+     },
+     "hostMappings": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.HostAlias"
+      },
+      "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods."
      }
     }
    },
@@ -4356,6 +4363,23 @@
       "type": "integer",
       "format": "int64",
       "description": "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system."
+     }
+    }
+   },
+   "v1.HostAlias": {
+    "id": "v1.HostAlias",
+    "description": "HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
+    "properties": {
+     "ip": {
+      "type": "string",
+      "description": "IP address of the host file entry."
+     },
+     "hostnames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Hostnames for the the above IP address."
      }
     }
    },
