@@ -14,6 +14,7 @@ go_library(
         "active_deadline.go",
         "disk_manager.go",
         "doc.go",
+        "heartbeat.go",
         "kubelet.go",
         "kubelet_cadvisor.go",
         "kubelet_getters.go",
@@ -146,6 +147,7 @@ go_test(
     srcs = [
         "active_deadline_test.go",
         "disk_manager_test.go",
+        "heartbeat_test.go",
         "kubelet_cadvisor_test.go",
         "kubelet_getters_test.go",
         "kubelet_network_test.go",
