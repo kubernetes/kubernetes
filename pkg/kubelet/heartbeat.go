@@ -47,6 +47,7 @@ func registerInitiallyWithInfiniteRetry(theClock clock.Clock, register func() bo
 	step := 100 * time.Millisecond
 	complete := false
 	for !complete {
+		glog.Infof("Attempting to run registration function (%v) (attempt %v)", message, try)
 		try = try + 1
 		glog.Infof("Attempting to run registration function (%v) (attempt %v)", message, try)
 		theClock.Sleep(step)
