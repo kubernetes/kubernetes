@@ -583,6 +583,7 @@ func TestGetPodStatus(t *testing.T) {
 	defer ctrl.Finish()
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
+	fnet := newFakeNetNs()
 	fnp := nettest.NewMockNetworkPlugin(ctrl)
 	fos := &containertesting.FakeOS{}
 	frh := &containertesting.FakeRuntimeHelper{}
@@ -592,6 +593,7 @@ func TestGetPodStatus(t *testing.T) {
 		runtimeHelper: frh,
 		os:            fos,
 		network:       network.NewPluginManager(fnp),
+		netns:         fnet,
 	}
 
 	ns := func(seconds int64) int64 {
@@ -808,6 +810,8 @@ func TestGetPodStatus(t *testing.T) {
 			podTimes[podFinishedMarkerPath(r.runtimeHelper.GetPodDir(tt.result.ID), pod.Id)] = tt.result.ContainerStatuses[0].FinishedAt
 		}
 
+		ctrl := gomock.NewController(t)
+
 		r.os.(*containertesting.FakeOS).StatFn = func(name string) (os.FileInfo, error) {
 			podTime, ok := podTimes[name]
 			if !ok {
@@ -817,9 +821,13 @@ func TestGetPodStatus(t *testing.T) {
 			mockFI.EXPECT().ModTime().Return(podTime)
 			return mockFI, nil
 		}
-		fnp.EXPECT().Name().Return(tt.networkPluginName)
 
-		if tt.networkPluginName == kubenet.KubenetPluginName {
+		if tt.networkPluginName == network.DefaultPluginName {
+			fnp.EXPECT().Name().Return(tt.networkPluginName)
+		}
+
+		if tt.pods != nil && tt.networkPluginName == kubenet.KubenetPluginName {
+			fnp.EXPECT().Name().Return(tt.networkPluginName)
 			if tt.result.IP != "" {
 				fnp.EXPECT().GetPodNetworkStatus("default", "guestbook", kubecontainer.ContainerID{ID: "42"}).
 					Return(&network.PodNetworkStatus{IP: net.ParseIP(tt.result.IP)}, nil)
@@ -838,7 +846,9 @@ func TestGetPodStatus(t *testing.T) {
 
 		assert.Equal(t, tt.result, status, testCaseHint)
 		assert.Equal(t, []string{"ListPods"}, fr.called, testCaseHint)
+		fnet.networkNamespace = kubecontainer.ContainerID{}
 		fr.CleanCalls()
+		ctrl.Finish()
 	}
 }
 
@@ -1794,6 +1804,10 @@ func TestGarbageCollect(t *testing.T) {
 
 			for _, name := range serviceFileNames {
 				mockFI := containertesting.NewMockFileInfo(ctrl)
+				// we need to specify two calls
+				// first: get all systemd units
+				// second: filter only the files with a k8s_ prefix
+				mockFI.EXPECT().Name().Return(name)
 				mockFI.EXPECT().Name().Return(name)
 				fileInfos = append(fileInfos, mockFI)
 			}
@@ -1994,5 +2008,55 @@ func TestConstructSyslogIdentifier(t *testing.T) {
 	for i, testCase := range testCases {
 		identifier := constructSyslogIdentifier(testCase.podGenerateName, testCase.podName)
 		assert.Equal(t, testCase.identifier, identifier, fmt.Sprintf("Test case #%d", i))
+	}
+}
+
+func TestGetPodSystemdServiceFiles(t *testing.T) {
+	fs := kubetesting.NewFakeOS()
+	r := &Runtime{os: fs}
+
+	testCases := []struct {
+		serviceFilesOnDisk []string
+		expected           []string
+	}{
+		{
+			[]string{"one.service", "two.service", "k8s_513ce947-8f6e-4d27-8c03-99f97b78d680.service", "k8s_184482df-8630-4d41-b84f-302684871758.service", "k8s_f4a244d8-5ec2-4f59-b7dd-c9e130d6e7a3.service", "k8s_f5aad446-5598-488f-93a4-5a27e03e7fcb.service"},
+			[]string{"k8s_513ce947-8f6e-4d27-8c03-99f97b78d680.service", "k8s_184482df-8630-4d41-b84f-302684871758.service", "k8s_f4a244d8-5ec2-4f59-b7dd-c9e130d6e7a3.service", "k8s_f5aad446-5598-488f-93a4-5a27e03e7fcb.service"},
+		},
+		{
+			[]string{"one.service", "two.service"},
+			[]string{},
+		},
+		{
+			[]string{"one.service", "k8s_513ce947-8f6e-4d27-8c03-99f97b78d680.service"},
+			[]string{"k8s_513ce947-8f6e-4d27-8c03-99f97b78d680.service"},
+		},
+	}
+	for i, tt := range testCases {
+		ctrl := gomock.NewController(t)
+
+		fs.ReadDirFn = func(dirname string) ([]os.FileInfo, error) {
+			serviceFileNames := tt.serviceFilesOnDisk
+			var fileInfos []os.FileInfo
+
+			for _, name := range serviceFileNames {
+				mockFI := containertesting.NewMockFileInfo(ctrl)
+				// we need to specify two calls
+				// first: get all systemd units
+				// second: filter only the files with a k8s_ prefix
+				mockFI.EXPECT().Name().Return(name)
+				mockFI.EXPECT().Name().Return(name)
+				fileInfos = append(fileInfos, mockFI)
+			}
+			return fileInfos, nil
+		}
+		serviceFiles, err := r.getPodSystemdServiceFiles()
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+		for _, f := range serviceFiles {
+			assert.Contains(t, tt.expected, f.Name(), fmt.Sprintf("Test case #%d", i))
+
+		}
 	}
 }
