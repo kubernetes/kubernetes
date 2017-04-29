@@ -33,6 +33,8 @@ type FakeNodes struct {
 
 var nodesResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "nodes"}
 
+var nodesKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "Node"}
+
 func (c *FakeNodes) Create(node *api.Node) (result *api.Node, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(nodesResource, node), &api.Node{})
@@ -84,7 +86,7 @@ func (c *FakeNodes) Get(name string, options v1.GetOptions) (result *api.Node, e
 
 func (c *FakeNodes) List(opts v1.ListOptions) (result *api.NodeList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(nodesResource, opts), &api.NodeList{})
+		Invokes(testing.NewRootListAction(nodesResource, nodesKind, opts), &api.NodeList{})
 	if obj == nil {
 		return nil, err
 	}

@@ -34,6 +34,8 @@ type FakeSecrets struct {
 
 var secretsResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "secrets"}
 
+var secretsKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "Secret"}
+
 func (c *FakeSecrets) Create(secret *api.Secret) (result *api.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(secretsResource, c.ns, secret), &api.Secret{})
@@ -80,7 +82,7 @@ func (c *FakeSecrets) Get(name string, options v1.GetOptions) (result *api.Secre
 
 func (c *FakeSecrets) List(opts v1.ListOptions) (result *api.SecretList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(secretsResource, c.ns, opts), &api.SecretList{})
+		Invokes(testing.NewListAction(secretsResource, secretsKind, c.ns, opts), &api.SecretList{})
 
 	if obj == nil {
 		return nil, err

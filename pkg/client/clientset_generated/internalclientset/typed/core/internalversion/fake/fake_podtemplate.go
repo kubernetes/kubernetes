@@ -34,6 +34,8 @@ type FakePodTemplates struct {
 
 var podtemplatesResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "podtemplates"}
 
+var podtemplatesKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "PodTemplate"}
+
 func (c *FakePodTemplates) Create(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(podtemplatesResource, c.ns, podTemplate), &api.PodTemplate{})
@@ -80,7 +82,7 @@ func (c *FakePodTemplates) Get(name string, options v1.GetOptions) (result *api.
 
 func (c *FakePodTemplates) List(opts v1.ListOptions) (result *api.PodTemplateList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podtemplatesResource, c.ns, opts), &api.PodTemplateList{})
+		Invokes(testing.NewListAction(podtemplatesResource, podtemplatesKind, c.ns, opts), &api.PodTemplateList{})
 
 	if obj == nil {
 		return nil, err
