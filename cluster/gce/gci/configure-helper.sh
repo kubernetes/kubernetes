@@ -1605,4 +1605,5 @@ else
 fi
 reset-motd
 prepare-mounter-rootfs
+modprobe configs
 echo "Done for the configuration for kubernetes"

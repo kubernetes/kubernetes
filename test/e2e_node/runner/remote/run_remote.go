@@ -523,6 +523,7 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 				Type:       "PERSISTENT",
 				InitializeParams: &compute.AttachedDiskInitializeParams{
 					SourceImage: sourceImage(imageConfig.image, imageConfig.project),
+					DiskSizeGb:  20,
 				},
 			},
 		},
