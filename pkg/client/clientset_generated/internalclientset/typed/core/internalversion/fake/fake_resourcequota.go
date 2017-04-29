@@ -34,6 +34,8 @@ type FakeResourceQuotas struct {
 
 var resourcequotasResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "resourcequotas"}
 
+var resourcequotasKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "ResourceQuota"}
+
 func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(resourcequotasResource, c.ns, resourceQuota), &api.ResourceQuota{})
@@ -90,7 +92,7 @@ func (c *FakeResourceQuotas) Get(name string, options v1.GetOptions) (result *ap
 
 func (c *FakeResourceQuotas) List(opts v1.ListOptions) (result *api.ResourceQuotaList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(resourcequotasResource, c.ns, opts), &api.ResourceQuotaList{})
+		Invokes(testing.NewListAction(resourcequotasResource, resourcequotasKind, c.ns, opts), &api.ResourceQuotaList{})
 
 	if obj == nil {
 		return nil, err

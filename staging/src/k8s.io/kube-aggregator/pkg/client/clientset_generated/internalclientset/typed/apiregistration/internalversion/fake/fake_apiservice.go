@@ -33,6 +33,8 @@ type FakeAPIServices struct {
 
 var apiservicesResource = schema.GroupVersionResource{Group: "apiregistration.k8s.io", Version: "", Resource: "apiservices"}
 
+var apiservicesKind = schema.GroupVersionKind{Group: "apiregistration.k8s.io", Version: "", Kind: "APIService"}
+
 func (c *FakeAPIServices) Create(aPIService *apiregistration.APIService) (result *apiregistration.APIService, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(apiservicesResource, aPIService), &apiregistration.APIService{})
@@ -84,7 +86,7 @@ func (c *FakeAPIServices) Get(name string, options v1.GetOptions) (result *apire
 
 func (c *FakeAPIServices) List(opts v1.ListOptions) (result *apiregistration.APIServiceList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(apiservicesResource, opts), &apiregistration.APIServiceList{})
+		Invokes(testing.NewRootListAction(apiservicesResource, apiservicesKind, opts), &apiregistration.APIServiceList{})
 	if obj == nil {
 		return nil, err
 	}
