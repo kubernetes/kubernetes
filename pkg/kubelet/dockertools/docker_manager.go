@@ -1540,7 +1540,7 @@ func (dm *DockerManager) killPodWithSyncResult(pod *v1.Pod, runtimePod kubeconta
 // and will attempt to lookup the other information if missing.
 func (dm *DockerManager) KillContainerInPod(containerID kubecontainer.ContainerID, container *v1.Container, pod *v1.Pod, message string, gracePeriodOverride *int64) error {
 	switch {
-	case containerID.IsEmpty():
+	case containerID.IsEmpty() && pod != nil && container != nil:
 		// Locate the container.
 		pods, err := dm.GetPods(false)
 		if err != nil {
