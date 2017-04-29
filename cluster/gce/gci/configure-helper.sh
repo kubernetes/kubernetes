@@ -99,6 +99,15 @@ function ensure-local-ssds() {
   done
 }
 
+# Prepare the node to install nvidia drivers from within a container.
+function prepare-for-nvidia-driver() {
+    modprobe configs
+    # Setup a work directory for overlay mounts
+    mkdir -p /home/kubernetes/bin/usr-overlay /home/kubernetes/bin/nvidia-overlay /home/kubernetes/bin/usr-overlay-work /home/kubernetes/bin/lib-overlay /home/kubernetes/bin/lib-overlay-work
+    mount -t overlay -o lowerdir=/usr,upperdir=/home/kubernetes/bin/usr-overlay,workdir=/home/kubernetes/bin/usr-overlay-work none /usr
+    mount -t overlay -o lowerdir=/lib,upperdir=/home/kubernetes/bin/lib-overlay,workdir=/home/kubernetes/bin/lib-overlay-work none /lib
+}
+
 # Installs logrotate configuration files
 function setup-logrotate() {
   mkdir -p /etc/logrotate.d/
@@ -1543,6 +1552,7 @@ create-dirs
 setup-kubelet-dir
 ensure-local-ssds
 setup-logrotate
+prepare-for-nvidia-driver
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   mount-master-pd
   create-node-pki
