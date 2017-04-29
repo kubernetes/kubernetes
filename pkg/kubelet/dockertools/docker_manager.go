@@ -93,7 +93,7 @@ const (
 	// ndots specifies the minimum number of dots that a domain name must contain for the resolver to consider it as FQDN (fully-qualified)
 	// we want to able to consider SRV lookup names like _dns._udp.kube-dns.default.svc to be considered relative.
 	// hence, setting ndots to be 5.
-	ndotsDNSOption = "options ndots:5\n"
+	ndotsDNSOption = "options use-vc ndots:5\n"
 	// In order to avoid unnecessary SIGKILLs, give every container a minimum grace
 	// period after SIGTERM. Docker will guarantee the termination, but SIGTERM is
 	// potentially dangerous.
