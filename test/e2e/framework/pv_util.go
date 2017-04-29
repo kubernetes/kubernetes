@@ -689,6 +689,19 @@ func createPD() (string, error) {
 
 		volumeName := "aws://" + az + "/" + awsID
 		return volumeName, nil
+	} else if TestContext.Provider == "azure" {
+		pdName := fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
+		azureCloud, err := GetAzureCloud()
+		if err != nil {
+			return "", err
+		}
+
+		_, diskUri, _, err := azureCloud.CreateVolume(pdName, "" /* account */, "" /* sku */, "" /* location */, 1 /* sizeGb */)
+		if err != nil {
+			return "", err
+		}
+		return diskUri, nil
+
 	} else {
 		return "", fmt.Errorf("provider does not support volume creation")
 	}
@@ -726,6 +739,18 @@ func deletePD(pdName string) error {
 			} else {
 				return fmt.Errorf("error deleting EBS volumes: %v", err)
 			}
+		}
+		return nil
+	} else if TestContext.Provider == "azure" {
+		azureCloud, err := GetAzureCloud()
+		if err != nil {
+			return err
+		}
+		diskName := pdName[(strings.LastIndex(pdName, "/") + 1):]
+		err = azureCloud.DeleteVolume(diskName, pdName)
+		if err != nil {
+			Logf("failed to delete Azure volume %q: %v", pdName, err)
+			return err
 		}
 		return nil
 	} else {
