@@ -3202,6 +3202,13 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		{ // Populate HostAliases.
+			HostAliases:   []api.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1", "host2"}}},
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	for i := range successCases {
 		if errs := ValidatePodSpec(&successCases[i], field.NewPath("field")); len(errs) != 0 {
@@ -3261,6 +3268,24 @@ func TestValidatePodSpec(t *testing.T) {
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
+		},
+		"with hostNetwork and hostAliases": {
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
+			HostAliases: []api.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1", "host2"}}},
+		},
+		"with hostAliases with invalid IP": {
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: false,
+			},
+			HostAliases: []api.HostAlias{{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}},
+		},
+		"with hostAliases with invalid hostname": {
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: false,
+			},
+			HostAliases: []api.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"@#$^#@#$"}}},
 		},
 		"bad supplementalGroups large than math.MaxInt32": {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
