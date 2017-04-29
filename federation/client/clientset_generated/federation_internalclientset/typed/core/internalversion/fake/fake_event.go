@@ -34,6 +34,8 @@ type FakeEvents struct {
 
 var eventsResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "events"}
 
+var eventsKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "Event"}
+
 func (c *FakeEvents) Create(event *api.Event) (result *api.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(eventsResource, c.ns, event), &api.Event{})
@@ -80,7 +82,7 @@ func (c *FakeEvents) Get(name string, options v1.GetOptions) (result *api.Event,
 
 func (c *FakeEvents) List(opts v1.ListOptions) (result *api.EventList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(eventsResource, c.ns, opts), &api.EventList{})
+		Invokes(testing.NewListAction(eventsResource, eventsKind, c.ns, opts), &api.EventList{})
 
 	if obj == nil {
 		return nil, err

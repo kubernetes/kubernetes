@@ -34,6 +34,8 @@ type FakePodPresets struct {
 
 var podpresetsResource = schema.GroupVersionResource{Group: "settings.k8s.io", Version: "v1alpha1", Resource: "podpresets"}
 
+var podpresetsKind = schema.GroupVersionKind{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPreset"}
+
 func (c *FakePodPresets) Create(podPreset *v1alpha1.PodPreset) (result *v1alpha1.PodPreset, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(podpresetsResource, c.ns, podPreset), &v1alpha1.PodPreset{})
@@ -80,7 +82,7 @@ func (c *FakePodPresets) Get(name string, options v1.GetOptions) (result *v1alph
 
 func (c *FakePodPresets) List(opts v1.ListOptions) (result *v1alpha1.PodPresetList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podpresetsResource, c.ns, opts), &v1alpha1.PodPresetList{})
+		Invokes(testing.NewListAction(podpresetsResource, podpresetsKind, c.ns, opts), &v1alpha1.PodPresetList{})
 
 	if obj == nil {
 		return nil, err

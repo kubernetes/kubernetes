@@ -34,6 +34,8 @@ type FakeEndpoints struct {
 
 var endpointsResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "endpoints"}
 
+var endpointsKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Endpoints"}
+
 func (c *FakeEndpoints) Create(endpoints *v1.Endpoints) (result *v1.Endpoints, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(endpointsResource, c.ns, endpoints), &v1.Endpoints{})
@@ -80,7 +82,7 @@ func (c *FakeEndpoints) Get(name string, options meta_v1.GetOptions) (result *v1
 
 func (c *FakeEndpoints) List(opts meta_v1.ListOptions) (result *v1.EndpointsList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(endpointsResource, c.ns, opts), &v1.EndpointsList{})
+		Invokes(testing.NewListAction(endpointsResource, endpointsKind, c.ns, opts), &v1.EndpointsList{})
 
 	if obj == nil {
 		return nil, err
