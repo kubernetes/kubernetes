@@ -258,7 +258,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 		}
 
 		// Should use the revision in existingNewRS's annotation, since it set by before
-		updateConditions := deploymentutil.SetDeploymentRevision(d, rsCopy.Annotations[deploymentutil.RevisionAnnotation])
+		needsUpdate := deploymentutil.SetDeploymentRevision(d, rsCopy.Annotations[deploymentutil.RevisionAnnotation])
 		// If no other Progressing condition has been recorded and we need to estimate the progress
 		// of this deployment then it is likely that old users started caring about progress. In that
 		// case we need to take into account the first time we noticed their new replica set.
@@ -267,10 +267,10 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 			msg := fmt.Sprintf("Found new replica set %q", rsCopy.Name)
 			condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, deploymentutil.FoundNewRSReason, msg)
 			deploymentutil.SetDeploymentCondition(&d.Status, *condition)
-			updateConditions = true
+			needsUpdate = true
 		}
 
-		if updateConditions {
+		if needsUpdate {
 			if d, err = dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d); err != nil {
 				return nil, err
 			}
@@ -320,6 +320,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 	// Create the new ReplicaSet. If it already exists, then we need to check for possible
 	// hash collisions. If there is any other error, we need to report it in the status of
 	// the Deployment.
+	alreadyExists := false
 	createdRS, err := dc.client.Extensions().ReplicaSets(d.Namespace).Create(&newRS)
 	switch {
 	// We may end up hitting this due to a slow cache or a fast resync of the Deployment.
@@ -328,6 +329,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 	// this is a hash collision and we need to increment the uniquifier field in the status of
 	// the Deployment and try the creation again.
 	case errors.IsAlreadyExists(err):
+		alreadyExists = true
 		rs, rsErr := dc.rsLister.ReplicaSets(newRS.Namespace).Get(newRS.Name)
 		if rsErr != nil {
 			return nil, rsErr
@@ -342,24 +344,25 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 			if d.Status.Uniquifier == nil {
 				d.Status.Uniquifier = new(int64)
 			}
+			previousUniquifier := *d.Status.Uniquifier
 			*d.Status.Uniquifier++
-			// We don't care about this error - the Deployment will be requeued anyway.
-			if _, dErr := dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d); dErr != nil {
-				glog.V(2).Infof("couldn't update uniquifier for deployment %q: %v", d.Name, dErr)
+			// Update the uniquifier for the Deployment and let it requeue by returning the original
+			// error.
+			_, dErr := dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d)
+			if dErr == nil {
+				glog.V(2).Infof("Found a hash collision for deployment %q - bumping uniquifier (%d->%d) to resolve it", d.Name, previousUniquifier, *d.Status.Uniquifier)
 			}
 			return nil, err
 		}
 		// Pass through the matching ReplicaSet as the new ReplicaSet.
 		createdRS = rs
+		err = nil
 	case err != nil:
 		msg := fmt.Sprintf("Failed to create new replica set %q: %v", newRS.Name, err)
 		if d.Spec.ProgressDeadlineSeconds != nil {
 			cond := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionFalse, deploymentutil.FailedRSCreateReason, msg)
 			deploymentutil.SetDeploymentCondition(&d.Status, *cond)
 			// We don't really care about this error at this point, since we have a bigger issue to report.
-			// TODO: Update the rest of the Deployment status, too. We may need to do this every time we
-			// error out in all other places in the controller so that we let users know that their deployments
-			// have been noticed by the controller, albeit with errors.
 			// TODO: Identify which errors are permanent and switch DeploymentIsFailed to take into account
 			// these reasons as well. Related issue: https://github.com/kubernetes/kubernetes/issues/18568
 			_, _ = dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d)
@@ -367,17 +370,20 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, deploymentutil.FailedRSCreateReason, msg)
 		return nil, err
 	}
-	if newReplicasCount > 0 {
+	if !alreadyExists && newReplicasCount > 0 {
 		dc.eventRecorder.Eventf(d, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled up replica set %s to %d", createdRS.Name, newReplicasCount)
 	}
 
-	deploymentutil.SetDeploymentRevision(d, newRevision)
-	if d.Spec.ProgressDeadlineSeconds != nil {
+	needsUpdate := deploymentutil.SetDeploymentRevision(d, newRevision)
+	if !alreadyExists && d.Spec.ProgressDeadlineSeconds != nil {
 		msg := fmt.Sprintf("Created new replica set %q", createdRS.Name)
 		condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, deploymentutil.NewReplicaSetReason, msg)
 		deploymentutil.SetDeploymentCondition(&d.Status, *condition)
+		needsUpdate = true
 	}
-	_, err = dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d)
+	if needsUpdate {
+		_, err = dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d)
+	}
 	return createdRS, err
 }
 
