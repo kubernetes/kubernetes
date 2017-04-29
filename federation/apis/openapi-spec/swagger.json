@@ -10201,6 +10201,22 @@
      }
     }
    },
+   "io.k8s.kubernetes.pkg.api.v1.HostAlias": {
+    "description": "HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
+    "properties": {
+     "hostnames": {
+      "description": "Hostnames for the the above IP address.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "ip": {
+      "description": "IP address of the host file entry.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.HostPathVolumeSource": {
     "description": "Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.",
     "required": [
@@ -10721,6 +10737,15 @@
      "hostIPC": {
       "description": "Use the host's ipc namespace. Optional: Default to false.",
       "type": "boolean"
+     },
+     "hostMappings": {
+      "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.HostAlias"
+      },
+      "x-kubernetes-patch-merge-key": "IP",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "hostNetwork": {
       "description": "Host networking requested for this pod. Use the host's network namespace. If this option is set, the ports that will be used must be specified. Default to false.",
