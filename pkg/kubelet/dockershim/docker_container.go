@@ -163,6 +163,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 
 		// Apply security context.
 		applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, hc, securityOptSep)
+		modifyPIDNamespaceOverrides(ds.disableSharedPID, apiVersion, hc)
 	}
 
 	// Apply cgroupsParent derived from the sandbox config.
