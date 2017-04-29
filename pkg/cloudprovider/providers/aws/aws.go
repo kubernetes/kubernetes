@@ -412,6 +412,11 @@ type CloudConfig struct {
 		//local VPC subnet (so load balancers can access it). E.g. 10.82.0.0/16 30000-32000.
 		DisableSecurityGroupIngress bool
 
+		//AWS has a hard limit of 500 security groups. For large clusters creating a security group for each ELB
+		//can cause the max number of security groups to be reached. If this is set instead of creating a new
+		//Security group for each ELB this security group will be used instead.
+		ElbSecurityGroup string
+
 		//During the instantiation of an new AWS cloud provider, the detected region
 		//is validated against a known set of regions.
 		//
@@ -2724,7 +2729,10 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 
 	// Create a security group for the load balancer
 	var securityGroupID string
-	{
+	if c.cfg.Global.ElbSecurityGroup != "" {
+		securityGroupID = c.cfg.Global.ElbSecurityGroup
+	} else {
+
 		sgName := "k8s-elb-" + loadBalancerName
 		sgDescription := fmt.Sprintf("Security group for Kubernetes ELB %s (%v)", loadBalancerName, serviceName)
 		securityGroupID, err = c.ensureSecurityGroup(sgName, sgDescription)
@@ -3084,6 +3092,10 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 		// Collect the security groups to delete
 		securityGroupIDs := map[string]struct{}{}
 		for _, securityGroupID := range lb.SecurityGroups {
+			if *securityGroupID == c.cfg.Global.ElbSecurityGroup {
+				//We don't want to delete a security group that was defined in the Cloud Configurationn.
+				continue
+			}
 			if isNilOrEmpty(securityGroupID) {
 				glog.Warning("Ignoring empty security group in ", service.Name)
 				continue
