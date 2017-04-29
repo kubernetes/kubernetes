@@ -417,6 +417,7 @@ test/images/serve_hostname
 test/integration/examples
 test/integration/federation
 test/integration/metrics
+test/integration/node
 test/integration/objectmeta
 test/integration/openshift
 test/soak/cauldron

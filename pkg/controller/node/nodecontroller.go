@@ -82,8 +82,6 @@ var (
 )
 
 const (
-	// nodeStatusUpdateRetry controls the number of retries of writing NodeStatus update.
-	nodeStatusUpdateRetry = 5
 	// controls how often NodeController will try to evict Pods from non-responsive Nodes.
 	nodeEvictionPeriod = 100 * time.Millisecond
 	// Burst value for all eviction rate limiters
@@ -92,6 +90,10 @@ const (
 	apiserverStartupGracePeriod = 10 * time.Minute
 	// The amount of time the nodecontroller should sleep between retrying NodeStatus updates
 	retrySleepTime = 20 * time.Millisecond
+
+	// This needs to be identical to the value for NodeStatusUpdateRetry in the kubelet, and should be
+	// enforced as such in the integration tests.  It is duplicated to avoid a package dependency.
+	NodeStatusUpdateRetry = 5
 )
 
 type zoneState string
@@ -125,15 +127,16 @@ type NodeController struct {
 	// it doesn't receive update for this amount of time, it will start posting "NodeReady==
 	// ConditionUnknown". The amount of time before which NodeController start evicting pods
 	// is controlled via flag 'pod-eviction-timeout'.
-	// Note: be cautious when changing the constant, it must work with nodeStatusUpdateFrequency
+	// Note: be cautious when changing the constant, it must work with NodeStatusUpdateFrequency
+	// which should be shared and common between all kubelets.
 	// in kubelet. There are several constraints:
-	// 1. nodeMonitorGracePeriod must be N times more than nodeStatusUpdateFrequency, where
-	//    N means number of retries allowed for kubelet to post node status. It is pointless
-	//    to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
-	//    will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
-	//    The constant must be less than podEvictionTimeout.
-	// 2. nodeMonitorGracePeriod can't be too large for user experience - larger value takes
-	//    longer for user to see up-to-date node status.
+	// 1. nodeMonitorGracePeriod MUST be >= NodeStatusUpdateRetry * NodeStatusUpdateFrequency.
+	//    	Otherwise: there may be fresh values from the kubelet that are otherwise missed.
+	//    Also, nodeMonitorGracePeriod MUST be < podEvictionTimeout.
+	//    	Otherwise, we may evict a pod before its node was truly declared unhealthy.
+	// 2. nodeMonitorGracePeriod logically must be <= NodeStatusUpdateRetry * NodeStatusUpdateFrequency,
+	// 	Since the status will not change after this all the retries for status are completed.
+	// Hence from (1) and (2), the grace period is best set NodeStatusUpdateRetry * NodeStatusUpdateFrequency.
 	nodeMonitorGracePeriod time.Duration
 	// Value controlling NodeController monitoring period, i.e. how often does NodeController
 	// check node status posted from kubelet. This value should be lower than nodeMonitorGracePeriod.
@@ -611,7 +614,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			continue
 		}
 		node := nodeCopy.(*v1.Node)
-		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*nodeStatusUpdateRetry, func() (bool, error) {
+		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*NodeStatusUpdateRetry, func() (bool, error) {
 			gracePeriod, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeStatus(node)
 			if err == nil {
 				return true, nil

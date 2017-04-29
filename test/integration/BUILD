@@ -38,6 +38,7 @@ filegroup(
         "//test/integration/federation:all-srcs",
         "//test/integration/framework:all-srcs",
         "//test/integration/metrics:all-srcs",
+        "//test/integration/node:all-srcs",
         "//test/integration/objectmeta:all-srcs",
         "//test/integration/openshift:all-srcs",
         "//test/integration/scheduler_perf:all-srcs",
