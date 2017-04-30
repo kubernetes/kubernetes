@@ -39,6 +39,7 @@ from charms.reactive import is_state
 from charms.reactive import when, when_any, when_not
 from charms.reactive.helpers import data_changed
 from charms.kubernetes.common import get_version
+from charms.kubernetes.common import retry
 from charms.kubernetes.flagmanager import FlagManager
 
 from charmhelpers.core import hookenv
@@ -414,6 +415,7 @@ def push_api_data(kube_api):
 @when('kubernetes-master.components.started')
 def configure_cdk_addons():
     ''' Configure CDK addons '''
+    remove_state('cdk-addons.configured')
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
     args = [
         'arch=' + arch(),
@@ -422,13 +424,29 @@ def configure_cdk_addons():
         'enable-dashboard=' + dbEnabled
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
-    try:
-        check_call(['cdk-addons.apply'])
-    except CalledProcessError:
+    if not addons_ready():
         hookenv.status_set('waiting', 'Waiting to retry addon deployment')
         remove_state('cdk-addons.configured')
         return
+
     set_state('cdk-addons.configured')
+
+
+@retry(times=3, delay_secs=20)
+def addons_ready():
+    """
+    Test if the add ons got installed
+
+    Returns: True is the addons got applied
+
+    """
+    try:
+        check_call(['cdk-addons.apply'])
+        return True
+    except CalledProcessError:
+        hookenv.log("Addons are not ready yet.")
+        return False
+
 
 
 @when('loadbalancer.available', 'certificates.ca.available',
@@ -838,6 +856,7 @@ def setup_tokens(token, username, user):
         stream.write('{0},{1},{2}\n'.format(token, username, user))
 
 
+@retry(times=3, delay_secs=10)
 def all_kube_system_pods_running():
     ''' Check pod status in the kube-system namespace. Returns True if all
     pods are running, False otherwise. '''
