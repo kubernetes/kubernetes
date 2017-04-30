@@ -23,7 +23,7 @@ package v1alpha1
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	custom_metrics "k8s.io/metrics/pkg/apis/custom_metrics"
+	custom_metrics "k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/custom_metrics"
 	unsafe "unsafe"
 )
 

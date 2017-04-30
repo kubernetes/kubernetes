@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/metrics/pkg/apis/metrics"
-	"k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	"k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/metrics"
+	"k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/metrics/v1alpha1"
 )
 
 func init() {
@@ -38,7 +38,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  metrics.GroupName,
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/metrics/pkg/apis/metrics",
+			ImportPrefix:               "k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/metrics",
 			RootScopedKinds:            sets.NewString("NodeMetrics"),
 			AddInternalObjectsToScheme: metrics.AddToScheme,
 		},

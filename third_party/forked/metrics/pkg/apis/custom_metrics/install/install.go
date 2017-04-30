@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/metrics/pkg/apis/custom_metrics"
-	"k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
+	"k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/custom_metrics"
+	"k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/custom_metrics/v1alpha1"
 )
 
 func init() {
@@ -37,7 +37,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  custom_metrics.GroupName,
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/metrics/pkg/apis/custom_metrics",
+			ImportPrefix:               "k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/custom_metrics",
 			AddInternalObjectsToScheme: custom_metrics.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

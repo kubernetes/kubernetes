@@ -21,7 +21,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	metricsv1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	metricsv1alpha1 "k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/metrics/v1alpha1"
 )
 
 var Scheme = runtime.NewScheme()

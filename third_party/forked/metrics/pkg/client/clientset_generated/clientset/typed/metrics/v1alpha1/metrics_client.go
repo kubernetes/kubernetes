@@ -19,8 +19,8 @@ package v1alpha1
 import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	v1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
-	"k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme"
+	v1alpha1 "k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/metrics/v1alpha1"
+	"k8s.io/kubernetes/third_party/forked/metrics/pkg/client/clientset_generated/clientset/scheme"
 )
 
 type MetricsV1alpha1Interface interface {

@@ -22,7 +22,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
-	metricsv1alpha1 "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1"
+	metricsv1alpha1 "k8s.io/kubernetes/third_party/forked/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1"
 )
 
 type Interface interface {

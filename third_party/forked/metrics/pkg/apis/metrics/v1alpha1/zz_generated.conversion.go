@@ -25,7 +25,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
-	metrics "k8s.io/metrics/pkg/apis/metrics"
+	metrics "k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/metrics"
 	unsafe "unsafe"
 )
 

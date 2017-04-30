@@ -19,7 +19,7 @@ package custom_metrics
 import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
+	"k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/custom_metrics/v1alpha1"
 )
 
 // CustomMetricsClient is a client for fetching metrics

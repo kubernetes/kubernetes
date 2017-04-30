@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/testing"
-	"k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
-	cmclient "k8s.io/metrics/pkg/client/custom_metrics"
+	"k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/custom_metrics/v1alpha1"
+	cmclient "k8s.io/kubernetes/third_party/forked/metrics/pkg/client/custom_metrics"
 )
 
 type GetForActionImpl struct {

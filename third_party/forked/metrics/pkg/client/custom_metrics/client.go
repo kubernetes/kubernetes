@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
+	"k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/custom_metrics/v1alpha1"
 )
 
 type customMetricsClient struct {
