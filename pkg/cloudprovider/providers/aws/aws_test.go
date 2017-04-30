@@ -17,6 +17,7 @@ limitations under the License.
 package aws
 
 import (
+	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -385,8 +386,9 @@ func (ec2 *FakeEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (resp *ec2.Dele
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
-	panic("Not implemented")
+func (e *FakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
+	args := e.Called(request)
+	return args.Get(0).([]*ec2.SecurityGroup), nil
 }
 
 func (ec2 *FakeEC2) CreateSecurityGroup(*ec2.CreateSecurityGroupInput) (*ec2.CreateSecurityGroupOutput, error) {
@@ -1095,6 +1097,18 @@ func (self *FakeELB) expectDescribeLoadBalancers(loadBalancerName string) {
 	})
 }
 
+func (self *FakeEC2) expectDescribeSecurityGroups(groupName, clusterID string) {
+	tags := []*ec2.Tag{
+		{Key: aws.String(TagNameKubernetesClusterLegacy), Value: aws.String(TestClusterId)},
+		{Key: aws.String(fmt.Sprintf("%s%s", TagNameKubernetesClusterPrefix, TestClusterId)), Value: aws.String(ResourceLifecycleOwned)},
+	}
+
+	self.On("DescribeSecurityGroups", &ec2.DescribeSecurityGroupsInput{Filters: []*ec2.Filter{
+		newEc2Filter("group-name", groupName),
+		newEc2Filter("vpc-id", ""),
+	}}).Return([]*ec2.SecurityGroup{{Tags: tags}})
+}
+
 func TestDescribeLoadBalancerOnDelete(t *testing.T) {
 	awsServices := NewFakeAWSServices()
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
@@ -1284,4 +1298,38 @@ func TestProxyProtocolEnabled(t *testing.T) {
 	}
 	result = proxyProtocolEnabled(fakeBackend)
 	assert.False(t, result, "did not expect to find %s in %s", ProxyProtocolPolicyName, policies)
+}
+
+func TestLBExtraSecurityGroupsAnnotation(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
+
+	sg1 := "sg-000001"
+	sg2 := "sg-000002"
+
+	tests := []struct {
+		name string
+
+		extraSGsAnnotation string
+		expectedSGs        []string
+	}{
+		{"No extra SG annotation", "", []string{}},
+		{"Empty extra SGs specified", ", ,,", []string{}},
+		{"SG specified", sg1, []string{sg1}},
+		{"Multiple SGs specified", fmt.Sprintf("%s, %s", sg1, sg2), []string{sg1, sg2}},
+	}
+
+	awsServices.ec2.expectDescribeSecurityGroups("k8s-elb-aid", "cluster.test")
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			serviceName := types.NamespacedName{Namespace: "default", Name: "myservice"}
+
+			sgList, err := c.buildELBSecurityGroupList(serviceName, "aid", test.extraSGsAnnotation)
+			assert.NoError(t, err, "buildELBSecurityGroupList failed")
+			extraSGs := sgList[1:]
+			assert.True(t, sets.NewString(test.expectedSGs...).Equal(sets.NewString(extraSGs...)),
+				"Security Groups expected=%q , returned=%q", test.expectedSGs, extraSGs)
+		})
+	}
 }
