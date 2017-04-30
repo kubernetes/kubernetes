@@ -2865,6 +2865,26 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">numOfMatchingPods</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NumOfMatchingPods specifies the minimal number of pod that matching the selector; the term is considered to be matched if and only if the matching number is larger than NumOfMatchingPods. Different meanings when it is used with affinity vs. anti-affinity:<br>
+  * When used with anti-affinity, a node N is eligible only if the number of pods<br>
+    matching the LabelSelector that are running on nodes with the same value<br>
+    for key TopologyKey as N has is less than NumOfMatchingPods. For example,<br>
+    if NumOfMatchingPods is 1 (the default), then after this pod is scheduled to node M,<br>
+    there will not be more than one pod from the set selected by the LabelSelector<br>
+    running on nodes with M&#8217;s value for key TopologyKey.<br>
+  * When used with affinity (not implemented yet), a node N is eligible only if the number<br>
+    of pods matching the LabelSelector that are running on nodes with the same value<br>
+    for key TopologyKey as N has is greater or equal to NumOfMatchingPods.<br>
+    For example, if NumOfMatchingPods is 1 (the default), then after this pod is<br>
+    scheduled to node M, there will be at least one pods from the set selected by<br>
+    the LabelSelector running on nodes with M&#8217;s value for key TopologyKey.<br>
+The default value is 1.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -5581,7 +5601,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-04-29 05:45:24 UTC
+Last updated 2017-04-30 05:36:47 UTC
 </div>
 </div>
 </body>

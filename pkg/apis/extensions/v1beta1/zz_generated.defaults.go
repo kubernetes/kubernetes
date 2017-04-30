@@ -172,6 +172,9 @@ func SetObjectDefaults_DaemonSet(in *DaemonSet) {
 			}
 		}
 	}
+	if in.Spec.Template.Spec.Affinity != nil {
+		v1.SetDefaults_Affinity(in.Spec.Template.Spec.Affinity)
+	}
 }
 
 func SetObjectDefaults_DaemonSetList(in *DaemonSetList) {
@@ -312,6 +315,9 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 				}
 			}
 		}
+	}
+	if in.Spec.Template.Spec.Affinity != nil {
+		v1.SetDefaults_Affinity(in.Spec.Template.Spec.Affinity)
 	}
 }
 
@@ -464,6 +470,9 @@ func SetObjectDefaults_ReplicaSet(in *ReplicaSet) {
 				}
 			}
 		}
+	}
+	if in.Spec.Template.Spec.Affinity != nil {
+		v1.SetDefaults_Affinity(in.Spec.Template.Spec.Affinity)
 	}
 }
 
