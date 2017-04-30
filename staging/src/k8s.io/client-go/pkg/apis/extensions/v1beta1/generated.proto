@@ -325,6 +325,12 @@ message DeploymentStatus {
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated DeploymentCondition conditions = 6;
+
+  // Monotonically increasing counter that tracks hash collisions for
+  // the Deployment. Used as a collision avoidance mechanism by the
+  // Deployment controller.
+  // +optional
+  optional int64 uniquifier = 8;
 }
 
 // DeploymentStrategy describes how to replace existing pods with new ones.
