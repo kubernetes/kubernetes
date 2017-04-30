@@ -1193,6 +1193,16 @@ message Handler {
   optional TCPSocketAction tcpSocket = 3;
 }
 
+// HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
+// pod's hosts file.
+message HostAlias {
+  // IP address of the host file entry.
+  optional string ip = 1;
+
+  // Hostnames for the the above IP address.
+  repeated string hostnames = 2;
+}
+
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.
 message HostPathVolumeSource {
@@ -2734,6 +2744,13 @@ message PodSpec {
   // If specified, the pod's tolerations.
   // +optional
   repeated Toleration tolerations = 22;
+
+  // HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
+  // file if specified. This is only valid for non-hostNetwork pods.
+  // +optional
+  // +patchMergeKey=IP
+  // +patchStrategy=merge
+  repeated HostAlias hostMappings = 23;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
