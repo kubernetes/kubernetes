@@ -186,6 +186,7 @@ var map_DeploymentStatus = map[string]string{
 	"availableReplicas":   "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
 	"unavailableReplicas": "Total number of unavailable pods targeted by this deployment.",
 	"conditions":          "Represents the latest available observations of a deployment's current state.",
+	"uniquifier":          "Monotonically increasing counter that tracks hash collisions for the Deployment. Used as a collision avoidance mechanism by the Deployment controller.",
 }
 
 func (DeploymentStatus) SwaggerDoc() map[string]string {

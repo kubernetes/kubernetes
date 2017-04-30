@@ -12094,6 +12094,11 @@
       "type": "integer",
       "format": "int32"
      },
+     "uniquifier": {
+      "description": "Monotonically increasing counter that tracks hash collisions for the Deployment. Used as a collision avoidance mechanism by the Deployment controller.",
+      "type": "integer",
+      "format": "int64"
+     },
      "updatedReplicas": {
       "description": "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
       "type": "integer",

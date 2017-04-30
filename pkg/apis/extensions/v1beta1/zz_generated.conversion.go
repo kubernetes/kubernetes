@@ -630,6 +630,7 @@ func autoConvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in *Dep
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
 	out.Conditions = *(*[]extensions.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
+	out.Uniquifier = (*int64)(unsafe.Pointer(in.Uniquifier))
 	return nil
 }
 
@@ -646,6 +647,7 @@ func autoConvert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(in *ext
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
 	out.Conditions = *(*[]DeploymentCondition)(unsafe.Pointer(&in.Conditions))
+	out.Uniquifier = (*int64)(unsafe.Pointer(in.Uniquifier))
 	return nil
 }
 

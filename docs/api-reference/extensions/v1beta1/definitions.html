@@ -496,6 +496,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_deploymentcondition">v1beta1.DeploymentCondition</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">uniquifier</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Monotonically increasing counter that tracks hash collisions for the Deployment. Used as a collision avoidance mechanism by the Deployment controller.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -7986,7 +7993,7 @@ Both these may change in the future. Incoming requests are matched against the h
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-04-29 05:45:39 UTC
+Last updated 2017-04-30 02:28:59 UTC
 </div>
 </div>
 </body>

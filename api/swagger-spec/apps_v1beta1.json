@@ -4461,6 +4461,11 @@
        "$ref": "v1beta1.DeploymentCondition"
       },
       "description": "Represents the latest available observations of a deployment's current state."
+     },
+     "uniquifier": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Monotonically increasing counter that tracks hash collisions for the Deployment. Used as a collision avoidance mechanism by the Deployment controller."
      }
     }
    },
