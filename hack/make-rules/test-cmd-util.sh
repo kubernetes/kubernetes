@@ -1254,6 +1254,24 @@ run_kubectl_get_tests() {
   kubectl delete pods redis-master valid-pod "${kube_flags[@]}"
 }
 
+run_kubectl_rollout_with_non_default_namespace_test() {
+  ### Test rollout resource with non default namespace
+  # Pre-condition: no deployments exist
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Pre-condition: create custom namespace
+  kubectl create namespace my-namespace
+  ## check namespace 'my-namespace' is created.
+  kube::test::get_object_assert 'namespaces/my-namespace' "{{$id_field}}" 'my-namespace'
+  # Command
+  # Create deployments
+  kubectl create -f hack/testdata/deployment-non-default-namespace.yaml
+  # Check that trying to watch the status returns no error
+  kubectl rollout status -f hack/testdata/deployment-non-default-namespace.yaml
+  # Clean up
+  kubectl delete deployment nginx-non-default
+  kubectl delete namespace my-namespace
+}
+
 run_kubectl_request_timeout_tests() {
   ### Test global request timeout option
   # Pre-condition: no POD exists
@@ -3118,6 +3136,14 @@ runTests() {
     # TODO: Move get tests to run on rs instead of pods so that they can be
     # run for federation apiserver as well.
     run_kubectl_get_tests
+  fi
+
+  ###################
+  # Kubectl rollout #
+  ###################
+
+  if kube::test::if_supports_resource "${deployments}" ; then
+    run_kubectl_rollout_with_non_default_namespace_test
   fi
 
   ##################

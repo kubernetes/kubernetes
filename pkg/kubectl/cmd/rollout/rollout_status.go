@@ -126,7 +126,7 @@ func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []stri
 	}
 
 	// check if deployment's has finished the rollout
-	status, done, err := statusViewer.Status(cmdNamespace, info.Name, revision)
+	status, done, err := statusViewer.Status(info.Namespace, info.Name, revision)
 	if err != nil {
 		return err
 	}
