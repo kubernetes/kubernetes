@@ -89,6 +89,7 @@ kube::build::get_docker_wrapped_binaries() {
   case $1 in
     "amd64")
         local targets=(
+          cloud-controller-manager,busybox
           kube-apiserver,busybox
           kube-controller-manager,busybox
           kube-scheduler,busybox
@@ -97,6 +98,7 @@ kube::build::get_docker_wrapped_binaries() {
         );;
     "arm")
         local targets=(
+          cloud-controller-manager,armel/busybox
           kube-apiserver,armel/busybox
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
@@ -105,6 +107,7 @@ kube::build::get_docker_wrapped_binaries() {
         );;
     "arm64")
         local targets=(
+          cloud-controller-manager,aarch64/busybox
           kube-apiserver,aarch64/busybox
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
@@ -113,6 +116,7 @@ kube::build::get_docker_wrapped_binaries() {
         );;
     "ppc64le")
         local targets=(
+          cloud-controller-manager,ppc64le/busybox
           kube-apiserver,ppc64le/busybox
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
@@ -121,6 +125,7 @@ kube::build::get_docker_wrapped_binaries() {
         );;
     "s390x")
         local targets=(
+          cloud-controller-manager,s390x/busybox
           kube-apiserver,s390x/busybox
           kube-controller-manager,s390x/busybox
           kube-scheduler,s390x/busybox
