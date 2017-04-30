@@ -725,7 +725,7 @@ func (dm *DockerManager) runContainer(
 
 	userNsMode := ""
 	if opts.EnableHostUserNamespace {
-		userNsMode = "host"
+		userNsMode = namespaceModeHost
 	}
 
 	hc := &dockercontainer.HostConfig{
