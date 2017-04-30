@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 )
 
 const (
@@ -93,7 +93,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 
 // GetPodContainerName returns the CgroupName identifer, and its literal cgroupfs form on the host.
 func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, string) {
-	podQOS := qos.GetPodQOS(pod)
+	podQOS := v1helper.GetPodQOS(pod)
 	// Get the parent QOS container name
 	var parentContainer string
 	switch podQOS {

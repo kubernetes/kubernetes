@@ -38,9 +38,9 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
 
 // podStrategy implements behavior for Pods
@@ -63,7 +63,7 @@ func (podStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.O
 	pod := obj.(*api.Pod)
 	pod.Status = api.PodStatus{
 		Phase:    api.PodPending,
-		QOSClass: qos.InternalGetPodQOS(pod),
+		QOSClass: helper.GetPodQOS(pod),
 	}
 }
 

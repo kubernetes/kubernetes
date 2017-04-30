@@ -73,7 +73,6 @@ go_library(
         "//pkg/kubelet/preemption:go_default_library",
         "//pkg/kubelet/prober:go_default_library",
         "//pkg/kubelet/prober/results:go_default_library",
-        "//pkg/kubelet/qos:go_default_library",
         "//pkg/kubelet/remote:go_default_library",
         "//pkg/kubelet/rkt:go_default_library",
         "//pkg/kubelet/secret:go_default_library",

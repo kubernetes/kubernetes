@@ -21,7 +21,6 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
-        "//pkg/kubelet/qos:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
