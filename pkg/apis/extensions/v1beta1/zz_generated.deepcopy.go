@@ -368,6 +368,11 @@ func DeepCopy_v1beta1_DeploymentStatus(in interface{}, out interface{}, c *conve
 				}
 			}
 		}
+		if in.Uniquifier != nil {
+			in, out := &in.Uniquifier, &out.Uniquifier
+			*out = new(int64)
+			**out = **in
+		}
 		return nil
 	}
 }
