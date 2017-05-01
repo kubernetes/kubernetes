@@ -258,9 +258,11 @@ func (ds *dockerService) getIPFromPlugin(sandbox *dockertypes.ContainerJSON) (st
 	cID := kubecontainer.BuildContainerID(runtimeName, sandbox.ID)
 	networkStatus, err := ds.network.GetPodNetworkStatus(metadata.Namespace, metadata.Name, cID)
 	if err != nil {
-		// This might be a sandbox that somehow ended up without a default
-		// interface (eth0). We can't distinguish this from a more serious
-		// error, so callers should probably treat it as non-fatal.
+		// Ignore errors for now; PLEG races against network
+		// setup and asks for status (including IP) before
+		// the pod network is ready
+		// TODO(dcbw): don't call GetPodNetworkStatus() until we know
+		// networking is set up
 		return "", err
 	}
 	if networkStatus == nil {

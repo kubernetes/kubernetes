@@ -2379,10 +2379,14 @@ func (r *Runtime) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kube
 		}
 	} else {
 		containerID := kubecontainer.ContainerID{ID: string(uid)}
-		status, err := r.network.GetPodNetworkStatus(namespace, name, containerID)
-		if err != nil {
-			glog.Warningf("rkt: %v", err)
-		} else if status != nil {
+
+		// Ignore errors for now; PLEG races against network
+		// setup and asks for status (including IP) before
+		// the pod network is ready
+		// TODO(dcbw): don't call GetPodNetworkStatus() until we know
+		// networking is set up
+		status, _ := r.network.GetPodNetworkStatus(namespace, name, containerID)
+		if status != nil {
 			// status can be nil when the pod is running on the host network, in which case the pod IP
 			// will be populated by the upper layer.
 			podStatus.IP = status.IP.String()

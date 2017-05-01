@@ -362,7 +362,11 @@ func (dm *DockerManager) determineContainerIP(podNamespace, podName string, cont
 	if !isHostNetwork && dm.network.PluginName() != knetwork.DefaultPluginName {
 		netStatus, err := dm.network.GetPodNetworkStatus(podNamespace, podName, kubecontainer.DockerID(container.ID).ContainerID())
 		if err != nil {
-			glog.Error(err)
+			// Ignore errors for now; PLEG races against network
+			// setup and asks for status (including IP) before
+			// the pod network is ready
+			// TODO(dcbw): don't call GetPodNetworkStatus() until
+			// we know networking is set up
 			return result, err
 		} else if netStatus != nil {
 			result = netStatus.IP.String()
