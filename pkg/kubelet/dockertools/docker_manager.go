@@ -1877,8 +1877,7 @@ func (dm *DockerManager) calculateOomScoreAdj(pod *v1.Pod, container *v1.Contain
 
 // versionInfo wraps api version and daemon version.
 type versionInfo struct {
-	apiVersion    kubecontainer.Version
-	daemonVersion kubecontainer.Version
+	apiVersion kubecontainer.Version
 }
 
 // checkDockerAPIVersion checks current docker API version against expected version.
@@ -2751,19 +2750,14 @@ func (dm *DockerManager) GetPodStatus(uid kubetypes.UID, name, namespace string)
 	return podStatus, nil
 }
 
-// getVersionInfo returns apiVersion & daemonVersion of docker runtime
+// getVersionInfo returns apiVersion of docker runtime
 func (dm *DockerManager) getVersionInfo() (versionInfo, error) {
 	apiVersion, err := dm.APIVersion()
 	if err != nil {
 		return versionInfo{}, err
 	}
-	daemonVersion, err := dm.Version()
-	if err != nil {
-		return versionInfo{}, err
-	}
 	return versionInfo{
-		apiVersion:    apiVersion,
-		daemonVersion: daemonVersion,
+		apiVersion: apiVersion,
 	}, nil
 }
 
