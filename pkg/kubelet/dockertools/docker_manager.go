@@ -931,7 +931,6 @@ func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 		metrics.ContainerManagerLatency.WithLabelValues("GetPods").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	pods := make(map[kubetypes.UID]*kubecontainer.Pod)
-	var result []*kubecontainer.Pod
 
 	containers, err := GetKubeletDockerContainers(dm.client, all)
 	if err != nil {
@@ -964,6 +963,7 @@ func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 		pod.Containers = append(pod.Containers, converted)
 	}
 
+	result := make([]*kubecontainer.Pod, 0, len(pods))
 	// Convert map to list.
 	for _, p := range pods {
 		result = append(result, p)
@@ -973,13 +973,12 @@ func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 
 // List all images in the local storage.
 func (dm *DockerManager) ListImages() ([]kubecontainer.Image, error) {
-	var images []kubecontainer.Image
-
 	dockerImages, err := dm.client.ListImages(dockertypes.ImageListOptions{})
 	if err != nil {
-		return images, err
+		return []kubecontainer.Image{}, err
 	}
 
+	images := make([]kubecontainer.Image, 0, len(dockerImages))
 	for _, di := range dockerImages {
 		image, err := toRuntimeImage(&di)
 		if err != nil {
