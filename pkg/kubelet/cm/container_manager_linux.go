@@ -377,70 +377,25 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 
 	systemContainers := []*systemContainer{}
 	if cm.ContainerRuntime == "docker" {
-		dockerAPIVersion := getDockerAPIVersion(cm.cadvisorInterface)
-		if cm.EnableCRI {
-			// If kubelet uses CRI, dockershim will manage the cgroups and oom
-			// score for the docker processes.
-			// In the future, NodeSpec should mandate the cgroup that the
-			// runtime processes need to be in. For now, we still check the
-			// cgroup for docker periodically, so that kubelet can recognize
-			// the cgroup for docker and serve stats for the runtime.
-			// TODO(#27097): Fix this after NodeSpec is clearly defined.
-			cm.periodicTasks = append(cm.periodicTasks, func() {
-				glog.V(4).Infof("[ContainerManager]: Adding periodic tasks for docker CRI integration")
-				cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
-				if err != nil {
-					glog.Error(err)
-					return
-				}
-				glog.V(2).Infof("[ContainerManager]: Discovered runtime cgroups name: %s", cont)
-				cm.Lock()
-				defer cm.Unlock()
-				cm.RuntimeCgroupsName = cont
-			})
-		} else if cm.RuntimeCgroupsName != "" {
-			cont := newSystemCgroups(cm.RuntimeCgroupsName)
-			memoryLimit := (int64(cm.capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
-			if memoryLimit < MinDockerMemoryLimit {
-				glog.Warningf("Memory limit %d for container %s is too small, reset it to %d", memoryLimit, cm.RuntimeCgroupsName, MinDockerMemoryLimit)
-				memoryLimit = MinDockerMemoryLimit
+		// With the docker-CRI integration, dockershim will manage the cgroups
+		// and oom score for the docker processes.
+		// In the future, NodeSpec should mandate the cgroup that the
+		// runtime processes need to be in. For now, we still check the
+		// cgroup for docker periodically, so that kubelet can recognize
+		// the cgroup for docker and serve stats for the runtime.
+		// TODO(#27097): Fix this after NodeSpec is clearly defined.
+		cm.periodicTasks = append(cm.periodicTasks, func() {
+			glog.V(4).Infof("[ContainerManager]: Adding periodic tasks for docker CRI integration")
+			cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
+			if err != nil {
+				glog.Error(err)
+				return
 			}
-
-			glog.V(2).Infof("Configure resource-only container %s with memory limit: %d", cm.RuntimeCgroupsName, memoryLimit)
-			allowAllDevices := true
-			dockerContainer := &fs.Manager{
-				Cgroups: &configs.Cgroup{
-					Parent: "/",
-					Name:   cm.RuntimeCgroupsName,
-					Resources: &configs.Resources{
-						Memory:          memoryLimit,
-						MemorySwap:      -1,
-						AllowAllDevices: &allowAllDevices,
-					},
-				},
-			}
-			cont.ensureStateFunc = func(manager *fs.Manager) error {
-				return EnsureDockerInContainer(dockerAPIVersion, qos.DockerOOMScoreAdj, dockerContainer)
-			}
-			systemContainers = append(systemContainers, cont)
-		} else {
-			cm.periodicTasks = append(cm.periodicTasks, func() {
-				glog.V(10).Infof("Adding docker daemon periodic tasks")
-				if err := EnsureDockerInContainer(dockerAPIVersion, qos.DockerOOMScoreAdj, nil); err != nil {
-					glog.Error(err)
-					return
-				}
-				cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
-				if err != nil {
-					glog.Error(err)
-					return
-				}
-				glog.V(2).Infof("Discovered runtime cgroups name: %s", cont)
-				cm.Lock()
-				defer cm.Unlock()
-				cm.RuntimeCgroupsName = cont
-			})
-		}
+			glog.V(2).Infof("[ContainerManager]: Discovered runtime cgroups name: %s", cont)
+			cm.Lock()
+			defer cm.Unlock()
+			cm.RuntimeCgroupsName = cont
+		})
 	}
 
 	if cm.SystemCgroupsName != "" {
