@@ -27,10 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	finalizersutil "k8s.io/kubernetes/federation/pkg/federation-controller/util/finalizers"
-	"k8s.io/kubernetes/pkg/api"
 
 	"github.com/golang/glog"
 )
@@ -53,20 +51,17 @@ type DeletionHelper struct {
 	updateObjFunc UpdateObjFunc
 	objNameFunc   ObjNameFunc
 	updateTimeout time.Duration
-	eventRecorder record.EventRecorder
 	informer      util.FederatedInformer
 	updater       util.FederatedUpdater
 }
 
 func NewDeletionHelper(
-	updateObjFunc UpdateObjFunc, objNameFunc ObjNameFunc,
-	updateTimeout time.Duration, eventRecorder record.EventRecorder,
+	updateObjFunc UpdateObjFunc, objNameFunc ObjNameFunc, updateTimeout time.Duration,
 	informer util.FederatedInformer, updater util.FederatedUpdater) *DeletionHelper {
 	return &DeletionHelper{
 		updateObjFunc: updateObjFunc,
 		objNameFunc:   objNameFunc,
 		updateTimeout: updateTimeout,
-		eventRecorder: eventRecorder,
 		informer:      informer,
 		updater:       updater,
 	}
@@ -157,13 +152,10 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 			Type:        util.OperationTypeDelete,
 			ClusterName: clusterNsObj.ClusterName,
 			Obj:         clusterNsObj.Object.(runtime.Object),
+			Key:         objName,
 		})
 	}
-	err = dh.updater.UpdateWithOnError(operations, dh.updateTimeout, func(op util.FederatedOperation, operror error) {
-		objName := dh.objNameFunc(op.Obj)
-		dh.eventRecorder.Eventf(obj, api.EventTypeWarning, "DeleteInClusterFailed",
-			"Failed to delete obj %s in cluster %s: %v", objName, op.ClusterName, operror)
-	})
+	err = dh.updater.Update(operations, dh.updateTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute updates for obj %s: %v", objName, err)
 	}
