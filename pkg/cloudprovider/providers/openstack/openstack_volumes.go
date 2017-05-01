@@ -36,7 +36,7 @@ import (
 )
 
 type volumeService interface {
-	createVolume(opts VolumeCreateOpts) (string, error)
+	createVolume(opts VolumeCreateOpts) (string, string, error)
 	getVolume(diskName string) (Volume, error)
 	deleteVolume(volumeName string) error
 }
@@ -74,7 +74,7 @@ type VolumeCreateOpts struct {
 	Metadata     map[string]string
 }
 
-func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, error) {
+func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, string, error) {
 
 	create_opts := volumes_v1.CreateOpts{
 		Name:             opts.Name,
@@ -86,12 +86,12 @@ func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, error) {
 
 	vol, err := volumes_v1.Create(volumes.blockstorage, create_opts).Extract()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return vol.ID, nil
+	return vol.ID, vol.AvailabilityZone, nil
 }
 
-func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, error) {
+func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, string, error) {
 
 	create_opts := volumes_v2.CreateOpts{
 		Name:             opts.Name,
@@ -103,9 +103,9 @@ func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, error) {
 
 	vol, err := volumes_v2.Create(volumes.blockstorage, create_opts).Extract()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return vol.ID, nil
+	return vol.ID, vol.AvailabilityZone, nil
 }
 
 func (volumes *VolumesV1) getVolume(diskName string) (Volume, error) {
@@ -283,12 +283,12 @@ func (os *OpenStack) getVolume(diskName string) (Volume, error) {
 }
 
 // Create a volume of given size (in GiB)
-func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, err error) {
+func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, error) {
 
 	volumes, err := os.volumeService("")
 	if err != nil || volumes == nil {
 		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
-		return "", err
+		return "", "", err
 	}
 	opts := VolumeCreateOpts{
 		Name:         name,
@@ -299,15 +299,15 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 	if tags != nil {
 		opts.Metadata = *tags
 	}
-	volume_id, err := volumes.createVolume(opts)
+	volumeId, volumeAZ, err := volumes.createVolume(opts)
 
 	if err != nil {
 		glog.Errorf("Failed to create a %d GB volume: %v", size, err)
-		return "", err
+		return "", "", err
 	}
 
-	glog.Infof("Created volume %v", volume_id)
-	return volume_id, nil
+	glog.Infof("Created volume %v in Availability Zone: %v", volumeId, volumeAZ)
+	return volumeId, volumeAZ, nil
 }
 
 // GetDevicePath returns the path of an attached block storage volume, specified by its id.
