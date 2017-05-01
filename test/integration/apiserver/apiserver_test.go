@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2017 The Kubernetes Authors.
 

@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -325,13 +323,13 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 		Type:              v1.NodeReady,
 		Status:            v1.ConditionTrue,
 		Reason:            fmt.Sprintf("schedulable condition"),
-		LastHeartbeatTime: metav1.Time{time.Now()},
+		LastHeartbeatTime: metav1.Time{Time: time.Now()},
 	}
 	badCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
 		Status:            v1.ConditionUnknown,
 		Reason:            fmt.Sprintf("unschedulable condition"),
-		LastHeartbeatTime: metav1.Time{time.Now()},
+		LastHeartbeatTime: metav1.Time{Time: time.Now()},
 	}
 	// Create a new schedulable node, since we're first going to apply
 	// the unschedulable condition and verify that pods aren't scheduled.

@@ -9,14 +9,16 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["openshift_test.go"],
+    srcs = ["kubectl_test.go"],
     tags = [
         "automanaged",
         "integration",
     ],
     deps = [
-        "//pkg/master:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
+        "//pkg/kubectl/cmd/util:go_default_library",
+        "//test/integration/framework:go_default_library",
+        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
     ],
 )
 
