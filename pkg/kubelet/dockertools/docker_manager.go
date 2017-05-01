@@ -2090,7 +2090,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *v1.Pod, podStatus *kube
 				// If we are here it means that the container is dead and should be restarted, or never existed and should
 				// be created. We may be inserting this ID again if the container has changed and it has
 				// RestartPolicy::Always, but it's not a big deal.
-				message := fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
+				message := fmt.Sprintf("Container %+v has not been created, and will create it soon, or is dead, but RestartPolicy says that we should restart it.", container)
 				glog.V(3).Info(message)
 				containersToStart[index] = message
 			}

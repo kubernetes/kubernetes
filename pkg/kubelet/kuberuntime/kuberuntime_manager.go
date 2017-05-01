@@ -455,7 +455,7 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *v1.Pod, podS
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
-				message := fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
+				message := fmt.Sprintf("Container %+v has not been created, and will create it soon, is dead, but RestartPolicy says that we should restart it.", container)
 				glog.Info(message)
 				changes.ContainersToStart[index] = message
 			}
