@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/Azure/go-autorest/autorest"
@@ -328,11 +329,14 @@ func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
 		return nil, fmt.Errorf("initialing the device code authentication: %v", err)
 	}
 
-	fmt.Println(*deviceCode.Message)
+	_, err = fmt.Fprintln(os.Stderr, *deviceCode.Message)
+	if err != nil {
+		return nil, fmt.Errorf("prompting the device code message: %v", err)
+	}
 
 	token, err := azure.WaitForUserCompletion(client, deviceCode)
 	if err != nil {
-		return nil, fmt.Errorf("Waiting for device code authentication to complete: %v", err)
+		return nil, fmt.Errorf("waiting for device code authentication to complete: %v", err)
 	}
 
 	return &azureToken{
