@@ -1448,6 +1448,9 @@ function start-kube-addons {
   if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
     setup-addon-manifests "addons" "ip-masq-agent"
   fi
+  if [[ "${ENABLE_METADATA_PROXY:-}" == "simple" ]]; then
+    setup-addon-manifests "addons" "metadata-proxy/gce"
+  fi
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
