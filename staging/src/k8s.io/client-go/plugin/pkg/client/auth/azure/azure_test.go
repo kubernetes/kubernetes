@@ -101,9 +101,10 @@ type fakeTokenSource struct {
 
 func (ts *fakeTokenSource) Token() (*azureToken, error) {
 	return &azureToken{
-		token:    newFackeAzureToken(ts.accessToken, ts.expiresOn),
-		clientID: "fake",
-		tenantID: "fake",
+		token:       newFackeAzureToken(ts.accessToken, ts.expiresOn),
+		clientID:    "fake",
+		tenantID:    "fake",
+		apiserverID: "fake",
 	}, nil
 }
 
@@ -113,7 +114,7 @@ func token2Cfg(token *azureToken) map[string]string {
 	cfg[cfgRefreshToken] = token.token.RefreshToken
 	cfg[cfgClientID] = token.clientID
 	cfg[cfgTenantID] = token.tenantID
-	cfg[cfgApiserverID] = token.token.Resource
+	cfg[cfgApiserverID] = token.apiserverID
 	cfg[cfgExpiresIn] = token.token.ExpiresIn
 	cfg[cfgExpiresOn] = token.token.ExpiresOn
 	return cfg

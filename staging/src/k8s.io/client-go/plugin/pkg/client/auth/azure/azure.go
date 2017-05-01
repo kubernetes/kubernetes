@@ -131,9 +131,10 @@ func (r *azureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 }
 
 type azureToken struct {
-	token    azure.Token
-	clientID string
-	tenantID string
+	token       azure.Token
+	clientID    string
+	tenantID    string
+	apiserverID string
 }
 
 type tokenSource interface {
@@ -233,11 +234,12 @@ func (ts *azureTokenSource) retrieveTokenFromCfg() (*azureToken, error) {
 			ExpiresIn:    expiresIn,
 			ExpiresOn:    expiresOn,
 			NotBefore:    expiresOn,
-			Resource:     apiserverID,
+			Resource:     fmt.Sprintf("spn:%s", apiserverID),
 			Type:         tokenType,
 		},
-		clientID: clientID,
-		tenantID: tenantID,
+		clientID:    clientID,
+		tenantID:    tenantID,
+		apiserverID: apiserverID,
 	}, nil
 }
 
@@ -247,7 +249,7 @@ func (ts *azureTokenSource) storeTokenInCfg(token *azureToken) error {
 	newCfg[cfgRefreshToken] = token.token.RefreshToken
 	newCfg[cfgClientID] = token.clientID
 	newCfg[cfgTenantID] = token.tenantID
-	newCfg[cfgApiserverID] = token.token.Resource
+	newCfg[cfgApiserverID] = token.apiserverID
 	newCfg[cfgExpiresIn] = token.token.ExpiresIn
 	newCfg[cfgExpiresOn] = token.token.ExpiresOn
 
@@ -271,7 +273,7 @@ func (ts *azureTokenSource) refreshToken(token *azureToken) (*azureToken, error)
 	spt, err := azure.NewServicePrincipalTokenFromManualToken(
 		*oauthConfig,
 		token.clientID,
-		token.token.Resource,
+		token.apiserverID,
 		token.token,
 		callback)
 	if err != nil {
@@ -283,9 +285,10 @@ func (ts *azureTokenSource) refreshToken(token *azureToken) (*azureToken, error)
 	}
 
 	return &azureToken{
-		token:    spt.Token,
-		clientID: token.clientID,
-		tenantID: token.tenantID,
+		token:       spt.Token,
+		clientID:    token.clientID,
+		tenantID:    token.tenantID,
+		apiserverID: token.apiserverID,
 	}, nil
 }
 
@@ -333,8 +336,9 @@ func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
 	}
 
 	return &azureToken{
-		token:    *token,
-		clientID: ts.clientID,
-		tenantID: ts.tenantID,
+		token:       *token,
+		clientID:    ts.clientID,
+		tenantID:    ts.tenantID,
+		apiserverID: ts.apiserverID,
 	}, nil
 }
