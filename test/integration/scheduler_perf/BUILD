@@ -10,7 +10,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["util.go"],
+    srcs = [
+        "scheduler_perf_types.go",
+        "util.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
