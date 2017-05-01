@@ -30,7 +30,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/api/v1/helper:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubelet/api:go_default_library",

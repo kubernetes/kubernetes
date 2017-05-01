@@ -477,6 +477,18 @@ func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig
 		return err
 	}
 
+	// Set sysctls if requested
+	if lc.Sysctls != nil {
+		sysctls := make(map[string]string)
+		for k, v := range lc.Sysctls.Sysctls {
+			sysctls[k] = v
+		}
+		for k, v := range lc.Sysctls.UnsafeSysctls {
+			sysctls[k] = v
+		}
+		hc.Sysctls = sysctls
+	}
+
 	return nil
 }
 
@@ -507,13 +519,6 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 		},
 		HostConfig: hc,
 	}
-
-	// Set sysctls if requested
-	sysctls, err := getSysctlsFromAnnotations(c.Annotations)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sysctls from annotations %v for sandbox %q: %v", c.Annotations, c.Metadata.Name, err)
-	}
-	hc.Sysctls = sysctls
 
 	// Apply linux-specific options.
 	if lc := c.GetLinux(); lc != nil {
