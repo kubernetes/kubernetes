@@ -68,7 +68,7 @@ runTests() {
   # KUBE_RACE="-race"
   make -C "${KUBE_ROOT}" test \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
-      KUBE_GOFLAGS="${KUBE_GOFLAGS:-} -tags 'integration no-docker'" \
+      KUBE_GOFLAGS="${KUBE_GOFLAGS:-}" \
       KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=garbage*collector*=6 --alsologtostderr=true" \
       KUBE_RACE="" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \

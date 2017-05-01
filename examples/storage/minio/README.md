@@ -22,7 +22,7 @@ Minio is an AWS S3 compatible, object storage server built for cloud application
 
 ## Prerequisites
 
-This example assumes that you have a Kubernetes version >=1.4 cluster installed and running, and that you have installed the [`kubectl`](https://kubernetes.io/docs/user-guide/prereqs/) command line tool in your path. Please see the
+This example assumes that you have a Kubernetes version >=1.4 cluster installed and running, and that you have installed the [`kubectl`](https://kubernetes.io/docs/tasks/kubectl/install/) command line tool in your path. Please see the
 [getting started guides](https://kubernetes.io/docs/getting-started-guides/) for installation instructions for your platform.
 
 ## Minio Standalone Server Deployment
@@ -190,8 +190,8 @@ The following document describes the process to deploy [distributed Minio](https
 
 This example uses following core components of Kubernetes:
 
-- [_Pods_](https://kubernetes.io/docs/user-guide/pods/)
-- [_Services_](https://kubernetes.io/docs/user-guide/services/)
+- [_Pods_](https://kubernetes.io/docs/concepts/workloads/pods/pod/)
+- [_Services_](https://kubernetes.io/docs/concepts/services-networking/service/)
 - [_Statefulsets_](https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/)
 
 ### Distributed Quickstart

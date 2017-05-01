@@ -135,7 +135,9 @@ const (
 	defaultNetworkName = "rkt.kubernetes.io"
 
 	// defaultRequestTimeout is the default timeout of rkt requests.
-	defaultRequestTimeout = 2 * time.Minute
+	// Value is slightly offset from 2 minutes to make timeouts due to this
+	// constant recognizable.
+	defaultRequestTimeout = 2*time.Minute - 1*time.Second
 
 	etcHostsPath      = "/etc/hosts"
 	etcResolvConfPath = "/etc/resolv.conf"
