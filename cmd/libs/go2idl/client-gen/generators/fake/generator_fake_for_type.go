@@ -106,6 +106,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 
 	const pkgClientGoTesting = "k8s.io/client-go/testing"
 	m := map[string]interface{}{
+		"resource":             c.Namers["allLowercasePlural"].Name(t),
 		"type":                 t,
 		"package":              pkg,
 		"Package":              namer.IC(pkg),
@@ -144,6 +145,11 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"NewRootPatchSubresourceAction":  c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootPatchSubresourceAction"}),
 		"NewPatchSubresourceAction":      c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewPatchSubresourceAction"}),
 		"ExtractFromListOptions":         c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "ExtractFromListOptions"}),
+	}
+
+	// allow overriding the resource name
+	if resourceNameOverride := extractTag("resourceName", t.SecondClosestCommentLines); resourceNameOverride != "" {
+		m["resource"] = resourceNameOverride
 	}
 
 	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
@@ -195,7 +201,7 @@ type Fake$.type|publicPlural$ struct {
 `
 
 var resource = `
-var $.type|allLowercasePlural$Resource = $.GroupVersionResource|raw${Group: "$.groupName$", Version: "$.version$", Resource: "$.type|allLowercasePlural$"}
+var $.type|allLowercasePlural$Resource = $.GroupVersionResource|raw${Group: "$.groupName$", Version: "$.version$", Resource: "$.resource$"}
 `
 
 var listTemplate = `
