@@ -143,6 +143,14 @@ func newTestKubeletWithImageList(
 	fakeRuntime.RuntimeType = "test"
 	fakeRuntime.VersionInfo = "1.5.0"
 	fakeRuntime.ImageList = imageList
+	// Set ready conditions by default.
+	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
+		Conditions: []kubecontainer.RuntimeCondition{
+			{Type: "RuntimeReady", Status: true},
+			{Type: "NetworkReady", Status: true},
+		},
+	}
+
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
