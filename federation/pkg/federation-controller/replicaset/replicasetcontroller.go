@@ -196,7 +196,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	)
 	frsc.replicaSetLister = extensionslisters.NewReplicaSetLister(replicaSetIndexer)
 
-	frsc.fedUpdater = fedutil.NewFederatedUpdater(frsc.fedReplicaSetInformer,
+	frsc.fedUpdater = fedutil.NewFederatedUpdater(frsc.fedReplicaSetInformer, "replicaset", frsc.eventRecorder,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.ReplicaSet)
 			_, err := client.Extensions().ReplicaSets(rs.Namespace).Create(rs)
@@ -222,7 +222,6 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			return fmt.Sprintf("%s/%s", replicaset.Namespace, replicaset.Name)
 		},
 		updateTimeout,
-		frsc.eventRecorder,
 		frsc.fedReplicaSetInformer,
 		frsc.fedUpdater,
 	)
@@ -543,26 +542,22 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 
 		if !exists {
 			if replicas > 0 {
-				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "CreateInCluster",
-					"Creating replicaset in cluster %s", clusterName)
-
 				operations = append(operations, fedutil.FederatedOperation{
 					Type:        fedutil.OperationTypeAdd,
 					Obj:         lrs,
 					ClusterName: clusterName,
+					Key:         key,
 				})
 			}
 		} else {
 			currentLrs := lrsObj.(*extensionsv1.ReplicaSet)
 			// Update existing replica set, if needed.
 			if !fedutil.ObjectMetaAndSpecEquivalent(lrs, currentLrs) {
-				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "UpdateInCluster",
-					"Updating replicaset in cluster %s", clusterName)
-
 				operations = append(operations, fedutil.FederatedOperation{
 					Type:        fedutil.OperationTypeUpdate,
 					Obj:         lrs,
 					ClusterName: clusterName,
+					Key:         key,
 				})
 			}
 			fedStatus.Replicas += currentLrs.Status.Replicas
@@ -584,10 +579,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		// Everything is in order
 		return statusAllOk, nil
 	}
-	err = frsc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
-		frsc.eventRecorder.Eventf(frs, api.EventTypeWarning, "FailedUpdateInCluster",
-			"Replicaset update in cluster %s failed: %v", op.ClusterName, operror)
-	})
+	err = frsc.fedUpdater.Update(operations, updateTimeout)
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", key, err)
 		return statusError, err
