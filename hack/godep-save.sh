@@ -53,6 +53,9 @@ pushd "${KUBE_ROOT}" > /dev/null
   if [ ! -e "vendor/k8s.io/sample-apiserver" ]; then
     ln -s ../../staging/src/k8s.io/sample-apiserver vendor/k8s.io/sample-apiserver
   fi
+  if [ ! -e "vendor/k8s.io/metrics" ]; then
+    ln -s ../../staging/src/k8s.io/metrics
+  fi
 popd > /dev/null
 
 echo "Don't forget to run hack/update-godep-licenses.sh if you added or removed a dependency!"
