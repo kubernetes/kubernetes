@@ -480,8 +480,8 @@ func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
 }
 
 // Create a volume of given size (in GiB)
-func (rs *Rackspace) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, err error) {
-	return "", errors.New("unimplemented")
+func (rs *Rackspace) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, volumeAZ string, err error) {
+	return "", "", errors.New("unimplemented")
 }
 
 func (rs *Rackspace) DeleteVolume(volumeName string) error {
