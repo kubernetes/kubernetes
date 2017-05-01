@@ -47,14 +47,14 @@ import (
 	"k8s.io/kube-apiextensions-server/pkg/registry/customresourcestorage"
 )
 
-// apisHandler serves the `/apis` endpoint.
+// customResourceHandler serves the `/apis` endpoint.
 // This is registered as a filter so that it never collides with any explictly registered endpoints
 type customResourceHandler struct {
-	versionDiscoveryHandler *customResourceVersionDiscoveryHandler
-	groupDiscoveryHandler   *customResourceGroupDiscoveryHandler
+	versionDiscoveryHandler *versionDiscoveryHandler
+	groupDiscoveryHandler   *groupDiscoveryHandler
 
-	storageMutationLock sync.Mutex
-	// customStorage contains a map[types.UID]*customResourceInfo
+	customStorageLock sync.Mutex
+	// customStorage contains a customResourceStorageMap
 	customStorage atomic.Value
 
 	requestContextMapper apirequest.RequestContextMapper
@@ -72,9 +72,12 @@ type customResourceInfo struct {
 	requestScope handlers.RequestScope
 }
 
+// customResourceStorageMap goes from customresource to its storage
+type customResourceStorageMap map[types.UID]*customResourceInfo
+
 func NewCustomResourceHandler(
-	versionDiscoveryHandler *customResourceVersionDiscoveryHandler,
-	groupDiscoveryHandler *customResourceGroupDiscoveryHandler,
+	versionDiscoveryHandler *versionDiscoveryHandler,
+	groupDiscoveryHandler *groupDiscoveryHandler,
 	requestContextMapper apirequest.RequestContextMapper,
 	customResourceLister listers.CustomResourceLister,
 	delegate http.Handler,
@@ -91,24 +94,27 @@ func NewCustomResourceHandler(
 		admission:               admission,
 	}
 
-	ret.customStorage.Store(map[types.UID]*customResourceInfo{})
+	ret.customStorage.Store(customResourceStorageMap{})
 	return ret
 }
 
 func (r *customResourceHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx, ok := r.requestContextMapper.Get(req)
 	if !ok {
-		http.Error(w, "missing context", http.StatusInternalServerError)
+		// programmer error
+		panic("missing context")
 		return
 	}
 	requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 	if !ok {
-		http.Error(w, "missing requestInfo", http.StatusInternalServerError)
+		// programmer error
+		panic("missing requestInfo")
 		return
 	}
 	if !requestInfo.IsResourceRequest {
 		pathParts := splitPath(requestInfo.Path)
 		// only match /apis/<group>/<version>
+		// only registered under /apis
 		if len(pathParts) == 3 {
 			r.versionDiscoveryHandler.ServeHTTP(w, req)
 			return
@@ -192,7 +198,7 @@ func (r *customResourceHandler) removeDeadStorage() {
 	// these don't have to be live.  A snapshot is fine
 	// if we wrongly delete, that's ok.  The rest storage will be recreated on the next request
 	// if we wrongly miss one, that's ok.  We'll get it next time
-	storageMap := r.customStorage.Load().(map[types.UID]*customResourceInfo)
+	storageMap := r.customStorage.Load().(customResourceStorageMap)
 	allCustomResources, err := r.customResourceLister.List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -212,21 +218,21 @@ func (r *customResourceHandler) removeDeadStorage() {
 		}
 	}
 
-	r.storageMutationLock.Lock()
-	defer r.storageMutationLock.Unlock()
+	r.customStorageLock.Lock()
+	defer r.customStorageLock.Unlock()
 
 	r.customStorage.Store(storageMap)
 }
 
 func (r *customResourceHandler) getServingInfoFor(customResource *apiextensions.CustomResource) *customResourceInfo {
-	storageMap := r.customStorage.Load().(map[types.UID]*customResourceInfo)
+	storageMap := r.customStorage.Load().(customResourceStorageMap)
 	ret, ok := storageMap[customResource.UID]
 	if ok {
 		return ret
 	}
 
-	r.storageMutationLock.Lock()
-	defer r.storageMutationLock.Unlock()
+	r.customStorageLock.Lock()
+	defer r.customStorageLock.Unlock()
 
 	ret, ok = storageMap[customResource.UID]
 	if ok {

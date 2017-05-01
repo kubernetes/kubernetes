@@ -10,7 +10,10 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["basic_test.go"],
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "integration",
+    ],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

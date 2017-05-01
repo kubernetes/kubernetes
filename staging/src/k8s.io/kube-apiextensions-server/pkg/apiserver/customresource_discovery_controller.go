@@ -36,9 +36,9 @@ import (
 	listers "k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/internalversion"
 )
 
-type CustomResourceDiscoveryController struct {
-	versionHandler *customResourceVersionDiscoveryHandler
-	groupHandler   *customResourceGroupDiscoveryHandler
+type DiscoveryController struct {
+	versionHandler *versionDiscoveryHandler
+	groupHandler   *groupDiscoveryHandler
 
 	customResourceLister  listers.CustomResourceLister
 	customResourcesSynced cache.InformerSynced
@@ -49,14 +49,14 @@ type CustomResourceDiscoveryController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-func NewCustomResourceDiscoveryController(customResourceInformer informers.CustomResourceInformer, versionHandler *customResourceVersionDiscoveryHandler, groupHandler *customResourceGroupDiscoveryHandler) *CustomResourceDiscoveryController {
-	c := &CustomResourceDiscoveryController{
+func NewDiscoveryController(customResourceInformer informers.CustomResourceInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler) *DiscoveryController {
+	c := &DiscoveryController{
 		versionHandler:        versionHandler,
 		groupHandler:          groupHandler,
 		customResourceLister:  customResourceInformer.Lister(),
 		customResourcesSynced: customResourceInformer.Informer().HasSynced,
 
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "CustomResourceDiscoveryController"),
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DiscoveryController"),
 	}
 
 	customResourceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -70,10 +70,7 @@ func NewCustomResourceDiscoveryController(customResourceInformer informers.Custo
 	return c
 }
 
-func (c *CustomResourceDiscoveryController) sync(version schema.GroupVersion) error {
-
-	foundVersion := false
-	foundGroup := false
+func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 
 	apiVersionsForDiscovery := []metav1.GroupVersionForDiscovery{}
 	apiResourcesForDiscovery := []metav1.APIResource{}
@@ -82,7 +79,11 @@ func (c *CustomResourceDiscoveryController) sync(version schema.GroupVersion) er
 	if err != nil {
 		return err
 	}
+	foundVersion := false
+	foundGroup := false
 	for _, customResource := range customResources {
+		// TODO add status checking
+
 		if customResource.Spec.Group != version.Group {
 			continue
 		}
@@ -114,8 +115,9 @@ func (c *CustomResourceDiscoveryController) sync(version schema.GroupVersion) er
 	}
 
 	apiGroup := metav1.APIGroup{
-		Name:             version.Group,
-		Versions:         apiVersionsForDiscovery,
+		Name:     version.Group,
+		Versions: apiVersionsForDiscovery,
+		// the preferred versions for a group is arbitrary since there cannot be duplicate resources
 		PreferredVersion: apiVersionsForDiscovery[0],
 	}
 	c.groupHandler.setDiscovery(version.Group, discovery.NewAPIGroupHandler(Codecs, apiGroup))
@@ -131,12 +133,12 @@ func (c *CustomResourceDiscoveryController) sync(version schema.GroupVersion) er
 	return nil
 }
 
-func (c *CustomResourceDiscoveryController) Run(stopCh <-chan struct{}) {
+func (c *DiscoveryController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
-	defer glog.Infof("Shutting down CustomResourceDiscoveryController")
+	defer glog.Infof("Shutting down DiscoveryController")
 
-	glog.Infof("Starting CustomResourceDiscoveryController")
+	glog.Infof("Starting DiscoveryController")
 
 	if !cache.WaitForCacheSync(stopCh, c.customResourcesSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
@@ -149,13 +151,13 @@ func (c *CustomResourceDiscoveryController) Run(stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-func (c *CustomResourceDiscoveryController) runWorker() {
+func (c *DiscoveryController) runWorker() {
 	for c.processNextWorkItem() {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (c *CustomResourceDiscoveryController) processNextWorkItem() bool {
+func (c *DiscoveryController) processNextWorkItem() bool {
 	key, quit := c.queue.Get()
 	if quit {
 		return false
@@ -168,29 +170,29 @@ func (c *CustomResourceDiscoveryController) processNextWorkItem() bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("%v failed with : %v", key, err))
+	utilruntime.HandleError(fmt.Errorf("%v failed with: %v", key, err))
 	c.queue.AddRateLimited(key)
 
 	return true
 }
 
-func (c *CustomResourceDiscoveryController) enqueue(obj *apiextensions.CustomResource) {
+func (c *DiscoveryController) enqueue(obj *apiextensions.CustomResource) {
 	c.queue.Add(schema.GroupVersion{Group: obj.Spec.Group, Version: obj.Spec.Version})
 }
 
-func (c *CustomResourceDiscoveryController) addCustomResource(obj interface{}) {
+func (c *DiscoveryController) addCustomResource(obj interface{}) {
 	castObj := obj.(*apiextensions.CustomResource)
-	glog.V(4).Infof("Adding %s", castObj.Name)
+	glog.V(4).Infof("Adding customresource %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
-func (c *CustomResourceDiscoveryController) updateCustomResource(obj, _ interface{}) {
+func (c *DiscoveryController) updateCustomResource(obj, _ interface{}) {
 	castObj := obj.(*apiextensions.CustomResource)
-	glog.V(4).Infof("Updating %s", castObj.Name)
+	glog.V(4).Infof("Updating customresource %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
-func (c *CustomResourceDiscoveryController) deleteCustomResource(obj interface{}) {
+func (c *DiscoveryController) deleteCustomResource(obj interface{}) {
 	castObj, ok := obj.(*apiextensions.CustomResource)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
@@ -204,6 +206,6 @@ func (c *CustomResourceDiscoveryController) deleteCustomResource(obj interface{}
 			return
 		}
 	}
-	glog.V(4).Infof("Deleting %q", castObj.Name)
+	glog.V(4).Infof("Deleting customresource %q", castObj.Name)
 	c.enqueue(castObj)
 }

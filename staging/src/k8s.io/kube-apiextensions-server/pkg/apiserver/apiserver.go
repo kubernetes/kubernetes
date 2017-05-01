@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"net/http"
 	"time"
 
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
@@ -126,13 +127,18 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget,
 	}
 	customResourceInformers := internalinformers.NewSharedInformerFactory(customResourceClient, 5*time.Minute)
 
-	versionDiscoveryHandler := &customResourceVersionDiscoveryHandler{
-		discovery: map[schema.GroupVersion]*discovery.APIVersionHandler{},
-		delegate:  delegationTarget.UnprotectedHandler(),
+	delegateHandler := delegationTarget.UnprotectedHandler()
+	if delegateHandler == nil {
+		delegateHandler = http.NotFoundHandler()
 	}
-	groupDiscoveryHandler := &customResourceGroupDiscoveryHandler{
+
+	versionDiscoveryHandler := &versionDiscoveryHandler{
+		discovery: map[schema.GroupVersion]*discovery.APIVersionHandler{},
+		delegate:  delegateHandler,
+	}
+	groupDiscoveryHandler := &groupDiscoveryHandler{
 		discovery: map[string]*discovery.APIGroupHandler{},
-		delegate:  delegationTarget.UnprotectedHandler(),
+		delegate:  delegateHandler,
 	}
 	customResourceHandler := NewCustomResourceHandler(
 		versionDiscoveryHandler,
@@ -143,9 +149,10 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget,
 		c.CustomResourceRESTOptionsGetter,
 		c.GenericConfig.AdmissionControl,
 	)
-	s.GenericAPIServer.FallThroughHandler.Handle("/apis/", customResourceHandler)
+	s.GenericAPIServer.FallThroughHandler.Handle("/apis", customResourceHandler)
+	s.GenericAPIServer.FallThroughHandler.HandlePrefix("/apis/", customResourceHandler)
 
-	customResourceController := NewCustomResourceDiscoveryController(customResourceInformers.Apiextensions().InternalVersion().CustomResources(), versionDiscoveryHandler, groupDiscoveryHandler)
+	customResourceController := NewDiscoveryController(customResourceInformers.Apiextensions().InternalVersion().CustomResources(), versionDiscoveryHandler, groupDiscoveryHandler)
 
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
 		customResourceInformers.Start(stopCh)
