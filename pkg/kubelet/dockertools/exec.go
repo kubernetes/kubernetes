@@ -17,10 +17,14 @@ limitations under the License.
 package dockertools
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
@@ -46,14 +50,21 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 		return fmt.Errorf("exec unavailable - unable to locate nsenter")
 	}
 
+	cgexec, err := exec.LookPath("cgexec")
+	if err != nil {
+		return fmt.Errorf("exec unavailable - unable to locate cgexec")
+	}
+
 	containerPid := container.State.Pid
 
+	args, _ := cgexecArgs(containerPid)
 	// TODO what if the container doesn't have `env`???
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-m", "-i", "-u", "-n", "-p", "--", "env", "-i"}
+	args = append(args, nsenter, "-t", fmt.Sprintf("%d", containerPid), "-m", "-i", "-u", "-n", "-p", "--", "env", "-i")
 	args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
 	args = append(args, container.Config.Env...)
 	args = append(args, cmd...)
-	command := exec.Command(nsenter, args...)
+	//cgexec -g memory:/system.slice/docker-bbe0d2d2a404c8650472eb7a57975d25178fa4a49c4d6b176f9e25527805b17a.scope -g ... nsenter -t 17153 -m -i -u -n -p -- env -i HOSTNAME=test1-3020125803-sqqvl -i ... /bin/bash
+	command := exec.Command(cgexec, args...)
 	var cmdErr error
 	if tty {
 		p, err := kubecontainer.StartPty(command)
@@ -167,4 +178,38 @@ func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *doc
 	}
 
 	return err
+}
+
+func cgexecArgs(pid int) ([]string, error) {
+	//$ cat /proc/17153/cgroup
+	//10:cpuset:/docker/2469451a734cd4699f15b090ce9d36554e89bcc913989907e8961d66a9aebc17
+	//9:perf_event:/docker/2469451a734cd4699f15b090ce9d36554e89bcc913989907e8961d66a9aebc17
+	//8:freezer:/docker/2469451a734cd4699f15b090ce9d36554e89bcc913989907e8961d66a9aebc17
+	//7:hugetlb:/docker/2469451a734cd4699f15b090ce9d36554e89bcc913989907e8961d66a9aebc17
+	//6:devices:/docker/2469451a734cd4699f15b090ce9d36554e89bcc913989907e8961d66a9aebc17
+	//5:memory:/docker/2469451a734cd4699f15b090ce9d36554e89bcc913989907e8961d66a9aebc17
+	//4:blkio:/docker/2469451a734cd4699f15b090ce9d36554e89bcc913989907e8961d66a9aebc17
+	//3:net_cls:/docker/2469451a734cd4699f15b090ce9d36554e89bcc913989907e8961d66a9aebc17
+	//2:cpuacct,cpu:/docker/2469451a734cd4699f15b090ce9d36554e89bcc913989907e8961d66a9aebc17
+	//1:name=systemd:/system.slice/docker.service
+	data, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/cgroup", pid))
+	if err != nil {
+		return nil, err
+	}
+	var (
+		id         int
+		cgroupPath string
+		args       []string
+	)
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	for sc.Scan() {
+		line := sc.Text()
+		if n, err := fmt.Sscanf(line, "%d:%s", &id, &cgroupPath); n == 2 && err == nil {
+			//skip name=systemd:/system.slice/docker.service
+			if !strings.HasPrefix(cgroupPath, "name") {
+				args = append(args, "-g", cgroupPath)
+			}
+		}
+	}
+	return args, nil
 }
