@@ -18,39 +18,6 @@ limitations under the License.
 
 package dockertools
 
-import (
-	dockertypes "github.com/docker/engine-api/types"
-	dockercontainer "github.com/docker/engine-api/types/container"
-
-	"k8s.io/kubernetes/pkg/api/v1"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-)
-
-// These two functions are OS specific (for now at least)
-func updateHostConfig(hc *dockercontainer.HostConfig, opts *kubecontainer.RunContainerOptions) {
-}
-
 func DefaultMemorySwap() int64 {
 	return -1
-}
-
-func getContainerIP(container *dockertypes.ContainerJSON) string {
-	return ""
-}
-
-func getNetworkingMode() string {
-	return ""
-}
-
-func containerProvidesPodIP(containerName string) bool {
-	return false
-}
-
-func containerIsNetworked(containerName string) bool {
-	return containerName == PodInfraContainerName
-}
-
-// Returns nil as both Seccomp and AppArmor security options are not valid on Windows
-func (dm *DockerManager) getSecurityOpts(pod *v1.Pod, ctrName string) ([]dockerOpt, error) {
-	return nil, nil
 }
