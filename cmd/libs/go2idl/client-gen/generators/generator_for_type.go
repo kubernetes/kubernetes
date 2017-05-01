@@ -79,6 +79,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	pkg := filepath.Base(t.Name.Package)
 	namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 	m := map[string]interface{}{
+		"resource":             c.Namers["allLowercasePlural"].Name(t),
 		"type":                 t,
 		"package":              pkg,
 		"Package":              namer.IC(pkg),
@@ -92,6 +93,11 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
 		"RESTClientInterface":  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"schemeParameterCodec": c.Universe.Variable(types.Name{Package: filepath.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
+	}
+
+	// allow overriding the resource name
+	if resourceNameOverride := extractTag("resourceName", t.SecondClosestCommentLines); resourceNameOverride != "" {
+		m["resource"] = resourceNameOverride
 	}
 
 	sw.Do(getterComment, m)
@@ -224,7 +230,7 @@ func (c *$.type|privatePlural$) List(opts $.ListOptions|raw$) (result *$.type|ra
 	result = &$.type|raw$List{}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|allLowercasePlural$").
+		Resource("$.resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Do().
 		Into(result)
@@ -237,7 +243,7 @@ func (c *$.type|privatePlural$) Get(name string, options $.GetOptions|raw$) (res
 	result = &$.type|raw${}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|allLowercasePlural$").
+		Resource("$.resource$").
 		Name(name).
 		VersionedParams(&options, $.schemeParameterCodec|raw$).
 		Do().
@@ -251,7 +257,7 @@ var deleteTemplate = `
 func (c *$.type|privatePlural$) Delete(name string, options *$.DeleteOptions|raw$) error {
 	return c.client.Delete().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|allLowercasePlural$").
+		Resource("$.resource$").
 		Name(name).
 		Body(options).
 		Do().
@@ -264,7 +270,7 @@ var deleteCollectionTemplate = `
 func (c *$.type|privatePlural$) DeleteCollection(options *$.DeleteOptions|raw$, listOptions $.ListOptions|raw$) error {
 	return c.client.Delete().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|allLowercasePlural$").
+		Resource("$.resource$").
 		VersionedParams(&listOptions, $.schemeParameterCodec|raw$).
 		Body(options).
 		Do().
@@ -278,7 +284,7 @@ func (c *$.type|privatePlural$) Create($.type|private$ *$.type|raw$) (result *$.
 	result = &$.type|raw${}
 	err = c.client.Post().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|allLowercasePlural$").
+		Resource("$.resource$").
 		Body($.type|private$).
 		Do().
 		Into(result)
@@ -292,7 +298,7 @@ func (c *$.type|privatePlural$) Update($.type|private$ *$.type|raw$) (result *$.
 	result = &$.type|raw${}
 	err = c.client.Put().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|allLowercasePlural$").
+		Resource("$.resource$").
 		Name($.type|private$.Name).
 		Body($.type|private$).
 		Do().
@@ -309,7 +315,7 @@ func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (resu
 	result = &$.type|raw${}
 	err = c.client.Put().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|allLowercasePlural$").
+		Resource("$.resource$").
 		Name($.type|private$.Name).
 		SubResource("status").
 		Body($.type|private$).
@@ -325,7 +331,7 @@ func (c *$.type|privatePlural$) Watch(opts $.ListOptions|raw$) ($.watchInterface
 	opts.Watch = true
 	return c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|allLowercasePlural$").
+		Resource("$.resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Watch()
 }
@@ -337,7 +343,7 @@ func (c *$.type|privatePlural$) Patch(name string, pt $.PatchType|raw$, data []b
 	result = &$.type|raw${}
 	err = c.client.Patch(pt).
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|allLowercasePlural$").
+		Resource("$.resource$").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).

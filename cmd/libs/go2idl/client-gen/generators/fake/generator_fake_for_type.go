@@ -106,6 +106,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 
 	const pkgClientGoTesting = "k8s.io/client-go/testing"
 	m := map[string]interface{}{
+		"resource":             c.Namers["allLowercasePlural"].Name(t),
 		"type":                 t,
 		"package":              pkg,
 		"Package":              namer.IC(pkg),
@@ -147,6 +148,11 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"ExtractFromListOptions":         c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "ExtractFromListOptions"}),
 	}
 
+	// allow overriding the resource name
+	if resourceNameOverride := extractTag("resourceName", t.SecondClosestCommentLines); resourceNameOverride != "" {
+		m["resource"] = resourceNameOverride
+	}
+
 	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
 
 	if namespaced {
@@ -179,6 +185,17 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	return sw.Error()
 }
 
+// extractTag gets the comment-tags for the key.  If the tag did not exist, it
+// returns the empty string.
+func extractTag(key string, lines []string) string {
+	val, present := types.ExtractCommentTags("+", lines)[key]
+	if !present || len(val) < 1 {
+		return ""
+	}
+
+	return val[0]
+}
+
 // template for the struct that implements the type's interface
 var structNamespaced = `
 // Fake$.type|publicPlural$ implements $.type|public$Interface
@@ -197,7 +214,7 @@ type Fake$.type|publicPlural$ struct {
 `
 
 var resource = `
-var $.type|allLowercasePlural$Resource = $.GroupVersionResource|raw${Group: "$.groupName$", Version: "$.version$", Resource: "$.type|allLowercasePlural$"}
+var $.type|allLowercasePlural$Resource = $.GroupVersionResource|raw${Group: "$.groupName$", Version: "$.version$", Resource: "$.resource$"}
 `
 
 var kind = `
