@@ -475,7 +475,9 @@ func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig
 	}
 	hc.CgroupParent = cgroupParent
 	// Apply security context.
-	applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator)
+	if err = applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -541,7 +543,7 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	}
 
 	// Set security options.
-	securityOpts, err := getSandboxSecurityOpts(c, ds.seccompProfileRoot, securityOptSep)
+	securityOpts, err := getSeccompSecurityOpts(sandboxContainerName, c, ds.seccompProfileRoot, securityOptSep)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.Name, err)
 	}

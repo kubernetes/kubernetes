@@ -1260,13 +1260,13 @@ func GetSeccompOpts(annotations map[string]string, ctrName, profileRoot string) 
 
 // Get the docker security options for AppArmor.
 func (dm *DockerManager) getAppArmorOpts(pod *v1.Pod, ctrName string) ([]dockerOpt, error) {
-	return GetAppArmorOpts(pod.Annotations, ctrName)
+	profile := apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, ctrName)
+	return GetAppArmorOpts(profile)
 }
 
 // Temporarily export this function to share with dockershim.
 // TODO: clean this up.
-func GetAppArmorOpts(annotations map[string]string, ctrName string) ([]dockerOpt, error) {
-	profile := apparmor.GetProfileNameFromPodAnnotations(annotations, ctrName)
+func GetAppArmorOpts(profile string) ([]dockerOpt, error) {
 	if profile == "" || profile == apparmor.ProfileRuntimeDefault {
 		// The docker applies the default profile by default.
 		return nil, nil

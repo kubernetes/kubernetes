@@ -145,7 +145,6 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 
 	// Apply Linux-specific options if applicable.
 	if lc := config.GetLinux(); lc != nil {
-		// Apply resource options.
 		// TODO: Check if the units are correct.
 		// TODO: Can we assume the defaults are sane?
 		rOpts := lc.GetResources()
@@ -162,7 +161,9 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 		// Note: ShmSize is handled in kube_docker_client.go
 
 		// Apply security context.
-		applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, hc, securityOptSep)
+		if err = applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, hc, securityOptSep); err != nil {
+			return "", fmt.Errorf("failed to apply container security context for container %q: %v", config.Metadata.Name, err)
+		}
 		modifyPIDNamespaceOverrides(ds.disableSharedPID, apiVersion, hc)
 	}
 
@@ -187,12 +188,12 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	}
 	hc.Resources.Devices = devices
 
-	// Apply appArmor and seccomp options.
-	securityOpts, err := getContainerSecurityOpts(config.Metadata.Name, sandboxConfig, ds.seccompProfileRoot, securityOptSep)
+	// Apply seccomp options.
+	seccompSecurityOpts, err := getSeccompSecurityOpts(config.Metadata.Name, sandboxConfig, ds.seccompProfileRoot, securityOptSep)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate container security options for container %q: %v", config.Metadata.Name, err)
+		return "", fmt.Errorf("failed to generate seccomp security options for container %q: %v", config.Metadata.Name, err)
 	}
-	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
+	hc.SecurityOpt = append(hc.SecurityOpt, seccompSecurityOpts...)
 
 	createConfig.HostConfig = hc
 	createResp, err := ds.client.CreateContainer(createConfig)
