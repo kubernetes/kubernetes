@@ -315,6 +315,12 @@ func SkipIfProviderIs(unsupportedProviders ...string) {
 	}
 }
 
+func SkipUnlessSSHKeyPresent() {
+	if _, err := GetSigner(TestContext.Provider); err != nil {
+		Skipf("No SSH Key for provider %s: '%v'", TestContext.Provider, err)
+	}
+}
+
 func SkipUnlessProviderIs(supportedProviders ...string) {
 	if !ProviderIs(supportedProviders...) {
 		Skipf("Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider)
