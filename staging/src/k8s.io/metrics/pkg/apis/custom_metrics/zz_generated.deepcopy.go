@@ -64,8 +64,10 @@ func DeepCopy_custom_metrics_MetricValueList(in interface{}, out interface{}, c 
 			in, out := &in.Items, &out.Items
 			*out = make([]MetricValue, len(*in))
 			for i := range *in {
-				if err := DeepCopy_custom_metrics_MetricValue(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*MetricValue)
 				}
 			}
 		}

@@ -91,8 +91,10 @@ func DeepCopy_v1alpha1_NodeMetricsList(in interface{}, out interface{}, c *conve
 			in, out := &in.Items, &out.Items
 			*out = make([]NodeMetrics, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1alpha1_NodeMetrics(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*NodeMetrics)
 				}
 			}
 		}
@@ -115,8 +117,10 @@ func DeepCopy_v1alpha1_PodMetrics(in interface{}, out interface{}, c *conversion
 			in, out := &in.Containers, &out.Containers
 			*out = make([]ContainerMetrics, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1alpha1_ContainerMetrics(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*ContainerMetrics)
 				}
 			}
 		}
@@ -133,8 +137,10 @@ func DeepCopy_v1alpha1_PodMetricsList(in interface{}, out interface{}, c *conver
 			in, out := &in.Items, &out.Items
 			*out = make([]PodMetrics, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1alpha1_PodMetrics(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*PodMetrics)
 				}
 			}
 		}
