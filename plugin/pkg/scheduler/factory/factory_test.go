@@ -62,6 +62,7 @@ func TestCreate(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		true,
 	)
 	factory.Create()
 }
@@ -92,6 +93,7 @@ func TestCreateFromConfig(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		true,
 	)
 
 	// Pre-register some predicate and priority functions
@@ -145,6 +147,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		true,
 	)
 
 	configData = []byte(`{}`)
@@ -200,6 +203,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		true,
 	)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
@@ -311,6 +315,7 @@ func TestResponsibleForPod(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		true,
 	)
 	// factory of "foo-scheduler"
 	factoryFooScheduler := NewConfigFactory(
@@ -324,6 +329,7 @@ func TestResponsibleForPod(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		true,
 	)
 	// scheduler annotations to be tested
 	schedulerFitsDefault := "default-scheduler"
@@ -392,6 +398,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		-1,
+		true,
 	)
 	_, err := factory.Create()
 	if err == nil {
@@ -436,6 +443,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 			informerFactory.Apps().V1beta1().StatefulSets(),
 			informerFactory.Core().V1().Services(),
 			test.hardPodAffinitySymmetricWeight,
+			true,
 		)
 		_, err := factory.Create()
 		if err == nil {
@@ -446,7 +454,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 }
 
 func TestNodeConditionPredicate(t *testing.T) {
-	nodeFunc := getNodeConditionPredicate()
+	nodeFunc := getNodeConditionPredicate(true)
 	nodeList := &v1.NodeList{
 		// we only filter out node with Unschedulable=true in spec
 		Items: []v1.Node{

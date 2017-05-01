@@ -30,11 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/features"
 
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 
@@ -96,6 +98,7 @@ func CreateScheduler(
 		statefulSetInformer,
 		serviceInformer,
 		s.HardPodAffinitySymmetricWeight,
+		utilfeature.DefaultFeatureGate.Enabled(features.EnableControllerTaint),
 	)
 
 	// Rebuild the configurator with a default Create(...) method.

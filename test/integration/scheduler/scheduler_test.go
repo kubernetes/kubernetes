@@ -251,6 +251,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		true,
 	)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
@@ -483,6 +484,7 @@ func TestMultiScheduler(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		true,
 	)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
@@ -567,6 +569,7 @@ func TestMultiScheduler(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		true,
 	)
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
 	if err != nil {
@@ -675,6 +678,7 @@ func TestAllocatable(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		true,
 	)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
