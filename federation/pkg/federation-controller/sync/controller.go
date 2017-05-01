@@ -166,7 +166,7 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 	)
 
 	// Federated updeater along with Create/Update/Delete operations.
-	s.updater = util.NewFederatedUpdater(s.informer,
+	s.updater = util.NewFederatedUpdater(s.informer, adapter.Kind(), s.eventRecorder,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			_, err := adapter.ClusterCreate(client, obj)
 			return err
@@ -189,7 +189,6 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 			return adapter.NamespacedName(obj).String()
 		},
 		s.updateTimeout,
-		s.eventRecorder,
 		s.informer,
 		s.updater,
 	)
@@ -352,25 +351,22 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		desiredObj := s.adapter.Copy(obj)
 
 		if !found {
-			s.eventRecorder.Eventf(obj, api.EventTypeNormal, "CreateInCluster",
-				"Creating %s in cluster %s", kind, cluster.Name)
-
 			operations = append(operations, util.FederatedOperation{
 				Type:        util.OperationTypeAdd,
 				Obj:         desiredObj,
 				ClusterName: cluster.Name,
+				Key:         key,
 			})
 		} else {
 			clusterObj := clusterObj.(pkgruntime.Object)
 
 			// Update existing resource, if needed.
 			if !s.adapter.Equivalent(desiredObj, clusterObj) {
-				s.eventRecorder.Eventf(obj, api.EventTypeNormal, "UpdateInCluster",
-					"Updating %s in cluster %s", kind, cluster.Name)
 				operations = append(operations, util.FederatedOperation{
 					Type:        util.OperationTypeUpdate,
 					Obj:         desiredObj,
 					ClusterName: cluster.Name,
+					Key:         key,
 				})
 			}
 		}
@@ -380,11 +376,7 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		// Everything is in order
 		return
 	}
-	err = s.updater.UpdateWithOnError(operations, s.updateTimeout,
-		func(op util.FederatedOperation, operror error) {
-			s.eventRecorder.Eventf(obj, api.EventTypeWarning, "UpdateInClusterFailed",
-				"%s update in cluster %s failed: %v", strings.ToTitle(kind), op.ClusterName, operror)
-		})
+	err = s.updater.Update(operations, s.updateTimeout)
 
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", key, err)
