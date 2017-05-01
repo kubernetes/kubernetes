@@ -39,13 +39,15 @@ func NameSystems() namer.NameSystems {
 	pluralExceptions := map[string]string{
 		"Endpoints": "Endpoints",
 	}
+	lowercaseNamer := namer.NewAllLowercasePluralNamer(pluralExceptions)
 	return namer.NameSystems{
 		"public":             namer.NewPublicNamer(0),
 		"private":            namer.NewPrivateNamer(0),
 		"raw":                namer.NewRawNamer("", nil),
 		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
 		"privatePlural":      namer.NewPrivatePluralNamer(pluralExceptions),
-		"allLowercasePlural": namer.NewAllLowercasePluralNamer(pluralExceptions),
+		"allLowercasePlural": lowercaseNamer,
+		"resource":           NewTagOverrideNamer("resourceName", lowercaseNamer),
 	}
 }
 
@@ -278,4 +280,28 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	return generator.Packages(packageList)
+}
+
+// tagOverrideNamer is a namer which pulls names from a given tag, if specified,
+// and otherwise falls back to a different namer.
+type tagOverrideNamer struct {
+	tagName  string
+	fallback namer.Namer
+}
+
+func (n *tagOverrideNamer) Name(t *types.Type) string {
+	if nameOverride := extractTag(n.tagName, t.SecondClosestCommentLines); nameOverride != "" {
+		return nameOverride
+	}
+
+	return n.fallback.Name(t)
+}
+
+// NewTagOverrideNamer creates a namer.Namer which uses the contents of the given tag as
+// the name, or falls back to another Namer if the tag is not present.
+func NewTagOverrideNamer(tagName string, fallback namer.Namer) namer.Namer {
+	return &tagOverrideNamer{
+		tagName:  tagName,
+		fallback: fallback,
+	}
 }

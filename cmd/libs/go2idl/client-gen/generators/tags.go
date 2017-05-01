@@ -31,3 +31,14 @@ func extractBoolTagOrDie(key string, lines []string) bool {
 	}
 	return val
 }
+
+// extractTag gets the comment-tags for the key.  If the tag did not exist, it
+// returns the empty string.
+func extractTag(key string, lines []string) string {
+	val, present := types.ExtractCommentTags("+", lines)[key]
+	if !present || len(val) < 1 {
+		return ""
+	}
+
+	return val[0]
+}
