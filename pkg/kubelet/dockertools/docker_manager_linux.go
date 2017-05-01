@@ -51,6 +51,16 @@ func getContainerIP(container *dockertypes.ContainerJSON) string {
 // We don't want to override the networking mode on Linux.
 func getNetworkingMode() string { return "" }
 
+// Configure Infra Networking post Container Creation, before the container starts
+func (dm *DockerManager) configureInfraContainerNetworkConfig(containerID string) {
+	// Do nothing
+}
+
+// Configure Infra Networking post Container Creation, after the container starts
+func (dm *DockerManager) FinalizeInfraContainerNetwork(containerID kubecontainer.ContainerID, DNS string) {
+	// Do nothing
+}
+
 // Returns true if the container name matches the infrastructure's container name
 func containerProvidesPodIP(containerName string) bool {
 	return containerName == PodInfraContainerName

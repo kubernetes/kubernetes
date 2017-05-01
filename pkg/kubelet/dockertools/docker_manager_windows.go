@@ -23,7 +23,7 @@ import (
 
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
-
+        "fmt"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -43,15 +43,21 @@ func DefaultMemorySwap() int64 {
 	return 0
 }
 
+//getContainerIP corresponding to the network specified by networkMode
 func getContainerIP(container *dockertypes.ContainerJSON) string {
+	ipFound := ""
+	containerNetworkName := getNetworkingMode()
 	if container.NetworkSettings != nil {
-		for _, network := range container.NetworkSettings.Networks {
+		for name, network := range container.NetworkSettings.Networks {
 			if network.IPAddress != "" {
-				return network.IPAddress
+				ipFound = network.IPAddress
+				if name == containerNetworkName {
+					return network.IPAddress
+				}
 			}
 		}
 	}
-	return ""
+	return ipFound
 }
 
 func getNetworkingMode() string {
@@ -61,6 +67,41 @@ func getNetworkingMode() string {
 		netMode = "kubenet"
 	}
 	return netMode
+}
+
+// Configure Infra Networking post Container Creation, before the container starts
+func (dm *DockerManager) configureInfraContainerNetworkConfig(containerID string) {
+	// Attach a second Nat network endpoint to the container to allow outbound internet traffic
+	netMode := os.Getenv("NAT_NETWORK")
+	if netMode == "" {
+		netMode = "nat"
+	}
+	dm.client.ConnectNetwork(netMode, containerID, nil)
+}
+
+
+// Configure Infra Networking post Container Creation, after the container starts
+func (dm *DockerManager) FinalizeInfraContainerNetwork(containerID kubecontainer.ContainerID, DNS string) {
+	podGW := os.Getenv("POD_GW")
+	vipCidr := os.Getenv("VIP_CIDR")
+
+	// Execute the below inside the container
+	// Remove duplicate default gateway (0.0.0.0/0) because of 2 network endpoints
+	// Add a route to the Vip CIDR via the POD CIDR transparent network
+	pscmd := fmt.Sprintf("$ifIndex=(get-netroute -NextHop %s).IfIndex;", podGW) +
+ 		 fmt.Sprintf("netsh interface ipv4 delete route 0.0.0.0/0 $ifIndex %s;", podGW) +
+		 fmt.Sprintf("netsh interface ipv4 add route %s $ifIndex %s;", vipCidr, podGW)
+	if DNS != "" {
+		pscmd += fmt.Sprintf("Get-NetAdapter | foreach { netsh interface ipv4 set dns $_.ifIndex static %s} ;", DNS) 
+	}
+
+	cmd := []string{
+		"powershell.exe",
+		"-command",
+		pscmd,
+	}
+
+	dm.ExecInContainer(containerID, cmd, nil, nil, nil, false, nil, 30)
 }
 
 // Infrastructure containers are not supported on Windows. For this reason, we

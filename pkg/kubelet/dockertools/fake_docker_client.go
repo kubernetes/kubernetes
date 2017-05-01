@@ -30,6 +30,7 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
+	dockernetworktypes "github.com/docker/engine-api/types/network"
 	dockercontainer "github.com/docker/engine-api/types/container"
 
 	"k8s.io/client-go/util/clock"
@@ -614,6 +615,20 @@ func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 	// To be a good fake, report error if container is not stopped.
 	return fmt.Errorf("container not stopped")
 }
+
+func (f *FakeDockerClient) ConnectNetwork(id string, containerID string, config *dockernetworktypes.EndpointSettings) error {
+	f.Lock()
+	defer f.Unlock()
+	f.appendCalled(calledDetail{name: "connect"})
+	err := f.popError("connect")
+	if err != nil {
+		return err
+	}
+	// TBD
+	// To be a good fake, report error if container is not stopped.
+	return nil
+}
+
 
 // Logs is a test-spy implementation of DockerInterface.Logs.
 // It adds an entry "logs" to the internal method call record.

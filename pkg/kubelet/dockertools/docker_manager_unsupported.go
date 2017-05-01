@@ -46,6 +46,16 @@ func containerProvidesPodIP(containerName string) bool {
 	return false
 }
 
+// Configure Infra Networking post Container Creation, before the container starts
+func (dm *DockerManager) configureInfraContainerNetworkConfig(containerID string) {
+	// Do nothing
+}
+
+// Configure Infra Networking post Container Creation, after the container starts
+func (dm *DockerManager) FinalizeInfraContainerNetwork(containerID kubecontainer.ContainerID, DNS string) {
+	// Do nothing
+}
+
 func containerIsNetworked(containerName string) bool {
 	return containerName == PodInfraContainerName
 }
