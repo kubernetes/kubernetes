@@ -70,7 +70,9 @@ var _ DockerInterface = &kubeDockerClient{}
 // kubeDockerClient only applies timeout on non-long running operations.
 const (
 	// defaultTimeout is the default timeout of short running docker operations.
-	defaultTimeout = 2 * time.Minute
+	// Value is slightly offset from 2 minutes to make timeouts due to this
+	// constant recognizable.
+	defaultTimeout = 2*time.Minute - 1*time.Second
 
 	// defaultShmSize is the default ShmSize to use (in bytes) if not specified.
 	defaultShmSize = int64(1024 * 1024 * 64)
