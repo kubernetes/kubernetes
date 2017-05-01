@@ -143,6 +143,7 @@ type tokenSource interface {
 type azureTokenSource struct {
 	source    tokenSource
 	cache     *azureTokenCache
+	lock      sync.Mutex
 	cfg       map[string]string
 	persister restclient.AuthProviderConfigPersister
 }
@@ -160,6 +161,9 @@ func newAzureTokenSource(source tokenSource, cache *azureTokenCache, cfg map[str
 // acquires a new token from the configured source. Automatically refreshes
 // the token if expired.
 func (ts *azureTokenSource) Token() (*azureToken, error) {
+	ts.lock.Lock()
+	defer ts.lock.Unlock()
+
 	var err error
 	token := ts.cache.getToken(azureTokenKey)
 	if token == nil {
