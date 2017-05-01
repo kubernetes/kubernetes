@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockertools
+package dockershim
 
 import (
 	"fmt"
@@ -25,22 +25,44 @@ import (
 
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
 // ExecHandler knows how to execute a command in a running Docker container.
 type ExecHandler interface {
-	ExecInContainer(client DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
+	ExecInContainer(client dockertools.DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
 }
 
 // NsenterExecHandler executes commands in Docker containers using nsenter.
 type NsenterExecHandler struct{}
 
+type dockerExitError struct {
+	Inspect *dockertypes.ContainerExecInspect
+}
+
+func (d *dockerExitError) String() string {
+	return d.Error()
+}
+
+func (d *dockerExitError) Error() string {
+	return fmt.Sprintf("Error executing in Docker Container: %d", d.Inspect.ExitCode)
+}
+
+func (d *dockerExitError) Exited() bool {
+	return !d.Inspect.Running
+}
+
+func (d *dockerExitError) ExitStatus() int {
+	return d.Inspect.ExitCode
+}
+
 // TODO should we support nsenter in a container, running with elevated privs and --pid=host?
-func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
+func (*NsenterExecHandler) ExecInContainer(client dockertools.DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	nsenter, err := exec.LookPath("nsenter")
 	if err != nil {
 		return fmt.Errorf("exec unavailable - unable to locate nsenter")
@@ -111,7 +133,7 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 // NativeExecHandler executes commands in Docker containers using Docker's exec API.
 type NativeExecHandler struct{}
 
-func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
+func (*NativeExecHandler) ExecInContainer(client dockertools.DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	createOpts := dockertypes.ExecConfig{
 		Cmd:          cmd,
 		AttachStdin:  stdin != nil,
@@ -131,7 +153,7 @@ func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *doc
 	})
 
 	startOpts := dockertypes.ExecStartCheck{Detach: false, Tty: tty}
-	streamOpts := StreamOptions{
+	streamOpts := dockertools.StreamOptions{
 		InputStream:  stdin,
 		OutputStream: stdout,
 		ErrorStream:  stderr,
