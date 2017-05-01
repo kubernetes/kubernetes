@@ -33,7 +33,7 @@ import (
 
 type streamingRuntime struct {
 	client      dockertools.DockerInterface
-	execHandler dockertools.ExecHandler
+	execHandler ExecHandler
 }
 
 var _ streaming.Runtime = &streamingRuntime{}
