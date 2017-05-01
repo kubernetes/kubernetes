@@ -174,7 +174,7 @@ func (c *awsTagging) readRepairClusterTags(client EC2, resourceID string, lifecy
 		}
 	}
 
-	if err := c.createTags(client, resourceID, lifecycle, additionalTags); err != nil {
+	if err := c.createTags(client, resourceID, lifecycle, addTags); err != nil {
 		return fmt.Errorf("error adding missing tags to resource %q: %v", resourceID, err)
 	}
 
@@ -184,9 +184,7 @@ func (c *awsTagging) readRepairClusterTags(client EC2, resourceID string, lifecy
 // createTags calls EC2 CreateTags, but adds retry-on-failure logic
 // We retry mainly because if we create an object, we cannot tag it until it is "fully created" (eventual consistency)
 // The error code varies though (depending on what we are tagging), so we simply retry on all errors
-func (t *awsTagging) createTags(client EC2, resourceID string, lifecycle ResourceLifecycle, additionalTags map[string]string) error {
-	tags := t.buildTags(lifecycle, additionalTags)
-
+func (t *awsTagging) createTags(client EC2, resourceID string, lifecycle ResourceLifecycle, tags map[string]string) error {
 	if tags == nil || len(tags) == 0 {
 		return nil
 	}
