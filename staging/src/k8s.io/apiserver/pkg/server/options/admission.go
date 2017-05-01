@@ -25,25 +25,25 @@ import (
 
 // AdmissionOptions holds the admission options
 type AdmissionOptions struct {
-	Control           string
-	ControlConfigFile string
-	Plugins           *admission.Plugins
+	PluginsNames []string
+	ConfigFile   string
+	Plugins      *admission.Plugins
 }
 
 // NewAdmissionOptions creates a new instance of AdmissionOptions
 func NewAdmissionOptions(plugins *admission.Plugins) *AdmissionOptions {
 	return &AdmissionOptions{
-		Plugins: plugins,
-		Control: "AlwaysAdmit",
+		Plugins:      plugins,
+		PluginsNames: []string{},
 	}
 }
 
 // AddFlags adds flags related to admission for a specific APIServer to the specified FlagSet
 func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&a.Control, "admission-control", a.Control, ""+
+	fs.StringSliceVar(&a.PluginsNames, "admission-control", a.PluginsNames, ""+
 		"Ordered list of plug-ins to do admission control of resources into cluster. "+
 		"Comma-delimited list of: "+strings.Join(a.Plugins.Registered(), ", ")+".")
 
-	fs.StringVar(&a.ControlConfigFile, "admission-control-config-file", a.ControlConfigFile,
+	fs.StringVar(&a.ConfigFile, "admission-control-config-file", a.ConfigFile,
 		"File with admission control configuration.")
 }
