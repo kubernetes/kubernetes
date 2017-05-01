@@ -315,6 +315,9 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			expectedPodName := ss.Name + "-1"
 			expectedPod, err := f.ClientSet.Core().Pods(ns).Get(expectedPodName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying the 2nd pod is removed only when it becomes running and ready")
+			sst.RestoreProbe(ss, testProbe)
 			watcher, err := f.ClientSet.Core().Pods(ns).Watch(metav1.SingleObject(
 				metav1.ObjectMeta{
 					Name:            expectedPod.Name,
@@ -322,9 +325,6 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 				},
 			))
 			Expect(err).NotTo(HaveOccurred())
-
-			By("Verifying the 2nd pod is removed only when it becomes running and ready")
-			sst.RestoreProbe(ss, testProbe)
 			_, err = watch.Until(framework.StatefulSetTimeout, watcher, func(event watch.Event) (bool, error) {
 				pod := event.Object.(*v1.Pod)
 				if event.Type == watch.Deleted && pod.Name == expectedPodName {

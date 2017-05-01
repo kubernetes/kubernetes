@@ -61,8 +61,8 @@ var controllerKind = v1.SchemeGroupVersion.WithKind("ReplicationController")
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored
 // in the system with actual running pods.
-// TODO: this really should be called ReplicationController. The only reason why it's a Manager
-// is to distinguish this type from API object "ReplicationController". We should fix this.
+// NOTE: using this name to distinguish this type from API object "ReplicationController"; will
+//       not fix it right now. Refer to #41459 for more detail.
 type ReplicationManager struct {
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
