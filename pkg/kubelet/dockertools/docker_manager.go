@@ -311,13 +311,8 @@ func (dm *DockerManager) GetContainerLogs(pod *v1.Pod, containerID kubecontainer
 	if err != nil {
 		return err
 	}
-	return GetContainerLogs(dm.client, pod, containerID, logOptions, stdout, stderr, container.Config.Tty)
-}
-
-// Temporarily export this function to share with dockershim.
-// TODO: clean this up.
-func GetContainerLogs(client DockerInterface, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer, rawTerm bool) error {
 	var since int64
+	rawTerm := container.Config.Tty
 	if logOptions.SinceSeconds != nil {
 		t := metav1.Now().Add(-time.Duration(*logOptions.SinceSeconds) * time.Second)
 		since = t.Unix()
@@ -341,7 +336,7 @@ func GetContainerLogs(client DockerInterface, pod *v1.Pod, containerID kubeconta
 		ErrorStream:  stderr,
 		RawTerminal:  rawTerm,
 	}
-	return client.Logs(containerID.ID, opts, sopts)
+	return dm.client.Logs(containerID.ID, opts, sopts)
 }
 
 var (

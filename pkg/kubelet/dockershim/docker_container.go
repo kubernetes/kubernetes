@@ -94,7 +94,6 @@ func (ds *dockerService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*
 // CreateContainer creates a new container in the given PodSandbox
 // Docker cannot store the log to an arbitrary location (yet), so we create an
 // symlink at LogPath, linking to the actual path of the log.
-// TODO: check if the default values returned by the runtime API are ok.
 func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	if config == nil {
 		return "", fmt.Errorf("container config is nil")
@@ -124,7 +123,6 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	createConfig := dockertypes.ContainerCreateConfig{
 		Name: makeContainerName(sandboxConfig, config),
 		Config: &dockercontainer.Config{
-			// TODO: set User.
 			Entrypoint: dockerstrslice.StrSlice(config.Command),
 			Cmd:        dockerstrslice.StrSlice(config.Args),
 			Env:        generateEnvList(config.GetEnvs()),
@@ -146,8 +144,6 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	// Apply Linux-specific options if applicable.
 	if lc := config.GetLinux(); lc != nil {
 		// Apply resource options.
-		// TODO: Check if the units are correct.
-		// TODO: Can we assume the defaults are sane?
 		rOpts := lc.GetResources()
 		if rOpts != nil {
 			hc.Resources = dockercontainer.Resources{
