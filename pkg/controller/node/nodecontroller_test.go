@@ -2401,7 +2401,8 @@ func TestAddOrRemoveNoScheduleTaintByCondition(t *testing.T) {
 	for i, item := range table {
 		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute,
 			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
-			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
+			testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
+			testNodeMonitorPeriod, nil, nil, 0, false, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
 		nodeController.nodeStatusMap[item.fakeNodeHandler.Existing[0].Name] = nodeStatusData{

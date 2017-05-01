@@ -96,6 +96,7 @@ func CreateScheduler(
 		statefulSetInformer,
 		serviceInformer,
 		s.HardPodAffinitySymmetricWeight,
+		s.EnableControllerTaint,
 	)
 
 	// Rebuild the configurator with a default Create(...) method.

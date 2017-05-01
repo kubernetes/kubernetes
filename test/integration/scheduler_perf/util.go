@@ -72,6 +72,7 @@ func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroy
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		v1.DefaultEnableControllerTaint,
 	)
 
 	eventBroadcaster := record.NewBroadcaster()

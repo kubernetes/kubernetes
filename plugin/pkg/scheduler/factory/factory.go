@@ -97,6 +97,9 @@ type ConfigFactory struct {
 
 	// Equivalence class cache
 	equivalencePodCache *core.EquivalenceCache
+
+	// Leave add/remove NoSchedule taint to node controller
+	enableControllerTaint bool
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
@@ -112,6 +115,8 @@ func NewConfigFactory(
 	statefulSetInformer appsinformers.StatefulSetInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	hardPodAffinitySymmetricWeight int,
+	enableControllerTaint bool,
+
 ) scheduler.Configurator {
 	stopEverything := make(chan struct{})
 	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
@@ -130,6 +135,7 @@ func NewConfigFactory(
 		StopEverything:                 stopEverything,
 		schedulerName:                  schedulerName,
 		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
+		enableControllerTaint:          enableControllerTaint,
 	}
 
 	// On add/delete to the scheduled pods, remove from the assumed pods.
@@ -376,7 +382,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	return &scheduler.Config{
 		SchedulerCache: f.schedulerCache,
 		// The scheduler only needs to consider schedulable nodes.
-		NodeLister:          &nodePredicateLister{f.nodeLister},
+		NodeLister:          &nodePredicateLister{f.nodeLister, f.enableControllerTaint},
 		Algorithm:           algo,
 		Binder:              &binder{f.client},
 		PodConditionUpdater: &podConditionUpdater{f.client},
@@ -390,10 +396,11 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 
 type nodePredicateLister struct {
 	corelisters.NodeLister
+	enableControllerTaint bool
 }
 
 func (n *nodePredicateLister) List() ([]*v1.Node, error) {
-	return n.ListWithPredicate(getNodeConditionPredicate())
+	return n.ListWithPredicate(getNodeConditionPredicate(n.enableControllerTaint))
 }
 
 func (f *ConfigFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error) {
@@ -439,7 +446,7 @@ func (f *ConfigFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		ReplicaSetLister:  f.replicaSetLister,
 		StatefulSetLister: f.statefulSetLister,
 		// All fit predicates only need to consider schedulable nodes.
-		NodeLister: &nodePredicateLister{f.nodeLister},
+		NodeLister: &nodePredicateLister{f.nodeLister, f.enableControllerTaint},
 		NodeInfo:   &predicates.CachedNodeInfo{NodeLister: f.nodeLister},
 		PVInfo:     &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: f.pVLister},
 		PVCInfo:    &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: f.pVCLister},
@@ -469,8 +476,27 @@ func (f *ConfigFactory) ResponsibleForPod(pod *v1.Pod) bool {
 	return f.schedulerName == pod.Spec.SchedulerName
 }
 
-func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
+func getNodeConditionPredicate(enableControllerTaint bool) corelisters.NodeConditionPredicate {
 	return func(node *v1.Node) bool {
+		if !enableControllerTaint {
+			for i := range node.Status.Conditions {
+				cond := &node.Status.Conditions[i]
+				// We consider the node for scheduling only when its:
+				// - NodeReady condition status is ConditionTrue,
+				// - NodeOutOfDisk condition status is ConditionFalse,
+				// - NodeNetworkUnavailable condition status is ConditionFalse.
+				if cond.Type == v1.NodeReady && cond.Status != v1.ConditionTrue {
+					glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+					return false
+				} else if cond.Type == v1.NodeOutOfDisk && cond.Status != v1.ConditionFalse {
+					glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+					return false
+				} else if cond.Type == v1.NodeNetworkUnavailable && cond.Status != v1.ConditionFalse {
+					glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+					return false
+				}
+			}
+		}
 		// Ignore nodes that are marked unschedulable
 		if node.Spec.Unschedulable {
 			glog.V(4).Infof("Ignoring node %v since it is unschedulable", node.Name)

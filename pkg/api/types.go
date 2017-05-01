@@ -3846,4 +3846,7 @@ const (
 	// When the --failure-domains scheduler flag is not specified,
 	// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
 	DefaultFailureDomains string = metav1.LabelHostname + "," + metav1.LabelZoneFailureDomain + "," + metav1.LabelZoneRegion
+
+	// Enable controller to add NoExecute taint instead of scheduler
+	DefaultEnableControllerTaint bool = true
 )

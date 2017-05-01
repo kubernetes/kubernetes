@@ -80,10 +80,10 @@ var (
 		Effect: v1.TaintEffectNoExecute,
 	}
 
-	// TODO(resouer) will move this to metav1 well_known_labels.go.
+	// TODO(resouer) move this to metav1 well_known_labels.go after #42406 get merged.
 	// TaintNodeNoSchedule would be automatically added by node controller when
 	// node runs into a unschedulable condition and removed when node becomes schedulable.
-	TaintNodeNoSchedule = "node.alpha.kubernetes.io/noSchedule"
+	TaintNodeNoSchedule = "node.beta.kubernetes.io/noSchedule"
 
 	NoScheduleTaintTemplate = &v1.Taint{
 		Key:    TaintNodeNoSchedule,
@@ -566,17 +566,20 @@ func (nc *NodeController) Run(stopCh <-chan struct{}) {
 }
 
 // addOrRemoveNoScheduleTaintByCondition taint or remove NoSchedule taint on this node based on it's condition change.
+// return:
+// 1. if node changed to schedulable
+// 2. if node changed to unschedulable
 func (nc *NodeController) addOrRemoveNoScheduleTaintByCondition(node *v1.Node) (bool, bool) {
 	var changedToUnSchedulable, changedToSchedulable bool
 	observedMap := map[v1.NodeConditionType]*v1.NodeCondition{}
-	_, observedMap[v1.NodeReady] = v1.GetNodeCondition(&node.Status, v1.NodeReady)
-	_, observedMap[v1.NodeOutOfDisk] = v1.GetNodeCondition(&node.Status, v1.NodeOutOfDisk)
-	_, observedMap[v1.NodeNetworkUnavailable] = v1.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+	_, observedMap[v1.NodeReady] = nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
+	_, observedMap[v1.NodeOutOfDisk] = nodeutil.GetNodeCondition(&node.Status, v1.NodeOutOfDisk)
+	_, observedMap[v1.NodeNetworkUnavailable] = nodeutil.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
 
 	// If there are saved node status, it only make sense to check conditions when some change happened.
 	if savedNodeStatus, found := nc.nodeStatusMap[node.GetName()]; found {
 		for conditionType, condition := range observedMap {
-			_, savedCondition := v1.GetNodeCondition(&savedNodeStatus.status, conditionType)
+			_, savedCondition := nodeutil.GetNodeCondition(&savedNodeStatus.status, conditionType)
 			// something changed
 			if (condition != nil && savedCondition == nil) ||
 				(condition != nil && savedCondition != nil && condition.Status != savedCondition.Status) {
@@ -589,7 +592,6 @@ func (nc *NodeController) addOrRemoveNoScheduleTaintByCondition(node *v1.Node) (
 					changedToSchedulable = true
 				}
 			}
-			// if condition == nil && savedCondition != nil, we do nothing
 		}
 	} else {
 		// Otherwise, there are no saved node status, it always worth to check conditions

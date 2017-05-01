@@ -620,6 +620,8 @@ type KubeSchedulerConfiguration struct {
 	// UseLegacyPolicyConfig tells the scheduler to ignore Policy ConfigMap and
 	// to use PolicyConfigFile if available.
 	UseLegacyPolicyConfig bool
+	// Leave add/remove NoSchedule taint to node controller
+	EnableControllerTaint bool
 }
 
 // LeaderElectionConfiguration defines the configuration of leader election

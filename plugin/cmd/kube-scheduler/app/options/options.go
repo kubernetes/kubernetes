@@ -88,6 +88,8 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 		"RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule corresponding "+
 			"to every RequiredDuringScheduling affinity rule. --hard-pod-affinity-symmetric-weight represents the weight of implicit PreferredDuringScheduling affinity rule.")
 	fs.StringVar(&s.FailureDomains, "failure-domains", api.DefaultFailureDomains, "Indicate the \"all topologies\" set for an empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.")
+	fs.BoolVar(&s.EnableControllerTaint, "enable-controller-taint", true, "Leave add/remove NoSchedule taint to node controller")
+
 	fs.MarkDeprecated("failure-domains", "Doesn't have any effect. Will be removed in future version.")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 	utilfeature.DefaultFeatureGate.AddFlag(fs)

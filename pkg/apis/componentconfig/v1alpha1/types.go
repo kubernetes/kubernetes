@@ -147,6 +147,8 @@ type KubeSchedulerConfiguration struct {
 	// UseLegacyPolicyConfig tells the scheduler to ignore Policy ConfigMap and
 	// to use PolicyConfigFile if available.
 	UseLegacyPolicyConfig bool `json:"useLegacyPolicyConfig"`
+	// Leave add/remove NoSchedule taint to node controller
+	EnableControllerTaint bool
 }
 
 // HairpinMode denotes how the kubelet should configure networking to handle
