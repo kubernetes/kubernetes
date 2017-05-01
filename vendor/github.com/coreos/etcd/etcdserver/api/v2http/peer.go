@@ -26,14 +26,14 @@ import (
 
 const (
 	peerMembersPrefix = "/members"
-	leasesPrefix      = "/leases"
 )
 
 // NewPeerHandler generates an http.Handler to handle etcd peer requests.
 func NewPeerHandler(s *etcdserver.EtcdServer) http.Handler {
 	var lh http.Handler
-	if l := s.Lessor(); l != nil {
-		lh = leasehttp.NewHandler(l)
+	l := s.Lessor()
+	if l != nil {
+		lh = leasehttp.NewHandler(l, func() <-chan struct{} { return s.ApplyWait() })
 	}
 	return newPeerHandler(s.Cluster(), s.RaftHandler(), lh)
 }
@@ -49,7 +49,8 @@ func newPeerHandler(cluster api.Cluster, raftHandler http.Handler, leaseHandler 
 	mux.Handle(rafthttp.RaftPrefix+"/", raftHandler)
 	mux.Handle(peerMembersPrefix, mh)
 	if leaseHandler != nil {
-		mux.Handle(leasesPrefix, leaseHandler)
+		mux.Handle(leasehttp.LeasePrefix, leaseHandler)
+		mux.Handle(leasehttp.LeaseInternalPrefix, leaseHandler)
 	}
 	mux.HandleFunc(versionPath, versionHandler(cluster, serveVersion))
 	return mux

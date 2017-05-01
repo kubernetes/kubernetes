@@ -26,10 +26,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	"k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
-	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
-	"k8s.io/kubernetes/pkg/util/term"
 )
 
 // StreamOptions holds information pertaining to the current streaming session: supported stream
@@ -41,7 +40,7 @@ type StreamOptions struct {
 	Stdout             io.Writer
 	Stderr             io.Writer
 	Tty                bool
-	TerminalSizeQueue  term.TerminalSizeQueue
+	TerminalSizeQueue  TerminalSizeQueue
 }
 
 // Executor is an interface for transporting shell-style streams.
@@ -79,7 +78,7 @@ func NewExecutor(config *restclient.Config, method string, url *url.URL) (Stream
 		return nil, err
 	}
 
-	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig)
+	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, true)
 	wrapper, err := restclient.HTTPWrappersForConfig(config, upgradeRoundTripper)
 	if err != nil {
 		return nil, err

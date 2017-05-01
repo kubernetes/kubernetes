@@ -481,6 +481,11 @@ type KubeletConfiguration struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool
+	// This flag, if set, enables use of a shared PID namespace for pods running in the docker CRI runtime.
+	// A shared PID namespace is the only option in non-docker runtimes and is required by the CRI. The ability to
+	// disable it for docker will be removed unless a compelling use case is discovered with widespread use.
+	// TODO: Remove once we no longer support disabling shared PID namespace (https://issues.k8s.io/41938)
+	DockerEnableSharedPID bool
 
 	/* following flags are meant for Node Allocatable */
 
@@ -744,6 +749,10 @@ type KubeControllerManagerConfiguration struct {
 	// horizontalPodAutoscalerSyncPeriod is the period for syncing the number of
 	// pods in horizontal pod autoscaler.
 	HorizontalPodAutoscalerSyncPeriod metav1.Duration
+	// horizontalPodAutoscalerUpscaleForbiddenWindow is a period after which next upscale allowed.
+	HorizontalPodAutoscalerUpscaleForbiddenWindow metav1.Duration
+	// horizontalPodAutoscalerDownscaleForbiddenWindow is a period after which next downscale allowed.
+	HorizontalPodAutoscalerDownscaleForbiddenWindow metav1.Duration
 	// deploymentControllerSyncPeriod is the period for syncing the deployments.
 	DeploymentControllerSyncPeriod metav1.Duration
 	// podEvictionTimeout is the grace period for deleting pods on failed nodes.
@@ -794,9 +803,11 @@ type KubeControllerManagerConfiguration struct {
 	ServiceCIDR string
 	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
 	NodeCIDRMaskSize int32
-	// allocateNodeCIDRs enables CIDRs for Pods to be allocated and, if
+	// AllocateNodeCIDRs enables CIDRs for Pods to be allocated and, if
 	// ConfigureCloudRoutes is true, to be set on the cloud provider.
 	AllocateNodeCIDRs bool
+	// CIDRAllocatorType determines what kind of pod CIDR allocator will be used.
+	CIDRAllocatorType string
 	// configureCloudRoutes enables CIDRs allocated with allocateNodeCIDRs
 	// to be configured on the cloud provider.
 	ConfigureCloudRoutes bool

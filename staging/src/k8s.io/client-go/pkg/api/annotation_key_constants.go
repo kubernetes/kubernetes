@@ -64,4 +64,7 @@ const (
 	// in the Annotations of a Pod.
 	// TODO: remove when alpha support for affinity is removed
 	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
+
+	// annotation key prefix used to identify non-convertible json paths.
+	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"
 )

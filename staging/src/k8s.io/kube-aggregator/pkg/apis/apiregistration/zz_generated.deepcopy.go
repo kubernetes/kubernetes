@@ -36,6 +36,7 @@ func init() {
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apiregistration_APIService, InType: reflect.TypeOf(&APIService{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apiregistration_APIServiceCondition, InType: reflect.TypeOf(&APIServiceCondition{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apiregistration_APIServiceList, InType: reflect.TypeOf(&APIServiceList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apiregistration_APIServiceSpec, InType: reflect.TypeOf(&APIServiceSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apiregistration_APIServiceStatus, InType: reflect.TypeOf(&APIServiceStatus{})},
@@ -58,6 +59,21 @@ func DeepCopy_apiregistration_APIService(in interface{}, out interface{}, c *con
 		} else {
 			out.Spec = *newVal.(*APIServiceSpec)
 		}
+		if newVal, err := c.DeepCopy(&in.Status); err != nil {
+			return err
+		} else {
+			out.Status = *newVal.(*APIServiceStatus)
+		}
+		return nil
+	}
+}
+
+func DeepCopy_apiregistration_APIServiceCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*APIServiceCondition)
+		out := out.(*APIServiceCondition)
+		*out = *in
+		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
 		return nil
 	}
 }
@@ -106,6 +122,17 @@ func DeepCopy_apiregistration_APIServiceStatus(in interface{}, out interface{}, 
 		in := in.(*APIServiceStatus)
 		out := out.(*APIServiceStatus)
 		*out = *in
+		if in.Conditions != nil {
+			in, out := &in.Conditions, &out.Conditions
+			*out = make([]APIServiceCondition, len(*in))
+			for i := range *in {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
+					return err
+				} else {
+					(*out)[i] = *newVal.(*APIServiceCondition)
+				}
+			}
+		}
 		return nil
 	}
 }

@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 
@@ -190,7 +191,7 @@ func isRunningAndReady(pod *v1.Pod) bool {
 	if pod.Status.Phase != v1.PodRunning {
 		return false
 	}
-	podReady := v1.IsPodReady(pod)
+	podReady := podutil.IsPodReady(pod)
 	// User may have specified a pod readiness override through a debug annotation.
 	initialized, ok := pod.Annotations[apps.StatefulSetInitAnnotation]
 	if ok {
@@ -216,14 +217,14 @@ func isFailed(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodFailed
 }
 
-// isTerminated returns true if pod's deletion Timestamp has been set
-func isTerminated(pod *v1.Pod) bool {
+// isTerminating returns true if pod's DeletionTimestamp has been set
+func isTerminating(pod *v1.Pod) bool {
 	return pod.DeletionTimestamp != nil
 }
 
 // isHealthy returns true if pod is running and ready and has not been terminated
 func isHealthy(pod *v1.Pod) bool {
-	return isRunningAndReady(pod) && !isTerminated(pod)
+	return isRunningAndReady(pod) && !isTerminating(pod)
 }
 
 // newControllerRef returns an ControllerRef pointing to a given StatefulSet.

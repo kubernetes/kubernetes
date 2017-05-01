@@ -231,7 +231,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 		if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
 			codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
-			object, err = cmdutil.Merge(codec, object, inline, mapping.GroupVersionKind.Kind)
+			object, err = cmdutil.Merge(codec, object, inline)
 			if err != nil {
 				return err
 			}

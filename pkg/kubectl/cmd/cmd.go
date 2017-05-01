@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	bash_completion_func = `# call kubectl get $1,
+	bashCompletionFunc = `# call kubectl get $1,
 __kubectl_override_flag_list=(kubeconfig cluster user context namespace server)
 __kubectl_override_flags()
 {
@@ -76,10 +76,26 @@ __kubectl_get_namespaces()
     fi
 }
 
-__kubectl_get_contexts()
+__kubectl_config_get_contexts()
+{
+    __kubectl_parse_config "contexts"
+}
+
+__kubectl_config_get_clusters()
+{
+    __kubectl_parse_config "clusters"
+}
+
+__kubectl_config_get_users()
+{
+    __kubectl_parse_config "users"
+}
+
+# $1 has to be "contexts", "clusters" or "users"
+__kubectl_config_get()
 {
     local template kubectl_out
-    template="{{ range .contexts  }}{{ .name }} {{ end }}"
+    template="{{ range .$1  }}{{ .name }} {{ end }}"
     if kubectl_out=$(kubectl config $(__kubectl_override_flags) -o template --template="${template}" view 2>/dev/null); then
         COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
@@ -171,7 +187,7 @@ __custom_func() {
             return
             ;;
         kubectl_config_use-context)
-            __kubectl_get_contexts
+            __kubectl_config_get_contexts
             return
             ;;
         *)
@@ -183,7 +199,7 @@ __custom_func() {
 	// If you add a resource to this list, please also take a look at pkg/kubectl/kubectl.go
 	// and add a short forms entry in expandResourceShortcut() when appropriate.
 	// TODO: This should be populated using the discovery information from apiserver.
-	valid_resources = `Valid resource types include:
+	validResources = `Valid resource types include:
 
     * all
     * certificatesigningrequests (aka 'csr')
@@ -202,7 +218,7 @@ __custom_func() {
     * jobs
     * limitranges (aka 'limits')
     * namespaces (aka 'ns')
-    * networkpolicies
+    * networkpolicies (aka 'netpol')
     * nodes (aka 'no')
     * persistentvolumeclaims (aka 'pvc')
     * persistentvolumes (aka 'pv')
@@ -224,6 +240,15 @@ __custom_func() {
     `
 )
 
+var (
+	bash_completion_flags = map[string]string{
+		"namespace": "__kubectl_get_namespaces",
+		"context":   "__kubectl_config_get_contexts",
+		"cluster":   "__kubectl_config_get_clusters",
+		"user":      "__kubectl_config_get_users",
+	}
+)
+
 // NewKubectlCommand creates the `kubectl` command and its nested children.
 func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
@@ -235,7 +260,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 
       Find more information at https://github.com/kubernetes/kubernetes.`),
 		Run: runHelp,
-		BashCompletionFunction: bash_completion_func,
+		BashCompletionFunction: bashCompletionFunc,
 	}
 
 	f.BindFlags(cmds.PersistentFlags())
@@ -300,7 +325,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdExec(f, in, out, err),
 				NewCmdPortForward(f, out, err),
 				NewCmdProxy(f, out),
-				NewCmdCp(f, in, out, err),
+				NewCmdCp(f, out, err),
 				auth.NewCmdAuth(f, out, err),
 			},
 		},
@@ -318,7 +343,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				NewCmdLabel(f, out),
 				NewCmdAnnotate(f, out),
-				NewCmdCompletion(f, out, ""),
+				NewCmdCompletion(out, ""),
 			},
 		},
 	}
@@ -330,30 +355,23 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	}
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
-	if cmds.Flag("namespace") != nil {
-		if cmds.Flag("namespace").Annotations == nil {
-			cmds.Flag("namespace").Annotations = map[string][]string{}
+	for name, completion := range bash_completion_flags {
+		if cmds.Flag(name) != nil {
+			if cmds.Flag(name).Annotations == nil {
+				cmds.Flag(name).Annotations = map[string][]string{}
+			}
+			cmds.Flag(name).Annotations[cobra.BashCompCustom] = append(
+				cmds.Flag(name).Annotations[cobra.BashCompCustom],
+				completion,
+			)
 		}
-		cmds.Flag("namespace").Annotations[cobra.BashCompCustom] = append(
-			cmds.Flag("namespace").Annotations[cobra.BashCompCustom],
-			"__kubectl_get_namespaces",
-		)
-	}
-
-	if cmds.Flag("context") != nil {
-		if cmds.Flag("context").Annotations == nil {
-			cmds.Flag("context").Annotations = map[string][]string{}
-		}
-		cmds.Flag("context").Annotations[cobra.BashCompCustom] = append(
-			cmds.Flag("context").Annotations[cobra.BashCompCustom],
-			"__kubectl_get_contexts",
-		)
 	}
 
 	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out, err))
+	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
-	cmds.AddCommand(NewCmdOptions(out))
+	cmds.AddCommand(NewCmdOptions())
 
 	return cmds
 }

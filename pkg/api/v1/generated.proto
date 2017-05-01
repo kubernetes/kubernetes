@@ -27,6 +27,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
+import "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1";
@@ -1190,6 +1191,16 @@ message Handler {
   // TODO: implement a realistic TCP lifecycle hook
   // +optional
   optional TCPSocketAction tcpSocket = 3;
+}
+
+// HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
+// pod's hosts file.
+message HostAlias {
+  // IP address of the host file entry.
+  optional string ip = 1;
+
+  // Hostnames for the the above IP address.
+  repeated string hostnames = 2;
 }
 
 // Represents a host path mapped into a pod.
@@ -2733,6 +2744,13 @@ message PodSpec {
   // If specified, the pod's tolerations.
   // +optional
   repeated Toleration tolerations = 22;
+
+  // HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
+  // file if specified. This is only valid for non-hostNetwork pods.
+  // +optional
+  // +patchMergeKey=IP
+  // +patchStrategy=merge
+  repeated HostAlias hostMappings = 23;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -3647,20 +3665,9 @@ message ServiceSpec {
   // will also accept traffic for this service.  These IPs are not managed by
   // Kubernetes.  The user is responsible for ensuring that traffic arrives
   // at a node with this IP.  A common example is external load-balancers
-  // that are not part of the Kubernetes system.  A previous form of this
-  // functionality exists as the deprecatedPublicIPs field.  When using this
-  // field, callers should also clear the deprecatedPublicIPs field.
+  // that are not part of the Kubernetes system.
   // +optional
   repeated string externalIPs = 5;
-
-  // deprecatedPublicIPs is deprecated and replaced by the externalIPs field
-  // with almost the exact same semantics.  This field is retained in the v1
-  // API for compatibility until at least 8/20/2016.  It will be removed from
-  // any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are
-  // set, deprecatedPublicIPs is used.
-  // +k8s:conversion-gen=false
-  // +optional
-  repeated string deprecatedPublicIPs = 6;
 
   // Supports "ClientIP" and "None". Used to maintain session affinity.
   // Enable client IP based session affinity.
@@ -3700,9 +3707,12 @@ message ServiceStatus {
   optional LoadBalancerStatus loadBalancer = 1;
 }
 
+// Sysctl defines a kernel parameter to be set
 message Sysctl {
+  // Name of a property to set
   optional string name = 1;
 
+  // Value of a property to set
   optional string value = 2;
 }
 

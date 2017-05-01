@@ -17,9 +17,13 @@ limitations under the License.
 package framework
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
 	"reflect"
 	"strings"
 	"sync"
@@ -89,6 +93,7 @@ type Framework struct {
 }
 
 type TestDataSummary interface {
+	SummaryKind() string
 	PrintHumanReadable() string
 	PrintJSON() string
 }
@@ -281,8 +286,25 @@ func (f *Framework) AfterEach() {
 		if !f.SkipNamespaceCreation {
 			DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
 		}
-		By(fmt.Sprintf("Dumping a list of prepulled images on each node"))
-		LogContainersInPodsWithLabels(f.ClientSet, metav1.NamespaceSystem, ImagePullerLabels, "image-puller", Logf)
+
+		logFunc := Logf
+		if TestContext.ReportDir != "" {
+			filePath := path.Join(TestContext.ReportDir, "image-puller.txt")
+			file, err := os.Create(filePath)
+			if err != nil {
+				By(fmt.Sprintf("Failed to create a file with image-puller data %v: %v\nPrinting to stdout", filePath, err))
+			} else {
+				By(fmt.Sprintf("Dumping a list of prepulled images on each node to file %v", filePath))
+				defer file.Close()
+				if err = file.Chmod(0644); err != nil {
+					Logf("Failed to chmod to 644 of %v: %v", filePath, err)
+				}
+				logFunc = GetLogToFileFunc(file)
+			}
+		} else {
+			By("Dumping a list of prepulled images on each node...")
+		}
+		LogContainersInPodsWithLabels(f.ClientSet, metav1.NamespaceSystem, ImagePullerLabels, "image-puller", logFunc)
 	}
 
 	summaries := make([]TestDataSummary, 0)
@@ -302,14 +324,15 @@ func (f *Framework) AfterEach() {
 
 	if TestContext.GatherMetricsAfterTest {
 		By("Gathering metrics")
+		// Grab apiserver metrics and nodes' kubelet metrics (for non-kubemark case).
 		// TODO: enable Scheduler and ControllerManager metrics grabbing when Master's Kubelet will be registered.
-		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, true, false, false, true)
+		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, !ProviderIs("kubemark"), false, false, true)
 		if err != nil {
-			Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
+			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 		} else {
 			received, err := grabber.Grab()
 			if err != nil {
-				Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
+				Logf("MetricsGrabber failed to grab metrics (skipping metrics gathering): %v", err)
 			} else {
 				summaries = append(summaries, (*MetricsForE2E)(&received))
 			}
@@ -317,17 +340,33 @@ func (f *Framework) AfterEach() {
 	}
 
 	outputTypes := strings.Split(TestContext.OutputPrintType, ",")
+	now := time.Now()
 	for _, printType := range outputTypes {
 		switch printType {
 		case "hr":
 			for i := range summaries {
-				Logf(summaries[i].PrintHumanReadable())
+				if TestContext.ReportDir == "" {
+					Logf(summaries[i].PrintHumanReadable())
+				} else {
+					// TODO: learn to extract test name and append it to the kind instead of timestamp.
+					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+f.BaseName+"_"+now.Format(time.RFC3339)+".txt")
+					if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
+						Logf("Failed to write file %v with test performance data: %v", filePath, err)
+					}
+				}
 			}
 		case "json":
 			for i := range summaries {
-				typeName := reflect.TypeOf(summaries[i]).String()
-				Logf("%v JSON\n%v", typeName[strings.LastIndex(typeName, ".")+1:], summaries[i].PrintJSON())
-				Logf("Finished")
+				if TestContext.ReportDir == "" {
+					Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
+					Logf("Finished")
+				} else {
+					// TODO: learn to extract test name and append it to the kind instead of timestamp.
+					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+f.BaseName+"_"+now.Format(time.RFC3339)+".json")
+					if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
+						Logf("Failed to write file %v with test performance data: %v", filePath, err)
+					}
+				}
 			}
 		default:
 			Logf("Unknown output type: %v. Skipping.", printType)
@@ -828,4 +867,16 @@ func (cl *ClusterVerification) ForEach(podFunc func(v1.Pod)) error {
 	}
 
 	return err
+}
+
+// GetLogToFileFunc is a convenience function that returns a function that have the same interface as
+// Logf, but writes to a specified file.
+func GetLogToFileFunc(file *os.File) func(format string, args ...interface{}) {
+	return func(format string, args ...interface{}) {
+		writer := bufio.NewWriter(file)
+		if _, err := fmt.Fprintf(writer, format, args...); err != nil {
+			Logf("Failed to write file %v with test performance data: %v", file.Name(), err)
+		}
+		writer.Flush()
+	}
 }

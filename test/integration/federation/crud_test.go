@@ -17,10 +17,12 @@ limitations under the License.
 package federation
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/pborman/uuid"
 
+	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/test/integration/federation/framework"
 )
 
@@ -30,15 +32,16 @@ func TestFederationCRUD(t *testing.T) {
 	fedFixture.SetUp(t)
 	defer fedFixture.TearDown(t)
 
-	controllerFixtures := []framework.ControllerFixture{
-		&framework.SecretFixture{},
-	}
-	for _, fixture := range controllerFixtures {
-		t.Run(fixture.Kind(), func(t *testing.T) {
-			framework.SetUpControllerFixture(t, fedFixture.APIFixture, fixture)
+	federatedTypes := federatedtypes.FederatedTypes()
+	for kind, fedType := range federatedTypes {
+		t.Run(kind, func(t *testing.T) {
+			config := fedFixture.APIFixture.NewConfig()
+			fixture := framework.NewControllerFixture(t, kind, fedType.AdapterFactory, config)
 			defer fixture.TearDown(t)
 
-			adapter := fixture.Adapter()
+			client := fedFixture.APIFixture.NewClient(fmt.Sprintf("crud-test-%s", kind))
+			adapter := fedType.AdapterFactory(client)
+
 			crudtester := framework.NewFederatedTypeCRUDTester(t, adapter, fedFixture.ClusterClients)
 			obj := adapter.NewTestObject(uuid.New())
 			crudtester.CheckLifecycle(obj)
@@ -52,13 +55,17 @@ func TestFederationCRUD(t *testing.T) {
 		"Resources should not be deleted from underlying clusters when OrphanDependents is true": &orphanedDependents,
 		"Resources should not be deleted from underlying clusters when OrphanDependents is nil":  nil,
 	}
+	kind := federatedtypes.SecretKind
+	adapterFactory := federatedtypes.NewSecretAdapter
 	for testName, orphanDependents := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			fixture := &framework.SecretFixture{}
-			framework.SetUpControllerFixture(t, fedFixture.APIFixture, fixture)
+			config := fedFixture.APIFixture.NewConfig()
+			fixture := framework.NewControllerFixture(t, kind, adapterFactory, config)
 			defer fixture.TearDown(t)
 
-			adapter := fixture.Adapter()
+			client := fedFixture.APIFixture.NewClient(fmt.Sprintf("deletion-test-%s", kind))
+			adapter := adapterFactory(client)
+
 			crudtester := framework.NewFederatedTypeCRUDTester(t, adapter, fedFixture.ClusterClients)
 			obj := adapter.NewTestObject(uuid.New())
 			updatedObj := crudtester.CheckCreate(obj)

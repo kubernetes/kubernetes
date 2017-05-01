@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/logs"
 	commontest "k8s.io/kubernetes/test/e2e/common"
@@ -85,6 +86,16 @@ func setupProviderConfig() error {
 		if cloudConfig.Zone == "" {
 			return fmt.Errorf("gce-zone must be specified for AWS")
 		}
+	case "azure":
+		if cloudConfig.ConfigFile == "" {
+			return fmt.Errorf("config-file must be specified for Azure")
+		}
+		config, err := os.Open(cloudConfig.ConfigFile)
+		if err != nil {
+			framework.Logf("Couldn't open cloud provider configuration %s: %#v",
+				cloudConfig.ConfigFile, err)
+		}
+		cloudConfig.Provider, err = azure.NewCloud(config)
 	}
 
 	return nil
@@ -160,8 +171,24 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	// Dump the output of the nethealth containers only once per run
 	if framework.TestContext.DumpLogsOnFailure {
-		framework.Logf("Dumping network health container logs from all nodes")
-		framework.LogContainersInPodsWithLabels(c, metav1.NamespaceSystem, framework.ImagePullerLabels, "nethealth", framework.Logf)
+		logFunc := framework.Logf
+		if framework.TestContext.ReportDir != "" {
+			filePath := path.Join(framework.TestContext.ReportDir, "nethealth.txt")
+			file, err := os.Create(filePath)
+			if err != nil {
+				framework.Logf("Failed to create a file with network health data %v: %v\nPrinting to stdout", filePath, err)
+			} else {
+				defer file.Close()
+				if err = file.Chmod(0644); err != nil {
+					framework.Logf("Failed to chmod to 644 of %v: %v", filePath, err)
+				}
+				logFunc = framework.GetLogToFileFunc(file)
+				framework.Logf("Dumping network health container logs from all nodes to file %v", filePath)
+			}
+		} else {
+			framework.Logf("Dumping network health container logs from all nodes...")
+		}
+		framework.LogContainersInPodsWithLabels(c, metav1.NamespaceSystem, framework.ImagePullerLabels, "nethealth", logFunc)
 	}
 
 	// Reference common test to make the import valid.

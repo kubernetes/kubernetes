@@ -21,7 +21,6 @@ package v1
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -89,7 +88,7 @@ func (s serviceAccountNamespaceLister) Get(name string) (*v1.ServiceAccount, err
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("serviceaccount"), name)
+		return nil, errors.NewNotFound(v1.Resource("serviceaccount"), name)
 	}
 	return obj.(*v1.ServiceAccount), nil
 }

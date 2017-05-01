@@ -143,7 +143,7 @@ func main() {
 		serviceConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
 
 		endpointsConfig := proxyconfig.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), configResyncPeriod)
-		endpointsConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
+		endpointsConfig.RegisterEventHandler(&kubemark.FakeProxyHandler{})
 
 		eventClient, err := clientgoclientset.NewForConfig(clientConfig)
 		if err != nil {

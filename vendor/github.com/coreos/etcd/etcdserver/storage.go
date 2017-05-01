@@ -16,16 +16,12 @@ package etcdserver
 
 import (
 	"io"
-	"os"
-	"path"
 
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
-	"github.com/coreos/etcd/pkg/fileutil"
 	"github.com/coreos/etcd/pkg/pbutil"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/raft/raftpb"
 	"github.com/coreos/etcd/snap"
-	"github.com/coreos/etcd/version"
 	"github.com/coreos/etcd/wal"
 	"github.com/coreos/etcd/wal/walpb"
 )
@@ -102,42 +98,4 @@ func readWAL(waldir string, snap walpb.Snapshot) (w *wal.WAL, id, cid types.ID, 
 	id = types.ID(metadata.NodeID)
 	cid = types.ID(metadata.ClusterID)
 	return
-}
-
-// upgradeDataDir converts an older version of the etcdServer data to the newest version.
-// It must ensure that, after upgrading, the most recent version is present.
-func upgradeDataDir(baseDataDir string, name string, ver version.DataDirVersion) error {
-	switch ver {
-	case version.DataDir2_0:
-		err := makeMemberDir(baseDataDir)
-		if err != nil {
-			return err
-		}
-		fallthrough
-	case version.DataDir2_0_1:
-		fallthrough
-	default:
-	}
-	return nil
-}
-
-func makeMemberDir(dir string) error {
-	membdir := path.Join(dir, "member")
-	_, err := os.Stat(membdir)
-	switch {
-	case err == nil:
-		return nil
-	case !os.IsNotExist(err):
-		return err
-	}
-	if err := fileutil.CreateDirAll(membdir); err != nil {
-		return err
-	}
-	names := []string{"snap", "wal"}
-	for _, name := range names {
-		if err := os.Rename(path.Join(dir, name), path.Join(membdir, name)); err != nil {
-			return err
-		}
-	}
-	return nil
 }

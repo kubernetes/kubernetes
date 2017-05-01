@@ -70,10 +70,12 @@ type Networking struct {
 }
 
 type Etcd struct {
-	Endpoints []string `json:"endpoints"`
-	CAFile    string   `json:"caFile"`
-	CertFile  string   `json:"certFile"`
-	KeyFile   string   `json:"keyFile"`
+	Endpoints []string          `json:"endpoints"`
+	CAFile    string            `json:"caFile"`
+	CertFile  string            `json:"certFile"`
+	KeyFile   string            `json:"keyFile"`
+	DataDir   string            `json:"dataDir"`
+	ExtraArgs map[string]string `json:"extraArgs"`
 }
 
 type NodeConfiguration struct {

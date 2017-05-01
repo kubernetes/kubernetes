@@ -18,9 +18,9 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/util:go_default_library",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apiserver/pkg/util/feature",
-        "//vendor:k8s.io/client-go/pkg/api/v1",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
     ],
 )
 

@@ -148,18 +148,26 @@ func (o *SubcommandOptions) SetName(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func CreateKubeconfigSecret(clientset client.Interface, kubeconfig *clientcmdapi.Config, namespace, name string, dryRun bool) (*api.Secret, error) {
+func CreateKubeconfigSecret(clientset client.Interface, kubeconfig *clientcmdapi.Config, namespace, name, federationName, clusterName string, dryRun bool) (*api.Secret, error) {
 	configBytes, err := clientcmd.Write(*kubeconfig)
 	if err != nil {
 		return nil, err
+	}
+	annotations := map[string]string{
+		federationapi.FederationNameAnnotation: federationName,
+	}
+
+	if clusterName != "" {
+		annotations[federationapi.ClusterNameAnnotation] = clusterName
 	}
 
 	// Build the secret object with the minified and flattened
 	// kubeconfig content.
 	secret := &api.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:        name,
+			Namespace:   namespace,
+			Annotations: annotations,
 		},
 		Data: map[string][]byte{
 			KubeconfigSecretDataKey: configBytes,

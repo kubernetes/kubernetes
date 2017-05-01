@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes
@@ -40,7 +41,7 @@ func newPersistentVolumeOrderedIndex() persistentVolumeOrderedIndex {
 // volume's AccessModes as a string
 func accessModesIndexFunc(obj interface{}) ([]string, error) {
 	if pv, ok := obj.(*v1.PersistentVolume); ok {
-		modes := v1.GetAccessModesAsString(pv.Spec.AccessModes)
+		modes := v1helper.GetAccessModesAsString(pv.Spec.AccessModes)
 		return []string{modes}, nil
 	}
 	return []string{""}, fmt.Errorf("object is not a persistent volume: %v", obj)
@@ -89,7 +90,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 	var smallestVolumeSize int64
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestedSize := requestedQty.Value()
-	requestedClass := v1.GetPersistentVolumeClaimClass(claim)
+	requestedClass := v1helper.GetPersistentVolumeClaimClass(claim)
 
 	var selector labels.Selector
 	if claim.Spec.Selector != nil {
@@ -126,14 +127,6 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 				return volume, nil
 			}
 
-			// In Alpha dynamic provisioning, we do now want not match claims
-			// with existing PVs, findByClaim must find only PVs that are
-			// pre-bound to the claim (by dynamic provisioning). TODO: remove in
-			// 1.5
-			if metav1.HasAnnotation(claim.ObjectMeta, v1.AlphaStorageClassAnnotation) {
-				continue
-			}
-
 			// filter out:
 			// - volumes bound to another claim
 			// - volumes whose labels don't match the claim's selector, if specified
@@ -143,7 +136,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 			} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 				continue
 			}
-			if v1.GetPersistentVolumeClass(volume) != requestedClass {
+			if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
 				continue
 			}
 
@@ -212,7 +205,7 @@ func (pvIndex *persistentVolumeOrderedIndex) allPossibleMatchingAccessModes(requ
 	matchedModes := [][]v1.PersistentVolumeAccessMode{}
 	keys := pvIndex.store.ListIndexFuncValues("accessmodes")
 	for _, key := range keys {
-		indexedModes := v1.GetAccessModesFromString(key)
+		indexedModes := v1helper.GetAccessModesFromString(key)
 		if containedInAll(indexedModes, requestedModes) {
 			matchedModes = append(matchedModes, indexedModes)
 		}

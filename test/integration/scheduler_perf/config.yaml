@@ -1,0 +1,5 @@
+nodeaffinity:
+  enabled: true
+  numgroups: 10
+  nodeaffinitykey: "kubernetes.io/sched-perf-node-affinity"
+  operator: "v1.NodeSelectorOpIn"

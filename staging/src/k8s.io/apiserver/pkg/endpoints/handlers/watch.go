@@ -33,7 +33,6 @@ import (
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/wsstream"
 
-	"github.com/emicklei/go-restful"
 	"golang.org/x/net/websocket"
 )
 
@@ -62,18 +61,18 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatch handles serving requests to the server
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatch(watcher watch.Interface, scope RequestScope, req *restful.Request, res *restful.Response, timeout time.Duration) {
+func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, w http.ResponseWriter, timeout time.Duration) {
 	// negotiate for the stream serializer
-	serializer, err := negotiation.NegotiateOutputStreamSerializer(req.Request, scope.Serializer)
+	serializer, err := negotiation.NegotiateOutputStreamSerializer(req, scope.Serializer)
 	if err != nil {
-		scope.err(err, res.ResponseWriter, req.Request)
+		scope.err(err, w, req)
 		return
 	}
 	framer := serializer.StreamSerializer.Framer
 	streamSerializer := serializer.StreamSerializer.Serializer
 	embedded := serializer.Serializer
 	if framer == nil {
-		scope.err(fmt.Errorf("no framer defined for %q available for embedded encoding", serializer.MediaType), res.ResponseWriter, req.Request)
+		scope.err(fmt.Errorf("no framer defined for %q available for embedded encoding", serializer.MediaType), w, req)
 		return
 	}
 	encoder := scope.Serializer.EncoderForVersion(streamSerializer, scope.Kind.GroupVersion())
@@ -107,7 +106,7 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *restful.Reques
 		TimeoutFactory: &realTimeoutFactory{timeout},
 	}
 
-	server.ServeHTTP(res.ResponseWriter, req.Request)
+	server.ServeHTTP(w, req)
 }
 
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
@@ -206,9 +205,18 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			unknown.Raw = buf.Bytes()
 			event.Object = &unknown
 
-			// the internal event will be versioned by the encoder
+			// create the external type directly and encode it.  Clients will only recognize the serialization we provide.
+			// The internal event is being reused, not reallocated so its just a few extra assignments to do it this way
+			// and we get the benefit of using conversion functions which already have to stay in sync
+			outEvent := &metav1.WatchEvent{}
 			*internalEvent = metav1.InternalEvent(event)
-			if err := e.Encode(internalEvent); err != nil {
+			err := metav1.Convert_versioned_InternalEvent_to_versioned_Event(internalEvent, outEvent, nil)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to convert watch object: %v", err))
+				// client disconnect.
+				return
+			}
+			if err := e.Encode(outEvent); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v (%#v)", err, e))
 				// client disconnect.
 				return
@@ -265,8 +273,19 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			event.Object = &unknown
 
 			// the internal event will be versioned by the encoder
+			// create the external type directly and encode it.  Clients will only recognize the serialization we provide.
+			// The internal event is being reused, not reallocated so its just a few extra assignments to do it this way
+			// and we get the benefit of using conversion functions which already have to stay in sync
+			outEvent := &metav1.WatchEvent{}
 			*internalEvent = metav1.InternalEvent(event)
-			if err := s.Encoder.Encode(internalEvent, streamBuf); err != nil {
+			err := metav1.Convert_versioned_InternalEvent_to_versioned_Event(internalEvent, outEvent, nil)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to convert watch object: %v", err))
+				// client disconnect.
+				s.Watching.Stop()
+				return
+			}
+			if err := s.Encoder.Encode(outEvent, streamBuf); err != nil {
 				// encoding error
 				utilruntime.HandleError(fmt.Errorf("unable to encode event: %v", err))
 				s.Watching.Stop()

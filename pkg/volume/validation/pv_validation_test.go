@@ -68,7 +68,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 func testVolumeWithMountOption(name string, namespace string, mountOptions string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
 	annotations := map[string]string{
-		MountOptionAnnotation: mountOptions,
+		api.MountOptionAnnotation: mountOptions,
 	}
 	objMeta := metav1.ObjectMeta{
 		Name:        name,

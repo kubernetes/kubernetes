@@ -20,10 +20,10 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//vendor:github.com/spf13/cobra",
-        "//vendor:k8s.io/apimachinery/pkg/api/meta",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],
 )
 
@@ -48,7 +48,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
-        "//vendor:k8s.io/client-go/rest",
-        "//vendor:k8s.io/client-go/rest/fake",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/rest/fake:go_default_library",
     ],
 )

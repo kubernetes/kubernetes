@@ -21,9 +21,9 @@ go_library(
     deps = [
         "//pkg/kubectl/cmd:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//vendor:github.com/spf13/cobra",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:gopkg.in/yaml.v2",
+        "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
 )
 

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	kapi "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
@@ -1172,8 +1173,8 @@ func TestAdmitSysctls(t *testing.T) {
 			}
 			return sysctls
 		}
-		pod.Annotations[kapi.SysctlsPodAnnotationKey] = kapi.PodAnnotationsFromSysctls(dummySysctls(safeSysctls))
-		pod.Annotations[kapi.UnsafeSysctlsPodAnnotationKey] = kapi.PodAnnotationsFromSysctls(dummySysctls(unsafeSysctls))
+		pod.Annotations[kapi.SysctlsPodAnnotationKey] = helper.PodAnnotationsFromSysctls(dummySysctls(safeSysctls))
+		pod.Annotations[kapi.UnsafeSysctlsPodAnnotationKey] = helper.PodAnnotationsFromSysctls(dummySysctls(unsafeSysctls))
 		return pod
 	}
 
@@ -1319,7 +1320,7 @@ func TestAdmitSysctls(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		origSafeSysctls, origUnsafeSysctls, err := kapi.SysctlsFromPodAnnotations(v.pod.Annotations)
+		origSafeSysctls, origUnsafeSysctls, err := helper.SysctlsFromPodAnnotations(v.pod.Annotations)
 		if err != nil {
 			t.Fatalf("invalid sysctl annotation: %v", err)
 		}
@@ -1327,7 +1328,7 @@ func TestAdmitSysctls(t *testing.T) {
 		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
 
 		if v.shouldPass {
-			safeSysctls, unsafeSysctls, _ := kapi.SysctlsFromPodAnnotations(v.pod.Annotations)
+			safeSysctls, unsafeSysctls, _ := helper.SysctlsFromPodAnnotations(v.pod.Annotations)
 			if !reflect.DeepEqual(safeSysctls, origSafeSysctls) {
 				t.Errorf("%s: wrong safe sysctls: expected=%v, got=%v", k, origSafeSysctls, safeSysctls)
 			}
@@ -1612,25 +1613,34 @@ func TestGetMatchingPolicies(t *testing.T) {
 			},
 			expectedPolicies: sets.NewString("policy1", "policy2", "policy4", "policy5"),
 		},
-		"policies are allowed for nil user info": {
-			user:    nil,
-			sa:      &user.DefaultInfo{Name: "sa"},
-			ns:      "test",
-			allowed: map[string]map[string]map[string]bool{}, // authorizer not consulted
+		"policies are not allowed for nil user info": {
+			user: nil,
+			sa:   &user.DefaultInfo{Name: "sa"},
+			ns:   "test",
+			allowed: map[string]map[string]map[string]bool{
+				"sa": {
+					"test": {"policy1": true},
+				},
+				"user": {
+					"test": {"policy2": true},
+				},
+			},
 			inPolicies: []*extensions.PodSecurityPolicy{
 				policyWithName("policy1"),
 				policyWithName("policy2"),
 				policyWithName("policy3"),
 			},
-			// all policies are allowed regardless of the permissions when user info is nil
-			// (ie. a request hitting the unsecure port)
-			expectedPolicies: sets.NewString("policy1", "policy2", "policy3"),
+			// only the policies for the sa are allowed when user info is nil
+			expectedPolicies: sets.NewString("policy1"),
 		},
 		"policies are not allowed for nil sa info": {
 			user: &user.DefaultInfo{Name: "user"},
 			sa:   nil,
 			ns:   "test",
 			allowed: map[string]map[string]map[string]bool{
+				"sa": {
+					"test": {"policy1": true},
+				},
 				"user": {
 					"test": {"policy2": true},
 				},
@@ -1642,6 +1652,26 @@ func TestGetMatchingPolicies(t *testing.T) {
 			},
 			// only the policies for the user are allowed when sa info is nil
 			expectedPolicies: sets.NewString("policy2"),
+		},
+		"policies are not allowed for nil sa and user info": {
+			user: nil,
+			sa:   nil,
+			ns:   "test",
+			allowed: map[string]map[string]map[string]bool{
+				"sa": {
+					"test": {"policy1": true},
+				},
+				"user": {
+					"test": {"policy2": true},
+				},
+			},
+			inPolicies: []*extensions.PodSecurityPolicy{
+				policyWithName("policy1"),
+				policyWithName("policy2"),
+				policyWithName("policy3"),
+			},
+			// no policies are allowed if sa and user are both nil
+			expectedPolicies: sets.NewString(),
 		},
 	}
 	for k, v := range tests {

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
+	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -435,7 +436,7 @@ func verifyNodeCondition(n coreclientset.NodeInterface, condition v1.NodeConditi
 	if err != nil {
 		return err
 	}
-	_, c := v1.GetNodeCondition(&node.Status, condition)
+	_, c := nodeutil.GetNodeCondition(&node.Status, condition)
 	if c == nil {
 		return fmt.Errorf("node condition %q not found", condition)
 	}

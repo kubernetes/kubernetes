@@ -921,7 +921,6 @@ func ValidateNetworkPolicySpec(spec *extensions.NetworkPolicySpec, fldPath *fiel
 				}
 			}
 		}
-		// TODO: Update From to be a pointer to slice as soon as auto-generation supports it.
 		for i, from := range ingress.From {
 			fromPath := ingressPath.Child("from").Index(i)
 			numFroms := 0

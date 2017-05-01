@@ -15,3 +15,4 @@ spec:
       containers:
       - name: nginx
         image: gcr.io/google-containers/nginx:1.7.9
+        terminationMessagePolicy: null

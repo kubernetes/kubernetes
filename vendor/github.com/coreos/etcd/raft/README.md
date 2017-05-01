@@ -5,15 +5,51 @@ The state machine is kept in sync through the use of a replicated log.
 For more details on Raft, see "In Search of an Understandable Consensus Algorithm"
 (https://ramcloud.stanford.edu/raft.pdf) by Diego Ongaro and John Ousterhout.
 
+This Raft library is stable and feature complete. As of 2016, it is **the most widely used** Raft library in production, serving tens of thousands clusters each day. It powers distributed systems such as etcd, Kubernetes, Docker Swarm, Cloud Foundry Diego, CockroachDB, TiDB, Project Calico, Flannel, and more.
+
+Most Raft implementations have a monolithic design, including storage handling, messaging serialization, and network transport. This library instead follows a minimalistic design philosophy by only implementing the core raft algorithm. This minimalism buys flexibility, determinism, and performance.
+
+To keep the codebase small as well as provide flexibility, the library only implements the Raft algorithm; both network and disk IO are left to the user. Library users must implement their own transportation layer for message passing between Raft peers over the wire. Similarly, users must implement their own storage layer to persist the Raft log and state.
+
+In order to easily test the Raft library, its behavior should be deterministic. To achieve this determinism, the library models Raft as a state machine.  The state machine takes a `Message` as input. A message can either be a local timer update or a network message sent from a remote peer. The state machine's output is a 3-tuple `{[]Messages, []LogEntries, NextState}` consisting of an array of `Messages`, `log entries`, and `Raft state changes`. For state machines with the same state, the same state machine input should always generate the same state machine output.
+
 A simple example application, _raftexample_, is also available to help illustrate
 how to use this package in practice:
 https://github.com/coreos/etcd/tree/master/contrib/raftexample
 
+# Features
+
+This raft implementation is a full feature implementation of Raft protocol. Features includes:
+
+- Leader election
+- Log replication
+- Log compaction 
+- Membership changes
+- Leadership transfer extension
+- Efficient linearizable read-only queries served by both the leader and followers
+ - leader checks with quorum and bypasses Raft log before processing read-only queries
+ - followers asks leader to get a safe read index before processing read-only queries
+- More efficient lease-based linearizable read-only queries served by both the leader and followers
+ - leader bypasses Raft log and processing read-only queries locally
+ - followers asks leader to get a safe read index before processing read-only queries
+ - this approach relies on the clock of the all the machines in raft group
+
+This raft implementation also includes a few optional enhancements:
+
+- Optimistic pipelining to reduce log replication latency
+- Flow control for log replication
+- Batching Raft messages to reduce synchronized network I/O calls
+- Batching log entries to reduce disk synchronized I/O
+- Writing to leader's disk in parallel
+- Internal proposal redirection from followers to leader
+- Automatic stepping down when the leader loses quorum 
+
 ## Notable Users
 
 - [cockroachdb](https://github.com/cockroachdb/cockroach) A Scalable, Survivable, Strongly-Consistent SQL Database
+- [dgraph](https://github.com/dgraph-io/dgraph) A Scalable, Distributed, Low Latency, High Throughput Graph Database
 - [etcd](https://github.com/coreos/etcd) A distributed reliable key-value store
-- [tikv](https://github.com/pingcap/tikv) Distributed transactional key value database powered by Rust and Raft
+- [tikv](https://github.com/pingcap/tikv) A Distributed transactional key value database powered by Rust and Raft
 - [swarmkit](https://github.com/docker/swarmkit) A toolkit for orchestrating distributed systems at any scale.
 
 ## Usage
@@ -21,8 +57,7 @@ https://github.com/coreos/etcd/tree/master/contrib/raftexample
 The primary object in raft is a Node. You either start a Node from scratch
 using raft.StartNode or start a Node from some initial state using raft.RestartNode.
 
-To start a node from scratch:
-
+To start a three-node cluster
 ```go
   storage := raft.NewMemoryStorage()
   c := &Config{
@@ -33,16 +68,30 @@ To start a node from scratch:
     MaxSizePerMsg:   4096,
     MaxInflightMsgs: 256,
   }
+  // Set peer list to the other nodes in the cluster.
+  // Note that they need to be started separately as well.
   n := raft.StartNode(c, []raft.Peer{{ID: 0x02}, {ID: 0x03}})
 ```
 
-To restart a node from previous state:
+You can start a single node cluster, like so:
+```go
+  // Create storage and config as shown above.
+  // Set peer list to itself, so this node can become the leader of this single-node cluster.
+  peers := []raft.Peer{{ID: 0x01}}
+  n := raft.StartNode(c, peers)
+```
 
+To allow a new node to join this cluster, do not pass in any peers. First, you need add the node to the existing cluster by calling `ProposeConfChange` on any existing node inside the cluster. Then, you can start the node with empty peer list, like so:
+```go
+  // Create storage and config as shown above.
+  n := raft.StartNode(c, nil)
+```
+
+To restart a node from previous state:
 ```go
   storage := raft.NewMemoryStorage()
 
-  // recover the in-memory storage from persistent
-  // snapshot, state and entries.
+  // Recover the in-memory storage from persistent snapshot, state and entries.
   storage.ApplySnapshot(snapshot)
   storage.SetHardState(state)
   storage.Append(entries)
@@ -56,8 +105,8 @@ To restart a node from previous state:
     MaxInflightMsgs: 256,
   }
 
-  // restart raft without peer information.
-  // peer information is already included in the storage.
+  // Restart raft without peer information.
+  // Peer information is already included in the storage.
   n := raft.RestartNode(c)
 ```
 

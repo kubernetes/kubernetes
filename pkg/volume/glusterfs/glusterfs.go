@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -133,16 +134,16 @@ func (plugin *glusterfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode 
 
 func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	source, _ := plugin.getGlusterVolumeSource(spec)
-	ep_name := source.EndpointsName
+	epName := source.EndpointsName
 	// PVC/POD is in same ns.
 	ns := pod.Namespace
 	kubeClient := plugin.host.GetKubeClient()
 	if kubeClient == nil {
 		return nil, fmt.Errorf("glusterfs: failed to get kube client to initialize mounter")
 	}
-	ep, err := kubeClient.Core().Endpoints(ns).Get(ep_name, metav1.GetOptions{})
+	ep, err := kubeClient.Core().Endpoints(ns).Get(epName, metav1.GetOptions{})
 	if err != nil {
-		glog.Errorf("glusterfs: failed to get endpoints %s[%v]", ep_name, err)
+		glog.Errorf("glusterfs: failed to get endpoints %s[%v]", epName, err)
 		return nil, err
 	}
 	glog.V(1).Infof("glusterfs: endpoints %v", ep)
@@ -476,7 +477,7 @@ func (p *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAllocato
 	}
 
 	for _, pv := range pvList.Items {
-		if v1.GetPersistentVolumeClass(&pv) != className {
+		if v1helper.GetPersistentVolumeClass(&pv) != className {
 			continue
 		}
 
@@ -655,7 +656,7 @@ func (r *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, fmt.Errorf("glusterfs: not able to parse your claim Selector")
 	}
 	glog.V(4).Infof("glusterfs: Provison VolumeOptions %v", r.options)
-	scName := v1.GetPersistentVolumeClaimClass(r.options.PVC)
+	scName := v1helper.GetPersistentVolumeClaimClass(r.options.PVC)
 	cfg, err := parseClassParameters(r.options.Parameters, r.plugin.host.GetKubeClient())
 	if err != nil {
 		return nil, err
@@ -679,7 +680,7 @@ func (r *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 
 	glusterfs, sizeGB, err := r.CreateVolume(gid)
 	if err != nil {
-		if release_err := gidTable.Release(gid); release_err != nil {
+		if releaseErr := gidTable.Release(gid); releaseErr != nil {
 			glog.Errorf("glusterfs:  error when releasing gid in storageclass: %s", scName)
 		}
 
@@ -772,9 +773,9 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
 	if err != nil {
 		glog.Errorf("glusterfs: failed to create endpoint/service: %v", err)
-		delete_err := cli.VolumeDelete(volume.Id)
-		if delete_err != nil {
-			glog.Errorf("glusterfs: error when deleting the volume :%v , manual deletion required", delete_err)
+		deleteErr := cli.VolumeDelete(volume.Id)
+		if deleteErr != nil {
+			glog.Errorf("glusterfs: error when deleting the volume :%v , manual deletion required", deleteErr)
 		}
 		return nil, 0, fmt.Errorf("failed to create endpoint/service %v", err)
 	}

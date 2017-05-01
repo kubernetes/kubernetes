@@ -32,7 +32,6 @@ fi
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
-
 if [ -z "${ZONE-}" ]; then
   echo "... Starting cluster using provider: ${KUBERNETES_PROVIDER}" >&2
 else

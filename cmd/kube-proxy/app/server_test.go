@@ -122,11 +122,9 @@ func Test_getProxyMode(t *testing.T) {
 		},
 	}
 	for i, c := range cases {
-		getter := &fakeNodeInterface{}
-		getter.node.Annotations = map[string]string{c.annotationKey: c.annotationVal}
 		versioner := &fakeIPTablesVersioner{c.iptablesVersion, c.iptablesError}
 		kcompater := &fakeKernelCompatTester{c.kernelCompat}
-		r := getProxyMode(c.flag, getter, "host", versioner, kcompater)
+		r := getProxyMode(c.flag, versioner, kcompater)
 		if r != c.expected {
 			t.Errorf("Case[%d] Expected %q, got %q", i, c.expected, r)
 		}

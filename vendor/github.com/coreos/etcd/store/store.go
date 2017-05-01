@@ -61,6 +61,8 @@ type Store interface {
 
 	JsonStats() []byte
 	DeleteExpiredKeys(cutoff time.Time)
+
+	HasTTLKeys() bool
 }
 
 type TTLOptionSet struct {
@@ -140,8 +142,6 @@ func (s *store) Get(nodePath string, recursive, sorted bool) (*Event, error) {
 			reportReadFailure(Get)
 		}
 	}()
-
-	nodePath = path.Clean(path.Join("/", nodePath))
 
 	n, err := s.internalGet(nodePath)
 	if err != nil {
@@ -779,4 +779,10 @@ func (s *store) Recovery(state []byte) error {
 func (s *store) JsonStats() []byte {
 	s.Stats.Watchers = uint64(s.WatcherHub.count)
 	return s.Stats.toJson()
+}
+
+func (s *store) HasTTLKeys() bool {
+	s.worldLock.RLock()
+	defer s.worldLock.RUnlock()
+	return s.ttlKeyHeap.Len() != 0
 }

@@ -42,6 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -404,6 +406,10 @@ func (f *FakeFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclar
 	return nil, nil
 }
 
+func (f *FakeFactory) OpenAPISchema(cacheDir string) (*openapi.Resources, error) {
+	return &openapi.Resources{}, nil
+}
+
 func (f *FakeFactory) DefaultNamespace() (string, bool, error) {
 	return f.tf.Namespace, false, f.tf.Err
 }
@@ -474,6 +480,14 @@ func (f *FakeFactory) DefaultResourceFilterFunc() kubectl.Filters {
 
 func (f *FakeFactory) SuggestedPodTemplateResources() []schema.GroupResource {
 	return []schema.GroupResource{}
+}
+
+func (f *FakeFactory) PluginLoader() plugins.PluginLoader {
+	return &plugins.DummyPluginLoader{}
+}
+
+func (f *FakeFactory) PluginRunner() plugins.PluginRunner {
+	return &plugins.ExecPluginRunner{}
 }
 
 type fakeMixedFactory struct {
