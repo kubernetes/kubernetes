@@ -18,10 +18,12 @@ package vsphere
 
 import (
 	"context"
-	"github.com/vmware/govmomi"
+	"net"
 	"os"
 	"runtime"
 	"strings"
+
+	"github.com/vmware/govmomi"
 )
 
 // Reads vSphere configuration from system environment and construct vSphere object
@@ -62,4 +64,9 @@ func GetgovmomiClient(cfg *VSphereConfig) (*govmomi.Client, error) {
 	}
 	client, err := newClient(context.TODO(), cfg)
 	return client, err
+}
+
+func IsIpv4Address(str string) bool {
+	ip := net.ParseIP(str)
+	return ip != nil && strings.Contains(str, ".")
 }

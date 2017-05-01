@@ -530,12 +530,14 @@ func (vs *VSphere) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 			addressType = v1.NodeInternalIP
 		}
 		for _, ip := range v.IpAddress {
-			v1helper.AddToNodeAddresses(&addrs,
-				v1.NodeAddress{
-					Type:    addressType,
-					Address: ip,
-				},
-			)
+			if IsIpv4Address(ip) {
+				v1helper.AddToNodeAddresses(&addrs,
+					v1.NodeAddress{
+						Type:    addressType,
+						Address: ip,
+					},
+				)
+			}
 		}
 	}
 	return addrs, nil
