@@ -279,6 +279,9 @@ var _ = framework.KubeDescribe("Services", func() {
 		// TODO: use the ServiceTestJig here
 		// this test uses framework.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		// this test does not work if the Node does not support SSH Key
+		framework.SkipUnlessSSHKeyPresent()
+
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
 
