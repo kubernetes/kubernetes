@@ -17,8 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -155,7 +153,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:GCEPD [Volume]", func() {
 		err := c.CoreV1().Namespaces().Delete(ns, nil)
 		Expect(err).NotTo(HaveOccurred())
 
-		err = framework.WaitForNamespacesDeleted(c, []string{ns}, 3*time.Minute)
+		err = framework.WaitForNamespacesDeleted(c, []string{ns}, framework.DefaultNamespaceDeletionTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Verifying Persistent Disk detaches")
