@@ -37,6 +37,8 @@ import (
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -100,6 +102,12 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 		Dial:            func(network, addr string) (net.Conn, error) { return nil, nil },
 		TLSClientConfig: &tls.Config{},
 	})
+
+	clientset, err := kubernetes.NewForConfig(config.GenericConfig.LoopbackClientConfig)
+	if err != nil {
+		t.Fatalf("unable to create client set due to %v", err)
+	}
+	config.GenericConfig.SharedInformerFactory = informers.NewSharedInformerFactory(clientset, config.GenericConfig.LoopbackClientConfig.Timeout)
 
 	return server, *config, assert.New(t)
 }
