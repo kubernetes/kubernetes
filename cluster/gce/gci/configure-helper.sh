@@ -1423,6 +1423,9 @@ function start-kube-addons {
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi
+  if [[ "${ENABLE_METADATA_PROXY:-}" == "simple" ]]; then
+    setup-addon-manifests "addons" "metadata-proxy"
+  fi
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
