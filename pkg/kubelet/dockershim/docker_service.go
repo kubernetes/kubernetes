@@ -147,12 +147,23 @@ var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPat
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler, dockershimRootDir string, disableSharedPID bool) (DockerService, error) {
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandlerName, dockershimRootDir string, disableSharedPID bool) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
 	checkpointHandler, err := NewPersistentCheckpointHandler(dockershimRootDir)
 	if err != nil {
 		return nil, err
 	}
+	var execHandler ExecHandler
+	switch execHandlerName {
+	case "native":
+		execHandler = &NativeExecHandler{}
+	case "nsenter":
+		execHandler = &NsenterExecHandler{}
+	default:
+		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", execHandlerName)
+		execHandler = &NativeExecHandler{}
+	}
+
 	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
 		client:             c,
