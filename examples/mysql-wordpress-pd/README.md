@@ -10,11 +10,11 @@ WordPress image includes an Apache server).
 
 Demonstrated Kubernetes Concepts:
 
-* [Persistent Volumes](http://kubernetes.io/docs/user-guide/persistent-volumes/) to
+* [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) to
   define persistent disks (disk lifecycle not tied to the Pods).
-* [Services](http://kubernetes.io/docs/user-guide/services/) to enable Pods to
+* [Services](https://kubernetes.io/docs/concepts/services-networking/service/) to enable Pods to
   locate one another.
-* [External Load Balancers](http://kubernetes.io/docs/user-guide/services/#type-loadbalancer)
+* [External Load Balancers](https://kubernetes.io/docs/concepts/services-networking/service/#type-loadbalancer)
   to expose Services externally.
 * [Deployments](http://kubernetes.io/docs/user-guide/deployments/) to ensure Pods
   stay up and running.
@@ -68,9 +68,9 @@ this example.
   at PV Claims and Deployments. Run `kubectl version` to see your
   cluster version.
 * [Cluster DNS](https://github.com/kubernetes/dns) will be used for service discovery.
-* An [external load balancer](http://kubernetes.io/docs/user-guide/services/#type-loadbalancer)
+* An [external load balancer](https://kubernetes.io/docs/concepts/services-networking/service/#type-loadbalancer)
   will be used to access WordPress.
-* [Persistent Volume Claims](http://kubernetes.io/docs/user-guide/persistent-volumes/)
+* [Persistent Volume Claims](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims)
   are used. You must create Persistent Volumes in your cluster to be
   claimed. This example demonstrates how to create two types of
   volumes, but any volume is sufficient.
@@ -83,11 +83,11 @@ to set up a cluster and the
 ## Decide where you will store your data
 
 MySQL and WordPress will each use a
-[Persistent Volume](http://kubernetes.io/docs/user-guide/persistent-volumes/)
+[Persistent Volume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
 to store their data. We will use a Persistent Volume Claim to claim an
 available persistent volume. This example covers HostPath and
 GCEPersistentDisk volumes. Choose one of the two, or see
-[Types of Persistent Volumes](http://kubernetes.io/docs/user-guide/persistent-volumes/#types-of-persistent-volumes)
+[Types of Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#types-of-persistent-volumes)
 for more options.
 
 ### Host Path
