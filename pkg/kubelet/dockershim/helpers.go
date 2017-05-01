@@ -181,26 +181,32 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (map[dockernat.Port]stru
 	return exposedPorts, portBindings
 }
 
-// getContainerSecurityOpt gets container security options from container and sandbox config, currently from sandbox
-// annotations.
+// getSeccompSecurityOpts gets container seccomp options from container and sandbox
+// config, currently from sandbox annotations.
 // It is an experimental feature and may be promoted to official runtime api in the future.
-func getContainerSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string, separator rune) ([]string, error) {
-	appArmorOpts, err := dockertools.GetAppArmorOpts(sandboxConfig.GetAnnotations(), containerName)
-	if err != nil {
-		return nil, err
-	}
+func getSeccompSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string, separator rune) ([]string, error) {
 	seccompOpts, err := dockertools.GetSeccompOpts(sandboxConfig.GetAnnotations(), containerName, seccompProfileRoot)
 	if err != nil {
 		return nil, err
 	}
-	securityOpts := append(appArmorOpts, seccompOpts...)
-	fmtOpts := dockertools.FmtDockerOpts(securityOpts, separator)
+
+	fmtOpts := dockertools.FmtDockerOpts(seccompOpts, separator)
 	return fmtOpts, nil
 }
 
-func getSandboxSecurityOpts(sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string, separator rune) ([]string, error) {
-	// sandboxContainerName doesn't exist in the pod, so pod security options will be returned by default.
-	return getContainerSecurityOpts(sandboxContainerName, sandboxConfig, seccompProfileRoot, separator)
+// getApparmorSecurityOpts gets apparmor options from container config.
+func getApparmorSecurityOpts(sc *runtimeapi.LinuxContainerSecurityContext, separator rune) ([]string, error) {
+	if sc == nil || sc.ApparmorProfile == "" {
+		return nil, nil
+	}
+
+	appArmorOpts, err := dockertools.GetAppArmorOpts(sc.ApparmorProfile)
+	if err != nil {
+		return nil, err
+	}
+
+	fmtOpts := dockertools.FmtDockerOpts(appArmorOpts, separator)
+	return fmtOpts, nil
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) string {
