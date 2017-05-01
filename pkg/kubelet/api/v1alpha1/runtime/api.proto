@@ -338,8 +338,6 @@ message PodSandboxNetworkStatus {
 
 // Namespace contains paths to the namespaces.
 message Namespace {
-    // Path to the network namespace.
-    string network = 1;
     // Namespace options for Linux namespaces.
     NamespaceOption options = 2;
 }
