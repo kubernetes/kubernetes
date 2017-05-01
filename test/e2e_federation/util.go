@@ -114,18 +114,7 @@ func waitForServiceShardsOrFail(namespace string, service *v1.Service, clusters 
 	}
 }
 
-func createService(clientset *fedclientset.Clientset, namespace, name string) (*v1.Service, error) {
-	if clientset == nil || len(namespace) == 0 {
-		return nil, fmt.Errorf("Internal error: invalid parameters passed to createService: clientset: %v, namespace: %v", clientset, namespace)
-	}
-	By(fmt.Sprintf("Creating federated service %q in namespace %q", name, namespace))
-
-	// Tests can be run in parallel, so we need a different nodePort for
-	// each test.
-	// We add 1 to FederatedSvcNodePortLast because IntnRange's range end
-	// is not inclusive.
-	nodePort := int32(rand.IntnRange(FederatedSvcNodePortFirst, FederatedSvcNodePortLast+1))
-
+func createServiceWithNodePort(clientset *fedclientset.Clientset, namespace, name string, nodePort int32) (*v1.Service, error) {
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -150,6 +139,66 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 	return clientset.Services(namespace).Create(service)
 }
 
+func createService(clientset *fedclientset.Clientset, namespace, name string) (*v1.Service, error) {
+	if clientset == nil || len(namespace) == 0 {
+		return nil, fmt.Errorf("Internal error: invalid parameters passed to createService: clientset: %v, namespace: %v", clientset, namespace)
+	}
+	By(fmt.Sprintf("Creating federated service %q in namespace %q", name, namespace))
+
+	// Tests can be run in parallel, so we need a different nodePort for
+	// each test.
+	// we add in a array all the "available" ports
+	availablePorts := make([]int32, FederatedSvcNodePortLast-FederatedSvcNodePortFirst)
+	for i := range availablePorts {
+		availablePorts[i] = int32(FederatedSvcNodePortFirst + i)
+	}
+
+	var err error
+	// until the availablePort list is not empty, lets try to create the service
+	for len(availablePorts) > 0 {
+		// select the Id of an available port
+		i := rand.Intn(len(availablePorts))
+
+		service, err := createServiceWithNodePort(clientset, namespace, name, availablePorts[i])
+		if err == nil {
+			return service, nil
+		}
+
+		// check if service have been created in some clusters.
+		// if it's the case, delete them.
+		needsToBeDeleted := false
+		err = wait.Poll(5*time.Second, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
+			var err error
+			_, err = clientset.Core().Services(namespace).Get(name, metav1.GetOptions{})
+			if service != nil && err == nil {
+				needsToBeDeleted = true
+				return true, nil
+			}
+			if err != nil && errors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		})
+
+		if err != nil {
+			framework.Failf("Getting the service %q creation status after a partial createService(): %v", service.Name, err)
+		}
+
+		if needsToBeDeleted {
+			if err = deleteService(clientset, namespace, name, nil); err != nil {
+				framework.ExpectNoError(err, "Deleting service %q after a partial createService() error", service.Name)
+				return nil, err
+			}
+		}
+
+		// creation failed, lets try with another port
+		// first remove from the availablePorts the port with which the creation failed
+		availablePorts = append(availablePorts[:i], availablePorts[i+1:]...)
+	}
+
+	return nil, err
+}
+
 func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name string) *v1.Service {
 	service, err := createService(clientset, namespace, name)
 	framework.ExpectNoError(err, "Creating service %q in namespace %q", service.Name, namespace)
@@ -157,13 +206,11 @@ func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name stri
 	return service
 }
 
-func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, serviceName string, orphanDependents *bool) {
-	if clientset == nil || len(namespace) == 0 || len(serviceName) == 0 {
-		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
-	}
-	framework.Logf("Deleting service %q in namespace %v", serviceName, namespace)
+func deleteService(clientset *fedclientset.Clientset, namespace string, serviceName string, orphanDependents *bool) error {
 	err := clientset.Services(namespace).Delete(serviceName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
-	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
+	if err != nil {
+		return err
+	}
 	// Wait for the service to be deleted.
 	err = wait.Poll(5*time.Second, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
 		_, err := clientset.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
@@ -172,6 +219,15 @@ func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, se
 		}
 		return false, err
 	})
+	return err
+}
+
+func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, serviceName string, orphanDependents *bool) {
+	if clientset == nil || len(namespace) == 0 || len(serviceName) == 0 {
+		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
+	}
+	framework.Logf("Deleting service %q in namespace %v", serviceName, namespace)
+	err := deleteService(clientset, namespace, serviceName, orphanDependents)
 	if err != nil {
 		framework.DescribeSvc(namespace)
 		framework.Failf("Error in deleting service %s: %v", serviceName, err)
