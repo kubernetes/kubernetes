@@ -108,14 +108,20 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	}
 	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
 
+	readonly := extractBoolTagOrDie("readonly", t.SecondClosestCommentLines) == true
+
 	sw.Do(interfaceTemplate1, m)
 	if !noMethods {
-		sw.Do(interfaceTemplate2, m)
-		// Include the UpdateStatus method if the type has a status
-		if genStatus(t) {
-			sw.Do(interfaceUpdateStatusTemplate, m)
+		if readonly {
+			sw.Do(interfaceTemplateReadonly, m)
+		} else {
+			sw.Do(interfaceTemplate2, m)
+			// Include the UpdateStatus method if the type has a status
+			if genStatus(t) {
+				sw.Do(interfaceUpdateStatusTemplate, m)
+			}
+			sw.Do(interfaceTemplate3, m)
 		}
-		sw.Do(interfaceTemplate3, m)
 	}
 	sw.Do(interfaceTemplate4, m)
 
@@ -128,18 +134,22 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	}
 
 	if !noMethods {
-		sw.Do(createTemplate, m)
-		sw.Do(updateTemplate, m)
-		// Generate the UpdateStatus method if the type has a status
-		if genStatus(t) {
-			sw.Do(updateStatusTemplate, m)
+		if !readonly {
+			sw.Do(createTemplate, m)
+			sw.Do(updateTemplate, m)
+			// Generate the UpdateStatus method if the type has a status
+			if genStatus(t) {
+				sw.Do(updateStatusTemplate, m)
+			}
+			sw.Do(deleteTemplate, m)
+			sw.Do(deleteCollectionTemplate, m)
 		}
-		sw.Do(deleteTemplate, m)
-		sw.Do(deleteCollectionTemplate, m)
 		sw.Do(getTemplate, m)
 		sw.Do(listTemplate, m)
 		sw.Do(watchTemplate, m)
-		sw.Do(patchTemplate, m)
+		if !readonly {
+			sw.Do(patchTemplate, m)
+		}
 	}
 
 	return sw.Error()
@@ -182,6 +192,11 @@ var interfaceTemplate3 = `
 	List(opts $.ListOptions|raw$) (*$.type|raw$List, error)
 	Watch(opts $.ListOptions|raw$) ($.watchInterface|raw$, error)
 	Patch(name string, pt $.PatchType|raw$, data []byte, subresources ...string) (result *$.type|raw$, err error)`
+
+var interfaceTemplateReadonly = `
+	Get(name string, options $.GetOptions|raw$) (*$.type|raw$, error)
+	List(opts $.ListOptions|raw$) (*$.type|raw$List, error)
+	Watch(opts $.ListOptions|raw$) ($.watchInterface|raw$, error)`
 
 var interfaceTemplate4 = `
 	$.type|public$Expansion

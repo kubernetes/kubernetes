@@ -154,6 +154,8 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 
 	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
 
+	readonly := extractBoolTagOrDie("readonly", t.SecondClosestCommentLines) == true
+
 	if namespaced {
 		sw.Do(structNamespaced, m)
 	} else {
@@ -162,14 +164,16 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 
 	if !noMethods {
 		sw.Do(resource, m)
-		sw.Do(createTemplate, m)
-		sw.Do(updateTemplate, m)
-		// Generate the UpdateStatus method if the type has a status
-		if genStatus(t) {
-			sw.Do(updateStatusTemplate, m)
+		if !readonly {
+			sw.Do(createTemplate, m)
+			sw.Do(updateTemplate, m)
+			// Generate the UpdateStatus method if the type has a status
+			if genStatus(t) {
+				sw.Do(updateStatusTemplate, m)
+			}
+			sw.Do(deleteTemplate, m)
+			sw.Do(deleteCollectionTemplate, m)
 		}
-		sw.Do(deleteTemplate, m)
-		sw.Do(deleteCollectionTemplate, m)
 		sw.Do(getTemplate, m)
 		if hasObjectMeta(t) {
 			sw.Do(listUsingOptionsTemplate, m)
@@ -177,7 +181,9 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 			sw.Do(listTemplate, m)
 		}
 		sw.Do(watchTemplate, m)
-		sw.Do(patchTemplate, m)
+		if !readonly {
+			sw.Do(patchTemplate, m)
+		}
 	}
 
 	return sw.Error()
