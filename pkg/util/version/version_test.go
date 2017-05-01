@@ -205,6 +205,7 @@ func TestGenericVersions(t *testing.T) {
 		{version: "2.0.0", unparsed: "2.0.0"},
 		{version: "2.1.0", unparsed: "2.1.0"},
 		{version: "2.1.1", unparsed: "2.1.1"},
+		{version: "17.04.0-ce", unparsed: "17.4.0"},
 		{version: "42.0.0", unparsed: "42.0.0"},
 		{version: "   42.0.0", unparsed: "42.0.0", equalsPrev: true},
 		{version: "\t42.0.0  ", unparsed: "42.0.0", equalsPrev: true},
