@@ -25,7 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 )
 
-type customResourceVersionDiscoveryHandler struct {
+type versionDiscoveryHandler struct {
 	// TODO, writing is infrequent, optimize this
 	discoveryLock sync.RWMutex
 	discovery     map[schema.GroupVersion]*discovery.APIVersionHandler
@@ -33,10 +33,10 @@ type customResourceVersionDiscoveryHandler struct {
 	delegate http.Handler
 }
 
-func (r *customResourceVersionDiscoveryHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (r *versionDiscoveryHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	pathParts := splitPath(req.URL.Path)
 	// only match /apis/<group>/<version>
-	if len(pathParts) != 3 {
+	if len(pathParts) != 3 || pathParts[0] != "apis" {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
@@ -49,29 +49,29 @@ func (r *customResourceVersionDiscoveryHandler) ServeHTTP(w http.ResponseWriter,
 	discovery.ServeHTTP(w, req)
 }
 
-func (r *customResourceVersionDiscoveryHandler) getDiscovery(version schema.GroupVersion) (*discovery.APIVersionHandler, bool) {
+func (r *versionDiscoveryHandler) getDiscovery(gv schema.GroupVersion) (*discovery.APIVersionHandler, bool) {
 	r.discoveryLock.RLock()
 	defer r.discoveryLock.RUnlock()
 
-	ret, ok := r.discovery[version]
+	ret, ok := r.discovery[gv]
 	return ret, ok
 }
 
-func (r *customResourceVersionDiscoveryHandler) setDiscovery(version schema.GroupVersion, discovery *discovery.APIVersionHandler) {
+func (r *versionDiscoveryHandler) setDiscovery(gv schema.GroupVersion, discovery *discovery.APIVersionHandler) {
 	r.discoveryLock.Lock()
 	defer r.discoveryLock.Unlock()
 
-	r.discovery[version] = discovery
+	r.discovery[gv] = discovery
 }
 
-func (r *customResourceVersionDiscoveryHandler) unsetDiscovery(version schema.GroupVersion) {
+func (r *versionDiscoveryHandler) unsetDiscovery(gv schema.GroupVersion) {
 	r.discoveryLock.Lock()
 	defer r.discoveryLock.Unlock()
 
-	delete(r.discovery, version)
+	delete(r.discovery, gv)
 }
 
-type customResourceGroupDiscoveryHandler struct {
+type groupDiscoveryHandler struct {
 	// TODO, writing is infrequent, optimize this
 	discoveryLock sync.RWMutex
 	discovery     map[string]*discovery.APIGroupHandler
@@ -79,10 +79,10 @@ type customResourceGroupDiscoveryHandler struct {
 	delegate http.Handler
 }
 
-func (r *customResourceGroupDiscoveryHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (r *groupDiscoveryHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	pathParts := splitPath(req.URL.Path)
 	// only match /apis/<group>
-	if len(pathParts) != 2 {
+	if len(pathParts) != 2 || pathParts[0] != "apis" {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
@@ -95,7 +95,7 @@ func (r *customResourceGroupDiscoveryHandler) ServeHTTP(w http.ResponseWriter, r
 	discovery.ServeHTTP(w, req)
 }
 
-func (r *customResourceGroupDiscoveryHandler) getDiscovery(group string) (*discovery.APIGroupHandler, bool) {
+func (r *groupDiscoveryHandler) getDiscovery(group string) (*discovery.APIGroupHandler, bool) {
 	r.discoveryLock.RLock()
 	defer r.discoveryLock.RUnlock()
 
@@ -103,14 +103,14 @@ func (r *customResourceGroupDiscoveryHandler) getDiscovery(group string) (*disco
 	return ret, ok
 }
 
-func (r *customResourceGroupDiscoveryHandler) setDiscovery(group string, discovery *discovery.APIGroupHandler) {
+func (r *groupDiscoveryHandler) setDiscovery(group string, discovery *discovery.APIGroupHandler) {
 	r.discoveryLock.Lock()
 	defer r.discoveryLock.Unlock()
 
 	r.discovery[group] = discovery
 }
 
-func (r *customResourceGroupDiscoveryHandler) unsetDiscovery(group string) {
+func (r *groupDiscoveryHandler) unsetDiscovery(group string) {
 	r.discoveryLock.Lock()
 	defer r.discoveryLock.Unlock()
 
