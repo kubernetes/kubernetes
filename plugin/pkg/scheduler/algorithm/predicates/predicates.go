@@ -1235,7 +1235,7 @@ func isPodBestEffort(pod *v1.Pod) bool {
 
 // CheckNodeMemoryPressurePredicate checks if a pod can be scheduled on a node
 // reporting memory pressure condition.
-func CheckNodeMemoryPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func CheckNodeMemoryPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason) {
 	var podBestEffort bool
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		podBestEffort = predicateMeta.podBestEffort
@@ -1245,22 +1245,21 @@ func CheckNodeMemoryPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 	}
 	// pod is not BestEffort pod
 	if !podBestEffort {
-		return true, nil, nil
+		return true, nil
 	}
-
-	// is node under presure?
+	// is node under pressure?
 	if nodeInfo.MemoryPressureCondition() == v1.ConditionTrue {
-		return false, []algorithm.PredicateFailureReason{ErrNodeUnderMemoryPressure}, nil
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnderMemoryPressure}
 	}
-	return true, nil, nil
+	return true, nil
 }
 
 // CheckNodeDiskPressurePredicate checks if a pod can be scheduled on a node
 // reporting disk pressure condition.
-func CheckNodeDiskPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	// is node under presure?
+func CheckNodeDiskPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason) {
+	// is node under pressure?
 	if nodeInfo.DiskPressureCondition() == v1.ConditionTrue {
-		return false, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}, nil
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}
 	}
-	return true, nil, nil
+	return true, nil
 }
