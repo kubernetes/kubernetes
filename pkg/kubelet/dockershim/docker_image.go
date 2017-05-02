@@ -121,3 +121,8 @@ func getImageRef(client dockertools.DockerInterface, image string) (string, erro
 
 	return img.ID, nil
 }
+
+// ImageFsInfo returns information of the filesystem that is used to store images.
+func (ds *dockerService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
+	return nil, fmt.Errorf("not implemented")
+}

@@ -256,3 +256,12 @@ func (in instrumentedImageManagerService) RemoveImage(image *runtimeapi.ImageSpe
 	recordError(operation, err)
 	return err
 }
+
+func (in instrumentedImageManagerService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
+	const operation = "image_fs_info"
+	defer recordOperation(operation, time.Now())
+
+	fsInfo, err := in.service.ImageFsInfo()
+	recordError(operation, err)
+	return fsInfo, nil
+}
