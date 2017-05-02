@@ -152,6 +152,8 @@ func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) In
 		waitFlag:        getIPTablesWaitFlag(vstring),
 		restoreWaitFlag: getIPTablesRestoreWaitFlag(exec),
 	}
+	// TODO this needs to be moved to a separate Start() or Run() function so that New() has zero side
+	// effects.
 	runner.connectToFirewallD()
 	return runner
 }
