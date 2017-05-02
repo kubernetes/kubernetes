@@ -218,8 +218,7 @@ func TestTCPProxy(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "TCP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -246,8 +245,7 @@ func TestUDPProxy(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "UDP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -274,8 +272,7 @@ func TestUDPProxyTimeout(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "UDP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -314,16 +311,14 @@ func TestMultiPortProxy(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRefP := api.ObjectReference{Name: serviceP.Name, Namespace: serviceP.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfoP, err := p.addServiceOnPort(serviceP, serviceRefP, "TCP", 0, time.Second)
+	svcInfoP, err := p.addServiceOnPort(serviceP, "TCP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
 	testEchoTCP(t, "127.0.0.1", svcInfoP.proxyPort)
 	waitForNumProxyLoops(t, p, 1)
 
-	serviceRefQ := api.ObjectReference{Name: serviceQ.Name, Namespace: serviceQ.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfoQ, err := p.addServiceOnPort(serviceQ, serviceRefQ, "UDP", 0, time.Second)
+	svcInfoQ, err := p.addServiceOnPort(serviceQ, "UDP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -408,8 +403,7 @@ func TestTCPProxyStop(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "TCP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -453,8 +447,7 @@ func TestUDPProxyStop(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "UDP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -492,8 +485,7 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "TCP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -530,8 +522,7 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "UDP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -569,8 +560,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "TCP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -625,8 +615,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "UDP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -680,8 +669,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "TCP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -729,8 +717,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "UDP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -775,8 +762,7 @@ func TestProxyUpdatePublicIPs(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "TCP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -829,8 +815,7 @@ func TestProxyUpdatePortal(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	serviceRef := api.ObjectReference{Name: service.Name, Namespace: service.Namespace, Kind: "Service", APIVersion: "v1"}
-	svcInfo, err := p.addServiceOnPort(service, serviceRef, "TCP", 0, time.Second)
+	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}

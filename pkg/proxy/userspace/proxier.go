@@ -52,8 +52,6 @@ type ServiceInfo struct {
 	Timeout time.Duration
 	// ActiveClients is the cache of active UDP clients being proxied by this proxy for this service
 	ActiveClients *ClientCache
-	// ServiceRef is a full object reference to the the service described by this ServiceInfo
-	ServiceRef api.ObjectReference
 
 	isAliveAtomic       int32 // Only access this with atomic ops
 	portal              portal
@@ -358,7 +356,7 @@ func (proxier *Proxier) setServiceInfo(service proxy.ServicePortName, info *Serv
 // addServiceOnPort starts listening for a new service, returning the ServiceInfo.
 // Pass proxyPort=0 to allocate a random port. The timeout only applies to UDP
 // connections, for now.
-func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, serviceRef api.ObjectReference, protocol api.Protocol, proxyPort int, timeout time.Duration) (*ServiceInfo, error) {
+func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol api.Protocol, proxyPort int, timeout time.Duration) (*ServiceInfo, error) {
 	sock, err := proxier.makeProxySocket(protocol, proxier.listenIP, proxyPort)
 	if err != nil {
 		return nil, err
@@ -376,7 +374,6 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, serviceR
 	si := &ServiceInfo{
 		Timeout:       timeout,
 		ActiveClients: newClientCache(),
-		ServiceRef:    serviceRef,
 
 		isAliveAtomic:       1,
 		proxyPort:           portNum,
@@ -411,17 +408,6 @@ func (proxier *Proxier) OnServiceUpdate(services []*api.Service) {
 			continue
 		}
 
-		// TODO: should this just be ref.GetReference?
-		svcGVK := service.GetObjectKind().GroupVersionKind()
-		svcRef := api.ObjectReference{
-			Kind:            svcGVK.Kind,
-			Namespace:       service.Namespace,
-			Name:            service.Name,
-			UID:             service.UID,
-			APIVersion:      svcGVK.GroupVersion().String(),
-			ResourceVersion: service.ResourceVersion,
-		}
-
 		for i := range service.Spec.Ports {
 			servicePort := &service.Spec.Ports[i]
 			serviceName := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: servicePort.Name}
@@ -452,7 +438,7 @@ func (proxier *Proxier) OnServiceUpdate(services []*api.Service) {
 			}
 
 			glog.V(1).Infof("Adding new service %q at %s:%d/%s", serviceName, serviceIP, servicePort.Port, servicePort.Protocol)
-			info, err = proxier.addServiceOnPort(serviceName, svcRef, servicePort.Protocol, proxyPort, proxier.udpIdleTimeout)
+			info, err = proxier.addServiceOnPort(serviceName, servicePort.Protocol, proxyPort, proxier.udpIdleTimeout)
 			if err != nil {
 				glog.Errorf("Failed to start proxy for %q: %v", serviceName, err)
 				continue
