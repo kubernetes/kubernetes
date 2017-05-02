@@ -22,4 +22,5 @@ go_library(
         "healthz.go",
     ],
     tags = ["automanaged"],
+    deps = ["//vendor/github.com/golang/glog:go_default_library"],
 )
