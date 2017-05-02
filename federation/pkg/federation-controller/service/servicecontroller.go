@@ -240,7 +240,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
 			service := obj.(*v1.Service)
-			return service.Name
+			return fmt.Sprintf("%s/%s", service.Namespace, service.Name)
 		},
 		updateTimeout,
 		s.eventRecorder,

@@ -183,7 +183,7 @@ func NewNamespaceController(client federationclientset.Interface, dynamicClientP
 		// objNameFunc
 		func(obj runtime.Object) string {
 			namespace := obj.(*apiv1.Namespace)
-			return namespace.Name
+			return fmt.Sprintf("%s/%s", namespace.Namespace, namespace.Name)
 		},
 		nc.updateTimeout,
 		nc.eventRecorder,

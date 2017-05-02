@@ -186,7 +186,7 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 		s.updateObject,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
-			return adapter.ObjectMeta(obj).Name
+			return adapter.NamespacedName(obj).String()
 		},
 		s.updateTimeout,
 		s.eventRecorder,

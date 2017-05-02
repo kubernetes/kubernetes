@@ -211,7 +211,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		// objNameFunc
 		func(obj runtime.Object) string {
 			deployment := obj.(*extensionsv1.Deployment)
-			return deployment.Name
+			return fmt.Sprintf("%s/%s", deployment.Namespace, deployment.Name)
 		},
 		updateTimeout,
 		fdc.eventRecorder,

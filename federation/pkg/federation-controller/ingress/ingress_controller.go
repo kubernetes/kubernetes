@@ -294,7 +294,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
 			ingress := obj.(*extensionsv1beta1.Ingress)
-			return ingress.Name
+			return fmt.Sprintf("%s/%s", ingress.Namespace, ingress.Name)
 		},
 		ic.updateTimeout,
 		ic.eventRecorder,
