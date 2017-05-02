@@ -50,7 +50,7 @@ message Event {
   Kind kind = 1;
   string pod_name = 2;
   string container_name = 3;
-  bytes Pod = 4;
+  bytes pod = 4;
   CgroupInfo cgroup_info = 5;
 }
 
