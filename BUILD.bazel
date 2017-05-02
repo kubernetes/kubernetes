@@ -20,7 +20,7 @@ filegroup(
 )
 
 gcs_upload(
-    name = "ci-artifacts",
+    name = "push-build",
     data = [
         ":_binary-artifacts-and-hashes",
         "//build/release-tars:release-tars-and-hashes",
@@ -31,6 +31,12 @@ gcs_upload(
         "//build/release-tars:release-tars-and-hashes": "",
         "//cluster/gce:gcs-release-artifacts-and-hashes": "extra/gce",
     },
+)
+
+alias(
+    name = "ci-artifacts",
+    actual = "push-build",
+    deprecation = "use //:push-build instead",
 )
 
 filegroup(
