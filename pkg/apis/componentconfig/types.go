@@ -521,11 +521,11 @@ type KubeletConfiguration struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool
-	// This flag, if set, enables use of a shared PID namespace for pods running in the docker CRI runtime.
+	// This flag, if set, disables use of a shared PID namespace for pods running in the docker CRI runtime.
 	// A shared PID namespace is the only option in non-docker runtimes and is required by the CRI. The ability to
 	// disable it for docker will be removed unless a compelling use case is discovered with widespread use.
 	// TODO: Remove once we no longer support disabling shared PID namespace (https://issues.k8s.io/41938)
-	DockerEnableSharedPID bool
+	DockerDisableSharedPID bool
 
 	/* following flags are meant for Node Allocatable */
 

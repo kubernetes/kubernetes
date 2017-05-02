@@ -178,6 +178,7 @@ dns-provider
 dns-provider-config
 dns-zone-name
 dockercfg-path
+docker-disable-shared-pid
 docker-email
 docker-endpoint
 docker-exec-handler
@@ -245,7 +246,6 @@ experimental-check-node-capabilities-before-mount
 experimental-cri
 experimental-dockershim
 experimental-dockershim-root-directory
-experimental-docker-enable-shared-pid
 experimental-fail-swap-on
 experimental-kernel-memcg-notification
 experimental-keystone-ca-file

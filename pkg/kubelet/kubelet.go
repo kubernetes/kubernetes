@@ -546,7 +546,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
 			ds, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage,
 				streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver, kubeCfg.DockerExecHandlerName, dockershimRootDir,
-				!kubeCfg.DockerEnableSharedPID)
+				kubeCfg.DockerDisableSharedPID)
 			if err != nil {
 				return nil, err
 			}
