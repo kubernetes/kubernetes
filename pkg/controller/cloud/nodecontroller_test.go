@@ -107,7 +107,7 @@ func TestNodeDeleted(t *testing.T) {
 		nodeInformer:      factory.Core().V1().Nodes(),
 		cloud:             &fakecloud.FakeCloud{Err: cloudprovider.InstanceNotFound},
 		nodeMonitorPeriod: 5 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "controllermanager"}),
+		recorder:          eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "cloudcontrollermanager"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 

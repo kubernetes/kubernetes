@@ -153,7 +153,7 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 // communicate with the API server.
 func NewNoExecuteTaintManager(c clientset.Interface) *NoExecuteTaintManager {
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "controllermanager"})
+	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "no-execute-taint-manager"})
 	eventBroadcaster.StartLogging(glog.Infof)
 	if c != nil {
 		glog.V(0).Infof("Sending events to api server.")
