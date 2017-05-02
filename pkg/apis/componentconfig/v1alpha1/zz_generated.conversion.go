@@ -522,7 +522,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
 	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
-	if err := v1.Convert_Pointer_bool_To_bool(&in.DockerEnableSharedPID, &out.DockerEnableSharedPID, s); err != nil {
+	if err := v1.Convert_Pointer_bool_To_bool(&in.DockerDisableSharedPID, &out.DockerDisableSharedPID, s); err != nil {
 		return err
 	}
 	out.SystemReserved = *(*componentconfig.ConfigurationMap)(unsafe.Pointer(&in.SystemReserved))
@@ -726,7 +726,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
 	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
-	if err := v1.Convert_bool_To_Pointer_bool(&in.DockerEnableSharedPID, &out.DockerEnableSharedPID, s); err != nil {
+	if err := v1.Convert_bool_To_Pointer_bool(&in.DockerDisableSharedPID, &out.DockerDisableSharedPID, s); err != nil {
 		return err
 	}
 	out.SystemReserved = *(*map[string]string)(unsafe.Pointer(&in.SystemReserved))
