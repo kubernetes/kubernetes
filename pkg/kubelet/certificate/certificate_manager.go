@@ -46,6 +46,9 @@ const (
 // manager. In the background it communicates with the API server to get new
 // certificates for certificates about to expire.
 type Manager interface {
+	// CertificateSigningRequestClient sets the client interface that is used for
+	// signing new certificates generated as part of rotation.
+	CertificateSigningRequestClient(certificatesclient.CertificateSigningRequestInterface)
 	// Start the API server status sync loop.
 	Start()
 	// Current returns the currently selected certificate from the
@@ -154,6 +157,12 @@ func (m *manager) Current() *tls.Certificate {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
 	return m.cert
+}
+
+// CertificateSigningRequestClient sets the client interface that is used for
+// signing new certificates generated as part of rotation.
+func (m *manager) CertificateSigningRequestClient(certSigningRequestClient certificatesclient.CertificateSigningRequestInterface) {
+	m.certSigningRequestClient = certSigningRequestClient
 }
 
 // Start will start the background work of rotating the certificates.
