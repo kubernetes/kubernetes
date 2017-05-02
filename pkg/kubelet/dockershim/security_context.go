@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/securitycontext"
 	knetwork "k8s.io/kubernetes/pkg/kubelet/network"
 )
 
