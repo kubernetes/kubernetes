@@ -45,6 +45,7 @@ type CanIOptions struct {
 
 	Verb         string
 	Resource     schema.GroupVersionResource
+	Subresource  string
 	ResourceName string
 
 	Out io.Writer
@@ -70,7 +71,10 @@ var (
 		kubectl auth can-i '*' '*'
 
 		# Check to see if I can get the job named "bar" in namespace "foo"
-		kubectl auth can-i list jobs.batch/bar -n foo`)
+		kubectl auth can-i list jobs.batch/bar -n foo
+
+		# check to see if I can read pod logs
+		kubectl auth can-i get pods --subresource=log`)
 )
 
 func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
@@ -101,6 +105,7 @@ func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 
 	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If true, check the specified action in all namespaces.")
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "If true, suppress output and just return the exit code.")
+	cmd.Flags().StringVar(&o.Subresource, "subresource", "", "SubResource such as pod/log or deployment/scale")
 	return cmd
 }
 
@@ -149,11 +154,12 @@ func (o *CanIOptions) RunAccessCheck() (bool, error) {
 	sar := &authorizationapi.SelfSubjectAccessReview{
 		Spec: authorizationapi.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &authorizationapi.ResourceAttributes{
-				Namespace: o.Namespace,
-				Verb:      o.Verb,
-				Group:     o.Resource.Group,
-				Resource:  o.Resource.Resource,
-				Name:      o.ResourceName,
+				Namespace:   o.Namespace,
+				Verb:        o.Verb,
+				Group:       o.Resource.Group,
+				Resource:    o.Resource.Resource,
+				Subresource: o.Subresource,
+				Name:        o.ResourceName,
 			},
 		},
 	}
