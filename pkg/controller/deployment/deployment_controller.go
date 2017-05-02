@@ -52,8 +52,12 @@ const (
 	// We must avoid creating new replica set / counting pods until the replica set / pods store has synced.
 	// If it hasn't synced, to avoid a hot loop, we'll wait this long between checks.
 	StoreSyncedPollPeriod = 100 * time.Millisecond
-	// MaxRetries is the number of times a deployment will be retried before it is dropped out of the queue.
-	MaxRetries = 5
+	// maxRetries is the number of times a deployment will be retried before it is dropped out of the queue.
+	// With the current rate-limiter in use (5ms*2^(maxRetries-1)) the following numbers represent the times
+	// a deployment is going to be requeued:
+	//
+	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
+	maxRetries = 15
 )
 
 // DeploymentController is responsible for synchronizing Deployment objects stored
@@ -294,7 +298,7 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 		return
 	}
 
-	if dc.queue.NumRequeues(key) < MaxRetries {
+	if dc.queue.NumRequeues(key) < maxRetries {
 		glog.V(2).Infof("Error syncing deployment %v: %v", key, err)
 		dc.queue.AddRateLimited(key)
 		return
