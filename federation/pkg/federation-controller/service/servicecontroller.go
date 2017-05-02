@@ -537,7 +537,7 @@ func (s *ServiceController) reconcileService(key string) reconciliationStatus {
 	if fedService.DeletionTimestamp != nil {
 		if err := s.delete(fedService); err != nil {
 			runtime.HandleError(fmt.Errorf("Failed to delete %s: %v", key, err))
-			s.eventRecorder.Eventf(fedService, api.EventTypeNormal, "DeleteFailed", "Deleting service failed: %v", err)
+			s.eventRecorder.Eventf(fedService, api.EventTypeWarning, "DeleteFailed", "Deleting service failed: %v", err)
 			return statusRecoverableError
 		}
 		glog.V(3).Infof("Deleting federated service succeeded: %s", key)
@@ -604,7 +604,7 @@ func (s *ServiceController) reconcileService(key string) reconciliationStatus {
 		err = s.federatedUpdater.UpdateWithOnError(operations, s.updateTimeout,
 			func(op fedutil.FederatedOperation, operror error) {
 				runtime.HandleError(fmt.Errorf("Service update in cluster %s failed: %v", op.ClusterName, operror))
-				s.eventRecorder.Eventf(fedService, api.EventTypeNormal, "UpdateInClusterFailed", "Service update in cluster %s failed: %v", op.ClusterName, operror)
+				s.eventRecorder.Eventf(fedService, api.EventTypeWarning, "UpdateInClusterFailed", "Service update in cluster %s failed: %v", op.ClusterName, operror)
 			})
 		if err != nil {
 			if !errors.IsAlreadyExists(err) {
