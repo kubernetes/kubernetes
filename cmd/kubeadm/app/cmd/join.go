@@ -156,12 +156,12 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		if err := preflight.RunJoinNodeChecks(cfg); err != nil {
 			return nil, err
 		}
+
+		// Try to start the kubelet service in case it's inactive
+		preflight.TryStartKubelet()
 	} else {
 		fmt.Println("[preflight] Skipping pre-flight checks")
 	}
-
-	// Try to start the kubelet service in case it's inactive
-	preflight.TryStartKubelet()
 
 	return &Join{cfg: cfg}, nil
 }
