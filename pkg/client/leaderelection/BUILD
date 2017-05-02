@@ -31,7 +31,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/core/v1/fake:go_default_library",
         "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
