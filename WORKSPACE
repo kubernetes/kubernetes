@@ -1,25 +1,31 @@
-git_repository(
+http_archive(
     name = "io_bazel_rules_go",
-    commit = "805fd1566500997379806373feb05e138a4dfe28",
-    remote = "https://github.com/bazelbuild/rules_go.git",
+    sha256 = "a1cae429e9d591017421150e3173478c46c693bc594322c7fa7e6cb5f672ef59",
+    strip_prefix = "rules_go-805fd1566500997379806373feb05e138a4dfe28",
+    urls = ["https://github.com/bazelbuild/rules_go/archive/805fd1566500997379806373feb05e138a4dfe28.tar.gz"],
 )
 
-git_repository(
+http_archive(
     name = "io_kubernetes_build",
-    commit = "684e550a2f006dbe3cf3b3d481d3f19217b228f7",
-    remote = "https://github.com/kubernetes/repo-infra.git",
+    sha256 = "1d146ccc034d3a9d8f5f02237144b78be135a0fb06935b37c745a2e7fcfecfed",
+    strip_prefix = "repo-infra-684e550a2f006dbe3cf3b3d481d3f19217b228f7",
+    urls = ["https://github.com/kubernetes/repo-infra/archive/684e550a2f006dbe3cf3b3d481d3f19217b228f7.tar.gz"],
 )
 
-git_repository(
+# This contains a patch to not prepend ./ to tarfiles produced by pkg_tar.
+# When merged upstream, we'll no longer need to use ixdy's fork.
+http_archive(
     name = "io_bazel",
-    commit = "b571b72961b9244059bdf96818948623cebf342e",
-    remote = "https://github.com/ixdy/bazel.git",
+    sha256 = "667d32da016b1e2f63cf345cd3583989ec4a165034df383a01996d93635753a0",
+    strip_prefix = "bazel-df2c687c22bdd7c76f3cdcc85f38fefd02f0b844",
+    urls = ["https://github.com/ixdy/bazel/archive/df2c687c22bdd7c76f3cdcc85f38fefd02f0b844.tar.gz"],
 )
 
-git_repository(
+http_archive(
     name = "io_bazel_rules_docker",
-    commit = "52d9faf209ff6d16eb850b6b66d03483735e0633",
-    remote = "https://github.com/bazelbuild/rules_docker.git",
+    sha256 = "261fbd8fda1d06a12a0479019b46acd302c6aaa8df8e49383dc37917f20492a1",
+    strip_prefix = "rules_docker-52d9faf209ff6d16eb850b6b66d03483735e0633",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/52d9faf209ff6d16eb850b6b66d03483735e0633.tar.gz"],
 )
 
 load("@io_bazel_rules_go//go:def.bzl", "go_repositories")
