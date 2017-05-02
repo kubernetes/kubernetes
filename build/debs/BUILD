@@ -11,6 +11,7 @@ load("@io_kubernetes_build//defs:deb.bzl", "k8s_deb", "deb_data")
 filegroup(
     name = "debs",
     srcs = [
+        ":cloud-controller-manager.deb",
         ":kubeadm.deb",
         ":kubectl.deb",
         ":kubelet.deb",
@@ -28,6 +29,7 @@ filegroup(
         },
     ],
 ) for binary in [
+    "cloud-controller-manager",
     "kubectl",
     "kube-apiserver",
     "kube-controller-manager",
@@ -81,6 +83,11 @@ pkg_tar(
     name = "kubernetes-cni-data",
     package_dir = "/opt/cni",
     deps = ["@kubernetes_cni//file"],
+)
+
+k8s_deb(
+    name = "cloud-controller-manager",
+    description = "Kubernetes Cloud Controller Manager",
 )
 
 k8s_deb(

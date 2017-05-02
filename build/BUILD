@@ -44,7 +44,13 @@ docker_build(
     ],
 )
 
+# This list should roughly match kube::build::get_docker_wrapped_binaries()
+# in build/common.sh.
 DOCKERIZED_BINARIES = {
+    "cloud-controller-manager": {
+        "base": ":busybox",
+        "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
+    },
     "kube-apiserver": {
         "base": ":busybox",
         "target": "//cmd/kube-apiserver:kube-apiserver",
