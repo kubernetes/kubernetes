@@ -134,6 +134,14 @@ message AzureFileVolumeSource {
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 3;
+
+  // Directory permission code that gives rwx permissions to all users. Must be a value between 0 and 511(0777). Defaults to 511(0777).
+  // +optional
+  optional int32 dirMode = 4;
+
+  // File permission code that gives rwx permissions to all users. Must be a value between 0 and 511(0777). Defaults to 511(0777).
+  // +optional
+  optional int32 fileMode = 5;
 }
 
 // Binding ties one object to another.
