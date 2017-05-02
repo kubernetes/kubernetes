@@ -18,63 +18,6 @@ limitations under the License.
 
 package dockertools
 
-import (
-	"os"
-
-	dockertypes "github.com/docker/engine-api/types"
-	dockercontainer "github.com/docker/engine-api/types/container"
-
-	"k8s.io/kubernetes/pkg/api/v1"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-)
-
-// These two functions are OS specific (for now at least)
-func updateHostConfig(hc *dockercontainer.HostConfig, opts *kubecontainer.RunContainerOptions) {
-	// There is no /etc/resolv.conf in Windows, DNS and DNSSearch options would have to be passed to Docker runtime instead
-	hc.DNS = opts.DNS
-	hc.DNSSearch = opts.DNSSearch
-
-	// MemorySwap == -1 is not currently supported in Docker 1.14 on Windows
-	// https://github.com/docker/docker/blob/master/daemon/daemon_windows.go#L175
-	hc.Resources.MemorySwap = 0
-}
-
 func DefaultMemorySwap() int64 {
 	return 0
-}
-
-func getContainerIP(container *dockertypes.ContainerJSON) string {
-	if container.NetworkSettings != nil {
-		for _, network := range container.NetworkSettings.Networks {
-			if network.IPAddress != "" {
-				return network.IPAddress
-			}
-		}
-	}
-	return ""
-}
-
-func getNetworkingMode() string {
-	// Allow override via env variable. Otherwise, use a default "kubenet" network
-	netMode := os.Getenv("CONTAINER_NETWORK")
-	if netMode == "" {
-		netMode = "kubenet"
-	}
-	return netMode
-}
-
-// Infrastructure containers are not supported on Windows. For this reason, we
-// make sure to not grab the infra container's IP for the pod.
-func containerProvidesPodIP(containerName string) bool {
-	return containerName != PodInfraContainerName
-}
-
-// All containers in Windows need networking setup/teardown
-func containerIsNetworked(containerName string) bool {
-	return true
-}
-
-// Returns nil as both Seccomp and AppArmor security options are not valid on Windows
-func (dm *DockerManager) getSecurityOpts(pod *v1.Pod, ctrName string) ([]dockerOpt, error) {
-	return nil, nil
 }

@@ -29,6 +29,10 @@ api-server-port
 api-server-port
 api-servers
 api-servers
+apiserver-count
+apiserver-count
+api-server-port
+api-servers
 api-server-service-type
 api-token
 api-version
@@ -80,6 +84,7 @@ cgroup-driver
 cgroup-root
 cgroups-per-qos
 chaos-chance
+cidr-allocator-type
 clean-start
 cleanup
 cleanup-iptables
@@ -92,7 +97,9 @@ clientset-name
 clientset-only
 clientset-path
 cloud-config
+cloud-config-file
 cloud-provider
+cloud-provider-gce-lb-src-cidrs
 cluster-cidr
 cluster-context
 cluster-dns
@@ -236,6 +243,9 @@ experimental-bootstrap-kubeconfig
 experimental-bootstrap-token-auth
 experimental-check-node-capabilities-before-mount
 experimental-cri
+experimental-dockershim
+experimental-dockershim-root-directory
+experimental-docker-enable-shared-pid
 experimental-fail-swap-on
 experimental-kernel-memcg-notification
 experimental-keystone-ca-file
@@ -260,6 +270,7 @@ feature-gates
 federated-api-burst
 federated-api-qps
 federated-kube-context
+federation-config-from-cluster
 federation-name
 federation-system-namespace
 federation-upgrade-target
@@ -281,6 +292,7 @@ garbage-collector-enabled
 gather-logs-sizes
 gather-metrics-at-teardown
 gather-resource-usage
+gce-multizone
 gce-project
 gce-service-account
 gce-upgrade-script
@@ -301,6 +313,8 @@ heapster-port
 heapster-scheme
 heapster-service
 horizontal-pod-autoscaler-sync-period
+horizontal-pod-autoscaler-upscale-delay
+horizontal-pod-autoscaler-downscale-delay
 host-cluster-context
 host-ipc-sources
 hostname-override
@@ -399,6 +413,8 @@ kube-master-url
 kube-reserved
 kube-reserved
 kube-reserved-cgroup
+kube-master-url
+kube-reserved
 kubernetes-anywhere-cluster
 kubernetes-anywhere-path
 kubernetes-anywhere-phase2-provider
@@ -520,6 +536,8 @@ pod-running
 pod-running-timeout
 pods-per-core
 policy-config-file
+policy-configmap
+policy-configmap-namespace
 poll-interval
 portal-net
 prepull-images
@@ -632,6 +650,7 @@ since-time
 skip-generated-rewrite
 skip-munges
 skip-preflight-checks
+skip-token-print
 skip-unsafe
 sort-by
 source-file
@@ -682,10 +701,14 @@ upgrade-image
 upgrade-target
 use-kubernetes-cluster-service
 use-kubernetes-version
+use-legacy-policy-config
 use-service-account-credentials
 user-whitelist
 use-service-account-credentials
 use-service-account-credentials
+user-whitelist
+use-service-account-credentials
+use-taint-based-evictions
 verb
 verify-only
 versioned-clientset-package
@@ -702,5 +725,7 @@ windows-line-endings
 www-prefix
 zone-id
 zone-name
+lock-object-name
+lock-object-namespace
 
 horizontal-pod-autoscaler-use-rest-clients

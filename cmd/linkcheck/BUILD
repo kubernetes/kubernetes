@@ -19,8 +19,8 @@ go_library(
     srcs = ["links.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/mvdan/xurls",
-        "//vendor:github.com/spf13/pflag",
+        "//vendor/github.com/mvdan/xurls:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
 

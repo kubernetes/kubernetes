@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -134,7 +135,9 @@ const (
 	defaultNetworkName = "rkt.kubernetes.io"
 
 	// defaultRequestTimeout is the default timeout of rkt requests.
-	defaultRequestTimeout = 2 * time.Minute
+	// Value is slightly offset from 2 minutes to make timeouts due to this
+	// constant recognizable.
+	defaultRequestTimeout = 2*time.Minute - 1*time.Second
 
 	etcHostsPath      = "/etc/hosts"
 	etcResolvConfPath = "/etc/resolv.conf"
@@ -1319,11 +1322,14 @@ func (r *Runtime) setupPodNetwork(pod *v1.Pod) (string, string, error) {
 func createHostPathVolumes(pod *v1.Pod) (err error) {
 	for _, v := range pod.Spec.Volumes {
 		if v.VolumeSource.HostPath != nil {
-			err = os.MkdirAll(v.HostPath.Path, os.ModePerm)
-			if err != nil && !os.IsExist(err) {
-				return err
+			_, err = os.Stat(v.HostPath.Path)
+			if os.IsNotExist(err) {
+				if err = os.MkdirAll(v.HostPath.Path, os.ModePerm); err != nil {
+					glog.Errorf("Create volume HostPath %q for Pod %q failed: %q", v.HostPath.Path, format.Pod(pod), err.Error())
+					return err
+				}
+				glog.V(4).Infof("Created volume HostPath %q for Pod %q", v.HostPath.Path, format.Pod(pod))
 			}
-			glog.V(4).Infof("Created volume HostPath %q for Pod %q", v.HostPath.Path, format.Pod(pod))
 		}
 	}
 	return nil
@@ -2068,14 +2074,14 @@ func newRktExitError(e error) error {
 	return e
 }
 
-func (r *Runtime) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (r *Runtime) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	return fmt.Errorf("unimplemented")
 }
 
 // Note: In rkt, the container ID is in the form of "UUID:appName", where UUID is
 // the rkt UUID, and appName is the container name.
 // TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
-func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
+func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	glog.V(4).Infof("Rkt execing in container.")
 
 	id, err := parseContainerID(containerID)
@@ -2096,7 +2102,7 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 		// make sure to close the stdout stream
 		defer stdout.Close()
 
-		kubecontainer.HandleResizing(resize, func(size term.Size) {
+		kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
 			term.SetSize(p.Fd(), size)
 		})
 

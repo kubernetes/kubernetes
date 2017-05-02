@@ -17,6 +17,7 @@ limitations under the License.
 package job
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
 )
@@ -28,4 +29,17 @@ func IsJobFinished(j *batch.Job) bool {
 		}
 	}
 	return false
+}
+
+func newControllerRef(j *batch.Job) *metav1.OwnerReference {
+	blockOwnerDeletion := true
+	isController := true
+	return &metav1.OwnerReference{
+		APIVersion:         controllerKind.GroupVersion().String(),
+		Kind:               controllerKind.Kind,
+		Name:               j.Name,
+		UID:                j.UID,
+		BlockOwnerDeletion: &blockOwnerDeletion,
+		Controller:         &isController,
+	}
 }

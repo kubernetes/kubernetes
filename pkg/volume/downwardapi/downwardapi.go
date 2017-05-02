@@ -24,7 +24,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -244,7 +246,7 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 			nodeAllocatable, err := host.GetNodeAllocatable()
 			if err != nil {
 				errlist = append(errlist, err)
-			} else if values, err := fieldpath.ExtractResourceValueByContainerNameAndNodeAllocatable(fileInfo.ResourceFieldRef, pod, containerName, nodeAllocatable); err != nil {
+			} else if values, err := resource.ExtractResourceValueByContainerNameAndNodeAllocatable(api.Scheme, fileInfo.ResourceFieldRef, pod, containerName, nodeAllocatable); err != nil {
 				glog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
 				errlist = append(errlist, err)
 			} else {

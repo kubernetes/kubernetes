@@ -338,13 +338,13 @@ func TestAPIGroupMissing(t *testing.T) {
 		t.Fatalf("expected %v, got %v", http.StatusForbidden, resp.StatusCode)
 	}
 
-	// groupName still has no api services for it (like it was deleted), it should 404
+	// groupName still has no api services for it (like it was deleted), it should delegate
 	resp, err = http.Get(server.URL + "/apis/groupName/")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("expected %v, got %v", http.StatusNotFound, resp.StatusCode)
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected %v, got %v", http.StatusForbidden, resp.StatusCode)
 	}
 
 	// missing group should delegate still has no api services for it (like it was deleted)

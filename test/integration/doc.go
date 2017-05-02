@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package integration provides integration tests for Kubernetes.  Use the integration
-// build tag during `go test` to start the tests.  Some tests require a running etcd
-// or Docker installation on the system which you can skip with no-docker and no-etcd.
+// Package integration provides integration tests for Kubernetes.Some tests require a
+// running etcd or Docker installation on the system.
 package integration // import "k8s.io/kubernetes/test/integration"

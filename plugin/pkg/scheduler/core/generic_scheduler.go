@@ -127,6 +127,18 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	return g.selectHost(priorityList)
 }
 
+// Prioritizers returns a slice containing all the scheduler's priority
+// functions and their config. It is exposed for testing only.
+func (g *genericScheduler) Prioritizers() []algorithm.PriorityConfig {
+	return g.prioritizers
+}
+
+// Predicates returns a map containing all the scheduler's predicate
+// functions. It is exposed for testing only.
+func (g *genericScheduler) Predicates() map[string]algorithm.FitPredicate {
+	return g.predicates
+}
+
 // selectHost takes a prioritized list of nodes and then picks one
 // in a round-robin manner from the nodes that had the highest score.
 func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList) (string, error) {

@@ -6856,6 +6856,13 @@
        "$ref": "v1.Toleration"
       },
       "description": "If specified, the pod's tolerations."
+     },
+     "hostMappings": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.HostAlias"
+      },
+      "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods."
      }
     }
    },
@@ -7183,6 +7190,28 @@
        "type": "string"
       },
       "description": "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260)."
+     },
+     "chapAuthDiscovery": {
+      "type": "boolean",
+      "description": "whether support iSCSI Discovery CHAP authentication"
+     },
+     "chapAuthSession": {
+      "type": "boolean",
+      "description": "whether support iSCSI Session CHAP authentication"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "CHAP secret for iSCSI target and initiator authentication"
+     }
+    }
+   },
+   "v1.LocalObjectReference": {
+    "id": "v1.LocalObjectReference",
+    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      }
     }
    },
@@ -7267,16 +7296,6 @@
      "readOnly": {
       "type": "boolean",
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
-     }
-    }
-   },
-   "v1.LocalObjectReference": {
-    "id": "v1.LocalObjectReference",
-    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
-    "properties": {
-     "name": {
-      "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      }
     }
    },
@@ -8594,6 +8613,23 @@
      }
     }
    },
+   "v1.HostAlias": {
+    "id": "v1.HostAlias",
+    "description": "HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
+    "properties": {
+     "ip": {
+      "type": "string",
+      "description": "IP address of the host file entry."
+     },
+     "hostnames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Hostnames for the the above IP address."
+     }
+    }
+   },
    "v1beta1.DaemonSetUpdateStrategy": {
     "id": "v1beta1.DaemonSetUpdateStrategy",
     "properties": {
@@ -9405,14 +9441,14 @@
       "items": {
        "$ref": "v1beta1.NetworkPolicyPort"
       },
-      "description": "List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is not provided, this rule matches all ports (traffic not restricted by port). If this field is empty, this rule matches no ports (no traffic matches). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list."
+      "description": "List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list."
      },
      "from": {
       "type": "array",
       "items": {
        "$ref": "v1beta1.NetworkPolicyPeer"
       },
-      "description": "List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is not provided, this rule matches all sources (traffic not restricted by source). If this field is empty, this rule matches no sources (no traffic matches). If this field is present and contains at least on item, this rule allows traffic only if the traffic matches at least one item in the from list."
+      "description": "List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least on item, this rule allows traffic only if the traffic matches at least one item in the from list."
      }
     }
    },
@@ -9438,11 +9474,11 @@
     "properties": {
      "podSelector": {
       "$ref": "v1.LabelSelector",
-      "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If not provided, this selector selects no pods. If present but empty, this selector selects all pods in this namespace."
+      "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If present but empty, this selector selects all pods in this namespace."
      },
      "namespaceSelector": {
       "$ref": "v1.LabelSelector",
-      "description": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omitted, this selector selects no namespaces. If present but empty, this selector selects all namespaces."
+      "description": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces."
      }
     }
    },

@@ -216,14 +216,12 @@ func getPortNum(t *testing.T, addr string) int {
 func TestTCPProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]*api.Endpoints{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
-			}},
-		},
+	lb.OnEndpointsAdd(&api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
+		}},
 	})
 
 	listenIP := "0.0.0.0"
@@ -245,14 +243,12 @@ func TestTCPProxy(t *testing.T) {
 func TestUDPProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]*api.Endpoints{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
-			}},
-		},
+	lb.OnEndpointsAdd(&api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
+		}},
 	})
 
 	listenIP := "0.0.0.0"
@@ -274,14 +270,12 @@ func TestUDPProxy(t *testing.T) {
 func TestUDPProxyTimeout(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]*api.Endpoints{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
-			}},
-		},
+	lb.OnEndpointsAdd(&api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
+		}},
 	})
 
 	listenIP := "0.0.0.0"
@@ -308,19 +302,20 @@ func TestMultiPortProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	serviceP := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo-p"}, Port: "p"}
 	serviceQ := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo-q"}, Port: "q"}
-	lb.OnEndpointsUpdate([]*api.Endpoints{{
+	lb.OnEndpointsAdd(&api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceP.Name, Namespace: serviceP.Namespace},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
 			Ports:     []api.EndpointPort{{Name: "p", Protocol: "TCP", Port: tcpServerPort}},
 		}},
-	}, {
+	})
+	lb.OnEndpointsAdd(&api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceQ.Name, Namespace: serviceQ.Namespace},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
 			Ports:     []api.EndpointPort{{Name: "q", Protocol: "UDP", Port: udpServerPort}},
 		}},
-	}})
+	})
 
 	listenIP := "0.0.0.0"
 	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
@@ -410,14 +405,12 @@ func stopProxyByName(proxier *Proxier, service ServicePortPortalName) error {
 func TestTCPProxyStop(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]*api.Endpoints{
-		{
-			ObjectMeta: metav1.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
-			}},
-		},
+	lb.OnEndpointsAdd(&api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
+		}},
 	})
 
 	listenIP := "0.0.0.0"
@@ -456,14 +449,12 @@ func TestTCPProxyStop(t *testing.T) {
 func TestUDPProxyStop(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]*api.Endpoints{
-		{
-			ObjectMeta: metav1.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
-			}},
-		},
+	lb.OnEndpointsAdd(&api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
+		}},
 	})
 
 	listenIP := "0.0.0.0"
@@ -496,14 +487,12 @@ func TestUDPProxyStop(t *testing.T) {
 func TestTCPProxyUpdateDelete(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]*api.Endpoints{
-		{
-			ObjectMeta: metav1.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
-			}},
-		},
+	lb.OnEndpointsAdd(&api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
+		}},
 	})
 
 	listenIP := "0.0.0.0"
@@ -536,14 +525,12 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 func TestUDPProxyUpdateDelete(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]*api.Endpoints{
-		{
-			ObjectMeta: metav1.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
-			}},
-		},
+	lb.OnEndpointsAdd(&api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
+		}},
 	})
 
 	listenIP := "0.0.0.0"
@@ -582,7 +569,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 			Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
 		}},
 	}
-	lb.OnEndpointsUpdate([]*api.Endpoints{endpoint})
+	lb.OnEndpointsAdd(endpoint)
 
 	listenIP := "0.0.0.0"
 	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
@@ -610,7 +597,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	waitForNumProxyLoops(t, p, 0)
 
 	// need to add endpoint here because it got clean up during service delete
-	lb.OnEndpointsUpdate([]*api.Endpoints{endpoint})
+	lb.OnEndpointsAdd(endpoint)
 	p.OnServiceUpdate([]*api.Service{{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Spec: api.ServiceSpec{ClusterIP: listenIP, Ports: []api.ServicePort{{
@@ -637,7 +624,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 			Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
 		}},
 	}
-	lb.OnEndpointsUpdate([]*api.Endpoints{endpoint})
+	lb.OnEndpointsAdd(endpoint)
 
 	listenIP := "0.0.0.0"
 	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
@@ -665,7 +652,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	waitForNumProxyLoops(t, p, 0)
 
 	// need to add endpoint here because it got clean up during service delete
-	lb.OnEndpointsUpdate([]*api.Endpoints{endpoint})
+	lb.OnEndpointsAdd(endpoint)
 	p.OnServiceUpdate([]*api.Service{{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Spec: api.ServiceSpec{ClusterIP: listenIP, Ports: []api.ServicePort{{
@@ -685,14 +672,12 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 func TestTCPProxyUpdatePort(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]*api.Endpoints{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
-			}},
-		},
+	lb.OnEndpointsAdd(&api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
+		}},
 	})
 
 	listenIP := "0.0.0.0"
@@ -735,14 +720,12 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 func TestUDPProxyUpdatePort(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]*api.Endpoints{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
-			}},
-		},
+	lb.OnEndpointsAdd(&api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
+		}},
 	})
 
 	listenIP := "0.0.0.0"
@@ -782,14 +765,12 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 func TestProxyUpdatePublicIPs(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]*api.Endpoints{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
-			}},
-		},
+	lb.OnEndpointsAdd(&api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
+		}},
 	})
 
 	listenIP := "0.0.0.0"
@@ -843,7 +824,7 @@ func TestProxyUpdatePortal(t *testing.T) {
 			Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
 		}},
 	}
-	lb.OnEndpointsUpdate([]*api.Endpoints{endpoint})
+	lb.OnEndpointsAdd(endpoint)
 
 	listenIP := "0.0.0.0"
 	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
@@ -894,7 +875,7 @@ func TestProxyUpdatePortal(t *testing.T) {
 			Protocol: "TCP",
 		}}},
 	}})
-	lb.OnEndpointsUpdate([]*api.Endpoints{endpoint})
+	lb.OnEndpointsAdd(endpoint)
 	svcInfo, exists = p.getServiceInfo(servicePortPortalName)
 	if !exists {
 		t.Fatalf("service with ClusterIP set not found in the proxy")

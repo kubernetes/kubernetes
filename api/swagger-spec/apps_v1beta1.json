@@ -2609,6 +2609,13 @@
        "$ref": "v1.Toleration"
       },
       "description": "If specified, the pod's tolerations."
+     },
+     "hostMappings": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.HostAlias"
+      },
+      "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods."
      }
     }
    },
@@ -2936,6 +2943,28 @@
        "type": "string"
       },
       "description": "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260)."
+     },
+     "chapAuthDiscovery": {
+      "type": "boolean",
+      "description": "whether support iSCSI Discovery CHAP authentication"
+     },
+     "chapAuthSession": {
+      "type": "boolean",
+      "description": "whether support iSCSI Session CHAP authentication"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "CHAP secret for iSCSI target and initiator authentication"
+     }
+    }
+   },
+   "v1.LocalObjectReference": {
+    "id": "v1.LocalObjectReference",
+    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      }
     }
    },
@@ -3020,16 +3049,6 @@
      "readOnly": {
       "type": "boolean",
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
-     }
-    }
-   },
-   "v1.LocalObjectReference": {
-    "id": "v1.LocalObjectReference",
-    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
-    "properties": {
-     "name": {
-      "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      }
     }
    },
@@ -4344,6 +4363,23 @@
       "type": "integer",
       "format": "int64",
       "description": "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system."
+     }
+    }
+   },
+   "v1.HostAlias": {
+    "id": "v1.HostAlias",
+    "description": "HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
+    "properties": {
+     "ip": {
+      "type": "string",
+      "description": "IP address of the host file entry."
+     },
+     "hostnames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Hostnames for the the above IP address."
      }
     }
    },

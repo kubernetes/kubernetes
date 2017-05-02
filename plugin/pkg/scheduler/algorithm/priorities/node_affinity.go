@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -58,7 +59,7 @@ func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *s
 			}
 
 			// TODO: Avoid computing it for all nodes if this becomes a performance problem.
-			nodeSelector, err := v1.NodeSelectorRequirementsAsSelector(preferredSchedulingTerm.Preference.MatchExpressions)
+			nodeSelector, err := v1helper.NodeSelectorRequirementsAsSelector(preferredSchedulingTerm.Preference.MatchExpressions)
 			if err != nil {
 				return schedulerapi.HostPriority{}, err
 			}

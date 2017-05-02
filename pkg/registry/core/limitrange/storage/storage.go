@@ -33,12 +33,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
-		NewFunc:     func() runtime.Object { return &api.LimitRange{} },
-		NewListFunc: func() runtime.Object { return &api.LimitRangeList{} },
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*api.LimitRange).Name, nil
-		},
+		Copier:            api.Scheme,
+		NewFunc:           func() runtime.Object { return &api.LimitRange{} },
+		NewListFunc:       func() runtime.Object { return &api.LimitRangeList{} },
 		PredicateFunc:     limitrange.MatchLimitRange,
 		QualifiedResource: api.Resource("limitranges"),
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("limitranges"),

@@ -27,13 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-
-	// Only required to authenticate against GKE clusters
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
+	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
 func main() {
@@ -91,7 +91,7 @@ func main() {
 
 	err = tprclient.Get().
 		Resource("examples").
-		Namespace(api.NamespaceDefault).
+		Namespace(v1.NamespaceDefault).
 		Name("example1").
 		Do().Into(&example)
 
@@ -111,7 +111,7 @@ func main() {
 			var result Example
 			err = tprclient.Post().
 				Resource("examples").
-				Namespace(api.NamespaceDefault).
+				Namespace(v1.NamespaceDefault).
 				Body(example).
 				Do().Into(&result)
 
@@ -151,7 +151,7 @@ func configureClient(config *rest.Config) {
 	config.GroupVersion = &groupversion
 	config.APIPath = "/apis"
 	config.ContentType = runtime.ContentTypeJSON
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 
 	schemeBuilder := runtime.NewSchemeBuilder(
 		func(scheme *runtime.Scheme) error {
@@ -162,6 +162,6 @@ func configureClient(config *rest.Config) {
 			)
 			return nil
 		})
-	metav1.AddToGroupVersion(api.Scheme, groupversion)
-	schemeBuilder.AddToScheme(api.Scheme)
+	metav1.AddToGroupVersion(scheme.Scheme, groupversion)
+	schemeBuilder.AddToScheme(scheme.Scheme)
 }

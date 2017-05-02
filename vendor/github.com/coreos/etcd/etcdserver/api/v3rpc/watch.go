@@ -92,6 +92,7 @@ type serverWatchStream struct {
 	mu sync.Mutex
 	// progress tracks the watchID that stream might need to send
 	// progress to.
+	// TODO: combine progress and prevKV into a single struct?
 	progress map[mvcc.WatchID]bool
 	prevKV   map[mvcc.WatchID]bool
 
@@ -130,10 +131,14 @@ func (ws *watchServer) Watch(stream pb.Watch_WatchServer) (err error) {
 	// but when stream.Context().Done() is closed, the stream's recv
 	// may continue to block since it uses a different context, leading to
 	// deadlock when calling sws.close().
-	go func() { errc <- sws.recvLoop() }()
-
+	go func() {
+		if rerr := sws.recvLoop(); rerr != nil {
+			errc <- rerr
+		}
+	}()
 	select {
 	case err = <-errc:
+		close(sws.ctrlStream)
 	case <-stream.Context().Done():
 		err = stream.Context().Err()
 		// the only server-side cancellation is noleader for now.
@@ -146,7 +151,6 @@ func (ws *watchServer) Watch(stream pb.Watch_WatchServer) (err error) {
 }
 
 func (sws *serverWatchStream) recvLoop() error {
-	defer close(sws.ctrlStream)
 	for {
 		req, err := sws.gRPCStream.Recv()
 		if err == io.EOF {
@@ -171,12 +175,14 @@ func (sws *serverWatchStream) recvLoop() error {
 				// support  >= key queries
 				creq.RangeEnd = []byte{}
 			}
+			filters := FiltersFromRequest(creq)
+
 			wsrev := sws.watchStream.Rev()
 			rev := creq.StartRevision
 			if rev == 0 {
 				rev = wsrev + 1
 			}
-			id := sws.watchStream.Watch(creq.Key, creq.RangeEnd, rev)
+			id := sws.watchStream.Watch(creq.Key, creq.RangeEnd, rev, filters...)
 			if id != -1 {
 				sws.mu.Lock()
 				if creq.ProgressNotify {
@@ -352,4 +358,26 @@ func (sws *serverWatchStream) newResponseHeader(rev int64) *pb.ResponseHeader {
 		Revision:  rev,
 		RaftTerm:  sws.raftTimer.Term(),
 	}
+}
+
+func filterNoDelete(e mvccpb.Event) bool {
+	return e.Type == mvccpb.DELETE
+}
+
+func filterNoPut(e mvccpb.Event) bool {
+	return e.Type == mvccpb.PUT
+}
+
+func FiltersFromRequest(creq *pb.WatchCreateRequest) []mvcc.FilterFunc {
+	filters := make([]mvcc.FilterFunc, 0, len(creq.Filters))
+	for _, ft := range creq.Filters {
+		switch ft {
+		case pb.WatchCreateRequest_NOPUT:
+			filters = append(filters, filterNoPut)
+		case pb.WatchCreateRequest_NODELETE:
+			filters = append(filters, filterNoDelete)
+		default:
+		}
+	}
+	return filters
 }

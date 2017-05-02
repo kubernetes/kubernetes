@@ -10,7 +10,6 @@ spec:
   # an external load-balanced IP for the frontend service.
   # type: LoadBalancer
   ports:
-    # the port that this service should serve on
   - port: 80
   selector:
     app: guestbook

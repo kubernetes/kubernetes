@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
@@ -314,6 +315,9 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			expectedPodName := ss.Name + "-1"
 			expectedPod, err := f.ClientSet.Core().Pods(ns).Get(expectedPodName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying the 2nd pod is removed only when it becomes running and ready")
+			sst.RestoreProbe(ss, testProbe)
 			watcher, err := f.ClientSet.Core().Pods(ns).Watch(metav1.SingleObject(
 				metav1.ObjectMeta{
 					Name:            expectedPod.Name,
@@ -321,20 +325,17 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 				},
 			))
 			Expect(err).NotTo(HaveOccurred())
-
-			By("Verifying the 2nd pod is removed only when it becomes running and ready")
-			sst.RestoreProbe(ss, testProbe)
 			_, err = watch.Until(framework.StatefulSetTimeout, watcher, func(event watch.Event) (bool, error) {
 				pod := event.Object.(*v1.Pod)
 				if event.Type == watch.Deleted && pod.Name == expectedPodName {
 					return false, fmt.Errorf("Pod %v was deleted before enter running", pod.Name)
 				}
 				framework.Logf("Observed event %v for pod %v. Phase %v, Pod is ready %v",
-					event.Type, pod.Name, pod.Status.Phase, v1.IsPodReady(pod))
+					event.Type, pod.Name, pod.Status.Phase, podutil.IsPodReady(pod))
 				if pod.Name != expectedPodName {
 					return false, nil
 				}
-				if pod.Status.Phase == v1.PodRunning && v1.IsPodReady(pod) {
+				if pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod) {
 					return true, nil
 				}
 				return false, nil
@@ -719,7 +720,7 @@ func (c *cockroachDBTester) name() string {
 }
 
 func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
-	cmd = fmt.Sprintf("/cockroach/cockroach sql --host %s.cockroachdb -e \"%v\"", podName, cmd)
+	cmd = fmt.Sprintf("/cockroach/cockroach sql --insecure --host %s.cockroachdb -e \"%v\"", podName, cmd)
 	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 

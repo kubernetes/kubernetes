@@ -31,6 +31,7 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnitypes020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -314,9 +315,14 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	}
 
 	// Hook container up with our bridge
-	res, err := plugin.addContainerToNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id)
+	resT, err := plugin.addContainerToNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id)
 	if err != nil {
 		return err
+	}
+	// Coerce the CNI result version
+	res, err := cnitypes020.GetResult(resT)
+	if err != nil {
+		return fmt.Errorf("unable to understand network config: %v", err)
 	}
 	if res.IP4 == nil {
 		return fmt.Errorf("CNI plugin reported no IPv4 address for container %v.", id)
@@ -381,7 +387,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 			return err
 		}
 
-		newPodPortMapping := constructPodPortMapping(pod, ip4)
+		newPodPortMapping := hostport.ConstructPodPortMapping(pod, ip4)
 		if err := plugin.hostportSyncer.OpenPodHostportsAndSync(newPodPortMapping, BridgeName, activePodPortMappings); err != nil {
 			return err
 		}
@@ -638,33 +644,10 @@ func (plugin *kubenetNetworkPlugin) getPodPortMappings() ([]*hostport.PodPortMap
 			continue
 		}
 		if pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name); ok {
-			activePodPortMappings = append(activePodPortMappings, constructPodPortMapping(pod, podIP))
+			activePodPortMappings = append(activePodPortMappings, hostport.ConstructPodPortMapping(pod, podIP))
 		}
 	}
 	return activePodPortMappings, nil
-}
-
-func constructPodPortMapping(pod *v1.Pod, podIP net.IP) *hostport.PodPortMapping {
-	portMappings := make([]*hostport.PortMapping, 0)
-	for _, c := range pod.Spec.Containers {
-		for _, port := range c.Ports {
-			portMappings = append(portMappings, &hostport.PortMapping{
-				Name:          port.Name,
-				HostPort:      port.HostPort,
-				ContainerPort: port.ContainerPort,
-				Protocol:      port.Protocol,
-				HostIP:        port.HostIP,
-			})
-		}
-	}
-
-	return &hostport.PodPortMapping{
-		Namespace:    pod.Namespace,
-		Name:         pod.Name,
-		PortMappings: portMappings,
-		HostNetwork:  pod.Spec.HostNetwork,
-		IP:           podIP,
-	}
 }
 
 // ipamGarbageCollection will release unused IP.
@@ -766,7 +749,7 @@ func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubeco
 	}, nil
 }
 
-func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.NetworkConfig, ifName, namespace, name string, id kubecontainer.ContainerID) (*cnitypes.Result, error) {
+func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.NetworkConfig, ifName, namespace, name string, id kubecontainer.ContainerID) (cnitypes.Result, error) {
 	rt, err := plugin.buildCNIRuntimeConf(ifName, id)
 	if err != nil {
 		return nil, fmt.Errorf("Error building CNI config: %v", err)

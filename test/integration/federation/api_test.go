@@ -35,19 +35,30 @@ import (
 	"k8s.io/kubernetes/test/integration/federation/framework"
 )
 
-var groupVersions = []schema.GroupVersion{
+// List of group versions that are enabled by default.
+var enabledGroupVersions = []schema.GroupVersion{
 	fed_v1b1.SchemeGroupVersion,
 	ext_v1b1.SchemeGroupVersion,
-	//	batch_v1.SchemeGroupVersion,
-	//	autoscaling_v1.SchemeGroupVersion,
 }
 
-type apiTestFunc func(t *testing.T, host string)
+// List of group versions that are disabled by default.
+var disabledGroupVersions = []schema.GroupVersion{
+	batch_v1.SchemeGroupVersion,
+	autoscaling_v1.SchemeGroupVersion,
+}
 
-func TestFederationAPI(t *testing.T) {
+type apiTestFunc func(t *testing.T, host string, expectedGroupVersions []schema.GroupVersion)
+
+func testFederationAPI(t *testing.T, runtimeConfig string, expectedGroupVersions []schema.GroupVersion) {
 	f := &framework.FederationAPIFixture{}
-	f.Setup(t)
-	defer f.Teardown(t)
+	if runtimeConfig == "" {
+		f.SetUp(t)
+	} else {
+		runOptions := framework.GetRunOptions()
+		runOptions.APIEnablement.RuntimeConfig.Set(runtimeConfig)
+		f.SetUpWithRunOptions(t, runOptions)
+	}
+	defer f.TearDown(t)
 
 	testCases := map[string]apiTestFunc{
 		"swaggerSpec":     testSwaggerSpec,
@@ -58,9 +69,21 @@ func TestFederationAPI(t *testing.T) {
 	}
 	for testName, testFunc := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			testFunc(t, f.Host)
+			testFunc(t, f.Host, expectedGroupVersions)
 		})
 	}
+}
+
+// Verifies that only default APIs are enabled when no runtime config is set.
+func TestDefaultRun(t *testing.T) {
+	testFederationAPI(t, "", enabledGroupVersions)
+}
+
+// Verifies that all APIs are enabled when runtime config is set to all.
+func TestRunWithRuntimeConfigAll(t *testing.T) {
+	expectedGroupVersions := enabledGroupVersions
+	expectedGroupVersions = append(enabledGroupVersions, disabledGroupVersions...)
+	testFederationAPI(t, "api/all=true", expectedGroupVersions)
 }
 
 func readResponse(serverURL string) ([]byte, error) {
@@ -79,7 +102,7 @@ func readResponse(serverURL string) ([]byte, error) {
 	return contents, nil
 }
 
-func testSwaggerSpec(t *testing.T, host string) {
+func testSwaggerSpec(t *testing.T, host string, expectedGroupVersions []schema.GroupVersion) {
 	serverURL := host + "/swaggerapi"
 	_, err := readResponse(serverURL)
 	if err != nil {
@@ -87,7 +110,7 @@ func testSwaggerSpec(t *testing.T, host string) {
 	}
 }
 
-func testSupport(t *testing.T, host string) {
+func testSupport(t *testing.T, host string, expectedGroupVersions []schema.GroupVersion) {
 	serverURL := host + "/version"
 	_, err := readResponse(serverURL)
 	if err != nil {
@@ -104,9 +127,9 @@ func findGroup(groups []metav1.APIGroup, groupName string) *metav1.APIGroup {
 	return nil
 }
 
-func testAPIGroupList(t *testing.T, host string) {
+func testAPIGroupList(t *testing.T, host string, expectedGroupVersions []schema.GroupVersion) {
 	groupVersionForDiscoveryMap := make(map[string]metav1.GroupVersionForDiscovery)
-	for _, groupVersion := range groupVersions {
+	for _, groupVersion := range expectedGroupVersions {
 		groupVersionForDiscoveryMap[groupVersion.Group] = metav1.GroupVersionForDiscovery{
 			GroupVersion: groupVersion.String(),
 			Version:      groupVersion.Version,
@@ -124,7 +147,8 @@ func testAPIGroupList(t *testing.T, host string) {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
 	}
 
-	for _, groupVersion := range groupVersions {
+	assert.Equal(t, len(apiGroupList.Groups), len(expectedGroupVersions), "expected: %v, actual: %v", expectedGroupVersions, apiGroupList.Groups)
+	for _, groupVersion := range expectedGroupVersions {
 		found := findGroup(apiGroupList.Groups, groupVersion.Group)
 		assert.NotNil(t, found)
 		assert.Equal(t, groupVersion.Group, found.Name)
@@ -135,8 +159,8 @@ func testAPIGroupList(t *testing.T, host string) {
 	}
 }
 
-func testAPIGroup(t *testing.T, host string) {
-	for _, groupVersion := range groupVersions {
+func testAPIGroup(t *testing.T, host string, expectedGroupVersions []schema.GroupVersion) {
+	for _, groupVersion := range expectedGroupVersions {
 		serverURL := host + "/apis/" + groupVersion.Group
 		contents, err := readResponse(serverURL)
 		if err != nil {
@@ -188,12 +212,25 @@ func findResource(resources []metav1.APIResource, resourceName string) *metav1.A
 	return nil
 }
 
-func testAPIResourceList(t *testing.T, host string) {
+func testAPIResourceList(t *testing.T, host string, expectedGroupVersions []schema.GroupVersion) {
 	testFederationResourceList(t, host)
 	testCoreResourceList(t, host)
 	testExtensionsResourceList(t, host)
-	// testBatchResourceList(t, host)
-	// testAutoscalingResourceList(t, host)
+	if contains(expectedGroupVersions, batch_v1.SchemeGroupVersion) {
+		testBatchResourceList(t, host)
+	}
+	if contains(expectedGroupVersions, autoscaling_v1.SchemeGroupVersion) {
+		testAutoscalingResourceList(t, host)
+	}
+}
+
+func contains(gvs []schema.GroupVersion, requiredGV schema.GroupVersion) bool {
+	for _, gv := range gvs {
+		if gv.String() == requiredGV.String() {
+			return true
+		}
+	}
+	return false
 }
 
 func testFederationResourceList(t *testing.T, host string) {
@@ -233,8 +270,7 @@ func testCoreResourceList(t *testing.T, host string) {
 	}
 	assert.Equal(t, "", apiResourceList.APIVersion)
 	assert.Equal(t, v1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
-	// Assert that there are exactly 7 resources.
-	assert.Equal(t, 8, len(apiResourceList.APIResources))
+	assert.Equal(t, 8, len(apiResourceList.APIResources), "ResourceList: %v", apiResourceList.APIResources)
 
 	// Verify services.
 	found := findResource(apiResourceList.APIResources, "services")

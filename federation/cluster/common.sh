@@ -24,7 +24,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 # kubefed configuration
 FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
 FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-system}
-FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-e2e-federation}"
+FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-${FEDERATION_NAME}}"
 HOST_CLUSTER_ZONE="${FEDERATION_HOST_CLUSTER_ZONE:-}"
 # If $HOST_CLUSTER_ZONE isn't specified, arbitrarily choose
 # last zone as the host cluster zone.
@@ -250,7 +250,7 @@ function create-federation-api-objects {
     done
 
     # Create server certificates.
-    ensure-temp-dir
+    kube::util::ensure-temp-dir
     echo "Creating federation apiserver certs for federation api host: ${FEDERATION_API_HOST} ( is this a dns name?: ${IS_DNS_NAME} )"
     MASTER_NAME="federation-apiserver" create-federation-apiserver-certs ${FEDERATION_API_HOST}
     export FEDERATION_APISERVER_CA_CERT_BASE64="${FEDERATION_APISERVER_CA_CERT_BASE64}"

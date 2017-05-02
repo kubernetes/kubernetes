@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -71,7 +72,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 							return fmt.Errorf("expected 1 node, but see %d. List: %v", len(nodeList.Items), nodeList.Items)
 						}
 						node := nodeList.Items[0]
-						_, pressure := v1.GetNodeCondition(&node.Status, v1.NodeMemoryPressure)
+						_, pressure := nodeutil.GetNodeCondition(&node.Status, v1.NodeMemoryPressure)
 						if pressure != nil && pressure.Status == v1.ConditionTrue {
 							return fmt.Errorf("node is still reporting memory pressure condition: %s", pressure)
 						}
@@ -200,7 +201,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 							glog.Errorf("expected 1 node, but see %d. List: %v", len(nodeList.Items), nodeList.Items)
 						}
 						node := nodeList.Items[0]
-						_, pressure := v1.GetNodeCondition(&node.Status, v1.NodeMemoryPressure)
+						_, pressure := nodeutil.GetNodeCondition(&node.Status, v1.NodeMemoryPressure)
 						glog.Infof("node pressure condition: %s", pressure)
 
 						// NOTE/TODO(mtaufen): Also log (at least temporarily) the actual memory consumption on the node.

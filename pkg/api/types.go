@@ -385,6 +385,9 @@ const (
 	// BetaStorageClassAnnotation represents the beta/previous StorageClass annotation.
 	// It's currently still used and will be held for backwards compatibility
 	BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
+
+	// MountOptionAnnotation defines mount option annotation used in PVs
+	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
 )
 
 // +genclient=true
@@ -653,10 +656,20 @@ type ISCSIVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
-	// Required: list of iSCSI target portal ips for high availability.
+	// Optional: list of iSCSI target portal ips for high availability.
 	// the portal is either an IP or ip_addr:port if port is other than default (typically TCP ports 860 and 3260)
 	// +optional
 	Portals []string
+	// Optional: whether support iSCSI Discovery CHAP authentication
+	// +optional
+	DiscoveryCHAPAuth bool
+	// Optional: whether support iSCSI Session CHAP authentication
+	// +optional
+	SessionCHAPAuth bool
+	// Optional: CHAP secret for iSCSI target and initiator authentication.
+	// The secret is used if either DiscoveryCHAPAuth or SessionCHAPAuth is true
+	// +optional
+	SecretRef *LocalObjectReference
 }
 
 // Represents a Fibre Channel volume.
@@ -2086,6 +2099,17 @@ type PodSpec struct {
 	// If specified, the pod's tolerations.
 	// +optional
 	Tolerations []Toleration
+	// HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
+	// file if specified. This is only valid for non-hostNetwork pods.
+	// +optional
+	HostAliases []HostAlias
+}
+
+// HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
+// pod's hosts file.
+type HostAlias struct {
+	IP        string
+	Hostnames []string
 }
 
 // Sysctl defines a kernel parameter to be set

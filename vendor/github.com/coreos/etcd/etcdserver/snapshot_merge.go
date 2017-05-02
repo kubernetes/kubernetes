@@ -16,7 +16,6 @@ package etcdserver
 
 import (
 	"io"
-	"log"
 
 	"github.com/coreos/etcd/mvcc/backend"
 	"github.com/coreos/etcd/raft/raftpb"
@@ -26,12 +25,7 @@ import (
 // createMergedSnapshotMessage creates a snapshot message that contains: raft status (term, conf),
 // a snapshot of v2 store inside raft.Snapshot as []byte, a snapshot of v3 KV in the top level message
 // as ReadCloser.
-func (s *EtcdServer) createMergedSnapshotMessage(m raftpb.Message, snapi uint64, confState raftpb.ConfState) snap.Message {
-	snapt, err := s.r.raftStorage.Term(snapi)
-	if err != nil {
-		log.Panicf("get term should never fail: %v", err)
-	}
-
+func (s *EtcdServer) createMergedSnapshotMessage(m raftpb.Message, snapt, snapi uint64, confState raftpb.ConfState) snap.Message {
 	// get a snapshot of v2 store as []byte
 	clone := s.store.Clone()
 	d, err := clone.SaveNoCopy()

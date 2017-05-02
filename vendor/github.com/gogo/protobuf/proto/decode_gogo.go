@@ -1,5 +1,7 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
-// http://github.com/gogo/protobuf/gogoproto
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
+// http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -96,7 +98,7 @@ func setPtrCustomType(base structPointer, f field, v interface{}) {
 	if v == nil {
 		return
 	}
-	structPointer_SetStructPointer(base, f, structPointer(reflect.ValueOf(v).Pointer()))
+	structPointer_SetStructPointer(base, f, toStructPointer(reflect.ValueOf(v)))
 }
 
 func setCustomType(base structPointer, f field, value interface{}) {
@@ -163,7 +165,8 @@ func (o *Buffer) dec_custom_slice_bytes(p *Properties, base structPointer) error
 	}
 	newBas := appendStructPointer(base, p.field, p.ctype)
 
-	setCustomType(newBas, 0, custom)
+	var zero field
+	setCustomType(newBas, zero, custom)
 
 	return nil
 }

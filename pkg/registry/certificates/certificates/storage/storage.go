@@ -36,12 +36,9 @@ type REST struct {
 // NewREST returns a registry which will store CertificateSigningRequest in the given helper
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *ApprovalREST) {
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
-		NewFunc:     func() runtime.Object { return &certificates.CertificateSigningRequest{} },
-		NewListFunc: func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*certificates.CertificateSigningRequest).Name, nil
-		},
+		Copier:            api.Scheme,
+		NewFunc:           func() runtime.Object { return &certificates.CertificateSigningRequest{} },
+		NewListFunc:       func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
 		PredicateFunc:     csrregistry.Matcher,
 		QualifiedResource: certificates.Resource("certificatesigningrequests"),
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("certificatesigningrequests"),

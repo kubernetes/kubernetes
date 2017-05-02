@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -117,18 +117,18 @@ func (cc *CertificateController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer cc.queue.ShutDown()
 
-	glog.Infof("Starting certificate controller manager")
+	glog.Infof("Starting certificate controller")
+	defer glog.Infof("Shutting down certificate controller")
 
-	if !cache.WaitForCacheSync(stopCh, cc.csrsSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("certificate", stopCh, cc.csrsSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(cc.worker, time.Second, stopCh)
 	}
+
 	<-stopCh
-	glog.Infof("Shutting down certificate controller")
 }
 
 // worker runs a thread that dequeues CSRs, handles them, and marks them done.
@@ -189,7 +189,7 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 	}
 
 	// need to operate on a copy so we don't mutate the csr in the shared cache
-	copy, err := api.Scheme.DeepCopy(csr)
+	copy, err := scheme.Scheme.DeepCopy(csr)
 	if err != nil {
 		return err
 	}

@@ -14,11 +14,11 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
-        "//vendor:github.com/aws/aws-sdk-go/aws",
-        "//vendor:github.com/aws/aws-sdk-go/aws/request",
-        "//vendor:github.com/aws/aws-sdk-go/aws/session",
-        "//vendor:github.com/aws/aws-sdk-go/service/ecr",
-        "//vendor:github.com/golang/glog",
+        "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/aws/session:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/service/ecr:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
     ],
 )
 
@@ -29,8 +29,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
-        "//vendor:github.com/aws/aws-sdk-go/aws",
-        "//vendor:github.com/aws/aws-sdk-go/service/ecr",
+        "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/service/ecr:go_default_library",
     ],
 )
 
