@@ -18,9 +18,11 @@ package azure_file
 
 import (
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -95,12 +97,19 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	dirMode := r.Int31n(511) + 1
+	fileMode := r.Int31n(511) + 1
+
 	spec := &v1.Volume{
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
 			AzureFile: &v1.AzureFileVolumeSource{
 				SecretName: "secret",
 				ShareName:  "share",
+				DirMode:    dirMode,
+				FileMode:   fileMode,
 			},
 		},
 	}
@@ -221,12 +230,19 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	dirMode := r.Int31n(511) + 1
+	fileMode := r.Int31n(511) + 1
+
 	spec := &v1.Volume{
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
 			AzureFile: &v1.AzureFileVolumeSource{
 				SecretName: "secret",
 				ShareName:  "share",
+				DirMode:    dirMode,
+				FileMode:   fileMode,
 			},
 		},
 	}

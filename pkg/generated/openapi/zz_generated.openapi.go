@@ -1981,6 +1981,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"dirMode": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Directory permission code that gives rwx permissions to all users. Must be a value between 0 and 511(0777). Defaults to 511(0777).",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"fileMode": {
+							SchemaProps: spec.SchemaProps{
+								Description: "File permission code that gives rwx permissions to all users. Must be a value between 0 and 511(0777). Defaults to 511(0777).",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
 					},
 					Required: []string{"secretName", "shareName"},
 				},
