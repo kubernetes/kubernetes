@@ -175,12 +175,12 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 		if err := preflight.RunInitMasterChecks(cfg); err != nil {
 			return nil, err
 		}
+
+		// Try to start the kubelet service in case it's inactive
+		preflight.TryStartKubelet()
 	} else {
 		fmt.Println("[preflight] Skipping pre-flight checks")
 	}
-
-	// Try to start the kubelet service in case it's inactive
-	preflight.TryStartKubelet()
 
 	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint}, nil
 }
