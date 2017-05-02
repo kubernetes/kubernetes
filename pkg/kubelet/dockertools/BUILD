@@ -14,7 +14,6 @@ go_library(
         "docker.go",
         "docker_manager.go",
         "docker_manager_linux.go",
-        "exec.go",
         "fake_docker_client.go",
         "instrumented_docker.go",
         "kube_docker_client.go",
@@ -22,15 +21,11 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
-        "//pkg/security/apparmor:go_default_library",
-        "//pkg/util/exec:go_default_library",
-        "//pkg/util/term:go_default_library",
         "//vendor/github.com/docker/distribution/digest:go_default_library",
         "//vendor/github.com/docker/distribution/reference:go_default_library",
         "//vendor/github.com/docker/docker/pkg/jsonmessage:go_default_library",
@@ -40,7 +35,6 @@ go_library(
         "//vendor/github.com/docker/engine-api/types/container:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/client-go/util/clock:go_default_library",
@@ -82,9 +76,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/kubelet/dockertools/securitycontext:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
