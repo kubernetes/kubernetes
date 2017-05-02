@@ -47,10 +47,6 @@ go_test(
         "docker_test.go",
         "kube_docker_client_test.go",
     ],
-    data = [
-        "fixtures/seccomp/sub/subtest",
-        "fixtures/seccomp/test",
-    ],
     library = ":go_default_library",
     tags = [
         "automanaged",
