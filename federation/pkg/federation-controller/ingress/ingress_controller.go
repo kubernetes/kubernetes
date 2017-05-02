@@ -63,6 +63,7 @@ const (
 	// other cluster.
 	firstClusterAnnotation = "ingress.federation.kubernetes.io/first-cluster"
 	ControllerName         = "ingresses"
+	UserAgentName          = "Federation-Ingresses-Controller"
 )
 
 var (
@@ -122,7 +123,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	glog.V(4).Infof("->NewIngressController V(4)")
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "federated-ingress-controller"})
+	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: UserAgentName})
 	ic := &IngressController{
 		federatedApiClient:    client,
 		ingressReviewDelay:    time.Second * 10,

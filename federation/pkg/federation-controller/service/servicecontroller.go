@@ -56,7 +56,7 @@ import (
 const (
 	serviceSyncPeriod = 10 * time.Minute
 
-	UserAgentName = "federation-service-controller"
+	UserAgentName = "Federation-Service-Controller"
 
 	reviewDelay           = 10 * time.Second
 	updateTimeout         = 30 * time.Second
