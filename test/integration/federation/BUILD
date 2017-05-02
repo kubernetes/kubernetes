@@ -13,7 +13,10 @@ go_test(
         "api_test.go",
         "crud_test.go",
     ],
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "integration",
+    ],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/pkg/federatedtypes:go_default_library",
