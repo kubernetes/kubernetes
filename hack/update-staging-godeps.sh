@@ -83,6 +83,10 @@ for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
   if [ "${repo}" == "client-go" ]; then
     continue
   fi
+  # we skip metrics because it's synced to the real repo manually
+  if [ "${repo}" == "metrics" ]; then
+    continue
+  fi
 
   kube::util::ensure_clean_working_dir
 
