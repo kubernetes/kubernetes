@@ -183,9 +183,10 @@ type KubeletConfiguration struct {
 	HTTPCheckFrequency metav1.Duration
 	// manifestURL is the URL for accessing the container manifest
 	ManifestURL string
-	// manifestURLHeader is the HTTP header to use when accessing the manifest
-	// URL, with the key separated from the value with a ':', as in 'key:value'
-	ManifestURLHeader string
+	// manifestURLHeader is the HTTP header(s) to use when accessing the manifest
+	// URL, with the key separated from the value with a ':', as in 'key:value'.
+	// The flag can be specified multiple times, and header can be repeated
+	ManifestURLHeader []string
 	// enableServer enables the Kubelet's server
 	EnableServer bool
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
