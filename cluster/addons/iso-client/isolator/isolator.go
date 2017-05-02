@@ -177,7 +177,7 @@ func StartIsolatorServer(i Isolator, isolatorLocalAddress string, eventDispatche
 	go func() {
 		<-sigterm
 		if err := client.UnregisterIsolator(); err != nil {
-			glog.Errorf("Failed to unregister handler: %v")
+			glog.Errorf("Failed to unregister handler: %v", err)
 		}
 		i.ShutDown()
 		stopServer()
