@@ -38,7 +38,10 @@ type HollowProxy struct {
 
 type FakeProxyHandler struct{}
 
-func (*FakeProxyHandler) OnServiceUpdate(services []*api.Service)                  {}
+func (*FakeProxyHandler) OnServiceAdd(service *api.Service)                        {}
+func (*FakeProxyHandler) OnServiceUpdate(oldService, service *api.Service)         {}
+func (*FakeProxyHandler) OnServiceDelete(service *api.Service)                     {}
+func (*FakeProxyHandler) OnServiceSynced()                                         {}
 func (*FakeProxyHandler) OnEndpointsAdd(endpoints *api.Endpoints)                  {}
 func (*FakeProxyHandler) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {}
 func (*FakeProxyHandler) OnEndpointsDelete(endpoints *api.Endpoints)               {}
@@ -46,8 +49,7 @@ func (*FakeProxyHandler) OnEndpointsSynced()                                    
 
 type FakeProxier struct{}
 
-func (*FakeProxier) OnServiceUpdate(services []*api.Service) {}
-func (*FakeProxier) Sync()                                   {}
+func (*FakeProxier) Sync() {}
 func (*FakeProxier) SyncLoop() {
 	select {}
 }
@@ -70,17 +72,19 @@ func NewHollowProxyOrDie(
 
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
-			Client:            client,
-			EventClient:       eventClient,
-			IptInterface:      iptInterface,
-			Proxier:           &FakeProxier{},
-			Broadcaster:       broadcaster,
-			Recorder:          recorder,
-			ProxyMode:         "fake",
-			NodeRef:           nodeRef,
-			OOMScoreAdj:       util.Int32Ptr(0),
-			ResourceContainer: "",
-			ConfigSyncPeriod:  30 * time.Second,
+			Client:                client,
+			EventClient:           eventClient,
+			IptInterface:          iptInterface,
+			Proxier:               &FakeProxier{},
+			Broadcaster:           broadcaster,
+			Recorder:              recorder,
+			ProxyMode:             "fake",
+			NodeRef:               nodeRef,
+			OOMScoreAdj:           util.Int32Ptr(0),
+			ResourceContainer:     "",
+			ConfigSyncPeriod:      30 * time.Second,
+			ServiceEventHandler:   &FakeProxyHandler{},
+			EndpointsEventHandler: &FakeProxyHandler{},
 		},
 	}
 }
