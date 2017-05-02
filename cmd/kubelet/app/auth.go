@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server"
 )
 
-func buildAuth(nodeName types.NodeName, client clientset.Interface, config componentconfig.KubeletConfiguration) (server.AuthInterface, error) {
+func BuildAuth(nodeName types.NodeName, client clientset.Interface, config componentconfig.KubeletConfiguration) (server.AuthInterface, error) {
 	// Get clients, if provided
 	var (
 		tokenClient authenticationclient.TokenReviewInterface
@@ -45,14 +45,14 @@ func buildAuth(nodeName types.NodeName, client clientset.Interface, config compo
 		sarClient = client.AuthorizationV1beta1().SubjectAccessReviews()
 	}
 
-	authenticator, err := buildAuthn(tokenClient, config.Authentication)
+	authenticator, err := BuildAuthn(tokenClient, config.Authentication)
 	if err != nil {
 		return nil, err
 	}
 
 	attributes := server.NewNodeAuthorizerAttributesGetter(nodeName)
 
-	authorizer, err := buildAuthz(sarClient, config.Authorization)
+	authorizer, err := BuildAuthz(sarClient, config.Authorization)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func buildAuth(nodeName types.NodeName, client clientset.Interface, config compo
 	return server.NewKubeletAuth(authenticator, attributes, authorizer), nil
 }
 
-func buildAuthn(client authenticationclient.TokenReviewInterface, authn componentconfig.KubeletAuthentication) (authenticator.Request, error) {
+func BuildAuthn(client authenticationclient.TokenReviewInterface, authn componentconfig.KubeletAuthentication) (authenticator.Request, error) {
 	authenticatorConfig := authenticatorfactory.DelegatingAuthenticatorConfig{
 		Anonymous:    authn.Anonymous.Enabled,
 		CacheTTL:     authn.Webhook.CacheTTL.Duration,
@@ -78,7 +78,7 @@ func buildAuthn(client authenticationclient.TokenReviewInterface, authn componen
 	return authenticator, err
 }
 
-func buildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz componentconfig.KubeletAuthorization) (authorizer.Authorizer, error) {
+func BuildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz componentconfig.KubeletAuthorization) (authorizer.Authorizer, error) {
 	switch authz.Mode {
 	case componentconfig.KubeletAuthorizationModeAlwaysAllow:
 		return authorizerfactory.NewAlwaysAllowAuthorizer(), nil
