@@ -88,7 +88,7 @@ type FederationSyncController struct {
 
 // StartFederationSyncController starts a new sync controller for a type adapter
 func StartFederationSyncController(kind string, adapterFactory federatedtypes.AdapterFactory, config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
-	restclient.AddUserAgent(config, fmt.Sprintf("%s-controller", kind))
+	restclient.AddUserAgent(config, fmt.Sprintf("federation-%s-controller", kind))
 	client := federationclientset.NewForConfigOrDie(config)
 	adapter := adapterFactory(client)
 	controller := newFederationSyncController(client, adapter)

@@ -47,6 +47,7 @@ import (
 const (
 	allClustersKey = "ALL_CLUSTERS"
 	ControllerName = "namespaces"
+	UserAgentName  = "federation-namespace-controller"
 )
 
 var (
@@ -96,7 +97,7 @@ type NamespaceController struct {
 func NewNamespaceController(client federationclientset.Interface, dynamicClientPool dynamic.ClientPool) *NamespaceController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "federated-namespace-controller"})
+	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: UserAgentName})
 
 	nc := &NamespaceController{
 		federatedApiClient:    client,
