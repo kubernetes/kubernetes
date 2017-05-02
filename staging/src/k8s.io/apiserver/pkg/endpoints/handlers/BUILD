@@ -35,7 +35,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "discovery.go",
         "doc.go",
         "namer.go",
         "patch.go",
@@ -45,7 +44,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
