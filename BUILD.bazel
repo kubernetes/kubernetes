@@ -14,6 +14,7 @@ filegroup(
         "//build:docker-artifacts-and-hashes",
         "//build:node-targets-and-hashes",
         "//build:server-targets-and-hashes",
+        "//build/debs:debs-and-hashes",
     ],
     visibility = ["//visibility:private"],
 )
