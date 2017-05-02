@@ -39,7 +39,7 @@ func TestForgivenessAdmission(t *testing.T) {
 		expectedPod  api.Pod
 	}{
 		{
-			description: "pod has no tolerations, expect add tolerations for `notread:NoExecute` and `unreachable:NoExecute`",
+			description: "pod has no tolerations, expect add tolerations for `notReady:NoExecute` and `unreachable:NoExecute`",
 			requestedPod: api.Pod{
 				Spec: api.PodSpec{},
 			},
@@ -63,7 +63,7 @@ func TestForgivenessAdmission(t *testing.T) {
 			},
 		},
 		{
-			description: "pod has tolerations, but none is for taint `notread:NoExecute` or `unreachable:NoExecute`, expect add tolerations for `notread:NoExecute` and `unreachable:NoExecute`",
+			description: "pod has tolerations, but none is for taint `notReady:NoExecute` or `unreachable:NoExecute`, expect add tolerations for `notReady:NoExecute` and `unreachable:NoExecute`",
 			requestedPod: api.Pod{
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
@@ -170,7 +170,7 @@ func TestForgivenessAdmission(t *testing.T) {
 			},
 		},
 		{
-			description: "pod specified tolerations for both `notread:NoExecute` and `unreachable:NoExecute`, expect no change",
+			description: "pod specified tolerations for both `notReady:NoExecute` and `unreachable:NoExecute`, expect no change",
 			requestedPod: api.Pod{
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
