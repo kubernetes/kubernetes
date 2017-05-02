@@ -235,11 +235,18 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 
 // RunDrain runs the 'drain' command
 func (o *DrainOptions) RunDrain() error {
+	// Run a preflight check to see if any pods currently exist that have local storage,
+	// that we would otherwise discover after cordoning.
+	_, err := o.getPodsForDeletion()
+	if err != nil {
+		return err
+	}
+
 	if err := o.RunCordonOrUncordon(true); err != nil {
 		return err
 	}
 
-	err := o.deleteOrEvictPodsSimple()
+	err = o.deleteOrEvictPodsSimple()
 	if err == nil {
 		cmdutil.PrintSuccess(o.mapper, false, o.Out, "node", o.nodeInfo.Name, false, "drained")
 	}

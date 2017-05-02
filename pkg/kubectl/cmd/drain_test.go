@@ -412,7 +412,7 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "DS-managed pod",
 			node:         node,
-			expected:     cordoned_node,
+			expected:     node,
 			pods:         []api.Pod{ds_pod},
 			rcs:          []api.ReplicationController{rc},
 			args:         []string{"node"},
@@ -422,7 +422,7 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "orphaned DS-managed pod",
 			node:         node,
-			expected:     cordoned_node,
+			expected:     node,
 			pods:         []api.Pod{orphaned_ds_pod},
 			rcs:          []api.ReplicationController{},
 			args:         []string{"node"},
@@ -472,7 +472,7 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "naked pod",
 			node:         node,
-			expected:     cordoned_node,
+			expected:     node,
 			pods:         []api.Pod{naked_pod},
 			rcs:          []api.ReplicationController{},
 			args:         []string{"node"},
@@ -492,7 +492,7 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "pod with EmptyDir",
 			node:         node,
-			expected:     cordoned_node,
+			expected:     node,
 			pods:         []api.Pod{emptydir_pod},
 			args:         []string{"node", "--force"},
 			expectFatal:  true,
@@ -532,6 +532,7 @@ func TestDrain(t *testing.T) {
 			new_node := &api.Node{}
 			deleted := false
 			evicted := false
+			updated := false
 			f, tf, codec, ns := cmdtesting.NewAPIFactory()
 			tf.Client = &fake.RESTClient{
 				APIRegistry:          api.Registry,
@@ -608,6 +609,7 @@ func TestDrain(t *testing.T) {
 						if !reflect.DeepEqual(test.expected.Spec, new_node.Spec) {
 							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec, new_node.Spec)
 						}
+						updated = true
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
 					case m.isFor("DELETE", "/namespaces/default/pods/bar"):
 						deleted = true
@@ -660,6 +662,9 @@ func TestDrain(t *testing.T) {
 				if deleted {
 					t.Fatalf("%s: unexpected delete when using %s", test.description, currMethod)
 				}
+			}
+			if !reflect.DeepEqual(test.expected.Spec, test.node.Spec) && !updated {
+				t.Fatalf("%s: node never updated", test.description)
 			}
 		}
 	}
