@@ -36,7 +36,7 @@ import (
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
@@ -158,12 +158,12 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	}
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
-	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
-	v1alpha1storage := map[string]rest.Storage{}
+	apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
+	v1beta1storage := map[string]rest.Storage{}
 	apiServiceREST := apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
-	v1alpha1storage["apiservices"] = apiServiceREST
-	v1alpha1storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
-	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
+	v1beta1storage["apiservices"] = apiServiceREST
+	v1beta1storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
+	apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = v1beta1storage
 
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
