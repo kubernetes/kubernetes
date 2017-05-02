@@ -151,11 +151,10 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 	// Heuristic for list kind: original kind + List suffix. Might
 	// not always be true but this tracker has a pretty limited
 	// understanding of the actual API model.
-	if gvr.Version == "" {
-
-	}
 	listGVK := gvk
 	listGVK.Kind = listGVK.Kind + "List"
+	// GVK does have the concept of "internal version". The scheme recognizes
+	// the runtime.APIVersionInternal, but not the empty string.
 	if listGVK.Version == "" {
 		listGVK.Version = runtime.APIVersionInternal
 	}
@@ -221,9 +220,6 @@ func (t *tracker) Get(gvr schema.GroupVersionResource, ns, name string) (runtime
 	}
 
 	if status, ok := obj.(*metav1.Status); ok {
-		if status.Details != nil {
-			status.Details.Kind = gvr.Resource
-		}
 		if status.Status != metav1.StatusSuccess {
 			return nil, &errors.StatusError{ErrStatus: *status}
 		}
@@ -248,6 +244,11 @@ func (t *tracker) Add(obj runtime.Object) error {
 		return fmt.Errorf("no registered kinds for %v", obj)
 	}
 	for _, gvk := range gvks {
+		// NOTE: KindToResource is a heuristic and default match. The actual
+		// registration in apiserver can specify arbitrary route for a gvk. If a
+		// test uses such objects, it cannot preset the tracker with objects via
+		// Add(). Instead, it should trigger the Create() function of the
+		// tracker, where an arbitrary gvr can be specified.
 		gvr, _ := meta.KindToResource(gvk)
 		// Resource doesn't have the concept of "__internal" version, just set it to "".
 		if gvr.Version == runtime.APIVersionInternal {
@@ -283,11 +284,6 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 	if err != nil {
 		return err
 	}
-
-	// TODO: remove before merge!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	//		if status, ok := obj.(*metav1.Status); ok && status.Details != nil {
-	//			gvk.Kind = status.Details.Kind
-	//		}
 
 	newMeta, err := meta.Accessor(obj)
 	if err != nil {
