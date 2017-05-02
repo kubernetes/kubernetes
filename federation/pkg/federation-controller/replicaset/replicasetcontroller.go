@@ -219,7 +219,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		// objNameFunc
 		func(obj runtime.Object) string {
 			replicaset := obj.(*extensionsv1.ReplicaSet)
-			return replicaset.Name
+			return fmt.Sprintf("%s/%s", replicaset.Namespace, replicaset.Name)
 		},
 		updateTimeout,
 		frsc.eventRecorder,
