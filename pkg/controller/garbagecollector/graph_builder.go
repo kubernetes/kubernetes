@@ -216,7 +216,7 @@ var ignoredResources = map[schema.GroupVersionResource]struct{}{
 	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {},
 	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {},
 	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
-	{Group: "apiregistration.k8s.io", Version: "v1alpha1", Resource: "apiservices"}:            {},
+	{Group: "apiregistration.k8s.io", Version: "v1beta1", Resource: "apiservices"}:             {},
 }
 
 func (gb *GraphBuilder) enqueueChanges(e *event) {
