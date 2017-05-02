@@ -9,11 +9,17 @@ load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 go_prefix("k8s.io/kubernetes")
 
 gcs_upload(
-    name = "ci-artifacts",
+    name = "push-build",
     data = [
         "//build/debs",
         "//build/release-tars",
     ],
+)
+
+alias(
+    name = "ci-artifacts",
+    actual = "push-build",
+    deprecation = "Use //:push-build instead.",
 )
 
 filegroup(
