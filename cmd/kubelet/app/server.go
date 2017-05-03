@@ -939,18 +939,6 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 	dockerClient := dockertools.ConnectToDockerOrDie(c.DockerEndpoint, c.RuntimeRequestTimeout.Duration,
 		c.ImagePullProgressDeadline.Duration)
 
-	// Initialize docker exec handler.
-	var dockerExecHandler dockertools.ExecHandler
-	switch c.DockerExecHandlerName {
-	case "native":
-		dockerExecHandler = &dockertools.NativeExecHandler{}
-	case "nsenter":
-		dockerExecHandler = &dockertools.NsenterExecHandler{}
-	default:
-		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", c.DockerExecHandlerName)
-		dockerExecHandler = &dockertools.NativeExecHandler{}
-	}
-
 	// Initialize network plugin settings.
 	binDir := c.CNIBinDir
 	if binDir == "" {
@@ -976,7 +964,7 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 	}
 
 	ds, err := dockershim.NewDockerService(dockerClient, c.SeccompProfileRoot, c.PodInfraContainerImage,
-		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, dockerExecHandler, dockershimRootDir,
+		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, c.DockerExecHandlerName, dockershimRootDir,
 		!c.DockerEnableSharedPID)
 	if err != nil {
 		return err
