@@ -144,7 +144,7 @@ func TestNodeStatusWithCloudProviderNodeIP(t *testing.T) {
 		Spec:       v1.NodeSpec{},
 	}
 
-	// TODO : is it possible to mock kubelet.validateNodeIP() to avoid relying on the host interface addresses ?
+	// TODO : is it possible to mock validateNodeIP() to avoid relying on the host interface addresses ?
 	addrs, err := net.InterfaceAddrs()
 	assert.NoError(t, err)
 	for _, addr := range addrs {
