@@ -13,7 +13,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/version:go_default_library",
-        "//vendor:github.com/spf13/pflag",
+        "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
 

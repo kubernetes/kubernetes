@@ -27,16 +27,11 @@ import (
 	"github.com/coreos/etcd/etcdserver/api/v2http"
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
-	"github.com/coreos/pkg/capnslog"
 	"github.com/golang/glog"
 )
 
+// TODO: These tests should not be leveraging v2http
 // TODO(random-liu): Add service interface to manage services with the same behaviour.
-
-func init() {
-	// github.com/coreos/etcd/etcdserver/api package is too spammy, set the log level to NOTICE.
-	capnslog.MustRepoLogger("github.com/coreos/etcd/etcdserver/api").SetRepoLogLevel(capnslog.NOTICE)
-}
 
 // All following configurations are got from etcd source code.
 // TODO(random-liu): Use embed.NewConfig after etcd3 is supported.

@@ -66,12 +66,12 @@ func (ls Set) AsSelector() Selector {
 // assumes that labels are already validated and thus don't
 // preform any validation.
 // According to our measurements this is significantly faster
-// in codepaths that matter at high sccale.
+// in codepaths that matter at high scale.
 func (ls Set) AsSelectorPreValidated() Selector {
 	return SelectorFromValidatedSet(ls)
 }
 
-// FormatLables convert label map into plain string
+// FormatLabels convert label map into plain string
 func FormatLabels(labelMap map[string]string) string {
 	l := Set(labelMap).String()
 	if l == "" {

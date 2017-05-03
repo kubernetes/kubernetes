@@ -31,18 +31,18 @@ import (
 )
 
 var (
-	autoscaleLong = templates.LongDesc(`
+	autoscaleLong = templates.LongDesc(i18n.T(`
 		Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
 
 		Looks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
-		An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`)
+		An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`))
 
-	autoscaleExample = templates.Examples(`
+	autoscaleExample = templates.Examples(i18n.T(`
 		# Auto scale a deployment "foo", with the number of pods between 2 and 10, target CPU utilization specified so a default autoscaling policy will be used:
 		kubectl autoscale deployment foo --min=2 --max=10
 
 		# Auto scale a replication controller "foo", with the number of pods between 1 and 5, target CPU utilization at 80%:
-		kubectl autoscale rc foo --max=5 --cpu-percent=80`)
+		kubectl autoscale rc foo --max=5 --cpu-percent=80`))
 )
 
 func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {

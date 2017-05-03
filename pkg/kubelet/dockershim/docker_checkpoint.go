@@ -84,7 +84,7 @@ type PersistentCheckpointHandler struct {
 	store CheckpointStore
 }
 
-func NewPersistentCheckpointHandler() (CheckpointHandler, error) {
+func NewPersistentCheckpointHandler(dockershimRootDir string) (CheckpointHandler, error) {
 	fstore, err := NewFileStore(filepath.Join(dockershimRootDir, sandboxCheckpointDir))
 	if err != nil {
 		return nil, err

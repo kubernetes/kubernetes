@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
+	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -208,7 +209,7 @@ func TestReconcile(t *testing.T) {
 		for _, action := range testCase.clientset.Actions() {
 			if action.GetVerb() == "update" && action.GetResource().Resource == "nodes" {
 				node := action.(core.UpdateAction).GetObject().(*v1.Node)
-				_, condition := v1.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+				_, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
 				if condition == nil {
 					t.Errorf("%d. Missing NodeNetworkUnavailable condition for Node %v", i, node.Name)
 				} else {

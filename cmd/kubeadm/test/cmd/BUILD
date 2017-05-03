@@ -21,6 +21,7 @@ go_test(
         "init_test.go",
         "join_test.go",
         "token_test.go",
+        "version_test.go",
     ],
     args = ["--kubeadm-path=../../kubeadm"],
     data = ["//cmd/kubeadm"],
@@ -30,6 +31,7 @@ go_test(
         "integration",
         "skip",
     ],
+    deps = ["//vendor/github.com/ghodss/yaml:go_default_library"],
 )
 
 filegroup(

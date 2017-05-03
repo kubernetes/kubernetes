@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
-	genericapihandlers "k8s.io/apiserver/pkg/endpoints/handlers"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -53,10 +53,12 @@ func (d dynamicLister) ListAPIResources() []metav1.APIResource {
 	return d.m.getExistingThirdPartyResources(d.path)
 }
 
-var _ genericapihandlers.APIResourceLister = &dynamicLister{}
+var _ discovery.APIResourceLister = &dynamicLister{}
 
 type ThirdPartyResourceServer struct {
 	genericAPIServer *genericapiserver.GenericAPIServer
+
+	availableGroupManager discovery.GroupManager
 
 	deleteCollectionWorkers int
 
@@ -71,10 +73,11 @@ type ThirdPartyResourceServer struct {
 	disableThirdPartyControllerForTesting bool
 }
 
-func NewThirdPartyResourceServer(genericAPIServer *genericapiserver.GenericAPIServer, storageFactory serverstorgage.StorageFactory) *ThirdPartyResourceServer {
+func NewThirdPartyResourceServer(genericAPIServer *genericapiserver.GenericAPIServer, availableGroupManager discovery.GroupManager, storageFactory serverstorgage.StorageFactory) *ThirdPartyResourceServer {
 	ret := &ThirdPartyResourceServer{
-		genericAPIServer:    genericAPIServer,
-		thirdPartyResources: map[string]*thirdPartyEntry{},
+		genericAPIServer:      genericAPIServer,
+		thirdPartyResources:   map[string]*thirdPartyEntry{},
+		availableGroupManager: availableGroupManager,
 	}
 
 	var err error
@@ -107,7 +110,7 @@ func (m *ThirdPartyResourceServer) HasThirdPartyResource(rsrc *extensions.ThirdP
 	if entry == nil {
 		return false, nil
 	}
-	plural, _ := meta.KindToResource(schema.GroupVersionKind{
+	plural, _ := meta.UnsafeGuessKindToResource(schema.GroupVersionKind{
 		Group:   group,
 		Version: rsrc.Versions[0].Name,
 		Kind:    kind,
@@ -133,7 +136,7 @@ func (m *ThirdPartyResourceServer) removeThirdPartyStorage(path, resource string
 	delete(entry.storage, resource)
 	if len(entry.storage) == 0 {
 		delete(m.thirdPartyResources, path)
-		m.genericAPIServer.RemoveAPIGroupForDiscovery(extensionsrest.GetThirdPartyGroupName(path))
+		m.availableGroupManager.RemoveGroup(extensionsrest.GetThirdPartyGroupName(path))
 	} else {
 		m.thirdPartyResources[path] = entry
 	}
@@ -236,7 +239,7 @@ func (m *ThirdPartyResourceServer) addThirdPartyResourceStorage(path, resource s
 	}
 	entry.storage[resource] = storage
 	if !found {
-		m.genericAPIServer.AddAPIGroupForDiscovery(apiGroup)
+		m.availableGroupManager.AddGroup(apiGroup)
 	}
 }
 
@@ -255,7 +258,7 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	if len(rsrc.Versions) == 0 {
 		return fmt.Errorf("ThirdPartyResource %s has no defined versions", rsrc.Name)
 	}
-	plural, _ := meta.KindToResource(schema.GroupVersionKind{
+	plural, _ := meta.UnsafeGuessKindToResource(schema.GroupVersionKind{
 		Group:   group,
 		Version: rsrc.Versions[0].Name,
 		Kind:    kind,
@@ -284,7 +287,7 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	if err := thirdparty.InstallREST(m.genericAPIServer.HandlerContainer.Container); err != nil {
 		glog.Errorf("Unable to setup thirdparty api: %v", err)
 	}
-	m.genericAPIServer.HandlerContainer.Add(genericapi.NewGroupWebService(api.Codecs, path, apiGroup))
+	m.genericAPIServer.HandlerContainer.Add(discovery.NewAPIGroupHandler(api.Codecs, apiGroup).WebService())
 
 	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedatastore.REST), apiGroup)
 	api.Registry.AddThirdPartyAPIGroupVersions(schema.GroupVersion{Group: group, Version: rsrc.Versions[0].Name})

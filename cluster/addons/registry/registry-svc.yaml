@@ -4,13 +4,13 @@ metadata:
   name: kube-registry
   namespace: kube-system
   labels:
-    k8s-app: kube-registry
+    k8s-app: kube-registry-upstream
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/name: "KubeRegistry"
 spec:
   selector:
-    k8s-app: kube-registry
+    k8s-app: kube-registry-upstream
   ports:
   - name: registry
     port: 5000

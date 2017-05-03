@@ -91,11 +91,11 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 	if set.Status.Replicas != 3 {
 		t.Error("Falied to scale statefulset to 3 replicas")
 	}
-	pods, err := spc.addTerminatedPod(set, 3)
+	pods, err := spc.addTerminatingPod(set, 3)
 	if err != nil {
 		t.Error(err)
 	}
-	pods, err = spc.addTerminatedPod(set, 4)
+	pods, err = spc.addTerminatingPod(set, 4)
 	if err != nil {
 		t.Error(err)
 	}
@@ -669,7 +669,7 @@ func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetContr
 	spc.setsIndexer.Add(set)
 	ssc.enqueueStatefulSet(set)
 	fakeWorker(ssc)
-	pods, err = spc.addTerminatedPod(set, ord)
+	pods, err = spc.addTerminatingPod(set, ord)
 	pod = getPodAtOrdinal(pods, ord)
 	ssc.updatePod(&prev, pod)
 	fakeWorker(ssc)
@@ -679,7 +679,7 @@ func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetContr
 	for set.Status.Replicas > *set.Spec.Replicas {
 		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
 		ord := len(pods)
-		pods, err = spc.addTerminatedPod(set, ord)
+		pods, err = spc.addTerminatingPod(set, ord)
 		pod = getPodAtOrdinal(pods, ord)
 		ssc.updatePod(&prev, pod)
 		fakeWorker(ssc)

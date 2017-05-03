@@ -73,7 +73,7 @@ func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, nodeName
 	// TODO: if disk is already attached?
 	err = attacher.photonDisks.AttachDisk(volumeSource.PdID, nodeName)
 	if err != nil {
-		glog.Errorf("Error attaching volume %q: %+v", volumeSource.PdID, err)
+		glog.Errorf("Error attaching volume %q to node %q: %+v", volumeSource.PdID, nodeName, err)
 		return "", err
 	}
 

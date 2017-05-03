@@ -167,7 +167,8 @@ func ConfirmUsable(config clientcmdapi.Config, passedContextName string) error {
 func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) []error {
 	validationErrors := make([]error, 0)
 
-	if reflect.DeepEqual(clientcmdapi.Cluster{}, clusterInfo) {
+	emptyCluster := clientcmdapi.NewCluster()
+	if reflect.DeepEqual(*emptyCluster, clusterInfo) {
 		return []error{ErrEmptyCluster}
 	}
 

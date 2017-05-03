@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"sort"
 
 	"github.com/coreos/pkg/capnslog"
@@ -33,13 +33,13 @@ const (
 )
 
 var (
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd/pkg", "fileutil")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "pkg/fileutil")
 )
 
 // IsDirWriteable checks if dir is writable by writing and removing a file
 // to dir. It returns nil if dir is writable.
 func IsDirWriteable(dir string) error {
-	f := path.Join(dir, ".touch")
+	f := filepath.Join(dir, ".touch")
 	if err := ioutil.WriteFile(f, []byte(""), PrivateFileMode); err != nil {
 		return err
 	}

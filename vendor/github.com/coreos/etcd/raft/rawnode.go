@@ -66,6 +66,9 @@ func (rn *RawNode) commitReady(rd Ready) {
 	if !IsEmptySnap(rd.Snapshot) {
 		rn.raft.raftLog.stableSnapTo(rd.Snapshot.Metadata.Index)
 	}
+	if len(rd.ReadStates) != 0 {
+		rn.raft.readStates = nil
+	}
 }
 
 // NewRawNode returns a new RawNode given configuration and a list of raft peers.
@@ -103,9 +106,14 @@ func NewRawNode(config *Config, peers []Peer) (*RawNode, error) {
 			r.addNode(peer.ID)
 		}
 	}
+
 	// Set the initial hard and soft states after performing all initialization.
 	rn.prevSoftSt = r.softState()
-	rn.prevHardSt = r.hardState()
+	if lastIndex == 0 {
+		rn.prevHardSt = emptyState
+	} else {
+		rn.prevHardSt = r.hardState()
+	}
 
 	return rn, nil
 }
@@ -113,6 +121,18 @@ func NewRawNode(config *Config, peers []Peer) (*RawNode, error) {
 // Tick advances the internal logical clock by a single tick.
 func (rn *RawNode) Tick() {
 	rn.raft.tick()
+}
+
+// TickQuiesced advances the internal logical clock by a single tick without
+// performing any other state machine processing. It allows the caller to avoid
+// periodic heartbeats and elections when all of the peers in a Raft group are
+// known to be at the same state. Expected usage is to periodically invoke Tick
+// or TickQuiesced depending on whether the group is "active" or "quiesced".
+//
+// WARNING: Be very careful about using this method as it subverts the Raft
+// state machine. You should probably be using Tick instead.
+func (rn *RawNode) TickQuiesced() {
+	rn.raft.electionElapsed++
 }
 
 // Campaign causes this RawNode to transition to candidate state.
@@ -200,6 +220,9 @@ func (rn *RawNode) HasReady() bool {
 	if len(r.msgs) > 0 || len(r.raftLog.unstableEntries()) > 0 || r.raftLog.hasNextEnts() {
 		return true
 	}
+	if len(r.readStates) != 0 {
+		return true
+	}
 	return false
 }
 
@@ -230,4 +253,12 @@ func (rn *RawNode) ReportSnapshot(id uint64, status SnapshotStatus) {
 // TransferLeader tries to transfer leadership to the given transferee.
 func (rn *RawNode) TransferLeader(transferee uint64) {
 	_ = rn.raft.Step(pb.Message{Type: pb.MsgTransferLeader, From: transferee})
+}
+
+// ReadIndex requests a read state. The read state will be set in ready.
+// Read State has a read index. Once the application advances further than the read
+// index, any linearizable read requests issued before the read request can be
+// processed safely. The read state will have the same rctx attached.
+func (rn *RawNode) ReadIndex(rctx []byte) {
+	_ = rn.raft.Step(pb.Message{Type: pb.MsgReadIndex, Entries: []pb.Entry{{Data: rctx}}})
 }

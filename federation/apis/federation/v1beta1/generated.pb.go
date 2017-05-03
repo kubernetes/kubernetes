@@ -52,7 +52,9 @@ var _ = math.Inf
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
-const _ = proto.GoGoProtoPackageIsVersion1
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
 func (m *Cluster) Reset()                    { *m = Cluster{} }
 func (*Cluster) ProtoMessage()               {}
@@ -88,41 +90,41 @@ func init() {
 	proto.RegisterType((*ClusterStatus)(nil), "k8s.io.kubernetes.federation.apis.federation.v1beta1.ClusterStatus")
 	proto.RegisterType((*ServerAddressByClientCIDR)(nil), "k8s.io.kubernetes.federation.apis.federation.v1beta1.ServerAddressByClientCIDR")
 }
-func (m *Cluster) Marshal() (data []byte, err error) {
+func (m *Cluster) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *Cluster) MarshalTo(data []byte) (int, error) {
+func (m *Cluster) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n1, err := m.ObjectMeta.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ObjectMeta.Size()))
+	n1, err := m.ObjectMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n1
-	data[i] = 0x12
+	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
-	n2, err := m.Spec.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.Spec.Size()))
+	n2, err := m.Spec.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n2
-	data[i] = 0x1a
+	dAtA[i] = 0x1a
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
-	n3, err := m.Status.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.Status.Size()))
+	n3, err := m.Status.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
@@ -130,85 +132,85 @@ func (m *Cluster) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ClusterCondition) Marshal() (data []byte, err error) {
+func (m *ClusterCondition) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ClusterCondition) MarshalTo(data []byte) (int, error) {
+func (m *ClusterCondition) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Type)))
-	i += copy(data[i:], m.Type)
-	data[i] = 0x12
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Type)))
+	i += copy(dAtA[i:], m.Type)
+	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Status)))
-	i += copy(data[i:], m.Status)
-	data[i] = 0x1a
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Status)))
+	i += copy(dAtA[i:], m.Status)
+	dAtA[i] = 0x1a
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.LastProbeTime.Size()))
-	n4, err := m.LastProbeTime.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.LastProbeTime.Size()))
+	n4, err := m.LastProbeTime.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n4
-	data[i] = 0x22
+	dAtA[i] = 0x22
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.LastTransitionTime.Size()))
-	n5, err := m.LastTransitionTime.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.LastTransitionTime.Size()))
+	n5, err := m.LastTransitionTime.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n5
-	data[i] = 0x2a
+	dAtA[i] = 0x2a
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Reason)))
-	i += copy(data[i:], m.Reason)
-	data[i] = 0x32
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Reason)))
+	i += copy(dAtA[i:], m.Reason)
+	dAtA[i] = 0x32
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Message)))
-	i += copy(data[i:], m.Message)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Message)))
+	i += copy(dAtA[i:], m.Message)
 	return i, nil
 }
 
-func (m *ClusterList) Marshal() (data []byte, err error) {
+func (m *ClusterList) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ClusterList) MarshalTo(data []byte) (int, error) {
+func (m *ClusterList) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n6, err := m.ListMeta.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ListMeta.Size()))
+	n6, err := m.ListMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n6
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
-			data[i] = 0x12
+			dAtA[i] = 0x12
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -218,27 +220,27 @@ func (m *ClusterList) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ClusterSpec) Marshal() (data []byte, err error) {
+func (m *ClusterSpec) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ClusterSpec) MarshalTo(data []byte) (int, error) {
+func (m *ClusterSpec) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if len(m.ServerAddressByClientCIDRs) > 0 {
 		for _, msg := range m.ServerAddressByClientCIDRs {
-			data[i] = 0xa
+			dAtA[i] = 0xa
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -246,10 +248,10 @@ func (m *ClusterSpec) MarshalTo(data []byte) (int, error) {
 		}
 	}
 	if m.SecretRef != nil {
-		data[i] = 0x12
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.SecretRef.Size()))
-		n7, err := m.SecretRef.MarshalTo(data[i:])
+		i = encodeVarintGenerated(dAtA, i, uint64(m.SecretRef.Size()))
+		n7, err := m.SecretRef.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
@@ -258,27 +260,27 @@ func (m *ClusterSpec) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ClusterStatus) Marshal() (data []byte, err error) {
+func (m *ClusterStatus) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ClusterStatus) MarshalTo(data []byte) (int, error) {
+func (m *ClusterStatus) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if len(m.Conditions) > 0 {
 		for _, msg := range m.Conditions {
-			data[i] = 0xa
+			dAtA[i] = 0xa
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -287,77 +289,77 @@ func (m *ClusterStatus) MarshalTo(data []byte) (int, error) {
 	}
 	if len(m.Zones) > 0 {
 		for _, s := range m.Zones {
-			data[i] = 0x2a
+			dAtA[i] = 0x2a
 			i++
 			l = len(s)
 			for l >= 1<<7 {
-				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
 				l >>= 7
 				i++
 			}
-			data[i] = uint8(l)
+			dAtA[i] = uint8(l)
 			i++
-			i += copy(data[i:], s)
+			i += copy(dAtA[i:], s)
 		}
 	}
-	data[i] = 0x32
+	dAtA[i] = 0x32
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Region)))
-	i += copy(data[i:], m.Region)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Region)))
+	i += copy(dAtA[i:], m.Region)
 	return i, nil
 }
 
-func (m *ServerAddressByClientCIDR) Marshal() (data []byte, err error) {
+func (m *ServerAddressByClientCIDR) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ServerAddressByClientCIDR) MarshalTo(data []byte) (int, error) {
+func (m *ServerAddressByClientCIDR) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.ClientCIDR)))
-	i += copy(data[i:], m.ClientCIDR)
-	data[i] = 0x12
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ClientCIDR)))
+	i += copy(dAtA[i:], m.ClientCIDR)
+	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.ServerAddress)))
-	i += copy(data[i:], m.ServerAddress)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ServerAddress)))
+	i += copy(dAtA[i:], m.ServerAddress)
 	return i, nil
 }
 
-func encodeFixed64Generated(data []byte, offset int, v uint64) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
-	data[offset+4] = uint8(v >> 32)
-	data[offset+5] = uint8(v >> 40)
-	data[offset+6] = uint8(v >> 48)
-	data[offset+7] = uint8(v >> 56)
+func encodeFixed64Generated(dAtA []byte, offset int, v uint64) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
+	dAtA[offset+4] = uint8(v >> 32)
+	dAtA[offset+5] = uint8(v >> 40)
+	dAtA[offset+6] = uint8(v >> 48)
+	dAtA[offset+7] = uint8(v >> 56)
 	return offset + 8
 }
-func encodeFixed32Generated(data []byte, offset int, v uint32) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
+func encodeFixed32Generated(dAtA []byte, offset int, v uint32) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
 	return offset + 4
 }
-func encodeVarintGenerated(data []byte, offset int, v uint64) int {
+func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
-		data[offset] = uint8(v&0x7f | 0x80)
+		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
-	data[offset] = uint8(v)
+	dAtA[offset] = uint8(v)
 	return offset + 1
 }
 func (m *Cluster) Size() (n int) {
@@ -543,8 +545,8 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *Cluster) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *Cluster) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -556,7 +558,7 @@ func (m *Cluster) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -584,7 +586,7 @@ func (m *Cluster) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -598,7 +600,7 @@ func (m *Cluster) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ObjectMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -614,7 +616,7 @@ func (m *Cluster) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -628,7 +630,7 @@ func (m *Cluster) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.Spec.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Spec.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -644,7 +646,7 @@ func (m *Cluster) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -658,13 +660,13 @@ func (m *Cluster) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.Status.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Status.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -683,8 +685,8 @@ func (m *Cluster) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ClusterCondition) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ClusterCondition) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -696,7 +698,7 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -724,7 +726,7 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -739,7 +741,7 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Type = ClusterConditionType(data[iNdEx:postIndex])
+			m.Type = ClusterConditionType(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -753,7 +755,7 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -768,7 +770,7 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Status = k8s_io_kubernetes_pkg_api_v1.ConditionStatus(data[iNdEx:postIndex])
+			m.Status = k8s_io_kubernetes_pkg_api_v1.ConditionStatus(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -782,7 +784,7 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -796,7 +798,7 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.LastProbeTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.LastProbeTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -812,7 +814,7 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -826,7 +828,7 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.LastTransitionTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.LastTransitionTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -842,7 +844,7 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -857,7 +859,7 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Reason = string(data[iNdEx:postIndex])
+			m.Reason = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 6:
 			if wireType != 2 {
@@ -871,7 +873,7 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -886,11 +888,11 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Message = string(data[iNdEx:postIndex])
+			m.Message = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -909,8 +911,8 @@ func (m *ClusterCondition) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ClusterList) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ClusterList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -922,7 +924,7 @@ func (m *ClusterList) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -950,7 +952,7 @@ func (m *ClusterList) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -964,7 +966,7 @@ func (m *ClusterList) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ListMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -980,7 +982,7 @@ func (m *ClusterList) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -995,13 +997,13 @@ func (m *ClusterList) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Items = append(m.Items, Cluster{})
-			if err := m.Items[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1020,8 +1022,8 @@ func (m *ClusterList) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ClusterSpec) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ClusterSpec) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1033,7 +1035,7 @@ func (m *ClusterSpec) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1061,7 +1063,7 @@ func (m *ClusterSpec) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1076,7 +1078,7 @@ func (m *ClusterSpec) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.ServerAddressByClientCIDRs = append(m.ServerAddressByClientCIDRs, ServerAddressByClientCIDR{})
-			if err := m.ServerAddressByClientCIDRs[len(m.ServerAddressByClientCIDRs)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ServerAddressByClientCIDRs[len(m.ServerAddressByClientCIDRs)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1092,7 +1094,7 @@ func (m *ClusterSpec) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1109,13 +1111,13 @@ func (m *ClusterSpec) Unmarshal(data []byte) error {
 			if m.SecretRef == nil {
 				m.SecretRef = &k8s_io_kubernetes_pkg_api_v1.LocalObjectReference{}
 			}
-			if err := m.SecretRef.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.SecretRef.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1134,8 +1136,8 @@ func (m *ClusterSpec) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ClusterStatus) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ClusterStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1147,7 +1149,7 @@ func (m *ClusterStatus) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1175,7 +1177,7 @@ func (m *ClusterStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1190,7 +1192,7 @@ func (m *ClusterStatus) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Conditions = append(m.Conditions, ClusterCondition{})
-			if err := m.Conditions[len(m.Conditions)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Conditions[len(m.Conditions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1206,7 +1208,7 @@ func (m *ClusterStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1221,7 +1223,7 @@ func (m *ClusterStatus) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Zones = append(m.Zones, string(data[iNdEx:postIndex]))
+			m.Zones = append(m.Zones, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		case 6:
 			if wireType != 2 {
@@ -1235,7 +1237,7 @@ func (m *ClusterStatus) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1250,11 +1252,11 @@ func (m *ClusterStatus) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Region = string(data[iNdEx:postIndex])
+			m.Region = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1273,8 +1275,8 @@ func (m *ClusterStatus) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ServerAddressByClientCIDR) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ServerAddressByClientCIDR) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1286,7 +1288,7 @@ func (m *ServerAddressByClientCIDR) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1314,7 +1316,7 @@ func (m *ServerAddressByClientCIDR) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1329,7 +1331,7 @@ func (m *ServerAddressByClientCIDR) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ClientCIDR = string(data[iNdEx:postIndex])
+			m.ClientCIDR = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -1343,7 +1345,7 @@ func (m *ServerAddressByClientCIDR) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1358,11 +1360,11 @@ func (m *ServerAddressByClientCIDR) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ServerAddress = string(data[iNdEx:postIndex])
+			m.ServerAddress = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1381,8 +1383,8 @@ func (m *ServerAddressByClientCIDR) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func skipGenerated(data []byte) (n int, err error) {
-	l := len(data)
+func skipGenerated(dAtA []byte) (n int, err error) {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		var wire uint64
@@ -1393,7 +1395,7 @@ func skipGenerated(data []byte) (n int, err error) {
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1411,7 +1413,7 @@ func skipGenerated(data []byte) (n int, err error) {
 					return 0, io.ErrUnexpectedEOF
 				}
 				iNdEx++
-				if data[iNdEx-1] < 0x80 {
+				if dAtA[iNdEx-1] < 0x80 {
 					break
 				}
 			}
@@ -1428,7 +1430,7 @@ func skipGenerated(data []byte) (n int, err error) {
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				length |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1451,7 +1453,7 @@ func skipGenerated(data []byte) (n int, err error) {
 					if iNdEx >= l {
 						return 0, io.ErrUnexpectedEOF
 					}
-					b := data[iNdEx]
+					b := dAtA[iNdEx]
 					iNdEx++
 					innerWire |= (uint64(b) & 0x7F) << shift
 					if b < 0x80 {
@@ -1462,7 +1464,7 @@ func skipGenerated(data []byte) (n int, err error) {
 				if innerWireType == 4 {
 					break
 				}
-				next, err := skipGenerated(data[start:])
+				next, err := skipGenerated(dAtA[start:])
 				if err != nil {
 					return 0, err
 				}
@@ -1486,57 +1488,63 @@ var (
 	ErrIntOverflowGenerated   = fmt.Errorf("proto: integer overflow")
 )
 
+func init() {
+	proto.RegisterFile("k8s.io/kubernetes/federation/apis/federation/v1beta1/generated.proto", fileDescriptorGenerated)
+}
+
 var fileDescriptorGenerated = []byte{
-	// 809 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xa4, 0x54, 0xcd, 0x6e, 0xeb, 0x44,
-	0x14, 0x8e, 0xf3, 0xdb, 0x4c, 0x09, 0x54, 0x23, 0x90, 0x42, 0x16, 0x4e, 0x15, 0x21, 0xd4, 0x22,
-	0xb0, 0x69, 0x40, 0xa8, 0x12, 0x02, 0xa9, 0x4e, 0x85, 0x54, 0xa9, 0x55, 0xd1, 0xb4, 0x62, 0x51,
-	0x21, 0xc1, 0xc4, 0x39, 0x71, 0x4d, 0xe2, 0x1f, 0x79, 0x26, 0x11, 0xe9, 0x8a, 0x07, 0x60, 0xc1,
-	0x43, 0xf0, 0x06, 0xac, 0xd9, 0x77, 0x77, 0xbb, 0xb8, 0x8b, 0xae, 0xa2, 0xdb, 0xdc, 0xb7, 0xe8,
-	0xea, 0x6a, 0xc6, 0x13, 0xc7, 0xbe, 0x49, 0x7a, 0x7b, 0xdb, 0x9d, 0xe7, 0xf8, 0x9c, 0xef, 0xfb,
-	0xe6, 0x7c, 0x73, 0x0e, 0x3a, 0x1c, 0xec, 0x33, 0xc3, 0x0d, 0xcc, 0xc1, 0xa8, 0x0b, 0x91, 0x0f,
-	0x1c, 0x98, 0xd9, 0x87, 0x1e, 0x44, 0x94, 0xbb, 0x81, 0x6f, 0xd2, 0xd0, 0xcd, 0x9c, 0xc7, 0x7b,
-	0x5d, 0xe0, 0x74, 0xcf, 0x74, 0xc0, 0x17, 0x21, 0xe8, 0x19, 0x61, 0x14, 0xf0, 0x00, 0x7f, 0x1b,
-	0xa3, 0x18, 0x0b, 0x14, 0x63, 0x51, 0x65, 0x08, 0x94, 0xf4, 0x59, 0xa1, 0x34, 0xbe, 0x72, 0x5c,
-	0x7e, 0x39, 0xea, 0x1a, 0x76, 0xe0, 0x99, 0x4e, 0xe0, 0x04, 0xa6, 0x04, 0xeb, 0x8e, 0xfa, 0xf2,
-	0x24, 0x0f, 0xf2, 0x2b, 0x26, 0x69, 0x28, 0x12, 0x21, 0xca, 0xa3, 0xf6, 0xa5, 0xeb, 0x43, 0x34,
-	0x31, 0xc3, 0x81, 0x13, 0xab, 0xf4, 0x80, 0x53, 0x73, 0xbc, 0x24, 0xad, 0x61, 0xae, 0xab, 0x8a,
-	0x46, 0x3e, 0x77, 0x3d, 0x58, 0x2a, 0xf8, 0xee, 0x5d, 0x05, 0xcc, 0xbe, 0x04, 0x8f, 0x2e, 0xd5,
-	0x7d, 0xb3, 0xae, 0x6e, 0xc4, 0xdd, 0xa1, 0xe9, 0xfa, 0x9c, 0xf1, 0x68, 0xa9, 0x28, 0x75, 0x27,
-	0x06, 0xd1, 0x18, 0xa2, 0xc5, 0x85, 0xe0, 0x4f, 0xea, 0x85, 0x43, 0x58, 0x75, 0xa7, 0x2f, 0x97,
-	0x4d, 0x53, 0x65, 0x2b, 0xb2, 0x5b, 0xff, 0xe7, 0x51, 0xa5, 0x33, 0x1c, 0x31, 0x0e, 0x11, 0xfe,
-	0x1d, 0x6d, 0x88, 0x46, 0xf5, 0x28, 0xa7, 0x75, 0x6d, 0x5b, 0xdb, 0xd9, 0x6c, 0x7f, 0x6d, 0x28,
-	0xef, 0xd2, 0xba, 0x8d, 0x70, 0xe0, 0xc4, 0xb6, 0x89, 0x6c, 0x63, 0xbc, 0x67, 0x9c, 0x76, 0xff,
-	0x00, 0x9b, 0x9f, 0x00, 0xa7, 0x16, 0xbe, 0x9e, 0x36, 0x73, 0xb3, 0x69, 0x13, 0x2d, 0x62, 0x24,
-	0x41, 0xc5, 0x36, 0x2a, 0xb2, 0x10, 0xec, 0x7a, 0x5e, 0xa2, 0x1f, 0x18, 0x4f, 0x79, 0x19, 0x86,
-	0x92, 0x7b, 0x16, 0x82, 0x6d, 0x7d, 0xa0, 0xe8, 0x8a, 0xe2, 0x44, 0x24, 0x38, 0x1e, 0xa0, 0x32,
-	0xe3, 0x94, 0x8f, 0x58, 0xbd, 0x20, 0x69, 0x3a, 0xcf, 0xa3, 0x91, 0x50, 0xd6, 0x87, 0x8a, 0xa8,
-	0x1c, 0x9f, 0x89, 0xa2, 0x68, 0xdd, 0x16, 0xd0, 0x96, 0xca, 0xec, 0x04, 0x7e, 0xcf, 0x15, 0x10,
-	0x78, 0x1f, 0x15, 0xf9, 0x24, 0x04, 0xd9, 0xc4, 0xaa, 0xf5, 0xd9, 0x5c, 0xe3, 0xf9, 0x24, 0x84,
-	0xfb, 0x69, 0xf3, 0xe3, 0xb7, 0xf3, 0x45, 0x9c, 0xc8, 0x0a, 0xfc, 0x4b, 0xa2, 0x3d, 0x2f, 0x6b,
-	0x7f, 0xcc, 0xd2, 0xde, 0x4f, 0x9b, 0x0f, 0xda, 0x6b, 0x24, 0x98, 0x59, 0x99, 0xd8, 0x41, 0xb5,
-	0x21, 0x65, 0xfc, 0xe7, 0x28, 0xe8, 0xc2, 0xb9, 0xeb, 0x81, 0x6a, 0xcd, 0x17, 0x8f, 0xf3, 0x57,
-	0x54, 0x58, 0x9f, 0x28, 0x29, 0xb5, 0xe3, 0x34, 0x10, 0xc9, 0xe2, 0xe2, 0x31, 0xc2, 0x22, 0x70,
-	0x1e, 0x51, 0x9f, 0xc5, 0x97, 0x13, 0x6c, 0xc5, 0xf7, 0x66, 0x6b, 0x28, 0x36, 0x7c, 0xbc, 0x84,
-	0x46, 0x56, 0x30, 0xe0, 0xcf, 0x51, 0x39, 0x02, 0xca, 0x02, 0xbf, 0x5e, 0x92, 0x8d, 0x4b, 0xfc,
-	0x22, 0x32, 0x4a, 0xd4, 0x5f, 0xbc, 0x8b, 0x2a, 0x1e, 0x30, 0x46, 0x1d, 0xa8, 0x97, 0x65, 0xe2,
-	0x47, 0x2a, 0xb1, 0x72, 0x12, 0x87, 0xc9, 0xfc, 0x7f, 0xeb, 0x85, 0x86, 0x36, 0x95, 0x55, 0xc7,
-	0x2e, 0xe3, 0xf8, 0xd7, 0xa5, 0xf1, 0x30, 0x1e, 0x77, 0x21, 0x51, 0x2d, 0x87, 0x63, 0x4b, 0x71,
-	0x6d, 0xcc, 0x23, 0xa9, 0xd1, 0xe8, 0xa2, 0x92, 0xcb, 0xc1, 0x13, 0xc6, 0x17, 0x76, 0x36, 0xdb,
-	0x3f, 0x3c, 0xeb, 0xd1, 0x5a, 0x35, 0xc5, 0x54, 0x3a, 0x12, 0x98, 0x24, 0x86, 0x6e, 0xfd, 0x9b,
-	0x4f, 0x6e, 0x24, 0xe6, 0x05, 0xff, 0xa7, 0xa1, 0x46, 0xbc, 0x59, 0x0e, 0x7a, 0xbd, 0x08, 0x18,
-	0xb3, 0x26, 0x9d, 0xa1, 0x0b, 0x3e, 0xef, 0x1c, 0x1d, 0x12, 0x56, 0xd7, 0xa4, 0x92, 0xd3, 0xa7,
-	0x29, 0x39, 0x5b, 0x87, 0x6b, 0xb5, 0x94, 0xb6, 0xc6, 0xda, 0x14, 0x46, 0x1e, 0x90, 0x85, 0x7f,
-	0x43, 0x55, 0x06, 0x76, 0x04, 0x9c, 0x40, 0x5f, 0x6d, 0x92, 0xf6, 0x0a, 0x8d, 0xca, 0x06, 0x69,
-	0x40, 0x60, 0xd3, 0x61, 0xbc, 0x90, 0x08, 0xf4, 0x21, 0x02, 0xdf, 0x06, 0xab, 0x36, 0x9b, 0x36,
-	0xab, 0x67, 0x73, 0x20, 0xb2, 0xc0, 0x6c, 0xbd, 0xd4, 0x50, 0x2d, 0x33, 0xfd, 0xf8, 0x0a, 0x21,
-	0x7b, 0x3e, 0x59, 0xf3, 0xbe, 0xfc, 0xf4, 0x2c, 0x87, 0x92, 0x41, 0x5d, 0x6c, 0xcc, 0x24, 0xc4,
-	0x48, 0x8a, 0x0d, 0x37, 0x51, 0xe9, 0x2a, 0xf0, 0x81, 0xd5, 0x4b, 0xdb, 0x85, 0x9d, 0xaa, 0x55,
-	0x15, 0xae, 0x5e, 0x88, 0x00, 0x89, 0xe3, 0xf1, 0xd3, 0x77, 0xdc, 0xc0, 0x57, 0x2f, 0x3a, 0xf5,
-	0xf4, 0x45, 0x94, 0xa8, 0xbf, 0xad, 0xbf, 0x35, 0xf4, 0xe9, 0xda, 0x96, 0xe3, 0x36, 0x42, 0x76,
-	0x72, 0x52, 0x9b, 0x6b, 0x21, 0x2d, 0xf9, 0x43, 0x52, 0x59, 0xf8, 0x7b, 0x54, 0xcb, 0xf8, 0xa4,
-	0x96, 0x56, 0xb2, 0x29, 0x32, 0x6c, 0x24, 0x9b, 0x6b, 0xed, 0x5e, 0xdf, 0xe9, 0xb9, 0x9b, 0x3b,
-	0x3d, 0x77, 0x7b, 0xa7, 0xe7, 0xfe, 0x9a, 0xe9, 0xda, 0xf5, 0x4c, 0xd7, 0x6e, 0x66, 0xba, 0xf6,
-	0x6a, 0xa6, 0x6b, 0xff, 0xbc, 0xd6, 0x73, 0x17, 0x15, 0xd5, 0xb3, 0x37, 0x01, 0x00, 0x00, 0xff,
-	0xff, 0x1d, 0x7e, 0xd9, 0xbe, 0x88, 0x08, 0x00, 0x00,
+	// 837 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x54, 0xcd, 0x8e, 0x1b, 0x45,
+	0x10, 0xf6, 0xac, 0xff, 0xe2, 0x5e, 0x0c, 0x51, 0x0b, 0x24, 0xe3, 0xc3, 0x38, 0xb2, 0x10, 0xda,
+	0x20, 0x32, 0xc3, 0x1a, 0x84, 0x22, 0x21, 0x90, 0x32, 0x8e, 0x10, 0x91, 0x36, 0x0a, 0xea, 0x5d,
+	0x71, 0x88, 0x90, 0xa0, 0x3d, 0x2e, 0x8f, 0x1b, 0x7b, 0x7e, 0xd4, 0xdd, 0xb6, 0x70, 0x4e, 0x3c,
+	0x00, 0x07, 0x1e, 0x82, 0x37, 0xe0, 0xcc, 0x7d, 0x6f, 0xe4, 0xc0, 0x21, 0x27, 0x8b, 0x35, 0x6f,
+	0x91, 0x13, 0xea, 0x9e, 0xf6, 0x78, 0x86, 0xb1, 0x43, 0xd8, 0xbd, 0x4d, 0xd7, 0x54, 0x7d, 0xdf,
+	0xd7, 0xf5, 0x75, 0x15, 0x7a, 0x38, 0xbb, 0x2f, 0x1c, 0x16, 0xbb, 0xb3, 0xc5, 0x08, 0x78, 0x04,
+	0x12, 0x84, 0x3b, 0x81, 0x31, 0x70, 0x2a, 0x59, 0x1c, 0xb9, 0x34, 0x61, 0x85, 0xf3, 0xf2, 0x74,
+	0x04, 0x92, 0x9e, 0xba, 0x01, 0x44, 0x2a, 0x04, 0x63, 0x27, 0xe1, 0xb1, 0x8c, 0xf1, 0x27, 0x29,
+	0x8a, 0xb3, 0x43, 0x71, 0x76, 0x55, 0x8e, 0x42, 0xc9, 0x9f, 0x0d, 0x4a, 0xf7, 0x5e, 0xc0, 0xe4,
+	0x74, 0x31, 0x72, 0xfc, 0x38, 0x74, 0x83, 0x38, 0x88, 0x5d, 0x0d, 0x36, 0x5a, 0x4c, 0xf4, 0x49,
+	0x1f, 0xf4, 0x57, 0x4a, 0xd2, 0x35, 0x24, 0x4a, 0x54, 0x48, 0xfd, 0x29, 0x8b, 0x80, 0xaf, 0xdc,
+	0x64, 0x16, 0xa4, 0x2a, 0x43, 0x90, 0xd4, 0x5d, 0x96, 0xa4, 0x75, 0xdd, 0x43, 0x55, 0x7c, 0x11,
+	0x49, 0x16, 0x42, 0xa9, 0xe0, 0xd3, 0xff, 0x2a, 0x10, 0xfe, 0x14, 0x42, 0x5a, 0xaa, 0xfb, 0xf8,
+	0x50, 0xdd, 0x42, 0xb2, 0xb9, 0xcb, 0x22, 0x29, 0x24, 0x2f, 0x15, 0xe5, 0xee, 0x24, 0x80, 0x2f,
+	0x81, 0xef, 0x2e, 0x04, 0x3f, 0xd2, 0x30, 0x99, 0xc3, 0xbe, 0x3b, 0x7d, 0x95, 0x33, 0xed, 0x1e,
+	0x0d, 0x02, 0x0e, 0x01, 0x95, 0x71, 0xae, 0x96, 0x26, 0x8c, 0x43, 0xc0, 0x84, 0xcc, 0x7c, 0xa3,
+	0xf3, 0x64, 0x5a, 0x36, 0xae, 0xfb, 0x61, 0xd9, 0x7e, 0x03, 0xb2, 0x87, 0xb7, 0xff, 0xfb, 0x11,
+	0x6a, 0x0e, 0xe7, 0x0b, 0x21, 0x81, 0xe3, 0xef, 0xd1, 0x2d, 0xd5, 0xf2, 0x31, 0x95, 0xb4, 0x63,
+	0xdd, 0xb1, 0x4e, 0x8e, 0x07, 0x1f, 0x39, 0xe6, 0x15, 0xe4, 0x3b, 0xe0, 0x24, 0xb3, 0x20, 0x7d,
+	0x00, 0x2a, 0xdb, 0x59, 0x9e, 0x3a, 0x4f, 0x46, 0x3f, 0x80, 0x2f, 0x1f, 0x83, 0xa4, 0x1e, 0xbe,
+	0x5c, 0xf7, 0x2a, 0x9b, 0x75, 0x0f, 0xed, 0x62, 0x24, 0x43, 0xc5, 0x3e, 0xaa, 0x89, 0x04, 0xfc,
+	0xce, 0x91, 0x46, 0x7f, 0xe0, 0x5c, 0xe7, 0x8d, 0x39, 0x46, 0xee, 0x79, 0x02, 0xbe, 0xf7, 0x86,
+	0xa1, 0xab, 0xa9, 0x13, 0xd1, 0xe0, 0x78, 0x86, 0x1a, 0x42, 0x52, 0xb9, 0x10, 0x9d, 0xaa, 0xa6,
+	0x19, 0xde, 0x8c, 0x46, 0x43, 0x79, 0x6f, 0x1a, 0xa2, 0x46, 0x7a, 0x26, 0x86, 0xa2, 0xff, 0xa2,
+	0x8a, 0x6e, 0x9b, 0xcc, 0x61, 0x1c, 0x8d, 0x99, 0x82, 0xc0, 0xf7, 0x51, 0x4d, 0xae, 0x12, 0xd0,
+	0x4d, 0x6c, 0x79, 0xef, 0x6d, 0x35, 0x5e, 0xac, 0x12, 0x78, 0xb9, 0xee, 0xbd, 0xfd, 0xef, 0x7c,
+	0x15, 0x27, 0xba, 0x02, 0x7f, 0x93, 0x69, 0x3f, 0xd2, 0xb5, 0x5f, 0x14, 0x69, 0x5f, 0xae, 0x7b,
+	0xaf, 0xb4, 0xd7, 0xc9, 0x30, 0x8b, 0x32, 0x71, 0x80, 0xda, 0x73, 0x2a, 0xe4, 0xd7, 0x3c, 0x1e,
+	0xc1, 0x05, 0x0b, 0xc1, 0xb4, 0xe6, 0x83, 0xd7, 0xf3, 0x57, 0x55, 0x78, 0xef, 0x18, 0x29, 0xed,
+	0xb3, 0x3c, 0x10, 0x29, 0xe2, 0xe2, 0x25, 0xc2, 0x2a, 0x70, 0xc1, 0x69, 0x24, 0xd2, 0xcb, 0x29,
+	0xb6, 0xda, 0xff, 0x66, 0xeb, 0x1a, 0x36, 0x7c, 0x56, 0x42, 0x23, 0x7b, 0x18, 0xf0, 0xfb, 0xa8,
+	0xc1, 0x81, 0x8a, 0x38, 0xea, 0xd4, 0x75, 0xe3, 0x32, 0xbf, 0x88, 0x8e, 0x12, 0xf3, 0x17, 0xdf,
+	0x45, 0xcd, 0x10, 0x84, 0xa0, 0x01, 0x74, 0x1a, 0x3a, 0xf1, 0x2d, 0x93, 0xd8, 0x7c, 0x9c, 0x86,
+	0xc9, 0xf6, 0x7f, 0xff, 0x0f, 0x0b, 0x1d, 0x1b, 0xab, 0xce, 0x98, 0x90, 0xf8, 0xdb, 0xd2, 0x78,
+	0x38, 0xaf, 0x77, 0x21, 0x55, 0xad, 0x87, 0xe3, 0xb6, 0xe1, 0xba, 0xb5, 0x8d, 0xe4, 0x46, 0x63,
+	0x84, 0xea, 0x4c, 0x42, 0xa8, 0x8c, 0xaf, 0x9e, 0x1c, 0x0f, 0x3e, 0xbf, 0xd1, 0xa3, 0xf5, 0xda,
+	0x86, 0xa9, 0xfe, 0x48, 0x61, 0x92, 0x14, 0xba, 0xff, 0xeb, 0x51, 0x76, 0x23, 0x35, 0x2f, 0xf8,
+	0x37, 0x0b, 0x75, 0xd3, 0x1d, 0xf5, 0x60, 0x3c, 0xe6, 0x20, 0x84, 0xb7, 0x1a, 0xce, 0x19, 0x44,
+	0x72, 0xf8, 0xe8, 0x21, 0x11, 0x1d, 0x4b, 0x2b, 0x79, 0x72, 0x3d, 0x25, 0xe7, 0x87, 0x70, 0xbd,
+	0xbe, 0xd1, 0xd6, 0x3d, 0x98, 0x22, 0xc8, 0x2b, 0x64, 0xe1, 0xef, 0x50, 0x4b, 0x80, 0xcf, 0x41,
+	0x12, 0x98, 0x98, 0x4d, 0x32, 0xd8, 0xa3, 0xd1, 0xd8, 0xa0, 0x0d, 0x88, 0x7d, 0x3a, 0x4f, 0x17,
+	0x12, 0x81, 0x09, 0x70, 0x88, 0x7c, 0xf0, 0xda, 0x9b, 0x75, 0xaf, 0x75, 0xbe, 0x05, 0x22, 0x3b,
+	0xcc, 0xfe, 0x9f, 0x16, 0x6a, 0x17, 0xa6, 0x1f, 0x3f, 0x43, 0xc8, 0xdf, 0x4e, 0xd6, 0xb6, 0x2f,
+	0x5f, 0xde, 0xc8, 0xa1, 0x6c, 0x50, 0x77, 0x1b, 0x33, 0x0b, 0x09, 0x92, 0x63, 0xc3, 0x3d, 0x54,
+	0x7f, 0x16, 0x47, 0x20, 0x3a, 0xf5, 0x3b, 0xd5, 0x93, 0x96, 0xd7, 0x52, 0xae, 0x3e, 0x55, 0x01,
+	0x92, 0xc6, 0xd3, 0xa7, 0x1f, 0xb0, 0x38, 0x32, 0x2f, 0x3a, 0xf7, 0xf4, 0x55, 0x94, 0x98, 0xbf,
+	0xfd, 0x9f, 0x2d, 0xf4, 0xee, 0xc1, 0x96, 0xe3, 0x01, 0x42, 0x7e, 0x76, 0x32, 0x9b, 0x6b, 0x27,
+	0x2d, 0xfb, 0x43, 0x72, 0x59, 0xf8, 0x33, 0xd4, 0x2e, 0xf8, 0x64, 0x96, 0x56, 0xb6, 0x29, 0x0a,
+	0x6c, 0xa4, 0x98, 0xeb, 0xdd, 0xbd, 0xbc, 0xb2, 0x2b, 0xcf, 0xaf, 0xec, 0xca, 0x8b, 0x2b, 0xbb,
+	0xf2, 0xd3, 0xc6, 0xb6, 0x2e, 0x37, 0xb6, 0xf5, 0x7c, 0x63, 0x5b, 0x7f, 0x6d, 0x6c, 0xeb, 0x97,
+	0xbf, 0xed, 0xca, 0xd3, 0xa6, 0xe9, 0xd9, 0x3f, 0x01, 0x00, 0x00, 0xff, 0xff, 0xce, 0x47, 0x11,
+	0x28, 0xd2, 0x08, 0x00, 0x00,
 }

@@ -5,6 +5,7 @@ Currently supported features are
   * Connecting to one portal
   * Mounting a device directly or via multipathd
   * Formatting and partitioning any new device connected
+  * CHAP authentication
 
 ## Prerequisites
 
@@ -25,6 +26,48 @@ If you want to use an iSCSI offload card or other open-iscsi transports besides 
 **Note:** If you have followed the instructions in the links above you
 may have partitioned the device, the iSCSI volume plugin does not
 currently support partitions so format the device as one partition or leave the device raw and Kubernetes will partition and format it one first mount.
+
+### CHAP Authentication
+
+To enable one-way or two-way CHAP authentication for discovery or session, following these steps.
+
+ * Set `chapAuthDiscovery` to `true` for discovery authentication.
+ * Set `chapAuthSession` to `true` for session authentication.
+ * Create a CHAP secret and set `secretRef` to reference the CHAP secret.
+
+
+Example can be found at [iscsi-chap.yaml](iscsi-chap.yaml)
+
+### CHAP Secret
+
+As illustrated in [chap-secret.yaml](chap-secret.yaml), the secret must have type `kubernetes.io/iscsi-chap` and consists of the following keys:
+
+```yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chap-secret
+type: "kubernetes.io/iscsi-chap"  
+data:
+  discovery.sendtargets.auth.username: 
+  discovery.sendtargets.auth.password: 
+  discovery.sendtargets.auth.username_in: 
+  discovery.sendtargets.auth.password_in: 
+  node.session.auth.username: 
+  node.session.auth.password: 
+  node.session.auth.username_in: 
+  node.session.auth.password_in: 
+```
+
+These keys map to those used by Open-iSCSI initiator. Detailed documents on these keys can be found at [Open-iSCSI](https://github.com/open-iscsi/open-iscsi/blob/master/etc/iscsid.conf)
+
+#### Create CHAP secret before creating iSCSI volumes and Pods
+
+```console
+# kubectl create -f examples/volumes/iscsi/chap-iscsi.yaml
+```
+
 
 
 Once the pod config is created, run it on the Kubernetes master:

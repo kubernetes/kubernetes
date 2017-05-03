@@ -2,6 +2,8 @@
 
 set -ex
 
+export PATH="$PATH:/snap/bin"
+
 # Grab the action parameter values
 FOCUS=$(action-get focus)
 SKIP=$(action-get skip)
@@ -26,7 +28,7 @@ ACTION_JUNIT_TGZ=$ACTION_JUNIT.tar.gz
 # This initializes an e2e build log with the START TIMESTAMP.
 echo "JUJU_E2E_START=$(date -u +%s)" | tee $ACTION_LOG
 echo "JUJU_E2E_VERSION=$(kubectl version | grep Server | cut -d " " -f 5 | cut -d ":" -f 2 | sed s/\"// | sed s/\",//)" | tee -a $ACTION_LOG
-ginkgo -nodes=$PARALLELISM $(which e2e.test) -- \
+GINKGO_ARGS="-nodes=$PARALLELISM" kubernetes-test.e2e \
   -kubeconfig /home/ubuntu/.kube/config \
   -host $SERVER \
   -ginkgo.focus $FOCUS \
@@ -45,3 +47,7 @@ tar -czf $ACTION_LOG_TGZ ${JUJU_ACTION_UUID}.log
 
 action-set log="$ACTION_LOG_TGZ"
 action-set junit="$ACTION_JUNIT_TGZ"
+
+if tail ${JUJU_ACTION_UUID}.log | grep -q "Test Suite Failed"; then
+  action-fail "Failure detected in the logs"
+fi

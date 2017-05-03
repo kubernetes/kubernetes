@@ -1,6 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
+load("@io_bazel//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 filegroup(
     name = "package-srcs",
@@ -50,7 +50,6 @@ pkg_tar(
 pkg_tar(
     name = "salt-manifests",
     files = [
-        "salt/fluentd-gcp/fluentd-gcp.yaml",
         "salt/kube-proxy/kube-proxy.manifest",
         "salt/kube-registry-proxy/kube-registry-proxy.yaml",
     ],

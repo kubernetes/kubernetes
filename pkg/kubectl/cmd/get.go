@@ -52,7 +52,7 @@ var (
 	get_long = templates.LongDesc(`
 		Display one or many resources.
 
-		` + valid_resources + `
+		` + validResources + `
 
 		This command will hide resources that have completed, such as pods that are
 		in the Succeeded or Failed phases. You can see the full results for any
@@ -61,7 +61,7 @@ var (
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resources.`)
 
-	get_example = templates.Examples(`
+	get_example = templates.Examples(i18n.T(`
 		# List all pods in ps output format.
 		kubectl get pods
 
@@ -87,7 +87,7 @@ var (
 		kubectl get rc/web service/frontend pods/web-pod-13je7
 
 		# List all resources with different types.
-		kubectl get all`)
+		kubectl get all`))
 )
 
 // NewCmdGet creates a command object for the generic "get" action, which
@@ -131,6 +131,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+	cmdutil.AddOpenAPIFlags(cmd)
 	cmd.Flags().StringVar(&options.Raw, "raw", options.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	return cmd
 }
@@ -174,7 +175,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	}
 
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
-		fmt.Fprint(errOut, "You must specify the type of resource to get. ", valid_resources)
+		fmt.Fprint(errOut, "You must specify the type of resource to get. ", validResources)
 
 		fullCmdName := cmd.Parent().CommandPath()
 		usageString := "Required resource not specified."
@@ -339,7 +340,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				},
 			}
 			for _, info := range infos {
-				list.Items = append(list.Items, info.Object.(*unstructured.Unstructured))
+				list.Items = append(list.Items, *info.Object.(*unstructured.Unstructured))
 			}
 			obj = list
 		} else {
@@ -362,12 +363,14 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				},
 			}
 			if listMeta, err := meta.ListAccessor(obj); err == nil {
-				list.Object["selfLink"] = listMeta.GetSelfLink()
-				list.Object["resourceVersion"] = listMeta.GetResourceVersion()
+				list.Object["metadata"] = map[string]interface{}{
+					"selfLink":        listMeta.GetSelfLink(),
+					"resourceVersion": listMeta.GetResourceVersion(),
+				}
 			}
 
 			for _, item := range items {
-				list.Items = append(list.Items, item.(*unstructured.Unstructured))
+				list.Items = append(list.Items, *item.(*unstructured.Unstructured))
 			}
 			if err := printer.PrintObj(list, out); err != nil {
 				errs = append(errs, err)
@@ -504,6 +507,6 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 	}
 	w.Flush()
-	cmdutil.PrintFilterCount(errOut, len(objs), filteredResourceCount, len(allErrs), "", filterOpts, options.IgnoreNotFound)
+	cmdutil.PrintFilterCount(errOut, len(objs), filteredResourceCount, len(allErrs), filterOpts, options.IgnoreNotFound)
 	return utilerrors.NewAggregate(allErrs)
 }

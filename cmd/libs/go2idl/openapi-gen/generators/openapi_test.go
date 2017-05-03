@@ -111,6 +111,10 @@ type Blah struct {
 	// a member with an extension
 	// +k8s:openapi-gen=x-kubernetes-member-tag:member_test
 	WithExtension string
+	// a member with struct tag as extension
+	// +patchStrategy=ps
+	// +patchMergeKey=pmk
+	WithStructTagExtension string `+"`"+`patchStrategy:"ps" patchMergeKey:"pmk"`+"`"+`
 }
 		`)
 	if err != nil {
@@ -238,8 +242,21 @@ Type: []string{"string"},
 Format: "",
 },
 },
+"WithStructTagExtension": {
+VendorExtensible: spec.VendorExtensible{
+Extensions: spec.Extensions{
+"x-kubernetes-patch-merge-key": "pmk",
+"x-kubernetes-patch-strategy": "ps",
 },
-Required: []string{"String","Int64","Int32","Int16","Int8","Uint","Uint64","Uint32","Uint16","Uint8","Byte","Bool","Float64","Float32","ByteArray","WithExtension"},
+},
+SchemaProps: spec.SchemaProps{
+Description: "a member with struct tag as extension",
+Type: []string{"string"},
+Format: "",
+},
+},
+},
+Required: []string{"String","Int64","Int32","Int16","Int8","Uint","Uint64","Uint32","Uint16","Uint8","Byte","Bool","Float64","Float32","ByteArray","WithExtension","WithStructTagExtension"},
 },
 VendorExtensible: spec.VendorExtensible{
 Extensions: spec.Extensions{

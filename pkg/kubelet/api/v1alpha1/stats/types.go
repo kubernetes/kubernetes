@@ -35,6 +35,8 @@ type NodeStats struct {
 	// Stats of system daemons tracked as raw containers.
 	// The system containers are named according to the SystemContainer* constants.
 	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	SystemContainers []ContainerStats `json:"systemContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	// The time at which data collection for the node-scoped (i.e. aggregate) stats was (re)started.
 	StartTime metav1.Time `json:"startTime"`
@@ -81,6 +83,8 @@ type PodStats struct {
 	// The time at which data collection for the pod-scoped (e.g. network) stats was (re)started.
 	StartTime metav1.Time `json:"startTime"`
 	// Stats of containers in the measured pod.
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	Containers []ContainerStats `json:"containers" patchStrategy:"merge" patchMergeKey:"name"`
 	// Stats pertaining to network resources.
 	// +optional
@@ -88,6 +92,8 @@ type PodStats struct {
 	// Stats pertaining to volume usage of filesystem resources.
 	// VolumeStats.UsedBytes is the number of bytes used by the Volume
 	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	VolumeStats []VolumeStats `json:"volume,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
@@ -112,6 +118,8 @@ type ContainerStats struct {
 	// +optional
 	Logs *FsStats `json:"logs,omitempty"`
 	// User defined metrics that are exposed by containers in the pod. Typically, we expect only one container in the pod to be exposing user defined metrics. In the event of multiple containers exposing metrics, they will be combined here.
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	UserDefinedMetrics []UserDefinedMetric `json:"userDefinedMetrics,omitmepty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 

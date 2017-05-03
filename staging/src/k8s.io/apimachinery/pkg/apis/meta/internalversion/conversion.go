@@ -20,16 +20,14 @@ import (
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Convert_internalversion_ListOptions_To_v1_ListOptions(in *ListOptions, out *metav1.ListOptions, s conversion.Scope) error {
-	if err := Convert_fields_Selector_To_string(&in.FieldSelector, &out.FieldSelector, s); err != nil {
+	if err := metav1.Convert_fields_Selector_To_string(&in.FieldSelector, &out.FieldSelector, s); err != nil {
 		return err
 	}
-	if err := Convert_labels_Selector_To_string(&in.LabelSelector, &out.LabelSelector, s); err != nil {
+	if err := metav1.Convert_labels_Selector_To_string(&in.LabelSelector, &out.LabelSelector, s); err != nil {
 		return err
 	}
 	out.ResourceVersion = in.ResourceVersion
@@ -39,49 +37,15 @@ func Convert_internalversion_ListOptions_To_v1_ListOptions(in *ListOptions, out 
 }
 
 func Convert_v1_ListOptions_To_internalversion_ListOptions(in *metav1.ListOptions, out *ListOptions, s conversion.Scope) error {
-	if err := Convert_string_To_fields_Selector(&in.FieldSelector, &out.FieldSelector, s); err != nil {
+	if err := metav1.Convert_string_To_fields_Selector(&in.FieldSelector, &out.FieldSelector, s); err != nil {
 		return err
 	}
-	if err := Convert_string_To_labels_Selector(&in.LabelSelector, &out.LabelSelector, s); err != nil {
+	if err := metav1.Convert_string_To_labels_Selector(&in.LabelSelector, &out.LabelSelector, s); err != nil {
 		return err
 	}
 	out.ResourceVersion = in.ResourceVersion
 	out.TimeoutSeconds = in.TimeoutSeconds
 	out.Watch = in.Watch
-	return nil
-}
-
-func Convert_string_To_labels_Selector(in *string, out *labels.Selector, s conversion.Scope) error {
-	selector, err := labels.Parse(*in)
-	if err != nil {
-		return err
-	}
-	*out = selector
-	return nil
-}
-
-func Convert_string_To_fields_Selector(in *string, out *fields.Selector, s conversion.Scope) error {
-	selector, err := fields.ParseSelector(*in)
-	if err != nil {
-		return err
-	}
-	*out = selector
-	return nil
-}
-
-func Convert_labels_Selector_To_string(in *labels.Selector, out *string, s conversion.Scope) error {
-	if *in == nil {
-		return nil
-	}
-	*out = (*in).String()
-	return nil
-}
-
-func Convert_fields_Selector_To_string(in *fields.Selector, out *string, s conversion.Scope) error {
-	if *in == nil {
-		return nil
-	}
-	*out = (*in).String()
 	return nil
 }
 

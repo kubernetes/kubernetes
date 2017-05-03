@@ -25,7 +25,7 @@ go_library(
         "//cmd/kube-proxy/app:go_default_library",
         "//cmd/kubelet/app:go_default_library",
         "//plugin/cmd/kube-scheduler/app:go_default_library",
-        "//vendor:github.com/spf13/cobra/doc",
+        "//vendor/github.com/spf13/cobra/doc:go_default_library",
     ],
 )
 

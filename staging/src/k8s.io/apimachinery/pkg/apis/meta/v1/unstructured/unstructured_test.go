@@ -21,7 +21,7 @@ import "testing"
 func TestUnstructuredList(t *testing.T) {
 	list := &UnstructuredList{
 		Object: map[string]interface{}{"kind": "List", "apiVersion": "v1"},
-		Items: []*Unstructured{
+		Items: []Unstructured{
 			{Object: map[string]interface{}{"kind": "Pod", "apiVersion": "v1", "metadata": map[string]interface{}{"name": "test"}}},
 		},
 	}

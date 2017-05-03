@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+
+from yaml import safe_load as load
+from charmhelpers.core.hookenv import (
+    action_get,
+    action_set,
+    action_fail,
+    action_name
+)
+from charms.templating.jinja2 import render
+from subprocess import check_output
+
+
+def kubectl(args):
+    cmd = ['kubectl'] + args
+    return check_output(cmd)
+
+
+def namespace_list():
+    y = load(kubectl(['get', 'namespaces', '-o', 'yaml']))
+    ns = [i['metadata']['name'] for i in y['items']]
+    action_set({'namespaces': ', '.join(ns)+'.'})
+    return ns
+
+
+def namespace_create():
+    name = action_get('name')
+    if name in namespace_list():
+        action_fail('Namespace "{}" already exists.'.format(name))
+        return
+
+    render('create-namespace.yaml.j2', '/etc/kubernetes/addons/create-namespace.yaml',
+           context={'name': name})
+    kubectl(['create', '-f', '/etc/kubernetes/addons/create-namespace.yaml'])
+    action_set({'msg': 'Namespace "{}" created.'.format(name)})
+
+
+def namespace_delete():
+    name = action_get('name')
+    if name in ['default', 'kube-system']:
+        action_fail('Not allowed to delete "{}".'.format(name))
+        return
+    if name not in namespace_list():
+        action_fail('Namespace "{}" does not exist.'.format(name))
+        return
+    kubectl(['delete', 'ns/'+name])
+    action_set({'msg': 'Namespace "{}" deleted.'.format(name)})
+
+
+action = action_name().replace('namespace-', '')
+if action == 'create':
+    namespace_create()
+elif action == 'list':
+    namespace_list()
+elif action == 'delete':
+    namespace_delete()

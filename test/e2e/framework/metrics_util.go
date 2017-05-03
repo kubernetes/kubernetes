@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
+	"k8s.io/kubernetes/pkg/util/system"
 
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -105,6 +106,10 @@ func (m *MetricsForE2E) PrintJSON() string {
 	return PrettyPrintJSON(*m)
 }
 
+func (m *MetricsForE2E) SummaryKind() string {
+	return "MetricsForE2E"
+}
+
 var InterestingApiServerMetrics = []string{
 	"apiserver_request_count",
 	"apiserver_request_latencies_summary",
@@ -162,6 +167,7 @@ type APICall struct {
 	Resource string        `json:"resource"`
 	Verb     string        `json:"verb"`
 	Latency  LatencyMetric `json:"latency"`
+	Count    int           `json:"count"`
 }
 
 type APIResponsiveness struct {
@@ -174,9 +180,10 @@ func (a APIResponsiveness) Less(i, j int) bool {
 	return a.APICalls[i].Latency.Perc99 < a.APICalls[j].Latency.Perc99
 }
 
+// Set request latency for a particular quantile in the APICall metric entry (creating one if necessary).
 // 0 <= quantile <=1 (e.g. 0.95 is 95%tile, 0.5 is median)
 // Only 0.5, 0.9 and 0.99 quantiles are supported.
-func (a *APIResponsiveness) addMetric(resource, verb string, quantile float64, latency time.Duration) {
+func (a *APIResponsiveness) addMetricRequestLatency(resource, verb string, quantile float64, latency time.Duration) {
 	for i, apicall := range a.APICalls {
 		if apicall.Resource == resource && apicall.Verb == verb {
 			a.APICalls[i] = setQuantileAPICall(apicall, quantile, latency)
@@ -206,6 +213,18 @@ func setQuantile(metric *LatencyMetric, quantile float64, latency time.Duration)
 	}
 }
 
+// Add request count to the APICall metric entry (creating one if necessary).
+func (a *APIResponsiveness) addMetricRequestCount(resource, verb string, count int) {
+	for i, apicall := range a.APICalls {
+		if apicall.Resource == resource && apicall.Verb == verb {
+			a.APICalls[i].Count += count
+			return
+		}
+	}
+	apicall := APICall{Resource: resource, Verb: verb, Count: count}
+	a.APICalls = append(a.APICalls, apicall)
+}
+
 func readLatencyMetrics(c clientset.Interface) (APIResponsiveness, error) {
 	var a APIResponsiveness
 
@@ -226,7 +245,9 @@ func readLatencyMetrics(c clientset.Interface) (APIResponsiveness, error) {
 	for _, sample := range samples {
 		// Example line:
 		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
-		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" {
+		// apiserver_request_count{resource="pods",verb="LIST",client="kubectl",code="200",contentType="json"} 233
+		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" &&
+			sample.Metric[model.MetricNameLabel] != "apiserver_request_count" {
 			continue
 		}
 
@@ -235,12 +256,20 @@ func readLatencyMetrics(c clientset.Interface) (APIResponsiveness, error) {
 		if ignoredResources.Has(resource) || ignoredVerbs.Has(verb) {
 			continue
 		}
-		latency := sample.Value
-		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
-		if err != nil {
-			return a, err
+
+		switch sample.Metric[model.MetricNameLabel] {
+		case "apiserver_request_latencies_summary":
+			latency := sample.Value
+			quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
+			if err != nil {
+				return a, err
+			}
+			a.addMetricRequestLatency(resource, verb, quantile, time.Duration(int64(latency))*time.Microsecond)
+		case "apiserver_request_count":
+			count := sample.Value
+			a.addMetricRequestCount(resource, verb, int(count))
+
 		}
-		a.addMetric(resource, verb, quantile, time.Duration(int64(latency))*time.Microsecond)
 	}
 
 	return a, err
@@ -335,7 +364,7 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 	var data string
 	var masterRegistered = false
 	for _, node := range nodes.Items {
-		if strings.HasSuffix(node.Name, "master") {
+		if system.IsMasterNode(node.Name) {
 			masterRegistered = true
 		}
 	}
@@ -490,17 +519,6 @@ func LogSuspiciousLatency(latencyData []PodLatencyData, latencyDataLag []PodLate
 	}
 	Logf("Approx throughput: %v pods/min",
 		float64(nodeCount)/(latencyDataLag[len(latencyDataLag)-1].Latency.Minutes()))
-}
-
-// testMaximumLatencyValue verifies the highest latency value is less than or equal to
-// the given time.Duration. Since the arrays are sorted we are looking at the last
-// element which will always be the highest. If the latency is higher than the max Failf
-// is called.
-func testMaximumLatencyValue(latencies []PodLatencyData, max time.Duration, name string) {
-	highestLatency := latencies[len(latencies)-1]
-	if !(highestLatency.Latency <= max) {
-		Failf("%s were not all under %s: %#v", name, max.String(), latencies)
-	}
 }
 
 func PrintLatencies(latencies []PodLatencyData, header string) {
