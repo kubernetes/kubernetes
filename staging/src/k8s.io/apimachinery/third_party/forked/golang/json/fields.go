@@ -17,15 +17,21 @@ import (
 	"unicode/utf8"
 )
 
+const (
+	patchStrategyTagKey = "patchStrategy"
+	patchMergeKeyTagKey = "patchMergeKey"
+)
+
 // Finds the patchStrategy and patchMergeKey struct tag fields on a given
 // struct field given the struct type and the JSON name of the field.
+// It reutnrs field type, a slice of patch strategies, merge key and error.
 // TODO: fix the returned errors to be introspectable.
-func LookupPatchMetadata(t reflect.Type, jsonField string) (reflect.Type, bool, string, string, error) {
+func LookupPatchMetadata(t reflect.Type, jsonField string) (reflect.Type, []string, string, error) {
 	if t.Kind() == reflect.Map {
-		return t.Elem(), false, "", "", nil
+		return t.Elem(), nil, "", nil
 	}
 	if t.Kind() != reflect.Struct {
-		return nil, false, "", "", fmt.Errorf("merging an object in json but data type is not map or struct, instead is: %s",
+		return nil, nil, "", fmt.Errorf("merging an object in json but data type is not map or struct, instead is: %s",
 			t.Kind().String())
 	}
 	jf := []byte(jsonField)
@@ -50,43 +56,12 @@ func LookupPatchMetadata(t reflect.Type, jsonField string) (reflect.Type, bool, 
 		for i := 1; i < len(f.index); i++ {
 			tjf = tjf.Type.Field(f.index[i])
 		}
-		patchStrategy := tjf.Tag.Get("patchStrategy")
-		patchMergeKey := tjf.Tag.Get("patchMergeKey")
-		hasReplacekeys, otherPatchStrategy, err := extractReplaceKeysPatchStrategy(patchStrategy)
-		if err != nil {
-			return nil, false, "", "", err
-		}
-		return tjf.Type, hasReplacekeys, otherPatchStrategy, patchMergeKey, nil
+		patchStrategy := tjf.Tag.Get(patchStrategyTagKey)
+		patchMergeKey := tjf.Tag.Get(patchMergeKeyTagKey)
+		patchStrategies := strings.Split(patchStrategy, ",")
+		return tjf.Type, patchStrategies, patchMergeKey, nil
 	}
-	return nil, false, "", "", fmt.Errorf("unable to find api field in struct %s for the json field %q", t.Name(), jsonField)
-}
-
-// extractReplaceKeysPatchStrategy process patch strategy, which is a string may contains multiple
-// patch strategies seperated by "|". It returns a boolean var indicating if it has replaceKeys strategies
-// and a string or other strategy.
-func extractReplaceKeysPatchStrategy(patchStrategy string) (bool, string, error) {
-	replaceKeysPatchStrategy := "replaceKeys"
-	strategies := strings.Split(patchStrategy, ",")
-	if len(strategies) == 1 {
-		singleStrategy := strategies[0]
-		switch singleStrategy {
-		case replaceKeysPatchStrategy:
-			return true, "", nil
-		default:
-			return false, singleStrategy, nil
-		}
-	}
-	if len(strategies) > 2 {
-		return false, "", fmt.Errorf("Unexpected patch strategy: %q\n", patchStrategy)
-	}
-	switch {
-	case strategies[0] == replaceKeysPatchStrategy:
-		return true, strategies[1], nil
-	case strategies[1] == replaceKeysPatchStrategy:
-		return true, strategies[0], nil
-	default:
-		return false, "", fmt.Errorf("Unexpected patch strategy: %q\n", patchStrategy)
-	}
+	return nil, nil, "", fmt.Errorf("unable to find api field in struct %s for the json field %q", t.Name(), jsonField)
 }
 
 // A field represents a single field found in a struct.
