@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"testing"
 	"time"
 
@@ -100,7 +99,6 @@ func TestSandboxStatus(t *testing.T) {
 	// TODO: The following variables depend on the internal
 	// implementation of FakeDockerClient, and should be fixed.
 	fakeIP := "2.3.4.5"
-	fakeNS := fmt.Sprintf("/proc/%d/ns/net", os.Getpid())
 
 	state := runtimeapi.PodSandboxState_SANDBOX_READY
 	ct := int64(0)
@@ -110,7 +108,7 @@ func TestSandboxStatus(t *testing.T) {
 		CreatedAt:   ct,
 		Metadata:    config.Metadata,
 		Network:     &runtimeapi.PodSandboxNetworkStatus{Ip: fakeIP},
-		Linux:       &runtimeapi.LinuxPodSandboxStatus{Namespaces: &runtimeapi.Namespace{Network: fakeNS, Options: &runtimeapi.NamespaceOption{HostNetwork: hostNetwork}}},
+		Linux:       &runtimeapi.LinuxPodSandboxStatus{Namespaces: &runtimeapi.Namespace{Options: &runtimeapi.NamespaceOption{HostNetwork: hostNetwork}}},
 		Labels:      labels,
 		Annotations: annotations,
 	}
