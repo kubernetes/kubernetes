@@ -24,7 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 // verifies the cacheWatcher.process goroutine is properly cleaned up even if
@@ -39,12 +40,12 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 		count++
 	}
 	initEvents := []*watchCacheEvent{
-		{Object: &api.Pod{}},
-		{Object: &api.Pod{}},
+		{Object: &v1.Pod{}},
+		{Object: &v1.Pod{}},
 	}
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
-	w := newCacheWatcher(api.Scheme, 0, 0, initEvents, filter, forget)
+	w := newCacheWatcher(scheme.Scheme, 0, 0, initEvents, filter, forget)
 	w.Stop()
 	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
 		lock.RLock()

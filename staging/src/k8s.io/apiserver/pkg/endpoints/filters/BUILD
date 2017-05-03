@@ -54,7 +54,8 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/httplog:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/authentication:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/apis/authentication/v1:go_default_library",
     ],
 )
