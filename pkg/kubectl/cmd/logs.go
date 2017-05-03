@@ -42,8 +42,11 @@ var (
 		# Return snapshot logs from pod nginx with only one container
 		kubectl logs nginx
 
-		# Return snapshot logs for the pods defined by label app=nginx
-		kubectl logs -lapp=nginx
+		# Return snapshot logs from pod nginx with multi containers
+		kubectl logs nginx --all-containers=true
+
+		# Return snapshot logs from all containers in pods defined by label app=nginx
+		kubectl logs -lapp=nginx --all-containers=true
 
 		# Return snapshot of previous terminated ruby container logs from pod web-1
 		kubectl logs -p -c ruby web-1
@@ -71,9 +74,10 @@ const (
 )
 
 type LogsOptions struct {
-	Namespace   string
-	ResourceArg string
-	Options     runtime.Object
+	Namespace     string
+	ResourceArg   string
+	AllContainers bool
+	Options       runtime.Object
 
 	Mapper       meta.RESTMapper
 	Typer        runtime.ObjectTyper
@@ -107,6 +111,7 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 		Aliases: []string{"log"},
 	}
+	cmd.Flags().Bool("all-containers", false, "Get all containers's logs in the pod(s).")
 	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")
 	cmd.Flags().Bool("timestamps", false, "Include timestamps on each line in the log output")
 	cmd.Flags().Int64("limit-bytes", 0, "Maximum bytes of logs to return. Defaults to no limit.")
@@ -126,6 +131,7 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	containerName := cmdutil.GetFlagString(cmd, "container")
 	selector := cmdutil.GetFlagString(cmd, "selector")
+	o.AllContainers = cmdutil.GetFlagBool(cmd, "all-containers")
 	switch len(args) {
 	case 0:
 		if len(selector) == 0 {
@@ -144,6 +150,9 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 		containerName = args[1]
 	default:
 		return cmdutil.UsageError(cmd, logsUsageStr)
+	}
+	if o.AllContainers && len(containerName) > 0 {
+		return cmdutil.UsageError(cmd, "--all-containers=True should not be specifiled with container name %s", containerName)
 	}
 	var err error
 	o.Namespace, _, err = f.DefaultNamespace()
@@ -238,14 +247,35 @@ func (o LogsOptions) RunLogs() error {
 	switch t := o.Object.(type) {
 	case *api.PodList:
 		for _, p := range t.Items {
-			if err := o.getLogs(&p); err != nil {
+			if err := o.getPodLogs(&p); err != nil {
 				return err
 			}
 		}
 		return nil
 	default:
-		return o.getLogs(o.Object)
+		return o.getPodLogs(o.Object)
 	}
+}
+
+// getpodLogs checks whether the obj is a pod and o.AllContainers is set to true.
+// If so, it retrives all containers' log in the pod.
+func (o LogsOptions) getPodLogs(obj runtime.Object) error {
+	if pod, ok := obj.(*api.Pod); ok && o.AllContainers {
+		for _, c := range pod.Spec.InitContainers {
+			o.Options.(*api.PodLogOptions).Container = c.Name
+			if err := o.getLogs(pod); err != nil {
+				return err
+			}
+		}
+		for _, c := range pod.Spec.Containers {
+			o.Options.(*api.PodLogOptions).Container = c.Name
+			if err := o.getLogs(pod); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return o.getLogs(obj)
 }
 
 func (o LogsOptions) getLogs(obj runtime.Object) error {

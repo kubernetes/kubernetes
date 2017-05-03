@@ -141,3 +141,45 @@ func TestValidateLogFlags(t *testing.T) {
 		}
 	}
 }
+
+func TestCompLeteCheckFlags(t *testing.T) {
+	f, _, _, _ := cmdtesting.NewAPIFactory()
+
+	tests := []struct {
+		name     string
+		flags    map[string]string
+		args     []string
+		expected string
+	}{
+		{
+			name:     "container name combined with --all-containers",
+			flags:    map[string]string{"all-containers": "true"},
+			args:     []string{"my-pod", "my-container"},
+			expected: "--all-containers=True should not be specifiled with container",
+		},
+		{
+			name:     "container name combined with -c",
+			flags:    map[string]string{"container": "my-container"},
+			args:     []string{"my-pod", "my-container"},
+			expected: "only one of -c or an inline [CONTAINER] arg is allowed",
+		},
+	}
+	for _, test := range tests {
+		cmd := NewCmdLogs(f, bytes.NewBuffer([]byte{}))
+		out := ""
+		for flag, value := range test.flags {
+			cmd.Flags().Set(flag, value)
+		}
+		// checkErr breaks tests in case of errors, plus we just
+		// need to check errors returned by the command validation
+		o := &LogsOptions{}
+		cmd.Run = func(cmd *cobra.Command, args []string) {
+			out = o.Complete(f, os.Stdout, cmd, args).Error()
+		}
+		cmd.Run(cmd, test.args)
+
+		if !strings.Contains(out, test.expected) {
+			t.Errorf("%s: expected to find:\n\t%s\nfound:\n\t%s\n", test.name, test.expected, out)
+		}
+	}
+}

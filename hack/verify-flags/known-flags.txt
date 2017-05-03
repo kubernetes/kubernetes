@@ -5,6 +5,7 @@ admission-control-config-file
 advertise-address
 advertised-address
 algorithm-provider
+all-containers
 all-namespaces
 allocate-node-cidrs
 allowed-not-ready-nodes
