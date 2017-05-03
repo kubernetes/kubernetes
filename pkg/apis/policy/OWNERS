@@ -1,14 +1,4 @@
+approvers:
+- sig-apps-api-reviews
 reviewers:
-- thockin
-- lavalamp
-- smarterclayton
-- deads2k
-- caesarxuchao
-- sttts
-- ncdc
-- timothysc
-- dims
-- mml
-- mbohlool
-- david-mcmahon
-- jianhuiz
+- sig-pr-reviews
