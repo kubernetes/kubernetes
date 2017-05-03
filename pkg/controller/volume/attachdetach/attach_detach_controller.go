@@ -87,7 +87,8 @@ func NewAttachDetachController(
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	disableReconciliationSync bool,
-	reconcilerSyncDuration time.Duration) (AttachDetachController, error) {
+	reconcilerSyncDuration time.Duration,
+	keepTerminatedPodVolumes bool) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in
@@ -113,6 +114,7 @@ func NewAttachDetachController(
 		nodeLister:  nodeInformer.Lister(),
 		nodesSynced: nodeInformer.Informer().HasSynced,
 		cloud:       cloud,
+		keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 	}
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, adc); err != nil {
@@ -153,7 +155,8 @@ func NewAttachDetachController(
 		adc.desiredStateOfWorld,
 		&adc.volumePluginMgr,
 		pvcInformer.Lister(),
-		pvInformer.Lister())
+		pvInformer.Lister(),
+		keepTerminatedPodVolumes)
 
 	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc:    adc.podAdd,
@@ -233,6 +236,9 @@ type attachDetachController struct {
 
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
+
+	// whether to keep pod volumes attached for terminated pods
+	keepTerminatedPodVolumes bool
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
@@ -385,8 +391,13 @@ func (adc *attachDetachController) podAdd(obj interface{}) {
 		return
 	}
 
-	util.ProcessPodVolumes(pod, true, /* addVolumes */
-		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
+	if volumehelper.IsPodTerminated(pod, pod.Status) && !adc.keepTerminatedPodVolumes {
+		util.ProcessPodVolumes(pod, false, /* addVolumes */
+			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
+	} else {
+		util.ProcessPodVolumes(pod, true, /* addVolumes */
+			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
+	}
 }
 
 // GetDesiredStateOfWorld returns desired state of world associated with controller
@@ -395,8 +406,23 @@ func (adc *attachDetachController) GetDesiredStateOfWorld() cache.DesiredStateOf
 }
 
 func (adc *attachDetachController) podUpdate(oldObj, newObj interface{}) {
-	// The flow for update is the same as add.
-	adc.podAdd(newObj)
+	pod, ok := newObj.(*v1.Pod)
+	if pod == nil || !ok {
+		return
+	}
+	if pod.Spec.NodeName == "" {
+		// Ignore pods without NodeName, indicating they are not scheduled.
+		return
+	}
+
+	addPodFlag := true
+
+	if volumehelper.IsPodTerminated(pod, pod.Status) && !adc.keepTerminatedPodVolumes {
+		addPodFlag = false
+	}
+
+	util.ProcessPodVolumes(pod, addPodFlag, /* addVolumes */
+		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
 }
 
 func (adc *attachDetachController) podDelete(obj interface{}) {
