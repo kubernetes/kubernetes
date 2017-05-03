@@ -1321,7 +1321,7 @@ func Convert_v1_Endpoints_To_api_Endpoints(in *Endpoints, out *api.Endpoints, s 
 
 func autoConvert_api_Endpoints_To_v1_Endpoints(in *api.Endpoints, out *Endpoints, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Subsets = *(*[]EndpointSubset)(unsafe.Pointer(&in.Subsets))
+	out.Subsets = *(*EndpointSubsetList)(unsafe.Pointer(&in.Subsets))
 	return nil
 }
 
@@ -1973,7 +1973,7 @@ func Convert_v1_LimitRangeSpec_To_api_LimitRangeSpec(in *LimitRangeSpec, out *ap
 }
 
 func autoConvert_api_LimitRangeSpec_To_v1_LimitRangeSpec(in *api.LimitRangeSpec, out *LimitRangeSpec, s conversion.Scope) error {
-	out.Limits = *(*[]LimitRangeItem)(unsafe.Pointer(&in.Limits))
+	out.Limits = *(*LimitRangeItemList)(unsafe.Pointer(&in.Limits))
 	return nil
 }
 
@@ -3757,7 +3757,7 @@ func Convert_v1_ProjectedVolumeSource_To_api_ProjectedVolumeSource(in *Projected
 }
 
 func autoConvert_api_ProjectedVolumeSource_To_v1_ProjectedVolumeSource(in *api.ProjectedVolumeSource, out *ProjectedVolumeSource, s conversion.Scope) error {
-	out.Sources = *(*[]VolumeProjection)(unsafe.Pointer(&in.Sources))
+	out.Sources = *(*VolumeProjectionList)(unsafe.Pointer(&in.Sources))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
 	return nil
 }

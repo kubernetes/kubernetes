@@ -1921,11 +1921,12 @@ func (x *HorizontalPodAutoscalerStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 			const yyr2 bool = false
 			yyq2[0] = x.ObservedGeneration != nil
 			yyq2[1] = x.LastScaleTime != nil
+			yyq2[4] = len(x.CurrentMetrics) != 0
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(5)
 			} else {
-				yynn2 = 3
+				yynn2 = 2
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -2052,28 +2053,34 @@ func (x *HorizontalPodAutoscalerStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.CurrentMetrics == nil {
-					r.EncodeNil()
-				} else {
-					yym18 := z.EncBinary()
-					_ = yym18
-					if false {
+				if yyq2[4] {
+					if x.CurrentMetrics == nil {
+						r.EncodeNil()
 					} else {
-						h.encSliceMetricStatus(([]MetricStatus)(x.CurrentMetrics), e)
+						yym18 := z.EncBinary()
+						_ = yym18
+						if false {
+						} else {
+							h.encSliceMetricStatus(([]MetricStatus)(x.CurrentMetrics), e)
+						}
 					}
+				} else {
+					r.EncodeNil()
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("currentMetrics"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.CurrentMetrics == nil {
-					r.EncodeNil()
-				} else {
-					yym19 := z.EncBinary()
-					_ = yym19
-					if false {
+				if yyq2[4] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("currentMetrics"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.CurrentMetrics == nil {
+						r.EncodeNil()
 					} else {
-						h.encSliceMetricStatus(([]MetricStatus)(x.CurrentMetrics), e)
+						yym19 := z.EncBinary()
+						_ = yym19
+						if false {
+						} else {
+							h.encSliceMetricStatus(([]MetricStatus)(x.CurrentMetrics), e)
+						}
 					}
 				}
 			}

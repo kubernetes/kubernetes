@@ -17,6 +17,7 @@ go_library(
         "doc.go",
         "generate.go",
         "generated.pb.go",
+        "json.go",
         "meta.go",
         "objectreference.go",
         "register.go",

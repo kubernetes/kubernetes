@@ -61,7 +61,7 @@ func DeepCopy_v1alpha1_ClusterRole(in interface{}, out interface{}, c *conversio
 		}
 		if in.Rules != nil {
 			in, out := &in.Rules, &out.Rules
-			*out = make([]PolicyRule, len(*in))
+			*out = make(PolicyRuleList, len(*in))
 			for i := range *in {
 				if err := DeepCopy_v1alpha1_PolicyRule(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
@@ -84,7 +84,7 @@ func DeepCopy_v1alpha1_ClusterRoleBinding(in interface{}, out interface{}, c *co
 		}
 		if in.Subjects != nil {
 			in, out := &in.Subjects, &out.Subjects
-			*out = make([]Subject, len(*in))
+			*out = make(SubjectList, len(*in))
 			copy(*out, *in)
 		}
 		return nil
@@ -173,7 +173,7 @@ func DeepCopy_v1alpha1_Role(in interface{}, out interface{}, c *conversion.Clone
 		}
 		if in.Rules != nil {
 			in, out := &in.Rules, &out.Rules
-			*out = make([]PolicyRule, len(*in))
+			*out = make(PolicyRuleList, len(*in))
 			for i := range *in {
 				if err := DeepCopy_v1alpha1_PolicyRule(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
@@ -196,7 +196,7 @@ func DeepCopy_v1alpha1_RoleBinding(in interface{}, out interface{}, c *conversio
 		}
 		if in.Subjects != nil {
 			in, out := &in.Subjects, &out.Subjects
-			*out = make([]Subject, len(*in))
+			*out = make(SubjectList, len(*in))
 			copy(*out, *in)
 		}
 		return nil

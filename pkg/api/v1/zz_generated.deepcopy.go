@@ -893,7 +893,7 @@ func DeepCopy_v1_Endpoints(in interface{}, out interface{}, c *conversion.Cloner
 		}
 		if in.Subsets != nil {
 			in, out := &in.Subsets, &out.Subsets
-			*out = make([]EndpointSubset, len(*in))
+			*out = make(EndpointSubsetList, len(*in))
 			for i := range *in {
 				if err := DeepCopy_v1_EndpointSubset(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
@@ -1345,7 +1345,7 @@ func DeepCopy_v1_LimitRangeSpec(in interface{}, out interface{}, c *conversion.C
 		*out = *in
 		if in.Limits != nil {
 			in, out := &in.Limits, &out.Limits
-			*out = make([]LimitRangeItem, len(*in))
+			*out = make(LimitRangeItemList, len(*in))
 			for i := range *in {
 				if err := DeepCopy_v1_LimitRangeItem(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
@@ -2628,7 +2628,7 @@ func DeepCopy_v1_ProjectedVolumeSource(in interface{}, out interface{}, c *conve
 		*out = *in
 		if in.Sources != nil {
 			in, out := &in.Sources, &out.Sources
-			*out = make([]VolumeProjection, len(*in))
+			*out = make(VolumeProjectionList, len(*in))
 			for i := range *in {
 				if err := DeepCopy_v1_VolumeProjection(&(*in)[i], &(*out)[i], c); err != nil {
 					return err

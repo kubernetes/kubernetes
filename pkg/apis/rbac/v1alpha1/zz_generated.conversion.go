@@ -77,7 +77,7 @@ func Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *ClusterRole, out *rbac
 
 func autoConvert_rbac_ClusterRole_To_v1alpha1_ClusterRole(in *rbac.ClusterRole, out *ClusterRole, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Rules = *(*[]PolicyRule)(unsafe.Pointer(&in.Rules))
+	out.Rules = *(*PolicyRuleList)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
@@ -114,7 +114,7 @@ func autoConvert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(in *rbac
 	out.ObjectMeta = in.ObjectMeta
 	if in.Subjects != nil {
 		in, out := &in.Subjects, &out.Subjects
-		*out = make([]Subject, len(*in))
+		*out = make(SubjectList, len(*in))
 		for i := range *in {
 			if err := Convert_rbac_Subject_To_v1alpha1_Subject(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -287,7 +287,7 @@ func Convert_v1alpha1_Role_To_rbac_Role(in *Role, out *rbac.Role, s conversion.S
 
 func autoConvert_rbac_Role_To_v1alpha1_Role(in *rbac.Role, out *Role, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Rules = *(*[]PolicyRule)(unsafe.Pointer(&in.Rules))
+	out.Rules = *(*PolicyRuleList)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
@@ -324,7 +324,7 @@ func autoConvert_rbac_RoleBinding_To_v1alpha1_RoleBinding(in *rbac.RoleBinding, 
 	out.ObjectMeta = in.ObjectMeta
 	if in.Subjects != nil {
 		in, out := &in.Subjects, &out.Subjects
-		*out = make([]Subject, len(*in))
+		*out = make(SubjectList, len(*in))
 		for i := range *in {
 			if err := Convert_rbac_Subject_To_v1alpha1_Subject(&(*in)[i], &(*out)[i], s); err != nil {
 				return err

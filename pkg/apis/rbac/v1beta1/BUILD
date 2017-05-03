@@ -14,6 +14,7 @@ go_library(
         "doc.go",
         "generated.pb.go",
         "helpers.go",
+        "json.go",
         "register.go",
         "types.generated.go",
         "types.go",
