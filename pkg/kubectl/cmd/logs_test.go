@@ -62,7 +62,6 @@ func TestLog(t *testing.T) {
 					body := ioutil.NopCloser(bytes.NewBufferString(logContent))
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				default:
-					// Ensures no GET is performed when deleting by name
 					t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
 					return nil, nil
 				}

@@ -193,7 +193,6 @@ func TestExec(t *testing.T) {
 					body := objBody(codec, test.pod)
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				default:
-					// Ensures no GET is performed when deleting by name
 					t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
 					return nil, fmt.Errorf("unexpected request")
 				}
