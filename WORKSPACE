@@ -7,9 +7,9 @@ http_archive(
 
 http_archive(
     name = "io_kubernetes_build",
-    sha256 = "1d146ccc034d3a9d8f5f02237144b78be135a0fb06935b37c745a2e7fcfecfed",
-    strip_prefix = "repo-infra-684e550a2f006dbe3cf3b3d481d3f19217b228f7",
-    urls = ["https://github.com/kubernetes/repo-infra/archive/684e550a2f006dbe3cf3b3d481d3f19217b228f7.tar.gz"],
+    sha256 = "8d1cff71523565996903076cec6cad8424afa6eb93a342d0d810a55c911e23c7",
+    strip_prefix = "repo-infra-61b7247ebf472398bdea148d8f67e3a1849d6de9",
+    urls = ["https://github.com/kubernetes/repo-infra/archive/61b7247ebf472398bdea148d8f67e3a1849d6de9.tar.gz"],
 )
 
 # This contains a patch to not prepend ./ to tarfiles produced by pkg_tar.
