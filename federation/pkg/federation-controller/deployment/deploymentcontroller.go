@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -42,7 +43,6 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/planner"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util/podanalyzer"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/replicapreferences"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
@@ -352,6 +352,62 @@ func (fdc *DeploymentController) worker() {
 	}
 }
 
+type podAnalysisResult struct {
+	// Total number of pods created.
+	total int
+	// Number of pods that are running and ready.
+	runningAndReady int
+	// Number of pods that have been in unschedulable state for UnshedulableThreshold seconds.
+	unschedulable int
+
+	// TODO: Handle other scenarios like pod waiting too long for scheduler etc.
+}
+
+const (
+	// TODO: make it configurable
+	unschedulableThreshold = 60 * time.Second
+)
+
+// A function that calculates how many pods from the list are in one of
+// the meaningful (from the replica set perspective) states. This function is
+// a temporary workaround against the current lack of ownerRef in pods.
+// TODO(perotinus): Unify this with the ReplicaSet controller.
+func analyzePods(selectorv1 *metav1.LabelSelector, allPods []fedutil.FederatedObject, currentTime time.Time) (map[string]podAnalysisResult, error) {
+	selector, err := metav1.LabelSelectorAsSelector(selectorv1)
+	if err != nil {
+		return nil, fmt.Errorf("invalid selector: %v", err)
+	}
+	result := make(map[string]podAnalysisResult)
+
+	for _, fedObject := range allPods {
+		pod, isPod := fedObject.Object.(*apiv1.Pod)
+		if !isPod {
+			return nil, fmt.Errorf("invalid arg content - not a *pod")
+		}
+		if !selector.Empty() && selector.Matches(labels.Set(pod.Labels)) {
+			status := result[fedObject.ClusterName]
+			status.total++
+			for _, condition := range pod.Status.Conditions {
+				if pod.Status.Phase == apiv1.PodRunning {
+					if condition.Type == apiv1.PodReady {
+						status.runningAndReady++
+					}
+				} else {
+					if condition.Type == apiv1.PodScheduled &&
+						condition.Status == apiv1.ConditionFalse &&
+						condition.Reason == apiv1.PodReasonUnschedulable &&
+						condition.LastTransitionTime.Add(unschedulableThreshold).Before(currentTime) {
+
+						status.unschedulable++
+					}
+				}
+			}
+			result[fedObject.ClusterName] = status
+		}
+	}
+	return result, nil
+}
+
 func (fdc *DeploymentController) schedule(fd *extensionsv1.Deployment, clusters []*fedv1.Cluster,
 	current map[string]int64, estimatedCapacity map[string]int64) map[string]int64 {
 	// TODO: integrate real scheduler
@@ -471,7 +527,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 	if err != nil {
 		return statusError, err
 	}
-	podStatus, err := podanalyzer.AnalysePods(fd.Spec.Selector, allPods, time.Now())
+	podStatus, err := analyzePods(fd.Spec.Selector, allPods, time.Now())
 	current := make(map[string]int64)
 	estimatedCapacity := make(map[string]int64)
 	for _, cluster := range clusters {
@@ -481,8 +537,8 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		}
 		if exists {
 			ld := ldObj.(*extensionsv1.Deployment)
-			current[cluster.Name] = int64(podStatus[cluster.Name].RunningAndReady) // include pending as well?
-			unschedulable := int64(podStatus[cluster.Name].Unschedulable)
+			current[cluster.Name] = int64(podStatus[cluster.Name].runningAndReady) // include pending as well?
+			unschedulable := int64(podStatus[cluster.Name].unschedulable)
 			if unschedulable > 0 {
 				estimatedCapacity[cluster.Name] = int64(*ld.Spec.Replicas) - unschedulable
 			}
