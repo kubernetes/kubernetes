@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package policies
 
 import (
 	"fmt"
@@ -24,6 +24,8 @@ import (
 
 	"k8s.io/client-go/util/clock"
 )
+
+// Manages default policies for when to backoff and retry for the fundamental kubelet <-> apiserver communications.
 
 const (
 	// These constants should be reviewed and updated very carefully.
@@ -42,7 +44,7 @@ const (
 // registerInitiallyWithInfiniteRetry continually runs a function until it succeeds, backing off
 // using specific timings we set for initial registration flow.  Specifically designed for initial registration,
 //  externalized to make timing policy easily maintainable.
-func registerInitiallyWithInfiniteRetry(theClock clock.Clock, register func() bool, message string) error {
+func RegisterInitiallyWithInfiniteRetry(theClock clock.Clock, register func() bool, message string) error {
 	try := 0
 	step := 100 * time.Millisecond
 	complete := false
@@ -62,7 +64,7 @@ func registerInitiallyWithInfiniteRetry(theClock clock.Clock, register func() bo
 
 // updateNodeStatusWithBurstRetry runs a function several times with burst retries.  Specifically designed for
 // node status updates, externalized to make timing policy easily maintainable.
-func updateNodeStatusWithBurstRetry(theClock clock.Clock, update func() error, message string) error {
+func UpdateNodeStatusWithBurstRetry(theClock clock.Clock, update func() error, message string) error {
 	for i := 0; i < NodeStatusUpdateRetry; i++ {
 		if err := update(); err != nil {
 			// TODO: Consider a small exponential backoff (1ms->100ms).

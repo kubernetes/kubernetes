@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package policies
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ func TestInitialRegistration(t *testing.T) {
 	tries := 0
 	start := time.Now()
 	clock := clock.NewFakeClock(start)
-	err := registerInitiallyWithInfiniteRetry(clock, func() bool {
+	err := RegisterInitiallyWithInfiniteRetry(clock, func() bool {
 		tries = tries + 1
 		// 10,000 is an arbitrarily large number which indicates that retries continue forever.
 		if tries < 10000 {
@@ -53,7 +53,7 @@ func TestNodeStatusBurst(t *testing.T) {
 	start := time.Now()
 	clock := clock.NewFakeClock(start)
 	tries := 0
-	err := updateNodeStatusWithBurstRetry(clock, func() error {
+	err := UpdateNodeStatusWithBurstRetry(clock, func() error {
 		if tries == 4 {
 			return nil
 		}

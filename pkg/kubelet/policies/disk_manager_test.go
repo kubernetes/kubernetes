@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package policies
 
 import (
 	"fmt"
@@ -42,23 +42,23 @@ func setUp(t *testing.T) (*assert.Assertions, DiskSpacePolicy, *cadvisortest.Moc
 
 func TestValidPolicy(t *testing.T) {
 	assert, policy, c := setUp(t)
-	_, err := newDiskSpaceManager(c, policy)
+	_, err := NewDiskSpaceManager(c, policy)
 	assert.NoError(err)
 
 	policy = testPolicy()
 	policy.DockerFreeDiskMB = -1
-	_, err = newDiskSpaceManager(c, policy)
+	_, err = NewDiskSpaceManager(c, policy)
 	assert.Error(err)
 
 	policy = testPolicy()
 	policy.RootFreeDiskMB = -1
-	_, err = newDiskSpaceManager(c, policy)
+	_, err = NewDiskSpaceManager(c, policy)
 	assert.Error(err)
 }
 
 func TestSpaceAvailable(t *testing.T) {
 	assert, policy, mockCadvisor := setUp(t)
-	dm, err := newDiskSpaceManager(mockCadvisor, policy)
+	dm, err := NewDiskSpaceManager(mockCadvisor, policy)
 	assert.NoError(err)
 
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapi.FsInfo{
@@ -84,7 +84,7 @@ func TestSpaceAvailable(t *testing.T) {
 // space is available.
 func TestIsRuntimeDiskSpaceAvailableWithSpace(t *testing.T) {
 	assert, policy, mockCadvisor := setUp(t)
-	dm, err := newDiskSpaceManager(mockCadvisor, policy)
+	dm, err := NewDiskSpaceManager(mockCadvisor, policy)
 	require.NoError(t, err)
 
 	// 500MB available
@@ -110,7 +110,7 @@ func TestIsRuntimeDiskSpaceAvailableWithoutSpace(t *testing.T) {
 		Available: 1 * mb,
 	}, nil)
 
-	dm, err := newDiskSpaceManager(mockCadvisor, policy)
+	dm, err := NewDiskSpaceManager(mockCadvisor, policy)
 	require.NoError(t, err)
 
 	ok, err := dm.IsRuntimeDiskSpaceAvailable()
@@ -123,7 +123,7 @@ func TestIsRuntimeDiskSpaceAvailableWithoutSpace(t *testing.T) {
 func TestIsRootDiskSpaceAvailableWithSpace(t *testing.T) {
 	assert, policy, mockCadvisor := setUp(t)
 	policy.RootFreeDiskMB = 10
-	dm, err := newDiskSpaceManager(mockCadvisor, policy)
+	dm, err := NewDiskSpaceManager(mockCadvisor, policy)
 	assert.NoError(err)
 
 	// 999MB available
@@ -143,7 +143,7 @@ func TestIsRootDiskSpaceAvailableWithSpace(t *testing.T) {
 func TestIsRootDiskSpaceAvailableWithoutSpace(t *testing.T) {
 	assert, policy, mockCadvisor := setUp(t)
 	policy.RootFreeDiskMB = 10
-	dm, err := newDiskSpaceManager(mockCadvisor, policy)
+	dm, err := NewDiskSpaceManager(mockCadvisor, policy)
 	assert.NoError(err)
 
 	// 9MB available
@@ -161,7 +161,7 @@ func TestIsRootDiskSpaceAvailableWithoutSpace(t *testing.T) {
 // TestCache verifies that caching works properly with DiskSpaceAvailable calls
 func TestCache(t *testing.T) {
 	assert, policy, mockCadvisor := setUp(t)
-	dm, err := newDiskSpaceManager(mockCadvisor, policy)
+	dm, err := NewDiskSpaceManager(mockCadvisor, policy)
 	assert.NoError(err)
 
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapi.FsInfo{
@@ -205,7 +205,7 @@ func TestCache(t *testing.T) {
 func TestFsInfoError(t *testing.T) {
 	assert, policy, mockCadvisor := setUp(t)
 	policy.RootFreeDiskMB = 10
-	dm, err := newDiskSpaceManager(mockCadvisor, policy)
+	dm, err := NewDiskSpaceManager(mockCadvisor, policy)
 	assert.NoError(err)
 
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapi.FsInfo{}, fmt.Errorf("can't find fs"))

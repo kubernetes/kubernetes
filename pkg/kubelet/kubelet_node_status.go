@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/policies"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -62,7 +63,7 @@ func (kl *Kubelet) registerWithApiServerWithRetry() {
 
 	var completedNode *v1.Node = nil
 
-	registerInitiallyWithInfiniteRetry(kl.clock,
+	policies.RegisterInitiallyWithInfiniteRetry(kl.clock,
 		func() bool {
 			// Possible error can happen when querying cloud info, so may need retrying.
 			node, err := kl.tryPopulateInitialNodeData()
@@ -75,7 +76,7 @@ func (kl *Kubelet) registerWithApiServerWithRetry() {
 			}
 		}, "populate initial node with metadata")
 
-	registerInitiallyWithInfiniteRetry(kl.clock,
+	policies.RegisterInitiallyWithInfiniteRetry(kl.clock,
 		func() bool {
 			// Once node is created, try to register.  Again, this might need to be retried.
 			glog.Infof("Attempting to register node %s", completedNode.Name)
@@ -314,13 +315,13 @@ func (kl *Kubelet) syncNodeStatus() {
 		// This will exit immediately if it doesn't need to do anything.
 		kl.registerWithApiServerWithRetry()
 	}
-	if err := kl.updateNodeStatusWithRetry(); err != nil {
+	if err := kl.UpdateNodeStatusWithRetry(); err != nil {
 		glog.Errorf("Unable to update node status: %v", err)
 	}
 }
 
 // updateNodeStatusWithRetry updates node status to master with retries.
-func (kl *Kubelet) updateNodeStatusWithRetry() error {
+func (kl *Kubelet) UpdateNodeStatusWithRetry() error {
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
 	// To reduce the load on etcd, we are serving GET operations from
@@ -329,7 +330,7 @@ func (kl *Kubelet) updateNodeStatusWithRetry() error {
 	// If it result in a conflict, all retries are served directly from etcd.
 	opts := metav1.GetOptions{}
 	util.FromApiserverCache(&opts)
-	err := updateNodeStatusWithBurstRetry(kl.clock, func() error {
+	err := policies.UpdateNodeStatusWithBurstRetry(kl.clock, func() error {
 		return kl.tryUpdateNodeStatus(opts)
 	}, "update node status with the master")
 

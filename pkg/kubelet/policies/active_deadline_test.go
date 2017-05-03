@@ -14,18 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package policies
 
 import (
 	"testing"
 	"time"
 
+	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
+
+// TODO Note this is a duplicate of the code from kubelet_test.go.  We duplicate it to avoid an artificial
+// dependency, we can consolidate this functionality as neeeded at some point.
+func newTestPods(count int) []*v1.Pod {
+	pods := make([]*v1.Pod, count)
+	for i := 0; i < count; i++ {
+		pods[i] = &v1.Pod{
+			Spec: v1.PodSpec{
+				HostNetwork: true,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  types.UID(10000 + i),
+				Name: fmt.Sprintf("pod%d", i),
+			},
+		}
+	}
+	return pods
+}
 
 // mockPodStatusProvider returns the status on the specified pod
 type mockPodStatusProvider struct {
@@ -48,7 +67,7 @@ func TestActiveDeadlineHandler(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 	podStatusProvider := &mockPodStatusProvider{pods: pods}
 	fakeRecorder := &record.FakeRecorder{}
-	handler, err := newActiveDeadlineHandler(podStatusProvider, fakeRecorder, fakeClock)
+	handler, err := NewActiveDeadlineHandler(podStatusProvider, fakeRecorder, fakeClock)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
