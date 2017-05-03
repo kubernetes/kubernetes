@@ -1177,7 +1177,9 @@ func (kl *Kubelet) initializeModules() error {
 	}
 
 	// Step 7: Initialize GPUs
-	kl.gpuManager.Start()
+	if err := kl.gpuManager.Start(); err != nil {
+		return fmt.Errorf("failed to start GPUManager: %v", err)
+	}
 
 	// Step 8: Start resource analyzer
 	kl.resourceAnalyzer.Start()
