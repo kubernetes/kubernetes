@@ -145,7 +145,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 			volumeAttacher, newAttacherErr := attachableVolumePlugin.NewAttacher()
 			if newAttacherErr != nil {
 				glog.Errorf(
-					"VolumesAreAttached failed for getting plugin %q with: %v",
+					"VolumesAreAttached.NewAttacher failed for getting plugin %q with: %v",
 					pluginName,
 					newAttacherErr)
 				continue
@@ -193,7 +193,7 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 
 		if newAttacherErr != nil {
 			glog.Errorf(
-				"BulkVerifyVolumes failed for getting plugin %q with: %v",
+				"BulkVerifyVolume.NewAttacher failed for getting plugin %q with: %v",
 				attachableVolumePlugin,
 				newAttacherErr)
 			return nil
@@ -261,7 +261,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 
 		if attachErr != nil {
 			// On failure, return error. Caller will log and retry.
-			eventErr, detailedErr := volumeToAttach.GenerateError("Attach failed", attachErr)
+			eventErr, detailedErr := volumeToAttach.GenerateError("AttachVolume.Attach failed", attachErr)
 			for _, pod := range volumeToAttach.ScheduledPods {
 				og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
 			}
@@ -377,7 +377,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		volumeToMount.Pod,
 		volume.VolumeOptions{})
 	if newMounterErr != nil {
-		eventErr, detailedErr := volumeToMount.GenerateError("Mount initialization failed", newMounterErr)
+		eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.NewMounter initialization failed", newMounterErr)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
 		return nil, detailedErr
 	}
@@ -405,7 +405,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	return func() error {
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
-			detailedMsg := volumeToMount.GenerateMsgDetailed("Entering MountVolume.WaitForAttach", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath))
+			detailedMsg := volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath))
 			glog.Infof(detailedMsg)
 
 			devicePath, err := volumeAttacher.WaitForAttach(
@@ -434,7 +434,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				deviceMountPath)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
-				eventErr, detailedErr := volumeToMount.GenerateError("Mount device failed", err)
+				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.MountDevice failed", err)
 				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
 				return detailedErr
 			}
@@ -457,7 +457,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				err = fmt.Errorf(
 					"Verify that your node machine has the required components before attempting to mount this volume type. %s",
 					canMountErr)
-				eventErr, detailedErr := volumeToMount.GenerateError("Mount failed", err)
+				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.CanMount failed", err)
 				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
 				return detailedErr
 			}
@@ -467,7 +467,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		mountErr := volumeMounter.SetUp(fsGroup)
 		if mountErr != nil {
 			// On failure, return error. Caller will log and retry.
-			eventErr, detailedErr := volumeToMount.GenerateError("Mount setup failed", mountErr)
+			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.SetUp failed", mountErr)
 			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
 			return detailedErr
 		}
