@@ -28,7 +28,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -385,12 +384,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	if outputFormat != "" {
 		return f.PrintObject(cmd, mapper, newRc, out)
 	}
-	kinds, _, err := api.Scheme.ObjectKinds(newRc)
-	if err != nil {
-		return err
-	}
-	_, res := meta.KindToResource(kinds[0])
-	cmdutil.PrintSuccess(mapper, false, out, res.Resource, oldName, dryrun, message)
+	cmdutil.PrintSuccess(mapper, false, out, "replicationcontrollers", oldName, dryrun, message)
 	return nil
 }
 
