@@ -200,8 +200,7 @@ func errSuffix(err error) string {
 
 // Generate a detailed error msg for logs
 func generateVolumeMsgDetailed(prefixMsg, suffixMsg, volumeName, details string) (detailedMsg string) {
-	detailedMsg = fmt.Sprintf("%v for volume %q %v %v", prefixMsg, volumeName, details, suffixMsg)
-	return detailedMsg
+	return fmt.Sprintf("%v for volume %q %v %v", prefixMsg, volumeName, details, suffixMsg)
 }
 
 // Generate a simplified error msg for events and a detailed error msg for logs
