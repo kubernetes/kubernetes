@@ -350,6 +350,7 @@ filegroup(
         "//vendor/google.golang.org/api/googleapi:all-srcs",
         "//vendor/google.golang.org/api/logging/v2beta1:all-srcs",
         "//vendor/google.golang.org/api/monitoring/v3:all-srcs",
+        "//vendor/google.golang.org/api/pubsub/v1:all-srcs",
         "//vendor/google.golang.org/grpc:all-srcs",
         "//vendor/gopkg.in/gcfg.v1:all-srcs",
         "//vendor/gopkg.in/inf.v0:all-srcs",

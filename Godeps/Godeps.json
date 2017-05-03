@@ -2737,6 +2737,10 @@
 			"Rev": "64485db7e8c8be51e572801d06cdbcfadd3546c1"
 		},
 		{
+			"ImportPath": "google.golang.org/api/pubsub/v1",
+			"Rev": "64485db7e8c8be51e572801d06cdbcfadd3546c1"
+		},
+		{
 			"ImportPath": "google.golang.org/grpc",
 			"Comment": "v1.0.4",
 			"Rev": "777daa17ff9b5daef1cfdf915088a2ada3332bf0"
