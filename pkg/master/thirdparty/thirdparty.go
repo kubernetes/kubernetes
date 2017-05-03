@@ -110,7 +110,7 @@ func (m *ThirdPartyResourceServer) HasThirdPartyResource(rsrc *extensions.ThirdP
 	if entry == nil {
 		return false, nil
 	}
-	plural, _ := meta.KindToResource(schema.GroupVersionKind{
+	plural, _ := meta.UnsafeGuessKindToResource(schema.GroupVersionKind{
 		Group:   group,
 		Version: rsrc.Versions[0].Name,
 		Kind:    kind,
@@ -258,7 +258,7 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	if len(rsrc.Versions) == 0 {
 		return fmt.Errorf("ThirdPartyResource %s has no defined versions", rsrc.Name)
 	}
-	plural, _ := meta.KindToResource(schema.GroupVersionKind{
+	plural, _ := meta.UnsafeGuessKindToResource(schema.GroupVersionKind{
 		Group:   group,
 		Version: rsrc.Versions[0].Name,
 		Kind:    kind,
