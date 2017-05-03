@@ -221,14 +221,14 @@ func isFailed(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodFailed
 }
 
-// isTerminated returns true if pod's deletion Timestamp has been set
-func isTerminated(pod *v1.Pod) bool {
+// isTerminating returns true if pod's DeletionTimestamp has been set
+func isTerminating(pod *v1.Pod) bool {
 	return pod.DeletionTimestamp != nil
 }
 
 // isHealthy returns true if pod is running and ready and has not been terminated
 func isHealthy(pod *v1.Pod) bool {
-	return isRunningAndReady(pod) && !isTerminated(pod)
+	return isRunningAndReady(pod) && !isTerminating(pod)
 }
 
 // newControllerRef returns an ControllerRef pointing to a given StatefulSet.
