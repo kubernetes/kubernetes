@@ -83,6 +83,12 @@ var (
 		# Set basic auth for the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
 
+		# Prompt username and password input for the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --username - --password -
+
+		# Prompt token input for the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --token -
+
 		# Embed client certificate data in the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true
 
