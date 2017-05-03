@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package audit
+package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	authnv1 "k8s.io/client-go/pkg/apis/authentication/v1"
 )
 
 // Level defines the amount of information logged during auditing
@@ -41,107 +42,107 @@ const (
 
 // Event captures all the information that can be included in an API audit log.
 type Event struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// ObjectMeta is included for interoperability with API infrastructure.
 	// +optional
-	metav1.ObjectMeta
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// AuditLevel at which event was generated
-	Level Level
+	Level Level `json:"level"`
 
 	// Time the request reached the apiserver.
-	Timestamp metav1.Time
+	Timestamp metav1.Time `json:"timestamp"`
 	// Unique audit ID, generated for each request.
-	AuditID types.UID
+	AuditID types.UID `json:"auditID,omitempty"`
 	// RequestURI is the request URI as sent by the client to a server.
-	RequestURI string
+	RequestURI string `json:"requestURI"`
 	// Verb is the kubernetes verb associated with the request.
-	// For non-resource requests, this is the lower-cased HTTP method.
-	Verb string
+	// For non-resource requests, this is identical to HttpMethod.
+	Verb string `json:"verb"`
 	// Authenticated user information.
-	User UserInfo
+	User authnv1.UserInfo `json:"user"`
 	// Impersonated user information.
 	// +optional
-	ImpersonatedUser *UserInfo
+	ImpersonatedUser *authnv1.UserInfo `json:"impersonatedUser,omitempty"`
 	// Source IPs, from where the request originated and intermediate proxies.
 	// +optional
-	SourceIPs []string
+	SourceIPs []string `json:"sourceIPs,omitempty"`
 	// Object reference this request is targeted at.
 	// Does not apply for List-type requests, or non-resource requests.
 	// +optional
-	ObjectRef *ObjectReference
+	ObjectRef *ObjectReference `json:"objectRef,omitempty"`
 	// The response status, populated even when the ResponseObject is not a Status type.
 	// For successful responses, this will only include the Code and StatusSuccess.
 	// For non-status type error responses, this will be auto-populated with the error Message.
 	// +optional
-	ResponseStatus *metav1.Status
+	ResponseStatus *metav1.Status `json:"responseStatus,omitempty"`
 
 	// API object from the request, in JSON format. The RequestObject is recorded as-is in the request
 	// (possibly re-encoded as JSON), prior to version conversion, defaulting, admission or
 	// merging. It is an external versioned object type, and may not be a valid object on its own.
 	// Omitted for non-resource requests.  Only logged at Request Level and higher.
 	// +optional
-	RequestObject runtime.Unknown
+	RequestObject runtime.RawExtension `json:"requestObject,omitempty"`
 	// API object returned in the response, in JSON. The ResponseObject is recorded after conversion
 	// to the external type, and serialized as JSON.  Omitted for non-resource requests.  Only logged
 	// at Response Level.
 	// +optional
-	ResponseObject runtime.Unknown
+	ResponseObject runtime.RawExtension `json:"responseObject,omitempty"`
 }
 
 // EventList is a list of audit Events.
 type EventList struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// +optional
-	metav1.ListMeta
+	metav1.ListMeta `json:"metadata,omitempty"`
 
-	Items []Event
+	Items []Event `json:"items"`
 }
 
 // Policy defines the configuration of audit logging, and the rules for how different request
 // categories are logged.
 type Policy struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// ObjectMeta is included for interoperability with API infrastructure.
 	// +optional
-	metav1.ObjectMeta
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Rules specify the audit Level a request should be recorded at.
 	// A request may match multiple rules, in which case the FIRST matching rule is used.
 	// The default audit level is None, but can be overridden by a catch-all rule at the end of the list.
 	// PolicyRules are strictly ordered.
-	Rules []PolicyRule
+	Rules []PolicyRule `json:"rules"`
 }
 
 // PolicyList is a list of audit Policies.
 type PolicyList struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// +optional
-	metav1.ListMeta
+	metav1.ListMeta `json:"metadata,omitempty"`
 
-	Items []Policy
+	Items []Policy `json:"items"`
 }
 
 // PolicyRule maps requests based off metadata to an audit Level.
 // Requests must match the rules of every field (an intersection of rules).
 type PolicyRule struct {
 	// The Level that requests matching this rule are recorded at.
-	Level Level
+	Level Level `json:"level"`
 
 	// The users (by authenticated user name) this rule applies to.
 	// An empty list implies every user.
 	// +optional
-	Users []string
+	Users []string `json:"users,omitempty"`
 	// The user groups this rule applies to. A user is considered matching
 	// if it is a member of any of the UserGroups.
 	// An empty list implies every user group.
 	// +optional
-	UserGroups []string
+	UserGroups []string `json:"userGroups,omitempty"`
 
 	// The verbs that match this rule.
 	// An empty list implies every verb.
 	// +optional
-	Verbs []string
+	Verbs []string `json:"verbs,omitempty"`
 
 	// Rules can apply to API resources (such as "pods" or "secrets"),
 	// non-resource URL paths (such as "/api"), or neither, but not both.
@@ -149,12 +150,12 @@ type PolicyRule struct {
 
 	// Resources that this rule matches. An empty list implies all kinds in all API groups.
 	// +optional
-	Resources []GroupResources
+	Resources []GroupResources `json:"resources,omitempty"`
 	// Namespaces that this rule matches.
 	// The empty string "" matches non-namespaced resources.
 	// An empty list implies every namespace.
 	// +optional
-	Namespaces []string
+	Namespaces []string `json:"namespaces,omitempty"`
 
 	// NonResourceURLs is a set of URL paths that should be audited.
 	// *s are allowed, but only as the full, final step in the path.
@@ -162,7 +163,7 @@ type PolicyRule struct {
 	//  "/metrics" - Log requests for apiserver metrics
 	//  "/healthz*" - Log all health checks
 	// +optional
-	NonResourceURLs []string
+	NonResourceURLs []string `json:"nonResourceURLs,omitempty"`
 }
 
 // GroupResources represents resource kinds in an API group.
@@ -170,43 +171,25 @@ type GroupResources struct {
 	// Group is the name of the API group that contains the resources.
 	// The empty string represents the core API group.
 	// +optional
-	Group string
+	Group string `json:"group,omitempty"`
 	// Resources is a list of resources within the API group.
 	// Any empty list implies every resource kind in the API group.
 	// +optional
-	Resources []string
+	Resources []string `json:"resources,omitempty"`
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
 	// +optional
-	Resource string
+	Resource string `json:"resource,omitempty"`
 	// +optional
-	Namespace string
+	Namespace string `json:"namespace,omitempty"`
 	// +optional
-	Name string
+	Name string `json:"name,omitempty"`
 	// +optional
-	UID types.UID
+	UID types.UID `json:"uid,omitempty"`
 	// +optional
-	APIVersion string
+	APIVersion string `json:"apiVersion,omitempty"`
 	// +optional
-	ResourceVersion string
+	ResourceVersion string `json:"resourceVersion,omitempty"`
 }
-
-// UserInfo holds the information about the user needed to implement the
-// user.Info interface.
-type UserInfo struct {
-	// The name that uniquely identifies this user among all active users.
-	Username string
-	// A unique value that identifies this user across time. If this user is
-	// deleted and another user by the same name is added, they will have
-	// different UIDs.
-	UID string
-	// The names of groups this user is a part of.
-	Groups []string
-	// Any additional information provided by the authenticator.
-	Extra map[string]ExtraValue
-}
-
-// ExtraValue masks the value so protobuf can generate
-type ExtraValue []string
