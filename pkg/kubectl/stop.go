@@ -284,9 +284,7 @@ func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Durati
 		}
 	}
 
-	falseVar := false
-	deleteOptions := &api.DeleteOptions{OrphanDependents: &falseVar}
-	return rsc.Delete(name, deleteOptions)
+	return rsc.Delete(name, getNonOrphanDeleteOptions())
 }
 
 func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -368,7 +366,7 @@ func (reaper *PetSetReaper) Stop(namespace, name string, timeout time.Duration, 
 
 	// TODO: Cleanup volumes? We don't want to accidentally delete volumes from
 	// stop, so just leave this up to the petset.
-	return petsets.Delete(name, nil)
+	return petsets.Delete(name, getNonOrphanDeleteOptions())
 }
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -414,7 +412,7 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 		return utilerrors.NewAggregate(errList)
 	}
 	// once we have all the pods removed we can safely remove the job itself
-	return jobs.Delete(name, nil)
+	return jobs.Delete(name, getNonOrphanDeleteOptions())
 }
 
 func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -467,7 +465,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 
 	// Delete deployment at the end.
 	// Note: We delete deployment at the end so that if removing RSs fails, we at least have the deployment to retry.
-	return deployments.Delete(name, nil)
+	return deployments.Delete(name, getNonOrphanDeleteOptions())
 }
 
 type updateDeploymentFunc func(d *extensions.Deployment)
@@ -508,4 +506,8 @@ func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration,
 		return err
 	}
 	return services.Delete(name)
+}
+
+func getNonOrphanDeleteOptions() *api.DeleteOptions {
+	return &api.DeleteOptions{OrphanDependents: new(bool)}
 }
