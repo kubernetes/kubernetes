@@ -163,7 +163,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			clusters = f.GetRegisteredClusters()
 			ns = f.FederationNamespace.Name
 			// create backend service
-			service = createServiceOrFail(f.FederationClientset, ns, FederatedIngressServiceName)
+			service = createServiceOrFail(f.FederationClientset, ns, FederatedIngressServiceName, clusters)
 			// create the TLS secret
 			secret = createTLSSecretOrFail(f.FederationClientset, ns, FederatedIngressTLSSecretName)
 			// wait for services objects sync
@@ -187,7 +187,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				By("Deleting service")
 				deleteServiceOrFail(f.FederationClientset, ns, service.Name, nil)
 				By("Cleanup service shards and provider resources")
-				cleanupServiceShardsAndProviderResources(ns, service, clusters)
+				cleanupServiceShardsAndProviderResources(ns, service.Name, clusters)
 				service = nil
 			} else {
 				By("No service to delete. Service is nil")

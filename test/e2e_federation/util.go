@@ -139,7 +139,7 @@ func createServiceWithNodePort(clientset *fedclientset.Clientset, namespace, nam
 	return clientset.Services(namespace).Create(service)
 }
 
-func createService(clientset *fedclientset.Clientset, namespace, name string) (*v1.Service, error) {
+func createService(clientset *fedclientset.Clientset, namespace, name string, clusters fedframework.ClusterSlice) (*v1.Service, error) {
 	if clientset == nil || len(namespace) == 0 {
 		return nil, fmt.Errorf("Internal error: invalid parameters passed to createService: clientset: %v, namespace: %v", clientset, namespace)
 	}
@@ -166,30 +166,30 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 
 		// check if service have been created in some clusters.
 		// if it's the case, delete them.
-		needsToBeDeleted := false
 		err = wait.Poll(5*time.Second, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
 			var err error
-			_, err = clientset.Core().Services(namespace).Get(name, metav1.GetOptions{})
+			service, err = clientset.Core().Services(namespace).Get(name, metav1.GetOptions{})
 			if service != nil && err == nil {
-				needsToBeDeleted = true
-				return true, nil
+				return true, err
 			}
-			if err != nil && errors.IsNotFound(err) {
-				return true, nil
+			if errors.IsNotFound(err) {
+				return true, err
 			}
-			return false, err
+			return false, nil
 		})
 
 		if err != nil {
-			framework.Failf("Getting the service %q creation status after a partial createService(): %v", service.Name, err)
+			framework.Failf("Getting the service %q creation status after a partial createService(): %v", name, err)
 		}
 
-		if needsToBeDeleted {
+		if service != nil {
 			if err = deleteService(clientset, namespace, name, nil); err != nil {
 				framework.ExpectNoError(err, "Deleting service %q after a partial createService() error", service.Name)
 				return nil, err
 			}
 		}
+
+		cleanupServiceShardsAndProviderResources(namespace, name, clusters)
 
 		// creation failed, lets try with another port
 		// first remove from the availablePorts the port with which the creation failed
@@ -199,8 +199,8 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 	return nil, err
 }
 
-func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name string) *v1.Service {
-	service, err := createService(clientset, namespace, name)
+func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name string, clusters fedframework.ClusterSlice) *v1.Service {
+	service, err := createService(clientset, namespace, name, clusters)
 	framework.ExpectNoError(err, "Creating service %q in namespace %q", service.Name, namespace)
 	By(fmt.Sprintf("Successfully created federated service %q in namespace %q", name, namespace))
 	return service
@@ -234,40 +234,46 @@ func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, se
 	}
 }
 
-func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Service, clusters fedframework.ClusterSlice) {
-	framework.Logf("Deleting service %q in %d clusters", service.Name, len(clusters))
+func getServiceShard(namespace string, serviceName string, cluster *fedframework.Cluster) (*v1.Service, error) {
+	name := cluster.Name
+	var cSvc *v1.Service
+	err := wait.PollImmediate(framework.Poll, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
+		var err error
+		cSvc, err = cluster.Clientset.Services(namespace).Get(serviceName, metav1.GetOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			// Get failed with an error, try again.
+			framework.Logf("Failed to find service %q in namespace %q, in cluster %q: %v. Trying again in %s", serviceName, namespace, name, err, framework.Poll)
+			return false, nil
+		} else if errors.IsNotFound(err) {
+			cSvc = nil
+			By(fmt.Sprintf("Service %q in namespace %q in cluster %q not found", serviceName, namespace, name))
+			return true, err
+		}
+		By(fmt.Sprintf("Service %q in namespace %q in cluster %q found", serviceName, namespace, name))
+		return true, err
+	})
+
+	return cSvc, err
+}
+
+func cleanupServiceShardsAndProviderResources(namespace string, serviceName string, clusters fedframework.ClusterSlice) {
+	framework.Logf("Deleting service %q in %d clusters", serviceName, len(clusters))
 	for _, c := range clusters {
 		name := c.Name
-		var cSvc *v1.Service
-
-		err := wait.PollImmediate(framework.Poll, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
-			var err error
-			cSvc, err = c.Clientset.Services(namespace).Get(service.Name, metav1.GetOptions{})
-			if err != nil && !errors.IsNotFound(err) {
-				// Get failed with an error, try again.
-				framework.Logf("Failed to find service %q in namespace %q, in cluster %q: %v. Trying again in %s", service.Name, namespace, name, err, framework.Poll)
-				return false, nil
-			} else if errors.IsNotFound(err) {
-				cSvc = nil
-				By(fmt.Sprintf("Service %q in namespace %q in cluster %q not found", service.Name, namespace, name))
-				return true, err
-			}
-			By(fmt.Sprintf("Service %q in namespace %q in cluster %q found", service.Name, namespace, name))
-			return true, err
-		})
+		cSvc, err := getServiceShard(namespace, serviceName, c)
 
 		if err != nil || cSvc == nil {
-			By(fmt.Sprintf("Failed to find service %q in namespace %q, in cluster %q in %s", service.Name, namespace, name, fedframework.FederatedDefaultTestTimeout))
+			By(fmt.Sprintf("Failed to find service %q in namespace %q, in cluster %q in %s", serviceName, namespace, name, fedframework.FederatedDefaultTestTimeout))
 			continue
 		}
 
 		err = cleanupServiceShard(c.Clientset, name, namespace, cSvc, fedframework.FederatedDefaultTestTimeout)
 		if err != nil {
-			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q: %v", service.Name, namespace, name, err)
+			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q: %v", serviceName, namespace, name, err)
 		}
 		err = cleanupServiceShardLoadBalancer(name, cSvc, fedframework.FederatedDefaultTestTimeout)
 		if err != nil {
-			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", service.Name, namespace, name)
+			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", serviceName, namespace, name)
 		}
 	}
 }

@@ -53,6 +53,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 	var _ = Describe("Without Clusters [NoCluster]", func() {
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
+			clusters = fedframework.ClusterSlice{}
 			// Placeholder
 		})
 
@@ -64,7 +65,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
-			service := createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
+			service := createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName, clusters)
 			By(fmt.Sprintf("Creation of service %q in namespace %q succeeded.  Deleting service.", service.Name, nsName))
 
 			// Cleanup
@@ -102,7 +103,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 				if service != nil {
 					By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", service.Name, nsName))
-					cleanupServiceShardsAndProviderResources(nsName, service, clusters)
+					cleanupServiceShardsAndProviderResources(nsName, service.Name, clusters)
 					service = nil
 					nsName = ""
 				}
@@ -110,7 +111,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 			It("should create and update matching services in underlying clusters", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
-				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
+				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName, clusters)
 				defer func() { // Cleanup
 					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
 					err := f.FederationClientset.Services(nsName).Delete(service.Name, &metav1.DeleteOptions{})
@@ -147,7 +148,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 			It("should recreate service shard in underlying clusters when service shard is deleted", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
-				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
+				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName, clusters)
 				defer func() {
 					// Cleanup
 					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
@@ -183,7 +184,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 				backendPods = createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
 
-				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
+				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName, clusters)
 				obj, err := api.Scheme.DeepCopy(service)
 				// Cloning shouldn't fail. On the off-chance it does, we
 				// should shallow copy service to serviceShard before
@@ -231,7 +232,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 				if serviceShard != nil {
 					By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", serviceShard.Name, nsName))
-					cleanupServiceShardsAndProviderResources(nsName, serviceShard, clusters)
+					cleanupServiceShardsAndProviderResources(nsName, serviceShard.Name, clusters)
 					serviceShard = nil
 				} else {
 					By("No service shards to delete. `serviceShard` is nil")
@@ -319,7 +320,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 // underlying clusters when orphan dependents is false and they are not
 // deleted when orphan dependents is true.
 func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, clusters fedframework.ClusterSlice, orphanDependents *bool, nsName string) {
-	service := createServiceOrFail(clientset, nsName, FederatedServiceName)
+	service := createServiceOrFail(clientset, nsName, FederatedServiceName, clusters)
 	serviceName := service.Name
 	// Check subclusters if the service was created there.
 	By(fmt.Sprintf("Waiting for service %s to be created in all underlying clusters", serviceName))

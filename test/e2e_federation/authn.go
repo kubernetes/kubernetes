@@ -35,8 +35,12 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federation-apiserver-authn")
 
 	var _ = Describe("Federation API server authentication [NoCluster]", func() {
+		var (
+			clusters fedframework.ClusterSlice
+		)
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
+			clusters = fedframework.ClusterSlice{}
 		})
 
 		It("should accept cluster resources when the client has certificate authentication credentials", func() {
@@ -44,7 +48,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			svc := createServiceOrFail(fcs, nsName, FederatedServiceName)
+			svc := createServiceOrFail(fcs, nsName, FederatedServiceName, clusters)
 			deleteServiceOrFail(f.FederationClientset, nsName, svc.Name, nil)
 		})
 
@@ -53,7 +57,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			svc, err := createService(fcs, nsName, FederatedServiceName)
+			svc, err := createService(fcs, nsName, FederatedServiceName, clusters)
 			Expect(err).NotTo(HaveOccurred())
 			deleteServiceOrFail(fcs, nsName, svc.Name, nil)
 		})
@@ -63,7 +67,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			svc, err := createService(fcs, nsName, FederatedServiceName)
+			svc, err := createService(fcs, nsName, FederatedServiceName, clusters)
 			Expect(err).NotTo(HaveOccurred())
 			deleteServiceOrFail(fcs, nsName, svc.Name, nil)
 		})
@@ -73,7 +77,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			_, err = createService(fcs, nsName, FederatedServiceName)
+			_, err = createService(fcs, nsName, FederatedServiceName, clusters)
 			Expect(errors.IsUnauthorized(err)).To(BeTrue())
 		})
 
@@ -85,7 +89,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			_, err = createService(fcs, nsName, FederatedServiceName)
+			_, err = createService(fcs, nsName, FederatedServiceName, clusters)
 			Expect(errors.IsUnauthorized(err)).To(BeTrue())
 		})
 
@@ -94,7 +98,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			_, err = createService(fcs, nsName, FederatedServiceName)
+			_, err = createService(fcs, nsName, FederatedServiceName, clusters)
 			Expect(errors.IsUnauthorized(err)).To(BeTrue())
 		})
 
