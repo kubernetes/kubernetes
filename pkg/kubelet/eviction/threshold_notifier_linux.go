@@ -116,7 +116,6 @@ func (n *memcgThresholdNotifier) Start(stopCh <-chan struct{}) {
 			syscall.Close(n.watchfd)
 			syscall.Close(n.controlfd)
 			syscall.Close(n.eventfd)
-			// close(eventCh) // may make getThresholdEvents panic
 			return
 		case <-eventCh:
 			glog.V(2).Infof("eviction: threshold crossed")
