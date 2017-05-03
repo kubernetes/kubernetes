@@ -23,6 +23,7 @@ go_library(
         "docker_streaming.go",
         "exec.go",
         "helpers.go",
+        "helpers_linux.go",
         "naming.go",
         "security_context.go",
     ],

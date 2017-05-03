@@ -12,8 +12,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "docker.go",
-        "docker_manager.go",
-        "docker_manager_linux.go",
         "fake_docker_client.go",
         "instrumented_docker.go",
         "kube_docker_client.go",
@@ -24,7 +22,6 @@ go_library(
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/images:go_default_library",
-        "//pkg/kubelet/leaky:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//vendor/github.com/docker/distribution/digest:go_default_library",
         "//vendor/github.com/docker/distribution/reference:go_default_library",

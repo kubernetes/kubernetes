@@ -1,4 +1,4 @@
-// +build linux
+// +build windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockertools
+package dockershim
 
 func DefaultMemorySwap() int64 {
 	return 0
