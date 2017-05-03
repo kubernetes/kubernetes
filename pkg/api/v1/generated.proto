@@ -759,6 +759,12 @@ message EmptyDirVolumeSource {
   // More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
   // +optional
   optional string medium = 1;
+
+  // Total amount of local storage required for this directory.
+  // The default is nil which means that the directory can use all available local storage on the node.
+  // More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity sizeLimit = 2;
 }
 
 // EndpointAddress is a tuple that describes single IP address.

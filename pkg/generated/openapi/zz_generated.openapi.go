@@ -3117,10 +3117,17 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"sizeLimit": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Total amount of local storage required for this directory. The default is nil which means that the directory can use all available local storage on the node. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
 					},
 				},
 			},
-			Dependencies: []string{},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.EndpointAddress": {
 			Schema: spec.Schema{
