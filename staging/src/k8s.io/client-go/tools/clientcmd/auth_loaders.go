@@ -23,7 +23,7 @@ import (
 	"os"
 
 	clientauth "k8s.io/client-go/tools/auth"
-	"k8s.io/kubernetes/pkg/prompt"
+	"k8s.io/kubernetes/pkg/util/prompt"
 )
 
 // AuthLoaders are used to build clientauth.Info objects.
@@ -72,12 +72,12 @@ func (a *PromptingAuthLoader) Prompt() (auth *clientauth.Info, err error) {
 	prompter := prompt.NewPrompter(a.reader)
 	auth = &clientauth.Info{}
 
-	auth.User, err = prompter.Prompt("Username", true, false)
+	auth.User, err = prompter.Prompt("Username", prompt.ShowEcho, prompt.DontMask)
 	if err != nil {
 		return nil, err
 	}
 
-	auth.Password, err = prompter.Prompt("Password", false, true)
+	auth.Password, err = prompter.Prompt("Password", prompt.DontShowEcho, prompt.Mask)
 	if err != nil {
 		return nil, err
 	}

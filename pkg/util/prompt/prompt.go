@@ -7,6 +7,13 @@ import (
 	"github.com/howeyc/gopass"
 )
 
+const (
+	ShowEcho     = true
+	DontShowEcho = false
+	Mask         = true
+	DontMask     = false
+)
+
 type Prompter struct {
 	reader io.Reader
 }

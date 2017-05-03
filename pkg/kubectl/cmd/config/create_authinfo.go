@@ -33,7 +33,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/prompt"
+	"k8s.io/kubernetes/pkg/util/prompt"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -313,7 +313,7 @@ func (o *createAuthInfoOptions) checkPrompts() (err error) {
 	prompter := prompt.NewPrompter(bufio.NewReader(os.Stdin))
 
 	if o.username.Value() == "-" {
-		result, err = prompter.Prompt("Username", true, false)
+		result, err = prompter.Prompt("Username", prompt.ShowEcho, prompt.DontMask)
 		if err != nil {
 			return err
 		}
@@ -321,7 +321,7 @@ func (o *createAuthInfoOptions) checkPrompts() (err error) {
 	}
 
 	if o.password.Value() == "-" {
-		result, err = prompter.Prompt("Password", false, true)
+		result, err = prompter.Prompt("Password", prompt.DontShowEcho, prompt.Mask)
 		if err != nil {
 			return err
 		}
@@ -329,7 +329,7 @@ func (o *createAuthInfoOptions) checkPrompts() (err error) {
 	}
 
 	if o.token.Value() == "-" {
-		result, err = prompter.Prompt("Token", false, false)
+		result, err = prompter.Prompt("Token", prompt.DontShowEcho, prompt.DontMask)
 		if err != nil {
 			return err
 		}
