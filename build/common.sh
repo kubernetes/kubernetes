@@ -86,6 +86,8 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
   debian_iptables_version=v7
+  ### If you change any of these lists, please also update DOCKERIZED_BINARIES
+  ### in build/BUILD.
   case $1 in
     "amd64")
         local targets=(

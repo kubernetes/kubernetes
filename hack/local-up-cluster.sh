@@ -213,6 +213,8 @@ ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # cur
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
 ROOT_CA_FILE=${CERT_DIR}/server-ca.crt
 ROOT_CA_KEY=${CERT_DIR}/server-ca.key
+CLUSTER_SIGNING_CERT_FILE=${CLUSTER_SIGNING_CERT_FILE:-"${ROOT_CA_FILE}"}
+CLUSTER_SIGNING_KEY_FILE=${CLUSTER_SIGNING_KEY_FILE:-"${ROOT_CA_KEY}"}
 
 # name of the cgroup driver, i.e. cgroupfs or systemd
 if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
@@ -441,8 +443,16 @@ function start_apiserver {
     fi
 
     # Create CA signers
-    kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" server '"server auth"'
-    kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" client '"client auth"'
+    if [[ "${ENABLE_SINGLE_CA_SIGNER:-}" = true ]]; then
+        kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" server '"client auth","server auth"'
+        sudo cp "${CERT_DIR}/server-ca.key" "${CERT_DIR}/client-ca.key"
+        sudo cp "${CERT_DIR}/server-ca.crt" "${CERT_DIR}/client-ca.crt"
+        sudo cp "${CERT_DIR}/server-ca-config.json" "${CERT_DIR}/client-ca-config.json"
+    else
+        kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" server '"server auth"'
+        kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" client '"client auth"'
+    fi
+
     # Create auth proxy client ca
     kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" request-header '"client auth"'
 
@@ -545,8 +555,8 @@ function start_controller_manager {
       --v=${LOG_LEVEL} \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
-      --cluster-signing-cert-file="${ROOT_CA_FILE}" \
-      --cluster-signing-key-file="${ROOT_CA_KEY}" \
+      --cluster-signing-cert-file="${CLUSTER_SIGNING_CERT_FILE}" \
+      --cluster-signing-key-file="${CLUSTER_SIGNING_KEY_FILE}" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
       ${node_cidr_args} \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
@@ -689,12 +699,20 @@ function start_kubelet {
 
 function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
+
+    cat <<EOF > /tmp/kube-proxy.yaml
+apiVersion: componentconfig/v1alpha1
+kind: KubeProxyConfiguration
+clientConnection:
+  kubeconfig: ${CERT_DIR}/kube-proxy.kubeconfig
+hostnameOverride: ${HOSTNAME_OVERRIDE}
+featureGates: ${FEATURE_GATES}
+EOF
+
     sudo "${GO_OUT}/hyperkube" proxy \
-      --v=${LOG_LEVEL} \
-      --hostname-override="${HOSTNAME_OVERRIDE}" \
-      --feature-gates="${FEATURE_GATES}" \
-      --kubeconfig "$CERT_DIR"/kube-proxy.kubeconfig \
-      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
+      --config=/tmp/kube-proxy.yaml \
+      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" \
+      --v=${LOG_LEVEL} 2>&1 &
     PROXY_PID=$!
 
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
