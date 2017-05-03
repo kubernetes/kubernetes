@@ -135,7 +135,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 
 	fakeMetricsClient := &metricsfake.Clientset{}
 	// NB: we have to sound like Gollum due to gengo's inability to handle already-plural resource names
-	fakeMetricsClient.AddReactor("list", "podmetricses", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	fakeMetricsClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		if tc.resource != nil {
 			metrics := &metricsapi.PodMetricsList{}
 			for i, resValue := range tc.resource.levels {
