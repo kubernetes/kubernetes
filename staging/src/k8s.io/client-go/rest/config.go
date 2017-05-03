@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/version"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/tools/metrics"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/flowcontrol"
 )
@@ -110,9 +111,8 @@ type Config struct {
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
 	Timeout time.Duration
 
-	// Version forces a specific version to be used (if registered)
-	// Do we need this?
-	// Version string
+	// ClientMetrics is a callback interface to a metrics provider.
+	ClientMetrics metrics.ClientMetrics
 }
 
 // ImpersonationConfig has all the available impersonation options
@@ -209,7 +209,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		}
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient, config.ClientMetrics)
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -243,7 +243,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		versionConfig.GroupVersion = &v
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
+	return NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient, config.ClientMetrics)
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the
