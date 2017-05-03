@@ -385,8 +385,13 @@ func (adc *attachDetachController) podAdd(obj interface{}) {
 		return
 	}
 
-	util.ProcessPodVolumes(pod, true, /* addVolumes */
-		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
+	if volumehelper.IsPodTerminated(pod, pod.Status) {
+		util.ProcessPodVolumes(pod, false, /* addVolumes */
+			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
+	} else {
+		util.ProcessPodVolumes(pod, true, /* addVolumes */
+			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
+	}
 }
 
 // GetDesiredStateOfWorld returns desired state of world associated with controller
@@ -395,8 +400,23 @@ func (adc *attachDetachController) GetDesiredStateOfWorld() cache.DesiredStateOf
 }
 
 func (adc *attachDetachController) podUpdate(oldObj, newObj interface{}) {
-	// The flow for update is the same as add.
-	adc.podAdd(newObj)
+	pod, ok := newObj.(*v1.Pod)
+	if pod == nil || !ok {
+		return
+	}
+	if pod.Spec.NodeName == "" {
+		// Ignore pods without NodeName, indicating they are not scheduled.
+		return
+	}
+
+	addPodFlag := true
+
+	if volumehelper.IsPodTerminated(pod, pod.Status) {
+		addPodFlag = false
+	}
+
+	util.ProcessPodVolumes(pod, addPodFlag, /* addVolumes */
+		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
 }
 
 func (adc *attachDetachController) podDelete(obj interface{}) {
