@@ -25,11 +25,20 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-# !!! ALERT !!! Jenkins default $HOME is /var/lib/jenkins, which is
-# global across jobs. We change $HOME instead to ${WORKSPACE}, which
-# is an incoming variable Jenkins provides us for this job's scratch
-# space.
-export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
+if [[ "${CIRCLECI:-}" == "true" ]]; then
+    JOB_NAME="circleci-${CIRCLE_PROJECT_USERNAME}-${CIRCLE_PROJECT_REPONAME}"
+    BUILD_NUMBER=${CIRCLE_BUILD_NUM}
+    WORKSPACE=`pwd`
+else
+    # Jenkins?
+
+    # !!! ALERT !!! Jenkins default $HOME is /var/lib/jenkins, which is
+    # global across jobs. We change $HOME instead to ${WORKSPACE}, which
+    # is an incoming variable Jenkins provides us for this job's scratch
+    # space.
+    export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
+fi
+
 export PATH=$PATH:/usr/local/go/bin
 
 # Skip gcloud update checking

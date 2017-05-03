@@ -1,0 +1,25 @@
+machine:
+  services:
+    - docker
+
+dependencies:
+  pre:
+    - sudo pip install awscli
+
+test:
+  pre:
+    - hack/jenkins/build.sh:
+        timeout: 1800
+        environment:
+          KUBERNETES_PROVIDER: aws
+          KUBE_SKIP_PUSH_GCS: y
+  override:
+    - hack/jenkins/e2e-simple.sh:
+        timeout: 1800
+        environment:
+          KUBERNETES_PROVIDER: aws
+          KUBE_SKIP_PUSH_DOCKER: y
+          E2E_CLUSTER_NAME: jenkins
+          E2E_NETWORK: ""
+          E2E_ZONE: us-west-2
+          E2E_OPT: ""
