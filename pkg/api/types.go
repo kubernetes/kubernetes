@@ -2948,15 +2948,14 @@ type ResourceName string
 // camel case, separating compound words.
 // Fully-qualified resource typenames are constructed from a DNS-style subdomain, followed by a slash `/` and a name.
 const (
-	// CPU, in cores. (500m = .5 cores)
+	// CPU, in cores. (e.g. 500m = 0.5 cores)
 	ResourceCPU ResourceName = "cpu"
-	// Memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	// Memory, in bytes. (e.g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
 	ResourceMemory ResourceName = "memory"
-	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
+	// Volume size, in bytes (e.g. 500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceStorage ResourceName = "storage"
 	// NVIDIA GPU, in devices. Alpha, might change: although fractional and allowing values >1, only one whole device per node is assigned.
 	ResourceNvidiaGPU ResourceName = "alpha.kubernetes.io/nvidia-gpu"
-	// Number of Pods that may be running on this Node: see ResourcePods
 )
 
 const (
