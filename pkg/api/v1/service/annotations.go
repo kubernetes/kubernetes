@@ -26,25 +26,19 @@ const (
 	// Not all cloud providers support this annotation, though AWS & GCE do.
 	AnnotationLoadBalancerSourceRangesKey = "service.beta.kubernetes.io/load-balancer-source-ranges"
 
-	// AnnotationValueExternalTrafficLocal Value of annotation to specify local endpoints behaviour
+	// AnnotationValueExternalTrafficLocal Value of annotation to specify local endpoints behavior.
 	AnnotationValueExternalTrafficLocal = "OnlyLocal"
-	// AnnotationValueExternalTrafficGlobal Value of annotation to specify global (legacy) behaviour
+	// AnnotationValueExternalTrafficGlobal Value of annotation to specify global (legacy) behavior.
 	AnnotationValueExternalTrafficGlobal = "Global"
 
-	// TODO: The alpha annotations have been deprecated, remove them when we move this feature to GA.
+	// TODO: The beta annotations have been deprecated, remove them when we release k8s 1.8.
 
-	// AlphaAnnotationHealthCheckNodePort Annotation specifying the healthcheck nodePort for the service
-	// If not specified, annotation is created by the service api backend with the allocated nodePort
-	// Will use user-specified nodePort value if specified by the client
-	AlphaAnnotationHealthCheckNodePort = "service.alpha.kubernetes.io/healthcheck-nodeport"
-
-	// AlphaAnnotationExternalTraffic An annotation that denotes if this Service desires to route external traffic to local
-	// endpoints only. This preserves Source IP and avoids a second hop.
-	AlphaAnnotationExternalTraffic = "service.alpha.kubernetes.io/external-traffic"
-
-	// BetaAnnotationHealthCheckNodePort is the beta version of AlphaAnnotationHealthCheckNodePort.
+	// BetaAnnotationHealthCheckNodePort Annotation specifying the healthcheck nodePort for the service.
+	// If not specified, annotation is created by the service api backend with the allocated nodePort.
+	// Will use user-specified nodePort value if specified by the client.
 	BetaAnnotationHealthCheckNodePort = "service.beta.kubernetes.io/healthcheck-nodeport"
 
-	// BetaAnnotationExternalTraffic is the beta version of AlphaAnnotationExternalTraffic.
+	// BetaAnnotationExternalTraffic An annotation that denotes if this Service desires to route
+	// external traffic to local endpoints only. This preserves Source IP and avoids a second hop.
 	BetaAnnotationExternalTraffic = "service.beta.kubernetes.io/external-traffic"
 )
