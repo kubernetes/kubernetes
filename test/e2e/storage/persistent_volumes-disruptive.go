@@ -63,6 +63,8 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 	BeforeEach(func() {
 		// To protect the NFS volume pod from the kubelet restart, we isolate it on its own node.
 		framework.SkipUnlessNodeCountIsAtLeast(MinNodes)
+		framework.SkipIfProviderIs("local")
+
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		volLabel = labels.Set{framework.VolumeSelectorKey: ns}
@@ -253,34 +255,32 @@ func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, 
 // - If `systemctl` returns stderr "command not found, issues the command via `service`
 // - If `service` also returns stderr "command not found", the test is aborted.
 // Allowed kubeletOps are `kStart`, `kStop`, and `kRestart`
-// TODO return error instead of handling internally
 func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
-	systemctlCmd := fmt.Sprintf("sudo systemctl %s kubelet", string(kOp))
-	serviceCmd := fmt.Sprintf("sudo service kubelet %s", string(kOp))
+
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
 
+	systemctlCmd := fmt.Sprintf("sudo systemctl %s kubelet", string(kOp))
 	framework.Logf("Attempting `%s`", systemctlCmd)
 	sshResult, err := framework.SSH(systemctlCmd, nodeIP, framework.TestContext.Provider)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	framework.LogSSHResult(sshResult)
-	if strings.Contains(sshResult.Stderr, "command not found") /*"command not found"*/ {
-		framework.Logf("Command `%s` returned code <%d>: %q.", systemctlCmd, sshResult.Code, sshResult.Stderr)
+	if strings.Contains(sshResult.Stderr, "command not found") /*"systemctl: command not found"*/ {
+		serviceCmd := fmt.Sprintf("sudo service kubelet %s", string(kOp))
 		framework.Logf("Attempting %s", serviceCmd)
 		sshResult, err = framework.SSH(serviceCmd, nodeIP, framework.TestContext.Provider)
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 		framework.LogSSHResult(sshResult)
-		if strings.Contains(sshResult.Stderr, "command not found") /*"command not found"*/ {
+		if strings.Contains(sshResult.Stderr, "command not found") /*"service: command not found"*/ {
 			framework.Logf("Command `%s` returned code <%d>: %q.", serviceCmd, sshResult.Code, sshResult.Stderr)
-			Expect(sshResult.Code).To(BeZero(), fmt.Sprintf("Unable to [%s] kubelet.", string(kOp)))
-		} else if sshResult.Code != 0 {
+		} else {
 			// Error other than "command not found"
-			Expect(err).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
+			Expect(sshResult).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
 		}
-	} else if sshResult.Code != 0 {
+	} else {
 		// Error other than "command not found"
-		Expect(err).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
+		Expect(sshResult.Code).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
 	}
 	// On restart, waiting for node NotReady prevents a race condition where the node takes a few moments to leave the
 	// Ready state which in turn short circuits WaitForNodeToBeReady()
