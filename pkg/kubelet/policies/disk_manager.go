@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package policies
 
 import (
 	"fmt"
@@ -32,7 +32,7 @@ import (
 const mb = 1024 * 1024
 
 // Implementation is thread-safe.
-type diskSpaceManager interface {
+type DiskSpaceManager interface {
 	// Checks the available disk space
 	IsRootDiskSpaceAvailable() (bool, error)
 	IsRuntimeDiskSpaceAvailable() (bool, error)
@@ -120,7 +120,8 @@ func validatePolicy(policy DiskSpacePolicy) error {
 	return nil
 }
 
-func newDiskSpaceManager(cadvisorInterface cadvisor.Interface, policy DiskSpacePolicy) (diskSpaceManager, error) {
+// NewDiskSpaceManager creates a disk space manager (intended specifically for the kubelet to use.
+func NewDiskSpaceManager(cadvisorInterface cadvisor.Interface, policy DiskSpacePolicy) (DiskSpaceManager, error) {
 	// validate policy
 	err := validatePolicy(policy)
 	if err != nil {
