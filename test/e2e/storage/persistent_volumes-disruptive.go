@@ -256,32 +256,22 @@ func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, 
 // - If `service` also returns stderr "command not found", the test is aborted.
 // Allowed kubeletOps are `kStart`, `kStop`, and `kRestart`
 func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
-
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
-
 	systemctlCmd := fmt.Sprintf("sudo systemctl %s kubelet", string(kOp))
 	framework.Logf("Attempting `%s`", systemctlCmd)
 	sshResult, err := framework.SSH(systemctlCmd, nodeIP, framework.TestContext.Provider)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	framework.LogSSHResult(sshResult)
-	if strings.Contains(sshResult.Stderr, "command not found") /*"systemctl: command not found"*/ {
+	if strings.Contains(sshResult.Stderr, "command not found") {
 		serviceCmd := fmt.Sprintf("sudo service kubelet %s", string(kOp))
-		framework.Logf("Attempting %s", serviceCmd)
+		framework.Logf("Attempting `%s`", serviceCmd)
 		sshResult, err = framework.SSH(serviceCmd, nodeIP, framework.TestContext.Provider)
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 		framework.LogSSHResult(sshResult)
-		if strings.Contains(sshResult.Stderr, "command not found") /*"service: command not found"*/ {
-			framework.Logf("Command `%s` returned code <%d>: %q.", serviceCmd, sshResult.Code, sshResult.Stderr)
-		} else {
-			// Error other than "command not found"
-			Expect(sshResult).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
-		}
-	} else {
-		// Error other than "command not found"
-		Expect(sshResult.Code).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
 	}
+	Expect(sshResult.Code).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
 	// On restart, waiting for node NotReady prevents a race condition where the node takes a few moments to leave the
 	// Ready state which in turn short circuits WaitForNodeToBeReady()
 	if kOp == kStop || kOp == kRestart {
