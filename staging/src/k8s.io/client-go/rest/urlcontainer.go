@@ -46,7 +46,7 @@ func NewURLContainer(urls []*url.URL) *URLContainer {
 
 // URLContainer tolerates burst of errors and sticks to currently selected url
 type URLContainer struct {
-	m            sync.Mutex
+	m            sync.RWMutex
 	stickyURL    *url.URL
 	stickyURLnum int
 	ratelimiter  flowcontrol.RateLimiter
@@ -63,8 +63,8 @@ func (c *URLContainer) Get() *url.URL {
 	if len(c.order) == 1 {
 		return c.order[0]
 	}
-	c.m.Lock()
-	defer c.m.Unlock()
+	c.m.RLock()
+	defer c.m.RUnlock()
 	return c.stickyURL
 }
 
