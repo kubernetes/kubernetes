@@ -238,8 +238,11 @@ func (o LogsOptions) RunLogs() error {
 	switch t := o.Object.(type) {
 	case *api.PodList:
 		for _, p := range t.Items {
-			if err := o.getLogs(&p); err != nil {
-				return err
+			for _, c := range p.Spec.Containers {
+				o.Options.(*api.PodLogOptions).Container = c.Name
+				if err := o.getLogs(&p); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
