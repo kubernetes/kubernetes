@@ -74,7 +74,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 	fakeCMClient := &cmfake.FakeCustomMetricsClient{}
 
 	if isResource {
-		fakeMetricsClient.AddReactor("list", "podmetricses", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		fakeMetricsClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			metrics := &metricsapi.PodMetricsList{}
 			for i, containers := range tc.reportedPodMetrics {
 				metric := metricsapi.PodMetrics{
