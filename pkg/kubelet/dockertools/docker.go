@@ -19,7 +19,6 @@ package dockertools
 import (
 	"fmt"
 	"net/http"
-	"path"
 	"strings"
 
 	"github.com/docker/docker/pkg/jsonmessage"
@@ -30,13 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/images"
-)
-
-const (
-	LogSuffix          = "log"
-	ext4MaxFileNameLen = 255
-
-	DockerType = "docker"
 )
 
 // DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
@@ -146,14 +138,4 @@ func (p dockerPuller) GetImageRef(image string) (string, error) {
 		return "", nil
 	}
 	return "", err
-}
-
-func LogSymlink(containerLogsDir, podFullName, containerName, dockerId string) string {
-	suffix := fmt.Sprintf(".%s", LogSuffix)
-	logPath := fmt.Sprintf("%s_%s-%s", podFullName, containerName, dockerId)
-	// Length of a filename cannot exceed 255 characters in ext4 on Linux.
-	if len(logPath) > ext4MaxFileNameLen-len(suffix) {
-		logPath = logPath[:ext4MaxFileNameLen-len(suffix)]
-	}
-	return path.Join(containerLogsDir, logPath+suffix)
 }
