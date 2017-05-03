@@ -17,36 +17,38 @@ limitations under the License.
 package e2e
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	gcl "google.golang.org/api/logging/v2beta1"
+	pubsub "google.golang.org/api/pubsub/v1"
 )
 
 const (
-	// GCL doesn't support page size more than 1000
-	gclPageSize = 1000
+	// Limit on the number of messages to pull from PubSub
+	maxPullLogMessages = 100 * 1000
 
-	// If we failed to get response from GCL, it can be a random 500 or
-	// quota limit exceeded. So we retry for some time in case the problem will go away.
-	// Quota is enforced every 100 seconds, so we have to wait for more than
-	// that to reliably get the next portion.
-	queryGclRetryDelay   = 100 * time.Second
-	queryGclRetryTimeout = 250 * time.Second
+	// PubSub topic with log entries polling interval
+	gclLoggingPollInterval = 100 * time.Millisecond
 )
 
 type gclLogsProvider struct {
-	GclService *gcl.Service
-	Framework  *framework.Framework
-}
-
-func (gclLogsProvider *gclLogsProvider) EnsureWorking() error {
-	// We assume that GCL is always working
-	return nil
+	GclService            *gcl.Service
+	PubsubService         *pubsub.Service
+	Framework             *framework.Framework
+	Topic                 *pubsub.Topic
+	Subscription          *pubsub.Subscription
+	LogSink               *gcl.LogSink
+	LogEntryCache         map[string][]*logEntry
+	PollingStopChannel    chan struct{}
+	PollingCleanupChannel chan struct{}
 }
 
 func newGclLogsProvider(f *framework.Framework) (*gclLogsProvider, error) {
@@ -57,75 +59,185 @@ func newGclLogsProvider(f *framework.Framework) (*gclLogsProvider, error) {
 		return nil, err
 	}
 
+	pubsubService, err := pubsub.New(hc)
+	if err != nil {
+		return nil, err
+	}
+
 	provider := &gclLogsProvider{
-		GclService: gclService,
-		Framework:  f,
+		GclService:            gclService,
+		PubsubService:         pubsubService,
+		Framework:             f,
+		LogEntryCache:         map[string][]*logEntry{},
+		PollingStopChannel:    make(chan struct{}, 1),
+		PollingCleanupChannel: make(chan struct{}, 1),
 	}
 	return provider, nil
 }
 
-func (logsProvider *gclLogsProvider) FluentdApplicationName() string {
-	return "fluentd-gcp"
-}
+func (gclLogsProvider *gclLogsProvider) Init() error {
+	projectId := framework.TestContext.CloudConfig.ProjectID
+	nsName := gclLogsProvider.Framework.Namespace.Name
 
-// Since GCL API is not easily available from the outside of cluster
-// we use gcloud command to perform search with filter
-func (gclLogsProvider *gclLogsProvider) ReadEntries(pod *loggingPod) []*logEntry {
-	filter := fmt.Sprintf("resource.labels.pod_id=%s AND resource.labels.namespace_id=%s AND timestamp>=\"%v\"",
-		pod.Name, gclLogsProvider.Framework.Namespace.Name, pod.LastTimestamp.Format(time.RFC3339))
-	framework.Logf("Reading entries from GCL with filter '%v'", filter)
+	topic, err := gclLogsProvider.createPubSubTopic(projectId, nsName)
+	if err != nil {
+		return fmt.Errorf("failed to create PubSub topic: %v", err)
+	}
+	gclLogsProvider.Topic = topic
 
-	response := getResponseSafe(gclLogsProvider.GclService, filter, "")
+	subs, err := gclLogsProvider.createPubSubSubscription(projectId, nsName, topic.Name)
+	if err != nil {
+		return fmt.Errorf("failed to create PubSub subscription: %v", err)
+	}
+	gclLogsProvider.Subscription = subs
 
-	var entries []*logEntry
-	for response != nil && len(response.Entries) > 0 {
-		framework.Logf("Received %d entries from GCL", len(response.Entries))
+	logSink, err := gclLogsProvider.createGclLogSink(projectId, nsName, nsName, topic.Name)
+	if err != nil {
+		return fmt.Errorf("failed to create Stackdriver Logging sink: %v", err)
+	}
+	gclLogsProvider.LogSink = logSink
+	framework.Logf("Waiting for log sink to become operational")
+	time.Sleep(1 * time.Minute)
 
-		for _, entry := range response.Entries {
-			if entry.TextPayload == "" {
-				continue
-			}
-
-			timestamp, parseErr := time.Parse(time.RFC3339, entry.Timestamp)
-			if parseErr != nil {
-				continue
-			}
-
-			entries = append(entries, &logEntry{
-				Timestamp: timestamp,
-				Payload:   entry.TextPayload,
-			})
-		}
-
-		nextToken := response.NextPageToken
-		if nextToken == "" {
-			break
-		}
-
-		response = getResponseSafe(gclLogsProvider.GclService, filter, response.NextPageToken)
+	if err = gclLogsProvider.authorizeGclLogSink(); err != nil {
+		return fmt.Errorf("failed to authorize log sink: %v", err)
 	}
 
-	return entries
+	go gclLogsProvider.pollLogs()
+
+	return nil
 }
 
-func getResponseSafe(gclService *gcl.Service, filter string, pageToken string) *gcl.ListLogEntriesResponse {
-	for start := time.Now(); time.Since(start) < queryGclRetryTimeout; time.Sleep(queryGclRetryDelay) {
-		response, err := gclService.Entries.List(&gcl.ListLogEntriesRequest{
-			ProjectIds: []string{
-				framework.TestContext.CloudConfig.ProjectID,
-			},
-			OrderBy:   "timestamp desc",
-			Filter:    filter,
-			PageSize:  int64(gclPageSize),
-			PageToken: pageToken,
-		}).Do()
+func (gclLogsProvider *gclLogsProvider) createPubSubTopic(projectId, topicName string) (*pubsub.Topic, error) {
+	topicFullName := fmt.Sprintf("projects/%s/topics/%s", projectId, topicName)
+	topic := &pubsub.Topic{
+		Name: topicFullName,
+	}
+	return gclLogsProvider.PubsubService.Projects.Topics.Create(topicFullName, topic).Do()
+}
 
-		if err == nil {
-			return response
-		}
+func (gclLogsProvider *gclLogsProvider) createPubSubSubscription(projectId, subsName, topicName string) (*pubsub.Subscription, error) {
+	subsFullName := fmt.Sprintf("projects/%s/subscriptions/%s", projectId, subsName)
+	subs := &pubsub.Subscription{
+		Name:  subsFullName,
+		Topic: topicName,
+	}
+	return gclLogsProvider.PubsubService.Projects.Subscriptions.Create(subsFullName, subs).Do()
+}
 
-		framework.Logf("Failed to get response from GCL due to %v, retrying", err)
+func (gclLogsProvider *gclLogsProvider) createGclLogSink(projectId, nsName, sinkName, topicName string) (*gcl.LogSink, error) {
+	projectDst := fmt.Sprintf("projects/%s", projectId)
+	filter := fmt.Sprintf("resource.labels.namespace_id=%s AND resource.labels.container_name=%s", nsName, loggingContainerName)
+	sink := &gcl.LogSink{
+		Name:        sinkName,
+		Destination: fmt.Sprintf("pubsub.googleapis.com/%s", topicName),
+		Filter:      filter,
+	}
+	return gclLogsProvider.GclService.Projects.Sinks.Create(projectDst, sink).Do()
+}
+
+func (gclLogsProvider *gclLogsProvider) authorizeGclLogSink() error {
+	topicsService := gclLogsProvider.PubsubService.Projects.Topics
+	policy, err := topicsService.GetIamPolicy(gclLogsProvider.Topic.Name).Do()
+	if err != nil {
+		return err
+	}
+
+	binding := &pubsub.Binding{
+		Role:    "roles/pubsub.publisher",
+		Members: []string{gclLogsProvider.LogSink.WriterIdentity},
+	}
+	policy.Bindings = append(policy.Bindings, binding)
+	req := &pubsub.SetIamPolicyRequest{Policy: policy}
+	if _, err = topicsService.SetIamPolicy(gclLogsProvider.Topic.Name, req).Do(); err != nil {
+		return err
 	}
 
 	return nil
+}
+
+func (gclLogsProvider *gclLogsProvider) pollLogs() {
+	wait.PollUntil(gclLoggingPollInterval, func() (bool, error) {
+		subsName := gclLogsProvider.Subscription.Name
+		subsService := gclLogsProvider.PubsubService.Projects.Subscriptions
+		req := &pubsub.PullRequest{
+			ReturnImmediately: true,
+			MaxMessages:       maxPullLogMessages,
+		}
+		resp, err := subsService.Pull(subsName, req).Do()
+		if err != nil {
+			framework.Logf("Failed to pull messaged from PubSub due to %v", err)
+			return false, nil
+		}
+
+		ids := []string{}
+		for _, msg := range resp.ReceivedMessages {
+			ids = append(ids, msg.AckId)
+
+			logEntryEncoded, err := base64.StdEncoding.DecodeString(msg.Message.Data)
+			if err != nil {
+				framework.Logf("Got a message from pubsub that is not base64-encoded: %s", msg.Message.Data)
+				continue
+			}
+
+			var gclLogEntry gcl.LogEntry
+			if err := json.Unmarshal(logEntryEncoded, &gclLogEntry); err != nil {
+				framework.Logf("Failed to decode a pubsub message '%s': %v", logEntryEncoded, err)
+				continue
+			}
+
+			logEntry := &logEntry{
+				Payload: gclLogEntry.TextPayload,
+			}
+			podName := gclLogEntry.Resource.Labels["pod_id"]
+			gclLogsProvider.LogEntryCache[podName] = append(
+				gclLogsProvider.LogEntryCache[podName], logEntry)
+		}
+
+		if len(ids) > 0 {
+			ackReq := &pubsub.AcknowledgeRequest{AckIds: ids}
+			if _, err = subsService.Acknowledge(subsName, ackReq).Do(); err != nil {
+				framework.Logf("Failed to ack: %v", err)
+			}
+		}
+
+		return false, nil
+	}, gclLogsProvider.PollingStopChannel)
+	gclLogsProvider.PollingCleanupChannel <- struct{}{}
+}
+
+func (gclLogsProvider *gclLogsProvider) Cleanup() {
+	gclLogsProvider.PollingStopChannel <- struct{}{}
+	<-gclLogsProvider.PollingCleanupChannel
+
+	if gclLogsProvider.LogSink != nil {
+		projectId := framework.TestContext.CloudConfig.ProjectID
+		sinkNameId := fmt.Sprintf("projects/%s/sinks/%s", projectId, gclLogsProvider.LogSink.Name)
+		sinksService := gclLogsProvider.GclService.Projects.Sinks
+		if _, err := sinksService.Delete(sinkNameId).Do(); err != nil {
+			framework.Logf("Failed to delete LogSink: %v", err)
+		}
+	}
+
+	if gclLogsProvider.Subscription != nil {
+		subsService := gclLogsProvider.PubsubService.Projects.Subscriptions
+		if _, err := subsService.Delete(gclLogsProvider.Subscription.Name).Do(); err != nil {
+			framework.Logf("Failed to delete PubSub subscription: %v", err)
+		}
+	}
+
+	if gclLogsProvider.Topic != nil {
+		topicsService := gclLogsProvider.PubsubService.Projects.Topics
+		if _, err := topicsService.Delete(gclLogsProvider.Topic.Name).Do(); err != nil {
+			framework.Logf("Failed to delete PubSub topic: %v", err)
+		}
+	}
+}
+
+func (gclLogsProvider *gclLogsProvider) ReadEntries(pod *loggingPod) []*logEntry {
+	return gclLogsProvider.LogEntryCache[pod.Name]
+}
+
+func (logsProvider *gclLogsProvider) FluentdApplicationName() string {
+	return "fluentd-gcp"
 }

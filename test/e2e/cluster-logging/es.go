@@ -39,10 +39,11 @@ var _ = framework.KubeDescribe("Cluster level logging using Elasticsearch [Featu
 	It("should check that logs from containers are ingested into Elasticsearch", func() {
 		podName := "synthlogger"
 		esLogsProvider, err := newEsLogsProvider(f)
-		framework.ExpectNoError(err, "Failed to create GCL logs provider")
+		framework.ExpectNoError(err, "Failed to create Elasticsearch logs provider")
 
-		err = esLogsProvider.EnsureWorking()
-		framework.ExpectNoError(err, "Elasticsearch is not working")
+		err = esLogsProvider.Init()
+		defer esLogsProvider.Cleanup()
+		framework.ExpectNoError(err, "Failed to init Elasticsearch logs provider")
 
 		err = ensureSingleFluentdOnEachNode(f, esLogsProvider.FluentdApplicationName())
 		framework.ExpectNoError(err, "Fluentd deployed incorrectly")
