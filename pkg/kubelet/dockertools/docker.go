@@ -37,15 +37,21 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
-	"k8s.io/kubernetes/pkg/kubelet/leaky"
 )
 
 const (
-	PodInfraContainerName = leaky.PodInfraContainerName
-	DockerPrefix          = "docker://"
-	DockerPullablePrefix  = "docker-pullable://"
-	LogSuffix             = "log"
-	ext4MaxFileNameLen    = 255
+	LogSuffix          = "log"
+	ext4MaxFileNameLen = 255
+
+	DockerType = "docker"
+
+	// https://docs.docker.com/engine/reference/api/docker_remote_api/
+	// docker version should be at least 1.10.x
+	minimumDockerAPIVersion = "1.22"
+
+	statusRunningPrefix = "Up"
+	statusExitedPrefix  = "Exited"
+	statusCreatedPrefix = "Created"
 )
 
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker client.
