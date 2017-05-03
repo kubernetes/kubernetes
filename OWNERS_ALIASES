@@ -65,3 +65,18 @@ aliases:
     - dcbw
     - danwinship
     - caseydavenport
+  sig-apps-reviewers:
+    - bprashanth
+    - enisoc
+    - erictune
+    - foxish
+    - janetkuo
+    - kargakis
+    - kow3ns
+    - lukaszo
+    - mfojtik
+    - smarterclayton
+    - soltysh
+  sig-apps-api-reviewers:
+    - erictune
+    - smarterclayton
