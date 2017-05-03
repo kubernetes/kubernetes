@@ -126,16 +126,17 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 		return "", err
 	}
 
-	scsiHostRescan(&osIOHandler{})
+	io := &osIOHandler{}
+	scsiHostRescan(io)
 
 	diskName := volumeSource.DiskName
 	nodeName := a.plugin.host.GetHostName()
 	newDevicePath := ""
 
-	err = wait.Poll(2*time.Second, timeout, func() (bool, error) {
+	err = wait.Poll(1*time.Second, timeout, func() (bool, error) {
 		exe := exec.New()
 
-		if newDevicePath, err = findDiskByLun(lun, exe); err != nil {
+		if newDevicePath, err = findDiskByLun(lun, io, exe); err != nil {
 			return false, fmt.Errorf("azureDisk - WaitForAttach ticker failed node (%s) disk (%s) lun(%v) err(%s)", nodeName, diskName, lun, err)
 		}
 

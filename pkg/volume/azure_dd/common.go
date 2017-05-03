@@ -187,6 +187,7 @@ func normalizeCachingMode(cachingMode v1.AzureDataDiskCachingMode) (v1.AzureData
 type ioHandler interface {
 	ReadDir(dirname string) ([]os.FileInfo, error)
 	WriteFile(filename string, data []byte, perm os.FileMode) error
+	Readlink(name string) (string, error)
 }
 
 //TODO: check if priming the iscsi interface is actually needed
@@ -199,6 +200,28 @@ func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 
 func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	return ioutil.WriteFile(filename, data, perm)
+}
+
+func (handler *osIOHandler) Readlink(name string) (string, error) {
+	return os.Readlink(name)
+}
+
+// exclude those used by azure as resource and OS root in /dev/disk/azure
+func listAzureDiskPath(io ioHandler) []string {
+	azureDiskPath := "/dev/disk/azure/"
+	var azureDiskList []string
+	if dirs, err := io.ReadDir(azureDiskPath); err == nil {
+		for _, f := range dirs {
+			name := f.Name()
+			diskPath := azureDiskPath + name
+			if link, linkErr := io.Readlink(diskPath); linkErr == nil {
+				sd := link[(STRINGS.LastIndex(link, "/") + 1):]
+				azureDiskList = append(azureDiskList, sd)
+			}
+		}
+	}
+	glog.V(12).Infof("Azure sys disks paths: %v", azureDiskList)
+	return azureDiskList
 }
 
 func scsiHostRescan(io ioHandler) {
@@ -216,31 +239,29 @@ func scsiHostRescan(io ioHandler) {
 	}
 }
 
+func findDiskByLun(lun int, io ioHandler, exe exec.Interface) (string, error) {
+	azureDisks := listAzureDiskPath(io)
+	return findDiskByLunWithConstraint(lun, io, exe, azureDisks)
+}
+
 // finds a device mounted to "current" node
-func findDiskByLun(lun int, exe exec.Interface) (string, error) {
+func findDiskByLunWithConstraint(lun int, io ioHandler, exe exec.Interface, azureDisks []string) (string, error) {
 	var err error
 	sys_path := "/sys/bus/scsi/devices"
-	dirs, _ := ioutil.ReadDir(sys_path)
-
-	for _, f := range dirs {
-		name := f.Name()
-		// look for path like /sys/bus/scsi/devices/3:0:1:0
-		arr := STRINGS.Split(name, ":")
-		if len(arr) < 4 {
-			continue
-		}
-		target, err := strconv.Atoi(arr[0])
-		if err != nil {
-			glog.Infof("azureDisk - findDiskByLun:failed to parse target from %v (%v), err %v, will continue", arr[0], name, err)
-			continue
-		}
-
-		// as observed, targets 0-3 are used by OS disks. Skip them
-		if target > 3 {
+	if dirs, err := io.ReadDir(sys_path); err == nil {
+		for _, f := range dirs {
+			name := f.Name()
+			// look for path like /sys/bus/scsi/devices/3:0:0:1
+			arr := STRINGS.Split(name, ":")
+			if len(arr) < 4 {
+				continue
+			}
+			// extract LUN from the path.
+			// LUN is the last index of the array, i.e. 1 in /sys/bus/scsi/devices/3:0:0:1
 			l, err := strconv.Atoi(arr[3])
 			if err != nil {
 				// unknown path format, continue to read the next one
-				glog.V(4).Infof("azureDisk - findDiskByLun:failed to parse lun from %v (%v), err %v, will continue", arr[3], name, err)
+				glog.V(4).Infof("azure disk - failed to parse lun from %v (%v), err %v", arr[3], name, err)
 				continue
 			}
 			if lun == l {
@@ -250,22 +271,28 @@ func findDiskByLun(lun int, exe exec.Interface) (string, error) {
 				model := path.Join(sys_path, name, "model")
 				out, err := exe.Command("cat", vendor, model).CombinedOutput()
 				if err != nil {
-					glog.Infof("Azure Md - failed to cat device vendor and model, err: %v", err)
+					glog.V(4).Infof("azure disk - failed to cat device vendor and model, err: %v", err)
 					continue
 				}
 				matched, err := regexp.MatchString("^MSFT[ ]{0,}\nVIRTUAL DISK[ ]{0,}\n$", STRINGS.ToUpper(string(out)))
 				if err != nil || !matched {
-					glog.V(4).Infof("azureDisk -  findDiskByLun: doesn't match VHD, output %v, error %v, will continue", string(out), err)
+					glog.V(4).Infof("azure disk - doesn't match VHD, output %v, error %v", string(out), err)
 					continue
 				}
-				// find it!
+				// find a disk, validate name
 				dir := path.Join(sys_path, name, "block")
-				dev, err := ioutil.ReadDir(dir)
-				if err != nil {
-					glog.V(4).Infof("azureDisk - findDiskByLun: failed to read %s", dir)
-				} else {
-					devicePath := "/dev/" + dev[0].Name()
-					return devicePath, nil
+				if dev, err := io.ReadDir(dir); err == nil {
+					found := false
+					for _, diskName := range azureDisks {
+						glog.V(12).Infof("azure disk - validating disk %q with sys disk %q", dev[0].Name(), diskName)
+						if string(dev[0].Name()) == diskName {
+							found = true
+							break
+						}
+					}
+					if !found {
+						return "/dev/" + dev[0].Name(), nil
+					}
 				}
 			}
 		}
