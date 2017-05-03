@@ -81,7 +81,7 @@ func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("accept-paths", kubectl.DefaultPathAcceptRE, "Regular expression for paths that the proxy should accept.")
 	cmd.Flags().String("reject-paths", kubectl.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject. Paths specified here will be rejected even accepted by --accept-paths.")
 	cmd.Flags().String("accept-hosts", kubectl.DefaultHostAcceptRE, "Regular expression for hosts that the proxy should accept.")
-	cmd.Flags().String("reject-methods", kubectl.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject.")
+	cmd.Flags().String("reject-methods", kubectl.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject (example --reject-methods='POST,PUT,PATCH'). ")
 	cmd.Flags().IntP("port", "p", defaultPort, "The port on which to run the proxy. Set to 0 to pick a random port.")
 	cmd.Flags().StringP("address", "", "127.0.0.1", "The IP address on which to serve on.")
 	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
@@ -122,9 +122,10 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		apiProxyPrefix += "/"
 	}
 	filter := &kubectl.FilterServer{
-		AcceptPaths: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-paths")),
-		RejectPaths: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "reject-paths")),
-		AcceptHosts: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-hosts")),
+		AcceptPaths:   kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-paths")),
+		RejectPaths:   kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "reject-paths")),
+		AcceptHosts:   kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-hosts")),
+		RejectMethods: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "reject-methods")),
 	}
 	if cmdutil.GetFlagBool(cmd, "disable-filter") {
 		if path == "" {
