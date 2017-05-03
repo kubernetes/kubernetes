@@ -19,10 +19,15 @@ package service
 import (
 	"testing"
 
+	"fmt"
+	"reflect"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestGetLoadBalancerSourceRanges(t *testing.T) {
@@ -128,4 +133,386 @@ func TestAllowAll(t *testing.T) {
 	checkAllowAll(true, "0.0.0.0/0")
 	checkAllowAll(true, "192.168.0.0/0")
 	checkAllowAll(true, "192.168.0.1/32", "0.0.0.0/0")
+}
+
+func TestRequestsOnlyLocalTraffic(t *testing.T) {
+	checkRequestsOnlyLocalTraffic := func(requestsOnlyLocalTraffic bool, service *api.Service) {
+		res := RequestsOnlyLocalTraffic(service)
+		if res != requestsOnlyLocalTraffic {
+			t.Errorf("Expected requests OnlyLocal traffic = %v, got %v",
+				requestsOnlyLocalTraffic, res)
+		}
+	}
+
+	checkRequestsOnlyLocalTraffic(false, &api.Service{})
+	checkRequestsOnlyLocalTraffic(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeClusterIP,
+		},
+	})
+	checkRequestsOnlyLocalTraffic(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeNodePort,
+		},
+	})
+	checkRequestsOnlyLocalTraffic(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeNodePort,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+		},
+	})
+	checkRequestsOnlyLocalTraffic(true, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeNodePort,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
+		},
+	})
+	checkRequestsOnlyLocalTraffic(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+		},
+	})
+	checkRequestsOnlyLocalTraffic(true, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
+		},
+	})
+}
+
+func TestNeedsHealthCheck(t *testing.T) {
+	checkNeedsHealthCheck := func(needsHealthCheck bool, service *api.Service) {
+		res := NeedsHealthCheck(service)
+		if res != needsHealthCheck {
+			t.Errorf("Expected needs health check = %v, got %v",
+				needsHealthCheck, res)
+		}
+	}
+
+	checkNeedsHealthCheck(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeClusterIP,
+		},
+	})
+	checkNeedsHealthCheck(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeNodePort,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+		},
+	})
+	checkNeedsHealthCheck(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeNodePort,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
+		},
+	})
+	checkNeedsHealthCheck(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+		},
+	})
+	checkNeedsHealthCheck(true, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
+		},
+	})
+
+	checkNeedsHealthCheck(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				BetaAnnotationExternalTraffic: "invalid",
+			},
+		},
+	})
+	checkNeedsHealthCheck(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				BetaAnnotationExternalTraffic: AnnotationValueExternalTrafficGlobal,
+			},
+		},
+	})
+	checkNeedsHealthCheck(true, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				BetaAnnotationExternalTraffic: AnnotationValueExternalTrafficLocal,
+			},
+		},
+	})
+}
+
+func TestGetServiceHealthCheckNodePort(t *testing.T) {
+	checkGetServiceHealthCheckNodePort := func(healthCheckNodePort int32, service *api.Service) {
+		res := GetServiceHealthCheckNodePort(service)
+		if res != healthCheckNodePort {
+			t.Errorf("Expected health check node port = %v, got %v",
+				healthCheckNodePort, res)
+		}
+	}
+
+	checkGetServiceHealthCheckNodePort(0, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeClusterIP,
+		},
+	})
+	checkGetServiceHealthCheckNodePort(0, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeNodePort,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+		},
+	})
+	checkGetServiceHealthCheckNodePort(0, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+		},
+	})
+	checkGetServiceHealthCheckNodePort(34567, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
+			HealthCheckNodePort:   int32(34567),
+		},
+	})
+	checkGetServiceHealthCheckNodePort(34567, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				BetaAnnotationExternalTraffic:     AnnotationValueExternalTrafficLocal,
+				BetaAnnotationHealthCheckNodePort: "34567",
+			},
+		},
+	})
+}
+
+func TestSetDefaultExternalTrafficPolicyIfNeeded(t *testing.T) {
+	testCases := []struct {
+		inputService    *api.Service
+		expectedService *api.Service
+	}{
+		// First class fields cases.
+		{
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+				},
+			},
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+				},
+			},
+		},
+		{
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeNodePort,
+				},
+			},
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeNodePort,
+					ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+				},
+			},
+		},
+		{
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeClusterIP,
+				},
+			},
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeClusterIP,
+				},
+			},
+		},
+		// Beta annotations cases.
+		{
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						BetaAnnotationExternalTraffic: AnnotationValueExternalTrafficLocal,
+					},
+				},
+			},
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						BetaAnnotationExternalTraffic: AnnotationValueExternalTrafficLocal,
+					},
+				},
+			},
+		},
+		{
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						BetaAnnotationExternalTraffic: AnnotationValueExternalTrafficGlobal,
+					},
+				},
+			},
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						BetaAnnotationExternalTraffic: AnnotationValueExternalTrafficGlobal,
+					},
+				},
+			},
+		},
+	}
+
+	for i, tc := range testCases {
+		SetDefaultExternalTrafficPolicyIfNeeded(tc.inputService)
+		if !reflect.DeepEqual(tc.inputService, tc.expectedService) {
+			t.Errorf("%v: got unexpected service", i)
+			spew.Dump(tc)
+		}
+	}
+}
+
+func TestClearExternalTrafficPolicy(t *testing.T) {
+	testCases := []struct {
+		inputService *api.Service
+	}{
+		// First class fields cases.
+		{
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeClusterIP,
+					ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+				},
+			},
+		},
+		// Beta annotations cases.
+		{
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeClusterIP,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						BetaAnnotationExternalTraffic: AnnotationValueExternalTrafficLocal,
+					},
+				},
+			},
+		},
+	}
+
+	for i, tc := range testCases {
+		ClearExternalTrafficPolicy(tc.inputService)
+		if _, ok := tc.inputService.Annotations[BetaAnnotationExternalTraffic]; ok ||
+			tc.inputService.Spec.ExternalTrafficPolicy != "" {
+			t.Errorf("%v: failed to clear ExternalTrafficPolicy", i)
+			spew.Dump(tc)
+		}
+	}
+}
+
+func TestSetServiceHealthCheckNodePort(t *testing.T) {
+	testCases := []struct {
+		inputService *api.Service
+		hcNodePort   int32
+		beta         bool
+	}{
+		// First class fields cases.
+		{
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeClusterIP,
+					ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+				},
+			},
+			30012,
+			false,
+		},
+		{
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeClusterIP,
+					ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+				},
+			},
+			0,
+			false,
+		},
+		// Beta annotations cases.
+		{
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeClusterIP,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						BetaAnnotationExternalTraffic: AnnotationValueExternalTrafficGlobal,
+					},
+				},
+			},
+			30012,
+			true,
+		},
+		{
+			&api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeClusterIP,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						BetaAnnotationExternalTraffic: AnnotationValueExternalTrafficGlobal,
+					},
+				},
+			},
+			0,
+			true,
+		},
+	}
+
+	for i, tc := range testCases {
+		SetServiceHealthCheckNodePort(tc.inputService, tc.hcNodePort)
+		if !tc.beta {
+			if tc.inputService.Spec.HealthCheckNodePort != tc.hcNodePort {
+				t.Errorf("%v: got HealthCheckNodePort %v, want %v", i, tc.inputService.Spec.HealthCheckNodePort, tc.hcNodePort)
+			}
+		} else {
+			l, ok := tc.inputService.Annotations[BetaAnnotationHealthCheckNodePort]
+			if tc.hcNodePort == 0 {
+				if ok {
+					t.Errorf("%v: HealthCheckNodePort set, want it to be cleared", i)
+				}
+			} else {
+				if !ok {
+					t.Errorf("%v: HealthCheckNodePort unset, want %v", i, tc.hcNodePort)
+				} else if l != fmt.Sprintf("%v", tc.hcNodePort) {
+					t.Errorf("%v: got HealthCheckNodePort %v, want %v", i, l, tc.hcNodePort)
+				}
+			}
+		}
+	}
 }

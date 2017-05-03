@@ -5656,9 +5656,19 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "LoadBalancer allows onlyLocal alpha annotations",
+			name: "invalid node port with clusterIP None",
 			tweakSvc: func(s *api.Service) {
-				s.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				s.Spec.Type = api.ServiceTypeNodePort
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
+				s.Spec.ClusterIP = "None"
+			},
+			numErrs: 1,
+		},
+		// ESIPP section begins.
+		{
+			name: "LoadBalancer allows onlyLocal beta annotations",
+			tweakSvc: func(s *api.Service) {
+				s.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
 			},
 			numErrs: 0,
 		},
@@ -5689,20 +5699,143 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "invalid node port with clusterIP None",
+			name: "valid healthCheckNodePort beta annotation",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypeNodePort
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
-				s.Spec.ClusterIP = "None"
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				s.Annotations[service.BetaAnnotationHealthCheckNodePort] = "31100"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid externalTraffic field",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = "invalid"
 			},
 			numErrs: 1,
 		},
+		{
+			name: "nagative healthCheckNodePort field",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.HealthCheckNodePort = -1
+			},
+			numErrs: 1,
+		},
+		{
+			name: "nagative healthCheckNodePort field",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.HealthCheckNodePort = 31100
+			},
+			numErrs: 0,
+		},
+		{
+			name: "disallows use ExternalTraffic beta annotation with first class field",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				s.Spec.HealthCheckNodePort = 3001
+			},
+			numErrs: 1,
+		},
+		{
+			name: "disallows duplicated ExternalTraffic beta annotation with first class field",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+			},
+			numErrs: 1,
+		},
+		{
+			name: "disallows use HealthCheckNodePort beta annotation with first class field",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				s.Annotations[service.BetaAnnotationHealthCheckNodePort] = "3001"
+			},
+			numErrs: 1,
+		},
+		// ESIPP section ends.
 	}
 
 	for _, tc := range testCases {
 		svc := makeValidService()
 		tc.tweakSvc(&svc)
 		errs := ValidateService(&svc)
+		if len(errs) != tc.numErrs {
+			t.Errorf("Unexpected error list for case %q: %v", tc.name, errs.ToAggregate())
+		}
+	}
+}
+
+func TestValidateServiceExternalTrafficFieldsCombination(t *testing.T) {
+	testCases := []struct {
+		name     string
+		tweakSvc func(svc *api.Service) // Given a basic valid service, each test case can customize it.
+		numErrs  int
+	}{
+		{
+			name: "valid loadBalancer service with externalTrafficPolicy and healthCheckNodePort set",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.HealthCheckNodePort = 34567
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid nodePort service with externalTrafficPolicy set",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNodePort
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid clusterIP service with none of externalTrafficPolicy and healthCheckNodePort set",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+			},
+			numErrs: 0,
+		},
+		{
+			name: "cannot set healthCheckNodePort field on loadBalancer service with externalTrafficPolicy!=Local",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeGlobal
+				s.Spec.HealthCheckNodePort = 34567
+			},
+			numErrs: 1,
+		},
+		{
+			name: "cannot set healthCheckNodePort field on nodePort service",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNodePort
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.HealthCheckNodePort = 34567
+			},
+			numErrs: 1,
+		},
+		{
+			name: "cannot set externalTrafficPolicy or healthCheckNodePort fields on clusterIP service",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.HealthCheckNodePort = 34567
+			},
+			numErrs: 2,
+		},
+	}
+
+	for _, tc := range testCases {
+		svc := makeValidService()
+		tc.tweakSvc(&svc)
+		errs := ValidateServiceExternalTrafficFieldsCombination(&svc)
 		if len(errs) != tc.numErrs {
 			t.Errorf("Unexpected error list for case %q: %v", tc.name, errs.ToAggregate())
 		}
@@ -7088,40 +7221,46 @@ func TestValidateServiceUpdate(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "Service allows removing onlyLocal alpha annotations",
+			name: "Service allows removing onlyLocal beta annotations",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
+				oldSvc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				oldSvc.Annotations[service.BetaAnnotationHealthCheckNodePort] = "3001"
 			},
 			numErrs: 0,
 		},
 		{
-			name: "Service allows modifying onlyLocal alpha annotations",
+			name: "Service allows modifying onlyLocal beta annotations",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
-				newSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficGlobal
-				newSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort]
-			},
-			numErrs: 0,
-		},
-		{
-			name: "Service disallows promoting one of the onlyLocal pair to beta",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
+				oldSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				oldSvc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				oldSvc.Annotations[service.BetaAnnotationHealthCheckNodePort] = "3001"
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
 				newSvc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficGlobal
-				newSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort]
+				newSvc.Annotations[service.BetaAnnotationHealthCheckNodePort] = oldSvc.Annotations[service.BetaAnnotationHealthCheckNodePort]
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service disallows promoting one of the onlyLocal pair to GA",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				oldSvc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				oldSvc.Annotations[service.BetaAnnotationHealthCheckNodePort] = "3001"
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				newSvc.Annotations[service.BetaAnnotationHealthCheckNodePort] = oldSvc.Annotations[service.BetaAnnotationHealthCheckNodePort]
 			},
 			numErrs: 1,
 		},
 		{
-			name: "Service allows changing both onlyLocal annotations from alpha to beta",
+			name: "Service allows changing both onlyLocal annotations from beta to GA",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
-				newSvc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-				newSvc.Annotations[service.BetaAnnotationHealthCheckNodePort] = oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort]
+				oldSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				oldSvc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				oldSvc.Annotations[service.BetaAnnotationHealthCheckNodePort] = "3001"
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				newSvc.Spec.HealthCheckNodePort = 3001
 			},
 			numErrs: 0,
 		},
