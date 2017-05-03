@@ -21,6 +21,8 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,6 +53,8 @@ func main() {
 		panic(err)
 	}
 
+	kind_created_here := false
+
 	// initialize third party resource if it does not exist
 	tpr, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Get("example.k8s.io", metav1.GetOptions{})
 	if err != nil {
@@ -69,6 +73,7 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
+			kind_created_here = true
 			fmt.Printf("CREATED: %#v\nFROM: %#v\n", result, tpr)
 		} else {
 			panic(err)
@@ -109,13 +114,19 @@ func main() {
 			}
 
 			var result Example
-			err = tprclient.Post().
+			req := tprclient.Post().
 				Resource("examples").
 				Namespace(v1.NamespaceDefault).
-				Body(example).
+				Body(example)
+			err = req.
 				Do().Into(&result)
 
 			if err != nil {
+				fmt.Println()
+				if kind_created_here {
+					glog.Infoln("Probably because of delay issue noted in https://github.com/kubernetes/features/issues/95 ...")
+				}
+				glog.Fatalf("Unable to create example1 --- request=%#v, result=%#v, err=%#v", req, result, err)
 				panic(err)
 			}
 			fmt.Printf("CREATED: %#v\n", result)
@@ -133,6 +144,9 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("LIST: %#v\n", exampleList)
+
+	fmt.Printf("Starting watch!\n")
+	Watch(tprclient)
 }
 
 func buildConfig(kubeconfig string) (*rest.Config, error) {
