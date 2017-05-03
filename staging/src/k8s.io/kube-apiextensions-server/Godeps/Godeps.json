@@ -184,7 +184,7 @@
 		},
 		{
 			"ImportPath": "github.com/howeyc/gopass",
-			"Rev": "3ca23474a7c7203e0a0a070fd33508f6efdb9b3d"
+			"Rev": "bf9dde6d0d2c004a008c27aaee91170c786f6db8"
 		},
 		{
 			"ImportPath": "github.com/imdario/mergo",
