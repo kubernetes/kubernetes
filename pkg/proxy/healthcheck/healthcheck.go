@@ -326,10 +326,5 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	} else {
 		resp.WriteHeader(http.StatusOK)
 	}
-	fmt.Fprintf(resp, strings.Trim(dedent.Dedent(fmt.Sprintf(`
-		{
-			"lastUpdated": %q,
-			"currentTime": %q
-		}
-		`, lastUpdated, currentTime)), "\n"))
+	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q,"currentTime": %q}`, lastUpdated, currentTime))
 }
