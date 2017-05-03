@@ -80,6 +80,8 @@ const (
 	NonSupportedControllerTypeErrMsg = "Disk is attached to non-supported controller type"
 	FileAlreadyExistErrMsg           = "File requested already exist"
 	CleanUpDummyVMRoutine_Interval   = 5
+	UUIDPath                         = "/sys/class/dmi/id/product_serial"
+	UUIDPrefix                       = "VMware-"
 )
 
 // Controller types that are currently supported for hot attach of disks
@@ -227,24 +229,45 @@ func init() {
 	})
 }
 
+// UUID gets the BIOS UUID via the sys interface.  This UUID is known by vsphere
+func getvmUUID() (string, error) {
+	id, err := ioutil.ReadFile(UUIDPath)
+	if err != nil {
+		return "", fmt.Errorf("error retrieving vm uuid: %s", err)
+	}
+
+	uuidstr := string(id[:])
+
+	// check the uuid starts with "VMware-"
+	if !strings.HasPrefix(uuidstr, UUIDPrefix) {
+		return "", fmt.Errorf("cannot find this VM's UUID")
+	}
+
+	// Strip the prefix, white spaces, and the trailing '\n'
+	uuidstr = strings.Replace(uuidstr[len(UUIDPrefix):(len(uuidstr)-1)], " ", "", -1)
+
+	// need to add dashes, e.g. "564d395e-d807-e18a-cb25-b79f65eb2b9f"
+	uuidstr = fmt.Sprintf("%s-%s-%s-%s", uuidstr[0:8], uuidstr[8:12], uuidstr[12:21], uuidstr[21:])
+
+	return uuidstr, nil
+}
+
 // Returns the name of the VM on which this code is running.
-// Prerequisite: this code assumes VMWare vmtools or open-vm-tools to be installed in the VM.
 // Will attempt to determine the machine's name via it's UUID in this precedence order, failing if neither have a UUID:
 // * cloud config value VMUUID
 // * sysfs entry
 func getVMName(client *govmomi.Client, cfg *VSphereConfig) (string, error) {
 	var vmUUID string
+	var err error
 
 	if cfg.Global.VMUUID != "" {
 		vmUUID = cfg.Global.VMUUID
 	} else {
 		// This needs root privileges on the host, and will fail otherwise.
-		vmUUIDbytes, err := ioutil.ReadFile("/sys/devices/virtual/dmi/id/product_uuid")
+		vmUUID, err = getvmUUID()
 		if err != nil {
 			return "", err
 		}
-
-		vmUUID = string(vmUUIDbytes)
 		cfg.Global.VMUUID = vmUUID
 	}
 
