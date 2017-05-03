@@ -237,7 +237,7 @@ type attachDetachController struct {
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
 
-	// keep pod volumes attached for terminated pods
+	// whether to keep pod volumes attached for terminated pods
 	keepTerminatedPodVolumes bool
 }
 
@@ -410,13 +410,13 @@ func (adc *attachDetachController) podUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
+	addPodFlag := true
+
 	if volumehelper.IsPodTerminated(pod, pod.Status) && !adc.keepTerminatedPodVolumes {
-		util.ProcessPodVolumes(pod, false, /* removeVolumes */
-			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
-		return
+		addPodFlag = false
 	}
 
-	util.ProcessPodVolumes(pod, true, /* addVolumes */
+	util.ProcessPodVolumes(pod, addPodFlag, /* addVolumes */
 		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
 }
 

@@ -47,7 +47,7 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		nil, /* plugins */
 		false,
 		time.Second*5,
-		false /*keep pod volumes attached for terminated pods */)
+		false /*keepTerminatedPodVolumes */)
 
 	// Assert
 	if err != nil {
@@ -215,7 +215,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		plugins,
 		false,
 		time.Second*1,
-		false /*keep pod volumes attached for terminated pods */)
+		false /*keepTerminatedPodVolumes */)
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
 	}
