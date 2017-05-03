@@ -1,3 +1,5 @@
+// +build !linux,!windows
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -14,16 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockertools
+package dockershim
 
-const (
-	DockerType = "docker"
-
-	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	// docker version should be at least 1.10.x
-	minimumDockerAPIVersion = "1.22"
-
-	statusRunningPrefix = "Up"
-	statusExitedPrefix  = "Exited"
-	statusCreatedPrefix = "Created"
-)
+func DefaultMemorySwap() int64 {
+	return -1
+}
