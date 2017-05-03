@@ -300,13 +300,13 @@ type KubeletConfiguration struct {
 	// hostNetworkSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use of host network. Defaults to "*". Valid
 	// options are "file", "http", "api", and "*" (all sources).
-	HostNetworkSources []string `json:"hostNetworkSources"`
+	HostNetworkSources []string `json:"hostNetworkSources,omitempty"`
 	// hostPIDSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host pid namespace. Defaults to "*".
-	HostPIDSources []string `json:"hostPIDSources"`
+	HostPIDSources []string `json:"hostPIDSources,omitempty"`
 	// hostIPCSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host ipc namespace. Defaults to "*".
-	HostIPCSources []string `json:"hostIPCSources"`
+	HostIPCSources []string `json:"hostIPCSources,omitempty"`
 	// registryPullQPS is the limit of registry pulls per second. If 0,
 	// unlimited. Set to 0 for no limit. Defaults to 5.0.
 	RegistryPullQPS *int32 `json:"registryPullQPS"`
@@ -357,7 +357,7 @@ type KubeletConfiguration struct {
 	// clusterDNS is a list of IP address for the cluster DNS server.  If set,
 	// kubelet will configure all containers to use this for DNS resolution
 	// instead of the host's DNS servers
-	ClusterDNS []string `json:"clusterDNS"`
+	ClusterDNS []string `json:"clusterDNS,omitempty"`
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout"`
@@ -477,7 +477,7 @@ type KubeletConfiguration struct {
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string `json:"podCIDR"`
 	// ResolverConfig is the resolver configuration file used as the basis
-	// for the container DNS resolution configuration."), []
+	// for the container DNS resolution configuration.
 	ResolverConfig string `json:"resolvConf"`
 	// cpuCFSQuota is Enable CPU CFS quota enforcement for containers that
 	// specify CPU limits
@@ -493,7 +493,7 @@ type KubeletConfiguration struct {
 	// registerWithTaints are an array of taints to add to a node object when
 	// the kubelet registers itself. This only takes effect when registerNode
 	// is true and upon the initial registration of the node.
-	RegisterWithTaints []v1.Taint `json:"registerWithTaints"`
+	RegisterWithTaints []v1.Taint `json:"registerWithTaints,omitempty"`
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver

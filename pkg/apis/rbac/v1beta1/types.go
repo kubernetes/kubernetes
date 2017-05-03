@@ -107,7 +107,7 @@ type Role struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Rules holds all the PolicyRules for this Role
-	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
+	Rules PolicyRuleList `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 }
 
 // +genclient=true
@@ -122,12 +122,15 @@ type RoleBinding struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Subjects holds references to the objects the role applies to.
-	Subjects []Subject `json:"subjects" protobuf:"bytes,2,rep,name=subjects"`
+	Subjects SubjectList `json:"subjects" protobuf:"bytes,2,rep,name=subjects"`
 
 	// RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
 	RoleRef RoleRef `json:"roleRef" protobuf:"bytes,3,opt,name=roleRef"`
 }
+
+// SubjectList represents a list of Subject objects.
+type SubjectList []Subject
 
 // RoleBindingList is a collection of RoleBindings
 type RoleBindingList struct {
@@ -162,8 +165,11 @@ type ClusterRole struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Rules holds all the PolicyRules for this ClusterRole
-	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
+	Rules PolicyRuleList `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 }
+
+// PolicyRuleList represents a list of PolicyRule objects.
+type PolicyRuleList []PolicyRule
 
 // +genclient=true
 // +nonNamespaced=true
@@ -177,7 +183,7 @@ type ClusterRoleBinding struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Subjects holds references to the objects the role applies to.
-	Subjects []Subject `json:"subjects" protobuf:"bytes,2,rep,name=subjects"`
+	Subjects SubjectList `json:"subjects" protobuf:"bytes,2,rep,name=subjects"`
 
 	// RoleRef can only reference a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.

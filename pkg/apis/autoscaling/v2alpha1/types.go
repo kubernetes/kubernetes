@@ -165,7 +165,7 @@ type HorizontalPodAutoscalerStatus struct {
 	DesiredReplicas int32 `json:"desiredReplicas" protobuf:"varint,4,opt,name=desiredReplicas"`
 
 	// currentMetrics is the last read state of the metrics used by this autoscaler.
-	CurrentMetrics []MetricStatus `json:"currentMetrics" protobuf:"bytes,5,rep,name=currentMetrics"`
+	CurrentMetrics []MetricStatus `json:"currentMetrics,omitempty" protobuf:"bytes,5,rep,name=currentMetrics"`
 }
 
 // MetricStatus describes the last-read state of a single metric.

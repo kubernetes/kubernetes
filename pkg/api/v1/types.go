@@ -1248,7 +1248,7 @@ type ConfigMapProjection struct {
 // Represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
-	Sources []VolumeProjection `json:"sources" protobuf:"bytes,1,rep,name=sources"`
+	Sources VolumeProjectionList `json:"sources" protobuf:"bytes,1,rep,name=sources"`
 	// Mode bits to use on created files by default. Must be a value between
 	// 0 and 0777.
 	// Directories within the path are not affected by this setting.
@@ -1257,6 +1257,9 @@ type ProjectedVolumeSource struct {
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
 }
+
+// VolumeProjectionList represents a list of VolumeProjection objects.
+type VolumeProjectionList []VolumeProjection
 
 // Projection that may be projected along with other supported volume types
 type VolumeProjection struct {
@@ -3060,8 +3063,11 @@ type Endpoints struct {
 	// subsets for the different ports. No address will appear in both Addresses and
 	// NotReadyAddresses in the same subset.
 	// Sets of addresses and ports that comprise a service.
-	Subsets []EndpointSubset `json:"subsets" protobuf:"bytes,2,rep,name=subsets"`
+	Subsets EndpointSubsetList `json:"subsets" protobuf:"bytes,2,rep,name=subsets"`
 }
+
+// EndpointSubsetList represents a list of EndpointSubset objects.
+type EndpointSubsetList []EndpointSubset
 
 // EndpointSubset is a group of addresses with a common set of ports. The
 // expanded set of endpoints is the Cartesian product of Addresses x Ports.
@@ -3952,8 +3958,11 @@ type LimitRangeItem struct {
 // LimitRangeSpec defines a min/max usage limit for resources that match on kind.
 type LimitRangeSpec struct {
 	// Limits is the list of LimitRangeItem objects that are enforced.
-	Limits []LimitRangeItem `json:"limits" protobuf:"bytes,1,rep,name=limits"`
+	Limits LimitRangeItemList `json:"limits" protobuf:"bytes,1,rep,name=limits"`
 }
+
+// LimitRangeItemList represents a list of LimitRangeItem objects
+type LimitRangeItemList []LimitRangeItem
 
 // +genclient=true
 
