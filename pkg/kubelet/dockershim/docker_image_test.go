@@ -22,7 +22,8 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 func TestRemoveImage(t *testing.T) {
@@ -30,8 +31,8 @@ func TestRemoveImage(t *testing.T) {
 	id := "1111"
 	fakeDocker.InjectImageInspects([]dockertypes.ImageInspect{{ID: id, RepoTags: []string{"foo"}}})
 	ds.RemoveImage(&runtimeapi.ImageSpec{Image: id})
-	fakeDocker.AssertCallDetails(dockertools.NewCalledDetail("inspect_image", nil),
-		dockertools.NewCalledDetail("remove_image", []interface{}{id, dockertypes.ImageRemoveOptions{PruneChildren: true}}))
+	fakeDocker.AssertCallDetails(libdocker.NewCalledDetail("inspect_image", nil),
+		libdocker.NewCalledDetail("remove_image", []interface{}{id, dockertypes.ImageRemoveOptions{PruneChildren: true}}))
 }
 
 func TestRemoveImageWithMultipleTags(t *testing.T) {
@@ -39,7 +40,7 @@ func TestRemoveImageWithMultipleTags(t *testing.T) {
 	id := "1111"
 	fakeDocker.InjectImageInspects([]dockertypes.ImageInspect{{ID: id, RepoTags: []string{"foo", "bar"}}})
 	ds.RemoveImage(&runtimeapi.ImageSpec{Image: id})
-	fakeDocker.AssertCallDetails(dockertools.NewCalledDetail("inspect_image", nil),
-		dockertools.NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
-		dockertools.NewCalledDetail("remove_image", []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}))
+	fakeDocker.AssertCallDetails(libdocker.NewCalledDetail("inspect_image", nil),
+		libdocker.NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
+		libdocker.NewCalledDetail("remove_image", []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}))
 }

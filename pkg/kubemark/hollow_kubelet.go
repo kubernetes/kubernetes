@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -52,7 +52,7 @@ func NewHollowKubelet(
 	nodeName string,
 	client *clientset.Clientset,
 	cadvisorInterface cadvisor.Interface,
-	dockerClient dockertools.DockerInterface,
+	dockerClient libdocker.Interface,
 	kubeletPort, kubeletReadOnlyPort int,
 	containerManager cm.ContainerManager,
 	maxPods int, podsPerCore int,

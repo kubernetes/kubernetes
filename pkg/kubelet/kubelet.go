@@ -63,8 +63,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/gpu"
@@ -219,7 +219,7 @@ type KubeletDeps struct {
 	CAdvisorInterface  cadvisor.Interface
 	Cloud              cloudprovider.Interface
 	ContainerManager   cm.ContainerManager
-	DockerClient       dockertools.DockerInterface
+	DockerClient       libdocker.Interface
 	EventClient        v1core.EventsGetter
 	KubeClient         clientset.Interface
 	ExternalKubeClient clientgoclientset.Interface
@@ -791,7 +791,7 @@ type Kubelet struct {
 
 	hostname      string
 	nodeName      types.NodeName
-	dockerClient  dockertools.DockerInterface
+	dockerClient  libdocker.Interface
 	runtimeCache  kubecontainer.RuntimeCache
 	kubeClient    clientset.Interface
 	iptClient     utilipt.Interface
