@@ -27,6 +27,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/fake"
@@ -1310,6 +1311,90 @@ func TestPrintLabelsMultiline(t *testing.T) {
 		output := out.String()
 		if output != testCase.expectPrint {
 			t.Errorf("Test case %d: expected to find %q in output: %q", i, testCase.expectPrint, output)
+		}
+	}
+}
+
+func TestDescribeUnstructuredContent(t *testing.T) {
+	testCases := []struct {
+		expected   string
+		unexpected string
+	}{
+		{
+			expected: `API Version:	v1
+Dummy 2:	present
+Items:
+  Item Bool:	true
+  Item Int:	42
+Kind:	Test
+Metadata:
+  Creation Timestamp:	2017-04-01T00:00:00Z
+  Name:	MyName
+  Namespace:	MyNamespace
+  Resource Version:	123
+  UID:	00000000-0000-0000-0000-000000000001
+Status:	ok
+URL:	http://localhost
+`,
+		},
+		{
+			unexpected: "\nDummy 1:\tpresent\n",
+		},
+		{
+			unexpected: "Dummy 1",
+		},
+		{
+			unexpected: "Dummy 3",
+		},
+		{
+			unexpected: "Dummy3",
+		},
+		{
+			unexpected: "dummy3",
+		},
+		{
+			unexpected: "dummy 3",
+		},
+	}
+	out := new(bytes.Buffer)
+	w := NewPrefixWriter(out)
+	obj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Test",
+			"dummy1":     "present",
+			"dummy2":     "present",
+			"metadata": map[string]interface{}{
+				"name":              "MyName",
+				"namespace":         "MyNamespace",
+				"creationTimestamp": "2017-04-01T00:00:00Z",
+				"resourceVersion":   123,
+				"uid":               "00000000-0000-0000-0000-000000000001",
+				"dummy3":            "present",
+			},
+			"items": []interface{}{
+				map[string]interface{}{
+					"itemBool": true,
+					"itemInt":  42,
+				},
+			},
+			"url":    "http://localhost",
+			"status": "ok",
+		},
+	}
+	printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), "", ".dummy1", ".metadata.dummy3")
+	output := out.String()
+
+	for _, test := range testCases {
+		if len(test.expected) > 0 {
+			if !strings.Contains(output, test.expected) {
+				t.Errorf("Expected to find %q in: %q", test.expected, output)
+			}
+		}
+		if len(test.unexpected) > 0 {
+			if strings.Contains(output, test.unexpected) {
+				t.Errorf("Didn't expect to find %q in: %q", test.unexpected, output)
+			}
 		}
 	}
 }

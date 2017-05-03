@@ -515,7 +515,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		// Only do etcd related checks when no external endpoints were specified
 		checks = append(checks,
 			PortOpenCheck{port: 2379},
-			DirAvailableCheck{Path: "/var/lib/etcd"},
+			DirAvailableCheck{Path: cfg.Etcd.DataDir},
 		)
 	} else {
 		// Only check etcd version when external endpoints are specified
@@ -525,11 +525,13 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 
 	// Check the config for authorization mode
-	switch cfg.AuthorizationMode {
-	case authzmodes.ModeABAC:
-		checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationPolicyPath})
-	case authzmodes.ModeWebhook:
-		checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationWebhookConfigPath})
+	for _, authzMode := range cfg.AuthorizationModes {
+		switch authzMode {
+		case authzmodes.ModeABAC:
+			checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationPolicyPath})
+		case authzmodes.ModeWebhook:
+			checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationWebhookConfigPath})
+		}
 	}
 
 	return RunChecks(checks, os.Stderr)

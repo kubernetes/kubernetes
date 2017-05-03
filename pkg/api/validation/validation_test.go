@@ -26,7 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -43,14 +45,6 @@ const (
 	nameErrMsg              = "a qualified name must consist of"
 	idErrMsg                = "a valid C identifier must"
 )
-
-func expectPrefix(t *testing.T, prefix string, errs field.ErrorList) {
-	for i := range errs {
-		if f, p := errs[i].Field, prefix; !strings.HasPrefix(f, p) {
-			t.Errorf("expected prefix '%s' for field '%s' (%v)", p, f, errs[i])
-		}
-	}
-}
 
 func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
 	objMeta := metav1.ObjectMeta{Name: name}
@@ -947,6 +941,42 @@ func TestValidateVolumes(t *testing.T) {
 			},
 			errtype:  field.ErrorTypeRequired,
 			errfield: "iscsi.iqn",
+		},
+		{
+			name: "empty secret",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal:      "127.0.0.1",
+						IQN:               "iqn.2015-02.example.com:test",
+						Lun:               1,
+						FSType:            "ext4",
+						ReadOnly:          false,
+						DiscoveryCHAPAuth: true,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "iscsi.secretRef",
+		},
+		{
+			name: "empty secret",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal:    "127.0.0.1",
+						IQN:             "iqn.2015-02.example.com:test",
+						Lun:             1,
+						FSType:          "ext4",
+						ReadOnly:        false,
+						SessionCHAPAuth: true,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "iscsi.secretRef",
 		},
 		// Secret
 		{
@@ -3172,6 +3202,13 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		{ // Populate HostAliases.
+			HostAliases:   []api.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1", "host2"}}},
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	for i := range successCases {
 		if errs := ValidatePodSpec(&successCases[i], field.NewPath("field")); len(errs) != 0 {
@@ -3231,6 +3268,24 @@ func TestValidatePodSpec(t *testing.T) {
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
+		},
+		"with hostNetwork and hostAliases": {
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
+			HostAliases: []api.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1", "host2"}}},
+		},
+		"with hostAliases with invalid IP": {
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: false,
+			},
+			HostAliases: []api.HostAlias{{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}},
+		},
+		"with hostAliases with invalid hostname": {
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: false,
+			},
+			HostAliases: []api.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"@#$^#@#$"}}},
 		},
 		"bad supplementalGroups large than math.MaxInt32": {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
@@ -3676,10 +3731,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("10"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("10"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("20"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("20"),
 							},
 						},
 						TerminationMessagePolicy: "File",
@@ -3701,10 +3756,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("10"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("10"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("20"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("20"),
 							},
 						},
 						TerminationMessagePolicy: "File",
@@ -4175,10 +4230,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("2"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("2"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("1"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("1"),
 							},
 						},
 					},
@@ -4197,7 +4252,7 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
 							},
 						},
 					},
@@ -4216,7 +4271,7 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
 							},
 						},
 					},
@@ -4236,10 +4291,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("5"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
 							},
 						},
 					},
@@ -4258,10 +4313,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("5"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
 							},
 						},
 					},
@@ -4275,6 +4330,124 @@ func TestValidatePod(t *testing.T) {
 	for k, v := range errorCases {
 		if errs := ValidatePod(&v); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
+		}
+	}
+}
+
+func TestValidatePodWithDisabledAffinityInAnnotations(t *testing.T) {
+	validPodSpec := func(affinity *api.Affinity) api.PodSpec {
+		spec := api.PodSpec{
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		}
+		if affinity != nil {
+			spec.Affinity = affinity
+		}
+		return spec
+	}
+
+	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=False")
+	errorCases := []api.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: validPodSpec(&api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
+							TopologyKey: "",
+							Namespaces:  []string{"ns"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: validPodSpec(&api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpNotIn,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+								Namespaces:  []string{"ns"},
+								TopologyKey: "",
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: validPodSpec(&api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
+							TopologyKey: "",
+							Namespaces:  []string{"ns"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: validPodSpec(&api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpNotIn,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+								Namespaces:  []string{"ns"},
+								TopologyKey: "",
+							},
+						},
+					},
+				},
+			}),
+		},
+	}
+
+	for _, v := range errorCases {
+		if errs := ValidatePod(&v); len(errs) == 0 {
+			t.Errorf("expected failure for %v", errs)
 		}
 	}
 }
@@ -5474,9 +5647,35 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "LoadBalancer disallows onlyLocal alpha annotations",
+			name: "LoadBalancer allows onlyLocal alpha annotations",
 			tweakSvc: func(s *api.Service) {
 				s.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid externalTraffic beta annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Annotations[service.BetaAnnotationExternalTraffic] = "invalid"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "nagative healthCheckNodePort beta annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				s.Annotations[service.BetaAnnotationHealthCheckNodePort] = "-1"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid healthCheckNodePort beta annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				s.Annotations[service.BetaAnnotationHealthCheckNodePort] = "whatisthis"
 			},
 			numErrs: 1,
 		},
@@ -6703,8 +6902,8 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.OpaqueIntResourceName("A"):       resource.MustParse("5"),
-					api.OpaqueIntResourceName("B"):       resource.MustParse("10"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("5"),
+					helper.OpaqueIntResourceName("B"):    resource.MustParse("10"),
 				},
 			},
 		}, true},
@@ -6720,7 +6919,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.OpaqueIntResourceName("A"):       resource.MustParse("500m"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("500m"),
 				},
 			},
 		}, false},
@@ -6736,12 +6935,12 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.OpaqueIntResourceName("A"):       resource.MustParse("5"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("5"),
 				},
 				Allocatable: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.OpaqueIntResourceName("A"):       resource.MustParse("4.5"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("4.5"),
 				},
 			},
 		}, false},
@@ -6880,22 +7079,22 @@ func TestValidateServiceUpdate(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "Service disallows removing one onlyLocal alpha annotation",
+			name: "Service allows removing onlyLocal alpha annotations",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
 				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
 				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
 			},
-			numErrs: 2,
+			numErrs: 0,
 		},
 		{
-			name: "Service disallows modifying onlyLocal alpha annotations",
+			name: "Service allows modifying onlyLocal alpha annotations",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
 				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
 				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
 				newSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficGlobal
 				newSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort]
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "Service disallows promoting one of the onlyLocal pair to beta",

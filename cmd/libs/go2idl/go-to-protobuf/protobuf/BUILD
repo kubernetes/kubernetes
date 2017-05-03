@@ -21,14 +21,14 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apimachinery/third_party/forked/golang/reflect",
-        "//vendor:k8s.io/gengo/args",
-        "//vendor:k8s.io/gengo/generator",
-        "//vendor:k8s.io/gengo/namer",
-        "//vendor:k8s.io/gengo/parser",
-        "//vendor:k8s.io/gengo/types",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/apimachinery/third_party/forked/golang/reflect:go_default_library",
+        "//vendor/k8s.io/gengo/args:go_default_library",
+        "//vendor/k8s.io/gengo/generator:go_default_library",
+        "//vendor/k8s.io/gengo/namer:go_default_library",
+        "//vendor/k8s.io/gengo/parser:go_default_library",
+        "//vendor/k8s.io/gengo/types:go_default_library",
     ],
 )
 

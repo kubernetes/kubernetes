@@ -18,11 +18,17 @@ package gce
 
 import (
 	"net/http"
+	"time"
 
 	compute "google.golang.org/api/compute/v1"
 )
 
-// BackendService Management
+func newBackendServiceMetricContext(request string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"backendservice_" + request, unusedMetricLabel, unusedMetricLabel},
+	}
+}
 
 // GetBackendService retrieves a backend by name.
 func (gce *GCECloud) GetBackendService(name string) (*compute.BackendService, error) {
@@ -31,32 +37,38 @@ func (gce *GCECloud) GetBackendService(name string) (*compute.BackendService, er
 
 // UpdateBackendService applies the given BackendService as an update to an existing service.
 func (gce *GCECloud) UpdateBackendService(bg *compute.BackendService) error {
+	mc := newBackendServiceMetricContext("update")
 	op, err := gce.service.BackendServices.Update(gce.projectID, bg.Name, bg).Do()
 	if err != nil {
-		return err
+		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op)
+
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // DeleteBackendService deletes the given BackendService by name.
 func (gce *GCECloud) DeleteBackendService(name string) error {
+	mc := newBackendServiceMetricContext("delete")
 	op, err := gce.service.BackendServices.Delete(gce.projectID, name).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return nil
 		}
-		return err
+		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op)
+
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // CreateBackendService creates the given BackendService.
 func (gce *GCECloud) CreateBackendService(bg *compute.BackendService) error {
+	mc := newBackendServiceMetricContext("create")
 	op, err := gce.service.BackendServices.Insert(gce.projectID, bg).Do()
 	if err != nil {
-		return err
+		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op)
+
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // ListBackendServices lists all backend services in the project.

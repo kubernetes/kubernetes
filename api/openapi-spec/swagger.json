@@ -4013,6 +4013,33 @@
       }
      }
     },
+    "patch": {
+     "description": "connect PATCH requests to proxy of Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PatchNamespacedPodProxy",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
     "parameters": [
      {
       "uniqueItems": true,
@@ -4190,6 +4217,33 @@
       "core_v1"
      ],
      "operationId": "connectCoreV1HeadNamespacedPodProxyWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "connect PATCH requests to proxy of Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PatchNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7270,6 +7324,33 @@
       }
      }
     },
+    "patch": {
+     "description": "connect PATCH requests to proxy of Service",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PatchNamespacedServiceProxy",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
     "parameters": [
      {
       "uniqueItems": true,
@@ -7447,6 +7528,33 @@
       "core_v1"
      ],
      "operationId": "connectCoreV1HeadNamespacedServiceProxyWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "connect PATCH requests to proxy of Service",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PatchNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8570,6 +8678,33 @@
       }
      }
     },
+    "patch": {
+     "description": "connect PATCH requests to proxy of Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PatchNodeProxy",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
     "parameters": [
      {
       "uniqueItems": true,
@@ -8739,6 +8874,33 @@
       "core_v1"
      ],
      "operationId": "connectCoreV1HeadNodeProxyWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "connect PATCH requests to proxy of Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "connectCoreV1PatchNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -37027,7 +37189,9 @@
     "properties": {
      "key": {
       "description": "key is the label key that the selector applies to.",
-      "type": "string"
+      "type": "string",
+      "x-kubernetes-patch-merge-key": "key",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "operator": {
       "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
@@ -37087,7 +37251,8 @@
       "type": "array",
       "items": {
        "type": "string"
-      }
+      },
+      "x-kubernetes-patch-strategy": "merge"
      },
      "generateName": {
       "description": "GenerateName is an optional prefix, used by the server, to generate a unique name ONLY IF the Name field has not been provided. If this field is used, the name returned to the client will be different than the name passed. This value will also be combined with a unique suffix. The provided value has the same validation rules as the Name field, and may be truncated by the length of the suffix required to make the value unique on the server.\n\nIf this field is specified and the generated name exists, the server will NOT return a 409 - instead, it will either return 201 Created or 500 with Reason ServerTimeout indicating a unique name could not be found in the time allotted, and the client should retry (optionally after the time indicated in the Retry-After header).\n\nApplied only if Name is not specified. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#idempotency",
@@ -37118,7 +37283,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "uid",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "resourceVersion": {
       "description": "An opaque value that represents the internal version of this object that can be used by clients to determine when objects have changed. May be used for optimistic concurrency, change detection, and the watch operation on a resource or set of resources. Clients must treat these values as opaque and passed unmodified back to the server. They may only be valid for a particular resource or set of resources.\n\nPopulated by the system. Read-only. Value must be treated as opaque by clients and . More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency",
@@ -37617,7 +37784,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ComponentCondition"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "kind": {
       "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -37838,7 +38007,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.EnvVar"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "name",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "envFrom": {
       "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
@@ -37872,7 +38043,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ContainerPort"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "containerPort",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "readinessProbe": {
       "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes",
@@ -37911,7 +38084,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.VolumeMount"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "mountPath",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "workingDir": {
       "description": "Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated.",
@@ -38688,6 +38863,22 @@
      }
     }
    },
+   "io.k8s.kubernetes.pkg.api.v1.HostAlias": {
+    "description": "HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
+    "properties": {
+     "hostnames": {
+      "description": "Hostnames for the the above IP address.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "ip": {
+      "description": "IP address of the host file entry.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.HostPathVolumeSource": {
     "description": "Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.",
     "required": [
@@ -38708,6 +38899,14 @@
      "lun"
     ],
     "properties": {
+     "chapAuthDiscovery": {
+      "description": "whether support iSCSI Discovery CHAP authentication",
+      "type": "boolean"
+     },
+     "chapAuthSession": {
+      "description": "whether support iSCSI Session CHAP authentication",
+      "type": "boolean"
+     },
      "fsType": {
       "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#iscsi",
       "type": "string"
@@ -38735,6 +38934,10 @@
      "readOnly": {
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
       "type": "boolean"
+     },
+     "secretRef": {
+      "description": "CHAP secret for iSCSI target and initiator authentication",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalObjectReference"
      },
      "targetPortal": {
       "description": "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
@@ -39205,7 +39408,9 @@
     "properties": {
      "key": {
       "description": "The label key that the selector applies to.",
-      "type": "string"
+      "type": "string",
+      "x-kubernetes-patch-merge-key": "key",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "operator": {
       "description": "Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.",
@@ -39271,7 +39476,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NodeAddress"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "allocatable": {
       "description": "Allocatable represents the resources of a node that are available for scheduling. Defaults to Capacity.",
@@ -39292,7 +39499,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NodeCondition"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "daemonEndpoints": {
       "description": "Endpoints of daemons running on the Node.",
@@ -39986,7 +40195,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Container"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "name",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "dnsPolicy": {
       "description": "Set DNS policy for containers within the pod. One of 'ClusterFirstWithHostNet', 'ClusterFirst' or 'Default'. Defaults to \"ClusterFirst\". To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.",
@@ -39995,6 +40206,15 @@
      "hostIPC": {
       "description": "Use the host's ipc namespace. Optional: Default to false.",
       "type": "boolean"
+     },
+     "hostMappings": {
+      "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.HostAlias"
+      },
+      "x-kubernetes-patch-merge-key": "IP",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "hostNetwork": {
       "description": "Host networking requested for this pod. Use the host's network namespace. If this option is set, the ports that will be used must be specified. Default to false.",
@@ -40013,21 +40233,25 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalObjectReference"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "name",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "initContainers": {
       "description": "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, or Liveness probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Container"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "name",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "nodeName": {
       "description": "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements.",
       "type": "string"
      },
      "nodeSelector": {
-      "description": "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://kubernetes.io/docs/user-guide/node-selection/README",
+      "description": "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://kubernetes.io/docs/user-guide/node-selection/README.md",
       "type": "object",
       "additionalProperties": {
        "type": "string"
@@ -40074,7 +40298,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Volume"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "name",
+      "x-kubernetes-patch-strategy": "merge"
      }
     }
    },
@@ -40086,7 +40312,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodCondition"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "containerStatuses": {
       "description": "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses",
@@ -40517,7 +40745,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ReplicationControllerCondition"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "fullyLabeledReplicas": {
       "description": "The number of pods that have labels matching the labels of the pod template of the replication controller.",
@@ -41003,7 +41233,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ObjectReference"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "name",
+      "x-kubernetes-patch-strategy": "merge"
      }
     },
     "x-kubernetes-group-version-kind": [
@@ -41119,15 +41351,8 @@
       "description": "clusterIP is the IP address of the service and is usually assigned randomly by the master. If an address is specified manually and is not in use by others, it will be allocated to the service; otherwise, creation of the service will fail. This field can not be changed through updates. Valid values are \"None\", empty string (\"\"), or a valid IP address. \"None\" can be specified for headless services when proxying is not required. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies",
       "type": "string"
      },
-     "deprecatedPublicIPs": {
-      "description": "deprecatedPublicIPs is deprecated and replaced by the externalIPs field with almost the exact same semantics.  This field is retained in the v1 API for compatibility until at least 8/20/2016.  It will be removed from any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are set, deprecatedPublicIPs is used.",
-      "type": "array",
-      "items": {
-       "type": "string"
-      }
-     },
      "externalIPs": {
-      "description": "externalIPs is a list of IP addresses for which nodes in the cluster will also accept traffic for this service.  These IPs are not managed by Kubernetes.  The user is responsible for ensuring that traffic arrives at a node with this IP.  A common example is external load-balancers that are not part of the Kubernetes system.  A previous form of this functionality exists as the deprecatedPublicIPs field.  When using this field, callers should also clear the deprecatedPublicIPs field.",
+      "description": "externalIPs is a list of IP addresses for which nodes in the cluster will also accept traffic for this service.  These IPs are not managed by Kubernetes.  The user is responsible for ensuring that traffic arrives at a node with this IP.  A common example is external load-balancers that are not part of the Kubernetes system.",
       "type": "array",
       "items": {
        "type": "string"
@@ -41153,7 +41378,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ServicePort"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "port",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "selector": {
       "description": "Route service traffic to pods with label keys and values matching this selector. If empty or not present, the service is assumed to have an external process managing its endpoints, which Kubernetes will not modify. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: http://kubernetes.io/docs/user-guide/services#overview",
@@ -41210,7 +41437,9 @@
      },
      "key": {
       "description": "Required. The taint key to be applied to a node.",
-      "type": "string"
+      "type": "string",
+      "x-kubernetes-patch-merge-key": "key",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "timeAdded": {
       "description": "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints.",
@@ -41231,7 +41460,9 @@
      },
      "key": {
       "description": "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.",
-      "type": "string"
+      "type": "string",
+      "x-kubernetes-patch-merge-key": "key",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "operator": {
       "description": "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
@@ -41639,7 +41870,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentCondition"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "observedGeneration": {
       "description": "The generation observed by the deployment controller.",
@@ -43038,11 +43271,11 @@
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "spec": {
-      "description": "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "description": "Specification of the desired behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v1.JobSpec"
      },
      "status": {
-      "description": "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "description": "Current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v1.JobStatus"
      }
     },
@@ -43098,7 +43331,7 @@
       "type": "string"
      },
      "items": {
-      "description": "Items is the list of Job.",
+      "description": "items is the list of Jobs.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v1.Job"
@@ -43109,7 +43342,7 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
     },
@@ -43133,25 +43366,25 @@
       "format": "int64"
      },
      "completions": {
-      "description": "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs",
+      "description": "Specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs",
       "type": "integer",
       "format": "int32"
      },
      "manualSelector": {
-      "description": "ManualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md",
+      "description": "manualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md",
       "type": "boolean"
      },
      "parallelism": {
-      "description": "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) \u003c .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs",
+      "description": "Specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) \u003c .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs",
       "type": "integer",
       "format": "int32"
      },
      "selector": {
-      "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+      "description": "A label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "template": {
-      "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
+      "description": "Describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec"
      }
     }
@@ -43160,32 +43393,34 @@
     "description": "JobStatus represents the current state of a Job.",
     "properties": {
      "active": {
-      "description": "Active is the number of actively running pods.",
+      "description": "The number of actively running pods.",
       "type": "integer",
       "format": "int32"
      },
      "completionTime": {
-      "description": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+      "description": "Represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
      },
      "conditions": {
-      "description": "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
+      "description": "The latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v1.JobCondition"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "failed": {
-      "description": "Failed is the number of pods which reached Phase Failed.",
+      "description": "The number of pods which reached phase Failed.",
       "type": "integer",
       "format": "int32"
      },
      "startTime": {
-      "description": "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+      "description": "Represents time when the job was acknowledged by the job controller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
      },
      "succeeded": {
-      "description": "Succeeded is the number of pods which reached Phase Succeeded.",
+      "description": "The number of pods which reached phase Succeeded.",
       "type": "integer",
       "format": "int32"
      }
@@ -43207,11 +43442,11 @@
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "spec": {
-      "description": "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "description": "Specification of the desired behavior of a cron job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.CronJobSpec"
      },
      "status": {
-      "description": "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "description": "Current status of a cron job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.CronJobStatus"
      }
     },
@@ -43239,7 +43474,7 @@
       "type": "string"
      },
      "items": {
-      "description": "Items is the list of CronJob.",
+      "description": "items is the list of CronJobs.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.CronJob"
@@ -43250,7 +43485,7 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
     },
@@ -43275,7 +43510,7 @@
     ],
     "properties": {
      "concurrencyPolicy": {
-      "description": "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
+      "description": "Specifies how to treat concurrent executions of a Job. Defaults to Allow.",
       "type": "string"
      },
      "failedJobsHistoryLimit": {
@@ -43284,11 +43519,11 @@
       "format": "int32"
      },
      "jobTemplate": {
-      "description": "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
+      "description": "Specifies the job that will be created when executing a CronJob.",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobTemplateSpec"
      },
      "schedule": {
-      "description": "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+      "description": "The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
       "type": "string"
      },
      "startingDeadlineSeconds": {
@@ -43302,7 +43537,7 @@
       "format": "int32"
      },
      "suspend": {
-      "description": "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+      "description": "This flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
       "type": "boolean"
      }
     }
@@ -43311,14 +43546,14 @@
     "description": "CronJobStatus represents the current state of a cron job.",
     "properties": {
      "active": {
-      "description": "Active holds pointers to currently running jobs.",
+      "description": "A list of pointers to currently running jobs.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ObjectReference"
       }
      },
      "lastScheduleTime": {
-      "description": "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
+      "description": "Information when was the last time the job was successfully scheduled.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
      }
     }
@@ -43849,7 +44084,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentCondition"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "observedGeneration": {
       "description": "The generation observed by the deployment controller.",
@@ -44150,14 +44387,14 @@
     "description": "This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.",
     "properties": {
      "from": {
-      "description": "List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is not provided, this rule matches all sources (traffic not restricted by source). If this field is empty, this rule matches no sources (no traffic matches). If this field is present and contains at least on item, this rule allows traffic only if the traffic matches at least one item in the from list.",
+      "description": "List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least on item, this rule allows traffic only if the traffic matches at least one item in the from list.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.NetworkPolicyPeer"
       }
      },
      "ports": {
-      "description": "List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is not provided, this rule matches all ports (traffic not restricted by port). If this field is empty, this rule matches no ports (no traffic matches). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.",
+      "description": "List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.NetworkPolicyPort"
@@ -44202,11 +44439,11 @@
    "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.NetworkPolicyPeer": {
     "properties": {
      "namespaceSelector": {
-      "description": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omitted, this selector selects no namespaces. If present but empty, this selector selects all namespaces.",
+      "description": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "podSelector": {
-      "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If not provided, this selector selects no pods. If present but empty, this selector selects all pods in this namespace.",
+      "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If present but empty, this selector selects all pods in this namespace.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      }
     }
@@ -44519,7 +44756,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetCondition"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "fullyLabeledReplicas": {
       "description": "The number of pods that have labels matching the labels of the pod template of the replicaset.",

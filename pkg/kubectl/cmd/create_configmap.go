@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	configMapLong = templates.LongDesc(`
+	configMapLong = templates.LongDesc(i18n.T(`
 		Create a configmap based on a file, directory, or specified literal value.
 
 		A single configmap may package one or more key/value pairs.
@@ -39,9 +39,9 @@ var (
 
 		When creating a configmap based on a directory, each file whose basename is a valid key in the directory will be
 		packaged into the configmap.  Any directory entries except regular files are ignored (e.g. subdirectories,
-		symlinks, devices, pipes, etc).`)
+		symlinks, devices, pipes, etc).`))
 
-	configMapExample = templates.Examples(`
+	configMapExample = templates.Examples(i18n.T(`
 		  # Create a new configmap named my-config based on folder bar
 		  kubectl create configmap my-config --from-file=path/to/bar
 
@@ -55,7 +55,7 @@ var (
 		  kubectl create configmap my-config --from-file=path/to/bar
 
 		  # Create a new configmap named my-config from an env file
-		  kubectl create configmap my-config --from-env-file=path/to/bar.env`)
+		  kubectl create configmap my-config --from-env-file=path/to/bar.env`))
 )
 
 // ConfigMap is a command to ease creating ConfigMaps.

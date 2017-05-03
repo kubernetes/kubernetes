@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -163,7 +161,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	}
 
 	if atomic.LoadUint32(&numberPodsEvicted) != numOfEvictions {
-		t.Fatalf("fewer number of successful evictions than expected :", numberPodsEvicted)
+		t.Fatalf("fewer number of successful evictions than expected : %d", numberPodsEvicted)
 	}
 }
 

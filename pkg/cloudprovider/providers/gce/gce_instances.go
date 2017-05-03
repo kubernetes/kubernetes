@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -25,6 +26,7 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
+	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -33,6 +35,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
+
+func newInstancesMetricContext(request string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"instances_" + request, unusedMetricLabel, unusedMetricLabel},
+	}
+}
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (gce *GCECloud) NodeAddresses(_ types.NodeName) ([]v1.NodeAddress, error) {
@@ -48,6 +57,20 @@ func (gce *GCECloud) NodeAddresses(_ types.NodeName) ([]v1.NodeAddress, error) {
 		{Type: v1.NodeInternalIP, Address: internalIP},
 		{Type: v1.NodeExternalIP, Address: externalIP},
 	}, nil
+}
+
+// This method will not be called from the node that is requesting this ID.
+// i.e. metadata service and other local methods cannot be used here
+func (gce *GCECloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+	return []v1.NodeAddress{}, errors.New("unimplemented")
+}
+
+// InstanceTypeByProviderID returns the cloudprovider instance type of the node
+// with the specified unique providerID This method will not be called from the
+// node that is requesting this ID. i.e. metadata service and other local
+// methods cannot be used here
+func (gce *GCECloud) InstanceTypeByProviderID(providerID string) (string, error) {
+	return "", errors.New("unimplemented")
 }
 
 // ExternalID returns the cloud provider ID of the node with the specified NodeName (deprecated).
@@ -140,15 +163,22 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 					Value: &keyString,
 				})
 		}
-		op, err := gce.service.Projects.SetCommonInstanceMetadata(gce.projectID, project.CommonInstanceMetadata).Do()
+
+		mc := newInstancesMetricContext("add_ssh_key")
+		op, err := gce.service.Projects.SetCommonInstanceMetadata(
+			gce.projectID, project.CommonInstanceMetadata).Do()
+
 		if err != nil {
 			glog.Errorf("Could not Set Metadata: %v", err)
+			mc.Observe(err)
 			return false, nil
 		}
-		if err := gce.waitForGlobalOp(op); err != nil {
+
+		if err := gce.waitForGlobalOp(op, mc); err != nil {
 			glog.Errorf("Could not Set Metadata: %v", err)
 			return false, nil
 		}
+
 		glog.Infof("Successfully added sshKey to project metadata")
 		return true, nil
 	})
@@ -199,6 +229,31 @@ func (gce *GCECloud) GetAllZones() (sets.String, error) {
 // Implementation of Instances.CurrentNodeName
 func (gce *GCECloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
+}
+
+// AliasRanges returns a list of CIDR ranges that are assigned to the
+// `node` for allocation to pods. Returns a list of the form
+// "<ip>/<netmask>".
+func (gce *GCECloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err error) {
+	var instance *gceInstance
+	instance, err = gce.getInstanceByName(mapNodeNameToInstanceName(nodeName))
+	if err != nil {
+		return
+	}
+
+	var res *computealpha.Instance
+	res, err = gce.serviceAlpha.Instances.Get(
+		gce.projectID, instance.Zone, instance.Name).Do()
+	if err != nil {
+		return
+	}
+
+	for _, networkInterface := range res.NetworkInterfaces {
+		for _, aliasIpRange := range networkInterface.AliasIpRanges {
+			cidrs = append(cidrs, aliasIpRange.IpCidrRange)
+		}
+	}
+	return
 }
 
 // Gets the named instances, returning cloudprovider.InstanceNotFound if any instance is not found
@@ -283,8 +338,7 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 	// Avoid changing behaviour when not managing multiple zones
 	for _, zone := range gce.managedZones {
 		name = canonicalizeInstanceName(name)
-		dc := contextWithNamespace(name, "gce_instance_list")
-		res, err := gce.service.Instances.Get(gce.projectID, zone, name).Context(dc).Do()
+		res, err := gce.service.Instances.Get(gce.projectID, zone, name).Do()
 		if err != nil {
 			glog.Errorf("getInstanceByName: failed to get instance %s; err: %v", name, err)
 

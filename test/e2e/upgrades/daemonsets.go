@@ -42,7 +42,7 @@ func (DaemonSetUpgradeTest) Name() string { return "daemonset-upgrade" }
 func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 	daemonSetName := "ds1"
 	labelSet := map[string]string{"ds-name": daemonSetName}
-	image := "gcr.io/google_containers/serve_hostname:v1.4"
+	image := framework.ServeHostnameImage
 
 	ns := f.Namespace
 

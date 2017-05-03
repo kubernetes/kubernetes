@@ -18,6 +18,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -26,10 +27,10 @@ import (
 )
 
 var (
-	godepsFile           = flag.String("godeps-file", "", "absolute path to Godeps.json")
-	clientRepoImportPath = flag.String("client-go-import-path", "", "import path to a version of client-go, e.g., k8s.io/client-go/1.4")
-	ignoredPrefixes      = flag.StringSlice("ignored-prefixes", []string{"k8s.io/"}, "any godep entry prefixed with the ignored-prefix will be deleted from Godeps.json")
-	rewrittenPrefixes    = flag.StringSlice("rewritten-prefixes", []string{}, "any godep entry prefixed with the rewritten-prefix will be filled will dummy rev; overridden by ignored-prefixes")
+	godepsFile         = flag.String("godeps-file", "", "absolute path to Godeps.json")
+	overrideImportPath = flag.String("override-import-path", "", "import path to be written into the Godeps.json, e.g., k8s.io/client-go")
+	ignoredPrefixes    = flag.StringSlice("ignored-prefixes", []string{"k8s.io/"}, "any godep entry prefixed with the ignored-prefix will be deleted from Godeps.json")
+	rewrittenPrefixes  = flag.StringSlice("rewritten-prefixes", []string{}, fmt.Sprintf("any godep entry prefixed with the rewritten-prefix will be filled will dummy rev %q; overridden by ignored-prefixes", dummyRev))
 )
 
 const dummyRev = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
@@ -55,9 +56,6 @@ func main() {
 	if len(*godepsFile) == 0 {
 		log.Fatalf("absolute path to Godeps.json is required")
 	}
-	if len(*clientRepoImportPath) == 0 {
-		log.Fatalf("import path to a version of client-go is required")
-	}
 	f, err := os.OpenFile(*godepsFile, os.O_RDWR, 0666)
 	if err != nil {
 		log.Fatalf("cannot open file %q: %v", *godepsFile, err)
@@ -67,8 +65,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to parse %q: %v", *godepsFile, err)
 	}
-	// rewrites the Godeps.ImportPath
-	g.ImportPath = *clientRepoImportPath
+	if len(*overrideImportPath) != 0 {
+		g.ImportPath = *overrideImportPath
+	}
 	// removes the Deps whose ImportPath contains "k8s.io/kubernetes"
 	i := 0
 	for _, dep := range g.Deps {

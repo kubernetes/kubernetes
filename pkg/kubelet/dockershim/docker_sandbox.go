@@ -218,14 +218,34 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 // sandbox, they should be forcibly removed.
 func (ds *dockerService) RemovePodSandbox(podSandboxID string) error {
 	var errs []error
+	opts := dockertypes.ContainerListOptions{All: true}
+
+	opts.Filter = dockerfilters.NewArgs()
+	f := newDockerFilter(&opts.Filter)
+	f.AddLabel(sandboxIDLabelKey, podSandboxID)
+
+	containers, err := ds.client.ListContainers(opts)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Remove all containers in the sandbox.
+	for i := range containers {
+		if err := ds.RemoveContainer(containers[i].ID); err != nil && !dockertools.IsContainerNotFoundError(err) {
+			errs = append(errs, err)
+		}
+	}
+
+	// Remove the sandbox container.
 	if err := ds.client.RemoveContainer(podSandboxID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); err != nil && !dockertools.IsContainerNotFoundError(err) {
 		errs = append(errs, err)
 	}
+
+	// Remove the checkpoint of the sandbox.
 	if err := ds.checkpointHandler.RemoveCheckpoint(podSandboxID); err != nil {
 		errs = append(errs, err)
 	}
 	return utilerrors.NewAggregate(errs)
-	// TODO: remove all containers in the sandbox.
 }
 
 // getIPFromPlugin interrogates the network plugin for an IP.
@@ -302,7 +322,6 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 		return nil, err
 	}
 	network := &runtimeapi.PodSandboxNetworkStatus{Ip: IP}
-	netNS := getNetworkNamespace(r)
 	hostNetwork := sharesHostNetwork(r)
 
 	// If the sandbox has no containerTypeLabelKey label, treat it as a legacy sandbox.
@@ -331,7 +350,6 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 		Network:     network,
 		Linux: &runtimeapi.LinuxPodSandboxStatus{
 			Namespaces: &runtimeapi.Namespace{
-				Network: netNS,
 				Options: &runtimeapi.NamespaceOption{
 					HostNetwork: hostNetwork,
 					HostPid:     sharesHostPid(r),
@@ -455,7 +473,9 @@ func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig
 	}
 	hc.CgroupParent = cgroupParent
 	// Apply security context.
-	applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator)
+	if err = applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -521,7 +541,7 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	}
 
 	// Set security options.
-	securityOpts, err := getSandboxSecurityOpts(c, ds.seccompProfileRoot, securityOptSep)
+	securityOpts, err := getSeccompSecurityOpts(sandboxContainerName, c, ds.seccompProfileRoot, securityOptSep)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.Name, err)
 	}
@@ -558,7 +578,7 @@ func sharesHostIpc(container *dockertypes.ContainerJSON) bool {
 
 func setSandboxResources(hc *dockercontainer.HostConfig) {
 	hc.Resources = dockercontainer.Resources{
-		MemorySwap: dockertools.DefaultMemorySwap(),
+		MemorySwap: DefaultMemorySwap(),
 		CPUShares:  defaultSandboxCPUshares,
 		// Use docker's default cpu quota/period.
 	}

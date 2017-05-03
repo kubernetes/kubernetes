@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type ViewLastAppliedOptions struct {
@@ -36,31 +37,32 @@ type ViewLastAppliedOptions struct {
 	Selector                     string
 	LastAppliedConfigurationList []string
 	OutputFormat                 string
+	All                          bool
 	Factory                      cmdutil.Factory
 	Out                          io.Writer
 	ErrOut                       io.Writer
 }
 
 var (
-	applyViewLastAppliedLong = templates.LongDesc(`
+	applyViewLastAppliedLong = templates.LongDesc(i18n.T(`
 		View the latest last-applied-configuration annotations by type/name or file.
 
 		The default output will be printed to stdout in YAML format. One can use -o option
-		to change output format.`)
+		to change output format.`))
 
-	applyViewLastAppliedExample = templates.Examples(`
+	applyViewLastAppliedExample = templates.Examples(i18n.T(`
 		# View the last-applied-configuration annotations by type/name in YAML.
 		kubectl apply view-last-applied deployment/nginx
 
 		# View the last-applied-configuration annotations by file in JSON
-		kubectl apply view-last-applied -f deploy.yaml -o json`)
+		kubectl apply view-last-applied -f deploy.yaml -o json`))
 )
 
 func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	options := &ViewLastAppliedOptions{Out: out, ErrOut: err}
 	cmd := &cobra.Command{
 		Use:     "view-last-applied (TYPE [NAME | -l label] | TYPE/NAME | -f FILENAME)",
-		Short:   "View latest last-applied-configuration annotations of a resource/object",
+		Short:   i18n.T("View latest last-applied-configuration annotations of a resource/object"),
 		Long:    applyViewLastAppliedLong,
 		Example: applyViewLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -73,6 +75,7 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Co
 
 	cmd.Flags().StringP("output", "o", "", "Output format. Must be one of yaml|json")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
+	cmd.Flags().BoolVar(&options.All, "all", false, "select all resources in the namespace of the specified resource types")
 	usage := "that contains the last-applied-configuration annotations"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 
@@ -94,6 +97,7 @@ func (o *ViewLastAppliedOptions) Complete(f cmdutil.Factory, args []string) erro
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(enforceNamespace, args...).
+		SelectAllParam(o.All).
 		SelectorParam(o.Selector).
 		Latest().
 		Flatten().

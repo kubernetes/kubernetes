@@ -95,20 +95,26 @@ func (a *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName ty
 		return nil, err
 	}
 
-	specsMap := make(map[*volume.Spec]bool)
+	if err == nil {
+		// Volume is already attached to node.
+		glog.V(4).Infof("Attach operation is successful. volume %q is already attached to node %q at lun %d.", volumeSource.DiskName, instanceid, lun)
+	} else {
+		glog.V(4).Infof("GetDiskLun returned: %v. Initiating attaching volume %q to node %q.", err, volumeSource.DataDiskURI, nodeName)
+		getLunMutex.LockKey(instanceid)
+		defer getLunMutex.UnlockKey(instanceid)
 
 	for _, s := range specs {
 		azureSpec, err := getVolumeSource(s)
 		if err != nil {
 			glog.Warningf("azureDisk - failed to get volume source for a spec during VolumesAreAttached, err: %s", err.Error())
 		}
-		for _, d := range attachedDisks {
-			attachedDisk := strings.ToLower(d)
-			specDisk := strings.ToLower(azureSpec.DataDiskURI)
-			if attachedDisk == specDisk {
-				specsMap[s] = true
-				break
-			}
+		glog.V(4).Infof("Trying to attach volume %q lun %d to node %q.", volumeSource.DataDiskURI, lun, nodeName)
+		err = attacher.azureProvider.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, nodeName, lun, compute.CachingTypes(*volumeSource.CachingMode))
+		if err == nil {
+			glog.V(4).Infof("Attach operation successful: volume %q attached to node %q.", volumeSource.DataDiskURI, nodeName)
+		} else {
+			glog.V(2).Infof("Attach volume %q to instance %q failed with %v", volumeSource.DataDiskURI, instanceid, err)
+			return "", fmt.Errorf("Attach volume %q to instance %q failed with %v", volumeSource.DiskName, instanceid, err)
 		}
 	}
 	return specsMap, nil
@@ -128,23 +134,14 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 
 	scsiHostRescan(&osIOHandler{})
 
-	diskName := volumeSource.DiskName
-	nodeName := a.plugin.host.GetHostName()
-	newDevicePath := ""
-
-	err = wait.Poll(2*time.Second, timeout, func() (bool, error) {
-		exe := exec.New()
-
-		if newDevicePath, err = findDiskByLun(lun, exe); err != nil {
-			return false, fmt.Errorf("azureDisk - WaitForAttach ticker failed node (%s) disk (%s) lun(%v) err(%s)", nodeName, diskName, lun, err)
-		}
-
-		// did we find it?
-		if newDevicePath != "" {
-			// the curent sequence k8s uses for unformated disk (check-disk, mount, fail, mkfs.extX) hangs on
-			// Azure Managed disk scsi interface. this is a hack and will be replaced once we identify and solve
-			// the root case on Azure.
-			formatIfNotFormatted(newDevicePath, *volumeSource.FSType)
+	err = wait.Poll(checkSleepDuration, timeout, func() (bool, error) {
+		glog.V(4).Infof("Checking Azure disk %q(lun %s) is attached.", volumeSource.DiskName, lunStr)
+		if devicePath, err = findDiskByLun(lun, &osIOHandler{}, exe); err == nil {
+			if len(devicePath) == 0 {
+				glog.Warningf("cannot find attached Azure disk %q(lun %s) locally.", volumeSource.DiskName, lunStr)
+				return false, fmt.Errorf("cannot find attached Azure disk %q(lun %s) locally.", volumeSource.DiskName, lunStr)
+			}
+			glog.V(4).Infof("Successfully found attached Azure disk %q(lun %s, device path %s).", volumeSource.DiskName, lunStr, devicePath)
 			return true, nil
 		}
 

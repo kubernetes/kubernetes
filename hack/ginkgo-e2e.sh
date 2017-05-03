@@ -29,6 +29,7 @@ e2e_test=$(kube::util::find-binary "e2e.test")
 # --- Setup some env vars.
 
 GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
+CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 
 # If 'y', Ginkgo's reporter will not print out in color when tests are run
 # in parallel
@@ -97,6 +98,13 @@ if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
   NODE_INSTANCE_GROUP=$(kube::util::join , "${NODE_INSTANCE_GROUPS[@]}")
 fi
 
+if [[ "${KUBERNETES_PROVIDER}" == "azure" ]]; then
+    if [[ ${CLOUD_CONFIG} == "" ]]; then
+        echo "Missing azure cloud config"
+        exit 1
+    fi
+fi
+
 ginkgo_args=()
 if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
   ginkgo_args+=("--skip=${CONFORMANCE_TEST_SKIP_REGEX}")
@@ -133,9 +141,11 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --provider="${KUBERNETES_PROVIDER}" \
   --gce-project="${PROJECT:-}" \
   --gce-zone="${ZONE:-}" \
+  --gce-multizone="${MULTIZONE:-false}" \
   --gke-cluster="${CLUSTER_NAME:-}" \
   --kube-master="${KUBE_MASTER:-}" \
   --cluster-tag="${CLUSTER_ID:-}" \
+  --cloud-config-file="${CLOUD_CONFIG:-}" \
   --repo-root="${KUBE_ROOT}" \
   --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
   --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \

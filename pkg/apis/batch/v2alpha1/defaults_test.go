@@ -41,7 +41,7 @@ func TestSetDefaultCronJob(t *testing.T) {
 				},
 			},
 		},
-		"nothing should be defaulted": {
+		"set fields should not be defaulted": {
 			original: &CronJob{
 				Spec: CronJobSpec{
 					ConcurrencyPolicy: ForbidConcurrent,

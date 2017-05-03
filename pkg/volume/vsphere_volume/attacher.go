@@ -77,7 +77,7 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 	// succeeds in that case, so no need to do that separately.
 	_, diskUUID, err := attacher.vsphereVolumes.AttachDisk(volumeSource.VolumePath, nodeName)
 	if err != nil {
-		glog.Errorf("Error attaching volume %q: %+v", volumeSource.VolumePath, err)
+		glog.Errorf("Error attaching volume %q to node %q: %+v", volumeSource.VolumePath, nodeName, err)
 		return "", err
 	}
 

@@ -18,11 +18,17 @@ package gce
 
 import (
 	"net/http"
+	"time"
 
 	compute "google.golang.org/api/compute/v1"
 )
 
-// SSL Certificate management
+func newCertMetricContext(request string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"cert_" + request, unusedMetricLabel, unusedMetricLabel},
+	}
+}
 
 // GetSslCertificate returns the SslCertificate by name.
 func (gce *GCECloud) GetSslCertificate(name string) (*compute.SslCertificate, error) {
@@ -31,26 +37,34 @@ func (gce *GCECloud) GetSslCertificate(name string) (*compute.SslCertificate, er
 
 // CreateSslCertificate creates and returns a SslCertificate.
 func (gce *GCECloud) CreateSslCertificate(sslCerts *compute.SslCertificate) (*compute.SslCertificate, error) {
+	mc := newCertMetricContext("create")
 	op, err := gce.service.SslCertificates.Insert(gce.projectID, sslCerts).Do()
+
 	if err != nil {
-		return nil, err
+		return nil, mc.Observe(err)
 	}
-	if err = gce.waitForGlobalOp(op); err != nil {
-		return nil, err
+
+	if err = gce.waitForGlobalOp(op, mc); err != nil {
+		return nil, mc.Observe(err)
 	}
+
 	return gce.GetSslCertificate(sslCerts.Name)
 }
 
 // DeleteSslCertificate deletes the SslCertificate by name.
 func (gce *GCECloud) DeleteSslCertificate(name string) error {
+	mc := newCertMetricContext("delete")
 	op, err := gce.service.SslCertificates.Delete(gce.projectID, name).Do()
+
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return nil
 		}
-		return err
+
+		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op)
+
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // ListSslCertificates lists all SslCertificates in the project.

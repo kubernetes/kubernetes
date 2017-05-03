@@ -23,7 +23,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -100,7 +99,6 @@ func RunServer(server *http.Server, network string, stopCh <-chan struct{}) (int
 		network = "tcp"
 	}
 
-	// first listen is synchronous (fail early!)
 	ln, err := net.Listen(network, server.Addr)
 	if err != nil {
 		return 0, fmt.Errorf("failed to listen on %v: %v", server.Addr, err)
@@ -113,52 +111,29 @@ func RunServer(server *http.Server, network string, stopCh <-chan struct{}) (int
 		return 0, fmt.Errorf("invalid listen address: %q", ln.Addr().String())
 	}
 
-	lock := sync.Mutex{} // to avoid we close an old listener during a listen retry
+	// Stop the server by closing the listener
 	go func() {
 		<-stopCh
-		lock.Lock()
-		defer lock.Unlock()
 		ln.Close()
 	}()
 
 	go func() {
 		defer utilruntime.HandleCrash()
 
-		for {
-			var listener net.Listener
-			listener = tcpKeepAliveListener{ln.(*net.TCPListener)}
-			if server.TLSConfig != nil {
-				listener = tls.NewListener(listener, server.TLSConfig)
-			}
+		var listener net.Listener
+		listener = tcpKeepAliveListener{ln.(*net.TCPListener)}
+		if server.TLSConfig != nil {
+			listener = tls.NewListener(listener, server.TLSConfig)
+		}
 
-			err := server.Serve(listener)
-			glog.Errorf("Error serving %v (%v); will try again.", server.Addr, err)
+		err := server.Serve(listener)
 
-			// listen again
-			func() {
-				lock.Lock()
-				defer lock.Unlock()
-				for {
-					time.Sleep(15 * time.Second)
-
-					ln, err = net.Listen(network, server.Addr)
-					if err == nil {
-						return
-					}
-					select {
-					case <-stopCh:
-						return
-					default:
-					}
-					glog.Errorf("Error listening on %v (%v); will try again.", server.Addr, err)
-				}
-			}()
-
-			select {
-			case <-stopCh:
-				return
-			default:
-			}
+		msg := fmt.Sprintf("Stopped listening on %s", tcpAddr.String())
+		select {
+		case <-stopCh:
+			glog.Info(msg)
+		default:
+			panic(fmt.Sprintf("%s due to error: %v", msg, err))
 		}
 	}()
 

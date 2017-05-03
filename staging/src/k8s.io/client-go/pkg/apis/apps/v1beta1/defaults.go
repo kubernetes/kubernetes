@@ -23,11 +23,7 @@ import (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	RegisterDefaults(scheme)
-	return scheme.AddDefaultingFuncs(
-		SetDefaults_StatefulSet,
-		SetDefaults_Deployment,
-	)
+	return RegisterDefaults(scheme)
 }
 
 func SetDefaults_StatefulSet(obj *StatefulSet) {

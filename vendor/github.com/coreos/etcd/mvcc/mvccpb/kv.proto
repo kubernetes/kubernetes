@@ -43,6 +43,7 @@ message Event {
   // A DELETE/EXPIRE event contains the deleted key with
   // its modification revision set to the revision of deletion.
   KeyValue kv = 2;
+
   // prev_kv holds the key-value pair before the event happens.
   KeyValue prev_kv = 3;
 }

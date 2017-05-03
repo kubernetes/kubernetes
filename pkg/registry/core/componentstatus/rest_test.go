@@ -50,16 +50,16 @@ type testResponse struct {
 }
 
 func NewTestREST(resp testResponse) *REST {
+	prober := &fakeHttpProber{
+		result: resp.result,
+		body:   resp.data,
+		err:    resp.err,
+	}
 	return &REST{
-		GetServersToValidate: func() map[string]Server {
-			return map[string]Server{
-				"test1": {Addr: "testserver1", Port: 8000, Path: "/healthz"},
+		GetServersToValidate: func() map[string]*Server {
+			return map[string]*Server{
+				"test1": {Addr: "testserver1", Port: 8000, Path: "/healthz", Prober: prober},
 			}
-		},
-		prober: &fakeHttpProber{
-			result: resp.result,
-			body:   resp.data,
-			err:    resp.err,
 		},
 	}
 }

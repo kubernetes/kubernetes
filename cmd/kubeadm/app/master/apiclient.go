@@ -18,13 +18,11 @@ package master
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
@@ -44,26 +42,10 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 func WaitForAPI(client *clientset.Clientset) {
 	start := time.Now()
 	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
-		// TODO: use /healthz API instead of this
-		cs, err := client.ComponentStatuses().List(metav1.ListOptions{})
-		if err != nil {
-			if apierrs.IsForbidden(err) {
-				fmt.Println("[apiclient] Waiting for API server authorization")
-			}
+		healthStatus := 0
+		client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		if healthStatus != http.StatusOK {
 			return false, nil
-		}
-
-		// TODO(phase2) must revisit this when we implement HA
-		if len(cs.Items) < 3 {
-			return false, nil
-		}
-		for _, item := range cs.Items {
-			for _, condition := range item.Conditions {
-				if condition.Type != v1.ComponentHealthy {
-					fmt.Printf("[apiclient] Control plane component %q is still unhealthy: %#v\n", item.ObjectMeta.Name, item.Conditions)
-					return false, nil
-				}
-			}
 		}
 
 		fmt.Printf("[apiclient] All control plane components are healthy after %f seconds\n", time.Since(start).Seconds())

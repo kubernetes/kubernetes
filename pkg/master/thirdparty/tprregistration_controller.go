@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/extensions/internalversion"
 	listers "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 )
 
@@ -108,7 +109,7 @@ func (c *tprRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 	defer glog.Infof("Shutting down tpr-autoregister controller")
 
 	// wait for your secondary caches to fill before starting your work
-	if !cache.WaitForCacheSync(stopCh, c.tprSynced) {
+	if !controller.WaitForCacheSync("tpr-autoregister", stopCh, c.tprSynced) {
 		return
 	}
 

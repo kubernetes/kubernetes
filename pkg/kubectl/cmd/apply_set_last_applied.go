@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type SetLastAppliedOptions struct {
@@ -58,12 +59,12 @@ type SetLastAppliedOptions struct {
 }
 
 var (
-	applySetLastAppliedLong = templates.LongDesc(`
+	applySetLastAppliedLong = templates.LongDesc(i18n.T(`
 		Set the latest last-applied-configuration annotations by setting it to match the contents of a file.
 		This results in the last-applied-configuration being updated as though 'kubectl apply -f <file>' was run,
-		without updating any other parts of the object.`)
+		without updating any other parts of the object.`))
 
-	applySetLastAppliedExample = templates.Examples(`
+	applySetLastAppliedExample = templates.Examples(i18n.T(`
 		# Set the last-applied-configuration of a resource to match the contents of a file.
 		kubectl apply set-last-applied -f deploy.yaml
 
@@ -72,14 +73,14 @@ var (
 
 		# Set the last-applied-configuration of a resource to match the contents of a file, will create the annotation if it does not already exist.
 		kubectl apply set-last-applied -f deploy.yaml --create-annotation=true
-		`)
+		`))
 )
 
 func NewCmdApplySetLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	options := &SetLastAppliedOptions{Out: out, ErrOut: err}
 	cmd := &cobra.Command{
 		Use:     "set-last-applied -f FILENAME",
-		Short:   "Set the last-applied-configuration annotation on a live object to match the contents of a file.",
+		Short:   i18n.T("Set the last-applied-configuration annotation on a live object to match the contents of a file."),
 		Long:    applySetLastAppliedLong,
 		Example: applySetLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -159,7 +160,7 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 		}
 
 		//only add to PatchBufferList when changed
-		if !bytes.Equal(stripComments(oringalBuf), stripComments(diffBuf)) {
+		if !bytes.Equal(cmdutil.StripComments(oringalBuf), cmdutil.StripComments(diffBuf)) {
 			o.PatchBufferList = append(o.PatchBufferList, patchBuf)
 			o.InfoList = append(o.InfoList, info)
 		} else {

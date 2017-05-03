@@ -64,7 +64,7 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
@@ -359,7 +359,12 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
-	genericConfig.AdmissionControl, err = BuildAdmission(s, client, sharedInformers, genericConfig.Authorizer)
+	genericConfig.AdmissionControl, err = BuildAdmission(s,
+		s.Admission.Plugins,
+		client,
+		sharedInformers,
+		genericConfig.Authorizer,
+	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize admission: %v", err)
 	}
@@ -368,8 +373,8 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 }
 
 // BuildAdmission constructs the admission chain
-func BuildAdmission(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, apiAuthorizer authorizer.Authorizer) (admission.Interface, error) {
-	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
+func BuildAdmission(s *options.ServerRunOptions, plugins *admission.Plugins, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, apiAuthorizer authorizer.Authorizer) (admission.Interface, error) {
+	admissionControlPluginNames := strings.Split(s.Admission.Control, ",")
 	var cloudConfig []byte
 	var err error
 
@@ -379,12 +384,14 @@ func BuildAdmission(s *options.ServerRunOptions, client internalclientset.Interf
 			glog.Fatalf("Error reading from cloud configuration file %s: %#v", s.CloudProvider.CloudConfigFile, err)
 		}
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig)
-	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
+	// TODO: use a dynamic restmapper. See https://github.com/kubernetes/kubernetes/pull/42615.
+	restMapper := api.Registry.RESTMapper()
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig, restMapper)
+	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.Admission.ControlConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read plugin config: %v", err)
 	}
-	return admission.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
+	return plugins.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
 }
 
 // BuildAuthenticator constructs the authenticator

@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	replace_long = templates.LongDesc(`
+	replaceLong = templates.LongDesc(i18n.T(`
 		Replace a resource by filename or stdin.
 
 		JSON and YAML formats are accepted. If replacing an existing resource, the
@@ -45,9 +45,9 @@ var (
 
 		    $ kubectl get TYPE NAME -o yaml
 
-		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`)
+		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`))
 
-	replace_example = templates.Examples(`
+	replaceExample = templates.Examples(i18n.T(`
 		# Replace a pod using the data in pod.json.
 		kubectl replace -f ./pod.json
 
@@ -58,7 +58,7 @@ var (
 		kubectl get pod mypod -o yaml | sed 's/\(image: myimage\):.*$/\1:v4/' | kubectl replace -f -
 
 		# Force replace, delete and then re-create the resource
-		kubectl replace --force -f ./pod.json`)
+		kubectl replace --force -f ./pod.json`))
 )
 
 func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -69,8 +69,8 @@ func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		// update is deprecated.
 		Aliases: []string{"update"},
 		Short:   i18n.T("Replace a resource by filename or stdin"),
-		Long:    replace_long,
-		Example: replace_example,
+		Long:    replaceLong,
+		Example: replaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			err := RunReplace(f, out, cmd, args, options)

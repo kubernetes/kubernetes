@@ -38,7 +38,7 @@ var _ = framework.KubeDescribe("ReplicationController", func() {
 	f := framework.NewDefaultFramework("replication-controller")
 
 	It("should serve a basic image on each replica with a public image [Conformance]", func() {
-		testReplicationControllerServeImageOrFail(f, "basic", "gcr.io/google_containers/serve_hostname:v1.4")
+		testReplicationControllerServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})
 
 	It("should serve a basic image on each replica with a private image", func() {

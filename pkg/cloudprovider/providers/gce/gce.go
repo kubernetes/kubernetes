@@ -17,7 +17,6 @@ limitations under the License.
 package gce
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,21 +25,19 @@ import (
 	"time"
 
 	"cloud.google.com/go/compute/metadata"
-	"golang.org/x/net/context"
 
 	"gopkg.in/gcfg.v1"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
-	"google.golang.org/api/gensupport"
 )
 
 const (
@@ -79,6 +76,7 @@ const (
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	service                  *compute.Service
+	serviceAlpha             *computealpha.Service
 	containerService         *container.Service
 	projectID                string
 	region                   string
@@ -103,47 +101,12 @@ type Config struct {
 	}
 }
 
-// ApiWithNamespace stores api and namespace in context
-type apiWithNamespace struct {
-	namespace string
-	apiCall   string
-}
-
 func init() {
-	registerMetrics()
 	cloudprovider.RegisterCloudProvider(
 		ProviderName,
 		func(config io.Reader) (cloudprovider.Interface, error) {
 			return newGCECloud(config)
 		})
-	gensupport.RegisterHook(trackAPILatency)
-}
-
-func trackAPILatency(ctx context.Context, req *http.Request) func(resp *http.Response) {
-	requestTime := time.Now()
-	t := ctx.Value("kube-api-namespace")
-	apiNamespace, ok := t.(apiWithNamespace)
-
-	if !ok {
-		return nil
-	}
-
-	apiResponseReceived := func(resp *http.Response) {
-		timeTaken := time.Since(requestTime).Seconds()
-		if mi, ok := gceMetricMap[apiNamespace.apiCall]; ok {
-			mi.WithLabelValues(apiNamespace.namespace).Observe(timeTaken)
-		}
-	}
-	return apiResponseReceived
-}
-
-func contextWithNamespace(namespace string, apiCall string) context.Context {
-	rootContext := context.Background()
-	apiNamespace := apiWithNamespace{
-		namespace: namespace,
-		apiCall:   apiCall,
-	}
-	return context.WithValue(rootContext, "kube-api-namespace", apiNamespace)
 }
 
 // Raw access to the underlying GCE service, probably should only be used for e2e tests
@@ -213,43 +176,29 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 func CreateGCECloud(projectID, region, zone string, managedZones []string, networkURL string, nodeTags []string,
 	nodeInstancePrefix string, tokenSource oauth2.TokenSource, useMetadataServer bool) (*GCECloud, error) {
 
-	if tokenSource == nil {
-		var err error
-		tokenSource, err = google.DefaultTokenSource(
-			oauth2.NoContext,
-			compute.CloudPlatformScope,
-			compute.ComputeScope)
-		glog.Infof("Using DefaultTokenSource %#v", tokenSource)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		glog.Infof("Using existing Token Source %#v", tokenSource)
-	}
-
-	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
-		if _, err := tokenSource.Token(); err != nil {
-			glog.Errorf("error fetching initial token: %v", err)
-			return false, nil
-		}
-		return true, nil
-	}); err != nil {
-		return nil, err
-	}
-
-	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
-	svc, err := compute.New(client)
+	client, err := newOauthClient(tokenSource)
 	if err != nil {
 		return nil, err
 	}
 
-	containerSvc, err := container.New(client)
+	service, err := compute.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err = newOauthClient(tokenSource)
+	serviceAlpha, err := computealpha.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	containerService, err := container.New(client)
 	if err != nil {
 		return nil, err
 	}
 
 	if networkURL == "" {
-		networkName, err := getNetworkNameViaAPICall(svc, projectID)
+		networkName, err := getNetworkNameViaAPICall(service, projectID)
 		if err != nil {
 			return nil, err
 		}
@@ -257,7 +206,7 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 	}
 
 	if len(managedZones) == 0 {
-		managedZones, err = getZonesForRegion(svc, projectID, region)
+		managedZones, err = getZonesForRegion(service, projectID, region)
 		if err != nil {
 			return nil, err
 		}
@@ -269,8 +218,9 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(10, 100) // 10 qps, 100 bucket size.
 
 	return &GCECloud{
-		service:                  svc,
-		containerService:         containerSvc,
+		service:                  service,
+		serviceAlpha:             serviceAlpha,
+		containerService:         containerService,
 		projectID:                projectID,
 		region:                   region,
 		localZone:                zone,
@@ -353,7 +303,7 @@ func getNetworkNameViaAPICall(svc *compute.Service, projectID string) (string, e
 	}
 
 	if networkList == nil || len(networkList.Items) <= 0 {
-		return "", fmt.Errorf("GCE Network List call returned no networks for project %q.", projectID)
+		return "", fmt.Errorf("GCE Network List call returned no networks for project %q", projectID)
 	}
 
 	return networkList.Items[0].Name, nil
@@ -381,16 +331,30 @@ func getZonesForRegion(svc *compute.Service, projectID, region string) ([]string
 	return zones, nil
 }
 
-// NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
-// This method will not be called from the node that is requesting this ID. i.e. metadata service
-// and other local methods cannot be used here
-func (gce *GCECloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	return []v1.NodeAddress{}, errors.New("unimplemented")
-}
+func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
+	if tokenSource == nil {
+		var err error
+		tokenSource, err = google.DefaultTokenSource(
+			oauth2.NoContext,
+			compute.CloudPlatformScope,
+			compute.ComputeScope)
+		glog.Infof("Using DefaultTokenSource %#v", tokenSource)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		glog.Infof("Using existing Token Source %#v", tokenSource)
+	}
 
-// InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
-// This method will not be called from the node that is requesting this ID. i.e. metadata service
-// and other local methods cannot be used here
-func (gce *GCECloud) InstanceTypeByProviderID(providerID string) (string, error) {
-	return "", errors.New("unimplemented")
+	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
+		if _, err := tokenSource.Token(); err != nil {
+			glog.Errorf("error fetching initial token: %v", err)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return oauth2.NewClient(oauth2.NoContext, tokenSource), nil
 }

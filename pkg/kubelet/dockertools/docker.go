@@ -37,15 +37,21 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
-	"k8s.io/kubernetes/pkg/kubelet/leaky"
 )
 
 const (
-	PodInfraContainerName = leaky.PodInfraContainerName
-	DockerPrefix          = "docker://"
-	DockerPullablePrefix  = "docker-pullable://"
-	LogSuffix             = "log"
-	ext4MaxFileNameLen    = 255
+	LogSuffix          = "log"
+	ext4MaxFileNameLen = 255
+
+	DockerType = "docker"
+
+	// https://docs.docker.com/engine/reference/api/docker_remote_api/
+	// docker version should be at least 1.10.x
+	minimumDockerAPIVersion = "1.22"
+
+	statusRunningPrefix = "Up"
+	statusExitedPrefix  = "Exited"
+	statusCreatedPrefix = "Created"
 )
 
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker client.
@@ -387,6 +393,8 @@ func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgre
 
 // GetKubeletDockerContainers lists all container or just the running ones.
 // Returns a list of docker containers that we manage
+// TODO: This function should be deleted after migrating
+// test/e2e_node/garbage_collector_test.go off of it.
 func GetKubeletDockerContainers(client DockerInterface, allContainers bool) ([]*dockertypes.Container, error) {
 	result := []*dockertypes.Container{}
 	containers, err := client.ListContainers(dockertypes.ContainerListOptions{All: allContainers})

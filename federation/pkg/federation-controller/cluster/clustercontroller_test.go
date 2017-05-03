@@ -132,7 +132,7 @@ func TestUpdateClusterStatusOK(t *testing.T) {
 		}
 	}
 
-	manager := NewclusterController(federationClientSet, 5)
+	manager := newClusterController(federationClientSet, 5)
 	err = manager.UpdateClusterStatus()
 	if err != nil {
 		t.Errorf("Failed to Update Cluster Status: %v", err)

@@ -34,7 +34,7 @@ func ShortHumanDuration(d time.Duration) string {
 		return fmt.Sprintf("%dm", minutes)
 	} else if hours := int(d.Hours()); hours < 24 {
 		return fmt.Sprintf("%dh", hours)
-	} else if hours < 24*364 {
+	} else if hours < 24*365 {
 		return fmt.Sprintf("%dd", hours/24)
 	}
 	return fmt.Sprintf("%dy", int(d.Hours()/24/365))

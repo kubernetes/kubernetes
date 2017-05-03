@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -563,7 +561,7 @@ func TestSingleWatch(t *testing.T) {
 func TestMultiWatch(t *testing.T) {
 	// Disable this test as long as it demonstrates a problem.
 	// TODO: Reenable this test when we get #6059 resolved.
-	return
+	t.Skip()
 
 	const watcherCount = 50
 	rt.GOMAXPROCS(watcherCount)

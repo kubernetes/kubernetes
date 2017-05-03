@@ -194,7 +194,8 @@ func deleteConfigMapFromCluster(hostClientset internalclientset.Interface, secre
 // deleteSecret deletes the secret with the given name from the host
 // cluster.
 func deleteSecret(clientset internalclientset.Interface, name, namespace string) error {
-	return clientset.Core().Secrets(namespace).Delete(name, &metav1.DeleteOptions{})
+	orphanDependents := false
+	return clientset.Core().Secrets(namespace).Delete(name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
 }
 
 // isNotFound checks if the given error is a NotFound status error.

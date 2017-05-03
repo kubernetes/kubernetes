@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package healthcheck LoadBalancer Healthcheck responder library for kubernetes network proxies
+// Package healthcheck provides tools for serving kube-proxy healthchecks.
 package healthcheck // import "k8s.io/kubernetes/pkg/proxy/healthcheck"

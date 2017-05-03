@@ -79,7 +79,7 @@ func (s *cidrSet) allocateNext() (*net.IPNet, error) {
 }
 
 func (s *cidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err error) {
-	begin, end = 0, s.maxCIDRs
+	begin, end = 0, s.maxCIDRs-1
 	cidrMask := cidr.Mask
 	maskSize, _ := cidrMask.Size()
 

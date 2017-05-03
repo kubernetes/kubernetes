@@ -44,7 +44,7 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&o.MaxBackups, "audit-log-maxbackup", o.MaxBackups,
 		"The maximum number of old audit log files to retain.")
 	fs.IntVar(&o.MaxSize, "audit-log-maxsize", o.MaxSize,
-		"The maximum size in megabytes of the audit log file before it gets rotated. Defaults to 100MB.")
+		"The maximum size in megabytes of the audit log file before it gets rotated.")
 }
 
 func (o *AuditLogOptions) ApplyTo(c *server.Config) error {

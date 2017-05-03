@@ -48,11 +48,11 @@ EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi"}
 EVICTION_SOFT=${EVICTION_SOFT:-""}
 EVICTION_PRESSURE_TRANSITION_PERIOD=${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}
 
-# We disable cluster DNS by default because this script uses docker0 (or whatever
-# container bridge docker is currently using) and we don't know the IP of the
-# DNS pod to pass in as --cluster-dns. To set this up by hand, set this flag
-# and change DNS_SERVER_IP to the appropriate IP.
-ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-false}
+# This script uses docker0 (or whatever container bridge docker is currently using)
+# and we don't know the IP of the DNS pod to pass in as --cluster-dns.
+# To set this up by hand, set this flag and change DNS_SERVER_IP.
+# Note also that you need API_HOST (defined above) for correct DNS.
+ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
 DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
 KUBECTL=${KUBECTL:-cluster/kubectl.sh}
@@ -65,6 +65,9 @@ FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=true"}
 STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 # enable swagger ui
 ENABLE_SWAGGER_UI=${ENABLE_SWAGGER_UI:-false}
+
+# enable kubernetes dashboard
+ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
 
 # enable audit log
 ENABLE_APISERVER_BASIC_AUDIT=${ENABLE_APISERVER_BASIC_AUDIT:-false}
@@ -182,9 +185,12 @@ set +e
 
 API_PORT=${API_PORT:-8080}
 API_SECURE_PORT=${API_SECURE_PORT:-6443}
+
+# WARNING: For DNS to work on most setups you should export API_HOST as the docker0 ip address,
 API_HOST=${API_HOST:-localhost}
 API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
+
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$}
@@ -206,6 +212,9 @@ ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # cur
 # which should be able to be used as the CA to verify itself
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
 ROOT_CA_FILE=${CERT_DIR}/server-ca.crt
+ROOT_CA_KEY=${CERT_DIR}/server-ca.key
+CLUSTER_SIGNING_CERT_FILE=${CLUSTER_SIGNING_CERT_FILE:-"${ROOT_CA_FILE}"}
+CLUSTER_SIGNING_KEY_FILE=${CLUSTER_SIGNING_KEY_FILE:-"${ROOT_CA_KEY}"}
 
 # name of the cgroup driver, i.e. cgroupfs or systemd
 if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
@@ -309,7 +318,7 @@ cleanup()
 {
   echo "Cleaning up..."
   # delete running images
-  # if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+  # if [[ "${ENABLE_CLUSTER_DNS}" == true ]]; then
   # Still need to figure why this commands throw an error: Error from server: client: etcd cluster is unavailable or misconfigured
   #     ${KUBECTL} --namespace=kube-system delete service kube-dns
   # And this one hang forever:
@@ -361,7 +370,7 @@ function start_etcd {
 }
 
 function set_service_accounts {
-    SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
+    SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-true}
     SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-/tmp/kube-serviceaccount.key}
     # Generate ServiceAccount key if needed
     if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
@@ -434,8 +443,16 @@ function start_apiserver {
     fi
 
     # Create CA signers
-    kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" server '"server auth"'
-    kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" client '"client auth"'
+    if [[ "${ENABLE_SINGLE_CA_SIGNER:-}" = true ]]; then
+        kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" server '"client auth","server auth"'
+        sudo cp "${CERT_DIR}/server-ca.key" "${CERT_DIR}/client-ca.key"
+        sudo cp "${CERT_DIR}/server-ca.crt" "${CERT_DIR}/client-ca.crt"
+        sudo cp "${CERT_DIR}/server-ca-config.json" "${CERT_DIR}/client-ca-config.json"
+    else
+        kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" server '"server auth"'
+        kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" client '"client auth"'
+    fi
+
     # Create auth proxy client ca
     kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" request-header '"client auth"'
 
@@ -538,6 +555,8 @@ function start_controller_manager {
       --v=${LOG_LEVEL} \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
+      --cluster-signing-cert-file="${CLUSTER_SIGNING_CERT_FILE}" \
+      --cluster-signing-key-file="${CLUSTER_SIGNING_KEY_FILE}" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
       ${node_cidr_args} \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
@@ -680,12 +699,20 @@ function start_kubelet {
 
 function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
+
+    cat <<EOF > /tmp/kube-proxy.yaml
+apiVersion: componentconfig/v1alpha1
+kind: KubeProxyConfiguration
+clientConnection:
+  kubeconfig: ${CERT_DIR}/kube-proxy.kubeconfig
+hostnameOverride: ${HOSTNAME_OVERRIDE}
+featureGates: ${FEATURE_GATES}
+EOF
+
     sudo "${GO_OUT}/hyperkube" proxy \
-      --v=${LOG_LEVEL} \
-      --hostname-override="${HOSTNAME_OVERRIDE}" \
-      --feature-gates="${FEATURE_GATES}" \
-      --kubeconfig "$CERT_DIR"/kube-proxy.kubeconfig \
-      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
+      --config=/tmp/kube-proxy.yaml \
+      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" \
+      --v=${LOG_LEVEL} 2>&1 &
     PROXY_PID=$!
 
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
@@ -700,19 +727,6 @@ function start_kubedns {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         echo "Creating kube-system namespace"
         sed -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.in" >| kubedns-deployment.yaml
-        if [[ "${FEDERATION:-}" == "true" ]]; then
-          FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
-          if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
-            FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
-          fi
-          if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
-            sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" kubedns-deployment.yaml
-          else
-            sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-deployment.yaml
-          fi
-        else
-          sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-deployment.yaml
-        fi
         sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.in" >| kubedns-svc.yaml
         
         # TODO update to dns role once we have one.
@@ -724,6 +738,16 @@ function start_kubedns {
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
         echo "Kube-dns deployment and service successfully deployed."
         rm  kubedns-deployment.yaml kubedns-svc.yaml
+    fi
+}
+
+function start_kubedashboard {
+    if [[ "${ENABLE_CLUSTER_DASHBOARD}" = true ]]; then
+        echo "Creating kubernetes-dashboard"       
+        # use kubectl to create the dashboard
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml
+        echo "kubernetes-dashboard deployment and service successfully deployed."
     fi
 }
 
@@ -803,7 +827,9 @@ fi
 }
 
 # validate that etcd is: not running, in path, and has minimum required version.
-kube::etcd::validate
+if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  kube::etcd::validate
+fi
 
 if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
   exit 1
@@ -818,7 +844,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
 fi
 
 kube::util::test_openssl_installed
-kube::util::test_cfssl_installed
+kube::util::ensure-cfssl
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
 if [ "$GO_OUT" == "" ]; then
@@ -839,6 +865,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   start_controller_manager
   start_kubeproxy
   start_kubedns
+  start_kubedashboard
 fi
 
 if [[ "${START_MODE}" != "nokubelet" ]]; then
@@ -871,5 +898,3 @@ print_success
 if [[ "${ENABLE_DAEMON}" = false ]]; then
   while true; do sleep 1; done
 fi
-
-

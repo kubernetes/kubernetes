@@ -288,10 +288,10 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	// Set ReadyCondition.LastTransitionTime.
-	if _, readyCondition := v1.GetPodCondition(&status, v1.PodReady); readyCondition != nil {
+	if _, readyCondition := podutil.GetPodCondition(&status, v1.PodReady); readyCondition != nil {
 		// Need to set LastTransitionTime.
 		lastTransitionTime := metav1.Now()
-		_, oldReadyCondition := v1.GetPodCondition(&oldStatus, v1.PodReady)
+		_, oldReadyCondition := podutil.GetPodCondition(&oldStatus, v1.PodReady)
 		if oldReadyCondition != nil && readyCondition.Status == oldReadyCondition.Status {
 			lastTransitionTime = oldReadyCondition.LastTransitionTime
 		}
@@ -299,10 +299,10 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	// Set InitializedCondition.LastTransitionTime.
-	if _, initCondition := v1.GetPodCondition(&status, v1.PodInitialized); initCondition != nil {
+	if _, initCondition := podutil.GetPodCondition(&status, v1.PodInitialized); initCondition != nil {
 		// Need to set LastTransitionTime.
 		lastTransitionTime := metav1.Now()
-		_, oldInitCondition := v1.GetPodCondition(&oldStatus, v1.PodInitialized)
+		_, oldInitCondition := podutil.GetPodCondition(&oldStatus, v1.PodInitialized)
 		if oldInitCondition != nil && initCondition.Status == oldInitCondition.Status {
 			lastTransitionTime = oldInitCondition.LastTransitionTime
 		}

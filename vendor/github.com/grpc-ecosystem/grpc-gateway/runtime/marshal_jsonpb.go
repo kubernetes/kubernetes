@@ -111,7 +111,8 @@ func decodeJSONPb(d *json.Decoder, v interface{}) error {
 	if !ok {
 		return decodeNonProtoField(d, v)
 	}
-	return jsonpb.UnmarshalNext(d, p)
+	unmarshaler := &jsonpb.Unmarshaler{AllowUnknownFields: true}
+	return unmarshaler.UnmarshalNext(d, p)
 }
 
 func decodeNonProtoField(d *json.Decoder, v interface{}) error {
@@ -124,7 +125,8 @@ func decodeNonProtoField(d *json.Decoder, v interface{}) error {
 			rv.Set(reflect.New(rv.Type().Elem()))
 		}
 		if rv.Type().ConvertibleTo(typeProtoMessage) {
-			return jsonpb.UnmarshalNext(d, rv.Interface().(proto.Message))
+			unmarshaler := &jsonpb.Unmarshaler{AllowUnknownFields: true}
+			return unmarshaler.UnmarshalNext(d, rv.Interface().(proto.Message))
 		}
 		rv = rv.Elem()
 	}
