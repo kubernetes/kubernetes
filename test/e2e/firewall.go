@@ -60,7 +60,7 @@ var _ = framework.KubeDescribe("Firewall rule", func() {
 		nodesSet := sets.NewString(nodesNames...)
 
 		// OnlyLocal service is needed to examine which exact nodes the requests are being forwarded to by the Load Balancer on GCE
-		By("Creating a LoadBalancer type service with onlyLocal annotation")
+		By("Creating a LoadBalancer type service with ExternalTrafficPolicy=Local")
 		svc := jig.CreateOnlyLocalLoadBalancerService(ns, serviceName,
 			framework.LoadBalancerCreateTimeoutDefault, false, func(svc *v1.Service) {
 				svc.Spec.Ports = []v1.ServicePort{{Protocol: "TCP", Port: framework.FirewallTestHttpPort}}
