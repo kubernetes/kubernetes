@@ -46,7 +46,8 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		nil, /* cloud */
 		nil, /* plugins */
 		false,
-		time.Second*5)
+		time.Second*5,
+		false /*keep pod volumes attached for terminated pods */)
 
 	// Assert
 	if err != nil {
@@ -74,6 +75,7 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 		nodeLister:  nodeInformer.Lister(),
 		nodesSynced: nodeInformer.Informer().HasSynced,
 		cloud:       nil,
+		keepTerminatedPodVolumes: false,
 	}
 
 	// Act
@@ -212,7 +214,8 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		nil, /* cloud */
 		plugins,
 		false,
-		time.Second*1)
+		time.Second*1,
+		false /*keep pod volumes attached for terminated pods */)
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
 	}
