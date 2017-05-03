@@ -2729,52 +2729,55 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 
 	// Create a security group for the load balancer
 	var securityGroupID string
-	if c.cfg.Global.ElbSecurityGroup != "" {
-		securityGroupID = c.cfg.Global.ElbSecurityGroup
-	} else {
+	{
+		if c.cfg.Global.ElbSecurityGroup != "" {
+			securityGroupID = c.cfg.Global.ElbSecurityGroup
 
-		sgName := "k8s-elb-" + loadBalancerName
-		sgDescription := fmt.Sprintf("Security group for Kubernetes ELB %s (%v)", loadBalancerName, serviceName)
-		securityGroupID, err = c.ensureSecurityGroup(sgName, sgDescription)
-		if err != nil {
-			glog.Error("Error creating load balancer security group: ", err)
-			return nil, err
-		}
+		} else {
 
-		ec2SourceRanges := []*ec2.IpRange{}
-		for _, sourceRange := range sourceRanges.StringSlice() {
-			ec2SourceRanges = append(ec2SourceRanges, &ec2.IpRange{CidrIp: aws.String(sourceRange)})
-		}
-
-		permissions := NewIPPermissionSet()
-		for _, port := range apiService.Spec.Ports {
-			portInt64 := int64(port.Port)
-			protocol := strings.ToLower(string(port.Protocol))
-
-			permission := &ec2.IpPermission{}
-			permission.FromPort = &portInt64
-			permission.ToPort = &portInt64
-			permission.IpRanges = ec2SourceRanges
-			permission.IpProtocol = &protocol
-
-			permissions.Insert(permission)
-		}
-
-		// Allow ICMP fragmentation packets, important for MTU discovery
-		{
-			permission := &ec2.IpPermission{
-				IpProtocol: aws.String("icmp"),
-				FromPort:   aws.Int64(3),
-				ToPort:     aws.Int64(4),
-				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+			sgName := "k8s-elb-" + loadBalancerName
+			sgDescription := fmt.Sprintf("Security group for Kubernetes ELB %s (%v)", loadBalancerName, serviceName)
+			securityGroupID, err = c.ensureSecurityGroup(sgName, sgDescription)
+			if err != nil {
+				glog.Error("Error creating load balancer security group: ", err)
+				return nil, err
 			}
 
-			permissions.Insert(permission)
-		}
+			ec2SourceRanges := []*ec2.IpRange{}
+			for _, sourceRange := range sourceRanges.StringSlice() {
+				ec2SourceRanges = append(ec2SourceRanges, &ec2.IpRange{CidrIp: aws.String(sourceRange)})
+			}
 
-		_, err = c.setSecurityGroupIngress(securityGroupID, permissions)
-		if err != nil {
-			return nil, err
+			permissions := NewIPPermissionSet()
+			for _, port := range apiService.Spec.Ports {
+				portInt64 := int64(port.Port)
+				protocol := strings.ToLower(string(port.Protocol))
+
+				permission := &ec2.IpPermission{}
+				permission.FromPort = &portInt64
+				permission.ToPort = &portInt64
+				permission.IpRanges = ec2SourceRanges
+				permission.IpProtocol = &protocol
+
+				permissions.Insert(permission)
+			}
+
+			// Allow ICMP fragmentation packets, important for MTU discovery
+			{
+				permission := &ec2.IpPermission{
+					IpProtocol: aws.String("icmp"),
+					FromPort:   aws.Int64(3),
+					ToPort:     aws.Int64(4),
+					IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+				}
+
+				permissions.Insert(permission)
+			}
+
+			_, err = c.setSecurityGroupIngress(securityGroupID, permissions)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	securityGroupIDs := []string{securityGroupID}
