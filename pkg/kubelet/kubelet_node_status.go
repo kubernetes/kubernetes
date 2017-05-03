@@ -458,8 +458,9 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 
 		// 1) Use nodeIP if set
 		// 2) If the user has specified an IP to HostnameOverride, use it
-		// 3) Lookup the IP from node name by DNS and use the first non-loopback ipv4 address
-		// 4) Try to get the IP from the network interface used as default gateway
+		// 3) Lookup the IP from node name by DNS and use the first valid IPv4 address
+		// 4) Lookup the IP from node name by DNS and use the first valid IPv6 address
+		// 5) Try to get the IP from the network interface used as default gateway
 		if kl.nodeIP != nil {
 			ipAddr = kl.nodeIP
 			node.ObjectMeta.Annotations[metav1.AnnotationProvidedIPAddr] = kl.nodeIP.String()
@@ -469,7 +470,11 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 			var addrs []net.IP
 			addrs, err = net.LookupIP(node.Name)
 			for _, addr := range addrs {
-				if !addr.IsLoopback() && addr.To4() != nil {
+				if err := kl.validateNodeIP(); err != nil && addr.To4() != nil {
+					ipAddr = addr
+					break
+				}
+				if err := kl.validateNodeIP(); err != nil && addr.To16() != nil {
 					ipAddr = addr
 					break
 				}
@@ -952,8 +957,17 @@ func (kl *Kubelet) validateNodeIP() error {
 	if kl.nodeIP.IsLoopback() {
 		return fmt.Errorf("nodeIP can't be loopback address")
 	}
-	if kl.nodeIP.To4() == nil {
-		return fmt.Errorf("nodeIP must be IPv4 address")
+	if kl.nodeIP.IsMulticast() {
+		return fmt.Errorf("nodeIP can't be a multicast address")
+	}
+	if kl.nodeIP.IsLinkLocalUnicast() {
+		return fmt.Errorf("nodeIP can't be a link-local unicast address")
+	}
+	if kl.nodeIP.IsUnspecified() {
+		return fmt.Errorf("nodeIP can't be an all zeros address")
+	}
+	if kl.nodeIP.To4() == nil || kl.nodeIP.To16() == nil {
+		return fmt.Errorf("nodeIP must be an IPv4 or IPv6 address")
 	}
 
 	addrs, err := net.InterfaceAddrs()
