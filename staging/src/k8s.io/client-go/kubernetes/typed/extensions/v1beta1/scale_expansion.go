@@ -34,7 +34,7 @@ func (c *scales) Get(kind string, name string) (result *v1beta1.Scale, err error
 
 	// TODO this method needs to take a proper unambiguous kind
 	fullyQualifiedKind := schema.GroupVersionKind{Kind: kind}
-	resource, _ := meta.KindToResource(fullyQualifiedKind)
+	resource, _ := meta.UnsafeGuessKindToResource(fullyQualifiedKind)
 
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -51,7 +51,7 @@ func (c *scales) Update(kind string, scale *v1beta1.Scale) (result *v1beta1.Scal
 
 	// TODO this method needs to take a proper unambiguous kind
 	fullyQualifiedKind := schema.GroupVersionKind{Kind: kind}
-	resource, _ := meta.KindToResource(fullyQualifiedKind)
+	resource, _ := meta.UnsafeGuessKindToResource(fullyQualifiedKind)
 
 	err = c.client.Put().
 		Namespace(scale.Namespace).
