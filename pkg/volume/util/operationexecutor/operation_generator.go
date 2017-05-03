@@ -318,7 +318,8 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		// when a pod has been deleted during the controller downtime
 		pluginName, volumeName, err = volumehelper.SplitUniqueName(volumeToDetach.VolumeName)
 		if err != nil {
-			return nil, err
+			detailedErr := volumeToDetach.GenerateErrorDetailed("DetachVolume.SplitUniqueName failed", err)
+			return nil, detailedErr
 		}
 		attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(pluginName)
 		if err != nil {
