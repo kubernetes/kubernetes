@@ -12,18 +12,13 @@ spec:
     metadata:
       labels:
         name: hollow-node
-      annotations:
-        pod.beta.kubernetes.io/init-containers: '[
-          {
-            "name": "init-inotify-limit",
-            "image": "busybox",
-            "command": ["sysctl", "-w", "fs.inotify.max_user_instances=200"],
-            "securityContext": {
-              "privileged": true
-            }
-          }
-        ]'
     spec:
+      initContainers:
+      - name: init-inotify-limit
+        image: busybox
+        command: ['sysctl', '-w', 'fs.inotify.max_user_instances=200']
+        securityContext:
+          privileged: true
       volumes:
       - name: kubeconfig-volume
         secret:
