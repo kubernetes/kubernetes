@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,7 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/quota"
@@ -209,7 +210,7 @@ func toInternalPersistentVolumeClaimOrError(obj runtime.Object) (*api.Persistent
 	pvc := &api.PersistentVolumeClaim{}
 	switch t := obj.(type) {
 	case *v1.PersistentVolumeClaim:
-		if err := v1.Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(t, pvc, nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(t, pvc, nil); err != nil {
 			return nil, err
 		}
 	case *api.PersistentVolumeClaim:

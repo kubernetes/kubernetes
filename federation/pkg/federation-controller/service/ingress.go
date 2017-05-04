@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	fedapi "k8s.io/kubernetes/federation/apis/federation"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 // Compile time check for interface adherence

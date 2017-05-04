@@ -21,7 +21,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	corev1 "k8s.io/kubernetes/pkg/api/v1"
+	corev1 "k8s.io/api/core/v1"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	authenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"

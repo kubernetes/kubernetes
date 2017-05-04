@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 // LoadPodFromFile will read, decode, and return a Pod from a file.

@@ -16,7 +16,7 @@ limitations under the License.
 
 package qos
 
-import "k8s.io/kubernetes/pkg/api/v1"
+import "k8s.io/api/core/v1"
 
 const (
 	// PodInfraOOMAdj is very docker specific. For arbitrary runtime, it may not make

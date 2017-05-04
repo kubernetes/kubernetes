@@ -23,12 +23,13 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
@@ -155,7 +156,7 @@ func createSecretOrFail(clientset *fedclientset.Clientset, nsName string) *v1.Se
 
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      v1.SimpleNameGenerator.GenerateName(secretNamePrefix),
+			Name:      k8s_api_v1.SimpleNameGenerator.GenerateName(secretNamePrefix),
 			Namespace: nsName,
 		},
 	}

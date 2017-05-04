@@ -18,7 +18,7 @@ package fake
 
 import (
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 func (c *FakeNodes) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {

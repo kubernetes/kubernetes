@@ -24,7 +24,7 @@ import (
 
 	dockercontainer "github.com/docker/engine-api/types/container"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 func TestModifyContainerConfig(t *testing.T) {

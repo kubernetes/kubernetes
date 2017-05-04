@@ -22,7 +22,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )

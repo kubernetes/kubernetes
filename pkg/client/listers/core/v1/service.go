@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // ServiceLister helps list Services.

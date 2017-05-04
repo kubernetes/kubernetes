@@ -36,7 +36,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	autoscalingv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"

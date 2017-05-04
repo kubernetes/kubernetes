@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	finalizersutil "k8s.io/kubernetes/federation/pkg/federation-controller/util/finalizers"
 	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/api/core/v1"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"

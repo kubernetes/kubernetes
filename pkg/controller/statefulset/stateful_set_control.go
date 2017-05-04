@@ -21,7 +21,7 @@ import (
 	"sort"
 
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 
 	"github.com/golang/glog"

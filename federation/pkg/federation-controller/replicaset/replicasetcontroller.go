@@ -47,7 +47,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/planner"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/podanalyzer"
 	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/api/core/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"

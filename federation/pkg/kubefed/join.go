@@ -36,7 +36,7 @@ import (
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -138,7 +138,7 @@ func (j *joinFederation) Run(f cmdutil.Factory, cmdOut io.Writer, config util.Ad
 	}
 	secretName := j.options.secretName
 	if secretName == "" {
-		secretName = v1.SimpleNameGenerator.GenerateName(j.commonOptions.Name + "-")
+		secretName = k8s_api_v1.SimpleNameGenerator.GenerateName(j.commonOptions.Name + "-")
 	}
 
 	generator, err := clusterGenerator(clientConfig, j.commonOptions.Name, j.options.clusterContext, secretName)

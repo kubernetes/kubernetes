@@ -22,7 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 func TestClusterGenerate(t *testing.T) {

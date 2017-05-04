@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
 )
 

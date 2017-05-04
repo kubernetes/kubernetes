@@ -25,7 +25,7 @@ import (
 	core "k8s.io/client-go/testing"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	kubev1 "k8s.io/kubernetes/pkg/api/v1"
+	kubev1 "k8s.io/api/core/v1"
 
 	"github.com/stretchr/testify/assert"
 )
