@@ -945,6 +945,7 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 	if binDir == "" {
 		binDir = c.NetworkPluginDir
 	}
+	nh := &kubelet.NoOpLegacyHost{}
 	pluginSettings := dockershim.NetworkPluginSettings{
 		HairpinMode:       componentconfig.HairpinMode(c.HairpinMode),
 		NonMasqueradeCIDR: c.NonMasqueradeCIDR,
@@ -952,6 +953,7 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 		PluginConfDir:     c.CNIConfDir,
 		PluginBinDir:      binDir,
 		MTU:               int(c.NetworkPluginMTU),
+		LegacyRuntimeHost: nh,
 	}
 
 	// Initialize streaming configuration. (Not using TLS now)
