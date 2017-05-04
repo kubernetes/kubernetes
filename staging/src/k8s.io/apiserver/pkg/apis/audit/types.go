@@ -146,10 +146,6 @@ type PolicyRule struct {
 	// An empty list implies every namespace.
 	// +optional
 	Namespaces []string
-	// ResourceNames is an optional white list of names that the rule applies to.
-	// An empty list implies everything.
-	// +optional
-	ResourceNames []string
 
 	// NonResourceURLs is a set of URL paths that should be audited.
 	// *s are allowed, but only as the full, final step in the path.
