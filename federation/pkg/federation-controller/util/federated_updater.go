@@ -18,10 +18,14 @@ package util
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
@@ -39,6 +43,7 @@ type FederatedOperation struct {
 	Type        FederatedOperationType
 	ClusterName string
 	Obj         pkgruntime.Object
+	Key         string
 }
 
 // A helper that executes the given set of updates on federation, in parallel.
@@ -48,8 +53,6 @@ type FederatedUpdater interface {
 	// stopped when it is reached. However the function will return after the timeout
 	// with a non-nil error.
 	Update([]FederatedOperation, time.Duration) error
-
-	UpdateWithOnError([]FederatedOperation, time.Duration, func(FederatedOperation, error)) error
 }
 
 // A function that executes some operation using the passed client and object.
@@ -58,25 +61,32 @@ type FederatedOperationHandler func(kubeclientset.Interface, pkgruntime.Object) 
 type federatedUpdaterImpl struct {
 	federation FederationView
 
+	kind string
+
+	eventRecorder record.EventRecorder
+
 	addFunction    FederatedOperationHandler
 	updateFunction FederatedOperationHandler
 	deleteFunction FederatedOperationHandler
 }
 
-func NewFederatedUpdater(federation FederationView, add, update, del FederatedOperationHandler) FederatedUpdater {
+func NewFederatedUpdater(federation FederationView, kind string, recorder record.EventRecorder, add, update, del FederatedOperationHandler) FederatedUpdater {
 	return &federatedUpdaterImpl{
 		federation:     federation,
+		kind:           kind,
+		eventRecorder:  recorder,
 		addFunction:    add,
 		updateFunction: update,
 		deleteFunction: del,
 	}
 }
 
-func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation, timeout time.Duration) error {
-	return fu.UpdateWithOnError(ops, timeout, nil)
+func (fu *federatedUpdaterImpl) recordEvent(obj runtime.Object, eventType, eventVerb string, args ...interface{}) {
+	messageFmt := eventVerb + " %s %q in cluster %s"
+	fu.eventRecorder.Eventf(obj, api.EventTypeNormal, eventType, messageFmt, args...)
 }
 
-func (fu *federatedUpdaterImpl) UpdateWithOnError(ops []FederatedOperation, timeout time.Duration, onError func(FederatedOperation, error)) error {
+func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation, timeout time.Duration) error {
 	done := make(chan error, len(ops))
 	for _, op := range ops {
 		go func(op FederatedOperation) {
@@ -89,21 +99,37 @@ func (fu *federatedUpdaterImpl) UpdateWithOnError(ops []FederatedOperation, time
 				return
 			}
 
+			eventArgs := []interface{}{fu.kind, op.Key, clusterName}
+			baseEventType := fmt.Sprintf("%s", op.Type)
+			eventType := fmt.Sprintf("%sInCluster", strings.Title(baseEventType))
+
 			switch op.Type {
 			case OperationTypeAdd:
+				// TODO s+OperationTypeAdd+OperationTypeCreate+
+				baseEventType = "create"
+				eventType := "CreateInCluster"
+
+				fu.recordEvent(op.Obj, eventType, "Creating", eventArgs...)
 				err = fu.addFunction(clientset, op.Obj)
 			case OperationTypeUpdate:
+				fu.recordEvent(op.Obj, eventType, "Updating", eventArgs...)
 				err = fu.updateFunction(clientset, op.Obj)
 			case OperationTypeDelete:
+				fu.recordEvent(op.Obj, eventType, "Deleting", eventArgs...)
 				err = fu.deleteFunction(clientset, op.Obj)
 				// IsNotFound error is fine since that means the object is deleted already.
-				if errors.IsNotFound(err) {
+				if err != nil && !errors.IsNotFound(err) {
 					err = nil
 				}
 			}
-			if err != nil && onError != nil {
-				onError(op, err)
+
+			if err != nil {
+				eventType := eventType + "Failed"
+				messageFmt := "Failed to " + baseEventType + " %s %q in cluster %s: %v"
+				eventArgs = append(eventArgs, err)
+				fu.eventRecorder.Eventf(op.Obj, api.EventTypeWarning, eventType, messageFmt, eventArgs...)
 			}
+
 			done <- err
 		}(op)
 	}
