@@ -479,7 +479,15 @@ func (c completedConfig) buildHandlers(s *GenericAPIServer, delegate http.Handle
 		}
 	}
 
-	installAPI(s, c.Config, delegate)
+	installAPI(s, c.Config)
+	if delegate != nil {
+		s.FallThroughHandler.NotFoundHandler(delegate)
+	} else if c.EnableIndex {
+		s.FallThroughHandler.NotFoundHandler(routes.IndexLister{
+			StatusCode:   http.StatusNotFound,
+			PathProvider: s.listedPathProvider,
+		})
+	}
 
 	s.Handler = c.BuildHandlerChainFunc(s.HandlerContainer.ServeMux, c.Config)
 
@@ -500,15 +508,9 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	return handler
 }
 
-func installAPI(s *GenericAPIServer, c *Config, delegate http.Handler) {
-	switch {
-	case c.EnableIndex:
-		routes.Index{}.Install(s.listedPathProvider, c.FallThroughHandler, delegate)
-
-	case delegate != nil:
-		// if we have a delegate, allow it to handle everything that's unmatched even if
-		// the index is disabled.
-		s.FallThroughHandler.UnlistedHandleFunc("/", delegate.ServeHTTP)
+func installAPI(s *GenericAPIServer, c *Config) {
+	if c.EnableIndex {
+		routes.Index{}.Install(s.listedPathProvider, c.FallThroughHandler)
 	}
 	if c.SwaggerConfig != nil && c.EnableSwaggerUI {
 		routes.SwaggerUI{}.Install(s.FallThroughHandler)
