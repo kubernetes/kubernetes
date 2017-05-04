@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
@@ -97,9 +96,6 @@ type kubeGenericRuntimeManager struct {
 	// If true, enforce container cpu limits with CFS quota support
 	cpuCFSQuota bool
 
-	// Network plugin.
-	networkPlugin network.NetworkPlugin
-
 	// wrapped image puller.
 	imagePuller images.ImageManager
 
@@ -125,7 +121,6 @@ func NewKubeGenericRuntimeManager(
 	machineInfo *cadvisorapi.MachineInfo,
 	podGetter podGetter,
 	osInterface kubecontainer.OSInterface,
-	networkPlugin network.NetworkPlugin,
 	runtimeHelper kubecontainer.RuntimeHelper,
 	httpClient types.HttpGetter,
 	imageBackOff *flowcontrol.Backoff,
@@ -143,7 +138,6 @@ func NewKubeGenericRuntimeManager(
 		containerRefManager: containerRefManager,
 		machineInfo:         machineInfo,
 		osInterface:         osInterface,
-		networkPlugin:       networkPlugin,
 		runtimeHelper:       runtimeHelper,
 		runtimeService:      newInstrumentedRuntimeService(runtimeService),
 		imageService:        newInstrumentedImageManagerService(imageService),

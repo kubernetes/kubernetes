@@ -596,7 +596,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			machineInfo,
 			klet.podManager,
 			kubeDeps.OSInterface,
-			klet.networkPlugin,
 			klet,
 			klet.httpClient,
 			imageBackOff,
