@@ -118,3 +118,13 @@ func (r *FakeImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 
 	return nil
 }
+
+// ImageFsInfo returns information of the filesystem that is used to store images.
+func (r *FakeImageService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ImageFsInfo")
+
+	return nil, nil
+}
