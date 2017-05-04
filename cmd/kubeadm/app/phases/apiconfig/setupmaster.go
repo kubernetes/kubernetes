@@ -58,7 +58,7 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 
 	// The master node is tainted and labelled accordingly
 	n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleMaster] = ""
-	n.Spec.Taints = []v1.Taint{{Key: kubeadmconstants.LabelNodeRoleMaster, Value: "", Effect: "NoSchedule"}}
+	n.Spec.Taints = append(n.Spec.Taints, v1.Taint{Key: kubeadmconstants.LabelNodeRoleMaster, Value: "", Effect: "NoSchedule"})
 
 	newData, err := json.Marshal(n)
 	if err != nil {
