@@ -8,24 +8,6 @@ load(
     "go_test",
 )
 
-go_test(
-    name = "go_default_test",
-    srcs = [
-        "openapi_cache_test.go",
-        "openapi_getter_test.go",
-        "openapi_test.go",
-    ],
-    library = ":go_default_library",
-    tags = ["automanaged"],
-    deps = [
-        "//vendor/github.com/go-openapi/loads:go_default_library",
-        "//vendor/github.com/go-openapi/spec:go_default_library",
-        "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/github.com/onsi/gomega:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-    ],
-)
-
 go_library(
     name = "go_default_library",
     srcs = [
@@ -47,11 +29,24 @@ go_library(
 
 go_test(
     name = "go_default_xtest",
-    srcs = ["openapi_suite_test.go"],
+    size = "small",
+    srcs = [
+        "openapi_cache_test.go",
+        "openapi_getter_test.go",
+        "openapi_suite_test.go",
+        "openapi_test.go",
+    ],
+    data = ["//api/openapi-spec:swagger-spec"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/kubectl/cmd/util/openapi:go_default_library",
+        "//vendor/github.com/go-openapi/loads:go_default_library",
+        "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/config:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/types:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 
@@ -66,4 +61,9 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+filegroup(
+    name = "testdata",
+    srcs = glob(["testdata/*"]),
 )
