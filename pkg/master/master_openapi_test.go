@@ -53,13 +53,13 @@ func TestValidOpenAPISpec(t *testing.T) {
 	}
 	config.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
-	master, err := config.Complete().New()
+	master, err := config.Complete().New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
 	// make sure swagger.json is not registered before calling PrepareRun.
-	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
+	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
 	defer server.Close()
 	resp, err := http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
