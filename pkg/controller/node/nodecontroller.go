@@ -1065,7 +1065,11 @@ func (nc *NodeController) cancelPodEviction(node *v1.Node) bool {
 	zone := utilnode.GetZoneKey(node)
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	wasDeleting := nc.zonePodEvictor[zone].Remove(node.Name)
+	evictor := nc.zonePodEvictor[zone]
+	if evictor == nil {
+		return false
+	}
+	wasDeleting := evictor.Remove(node.Name)
 	if wasDeleting {
 		glog.V(2).Infof("Cancelling pod Eviction on Node: %v", node.Name)
 		return true
@@ -1078,7 +1082,11 @@ func (nc *NodeController) cancelPodEviction(node *v1.Node) bool {
 func (nc *NodeController) evictPods(node *v1.Node) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	return nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
+	evictor := nc.zonePodEvictor[utilnode.GetZoneKey(node)]
+	if evictor == nil {
+		return true
+	}
+	return evictor.Add(node.Name, string(node.UID))
 }
 
 func (nc *NodeController) markNodeForTainting(node *v1.Node) bool {
