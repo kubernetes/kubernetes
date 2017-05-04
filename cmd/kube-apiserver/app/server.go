@@ -359,38 +359,43 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
-	genericConfig.AdmissionControl, err = BuildAdmission(s,
-		s.Admission.Plugins,
+	pluginInitializer, err := BuildAdmissionPluginInitializer(
+		s,
 		client,
 		sharedInformers,
 		genericConfig.Authorizer,
 	)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to initialize admission: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
 	}
 
+	err = s.Admission.ApplyTo(
+		pluginInitializer,
+		genericConfig.Authorizer,
+		genericConfig.LoopbackClientConfig,
+		genericConfig)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to initialize admission: %v", err)
+	}
 	return genericConfig, sharedInformers, insecureServingOptions, nil
 }
 
-// BuildAdmission constructs the admission chain
-func BuildAdmission(s *options.ServerRunOptions, plugins *admission.Plugins, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, apiAuthorizer authorizer.Authorizer) (admission.Interface, error) {
+// BuildAdmissionPluginInitializer constructs the admission plugin initializer
+func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, apiAuthorizer authorizer.Authorizer) (admission.PluginInitializer, error) {
 	var cloudConfig []byte
-	var err error
 
 	if s.CloudProvider.CloudConfigFile != "" {
+		var err error
 		cloudConfig, err = ioutil.ReadFile(s.CloudProvider.CloudConfigFile)
 		if err != nil {
 			glog.Fatalf("Error reading from cloud configuration file %s: %#v", s.CloudProvider.CloudConfigFile, err)
 		}
 	}
+
 	// TODO: use a dynamic restmapper. See https://github.com/kubernetes/kubernetes/pull/42615.
 	restMapper := api.Registry.RESTMapper()
 	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig, restMapper)
-	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(s.Admission.PluginsNames, s.Admission.ConfigFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read plugin config: %v", err)
-	}
-	return plugins.NewFromPlugins(s.Admission.PluginsNames, admissionConfigProvider, pluginInitializer)
+	return pluginInitializer, nil
 }
 
 // BuildAuthenticator constructs the authenticator
