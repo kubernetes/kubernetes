@@ -341,7 +341,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 		"secure-port":                       fmt.Sprintf("%d", cfg.API.BindPort),
 		"allow-privileged":                  "true",
 		"experimental-bootstrap-token-auth": "true",
-		"storage-backend":                   "etcd3",
 		"kubelet-preferred-address-types":   "InternalIP,ExternalIP,Hostname",
 		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
 		// so add it unconditionally with recommended values
