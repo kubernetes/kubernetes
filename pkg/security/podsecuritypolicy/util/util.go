@@ -195,8 +195,8 @@ func PSPAllowsHostVolumePath(psp *extensions.PodSecurityPolicy, hostPath string)
 // the string and pathPrefix are both normalized to remove trailing slashes prior to checking.
 func hasPathPrefix(s, pathPrefix string) bool {
 
-	s = normalizePath(s)
-	pathPrefix = normalizePath(pathPrefix)
+	s = strings.TrimSuffix(s, "/")
+	pathPrefix = strings.TrimSuffix(pathPrefix, "/")
 
 	// Short circuit if s doesn't contain the prefix at all
 	if !strings.HasPrefix(s, pathPrefix) {
@@ -209,10 +209,7 @@ func hasPathPrefix(s, pathPrefix string) bool {
 		// Exact match
 		return true
 	}
-	if strings.HasSuffix(pathPrefix, "/") {
-		// pathPrefix already ensured a path segment boundary
-		return true
-	}
+
 	if s[pathPrefixLength:pathPrefixLength+1] == "/" {
 		// The next character in s is a path segment boundary
 		// Check this instead of normalizing pathPrefix to avoid allocating on every call
@@ -220,13 +217,4 @@ func hasPathPrefix(s, pathPrefix string) bool {
 	}
 
 	return false
-}
-
-// normalizePath returns a subslice of the original string without a trailing slash.
-// if no trailing slash is found the original string is returned
-func normalizePath(path string) string {
-	if strings.HasSuffix(path, "/") {
-		return path[:len(path)-1]
-	}
-	return path
 }
