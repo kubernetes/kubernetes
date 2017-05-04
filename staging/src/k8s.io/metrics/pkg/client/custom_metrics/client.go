@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
@@ -31,11 +31,12 @@ import (
 
 type customMetricsClient struct {
 	client rest.Interface
-	mapper meta.RESTMapper
 }
 
 func New(client rest.Interface) CustomMetricsClient {
-	return NewForMapper(client, api.Registry.RESTMapper())
+	return &customMetricsClient{
+		client: client,
+	}
 }
 
 func NewForConfig(c *rest.Config) (CustomMetricsClient, error) {
@@ -48,7 +49,7 @@ func NewForConfig(c *rest.Config) (CustomMetricsClient, error) {
 		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	configShallowCopy.GroupVersion = &v1alpha1.SchemeGroupVersion
-	configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 
 	client, err := rest.RESTClientFor(&configShallowCopy)
 	if err != nil {
@@ -66,13 +67,6 @@ func NewForConfigOrDie(c *rest.Config) CustomMetricsClient {
 	return client
 }
 
-func NewForMapper(client rest.Interface, mapper meta.RESTMapper) CustomMetricsClient {
-	return &customMetricsClient{
-		client: client,
-		mapper: mapper,
-	}
-}
-
 func (c *customMetricsClient) RootScopedMetrics() MetricsInterface {
 	return &rootScopedMetrics{c}
 }
@@ -85,17 +79,11 @@ func (c *customMetricsClient) NamespacedMetrics(namespace string) MetricsInterfa
 }
 
 func (c *customMetricsClient) qualResourceForKind(groupKind schema.GroupKind) (string, error) {
-	mapping, err := c.mapper.RESTMapping(groupKind)
-	if err != nil {
-		return "", fmt.Errorf("unable to map kind %s to resource: %v", groupKind.String(), err)
-	}
-
-	groupResource := schema.GroupResource{
-		Group:    mapping.GroupVersionKind.Group,
-		Resource: mapping.Resource,
-	}
-
-	return groupResource.String(), nil
+	// the version doesn't matter
+	gvk := groupKind.WithVersion("")
+	gvr, _ := meta.UnsafeGuessKindToResource(gvk)
+	gv := gvr.GroupResource()
+	return gv.String(), nil
 }
 
 type rootScopedMetrics struct {
