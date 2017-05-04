@@ -18,7 +18,6 @@ package metrics
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api"
 )
 
 // +genclient=true
@@ -37,7 +36,7 @@ type NodeMetrics struct {
 	Window    metav1.Duration
 
 	// The memory usage is the memory working set.
-	Usage api.ResourceList
+	Usage ResourceList
 }
 
 // NodeMetricsList is a list of NodeMetrics.
@@ -85,5 +84,5 @@ type ContainerMetrics struct {
 	// Container name corresponding to the one from pod.spec.containers.
 	Name string
 	// The memory usage is the memory working set.
-	Usage api.ResourceList
+	Usage ResourceList
 }

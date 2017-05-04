@@ -19,7 +19,6 @@ package custom_metrics
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api"
 )
 
 // a list of values for a given metric for some set of objects
@@ -36,7 +35,7 @@ type MetricValue struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// a reference to the described object
-	DescribedObject api.ObjectReference `json:"describedObject"`
+	DescribedObject ObjectReference `json:"describedObject"`
 
 	// the name of the metric
 	MetricName string `json:"metricName"`
