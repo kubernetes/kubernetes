@@ -87,6 +87,8 @@ var map_AzureFileVolumeSource = map[string]string{
 	"secretName": "the name of secret that contains Azure Storage Account Name and Key",
 	"shareName":  "Share Name",
 	"readOnly":   "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"dirMode":    "Directory permission code that gives rwx permissions to all users. Must be a value between 0 and 511(0777). Defaults to 511(0777).",
+	"fileMode":   "File permission code that gives rwx permissions to all users. Must be a value between 0 and 511(0777). Defaults to 511(0777).",
 }
 
 func (AzureFileVolumeSource) SwaggerDoc() map[string]string {
