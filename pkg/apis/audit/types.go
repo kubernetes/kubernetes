@@ -77,13 +77,15 @@ type Event struct {
 	// +optional
 	ResponseStatus *metav1.Status
 
-	// RequestObject logged before admission. Omitted for non-resource requests.
-	// Only logged at RequestObject Level and higher.
+	// API object from the request. The RequestObject is recorded as-is in the request, prior to
+	// version conversion, defaulting, admission or merging. It is an external versioned object type,
+	// and may not be a valid object on its own.  Omitted for non-resource requests.  Only logged at
+	// RequestObject Level and higher.
 	// +optional
 	RequestObject runtime.Object
-	// ResponseObject logged before admission. Omitted for non-resource requests.
-	// Only logged at ResponseObject Level and higher.
-	// Omitted if the response is a metav1.Status object (see ResponseStatus above).
+	// API object returned in the response. The ResponseObject is recorded after conversion to the
+	// external type.  Omitted for non-resource requests.  Only logged at ResponseObject Level and
+	// higher.
 	// +optional
 	ResponseObject runtime.Object
 }
@@ -135,24 +137,14 @@ type PolicyRule struct {
 	// non-resource URL paths (such as "/api"), or neither, but not both.
 	// If neither is specified, the rule is treated as a default for all URLs.
 
-	// APIGroups is the name of the APIGroup that contains the resources ("" for core).
-	// If multiple API groups are specified, any action requested against one of the
-	// enumerated resources in any of the listed API groups will be allowed.
-	// Any empty list implies every group.
-	// +optional
-	APIGroups []string
-	// ResourceKinds is a list of kinds of resources within the listed APIGroups this rule applies to.
-	// A ResourceKind can be matched in any of the APIGroups listed above.
-	// Any empty list implies every resource kind.
-	// +optional
 	ResourceKinds []string
 	// Namespaces that this rule matches.
 	// The empty string "" matches non-namespaced resources.
-	// Any empty list implies every namespace.
+	// An empty list implies every namespace.
 	// +optional
 	Namespaces []string
 	// ResourceNames is an optional white list of names that the rule applies to.
-	// Any empty list implies everything.
+	// An empty list implies everything.
 	// +optional
 	ResourceNames []string
 
@@ -163,4 +155,16 @@ type PolicyRule struct {
 	//  "/healthz*" - Log all health checks
 	// +optional
 	NonResourceURLs []string
+}
+
+// GroupKinds represents resource kinds in an API group.
+type GroupKinds struct {
+	// Group is the name of the API group that contains the resources.
+	// The empty string represents the core API group.
+	// +optional
+	Group string
+	// Kinds is a list of kinds of resources within the API group.
+	// Any empty list implies every resource kind in the API group.
+	// +optional
+	Kinds []string
 }
