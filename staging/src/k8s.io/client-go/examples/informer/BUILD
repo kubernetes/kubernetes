@@ -19,10 +19,10 @@ go_library(
     srcs = ["main.go"],
     tags = ["automanaged"],
     deps = [
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
     ],
