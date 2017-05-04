@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 )
 
 type eventType int
@@ -62,6 +63,7 @@ type event struct {
 	obj       interface{}
 	// the update event comes with an old object, but it's not used by the garbage collector.
 	oldObj interface{}
+	gvk    schema.GroupVersionKind
 }
 
 // GraphBuilder: based on the events supplied by the informers, GraphBuilder updates
@@ -90,6 +92,8 @@ type GraphBuilder struct {
 	// GraphBuilder and GC share the absentOwnerCache. Objects that are known to
 	// be non-existent are added to the cached.
 	absentOwnerCache *UIDCache
+	sharedInformers  informers.SharedInformerFactory
+	stopCh           <-chan struct{}
 }
 
 func listWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *cache.ListWatch {
@@ -118,6 +122,58 @@ func listWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *
 }
 
 func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, error) {
+	handlers := cache.ResourceEventHandlerFuncs{
+		// add the event to the dependencyGraphBuilder's graphChanges.
+		AddFunc: func(obj interface{}) {
+			event := &event{
+				eventType: addEvent,
+				obj:       obj,
+				gvk:       kind,
+			}
+			gb.graphChanges.Add(event)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			// TODO: check if there are differences in the ownerRefs,
+			// finalizers, and DeletionTimestamp; if not, ignore the update.
+			event := &event{
+				eventType: updateEvent,
+				obj:       newObj,
+				oldObj:    oldObj,
+				gvk:       kind,
+			}
+			gb.graphChanges.Add(event)
+		},
+		DeleteFunc: func(obj interface{}) {
+			// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
+			if deletedFinalStateUnknown, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+				obj = deletedFinalStateUnknown.Obj
+			}
+			event := &event{
+				eventType: deleteEvent,
+				obj:       obj,
+				gvk:       kind,
+			}
+			gb.graphChanges.Add(event)
+		},
+	}
+
+	shared, err := gb.sharedInformers.ForResource(resource)
+	if err == nil {
+		glog.V(4).Infof("using a shared informer for resource %q, kind %q", resource.String(), kind.String())
+		// need to clone because it's from a shared cache
+		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
+		if gb.stopCh != nil {
+			// if gb.stopCh is set, it means we've already gotten past the initial gb.Run() call, so this
+			// means we've re-loaded and re-read discovery and we are adding a new monitor for a
+			// previously unseen resource, so we need to call Start on the shared informers again (this
+			// will only start those shared informers that have not yet been started).
+			go gb.sharedInformers.Start(gb.stopCh)
+		}
+		return shared.Informer().GetController(), nil
+	} else {
+		glog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
+	}
+
 	// TODO: consider store in one storage.
 	glog.V(5).Infof("create storage for resource %s", resource)
 	client, err := gb.metaOnlyClientPool.ClientForGroupVersionKind(kind)
@@ -125,47 +181,12 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 		return nil, err
 	}
 	gb.registeredRateLimiterForControllers.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
-	setObjectTypeMeta := func(obj interface{}) {
-		runtimeObject, ok := obj.(runtime.Object)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("expected runtime.Object, got %#v", obj))
-		}
-		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
-	}
 	_, monitor := cache.NewInformer(
 		listWatcher(client, resource),
 		nil,
 		ResourceResyncTime,
-		cache.ResourceEventHandlerFuncs{
-			// add the event to the dependencyGraphBuilder's graphChanges.
-			AddFunc: func(obj interface{}) {
-				setObjectTypeMeta(obj)
-				event := &event{
-					eventType: addEvent,
-					obj:       obj,
-				}
-				gb.graphChanges.Add(event)
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				setObjectTypeMeta(newObj)
-				// TODO: check if there are differences in the ownerRefs,
-				// finalizers, and DeletionTimestamp; if not, ignore the update.
-				event := &event{updateEvent, newObj, oldObj}
-				gb.graphChanges.Add(event)
-			},
-			DeleteFunc: func(obj interface{}) {
-				// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
-				if deletedFinalStateUnknown, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-					obj = deletedFinalStateUnknown.Obj
-				}
-				setObjectTypeMeta(obj)
-				event := &event{
-					eventType: deleteEvent,
-					obj:       obj,
-				}
-				gb.graphChanges.Add(event)
-			},
-		},
+		// don't need to clone because it's not from shared cache
+		handlers,
 	)
 	return monitor, nil
 }
@@ -205,6 +226,9 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 		go monitor.Run(stopCh)
 	}
 	go wait.Until(gb.runProcessGraphChanges, 1*time.Second, stopCh)
+
+	// set this so that we can use it if we need to start new shared informers
+	gb.stopCh = stopCh
 }
 
 var ignoredResources = map[schema.GroupVersionResource]struct{}{
@@ -435,12 +459,7 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return true
 	}
-	typeAccessor, err := meta.TypeAccessor(obj)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
-		return true
-	}
-	glog.V(5).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, event type %v", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.eventType)
+	glog.V(5).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, uid %s, event type %v", event.gvk.GroupVersion().String(), event.gvk.Kind, accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
 	// Check if the node already exsits
 	existingNode, found := gb.uidToNode.Read(accessor.GetUID())
 	switch {
@@ -448,8 +467,8 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		newNode := &node{
 			identity: objectReference{
 				OwnerReference: metav1.OwnerReference{
-					APIVersion: typeAccessor.GetAPIVersion(),
-					Kind:       typeAccessor.GetKind(),
+					APIVersion: event.gvk.GroupVersion().String(),
+					Kind:       event.gvk.Kind,
 					UID:        accessor.GetUID(),
 					Name:       accessor.GetName(),
 				},
