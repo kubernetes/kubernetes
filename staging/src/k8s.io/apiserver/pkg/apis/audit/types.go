@@ -19,6 +19,7 @@ package audit
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 )
@@ -53,7 +54,7 @@ type Event struct {
 	Timestamp metav1.Time
 	// Unique audit ID, generated for each request.
 	// +optional
-	RequestID string
+	AuditID types.UID
 	// RequestURI is the request URI as sent by the client to a server.
 	RequestURI string
 	// Verb is the kubernetes verb associated with the request.
