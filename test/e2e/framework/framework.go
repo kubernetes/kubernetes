@@ -258,12 +258,11 @@ func (f *Framework) AfterEach() {
 				}
 			}
 		} else {
-			if TestContext.DeleteNamespace {
+			if !TestContext.DeleteNamespace {
 				Logf("Found DeleteNamespace=false, skipping namespace deletion!")
-			} else if TestContext.DeleteNamespaceOnFailure {
-				Logf("Found DeleteNamespaceOnFailure=false, skipping namespace deletion!")
+			} else {
+				Logf("Found DeleteNamespaceOnFailure=false and current test failed, skipping namespace deletion!")
 			}
-
 		}
 
 		// Paranoia-- prevent reuse!
