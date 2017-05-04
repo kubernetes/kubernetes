@@ -25,10 +25,9 @@ import (
 	"errors"
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
-	pkg4_resource "k8s.io/apimachinery/pkg/api/resource"
+	pkg3_resource "k8s.io/apimachinery/pkg/api/resource"
 	pkg1_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	pkg3_types "k8s.io/apimachinery/pkg/types"
-	pkg2_api "k8s.io/client-go/pkg/api"
+	pkg2_types "k8s.io/apimachinery/pkg/types"
 	"reflect"
 	"runtime"
 	time "time"
@@ -64,12 +63,11 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg4_resource.Quantity
+		var v0 pkg3_resource.Quantity
 		var v1 pkg1_v1.TypeMeta
-		var v2 pkg3_types.UID
-		var v3 pkg2_api.ObjectReference
-		var v4 time.Time
-		_, _, _, _, _ = v0, v1, v2, v3, v4
+		var v2 pkg2_types.UID
+		var v3 time.Time
+		_, _, _, _ = v0, v1, v2, v3
 	}
 }
 
@@ -746,7 +744,7 @@ func (x *MetricValue) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "describedObject":
 			if r.TryDecodeAsNil() {
-				x.DescribedObject = pkg2_api.ObjectReference{}
+				x.DescribedObject = ObjectReference{}
 			} else {
 				yyv8 := &x.DescribedObject
 				yym9 := z.DecBinary()
@@ -804,7 +802,7 @@ func (x *MetricValue) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "value":
 			if r.TryDecodeAsNil() {
-				x.Value = pkg4_resource.Quantity{}
+				x.Value = pkg3_resource.Quantity{}
 			} else {
 				yyv16 := &x.Value
 				yym17 := z.DecBinary()
@@ -887,7 +885,7 @@ func (x *MetricValue) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.DescribedObject = pkg2_api.ObjectReference{}
+		x.DescribedObject = ObjectReference{}
 	} else {
 		yyv23 := &x.DescribedObject
 		yym24 := z.DecBinary()
@@ -985,7 +983,7 @@ func (x *MetricValue) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Value = pkg4_resource.Quantity{}
+		x.Value = pkg3_resource.Quantity{}
 	} else {
 		yyv31 := &x.Value
 		yym32 := z.DecBinary()
