@@ -64,6 +64,3 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }
-
-func (obj *CertificateSigningRequest) GetObjectKind() schema.ObjectKind     { return &obj.TypeMeta }
-func (obj *CertificateSigningRequestList) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
