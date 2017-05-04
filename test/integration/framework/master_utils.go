@@ -236,7 +236,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	masterConfig.GenericConfig.LoopbackClientConfig.BearerToken = privilegedLoopbackToken
 
-	m, err := masterConfig.Complete().New()
+	m, err := masterConfig.Complete().New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		glog.Fatalf("error in bringing up the master: %v", err)
 	}
