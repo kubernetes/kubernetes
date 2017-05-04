@@ -17,7 +17,6 @@ limitations under the License.
 package kubectl
 
 import (
-	goerrors "errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -616,11 +615,11 @@ func CreateNewControllerFromCurrentController(rcClient coreclient.ReplicationCon
 	}
 
 	if len(newRc.Spec.Template.Spec.Containers) > 1 && len(cfg.Container) == 0 {
-		return nil, goerrors.New("Must specify container to update when updating a multi-container pod")
+		return nil, fmt.Errorf("Must specify container to update when updating a multi-container pod")
 	}
 
 	if len(newRc.Spec.Template.Spec.Containers) == 0 {
-		return nil, goerrors.New(fmt.Sprintf("Pod has no containers! (%v)", newRc))
+		return nil, fmt.Errorf("Pod has no containers! (%v)", newRc)
 	}
 	newRc.Spec.Template.Spec.Containers[containerIndex].Image = cfg.Image
 	if len(cfg.PullPolicy) != 0 {
