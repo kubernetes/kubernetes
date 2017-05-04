@@ -64,6 +64,8 @@ const (
 	// 500 pods. Just creation is limited to 20qps, and watching happens with ~10-30s
 	// latency/pod at the scale of 3000 pods over 100 nodes.
 	ExpectationsTimeout = 5 * time.Minute
+	// Pods with label "POD_DELETE_LABEL" will be deleted first when there are too many replicas
+	POD_DELETE_LABEL = "POD_TO_DELETE"
 )
 
 var UpdateTaintBackoff = wait.Backoff{
@@ -703,6 +705,13 @@ func (s ActivePods) Len() int      { return len(s) }
 func (s ActivePods) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func (s ActivePods) Less(i, j int) bool {
+	// 0. Pod with label 'TO_DELETE=true' is smaller
+	_, exists1 := s[i].Labels[POD_DELETE_LABEL]
+	_, exists2 := s[j].Labels[POD_DELETE_LABEL]
+	if exists1 != exists2 {
+		return exists1
+	}
+
 	// 1. Unassigned < assigned
 	// If only one of the pods is unassigned, the unassigned one is smaller
 	if s[i].Spec.NodeName != s[j].Spec.NodeName && (len(s[i].Spec.NodeName) == 0 || len(s[j].Spec.NodeName) == 0) {
