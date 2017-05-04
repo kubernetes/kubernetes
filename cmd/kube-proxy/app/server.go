@@ -470,7 +470,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
 			}
-			serviceHandler = proxierUserspace
+			serviceEventHandler = proxierUserspace
 			proxier = proxierUserspace
 		}
 		// Remove artifacts from the pure-iptables Proxier, if not on Windows.
