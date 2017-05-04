@@ -172,7 +172,7 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 	)
 
 	// Federated updeater along with Create/Update/Delete operations.
-	s.updater = util.NewFederatedUpdater(s.informer, adapter.Kind(), s.eventRecorder,
+	s.updater = util.NewFederatedUpdater(s.informer, adapter.Kind(), s.updateTimeout, s.eventRecorder,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			_, err := adapter.ClusterCreate(client, obj)
 			return err
@@ -194,7 +194,6 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 		func(obj pkgruntime.Object) string {
 			return adapter.NamespacedName(obj).String()
 		},
-		s.updateTimeout,
 		s.informer,
 		s.updater,
 	)
@@ -414,7 +413,7 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		return statusAllOK
 	}
 
-	err = s.updater.Update(operations, s.updateTimeout)
+	err = s.updater.Update(operations)
 	if err != nil {
 		glog.Errorf("failed to execute updates for %s: %v", key, err)
 		return statusError
