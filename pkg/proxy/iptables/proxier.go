@@ -36,6 +36,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
@@ -286,11 +287,9 @@ type Proxier struct {
 	endpointsSynced bool
 	servicesSynced  bool
 
-	throttle flowcontrol.RateLimiter
+	syncRunner *flowcontrol.PeriodicRunner
 
 	// These are effectively const and do not need the mutex to be held.
-	syncPeriod     time.Duration
-	minSyncPeriod  time.Duration
 	iptables       utiliptables.Interface
 	masqueradeAll  bool
 	masqueradeMark string
@@ -345,7 +344,7 @@ func NewProxier(ipt utiliptables.Interface,
 	sysctl utilsysctl.Interface,
 	exec utilexec.Interface,
 	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
+	minSyncInterval time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
 	clusterCIDR string,
@@ -355,8 +354,8 @@ func NewProxier(ipt utiliptables.Interface,
 	healthzServer healthcheck.HealthzUpdater,
 ) (*Proxier, error) {
 	// check valid user input
-	if minSyncPeriod > syncPeriod {
-		return nil, fmt.Errorf("min-sync (%v) must be < sync(%v)", minSyncPeriod, syncPeriod)
+	if minSyncInterval > syncPeriod {
+		return nil, fmt.Errorf("min-sync (%v) must be < sync(%v)", minSyncInterval, syncPeriod)
 	}
 
 	// Set the route_localnet sysctl we need for
@@ -389,23 +388,12 @@ func NewProxier(ipt utiliptables.Interface,
 
 	healthChecker := healthcheck.NewServer(hostname, recorder, nil, nil) // use default implementations of deps
 
-	var throttle flowcontrol.RateLimiter
-	// Defaulting back to not limit sync rate when minSyncPeriod is 0.
-	if minSyncPeriod != 0 {
-		syncsPerSecond := float32(time.Second) / float32(minSyncPeriod)
-		// The average use case will process 2 updates in short succession
-		throttle = flowcontrol.NewTokenBucketRateLimiter(syncsPerSecond, 2)
-	}
-
-	return &Proxier{
+	proxier := &Proxier{
 		portsMap:         make(map[localPort]closeable),
 		serviceMap:       make(proxyServiceMap),
 		serviceChanges:   newServiceChangeMap(),
 		endpointsMap:     make(proxyEndpointsMap),
 		endpointsChanges: newEndpointsChangeMap(),
-		syncPeriod:       syncPeriod,
-		minSyncPeriod:    minSyncPeriod,
-		throttle:         throttle,
 		iptables:         ipt,
 		masqueradeAll:    masqueradeAll,
 		masqueradeMark:   masqueradeMark,
@@ -417,7 +405,12 @@ func NewProxier(ipt utiliptables.Interface,
 		recorder:         recorder,
 		healthChecker:    healthChecker,
 		healthzServer:    healthzServer,
-	}, nil
+	}
+
+	burstSyncs := 2
+	glog.V(3).Infof("minSyncInterval: %v, syncPeriod: %v, burstSyncs: %d", minSyncInterval, syncPeriod, burstSyncs)
+	proxier.syncRunner = flowcontrol.NewPeriodicRunner(proxier.Sync, minSyncInterval, syncPeriod, burstSyncs)
+	return proxier, nil
 }
 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
@@ -507,45 +500,42 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	return encounteredError
 }
 
-// Sync is called to immediately synchronize the proxier state to iptables
+// Sync is called to synchronize the proxier state to iptables as soon as possible.
 func (proxier *Proxier) Sync() {
 	proxier.syncProxyRules(syncReasonForce)
 }
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
-	t := time.NewTicker(proxier.syncPeriod)
-	defer t.Stop()
 	// Update healthz timestamp at beginning in case Sync() never succeeds.
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.UpdateTimestamp()
 	}
-	for {
-		<-t.C
-		glog.V(6).Infof("Periodic sync")
-		proxier.Sync()
-	}
+	proxier.syncRunner.Run(wait.NeverStop)
 }
 
 func (proxier *Proxier) OnServiceAdd(service *api.Service) {
 	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	proxier.serviceChanges.update(&namespacedName, nil, service)
 
-	proxier.syncProxyRules(syncReasonServices)
+	// FIXME: we need to pass a reason syncReasonServices.
+	proxier.syncRunner.CallFunction()
 }
 
 func (proxier *Proxier) OnServiceUpdate(oldService, service *api.Service) {
 	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	proxier.serviceChanges.update(&namespacedName, oldService, service)
 
-	proxier.syncProxyRules(syncReasonServices)
+	// FIXME: we need to pass a reason syncReasonServices.
+	proxier.syncRunner.CallFunction()
 }
 
 func (proxier *Proxier) OnServiceDelete(service *api.Service) {
 	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	proxier.serviceChanges.update(&namespacedName, service, nil)
 
-	proxier.syncProxyRules(syncReasonServices)
+	// FIXME: we need to pass a reason syncReasonServices.
+	proxier.syncRunner.CallFunction()
 }
 
 func (proxier *Proxier) OnServiceSynced() {
@@ -553,7 +543,8 @@ func (proxier *Proxier) OnServiceSynced() {
 	proxier.servicesSynced = true
 	proxier.mu.Unlock()
 
-	proxier.syncProxyRules(syncReasonServices)
+	// FIXME: we need to pass a reason syncReasonServices.
+	proxier.syncRunner.CallFunction()
 }
 
 func shouldSkipService(svcName types.NamespacedName, service *api.Service) bool {
@@ -662,21 +653,24 @@ func (proxier *Proxier) OnEndpointsAdd(endpoints *api.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 	proxier.endpointsChanges.update(&namespacedName, nil, endpoints)
 
-	proxier.syncProxyRules(syncReasonEndpoints)
+	// FIXME: we need to pass a reason syncReasonEndpoints.
+	proxier.syncRunner.CallFunction()
 }
 
 func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 	proxier.endpointsChanges.update(&namespacedName, oldEndpoints, endpoints)
 
-	proxier.syncProxyRules(syncReasonEndpoints)
+	// FIXME: we need to pass a reason syncReasonEndpoints.
+	proxier.syncRunner.CallFunction()
 }
 
 func (proxier *Proxier) OnEndpointsDelete(endpoints *api.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 	proxier.endpointsChanges.update(&namespacedName, endpoints, nil)
 
-	proxier.syncProxyRules(syncReasonEndpoints)
+	// FIXME: we need to pass a reason syncReasonEndpoints.
+	proxier.syncRunner.CallFunction()
 }
 
 func (proxier *Proxier) OnEndpointsSynced() {
@@ -684,7 +678,8 @@ func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.endpointsSynced = true
 	proxier.mu.Unlock()
 
-	proxier.syncProxyRules(syncReasonEndpoints)
+	// FIXME: we need to pass a reason syncReasonEndpoints.
+	proxier.syncRunner.CallFunction()
 }
 
 // <endpointsMap> is updated by this function (based on the given changes).
@@ -886,9 +881,6 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
-	if proxier.throttle != nil {
-		proxier.throttle.Accept()
-	}
 	start := time.Now()
 	defer func() {
 		glog.V(4).Infof("syncProxyRules(%s) took %v", reason, time.Since(start))
