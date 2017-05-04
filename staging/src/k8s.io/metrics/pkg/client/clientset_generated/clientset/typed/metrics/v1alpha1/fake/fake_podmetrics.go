@@ -33,6 +33,8 @@ type FakePodMetricses struct {
 
 var podmetricsesResource = schema.GroupVersionResource{Group: "metrics", Version: "v1alpha1", Resource: "podmetricses"}
 
+var podmetricsesKind = schema.GroupVersionKind{Group: "metrics", Version: "v1alpha1", Kind: "PodMetrics"}
+
 func (c *FakePodMetricses) Get(name string, options v1.GetOptions) (result *v1alpha1.PodMetrics, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(podmetricsesResource, c.ns, name), &v1alpha1.PodMetrics{})
@@ -45,7 +47,7 @@ func (c *FakePodMetricses) Get(name string, options v1.GetOptions) (result *v1al
 
 func (c *FakePodMetricses) List(opts v1.ListOptions) (result *v1alpha1.PodMetricsList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podmetricsesResource, c.ns, opts), &v1alpha1.PodMetricsList{})
+		Invokes(testing.NewListAction(podmetricsesResource, podmetricsesKind, c.ns, opts), &v1alpha1.PodMetricsList{})
 
 	if obj == nil {
 		return nil, err
