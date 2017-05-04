@@ -78,22 +78,6 @@ spec:
       labels:
         app: cockroachdb
       annotations:
-        scheduler.alpha.kubernetes.io/affinity: >
-            {
-              "podAntiAffinity": {
-                "preferredDuringSchedulingIgnoredDuringExecution": [{
-                  "weight": 100,
-                  "labelSelector": {
-                    "matchExpressions": [{
-                      "key": "app",
-                      "operator": "In",
-                      "values": ["cockroachdb"]
-                    }]
-                  },
-                  "topologyKey": "kubernetes.io/hostname"
-                }]
-              }
-            }
         # Init containers are run only once in the lifetime of a pod, before
         # it's started up for the first time. It has to exit successfully
         # before the pod's main containers are allowed to start.
@@ -133,6 +117,18 @@ spec:
             }
         ]'
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpress:
+                - key: app
+                  operator: In
+                  values:
+                  - cockroachdb
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: cockroachdb
         # Runs the master branch. Not recommended for production, but since
