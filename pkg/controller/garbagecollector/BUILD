@@ -23,6 +23,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/client/retry:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
@@ -60,6 +62,8 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",

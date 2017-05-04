@@ -34,6 +34,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/api"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 )
 
 type eventType int
@@ -90,6 +92,7 @@ type GraphBuilder struct {
 	// GraphBuilder and GC share the absentOwnerCache. Objects that are known to
 	// be non-existent are added to the cached.
 	absentOwnerCache *UIDCache
+	sharedInformers  informers.SharedInformerFactory
 }
 
 func listWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *cache.ListWatch {
@@ -118,28 +121,32 @@ func listWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *
 }
 
 func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, error) {
-	// TODO: consider store in one storage.
-	glog.V(5).Infof("create storage for resource %s", resource)
-	client, err := gb.metaOnlyClientPool.ClientForGroupVersionKind(kind)
-	if err != nil {
-		return nil, err
-	}
-	gb.registeredRateLimiterForControllers.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
-	setObjectTypeMeta := func(obj interface{}) {
+	setObjectTypeMeta := func(obj interface{}, clone bool) (runtime.Object, error) {
 		runtimeObject, ok := obj.(runtime.Object)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("expected runtime.Object, got %#v", obj))
+			return nil, fmt.Errorf("expected runtime.Object, got %#v", obj)
+		}
+		if clone {
+			copy, err := api.Scheme.DeepCopy(runtimeObject)
+			if err != nil {
+				return nil, err
+			}
+			runtimeObject = copy.(runtime.Object)
 		}
 		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
+		return runtimeObject, nil
 	}
-	_, monitor := cache.NewInformer(
-		listWatcher(client, resource),
-		nil,
-		ResourceResyncTime,
-		cache.ResourceEventHandlerFuncs{
+
+	handler := func(clone bool) cache.ResourceEventHandlerFuncs {
+		return cache.ResourceEventHandlerFuncs{
 			// add the event to the dependencyGraphBuilder's graphChanges.
 			AddFunc: func(obj interface{}) {
-				setObjectTypeMeta(obj)
+				var err error
+				obj, err = setObjectTypeMeta(obj, clone)
+				if err != nil {
+					utilruntime.HandleError(err)
+					return
+				}
 				event := &event{
 					eventType: addEvent,
 					obj:       obj,
@@ -147,7 +154,12 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 				gb.graphChanges.Add(event)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				setObjectTypeMeta(newObj)
+				var err error
+				newObj, err = setObjectTypeMeta(newObj, clone)
+				if err != nil {
+					utilruntime.HandleError(err)
+					return
+				}
 				// TODO: check if there are differences in the ownerRefs,
 				// finalizers, and DeletionTimestamp; if not, ignore the update.
 				event := &event{updateEvent, newObj, oldObj}
@@ -158,14 +170,44 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 				if deletedFinalStateUnknown, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 					obj = deletedFinalStateUnknown.Obj
 				}
-				setObjectTypeMeta(obj)
+				var err error
+				obj, err = setObjectTypeMeta(obj, clone)
+				if err != nil {
+					utilruntime.HandleError(err)
+					return
+				}
 				event := &event{
 					eventType: deleteEvent,
 					obj:       obj,
 				}
 				gb.graphChanges.Add(event)
 			},
-		},
+		}
+	}
+
+	shared, err := gb.sharedInformers.ForResource(resource)
+	if err == nil {
+		glog.V(4).Infof("using a shared informer for resource %q, kind %q", resource.String(), kind.String())
+		// need to clone because it's from a shared cache
+		shared.Informer().AddEventHandlerWithResyncPeriod(handler(true), ResourceResyncTime)
+		return shared.Informer().GetController(), nil
+	} else {
+		glog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
+	}
+
+	// TODO: consider store in one storage.
+	glog.V(5).Infof("create storage for resource %s", resource)
+	client, err := gb.metaOnlyClientPool.ClientForGroupVersionKind(kind)
+	if err != nil {
+		return nil, err
+	}
+	gb.registeredRateLimiterForControllers.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
+	_, monitor := cache.NewInformer(
+		listWatcher(client, resource),
+		nil,
+		ResourceResyncTime,
+		// don't need to clone because it's not from shared cache
+		handler(false),
 	)
 	return monitor, nil
 }
@@ -440,7 +482,7 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return true
 	}
-	glog.V(5).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, event type %v", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.eventType)
+	glog.V(5).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, uid %s, event type %v", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
 	// Check if the node already exsits
 	existingNode, found := gb.uidToNode.Read(accessor.GetUID())
 	switch {
