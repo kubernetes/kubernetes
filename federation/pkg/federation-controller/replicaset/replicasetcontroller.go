@@ -196,7 +196,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	)
 	frsc.replicaSetLister = extensionslisters.NewReplicaSetLister(replicaSetIndexer)
 
-	frsc.fedUpdater = fedutil.NewFederatedUpdater(frsc.fedReplicaSetInformer, "replicaset", frsc.eventRecorder,
+	frsc.fedUpdater = fedutil.NewFederatedUpdater(frsc.fedReplicaSetInformer, "replicaset", updateTimeout, frsc.eventRecorder,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.ReplicaSet)
 			_, err := client.Extensions().ReplicaSets(rs.Namespace).Create(rs)
@@ -221,7 +221,6 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			replicaset := obj.(*extensionsv1.ReplicaSet)
 			return fmt.Sprintf("%s/%s", replicaset.Namespace, replicaset.Name)
 		},
-		updateTimeout,
 		frsc.fedReplicaSetInformer,
 		frsc.fedUpdater,
 	)
@@ -579,7 +578,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		// Everything is in order
 		return statusAllOk, nil
 	}
-	err = frsc.fedUpdater.Update(operations, updateTimeout)
+	err = frsc.fedUpdater.Update(operations)
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", key, err)
 		return statusError, err

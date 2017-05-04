@@ -70,7 +70,7 @@ func TestFederatedUpdaterOK(t *testing.T) {
 	addChan := make(chan string, 5)
 	updateChan := make(chan string, 5)
 
-	updater := NewFederatedUpdater(&fakeFederationView{}, "foo", &fakeEventRecorder{},
+	updater := NewFederatedUpdater(&fakeFederationView{}, "foo", time.Minute, &fakeEventRecorder{},
 		func(_ kubeclientset.Interface, obj pkgruntime.Object) error {
 			service := obj.(*apiv1.Service)
 			addChan <- service.Name
@@ -92,7 +92,7 @@ func TestFederatedUpdaterOK(t *testing.T) {
 			Type: OperationTypeUpdate,
 			Obj:  makeService("B", "s2"),
 		},
-	}, time.Minute)
+	})
 	assert.NoError(t, err)
 	add := <-addChan
 	update := <-updateChan
@@ -101,7 +101,7 @@ func TestFederatedUpdaterOK(t *testing.T) {
 }
 
 func TestFederatedUpdaterError(t *testing.T) {
-	updater := NewFederatedUpdater(&fakeFederationView{}, "foo", &fakeEventRecorder{},
+	updater := NewFederatedUpdater(&fakeFederationView{}, "foo", time.Minute, &fakeEventRecorder{},
 		func(_ kubeclientset.Interface, obj pkgruntime.Object) error {
 			return fmt.Errorf("boom")
 		}, noop, noop)
@@ -115,13 +115,13 @@ func TestFederatedUpdaterError(t *testing.T) {
 			Type: OperationTypeUpdate,
 			Obj:  makeService("B", "s1"),
 		},
-	}, time.Minute)
+	})
 	assert.Error(t, err)
 }
 
 func TestFederatedUpdaterTimeout(t *testing.T) {
 	start := time.Now()
-	updater := NewFederatedUpdater(&fakeFederationView{}, "foo", &fakeEventRecorder{},
+	updater := NewFederatedUpdater(&fakeFederationView{}, "foo", time.Second, &fakeEventRecorder{},
 		func(_ kubeclientset.Interface, obj pkgruntime.Object) error {
 			time.Sleep(time.Minute)
 			return nil
@@ -137,7 +137,7 @@ func TestFederatedUpdaterTimeout(t *testing.T) {
 			Type: OperationTypeUpdate,
 			Obj:  makeService("B", "s1"),
 		},
-	}, time.Second)
+	})
 	end := time.Now()
 	assert.Error(t, err)
 	assert.True(t, start.Add(10*time.Second).After(end))

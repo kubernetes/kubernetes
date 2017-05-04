@@ -229,7 +229,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	)
 
 	// Federated ingress updater along with Create/Update/Delete operations.
-	ic.federatedIngressUpdater = util.NewFederatedUpdater(ic.ingressFederatedInformer, "ingress", ic.eventRecorder,
+	ic.federatedIngressUpdater = util.NewFederatedUpdater(ic.ingressFederatedInformer, "ingress", ic.updateTimeout, ic.eventRecorder,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			ingress := obj.(*extensionsv1beta1.Ingress)
 			glog.V(4).Infof("Attempting to create Ingress: %v", ingress)
@@ -261,7 +261,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		})
 
 	// Federated configmap updater along with Create/Update/Delete operations.  Only Update should ever be called.
-	ic.federatedConfigMapUpdater = util.NewFederatedUpdater(ic.configMapFederatedInformer, "configmap", ic.eventRecorder,
+	ic.federatedConfigMapUpdater = util.NewFederatedUpdater(ic.configMapFederatedInformer, "configmap", ic.updateTimeout, ic.eventRecorder,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			configMap := obj.(*v1.ConfigMap)
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
@@ -296,7 +296,6 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			ingress := obj.(*extensionsv1beta1.Ingress)
 			return fmt.Sprintf("%s/%s", ingress.Namespace, ingress.Name)
 		},
-		ic.updateTimeout,
 		ic.ingressFederatedInformer,
 		ic.federatedIngressUpdater,
 	)
@@ -568,7 +567,7 @@ func (ic *IngressController) reconcileConfigMap(cluster *federationapi.Cluster, 
 			Key:         configMapNsName.String(),
 		}}
 		glog.V(4).Infof("Calling federatedConfigMapUpdater.Update() - operations: %v", operations)
-		err := ic.federatedConfigMapUpdater.Update(operations, ic.updateTimeout)
+		err := ic.federatedConfigMapUpdater.Update(operations)
 		if err != nil {
 			glog.Errorf("Failed to execute update of ConfigMap %q on cluster %q: %v", configMapNsName, cluster.Name, err)
 			ic.configMapDeliverer.DeliverAfter(cluster.Name, nil, ic.configMapReviewDelay)
@@ -884,7 +883,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		return
 	}
 	glog.V(4).Infof("Calling federatedUpdater.Update() - operations: %v", operations)
-	err = ic.federatedIngressUpdater.Update(operations, ic.updateTimeout)
+	err = ic.federatedIngressUpdater.Update(operations)
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", ingress, err)
 		ic.deliverIngress(ingress, ic.ingressReviewDelay, true)
