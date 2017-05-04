@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package openapi_test
 
 import (
 	"fmt"
@@ -27,25 +27,27 @@ import (
 	"github.com/go-openapi/spec"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 var _ = Describe("When reading openAPIData", func() {
 	var tmpDir string
 	var err error
 	var client *fakeOpenAPIClient
-	var instance *cachingOpenAPIClient
-	var expectedData *Resources
+	var instance *openapi.CachingOpenAPIClient
+	var expectedData *openapi.Resources
 
 	BeforeEach(func() {
 		tmpDir, err = ioutil.TempDir("", "openapi_cache_test")
 		Expect(err).To(BeNil())
 		client = &fakeOpenAPIClient{}
-		instance = newCachingOpenAPIClient(client, "v1.6", tmpDir)
+		instance = openapi.NewCachingOpenAPIClient(client, "v1.6", tmpDir)
 
 		d, err := data.OpenAPISchema()
 		Expect(err).To(BeNil())
 
-		expectedData, err = newOpenAPIData(d)
+		expectedData, err = openapi.NewOpenAPIData(d)
 		Expect(err).To(BeNil())
 	})
 
@@ -55,7 +57,7 @@ var _ = Describe("When reading openAPIData", func() {
 
 	It("should write to the cache", func() {
 		By("getting the live openapi spec from the server")
-		result, err := instance.openAPIData()
+		result, err := instance.OpenAPIData()
 		Expect(err).To(BeNil())
 		expectEqual(result, expectedData)
 		Expect(client.calls).To(Equal(1))
@@ -77,13 +79,13 @@ var _ = Describe("When reading openAPIData", func() {
 
 	It("should read from the cache", func() {
 		// First call should use the client
-		result, err := instance.openAPIData()
+		result, err := instance.OpenAPIData()
 		Expect(err).To(BeNil())
 		expectEqual(result, expectedData)
 		Expect(client.calls).To(Equal(1))
 
 		// Second call shouldn't use the client
-		result, err = instance.openAPIData()
+		result, err = instance.OpenAPIData()
 		Expect(err).To(BeNil())
 		expectEqual(result, expectedData)
 		Expect(client.calls).To(Equal(1))
@@ -96,7 +98,7 @@ var _ = Describe("When reading openAPIData", func() {
 	It("propagate errors that are encountered", func() {
 		// Expect an error
 		client.err = fmt.Errorf("expected error")
-		result, err := instance.openAPIData()
+		result, err := instance.OpenAPIData()
 		Expect(err.Error()).To(Equal(client.err.Error()))
 		Expect(result).To(BeNil())
 		Expect(client.calls).To(Equal(1))
@@ -107,7 +109,7 @@ var _ = Describe("When reading openAPIData", func() {
 		Expect(files).To(HaveLen(0))
 
 		// Client error is not cached
-		result, err = instance.openAPIData()
+		result, err = instance.OpenAPIData()
 		Expect(err.Error()).To(Equal(client.err.Error()))
 		Expect(result).To(BeNil())
 		Expect(client.calls).To(Equal(2))
@@ -138,16 +140,16 @@ var _ = Describe("Reading openAPIData", func() {
 		It("should not cache the result", func() {
 			client := &fakeOpenAPIClient{}
 
-			instance := newCachingOpenAPIClient(client, serverVersion, cacheDir)
+			instance := openapi.NewCachingOpenAPIClient(client, serverVersion, cacheDir)
 
 			d, err := data.OpenAPISchema()
 			Expect(err).To(BeNil())
 
-			expectedData, err := newOpenAPIData(d)
+			expectedData, err := openapi.NewOpenAPIData(d)
 			Expect(err).To(BeNil())
 
 			By("getting the live openapi schema")
-			result, err := instance.openAPIData()
+			result, err := instance.OpenAPIData()
 			Expect(err).To(BeNil())
 			expectEqual(result, expectedData)
 			Expect(client.calls).To(Equal(1))
@@ -166,16 +168,16 @@ var _ = Describe("Reading openAPIData", func() {
 		It("should not cache the result", func() {
 			client := &fakeOpenAPIClient{}
 
-			instance := newCachingOpenAPIClient(client, serverVersion, cacheDir)
+			instance := openapi.NewCachingOpenAPIClient(client, serverVersion, cacheDir)
 
 			d, err := data.OpenAPISchema()
 			Expect(err).To(BeNil())
 
-			expectedData, err := newOpenAPIData(d)
+			expectedData, err := openapi.NewOpenAPIData(d)
 			Expect(err).To(BeNil())
 
 			By("getting the live openapi schema")
-			result, err := instance.openAPIData()
+			result, err := instance.OpenAPIData()
 			Expect(err).To(BeNil())
 			expectEqual(result, expectedData)
 			Expect(client.calls).To(Equal(1))
@@ -200,7 +202,7 @@ func getFilenames(path string) ([]string, error) {
 	return result, nil
 }
 
-func expectEqual(a *Resources, b *Resources) {
+func expectEqual(a *openapi.Resources, b *openapi.Resources) {
 	Expect(a.NameToDefinition).To(HaveLen(len(b.NameToDefinition)))
 	for k, v := range a.NameToDefinition {
 		Expect(v).To(Equal(b.NameToDefinition[k]),

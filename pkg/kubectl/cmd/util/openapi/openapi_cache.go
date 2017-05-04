@@ -37,31 +37,31 @@ func init() {
 
 const openapiFileName = "openapi_cache"
 
-type cachingOpenAPIClient struct {
+type CachingOpenAPIClient struct {
 	version      string
 	client       discovery.OpenAPISchemaInterface
 	cacheDirName string
 }
 
-// newCachingOpenAPIClient returns a new discovery.OpenAPISchemaInterface
+// NewCachingOpenAPIClient returns a new discovery.OpenAPISchemaInterface
 // that will read the openapi spec from a local cache if it exists, and
 // if not will then fetch an openapi spec using a client.
 // client: used to fetch a new openapi spec if a local cache is not found
 // version: the server version and used as part of the cache file location
 // cacheDir: the directory under which the cache file will be written
-func newCachingOpenAPIClient(client discovery.OpenAPISchemaInterface, version, cacheDir string) *cachingOpenAPIClient {
-	return &cachingOpenAPIClient{
+func NewCachingOpenAPIClient(client discovery.OpenAPISchemaInterface, version, cacheDir string) *CachingOpenAPIClient {
+	return &CachingOpenAPIClient{
 		client:       client,
 		version:      version,
 		cacheDirName: cacheDir,
 	}
 }
 
-// openAPIData returns an openapi spec.
+// OpenAPIData returns an openapi spec.
 // It will first attempt to read the spec from a local cache
 // If it cannot read a local cache, it will read the file
 // using the client and then write the cache.
-func (c *cachingOpenAPIClient) openAPIData() (*Resources, error) {
+func (c *CachingOpenAPIClient) OpenAPIData() (*Resources, error) {
 	// Try to use the cached version
 	if c.useCache() {
 		doc, err := c.readOpenAPICache()
@@ -77,7 +77,7 @@ func (c *cachingOpenAPIClient) openAPIData() (*Resources, error) {
 		return nil, err
 	}
 
-	oa, err := newOpenAPIData(s)
+	oa, err := NewOpenAPIData(s)
 	if err != nil {
 		glog.V(2).Infof("Failed to parse openapi data %v", err)
 		return nil, err
@@ -97,12 +97,12 @@ func (c *cachingOpenAPIClient) openAPIData() (*Resources, error) {
 }
 
 // useCache returns true if the client should try to use the cache file
-func (c *cachingOpenAPIClient) useCache() bool {
+func (c *CachingOpenAPIClient) useCache() bool {
 	return len(c.version) > 0 && len(c.cacheDirName) > 0
 }
 
 // readOpenAPICache tries to read the openapi spec from the local file cache
-func (c *cachingOpenAPIClient) readOpenAPICache() (*Resources, error) {
+func (c *CachingOpenAPIClient) readOpenAPICache() (*Resources, error) {
 	// Get the filename to read
 	filename := c.openAPICacheFilename()
 
@@ -119,7 +119,7 @@ func (c *cachingOpenAPIClient) readOpenAPICache() (*Resources, error) {
 }
 
 // decodeSpec binary decodes the openapi spec
-func (c *cachingOpenAPIClient) decodeSpec(data []byte) (*Resources, error) {
+func (c *CachingOpenAPIClient) decodeSpec(data []byte) (*Resources, error) {
 	b := bytes.NewBuffer(data)
 	d := gob.NewDecoder(b)
 	parsed := &Resources{}
@@ -128,7 +128,7 @@ func (c *cachingOpenAPIClient) decodeSpec(data []byte) (*Resources, error) {
 }
 
 // encodeSpec binary encodes the openapi spec
-func (c *cachingOpenAPIClient) encodeSpec(parsed *Resources) ([]byte, error) {
+func (c *CachingOpenAPIClient) encodeSpec(parsed *Resources) ([]byte, error) {
 	b := &bytes.Buffer{}
 	e := gob.NewEncoder(b)
 	err := e.Encode(parsed)
@@ -138,7 +138,7 @@ func (c *cachingOpenAPIClient) encodeSpec(parsed *Resources) ([]byte, error) {
 
 // writeToCache tries to write the openapi spec to the local file cache.
 // writes the data to a new tempfile, and then links the cache file and the tempfile
-func (c *cachingOpenAPIClient) writeToCache(parsed *Resources) error {
+func (c *CachingOpenAPIClient) writeToCache(parsed *Resources) error {
 	// Get the constant filename used to read the cache.
 	cacheFile := c.openAPICacheFilename()
 
@@ -168,7 +168,7 @@ func (c *cachingOpenAPIClient) writeToCache(parsed *Resources) error {
 }
 
 // openAPICacheFilename returns the filename to read the cache from
-func (c *cachingOpenAPIClient) openAPICacheFilename() string {
+func (c *CachingOpenAPIClient) openAPICacheFilename() string {
 	// Cache using the client and server versions
 	return filepath.Join(c.cacheDirName, c.version, version.Get().GitVersion, openapiFileName)
 }
