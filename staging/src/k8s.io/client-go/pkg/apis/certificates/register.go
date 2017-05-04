@@ -50,6 +50,3 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	)
 	return nil
 }
-
-func (obj *CertificateSigningRequest) GetObjectKind() schema.ObjectKind     { return &obj.TypeMeta }
-func (obj *CertificateSigningRequestList) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
