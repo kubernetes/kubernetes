@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mux
+package server
 
 import (
 	"bytes"
@@ -30,42 +30,59 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/server/mux"
+	genericmux "k8s.io/apiserver/pkg/server/mux"
 )
 
-// APIContainer is a restful container which in addition support registering
-// handlers that do not show up in swagger or in /
-type APIContainer struct {
-	*restful.Container
+// APIServerHandlers holds the different http.Handlers used by the API server.
+// This includes the full handler chain, the gorestful handler (used for the API) which falls through to the postGoRestful handler
+// and the postGoRestful handler (which can contain a fallthrough of its own)
+type APIServerHandler struct {
+	// CompleteHandler is the one that is eventually served with.  It should include the full filter
+	// chain and then call the HandlerContainer.
+	CompleteHandler http.Handler
+	// The registered APIs
+	GoRestfulContainer *restful.Container
+	// PostGoRestfulMux is the final HTTP handler in the chain.
+	// It comes after all filters and the API handling
+	PostGoRestfulMux *mux.PathRecorderMux
 }
 
-// NewAPIContainer constructs a new container for APIs
-func NewAPIContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer, defaultMux http.Handler) *APIContainer {
-	c := APIContainer{
-		Container: restful.NewContainer(),
+func NewAPIServerHandler(s runtime.NegotiatedSerializer, notFoundHandler http.Handler) *APIServerHandler {
+	postGoRestfulMux := genericmux.NewPathRecorderMux()
+	if notFoundHandler != nil {
+		postGoRestfulMux.NotFoundHandler(notFoundHandler)
 	}
-	c.Container.ServeMux = mux
-	c.Container.Router(restful.CurlyRouter{}) // e.g. for proxy/{kind}/{name}/{*}
-	c.Container.RecoverHandler(func(panicReason interface{}, httpWriter http.ResponseWriter) {
+
+	gorestfulContainer := restful.NewContainer()
+	gorestfulContainer.ServeMux = http.NewServeMux()
+	gorestfulContainer.Router(restful.CurlyRouter{}) // e.g. for proxy/{kind}/{name}/{*}
+	gorestfulContainer.RecoverHandler(func(panicReason interface{}, httpWriter http.ResponseWriter) {
 		logStackOnRecover(s, panicReason, httpWriter)
 	})
-	c.Container.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+	gorestfulContainer.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 		serviceErrorHandler(s, serviceErr, request, response)
 	})
 
 	// register the defaultHandler for everything.  This will allow an unhandled request to fall through to another handler instead of
 	// ending up with a forced 404
-	c.Container.Handle("/", defaultMux)
+	gorestfulContainer.Handle("/", postGoRestfulMux)
 
-	return &c
+	return &APIServerHandler{
+		CompleteHandler:    gorestfulContainer.ServeMux,
+		GoRestfulContainer: gorestfulContainer,
+		PostGoRestfulMux:   postGoRestfulMux,
+	}
 }
 
-// ListedPaths returns the paths of the webservices for listing on /.
-func (c *APIContainer) ListedPaths() []string {
+// ListedPaths returns the paths that should be shown under /
+func (a *APIServerHandler) ListedPaths() []string {
 	var handledPaths []string
 	// Extract the paths handled using restful.WebService
-	for _, ws := range c.RegisteredWebServices() {
+	for _, ws := range a.GoRestfulContainer.RegisteredWebServices() {
 		handledPaths = append(handledPaths, ws.RootPath())
 	}
+	handledPaths = append(handledPaths, a.PostGoRestfulMux.ListedPaths()...)
 	sort.Strings(handledPaths)
 
 	return handledPaths
@@ -99,4 +116,9 @@ func serviceErrorHandler(s runtime.NegotiatedSerializer, serviceErr restful.Serv
 		resp,
 		request.Request,
 	)
+}
+
+// ServeHTTP makes it an http.Handler
+func (a *APIServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	a.CompleteHandler.ServeHTTP(w, r)
 }

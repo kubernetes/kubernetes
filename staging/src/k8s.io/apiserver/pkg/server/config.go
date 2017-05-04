@@ -53,7 +53,6 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
-	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
@@ -109,10 +108,6 @@ type Config struct {
 	// ExternalAddress is the host name to use for external (public internet) facing URLs (e.g. Swagger)
 	// Will default to a value based on secure serving info and available ipv4 IPs.
 	ExternalAddress string
-
-	// FallThroughHandler is the final HTTP handler in the chain.  If it is nil, one will be created for you.
-	// It comes after all filters and the API handling
-	FallThroughHandler *mux.PathRecorderMux
 
 	//===========================================================================
 	// Fields you probably don't care about changing
@@ -342,9 +337,6 @@ func (c *Config) Complete() completedConfig {
 		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		c.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorizer)
 	}
-	if c.FallThroughHandler == nil {
-		c.FallThroughHandler = mux.NewPathRecorderMux()
-	}
 
 	return completedConfig{c}
 }
@@ -354,38 +346,7 @@ func (c *Config) SkipComplete() completedConfig {
 	return completedConfig{c}
 }
 
-// New returns a new instance of GenericAPIServer from the given config.
-// Certain config fields will be set to a default value if unset,
-// including:
-//   ServiceClusterIPRange
-//   ServiceNodePortRange
-//   MasterCount
-//   ReadWritePort
-//   PublicAddress
-// Public fields:
-//   Handler -- The returned GenericAPIServer has a field TopHandler which is an
-//   http.Handler which handles all the endpoints provided by the GenericAPIServer,
-//   including the API, the UI, and miscellaneous debugging endpoints.  All
-//   these are subject to authorization and authentication.
-//   InsecureHandler -- an http.Handler which handles all the same
-//   endpoints as Handler, but no authorization and authentication is done.
-// Public methods:
-//   HandleWithAuth -- Allows caller to add an http.Handler for an endpoint
-//   that uses the same authentication and authorization (if any is configured)
-//   as the GenericAPIServer's built-in endpoints.
-//   If the caller wants to add additional endpoints not using the GenericAPIServer's
-//   auth, then the caller should create a handler for those endpoints, which delegates the
-//   any unhandled paths to "Handler".
-func (c completedConfig) New() (*GenericAPIServer, error) {
-	s, err := c.constructServer()
-	if err != nil {
-		return nil, err
-	}
-
-	return c.buildHandlers(s, nil)
-}
-
-func (c completedConfig) constructServer() (*GenericAPIServer, error) {
+func (c completedConfig) constructServer(delegate http.Handler) (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
@@ -393,7 +354,7 @@ func (c completedConfig) constructServer() (*GenericAPIServer, error) {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.LoopbackClientConfig == nil")
 	}
 
-	handlerContainer := mux.NewAPIContainer(http.NewServeMux(), c.Serializer, c.FallThroughHandler)
+	apiServerHandler := NewAPIServerHandler(c.Serializer, delegate)
 
 	s := &GenericAPIServer{
 		discoveryAddresses:     c.DiscoveryAddresses,
@@ -408,10 +369,9 @@ func (c completedConfig) constructServer() (*GenericAPIServer, error) {
 		SecureServingInfo: c.SecureServingInfo,
 		ExternalAddress:   c.ExternalAddress,
 
-		HandlerContainer:   handlerContainer,
-		FallThroughHandler: c.FallThroughHandler,
+		Handler: apiServerHandler,
 
-		listedPathProvider: routes.ListedPathProviders{handlerContainer, c.FallThroughHandler},
+		listedPathProvider: apiServerHandler,
 
 		swaggerConfig: c.SwaggerConfig,
 		openAPIConfig: c.OpenAPIConfig,
@@ -427,13 +387,13 @@ func (c completedConfig) constructServer() (*GenericAPIServer, error) {
 	return s, nil
 }
 
-// NewWithDelegate creates a new server which logically combines the handling chain with the passed server.
-func (c completedConfig) NewWithDelegate(delegationTarget DelegationTarget) (*GenericAPIServer, error) {
+// New creates a new server which logically combines the handling chain with the passed server.
+func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServer, error) {
 	// some pieces of the delegationTarget take precendence.  Callers should already have ensured that these
 	// were wired correctly.  Documenting them here.
 	// c.RequestContextMapper = delegationTarget.RequestContextMapper()
 
-	s, err := c.constructServer()
+	s, err := c.constructServer(delegationTarget.UnprotectedHandler())
 	if err != nil {
 		return nil, err
 	}
@@ -480,16 +440,14 @@ func (c completedConfig) buildHandlers(s *GenericAPIServer, delegate http.Handle
 	}
 
 	installAPI(s, c.Config)
-	if delegate != nil {
-		s.FallThroughHandler.NotFoundHandler(delegate)
-	} else if c.EnableIndex {
-		s.FallThroughHandler.NotFoundHandler(routes.IndexLister{
+	if delegate == nil && c.EnableIndex {
+		s.Handler.PostGoRestfulMux.NotFoundHandler(routes.IndexLister{
 			StatusCode:   http.StatusNotFound,
 			PathProvider: s.listedPathProvider,
 		})
 	}
 
-	s.Handler = c.BuildHandlerChainFunc(s.HandlerContainer.ServeMux, c.Config)
+	s.Handler.CompleteHandler = c.BuildHandlerChainFunc(s.Handler.CompleteHandler, c.Config)
 
 	return s, nil
 }
@@ -510,28 +468,28 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableIndex {
-		routes.Index{}.Install(s.listedPathProvider, c.FallThroughHandler)
+		routes.Index{}.Install(s.listedPathProvider, s.Handler.PostGoRestfulMux)
 	}
 	if c.SwaggerConfig != nil && c.EnableSwaggerUI {
-		routes.SwaggerUI{}.Install(s.FallThroughHandler)
+		routes.SwaggerUI{}.Install(s.Handler.PostGoRestfulMux)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.FallThroughHandler)
+		routes.Profiling{}.Install(s.Handler.PostGoRestfulMux)
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}
 	if c.EnableMetrics {
 		if c.EnableProfiling {
-			routes.MetricsWithReset{}.Install(s.FallThroughHandler)
+			routes.MetricsWithReset{}.Install(s.Handler.PostGoRestfulMux)
 		} else {
-			routes.DefaultMetrics{}.Install(s.FallThroughHandler)
+			routes.DefaultMetrics{}.Install(s.Handler.PostGoRestfulMux)
 		}
 	}
-	routes.Version{Version: c.Version}.Install(s.HandlerContainer)
+	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer)
 
 	if c.EnableDiscovery {
-		s.HandlerContainer.Add(s.DiscoveryGroupManager.WebService())
+		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
 	}
 }
 

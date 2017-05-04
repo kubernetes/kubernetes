@@ -110,7 +110,7 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 
 	// run the insecure server now, don't block.  It doesn't have any aggregator goodies since authentication wouldn't work
 	if insecureServingOptions != nil {
-		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(kubeAPIServer.GenericAPIServer.HandlerContainer.ServeMux, kubeAPIServerConfig.GenericConfig)
+		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(kubeAPIServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig)
 		if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, stopCh); err != nil {
 			return err
 		}
@@ -139,7 +139,7 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 
 // CreateKubeAPIServer creates and wires a workable kube-apiserver
 func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, sharedInformers informers.SharedInformerFactory, stopCh <-chan struct{}) (*master.Master, error) {
-	kubeAPIServer, err := kubeAPIServerConfig.Complete().New()
+	kubeAPIServer, err := kubeAPIServerConfig.Complete().New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		return nil, err
 	}

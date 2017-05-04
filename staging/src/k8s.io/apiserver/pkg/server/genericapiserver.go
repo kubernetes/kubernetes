@@ -42,8 +42,6 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
-	"k8s.io/apiserver/pkg/server/mux"
-	genericmux "k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	restclient "k8s.io/client-go/rest"
 )
@@ -101,9 +99,6 @@ type GenericAPIServer struct {
 	// requestContextMapper provides a way to get the context for a request.  It may be nil.
 	requestContextMapper apirequest.RequestContextMapper
 
-	// The registered APIs
-	HandlerContainer *genericmux.APIContainer
-
 	SecureServingInfo *SecureServingInfo
 
 	// numerical ports, set after listening
@@ -121,10 +116,8 @@ type GenericAPIServer struct {
 	Serializer runtime.NegotiatedSerializer
 
 	// "Outputs"
-	Handler http.Handler
-	// FallThroughHandler is the final HTTP handler in the chain.
-	// It comes after all filters and the API handling
-	FallThroughHandler *mux.PathRecorderMux
+	// Handler holdes the handlers being used by this API server
+	Handler *APIServerHandler
 
 	// listedPathProvider is a lister which provides the set of paths to show at /
 	listedPathProvider routes.ListedPathProvider
@@ -171,7 +164,7 @@ type DelegationTarget interface {
 }
 
 func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
-	return s.HandlerContainer.ServeMux
+	return s.Handler.GoRestfulContainer.ServeMux
 }
 func (s *GenericAPIServer) PostStartHooks() map[string]postStartHookEntry {
 	return s.postStartHooks
@@ -233,12 +226,12 @@ type preparedGenericAPIServer struct {
 // PrepareRun does post API installation setup steps.
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	if s.swaggerConfig != nil {
-		routes.Swagger{Config: s.swaggerConfig}.Install(s.HandlerContainer)
+		routes.Swagger{Config: s.swaggerConfig}.Install(s.Handler.GoRestfulContainer)
 	}
 	if s.openAPIConfig != nil {
 		routes.OpenAPI{
 			Config: s.openAPIConfig,
-		}.Install(s.HandlerContainer, s.FallThroughHandler)
+		}.Install(s.Handler.GoRestfulContainer, s.Handler.PostGoRestfulMux)
 	}
 
 	s.installHealthz()
@@ -306,7 +299,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
 		}
 
-		if err := apiGroupVersion.InstallREST(s.HandlerContainer.Container); err != nil {
+		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer); err != nil {
 			return fmt.Errorf("Unable to setup API %v: %v", apiGroupInfo, err)
 		}
 	}
@@ -329,7 +322,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	}
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
-	s.HandlerContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions).WebService())
+	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions).WebService())
 	return nil
 }
 
@@ -373,7 +366,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	}
 
 	s.DiscoveryGroupManager.AddGroup(apiGroup)
-	s.HandlerContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup).WebService())
+	s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup).WebService())
 
 	return nil
 }
