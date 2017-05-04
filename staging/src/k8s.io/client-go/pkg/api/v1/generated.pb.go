@@ -1319,6 +1319,12 @@ func (m *AzureFileVolumeSource) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0
 	}
 	i++
+	dAtA[i] = 0x20
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.DirMode))
+	dAtA[i] = 0x28
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.FileMode))
 	return i, nil
 }
 
@@ -9231,6 +9237,8 @@ func (m *AzureFileVolumeSource) Size() (n int) {
 	l = len(m.ShareName)
 	n += 1 + l + sovGenerated(uint64(l))
 	n += 2
+	n += 1 + sovGenerated(uint64(m.DirMode))
+	n += 1 + sovGenerated(uint64(m.FileMode))
 	return n
 }
 
@@ -12179,6 +12187,8 @@ func (this *AzureFileVolumeSource) String() string {
 		`SecretName:` + fmt.Sprintf("%v", this.SecretName) + `,`,
 		`ShareName:` + fmt.Sprintf("%v", this.ShareName) + `,`,
 		`ReadOnly:` + fmt.Sprintf("%v", this.ReadOnly) + `,`,
+		`DirMode:` + fmt.Sprintf("%v", this.DirMode) + `,`,
+		`FileMode:` + fmt.Sprintf("%v", this.FileMode) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -15281,6 +15291,44 @@ func (m *AzureFileVolumeSource) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.ReadOnly = bool(v != 0)
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DirMode", wireType)
+			}
+			m.DirMode = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.DirMode |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FileMode", wireType)
+			}
+			m.FileMode = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.FileMode |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
