@@ -697,7 +697,7 @@ func (r *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 
 	gidStr := strconv.FormatInt(int64(gid), 10)
 	pv.Annotations = map[string]string{volumehelper.VolumeGidAnnotationKey: gidStr}
-
+	pv.Annotations = map[string]string{volume.MountOptionAnnotation: "auto_unmount"}
 	pv.Spec.Capacity = v1.ResourceList{
 		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 	}
