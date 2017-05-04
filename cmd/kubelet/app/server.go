@@ -110,8 +110,9 @@ containers which were not created by Kubernetes.
 Other than from an PodSpec from the apiserver, there are three ways that a container
 manifest can be provided to the Kubelet.
 
-File: Path passed as a flag on the command line. This file is rechecked every 20
-seconds (configurable with a flag).
+File: Path passed as a flag on the command line. Files under this path will be monitored
+periodically for updates. The monitoring period is 20s by default and is configurable
+via a flag.
 
 HTTP endpoint: HTTP endpoint passed as a parameter on the command line. This endpoint
 is checked every 20 seconds (also configurable with a flag).
@@ -939,18 +940,6 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 	dockerClient := dockertools.ConnectToDockerOrDie(c.DockerEndpoint, c.RuntimeRequestTimeout.Duration,
 		c.ImagePullProgressDeadline.Duration)
 
-	// Initialize docker exec handler.
-	var dockerExecHandler dockertools.ExecHandler
-	switch c.DockerExecHandlerName {
-	case "native":
-		dockerExecHandler = &dockertools.NativeExecHandler{}
-	case "nsenter":
-		dockerExecHandler = &dockertools.NsenterExecHandler{}
-	default:
-		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", c.DockerExecHandlerName)
-		dockerExecHandler = &dockertools.NativeExecHandler{}
-	}
-
 	// Initialize network plugin settings.
 	binDir := c.CNIBinDir
 	if binDir == "" {
@@ -976,7 +965,7 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 	}
 
 	ds, err := dockershim.NewDockerService(dockerClient, c.SeccompProfileRoot, c.PodInfraContainerImage,
-		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, dockerExecHandler, dockershimRootDir,
+		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, c.DockerExecHandlerName, dockershimRootDir,
 		!c.DockerEnableSharedPID)
 	if err != nil {
 		return err

@@ -236,11 +236,10 @@ def setup_non_leader_authentication():
         # the keys were not retrieved. Non-leaders have to retry.
         return
 
-    api_opts.add('--basic-auth-file', basic_auth)
-    api_opts.add('--token-auth-file', known_tokens)
-    api_opts.add('--service-cluster-ip-range', service_cidr())
-    api_opts.add('--service-account-key-file', service_key)
-    controller_opts.add('--service-account-private-key-file', service_key)
+    api_opts.add('basic-auth-file', basic_auth)
+    api_opts.add('token-auth-file', known_tokens)
+    api_opts.add('service-account-key-file', service_key)
+    controller_opts.add('service-account-private-key-file', service_key)
 
     set_state('authentication.setup')
 
@@ -275,12 +274,6 @@ def get_keys_from_leader(keys):
             with open(k, 'w+') as fp:
                 fp.write(contents)
 
-    api_opts.add('basic-auth-file', basic_auth)
-    api_opts.add('token-auth-file', known_tokens)
-    api_opts.add('service-account-key-file', service_key)
-    controller_opts.add('service-account-private-key-file', service_key)
-
-    set_state('authentication.setup')
     return True
 
 

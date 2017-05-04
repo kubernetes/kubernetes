@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
@@ -147,12 +149,23 @@ var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPat
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler, dockershimRootDir string, disableSharedPID bool) (DockerService, error) {
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandlerName, dockershimRootDir string, disableSharedPID bool) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
 	checkpointHandler, err := NewPersistentCheckpointHandler(dockershimRootDir)
 	if err != nil {
 		return nil, err
 	}
+	var execHandler ExecHandler
+	switch execHandlerName {
+	case "native":
+		execHandler = &NativeExecHandler{}
+	case "nsenter":
+		execHandler = &NsenterExecHandler{}
+	default:
+		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", execHandlerName)
+		execHandler = &NativeExecHandler{}
+	}
+
 	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
 		client:             c,
@@ -478,7 +491,32 @@ func (d *dockerLegacyService) GetContainerLogs(pod *v1.Pod, containerID kubecont
 	if err != nil {
 		return err
 	}
-	return dockertools.GetContainerLogs(d.client, pod, containerID, logOptions, stdout, stderr, container.Config.Tty)
+
+	var since int64
+	if logOptions.SinceSeconds != nil {
+		t := metav1.Now().Add(-time.Duration(*logOptions.SinceSeconds) * time.Second)
+		since = t.Unix()
+	}
+	if logOptions.SinceTime != nil {
+		since = logOptions.SinceTime.Unix()
+	}
+	opts := dockertypes.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Since:      strconv.FormatInt(since, 10),
+		Timestamps: logOptions.Timestamps,
+		Follow:     logOptions.Follow,
+	}
+	if logOptions.TailLines != nil {
+		opts.Tail = strconv.FormatInt(*logOptions.TailLines, 10)
+	}
+
+	sopts := dockertools.StreamOptions{
+		OutputStream: stdout,
+		ErrorStream:  stderr,
+		RawTerminal:  container.Config.Tty,
+	}
+	return d.client.Logs(containerID.ID, opts, sopts)
 }
 
 // criSupportedLogDrivers are log drivers supported by native CRI integration.
