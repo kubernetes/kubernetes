@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -31,6 +32,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+)
+
+const (
+	// Used when watching for node status, e.g. in VerifyControllerAttachedVolume
+	nodeWatchTimeoutInSeconds = 60
 )
 
 var _ OperationGenerator = &operationGenerator{}
@@ -798,66 +804,93 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			return nil
 		}
 
-		if !volumeToMount.ReportedInUse {
-			// If the given volume has not yet been added to the list of
-			// VolumesInUse in the node's volume status, do not proceed, return
-			// error. Caller will log and retry. The node status is updated
-			// periodically by kubelet, so it may take as much as 10 seconds
-			// before this clears.
-			// Issue #28141 to enable on demand status updates.
-			return fmt.Errorf("Volume %q (spec.Name: %q) pod %q (UID: %q) has not yet been added to the list of VolumesInUse in the node's volume status",
-				volumeToMount.VolumeName,
-				volumeToMount.VolumeSpec.Name(),
-				volumeToMount.PodName,
-				volumeToMount.Pod.UID)
-		}
-
-		// Fetch current node object
-		node, fetchErr := og.kubeClient.Core().Nodes().Get(string(nodeName), metav1.GetOptions{})
-		if fetchErr != nil {
+		timeout := int64(nodeWatchTimeoutInSeconds)
+		nodeSelector := fields.OneTermEqualSelector("metadata.name", string(nodeName))
+		w, err := og.kubeClient.Core().Nodes().Watch(metav1.ListOptions{
+			FieldSelector:   nodeSelector.String(),
+			ResourceVersion: "0",
+			TimeoutSeconds:  &timeout,
+		})
+		if err != nil {
 			// On failure, return error. Caller will log and retry.
 			return fmt.Errorf(
-				"VerifyControllerAttachedVolume failed fetching node from API server. Volume %q (spec.Name: %q) pod %q (UID: %q). Error: %v",
+				"VerifyControllerAttachedVolume failed watching node on API server. Volume %q (spec.Name: %q) pod %q (UID: %q). Error: %v",
 				volumeToMount.VolumeName,
 				volumeToMount.VolumeSpec.Name(),
 				volumeToMount.PodName,
 				volumeToMount.Pod.UID,
-				fetchErr)
+				err)
 		}
+		defer w.Stop()
 
-		if node == nil {
-			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
-				"VerifyControllerAttachedVolume failed. Volume %q (spec.Name: %q) pod %q (UID: %q). Error: node object retrieved from API server is nil",
-				volumeToMount.VolumeName,
-				volumeToMount.VolumeSpec.Name(),
-				volumeToMount.PodName,
-				volumeToMount.Pod.UID)
-		}
+		volumeInUse := false
 
-		for _, attachedVolume := range node.Status.VolumesAttached {
-			if attachedVolume.Name == volumeToMount.VolumeName {
-				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-					v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
-				glog.Infof("Controller successfully attached volume %q (spec.Name: %q) pod %q (UID: %q) devicePath: %q",
+		for r := range w.ResultChan() {
+			node, ok := r.Object.(*v1.Node)
+			if !ok {
+				return fmt.Errorf(
+					"VerifyControllerAttachedVolume received unexpect object while watching. Volume %q (spec.Name: %q) pod %q (UID: %q)",
 					volumeToMount.VolumeName,
 					volumeToMount.VolumeSpec.Name(),
 					volumeToMount.PodName,
-					volumeToMount.Pod.UID,
-					attachedVolume.DevicePath)
+					volumeToMount.Pod.UID)
+			}
 
-				if addVolumeNodeErr != nil {
-					// On failure, return error. Caller will log and retry.
-					return fmt.Errorf(
-						"VerifyControllerAttachedVolume.MarkVolumeAsAttached failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+			if node == nil {
+				// On failure, return error. Caller will log and retry.
+				return fmt.Errorf(
+					"VerifyControllerAttachedVolume failed. Volume %q (spec.Name: %q) pod %q (UID: %q). Error: node object retrieved from API server is nil",
+					volumeToMount.VolumeName,
+					volumeToMount.VolumeSpec.Name(),
+					volumeToMount.PodName,
+					volumeToMount.Pod.UID)
+			}
+
+			volumeInUse = false
+			for _, volume := range node.Status.VolumesInUse {
+				if volume == volumeToMount.VolumeName {
+					volumeInUse = true
+					break
+				}
+			}
+			if !volumeInUse {
+				continue
+			}
+			for _, attachedVolume := range node.Status.VolumesAttached {
+				if attachedVolume.Name == volumeToMount.VolumeName {
+					addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
+						v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
+					glog.Infof("Controller successfully attached volume %q (spec.Name: %q) pod %q (UID: %q) devicePath: %q",
 						volumeToMount.VolumeName,
 						volumeToMount.VolumeSpec.Name(),
 						volumeToMount.PodName,
 						volumeToMount.Pod.UID,
-						addVolumeNodeErr)
+						attachedVolume.DevicePath)
+
+					if addVolumeNodeErr != nil {
+						// On failure, return error. Caller will log and retry.
+						return fmt.Errorf(
+							"VerifyControllerAttachedVolume.MarkVolumeAsAttached failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+							volumeToMount.VolumeName,
+							volumeToMount.VolumeSpec.Name(),
+							volumeToMount.PodName,
+							volumeToMount.Pod.UID,
+							addVolumeNodeErr)
+					}
+					return nil
 				}
-				return nil
 			}
+		}
+
+		if !volumeInUse {
+			// If the given volume has not yet been added to the list of
+			// VolumesInUse in the node's volume status, do not proceed, return
+			// error. Caller will log and retry.
+			return fmt.Errorf("Volume %q (spec.Name: %q) pod %q (UID: %q) has not yet been added to the list of VolumesInUse in the node's volume status.",
+				volumeToMount.VolumeName,
+				volumeToMount.VolumeSpec.Name(),
+				volumeToMount.PodName,
+				volumeToMount.Pod.UID)
 		}
 
 		// Volume not attached, return error. Caller will log and retry.
