@@ -276,10 +276,10 @@ const (
 	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
 )
 
-// Tries to add a toleration to annotations list. Returns true if something was updated
-// false otherwise.
-func AddOrUpdateTolerationInPod(pod *Pod, toleration *Toleration) (bool, error) {
-	podTolerations := pod.Spec.Tolerations
+// AddOrUpdateTolerationInPodSpec tries to add a toleration to the toleration list in PodSpec.
+// Returns true if something was updated, false otherwise.
+func AddOrUpdateTolerationInPodSpec(spec *PodSpec, toleration *Toleration) (bool, error) {
+	podTolerations := spec.Tolerations
 
 	var newTolerations []Toleration
 	updated := false
@@ -300,8 +300,14 @@ func AddOrUpdateTolerationInPod(pod *Pod, toleration *Toleration) (bool, error) 
 		newTolerations = append(newTolerations, *toleration)
 	}
 
-	pod.Spec.Tolerations = newTolerations
+	spec.Tolerations = newTolerations
 	return true, nil
+}
+
+// AddOrUpdateTolerationInPod tries to add a toleration to the pod's toleration list.
+// Returns true if something was updated, false otherwise.
+func AddOrUpdateTolerationInPod(pod *Pod, toleration *Toleration) (bool, error) {
+	return AddOrUpdateTolerationInPodSpec(&pod.Spec, toleration)
 }
 
 // MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
