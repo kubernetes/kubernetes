@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
+	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
 type FakeNodeInfo v1.Node
@@ -563,7 +564,7 @@ func TestGetUsedPorts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ports := GetUsedPorts(test.pods...)
+		ports := schedutil.GetUsedPorts(test.pods...)
 		if !reflect.DeepEqual(test.ports, ports) {
 			t.Errorf("%s: expected %v, got %v", "test get used ports", test.ports, ports)
 		}

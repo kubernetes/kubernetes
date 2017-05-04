@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 	"k8s.io/metrics/pkg/client/clientset_generated/clientset"
 )
 
@@ -835,7 +836,7 @@ func PodFitsHostPorts(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 		wantPorts = predicateMeta.podPorts
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
-		wantPorts = GetUsedPorts(pod)
+		wantPorts = schedutil.GetUsedPorts(pod)
 	}
 	if len(wantPorts) == 0 {
 		return true, nil, nil
@@ -848,24 +849,6 @@ func PodFitsHostPorts(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 		}
 	}
 	return true, nil, nil
-}
-
-func GetUsedPorts(pods ...*v1.Pod) map[int]bool {
-	ports := make(map[int]bool)
-	for _, pod := range pods {
-		for j := range pod.Spec.Containers {
-			container := &pod.Spec.Containers[j]
-			for k := range container.Ports {
-				podPort := &container.Ports[k]
-				// "0" is explicitly ignored in PodFitsHostPorts,
-				// which is the only function that uses this value.
-				if podPort.HostPort != 0 {
-					ports[int(podPort.HostPort)] = true
-				}
-			}
-		}
-	}
-	return ports
 }
 
 // search two arrays and return true if they have at least one common element; return false otherwise
