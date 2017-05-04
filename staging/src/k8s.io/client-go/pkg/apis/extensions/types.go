@@ -877,6 +877,12 @@ type PodSecurityPolicySpec struct {
 	// will not be forced to.
 	// +optional
 	ReadOnlyRootFilesystem bool
+
+	// Priority determines which PodSecurityPolicy is used when more than one allow a particular pod.
+	// Higher priorities take precedence. PodSecurityPolicies with the same priority order themselves by name.
+	// PodSecurityPolicies without an explicit priority have an effective priority of 0.
+	// +optional
+	Priority int32
 }
 
 // HostPortRange defines a range of host ports that will be enabled by a policy

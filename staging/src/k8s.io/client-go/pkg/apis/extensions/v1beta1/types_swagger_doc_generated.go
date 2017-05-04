@@ -421,6 +421,7 @@ var map_PodSecurityPolicySpec = map[string]string{
 	"supplementalGroups":       "SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.",
 	"fsGroup":                  "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
 	"readOnlyRootFilesystem":   "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
+	"priority":                 "Priority determines which PodSecurityPolicy is used when more than one allow a particular pod. Higher priorities take precedence. PodSecurityPolicies with the same priority order themselves by name. PodSecurityPolicies without an explicit priority have an effective priority of 0.",
 }
 
 func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
