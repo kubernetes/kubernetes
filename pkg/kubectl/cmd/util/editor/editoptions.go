@@ -19,6 +19,8 @@ package editor
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -29,13 +31,12 @@ import (
 	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	apijson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -61,7 +62,7 @@ type EditOptions struct {
 	Mapper         meta.RESTMapper
 	ResourceMapper *resource.Mapper
 	OriginalResult *resource.Result
-	Codec          runtime.Encoder
+	Encoder        runtime.Encoder
 
 	EditMode EditMode
 
@@ -102,7 +103,6 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 	if err != nil {
 		return err
 	}
-	o.Codec = f.JSONEncoder()
 
 	mapper, typer, err := f.UnstructuredObject()
 	if err != nil {
@@ -110,7 +110,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 	}
 	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme)
 	if o.EditMode == NormalEditMode || o.EditMode == ApplyEditMode {
-		// when do normal edit we need to always retrieve the latest resource from server
+		// when do normal edit or apply edit we need to always retrieve the latest resource from server
 		b = b.ResourceTypeOrNameArgs(true, args...).Latest()
 	}
 	r := b.NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -135,7 +135,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 
 	o.Mapper = mapper
 	o.CmdNamespace = cmdNamespace
-
+	o.Encoder = f.JSONEncoder()
 	o.f = f
 
 	// Set up writer
@@ -165,21 +165,26 @@ func (o *EditOptions) Run() error {
 		containsError := false
 
 		if o.EditMode == ApplyEditMode {
+			var tempInfos []*resource.Info
 			for i := range infos {
 				data, err := kubectl.GetOriginalConfiguration(infos[i].Mapping, infos[i].Object)
 				if err != nil {
 					return err
 				}
 				if data == nil {
-					return fmt.Errorf("no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation")
+					continue
 				}
 
 				annotationInfos, err := o.updatedResultGetter(data).Infos()
 				if err != nil {
 					return err
 				}
-				infos[i] = annotationInfos[0]
+				tempInfos = append(tempInfos, annotationInfos[0])
 			}
+			if len(tempInfos) == 0 {
+				return errors.New("no last-applied-configuration annotation found on resources, to create the annotation, run the command with --create-annotation")
+			}
+			infos = tempInfos
 		}
 
 		// loop until we succeed or cancel editing
@@ -253,7 +258,7 @@ func (o *EditOptions) Run() error {
 					file: o.file,
 				}
 				containsError = true
-				fmt.Fprintln(o.ErrOut, results.addError(errors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), infos[0]))
+				fmt.Fprintln(o.ErrOut, results.addError(apierrors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), infos[0]))
 				continue
 			}
 
@@ -368,7 +373,7 @@ func (o *EditOptions) Run() error {
 func (o *EditOptions) applyEditPatch(oringalInfos, infos []*resource.Info) error {
 	for ix := range infos {
 		updatedInfo := infos[ix]
-		originalJS, editedJS, err := SerializationConvert(o.Codec, oringalInfos[ix].Object, updatedInfo.Object)
+		originalJS, editedJS, err := SerializationConvert(o.Encoder, oringalInfos[ix].Object, updatedInfo.Object)
 		if err != nil {
 			return err
 		}
@@ -384,7 +389,7 @@ func (o *EditOptions) applyEditPatch(oringalInfos, infos []*resource.Info) error
 }
 
 func (o *EditOptions) annotationPatch(update *resource.Info) error {
-	patch, _, err := GetApplyPatch(update, o.Codec, false)
+	patch, _, err := GetApplyPatch(update, o.Encoder, false)
 	if err != nil {
 		return err
 	}
@@ -402,19 +407,22 @@ func (o *EditOptions) annotationPatch(update *resource.Info) error {
 }
 
 func GetApplyPatch(info *resource.Info, codec runtime.Encoder, isLocal bool) ([]byte, []byte, error) {
-	wrapper := func(data []byte) ([]byte, []byte, error) {
+	wrapper := func(data []byte) ([]byte, error) {
+		if len(data) == 0 {
+			return []byte("{}"), nil
+		}
 		objMap := map[string]map[string]map[string]string{}
 		metadataMap := map[string]map[string]string{}
 		annotationsMap := map[string]string{}
 		annotationsMap[annotations.LastAppliedConfigAnnotation] = string(data)
 		metadataMap["annotations"] = annotationsMap
 		objMap["metadata"] = metadataMap
-		jsonString, err := apijson.Marshal(objMap)
-		return jsonString, data, err
+		jsonString, err := json.Marshal(objMap)
+		return jsonString, err
 	}
 
 	if info == nil {
-		return wrapper([]byte(""))
+		return []byte("{}"), []byte(""), nil
 	}
 	var obj runtime.Object
 	if isLocal {
@@ -426,30 +434,34 @@ func GetApplyPatch(info *resource.Info, codec runtime.Encoder, isLocal bool) ([]
 	if err != nil {
 		return nil, data, err
 	}
-	return wrapper(data)
+	js, err := wrapper(data)
+	return js, data, err
 }
 
 func SerializationConvert(codec runtime.Encoder, original, updated runtime.Object) ([]byte, []byte, error) {
-	originalSerialization, err := runtime.Encode(codec, original)
-	if err != nil {
-		return nil, nil, err
-	}
-	editedSerialization, err := runtime.Encode(codec, updated)
+	originalJS, err := encodeToJson(codec, original)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// compute the patch on a per-item basis
-	// use strategic merge to create a patch
-	originalJS, err := yaml.ToJSON(originalSerialization)
+	editedJS, err := encodeToJson(codec, updated)
 	if err != nil {
 		return nil, nil, err
 	}
-	editedJS, err := yaml.ToJSON(editedSerialization)
-	if err != nil {
-		return nil, nil, err
-	}
+
 	return originalJS, editedJS, nil
+}
+
+func encodeToJson(codec runtime.Encoder, obj runtime.Object) ([]byte, error) {
+	serialization, err := runtime.Encode(codec, obj)
+	if err != nil {
+		return nil, err
+	}
+	js, err := yaml.ToJSON(serialization)
+	if err != nil {
+		return nil, err
+	}
+	return js, nil
 }
 
 func getPrinter(format string) *editPrinterOptions {
@@ -605,7 +617,7 @@ type EditMode string
 const (
 	NormalEditMode       EditMode = "normal_mode"
 	EditBeforeCreateMode EditMode = "edit_before_create_mode"
-	ApplyEditMode        EditMode = "apply_mode"
+	ApplyEditMode        EditMode = "edit_last_applied_mode"
 )
 
 // editReason preserves a message about the reason this file must be edited again
@@ -665,12 +677,12 @@ type editResults struct {
 
 func (r *editResults) addError(err error, info *resource.Info) string {
 	switch {
-	case errors.IsInvalid(err):
+	case apierrors.IsInvalid(err):
 		r.edit = append(r.edit, info)
 		reason := editReason{
 			head: fmt.Sprintf("%s %q was not valid", info.Mapping.Resource, info.Name),
 		}
-		if err, ok := err.(errors.APIStatus); ok {
+		if err, ok := err.(apierrors.APIStatus); ok {
 			if details := err.Status().Details; details != nil {
 				for _, cause := range details.Causes {
 					reason.other = append(reason.other, fmt.Sprintf("%s: %s", cause.Field, cause.Message))
@@ -679,7 +691,7 @@ func (r *editResults) addError(err error, info *resource.Info) string {
 		}
 		r.header.reasons = append(r.header.reasons, reason)
 		return fmt.Sprintf("error: %s %q is invalid", info.Mapping.Resource, info.Name)
-	case errors.IsNotFound(err):
+	case apierrors.IsNotFound(err):
 		r.notfound++
 		return fmt.Sprintf("error: %s %q could not be found on the server", info.Mapping.Resource, info.Name)
 	default:

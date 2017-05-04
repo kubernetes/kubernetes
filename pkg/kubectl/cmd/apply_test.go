@@ -20,26 +20,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
-
-	yaml "gopkg.in/yaml.v2"
 
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
@@ -47,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -1021,202 +1013,5 @@ func checkPatchString(t *testing.T, req *http.Request) {
 	resultString := annotationsMap["kubectl.kubernetes.io/last-applied-configuration"]
 	if resultString != checkString {
 		t.Fatalf("patch annotation is not correct, expect:%s\n but got:%s\n", checkString, resultString)
-	}
-}
-
-func TestAppplyEdit(t *testing.T) {
-	var (
-		name     string
-		testcase EditTestCase
-		i        int
-		err      error
-	)
-
-	const updateEnvVar = "UPDATE_EDIT_FIXTURE_DATA"
-	updateInputFixtures := os.Getenv(updateEnvVar) == "true"
-
-	reqResp := func(req *http.Request) (*http.Response, error) {
-		defer func() { i++ }()
-		if i > len(testcase.Steps)-1 {
-			t.Fatalf("%s, step %d: more requests than steps, got %s %s", name, i, req.Method, req.URL.Path)
-		}
-		step := testcase.Steps[i]
-
-		body := []byte{}
-		if req.Body != nil {
-			body, err = ioutil.ReadAll(req.Body)
-			if err != nil {
-				t.Fatalf("%s, step %d: %v", name, i, err)
-			}
-		}
-
-		inputFile := filepath.Join("testdata/applyedit", "testcase-"+name, step.Input)
-		expectedInput, err := ioutil.ReadFile(inputFile)
-		if err != nil {
-			t.Fatalf("%s, step %d: %v", name, i, err)
-		}
-
-		outputFile := filepath.Join("testdata/applyedit", "testcase-"+name, step.Output)
-		resultingOutput, err := ioutil.ReadFile(outputFile)
-		if err != nil {
-			t.Fatalf("%s, step %d: %v", name, i, err)
-		}
-
-		if req.Method == "POST" && req.URL.Path == "/callback" {
-			if step.StepType != "edit" {
-				t.Fatalf("%s, step %d: expected edit step, got %s %s", name, i, req.Method, req.URL.Path)
-			}
-			if bytes.Compare(body, expectedInput) != 0 {
-				if updateInputFixtures {
-					// Convenience to allow recapturing the input and persisting it here
-					ioutil.WriteFile(inputFile, body, os.FileMode(0644))
-				} else {
-					t.Errorf("%s, step %d: diff in edit content:\n%s", name, i, diff.StringDiff(string(body), string(expectedInput)))
-					t.Logf("If the change in input is expected, rerun tests with %s=true to update input fixtures", updateEnvVar)
-				}
-			}
-			return &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(resultingOutput))}, nil
-		} else {
-			if step.StepType != "request" {
-				t.Fatalf("%s, step %d: expected request step, got %s %s", name, i, req.Method, req.URL.Path)
-			}
-			body = tryIndent(body)
-			expectedInput = tryIndent(expectedInput)
-			if req.Method != step.RequestMethod || req.URL.Path != step.RequestPath || req.Header.Get("Content-Type") != step.RequestContentType {
-				t.Fatalf(
-					"%s, step %d: expected \n%s %s (content-type=%s)\ngot\n%s %s (content-type=%s)", name, i,
-					step.RequestMethod, step.RequestPath, step.RequestContentType,
-					req.Method, req.URL.Path, req.Header.Get("Content-Type"),
-				)
-			}
-			if bytes.Compare(body, expectedInput) != 0 {
-				if updateInputFixtures {
-					// Convenience to allow recapturing the input and persisting it here
-					ioutil.WriteFile(inputFile, body, os.FileMode(0644))
-				} else {
-					t.Errorf("%s, step %d: diff in edit content:\n%s", name, i, diff.StringDiff(string(body), string(expectedInput)))
-					t.Logf("If the change in input is expected, rerun tests with %s=true to update input fixtures", updateEnvVar)
-				}
-			}
-			return &http.Response{StatusCode: step.ResponseStatusCode, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(resultingOutput))}, nil
-		}
-	}
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		resp, _ := reqResp(req)
-		for k, vs := range resp.Header {
-			w.Header().Del(k)
-			for _, v := range vs {
-				w.Header().Add(k, v)
-			}
-		}
-		w.WriteHeader(resp.StatusCode)
-		io.Copy(w, resp.Body)
-	})
-
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	os.Setenv("KUBE_EDITOR", "testdata/edit/test_editor.sh")
-	os.Setenv("KUBE_EDITOR_CALLBACK", server.URL+"/callback")
-
-	testcases := sets.NewString()
-	filepath.Walk("testdata/applyedit", func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if path == "testdata/applyedit" {
-			return nil
-		}
-		name := filepath.Base(path)
-		if info.IsDir() {
-			if strings.HasPrefix(name, "testcase-") {
-				testcases.Insert(strings.TrimPrefix(name, "testcase-"))
-			}
-			return filepath.SkipDir
-		}
-		return nil
-	})
-	// sanity check that we found the right folder
-	if !testcases.Has("apply-edit-port") {
-		t.Fatalf("Error locating edit testcases")
-	}
-
-	for _, testcaseName := range testcases.List() {
-		t.Logf("Running testcase: %s", testcaseName)
-		i = 0
-		name = testcaseName
-		testcase = EditTestCase{}
-		testcaseDir := filepath.Join("testdata", "applyedit", "testcase-"+name)
-		testcaseData, err := ioutil.ReadFile(filepath.Join(testcaseDir, "test.yaml"))
-		if err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-		if err := yaml.Unmarshal(testcaseData, &testcase); err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
-		tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-			versionedAPIPath := ""
-			if mapping.GroupVersionKind.Group == "" {
-				versionedAPIPath = "/api/" + mapping.GroupVersionKind.Version
-			} else {
-				versionedAPIPath = "/apis/" + mapping.GroupVersionKind.Group + "/" + mapping.GroupVersionKind.Version
-			}
-			return &fake.RESTClient{
-				APIRegistry:          api.Registry,
-				VersionedAPIPath:     versionedAPIPath,
-				NegotiatedSerializer: unstructuredSerializer,
-				Client:               fake.CreateHTTPClient(reqResp),
-			}, nil
-		}
-
-		if len(testcase.Namespace) > 0 {
-			tf.Namespace = testcase.Namespace
-		}
-
-		tf.ClientConfig = defaultClientConfig()
-		buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
-		tf.Command = "apply edit-last-applied cmd invocation"
-
-		var cmd *cobra.Command
-		switch testcase.Mode {
-		case "edit":
-			cmd = NewCmdApplyEditLastApplied(f, buf, errBuf)
-		default:
-			t.Errorf("%s: unexpected mode %s", name, testcase.Mode)
-			continue
-		}
-		if len(testcase.Filename) > 0 {
-			cmd.Flags().Set("filename", filepath.Join(testcaseDir, testcase.Filename))
-		}
-		if len(testcase.Output) > 0 {
-			cmd.Flags().Set("output", testcase.Output)
-		}
-
-		cmdutil.BehaviorOnFatal(func(str string, code int) {
-			errBuf.WriteString(str)
-			if testcase.ExpectedExitCode != code {
-				t.Errorf("%s: expected exit code %d, got %d: %s", name, testcase.ExpectedExitCode, code, str)
-			}
-		})
-
-		cmd.Run(cmd, testcase.Args)
-
-		stdout := buf.String()
-		stderr := errBuf.String()
-
-		for _, s := range testcase.ExpectedStdout {
-			if !strings.Contains(stdout, s) {
-				t.Errorf("%s: expected to see '%s' in stdout\n\nstdout:\n%s\n\nstderr:\n%s", name, s, stdout, stderr)
-			}
-		}
-		for _, s := range testcase.ExpectedStderr {
-			if !strings.Contains(stderr, s) {
-				t.Errorf("%s: expected to see '%s' in stderr\n\nstdout:\n%s\n\nstderr:\n%s", name, s, stdout, stderr)
-			}
-		}
 	}
 }

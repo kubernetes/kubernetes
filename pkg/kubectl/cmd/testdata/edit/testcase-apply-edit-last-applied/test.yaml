@@ -1,5 +1,5 @@
 description: add a testcase description
-mode: edit
+mode: edit-last-applied
 args:
 - service
 - svc1
