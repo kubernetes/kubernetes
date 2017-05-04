@@ -138,7 +138,9 @@ type PolicyRule struct {
 	// non-resource URL paths (such as "/api"), or neither, but not both.
 	// If neither is specified, the rule is treated as a default for all URLs.
 
-	ResourceKinds []string
+	// Resource kinds that this rule matches. An empty list implies all kinds in all API groups.
+	// +optional
+	ResourceKinds []GroupKinds
 	// Namespaces that this rule matches.
 	// The empty string "" matches non-namespaced resources.
 	// An empty list implies every namespace.
