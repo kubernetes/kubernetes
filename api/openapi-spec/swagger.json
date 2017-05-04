@@ -48321,6 +48321,11 @@
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.HostPortRange"
       }
      },
+     "priority": {
+      "description": "Priority determines which PodSecurityPolicy is used when more than one allow a particular pod. Higher priorities take precedence. PodSecurityPolicies with the same priority order themselves by name. PodSecurityPolicies without an explicit priority have an effective priority of 0.",
+      "type": "integer",
+      "format": "int32"
+     },
      "privileged": {
       "description": "privileged determines if a pod can request to be run as privileged.",
       "type": "boolean"

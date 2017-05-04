@@ -7540,6 +7540,13 @@ Both these may change in the future. Incoming requests are matched against the h
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">priority</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Priority determines which PodSecurityPolicy is used when more than one allow a particular pod. Higher priorities take precedence. PodSecurityPolicies with the same priority order themselves by name. PodSecurityPolicies without an explicit priority have an effective priority of 0.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
