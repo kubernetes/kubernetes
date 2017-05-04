@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"fmt"
+	"path"
 	"testing"
 
 	"github.com/blang/semver"
@@ -43,9 +44,6 @@ func TestLabelsAndAnnotationsRoundTrip(t *testing.T) {
 	assert.Equal(t, expectedAnnotations, actualAnnotations)
 }
 
-// TestGetSeccompSecurityOpts tests the logic of generating container seccomp options from sandbox annotations.
-// The actual profile loading logic is tested in dockertools.
-// TODO: Migrate the corresponding test to dockershim.
 func TestGetSeccompSecurityOpts(t *testing.T) {
 	containerName := "bar"
 	makeConfig := func(annotations map[string]string) *runtimeapi.PodSandboxConfig {
@@ -82,6 +80,55 @@ func TestGetSeccompSecurityOpts(t *testing.T) {
 
 	for i, test := range tests {
 		opts, err := getSeccompSecurityOpts(containerName, test.config, "test/seccomp/profile/root", '=')
+		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
+		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
+		for _, opt := range test.expectedOpts {
+			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)
+		}
+	}
+}
+
+func TestLoadSeccompLocalhostProfiles(t *testing.T) {
+	containerName := "bar"
+	makeConfig := func(annotations map[string]string) *runtimeapi.PodSandboxConfig {
+		return makeSandboxConfigWithLabelsAndAnnotations("pod", "ns", "1234", 1, nil, annotations)
+	}
+
+	tests := []struct {
+		msg          string
+		config       *runtimeapi.PodSandboxConfig
+		expectedOpts []string
+		expectErr    bool
+	}{{
+		msg: "Seccomp localhost/test profile",
+		config: makeConfig(map[string]string{
+			v1.SeccompPodAnnotationKey: "localhost/test",
+		}),
+		expectedOpts: []string{`seccomp={"foo":"bar"}`},
+		expectErr:    false,
+	}, {
+		msg: "Seccomp localhost/sub/subtest profile",
+		config: makeConfig(map[string]string{
+			v1.SeccompPodAnnotationKey: "localhost/sub/subtest",
+		}),
+		expectedOpts: []string{`seccomp={"abc":"def"}`},
+		expectErr:    false,
+	}, {
+		msg: "Seccomp non-existent",
+		config: makeConfig(map[string]string{
+			v1.SeccompPodAnnotationKey: "localhost/non-existent",
+		}),
+		expectedOpts: nil,
+		expectErr:    true,
+	}}
+
+	profileRoot := path.Join("fixtures", "seccomp")
+	for i, test := range tests {
+		opts, err := getSeccompSecurityOpts(containerName, test.config, profileRoot, '=')
+		if test.expectErr {
+			assert.Error(t, err, fmt.Sprintf("TestCase[%d]: %s", i, test.msg))
+			continue
+		}
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
 		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
 		for _, opt := range test.expectedOpts {
