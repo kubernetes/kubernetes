@@ -32,6 +32,8 @@ type FakeNodeMetricses struct {
 
 var nodemetricsesResource = schema.GroupVersionResource{Group: "metrics", Version: "v1alpha1", Resource: "nodemetricses"}
 
+var nodemetricsesKind = schema.GroupVersionKind{Group: "metrics", Version: "v1alpha1", Kind: "NodeMetrics"}
+
 func (c *FakeNodeMetricses) Get(name string, options v1.GetOptions) (result *v1alpha1.NodeMetrics, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(nodemetricsesResource, name), &v1alpha1.NodeMetrics{})
@@ -43,7 +45,7 @@ func (c *FakeNodeMetricses) Get(name string, options v1.GetOptions) (result *v1a
 
 func (c *FakeNodeMetricses) List(opts v1.ListOptions) (result *v1alpha1.NodeMetricsList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(nodemetricsesResource, opts), &v1alpha1.NodeMetricsList{})
+		Invokes(testing.NewRootListAction(nodemetricsesResource, nodemetricsesKind, opts), &v1alpha1.NodeMetricsList{})
 	if obj == nil {
 		return nil, err
 	}

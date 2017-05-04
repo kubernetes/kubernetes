@@ -33,6 +33,8 @@ type FakeNamespaces struct {
 
 var namespacesResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "namespaces"}
 
+var namespacesKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "Namespace"}
+
 func (c *FakeNamespaces) Create(namespace *api.Namespace) (result *api.Namespace, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(namespacesResource, namespace), &api.Namespace{})
@@ -84,7 +86,7 @@ func (c *FakeNamespaces) Get(name string, options v1.GetOptions) (result *api.Na
 
 func (c *FakeNamespaces) List(opts v1.ListOptions) (result *api.NamespaceList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(namespacesResource, opts), &api.NamespaceList{})
+		Invokes(testing.NewRootListAction(namespacesResource, namespacesKind, opts), &api.NamespaceList{})
 	if obj == nil {
 		return nil, err
 	}

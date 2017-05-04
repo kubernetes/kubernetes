@@ -33,6 +33,8 @@ type FakeCustomResources struct {
 
 var customresourcesResource = schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1alpha1", Resource: "customresources"}
 
+var customresourcesKind = schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1alpha1", Kind: "CustomResource"}
+
 func (c *FakeCustomResources) Create(customResource *v1alpha1.CustomResource) (result *v1alpha1.CustomResource, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(customresourcesResource, customResource), &v1alpha1.CustomResource{})
@@ -84,7 +86,7 @@ func (c *FakeCustomResources) Get(name string, options v1.GetOptions) (result *v
 
 func (c *FakeCustomResources) List(opts v1.ListOptions) (result *v1alpha1.CustomResourceList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(customresourcesResource, opts), &v1alpha1.CustomResourceList{})
+		Invokes(testing.NewRootListAction(customresourcesResource, customresourcesKind, opts), &v1alpha1.CustomResourceList{})
 	if obj == nil {
 		return nil, err
 	}
