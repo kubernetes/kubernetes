@@ -156,11 +156,11 @@ func (m *ThirdPartyResourceServer) RemoveThirdPartyResource(path string) error {
 		return err
 	}
 
-	services := m.genericAPIServer.HandlerContainer.RegisteredWebServices()
+	services := m.genericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices()
 	for ix := range services {
 		root := services[ix].RootPath()
 		if root == path || strings.HasPrefix(root, path+"/") {
-			m.genericAPIServer.HandlerContainer.Remove(services[ix])
+			m.genericAPIServer.Handler.GoRestfulContainer.Remove(services[ix])
 		}
 	}
 	return nil
@@ -281,13 +281,13 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	// the group with the new API
 	if m.hasThirdPartyGroupStorage(path) {
 		m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedatastore.REST), apiGroup)
-		return thirdparty.UpdateREST(m.genericAPIServer.HandlerContainer.Container)
+		return thirdparty.UpdateREST(m.genericAPIServer.Handler.GoRestfulContainer)
 	}
 
-	if err := thirdparty.InstallREST(m.genericAPIServer.HandlerContainer.Container); err != nil {
+	if err := thirdparty.InstallREST(m.genericAPIServer.Handler.GoRestfulContainer); err != nil {
 		glog.Errorf("Unable to setup thirdparty api: %v", err)
 	}
-	m.genericAPIServer.HandlerContainer.Add(discovery.NewAPIGroupHandler(api.Codecs, apiGroup).WebService())
+	m.genericAPIServer.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(api.Codecs, apiGroup).WebService())
 
 	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedatastore.REST), apiGroup)
 	api.Registry.AddThirdPartyAPIGroupVersions(schema.GroupVersion{Group: group, Version: rsrc.Versions[0].Name})
