@@ -23,10 +23,12 @@ go_library(
     name = "go_default_library",
     srcs = [
         "backoff.go",
+        "periodic_runner.go",
         "throttle.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/juju/ratelimit:go_default_library",
         "//vendor/k8s.io/client-go/util/clock:go_default_library",
         "//vendor/k8s.io/client-go/util/integer:go_default_library",
