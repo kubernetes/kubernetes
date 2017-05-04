@@ -24,11 +24,13 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 	apitest "k8s.io/kubernetes/pkg/kubelet/api/testing"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -40,6 +42,10 @@ var (
 )
 
 func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+	return customTestRuntimeManager(&credentialprovider.BasicDockerKeyring{})
+}
+
+func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
 	fakeRuntimeService := apitest.NewFakeRuntimeService()
 	fakeImageService := apitest.NewFakeImageService()
 	// Only an empty machineInfo is needed here, because in unit test all containers are besteffort,
@@ -47,7 +53,7 @@ func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImage
 	// we may want to set memory capacity.
 	machineInfo := &cadvisorapi.MachineInfo{}
 	osInterface := &containertest.FakeOS{}
-	manager, err := NewFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{})
+	manager, err := NewFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, keyring)
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 
