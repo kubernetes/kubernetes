@@ -8,6 +8,10 @@ images:
   ubuntu-docker12:
     image: e2e-node-ubuntu-trusty-docker12-v2-image # docker 1.12.6
     project: kubernetes-node-e2e-images
+    metadata: 'startup-script<test/e2e_node/jenkins/ubuntu-14.04-nvidia-install.sh'
+    accelerators:
+      type: nvidia-tesla-k80
+      count: 2
   coreos-alpha:
     image: coreos-alpha-1122-0-0-v20160727 # docker 1.11.2
     project: coreos-cloud

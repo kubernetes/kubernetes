@@ -237,6 +237,7 @@ define TEST_E2E_NODE_HELP_INFO
 #   Used when RUNTIME is set to "remote".
 #  IMAGE_SERVICE_ENDPOINT: remote image endpoint to connect to, to prepull images.
 #   Used when RUNTIME is set to "remote".
+#  IMAGE_CONFIG_FILE: path to a file containing image configuration.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
