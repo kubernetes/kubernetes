@@ -17,6 +17,7 @@ limitations under the License.
 package v1_test
 
 import (
+"k8s.io/api/core/v1"
 	"net/url"
 	"reflect"
 	"testing"
@@ -38,7 +39,7 @@ func TestPodLogOptions(t *testing.T) {
 	limitBytes := int64(3)
 
 	versionedLogOptions := &v1.PodLogOptions{
-		Container:    "mycontainer",
+		v1.Container:    "mycontainer",
 		Follow:       true,
 		Previous:     true,
 		SinceSeconds: &sinceSeconds,
@@ -48,7 +49,7 @@ func TestPodLogOptions(t *testing.T) {
 		LimitBytes:   &limitBytes,
 	}
 	unversionedLogOptions := &api.PodLogOptions{
-		Container:    "mycontainer",
+		v1.Container:    "mycontainer",
 		Follow:       true,
 		Previous:     true,
 		SinceSeconds: &sinceSeconds,
@@ -117,7 +118,7 @@ func TestPodLogOptions(t *testing.T) {
 	}
 }
 
-// TestPodSpecConversion tests that ServiceAccount is an alias for
+// TestPodSpecConversion tests that v1.ServiceAccount is an alias for
 // ServiceAccountName.
 func TestPodSpecConversion(t *testing.T) {
 	name, other := "foo", "bar"

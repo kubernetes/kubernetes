@@ -17,6 +17,7 @@ limitations under the License.
 package v1_test
 
 import (
+"k8s.io/api/core/v1"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
