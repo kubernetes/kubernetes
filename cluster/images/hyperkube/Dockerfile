@@ -32,6 +32,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
     nfs-common \
     glusterfs-client \
     cifs-utils \
+    curl \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
     && DEBIAN_FRONTEND=noninteractive apt-get autoremove -y \
     && DEBIAN_FRONTEND=noninteractive apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* # CACHEBUST
@@ -41,8 +42,14 @@ RUN cp /usr/bin/nsenter /nsenter
 # Copy the the cni-bin folder into /opt/cni/bin
 COPY cni-bin/bin /opt/cni/bin
 
+COPY setup-files.sh make-ca-cert.sh /
+
+# Manifests for the docker guide
+COPY static-pods /etc/kubernetes/manifests/
+
+
 # Create symlinks for each hyperkube server
-# Also create symlinks to /usr/local/bin/ where the server image binaries live, so the hyperkube image may be 
+# Also create symlinks to /usr/local/bin/ where the server image binaries live, so the hyperkube image may be
 # used instead of gcr.io/google_containers/kube-* without any modifications.
 # TODO: replace manual symlink creation with --make-symlink command once
 # cross-building with qemu supports go binaries. See #28702
@@ -66,3 +73,4 @@ RUN ln -s /hyperkube /apiserver \
 
 # Copy the hyperkube binary
 COPY hyperkube /hyperkube
+COPY kubeconfig.yaml /kubeconfig.yaml

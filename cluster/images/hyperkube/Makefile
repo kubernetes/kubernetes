@@ -61,6 +61,9 @@ ifndef VERSION
 endif
 	cp -r ./* ${TEMP_DIR}
 	mkdir -p ${TEMP_DIR}/cni-bin
+	
+	cp ../../saltbase/salt/generate-cert/make-ca-cert.sh ${TEMP_DIR}
+
 
 	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
 	chmod a+rx ${TEMP_DIR}/hyperkube
@@ -70,6 +73,12 @@ endif
 ifeq ($(CACHEBUST),1)
 	cd ${TEMP_DIR} && sed -i.back "s|CACHEBUST|$(shell uuidgen)|g" Dockerfile
 endif
+
+	cd ${TEMP_DIR} && sed -i "s|REGISTRY|${REGISTRY}|g" static-pods/*.json
+	cd ${TEMP_DIR} && sed -i "s|ARCH|${ARCH}|g" static-pods/*.json
+	cd ${TEMP_DIR} && sed -i "s|VERSION|${VERSION}|g" static-pods/*.json
+
+
 
 ifeq ($(ARCH),amd64)
 	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
@@ -86,7 +95,7 @@ endif
 	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/cni-${ARCH}-${CNI_RELEASE}.tar.gz | tar -xz -C ${TEMP_DIR}/cni-bin
 
 	docker build --pull -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
-	rm -rf "${TEMP_DIR}"
+	echo "Build dir: ${TEMP_DIR}"
 
 push: build
 	gcloud docker -- push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
