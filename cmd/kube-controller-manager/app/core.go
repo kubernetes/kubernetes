@@ -189,7 +189,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig = dynamic.ContentConfig()
 	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
-	garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, deletableGroupVersionResources)
+	garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, deletableGroupVersionResources, ctx.InformerFactory)
 	if err != nil {
 		return true, fmt.Errorf("Failed to start the generic garbage collector: %v", err)
 	}

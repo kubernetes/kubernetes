@@ -18,6 +18,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/controller/garbagecollector:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
         "//test/integration:go_default_library",
