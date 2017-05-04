@@ -30,39 +30,55 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-const volumeAvailableStatus = "available"
-const volumeInUseStatus = "in-use"
-const volumeCreateTimeoutSeconds = 30
-const testClusterName = "testCluster"
+const (
+	volumeAvailableStatus = "available"
+	volumeInUseStatus     = "in-use"
+	testClusterName       = "testCluster"
 
-func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status string, timeoutSeconds int) {
-	timeout := timeoutSeconds
-	start := time.Now().Second()
-	for {
-		time.Sleep(1 * time.Second)
+	volumeStatusTimeoutSeconds = 30
+	// volumeStatus* is configuration of exponential backoff for
+	// waiting for specified volume status. Starting with 1
+	// seconds, multiplying by 1.2 with each step and taking 13 steps at maximum
+	// it will time out after 32s, which roughly corresponds to 30s
+	volumeStatusInitDealy = 1 * time.Second
+	volumeStatusFactor    = 1.2
+	volumeStatusSteps     = 13
+)
 
-		if timeout >= 0 && time.Now().Second()-start >= timeout {
-			t.Logf("Volume (%s) status did not change to %s after %v seconds\n",
-				volumeName,
-				status,
-				timeout)
-			return
-		}
-
+func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status string) {
+	backoff := wait.Backoff{
+		Duration: volumeStatusInitDealy,
+		Factor:   volumeStatusFactor,
+		Steps:    volumeStatusSteps,
+	}
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		getVol, err := os.getVolume(volumeName)
 		if err != nil {
-			t.Fatalf("Cannot get existing Cinder volume (%s): %v", volumeName, err)
+			return false, err
 		}
 		if getVol.Status == status {
 			t.Logf("Volume (%s) status changed to %s after %v seconds\n",
 				volumeName,
 				status,
-				timeout)
-			return
+				volumeStatusTimeoutSeconds)
+			return true, nil
+		} else {
+			return false, nil
 		}
+	})
+	if err == wait.ErrWaitTimeout {
+		t.Logf("Volume (%s) status did not change to %s after %v seconds\n",
+			volumeName,
+			status,
+			volumeStatusTimeoutSeconds)
+		return
+	}
+	if err != nil {
+		t.Fatalf("Cannot get existing Cinder volume (%s): %v", volumeName, err)
 	}
 }
 
@@ -360,7 +376,7 @@ func TestVolumes(t *testing.T) {
 	}
 	t.Logf("Volume (%s) created\n", vol)
 
-	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus, volumeCreateTimeoutSeconds)
+	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
 
 	diskId, err := os.AttachDisk(os.localInstanceID, vol)
 	if err != nil {
@@ -368,7 +384,7 @@ func TestVolumes(t *testing.T) {
 	}
 	t.Logf("Volume (%s) attached, disk ID: %s\n", vol, diskId)
 
-	WaitForVolumeStatus(t, os, vol, volumeInUseStatus, volumeCreateTimeoutSeconds)
+	WaitForVolumeStatus(t, os, vol, volumeInUseStatus)
 
 	devicePath := os.GetDevicePath(diskId)
 	if !strings.HasPrefix(devicePath, "/dev/disk/by-id/") {
@@ -382,7 +398,7 @@ func TestVolumes(t *testing.T) {
 	}
 	t.Logf("Volume (%s) detached\n", vol)
 
-	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus, volumeCreateTimeoutSeconds)
+	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
 
 	err = os.DeleteVolume(vol)
 	if err != nil {
