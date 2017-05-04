@@ -101,7 +101,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"don't serve HTTPS at all.")
 
 	fs.StringVar(&s.ServerCert.CertDirectory, "cert-dir", s.ServerCert.CertDirectory, ""+
-		"The directory where the TLS certs are located (by default /var/run/kubernetes). "+
+		"The directory where the TLS certs are located. "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 
 	fs.StringVar(&s.ServerCert.CertKey.CertFile, "tls-cert-file", s.ServerCert.CertKey.CertFile, ""+

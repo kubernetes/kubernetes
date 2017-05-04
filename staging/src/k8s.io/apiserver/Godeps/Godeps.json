@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/apiserver",
-	"GoVersion": "go1.7",
+	"GoVersion": "go1.8",
 	"GodepVersion": "v79",
 	"Packages": [
 		"./..."
@@ -335,12 +335,20 @@
 			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 		},
 		{
+			"ImportPath": "github.com/go-openapi/analysis",
+			"Rev": "b44dc874b601d9e4e2f6e19140e794ba24bead3b"
+		},
+		{
 			"ImportPath": "github.com/go-openapi/jsonpointer",
 			"Rev": "46af16f9f7b149af66e5d1bd010e3574dc06de98"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/jsonreference",
 			"Rev": "13c6e3589ad90f49bd3e3bbe2c2cb3d7a4142272"
+		},
+		{
+			"ImportPath": "github.com/go-openapi/loads",
+			"Rev": "18441dfa706d924a39a030ee2c3b1d8d81917b38"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/spec",
@@ -384,31 +392,31 @@
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud",
-			"Rev": "12f19e5e04d617182cffa5c11f189ef0013b9791"
+			"Rev": "b06120d13e262ceaf890ef38ee30898813696af0"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack",
-			"Rev": "12f19e5e04d617182cffa5c11f189ef0013b9791"
+			"Rev": "b06120d13e262ceaf890ef38ee30898813696af0"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
-			"Rev": "12f19e5e04d617182cffa5c11f189ef0013b9791"
+			"Rev": "b06120d13e262ceaf890ef38ee30898813696af0"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
-			"Rev": "12f19e5e04d617182cffa5c11f189ef0013b9791"
+			"Rev": "b06120d13e262ceaf890ef38ee30898813696af0"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
-			"Rev": "12f19e5e04d617182cffa5c11f189ef0013b9791"
+			"Rev": "b06120d13e262ceaf890ef38ee30898813696af0"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/utils",
-			"Rev": "12f19e5e04d617182cffa5c11f189ef0013b9791"
+			"Rev": "b06120d13e262ceaf890ef38ee30898813696af0"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/pagination",
-			"Rev": "12f19e5e04d617182cffa5c11f189ef0013b9791"
+			"Rev": "b06120d13e262ceaf890ef38ee30898813696af0"
 		},
 		{
 			"ImportPath": "github.com/grpc-ecosystem/go-grpc-prometheus",

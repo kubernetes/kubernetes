@@ -30,13 +30,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubemark"
-	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 
@@ -138,13 +136,6 @@ func main() {
 
 		iptInterface := fakeiptables.NewFake()
 
-		informerFactory := informers.NewSharedInformerFactory(internalClientset, configResyncPeriod)
-		serviceConfig := proxyconfig.NewServiceConfig(informerFactory.Core().InternalVersion().Services(), configResyncPeriod)
-		serviceConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
-
-		endpointsConfig := proxyconfig.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), configResyncPeriod)
-		endpointsConfig.RegisterEventHandler(&kubemark.FakeProxyHandler{})
-
 		eventClient, err := clientgoclientset.NewForConfig(clientConfig)
 		if err != nil {
 			glog.Fatalf("Failed to create API Server client: %v", err)
@@ -154,9 +145,6 @@ func main() {
 			config.NodeName,
 			internalClientset,
 			eventClient,
-			endpointsConfig,
-			serviceConfig,
-			informerFactory,
 			iptInterface,
 			eventBroadcaster,
 			recorder,

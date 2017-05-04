@@ -18,7 +18,6 @@ package config
 
 import (
 	"reflect"
-	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -51,40 +50,34 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	ch := make(chan struct{})
-	handler := newSvcHandler(t, nil, func() { ch <- struct{}{} })
+	handler := NewServiceHandlerMock()
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
 	serviceConfig := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
-	serviceConfig.RegisterHandler(handler)
+	serviceConfig.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
 	go serviceConfig.Run(stopCh)
 
 	// Add the first service
-	handler.expected = []*api.Service{service1v1}
 	fakeWatch.Add(service1v1)
-	<-ch
+	handler.ValidateServices(t, []*api.Service{service1v1})
 
 	// Add another service
-	handler.expected = []*api.Service{service1v1, service2}
 	fakeWatch.Add(service2)
-	<-ch
+	handler.ValidateServices(t, []*api.Service{service1v1, service2})
 
 	// Modify service1
-	handler.expected = []*api.Service{service1v2, service2}
 	fakeWatch.Modify(service1v2)
-	<-ch
+	handler.ValidateServices(t, []*api.Service{service1v2, service2})
 
 	// Delete service1
-	handler.expected = []*api.Service{service2}
 	fakeWatch.Delete(service1v2)
-	<-ch
+	handler.ValidateServices(t, []*api.Service{service2})
 
 	// Delete service2
-	handler.expected = []*api.Service{}
 	fakeWatch.Delete(service2)
-	<-ch
+	handler.ValidateServices(t, []*api.Service{})
 }
 
 func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
@@ -155,22 +148,17 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	handler.ValidateEndpoints(t, []*api.Endpoints{})
 }
 
-type svcHandler struct {
-	t        *testing.T
-	expected []*api.Service
-	done     func()
-}
-
-func newSvcHandler(t *testing.T, svcs []*api.Service, done func()) *svcHandler {
-	return &svcHandler{t: t, expected: svcs, done: done}
-}
-
-func (s *svcHandler) OnServiceUpdate(services []*api.Service) {
-	defer s.done()
-	sort.Sort(sortedServices(services))
-	if !reflect.DeepEqual(s.expected, services) {
-		s.t.Errorf("Unexpected services: %#v, expected: %#v", services, s.expected)
+func newSvcHandler(t *testing.T, svcs []*api.Service, done func()) ServiceHandler {
+	shm := &ServiceHandlerMock{
+		state: make(map[types.NamespacedName]*api.Service),
 	}
+	shm.process = func(services []*api.Service) {
+		defer done()
+		if !reflect.DeepEqual(services, svcs) {
+			t.Errorf("Unexpected services: %#v, expected: %#v", services, svcs)
+		}
+	}
+	return shm
 }
 
 func newEpsHandler(t *testing.T, eps []*api.Endpoints, done func()) EndpointsHandler {
@@ -213,7 +201,7 @@ func TestInitialSync(t *testing.T) {
 	svcConfig := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), 0)
 	epsConfig := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), 0)
 	svcHandler := newSvcHandler(t, []*api.Service{svc2, svc1}, wg.Done)
-	svcConfig.RegisterHandler(svcHandler)
+	svcConfig.RegisterEventHandler(svcHandler)
 	epsHandler := newEpsHandler(t, []*api.Endpoints{eps2, eps1}, wg.Done)
 	epsConfig.RegisterEventHandler(epsHandler)
 

@@ -18,11 +18,17 @@ package gce
 
 import (
 	"net/http"
+	"time"
 
 	compute "google.golang.org/api/compute/v1"
 )
 
-// UrlMap management
+func newUrlMapMetricContext(request string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"urlmap_" + request, unusedMetricLabel, unusedMetricLabel},
+	}
+}
 
 // GetUrlMap returns the UrlMap by name.
 func (gce *GCECloud) GetUrlMap(name string) (*compute.UrlMap, error) {
@@ -35,11 +41,12 @@ func (gce *GCECloud) CreateUrlMap(backend *compute.BackendService, name string) 
 		Name:           name,
 		DefaultService: backend.SelfLink,
 	}
+	mc := newUrlMapMetricContext("create")
 	op, err := gce.service.UrlMaps.Insert(gce.projectID, urlMap).Do()
 	if err != nil {
-		return nil, err
+		return nil, mc.Observe(err)
 	}
-	if err = gce.waitForGlobalOp(op); err != nil {
+	if err = gce.waitForGlobalOp(op, mc); err != nil {
 		return nil, err
 	}
 	return gce.GetUrlMap(name)
@@ -47,11 +54,12 @@ func (gce *GCECloud) CreateUrlMap(backend *compute.BackendService, name string) 
 
 // UpdateUrlMap applies the given UrlMap as an update, and returns the new UrlMap.
 func (gce *GCECloud) UpdateUrlMap(urlMap *compute.UrlMap) (*compute.UrlMap, error) {
+	mc := newUrlMapMetricContext("update")
 	op, err := gce.service.UrlMaps.Update(gce.projectID, urlMap.Name, urlMap).Do()
 	if err != nil {
-		return nil, err
+		return nil, mc.Observe(err)
 	}
-	if err = gce.waitForGlobalOp(op); err != nil {
+	if err = gce.waitForGlobalOp(op, mc); err != nil {
 		return nil, err
 	}
 	return gce.service.UrlMaps.Get(gce.projectID, urlMap.Name).Do()
@@ -59,14 +67,15 @@ func (gce *GCECloud) UpdateUrlMap(urlMap *compute.UrlMap) (*compute.UrlMap, erro
 
 // DeleteUrlMap deletes a url map by name.
 func (gce *GCECloud) DeleteUrlMap(name string) error {
+	mc := newUrlMapMetricContext("delete")
 	op, err := gce.service.UrlMaps.Delete(gce.projectID, name).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return nil
 		}
-		return err
+		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op)
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // ListUrlMaps lists all UrlMaps in the project.

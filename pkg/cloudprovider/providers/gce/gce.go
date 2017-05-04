@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/compute/metadata"
-	"golang.org/x/net/context"
 
 	"gopkg.in/gcfg.v1"
 
@@ -39,7 +38,6 @@ import (
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
-	"google.golang.org/api/gensupport"
 )
 
 const (
@@ -103,47 +101,12 @@ type Config struct {
 	}
 }
 
-// ApiWithNamespace stores api and namespace in context
-type apiWithNamespace struct {
-	namespace string
-	apiCall   string
-}
-
 func init() {
-	registerMetrics()
 	cloudprovider.RegisterCloudProvider(
 		ProviderName,
 		func(config io.Reader) (cloudprovider.Interface, error) {
 			return newGCECloud(config)
 		})
-	gensupport.RegisterHook(trackAPILatency)
-}
-
-func trackAPILatency(ctx context.Context, req *http.Request) func(resp *http.Response) {
-	requestTime := time.Now()
-	t := ctx.Value("kube-api-namespace")
-	apiNamespace, ok := t.(apiWithNamespace)
-
-	if !ok {
-		return nil
-	}
-
-	apiResponseReceived := func(resp *http.Response) {
-		timeTaken := time.Since(requestTime).Seconds()
-		if mi, ok := gceMetricMap[apiNamespace.apiCall]; ok {
-			mi.WithLabelValues(apiNamespace.namespace).Observe(timeTaken)
-		}
-	}
-	return apiResponseReceived
-}
-
-func contextWithNamespace(namespace string, apiCall string) context.Context {
-	rootContext := context.Background()
-	apiNamespace := apiWithNamespace{
-		namespace: namespace,
-		apiCall:   apiCall,
-	}
-	return context.WithValue(rootContext, "kube-api-namespace", apiNamespace)
 }
 
 // Raw access to the underlying GCE service, probably should only be used for e2e tests
@@ -340,7 +303,7 @@ func getNetworkNameViaAPICall(svc *compute.Service, projectID string) (string, e
 	}
 
 	if networkList == nil || len(networkList.Items) <= 0 {
-		return "", fmt.Errorf("GCE Network List call returned no networks for project %q.", projectID)
+		return "", fmt.Errorf("GCE Network List call returned no networks for project %q", projectID)
 	}
 
 	return networkList.Items[0].Name, nil

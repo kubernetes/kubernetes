@@ -129,7 +129,7 @@ func GetVolumeFSType(v api.Volume) (extensions.FSType, error) {
 	return "", fmt.Errorf("unknown volume type for volume: %#v", v)
 }
 
-// fsTypeToStringSet converts an FSType slice to a string set.
+// FSTypeToStringSet converts an FSType slice to a string set.
 func FSTypeToStringSet(fsTypes []extensions.FSType) sets.String {
 	set := sets.NewString()
 	for _, v := range fsTypes {

@@ -28,7 +28,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -43,7 +42,7 @@ import (
 )
 
 var (
-	rollingUpdate_long = templates.LongDesc(i18n.T(`
+	rollingUpdateLong = templates.LongDesc(i18n.T(`
 		Perform a rolling update of the given ReplicationController.
 
 		Replaces the specified replication controller with a new replication controller by updating one pod at a time to use the
@@ -52,7 +51,7 @@ var (
 
 		![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)`))
 
-	rollingUpdate_example = templates.Examples(i18n.T(`
+	rollingUpdateExample = templates.Examples(i18n.T(`
 		# Update pods of frontend-v1 using new replication controller data in frontend-v2.json.
 		kubectl rolling-update frontend-v1 -f frontend-v2.json
 
@@ -84,8 +83,8 @@ func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		// rollingupdate is deprecated.
 		Aliases: []string{"rollingupdate"},
 		Short:   i18n.T("Perform a rolling update of the given ReplicationController"),
-		Long:    rollingUpdate_long,
-		Example: rollingUpdate_example,
+		Long:    rollingUpdateLong,
+		Example: rollingUpdateExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunRollingUpdate(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
@@ -385,12 +384,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	if outputFormat != "" {
 		return f.PrintObject(cmd, mapper, newRc, out)
 	}
-	kinds, _, err := api.Scheme.ObjectKinds(newRc)
-	if err != nil {
-		return err
-	}
-	_, res := meta.KindToResource(kinds[0])
-	cmdutil.PrintSuccess(mapper, false, out, res.Resource, oldName, dryrun, message)
+	cmdutil.PrintSuccess(mapper, false, out, "replicationcontrollers", oldName, dryrun, message)
 	return nil
 }
 

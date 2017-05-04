@@ -95,10 +95,10 @@ func TestKindFor(t *testing.T) {
 	}{
 		{
 			in:       schema.GroupVersionResource{Group: "storage.k8s.io", Version: "", Resource: "sc"},
-			expected: schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"},
+			expected: schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"},
 			srvRes: []*metav1.APIResourceList{
 				{
-					GroupVersion: "storage.k8s.io/v1beta1",
+					GroupVersion: "storage.k8s.io/v1",
 					APIResources: []metav1.APIResource{
 						{
 							Name:       "storageclasses",
@@ -110,10 +110,10 @@ func TestKindFor(t *testing.T) {
 		},
 		{
 			in:       schema.GroupVersionResource{Group: "", Version: "", Resource: "sc"},
-			expected: schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"},
+			expected: schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"},
 			srvRes: []*metav1.APIResourceList{
 				{
-					GroupVersion: "storage.k8s.io/v1beta1",
+					GroupVersion: "storage.k8s.io/v1",
 					APIResources: []metav1.APIResource{
 						{
 							Name:       "storageclasses",

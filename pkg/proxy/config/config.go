@@ -28,10 +28,10 @@ import (
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/core/internalversion"
 	listers "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/config"
 )
 
 // ServiceConfigHandler is an abstract interface of objects which receive update notifications for the set of services.
+// DEPRECATED: Use ServiceHandler instead - this will be removed soon.
 type ServiceConfigHandler interface {
 	// OnServiceUpdate gets called when a service is created, removed or changed
 	// on any of the configuration sources. An example is when a new service
@@ -46,7 +46,24 @@ type ServiceConfigHandler interface {
 	OnServiceUpdate(services []*api.Service)
 }
 
-// EndpointsHandler is an abstract interface o objects which receive
+// ServiceHandler is an abstract interface of objects which receive
+// notifications about service object changes.
+type ServiceHandler interface {
+	// OnServiceAdd is called whenever creation of new service object
+	// is observed.
+	OnServiceAdd(service *api.Service)
+	// OnServiceUpdate is called whenever modification of an existing
+	// service object is observed.
+	OnServiceUpdate(oldService, service *api.Service)
+	// OnServiceDelete is called whenever deletion of an existing service
+	// object is observed.
+	OnServiceDelete(service *api.Service)
+	// OnServiceSynced is called once all the initial even handlers were
+	// called and the state is fully propagated to local cache.
+	OnServiceSynced()
+}
+
+// EndpointsHandler is an abstract interface of objects which receive
 // notifications about endpoints object changes.
 type EndpointsHandler interface {
 	// OnEndpointsAdd is called whenever creation of new endpoints object
@@ -157,7 +174,7 @@ func (c *EndpointsConfig) handleDeleteEndpoints(obj interface{}) {
 		}
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnEndpointsUpdate")
+		glog.V(4).Infof("Calling handler.OnEndpointsDelete")
 		c.eventHandlers[i].OnEndpointsDelete(endpoints)
 	}
 }
@@ -165,9 +182,11 @@ func (c *EndpointsConfig) handleDeleteEndpoints(obj interface{}) {
 // ServiceConfig tracks a set of service configurations.
 // It accepts "set", "add" and "remove" operations of services via channels, and invokes registered handlers on change.
 type ServiceConfig struct {
-	lister       listers.ServiceLister
-	listerSynced cache.InformerSynced
-	handlers     []ServiceConfigHandler
+	lister        listers.ServiceLister
+	listerSynced  cache.InformerSynced
+	eventHandlers []ServiceHandler
+	// TODO: Remove as soon as we migrate everything to event handlers.
+	handlers []ServiceConfigHandler
 	// updates channel is used to trigger registered handlers
 	updates chan struct{}
 	stop    chan struct{}
@@ -199,8 +218,14 @@ func NewServiceConfig(serviceInformer coreinformers.ServiceInformer, resyncPerio
 }
 
 // RegisterHandler registers a handler which is called on every services change.
+// DEPRECATED: Use RegisterEventHandler instead - this will be removed soon.
 func (c *ServiceConfig) RegisterHandler(handler ServiceConfigHandler) {
 	c.handlers = append(c.handlers, handler)
+}
+
+// RegisterEventHandler registers a handler which is called on every service change.
+func (c *ServiceConfig) RegisterEventHandler(handler ServiceHandler) {
+	c.eventHandlers = append(c.eventHandlers, handler)
 }
 
 // Run starts the goroutine responsible for calling
@@ -217,6 +242,10 @@ func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 
 	// We have synced informers. Now we can start delivering updates
 	// to the registered handler.
+	for i := range c.eventHandlers {
+		glog.V(3).Infof("Calling handler.OnServiceSynced()")
+		c.eventHandlers[i].OnServiceSynced()
+	}
 	go func() {
 		defer utilruntime.HandleCrash()
 		for {
@@ -241,24 +270,60 @@ func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 			}
 		}
 	}()
+
 	// Close updates channel when stopCh is closed.
-	go func() {
-		<-stopCh
-		close(c.stop)
-	}()
-
 	<-stopCh
+	close(c.stop)
 }
 
-func (c *ServiceConfig) handleAddService(_ interface{}) {
+func (c *ServiceConfig) handleAddService(obj interface{}) {
+	service, ok := obj.(*api.Service)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+		return
+	}
+	for i := range c.eventHandlers {
+		glog.V(4).Infof("Calling handler.OnServiceAdd")
+		c.eventHandlers[i].OnServiceAdd(service)
+	}
 	c.dispatchUpdate()
 }
 
-func (c *ServiceConfig) handleUpdateService(_, _ interface{}) {
+func (c *ServiceConfig) handleUpdateService(oldObj, newObj interface{}) {
+	oldService, ok := oldObj.(*api.Service)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", oldObj))
+		return
+	}
+	service, ok := newObj.(*api.Service)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
+		return
+	}
+	for i := range c.eventHandlers {
+		glog.V(4).Infof("Calling handler.OnServiceUpdate")
+		c.eventHandlers[i].OnServiceUpdate(oldService, service)
+	}
 	c.dispatchUpdate()
 }
 
-func (c *ServiceConfig) handleDeleteService(_ interface{}) {
+func (c *ServiceConfig) handleDeleteService(obj interface{}) {
+	service, ok := obj.(*api.Service)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+			return
+		}
+		if service, ok = tombstone.Obj.(*api.Service); !ok {
+			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+			return
+		}
+	}
+	for i := range c.eventHandlers {
+		glog.V(4).Infof("Calling handler.OnServiceDelete")
+		c.eventHandlers[i].OnServiceDelete(service)
+	}
 	c.dispatchUpdate()
 }
 
@@ -270,14 +335,5 @@ func (c *ServiceConfig) dispatchUpdate() {
 		// We're shut down / avoid logging the message below
 	default:
 		glog.V(4).Infof("Service handler already has a pending interrupt.")
-	}
-}
-
-// watchForUpdates invokes bcaster.Notify() with the latest version of an object
-// when changes occur.
-func watchForUpdates(bcaster *config.Broadcaster, accessor config.Accessor, updates <-chan struct{}) {
-	for true {
-		<-updates
-		bcaster.Notify(accessor.MergedState())
 	}
 }

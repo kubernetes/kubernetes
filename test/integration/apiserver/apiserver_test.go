@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -101,7 +99,7 @@ func newRS(namespace string) *v1beta1.ReplicaSet {
 	}
 }
 
-var cascDel string = `
+var cascDel = `
 {
   "kind": "DeleteOptions",
   "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",

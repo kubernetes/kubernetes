@@ -17,9 +17,7 @@
 import re
 import subprocess
 
-from charmhelpers.core import unitdata
-
-BIN_VERSIONS = 'bin_versions'
+from time import sleep
 
 
 def get_version(bin_name):
@@ -34,31 +32,40 @@ def get_version(bin_name):
         (1, 6, 0)
 
     """
-    db = unitdata.kv()
-    bin_versions = db.get(BIN_VERSIONS, {})
-
-    cached_version = bin_versions.get(bin_name)
-    if cached_version:
-        return tuple(cached_version)
-
-    version = _get_bin_version(bin_name)
-    bin_versions[bin_name] = list(version)
-    db.set(BIN_VERSIONS, bin_versions)
-    return version
-
-
-def reset_versions():
-    """Reset the cache of bin versions.
-
-    """
-    db = unitdata.kv()
-    db.unset(BIN_VERSIONS)
-
-
-def _get_bin_version(bin_name):
-    """Get a binary version by calling it with --version and parsing output.
-
-    """
     cmd = '{} --version'.format(bin_name).split()
     version_string = subprocess.check_output(cmd).decode('utf-8')
     return tuple(int(q) for q in re.findall("[0-9]+", version_string)[:3])
+
+
+def retry(times, delay_secs):
+    """ Decorator for retrying a method call.
+
+    Args:
+        times: How many times should we retry before giving up
+        delay_secs: Delay in secs
+
+    Returns: A callable that would return the last call outcome
+    """
+
+    def retry_decorator(func):
+        """ Decorator to wrap the function provided.
+
+        Args:
+            func: Provided function should return either True od False
+
+        Returns: A callable that would return the last call outcome
+
+        """
+        def _wrapped(*args, **kwargs):
+            res = func(*args, **kwargs)
+            attempt = 0
+            while not res and attempt < times:
+                sleep(delay_secs)
+                res = func(*args, **kwargs)
+                if res:
+                    break
+                attempt += 1
+            return res
+        return _wrapped
+
+    return retry_decorator

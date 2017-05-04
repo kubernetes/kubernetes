@@ -32,7 +32,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-const testCertsDir = "/var/lib/certs"
+const (
+	testCertsDir = "/var/lib/certs"
+	etcdDataDir  = "/var/lib/etcd"
+)
 
 func TestWriteStaticPodManifests(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "")
@@ -121,18 +124,90 @@ func TestWriteStaticPodManifests(t *testing.T) {
 	}
 }
 
+func TestNewVolume(t *testing.T) {
+	var tests = []struct {
+		name     string
+		path     string
+		expected api.Volume
+	}{
+		{
+			name: "foo",
+			path: "/etc/foo",
+			expected: api.Volume{
+				Name: "foo",
+				VolumeSource: api.VolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/etc/foo"},
+				}},
+		},
+	}
+
+	for _, rt := range tests {
+		actual := newVolume(rt.name, rt.path)
+		if actual.Name != rt.expected.Name {
+			t.Errorf(
+				"failed newVolume:\n\texpected: %s\n\t  actual: %s",
+				rt.expected.Name,
+				actual.Name,
+			)
+		}
+		if actual.VolumeSource.HostPath.Path != rt.expected.VolumeSource.HostPath.Path {
+			t.Errorf(
+				"failed newVolume:\n\texpected: %s\n\t  actual: %s",
+				rt.expected.VolumeSource.HostPath.Path,
+				actual.VolumeSource.HostPath.Path,
+			)
+		}
+	}
+}
+
+func TestNewVolumeMount(t *testing.T) {
+	var tests = []struct {
+		name     string
+		path     string
+		expected api.VolumeMount
+	}{
+		{
+			name: "foo",
+			path: "/etc/foo",
+			expected: api.VolumeMount{
+				Name:      "foo",
+				MountPath: "/etc/foo",
+			},
+		},
+	}
+
+	for _, rt := range tests {
+		actual := newVolumeMount(rt.name, rt.path)
+		if actual.Name != rt.expected.Name {
+			t.Errorf(
+				"failed newVolumeMount:\n\texpected: %s\n\t  actual: %s",
+				rt.expected.Name,
+				actual.Name,
+			)
+		}
+		if actual.MountPath != rt.expected.MountPath {
+			t.Errorf(
+				"failed newVolumeMount:\n\texpected: %s\n\t  actual: %s",
+				rt.expected.MountPath,
+				actual.MountPath,
+			)
+		}
+	}
+}
+
 func TestEtcdVolume(t *testing.T) {
 	var tests = []struct {
 		cfg      *kubeadmapi.MasterConfiguration
 		expected api.Volume
 	}{
 		{
-			cfg: &kubeadmapi.MasterConfiguration{},
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{DataDir: etcdDataDir},
+			},
 			expected: api.Volume{
 				Name: "etcd",
 				VolumeSource: api.VolumeSource{
-					HostPath: &api.HostPathVolumeSource{
-						Path: kubeadmapi.GlobalEnvParams.HostEtcdPath},
+					HostPath: &api.HostPathVolumeSource{Path: etcdDataDir},
 				}},
 		},
 	}
@@ -163,13 +238,13 @@ func TestEtcdVolumeMount(t *testing.T) {
 		{
 			expected: api.VolumeMount{
 				Name:      "etcd",
-				MountPath: "/var/lib/etcd",
+				MountPath: etcdDataDir,
 			},
 		},
 	}
 
 	for _, rt := range tests {
-		actual := etcdVolumeMount()
+		actual := etcdVolumeMount(etcdDataDir)
 		if actual.Name != rt.expected.Name {
 			t.Errorf(
 				"failed etcdVolumeMount:\n\texpected: %s\n\t  actual: %s",
@@ -255,11 +330,9 @@ func TestCertsVolumeMount(t *testing.T) {
 
 func TestK8sVolume(t *testing.T) {
 	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
 		expected api.Volume
 	}{
 		{
-			cfg: &kubeadmapi.MasterConfiguration{},
 			expected: api.Volume{
 				Name: "k8s",
 				VolumeSource: api.VolumeSource{
@@ -270,7 +343,7 @@ func TestK8sVolume(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := k8sVolume(rt.cfg)
+		actual := k8sVolume()
 		if actual.Name != rt.expected.Name {
 			t.Errorf(
 				"failed k8sVolume:\n\texpected: %s\n\t  actual: %s",
@@ -295,7 +368,7 @@ func TestK8sVolumeMount(t *testing.T) {
 		{
 			expected: api.VolumeMount{
 				Name:      "k8s",
-				MountPath: "/etc/kubernetes/",
+				MountPath: kubeadmapi.GlobalEnvParams.KubernetesDir,
 				ReadOnly:  true,
 			},
 		},
@@ -660,6 +733,62 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
 			t.Errorf("failed getControllerManagerCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
+		}
+	}
+}
+
+func TestGetEtcdCommand(t *testing.T) {
+	var tests = []struct {
+		cfg      *kubeadmapi.MasterConfiguration
+		expected []string
+	}{
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{DataDir: "/var/lib/etcd"},
+			},
+			expected: []string{
+				"etcd",
+				"--listen-client-urls=http://127.0.0.1:2379",
+				"--advertise-client-urls=http://127.0.0.1:2379",
+				"--data-dir=/var/lib/etcd",
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					DataDir: "/var/lib/etcd",
+					ExtraArgs: map[string]string{
+						"listen-client-urls":    "http://10.0.1.10:2379",
+						"advertise-client-urls": "http://10.0.1.10:2379",
+					},
+				},
+			},
+			expected: []string{
+				"etcd",
+				"--listen-client-urls=http://10.0.1.10:2379",
+				"--advertise-client-urls=http://10.0.1.10:2379",
+				"--data-dir=/var/lib/etcd",
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{DataDir: "/etc/foo"},
+			},
+			expected: []string{
+				"etcd",
+				"--listen-client-urls=http://127.0.0.1:2379",
+				"--advertise-client-urls=http://127.0.0.1:2379",
+				"--data-dir=/etc/foo",
+			},
+		},
+	}
+
+	for _, rt := range tests {
+		actual := getEtcdCommand(rt.cfg)
+		sort.Strings(actual)
+		sort.Strings(rt.expected)
+		if !reflect.DeepEqual(actual, rt.expected) {
+			t.Errorf("failed getEtcdCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 		}
 	}
 }

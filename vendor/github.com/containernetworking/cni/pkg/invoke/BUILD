@@ -14,9 +14,14 @@ go_library(
         "delegate.go",
         "exec.go",
         "find.go",
+        "os_unix.go",
+        "raw_exec.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor/github.com/containernetworking/cni/pkg/types:go_default_library"],
+    deps = [
+        "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
+        "//vendor/github.com/containernetworking/cni/pkg/version:go_default_library",
+    ],
 )
 
 filegroup(

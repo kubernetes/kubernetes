@@ -14,7 +14,7 @@ go_library(
         "http_request.go",
         "offset_reader.go",
         "request.go",
-        "request_1_7.go",
+        "request_1_8.go",
         "request_pagination.go",
         "retryer.go",
         "validation.go",

@@ -205,9 +205,18 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			unknown.Raw = buf.Bytes()
 			event.Object = &unknown
 
-			// the internal event will be versioned by the encoder
+			// create the external type directly and encode it.  Clients will only recognize the serialization we provide.
+			// The internal event is being reused, not reallocated so its just a few extra assignments to do it this way
+			// and we get the benefit of using conversion functions which already have to stay in sync
+			outEvent := &metav1.WatchEvent{}
 			*internalEvent = metav1.InternalEvent(event)
-			if err := e.Encode(internalEvent); err != nil {
+			err := metav1.Convert_versioned_InternalEvent_to_versioned_Event(internalEvent, outEvent, nil)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to convert watch object: %v", err))
+				// client disconnect.
+				return
+			}
+			if err := e.Encode(outEvent); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v (%#v)", err, e))
 				// client disconnect.
 				return
@@ -264,8 +273,19 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			event.Object = &unknown
 
 			// the internal event will be versioned by the encoder
+			// create the external type directly and encode it.  Clients will only recognize the serialization we provide.
+			// The internal event is being reused, not reallocated so its just a few extra assignments to do it this way
+			// and we get the benefit of using conversion functions which already have to stay in sync
+			outEvent := &metav1.WatchEvent{}
 			*internalEvent = metav1.InternalEvent(event)
-			if err := s.Encoder.Encode(internalEvent, streamBuf); err != nil {
+			err := metav1.Convert_versioned_InternalEvent_to_versioned_Event(internalEvent, outEvent, nil)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to convert watch object: %v", err))
+				// client disconnect.
+				s.Watching.Stop()
+				return
+			}
+			if err := s.Encoder.Encode(outEvent, streamBuf); err != nil {
 				// encoding error
 				utilruntime.HandleError(fmt.Errorf("unable to encode event: %v", err))
 				s.Watching.Stop()

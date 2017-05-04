@@ -603,7 +603,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	}
 
 	expected := &unstructured.UnstructuredList{
-		Object: map[string]interface{}{"kind": "List", "apiVersion": "v1", "metadata": map[string]interface{}{}, "selfLink": "", "resourceVersion": ""},
+		Object: map[string]interface{}{"kind": "List", "apiVersion": "v1", "metadata": map[string]interface{}{"selfLink": "", "resourceVersion": ""}},
 		Items: []unstructured.Unstructured{
 			fn(&pods.Items[0]),
 			fn(&pods.Items[1]),

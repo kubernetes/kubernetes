@@ -97,6 +97,7 @@ clientset-name
 clientset-only
 clientset-path
 cloud-config
+cloud-config-file
 cloud-provider
 cloud-provider-gce-lb-src-cidrs
 cluster-cidr
@@ -244,6 +245,7 @@ experimental-check-node-capabilities-before-mount
 experimental-cri
 experimental-dockershim
 experimental-dockershim-root-directory
+experimental-docker-enable-shared-pid
 experimental-fail-swap-on
 experimental-kernel-memcg-notification
 experimental-keystone-ca-file
@@ -268,6 +270,7 @@ feature-gates
 federated-api-burst
 federated-api-qps
 federated-kube-context
+federation-config-from-cluster
 federation-name
 federation-system-namespace
 federation-upgrade-target
@@ -310,6 +313,8 @@ heapster-port
 heapster-scheme
 heapster-service
 horizontal-pod-autoscaler-sync-period
+horizontal-pod-autoscaler-upscale-delay
+horizontal-pod-autoscaler-downscale-delay
 host-cluster-context
 host-ipc-sources
 hostname-override
@@ -645,6 +650,7 @@ since-time
 skip-generated-rewrite
 skip-munges
 skip-preflight-checks
+skip-token-print
 skip-unsafe
 sort-by
 source-file
@@ -661,6 +667,7 @@ storage-media-type
 storage-version
 storage-versions
 streaming-connection-idle-timeout
+subresource
 suicide-timeout
 sync-frequency
 system-cgroups

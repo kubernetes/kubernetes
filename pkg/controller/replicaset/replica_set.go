@@ -219,8 +219,8 @@ func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
 	// this function), but in general extra resyncs shouldn't be
 	// that bad as ReplicaSets that haven't met expectations yet won't
 	// sync, and all the listing is done using local stores.
-	if oldRS.Status.Replicas != curRS.Status.Replicas {
-		glog.V(4).Infof("Observed updated replica count for ReplicaSet: %v, %d->%d", curRS.Name, oldRS.Status.Replicas, curRS.Status.Replicas)
+	if *(oldRS.Spec.Replicas) != *(curRS.Spec.Replicas) {
+		glog.V(4).Infof("Replica set %v updated. Desired pod count change: %d->%d", curRS.Name, *(oldRS.Spec.Replicas), *(curRS.Spec.Replicas))
 	}
 	rsc.enqueueReplicaSet(cur)
 }

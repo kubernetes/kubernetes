@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/client-go/pkg/api/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
@@ -60,7 +61,7 @@ var (
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
 // where kubelet will pick and schedule them.
 func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
-	volumes := []api.Volume{k8sVolume(cfg)}
+	volumes := []api.Volume{k8sVolume()}
 	volumeMounts := []api.VolumeMount{k8sVolumeMount()}
 
 	if isCertsVolumeMountNeeded() {
@@ -69,8 +70,13 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 
 	if isPkiVolumeMountNeeded() {
-		volumes = append(volumes, pkiVolume(cfg))
+		volumes = append(volumes, pkiVolume())
 		volumeMounts = append(volumeMounts, pkiVolumeMount())
+	}
+
+	if cfg.CertificatesDir != kubeadmapiext.DefaultCertificatesDir {
+		volumes = append(volumes, newVolume("certdir", cfg.CertificatesDir))
+		volumeMounts = append(volumeMounts, newVolumeMount("certdir", cfg.CertificatesDir))
 	}
 
 	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
@@ -106,27 +112,22 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			LivenessProbe: componentProbe(10251, "/healthz", api.URISchemeHTTP),
 			Resources:     componentResources("100m"),
 			Env:           getProxyEnvVars(),
-		}, k8sVolume(cfg)),
+		}, k8sVolume()),
 	}
 
 	// Add etcd static pod spec only if external etcd is not configured
 	if len(cfg.Etcd.Endpoints) == 0 {
 		etcdPod := componentPod(api.Container{
-			Name: etcd,
-			Command: []string{
-				"etcd",
-				"--listen-client-urls=http://127.0.0.1:2379",
-				"--advertise-client-urls=http://127.0.0.1:2379",
-				"--data-dir=/var/lib/etcd",
-			},
-			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
+			Name:          etcd,
+			Command:       getEtcdCommand(cfg),
+			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(cfg.Etcd.DataDir), k8sVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
 			LivenessProbe: componentProbe(2379, "/health", api.URISchemeHTTP),
-		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))
+		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume())
 
 		etcdPod.Spec.SecurityContext = &api.PodSecurityContext{
 			SELinuxOptions: &api.SELinuxOptions{
-				// Unconfine the etcd container so it can write to /var/lib/etcd with SELinux enforcing:
+				// Unconfine the etcd container so it can write to the data dir with SELinux enforcing:
 				Type: "spc_t",
 			},
 		}
@@ -151,20 +152,36 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	return nil
 }
 
+func newVolume(name, path string) api.Volume {
+	return api.Volume{
+		Name: name,
+		VolumeSource: api.VolumeSource{
+			HostPath: &api.HostPathVolumeSource{Path: path},
+		},
+	}
+}
+
+func newVolumeMount(name, path string) api.VolumeMount {
+	return api.VolumeMount{
+		Name:      name,
+		MountPath: path,
+	}
+}
+
 // etcdVolume exposes a path on the host in order to guarantee data survival during reboot.
 func etcdVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	return api.Volume{
 		Name: "etcd",
 		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{Path: kubeadmapi.GlobalEnvParams.HostEtcdPath},
+			HostPath: &api.HostPathVolumeSource{Path: cfg.Etcd.DataDir},
 		},
 	}
 }
 
-func etcdVolumeMount() api.VolumeMount {
+func etcdVolumeMount(dataDir string) api.VolumeMount {
 	return api.VolumeMount{
 		Name:      "etcd",
-		MountPath: "/var/lib/etcd",
+		MountPath: dataDir,
 	}
 }
 
@@ -201,7 +218,7 @@ func isPkiVolumeMountNeeded() bool {
 	return false
 }
 
-func pkiVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
+func pkiVolume() api.Volume {
 	return api.Volume{
 		Name: "pki",
 		VolumeSource: api.VolumeSource{
@@ -235,7 +252,7 @@ func flockVolumeMount() api.VolumeMount {
 	}
 }
 
-func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
+func k8sVolume() api.Volume {
 	return api.Volume{
 		Name: "k8s",
 		VolumeSource: api.VolumeSource{
@@ -247,7 +264,7 @@ func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 func k8sVolumeMount() api.VolumeMount {
 	return api.VolumeMount{
 		Name:      "k8s",
-		MountPath: "/etc/kubernetes/",
+		MountPath: kubeadmapi.GlobalEnvParams.KubernetesDir,
 		ReadOnly:  true,
 	}
 }
@@ -375,6 +392,21 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 			command = append(command, "--cloud-config="+DefaultCloudConfigPath)
 		}
 	}
+
+	return command
+}
+
+func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
+	var command []string
+
+	defaultArguments := map[string]string{
+		"listen-client-urls":    "http://127.0.0.1:2379",
+		"advertise-client-urls": "http://127.0.0.1:2379",
+		"data-dir":              cfg.Etcd.DataDir,
+	}
+
+	command = append(command, "etcd")
+	command = append(command, getExtraParameters(cfg.Etcd.ExtraArgs, defaultArguments)...)
 
 	return command
 }

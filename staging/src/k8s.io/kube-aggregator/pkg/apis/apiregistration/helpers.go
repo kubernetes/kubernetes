@@ -55,7 +55,7 @@ func (s ByPriority) Len() int      { return len(s) }
 func (s ByPriority) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s ByPriority) Less(i, j int) bool {
 	if s[i].Spec.Priority == s[j].Spec.Priority {
-		return strings.Compare(s[i].Name, s[j].Name) < 0
+		return s[i].Name < s[j].Name
 	}
 	return s[i].Spec.Priority < s[j].Spec.Priority
 }

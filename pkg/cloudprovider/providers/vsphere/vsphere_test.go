@@ -248,3 +248,36 @@ func TestVolumes(t *testing.T) {
 	// 	t.Fatalf("Cannot delete VMDK volume %s: %v", volPath, err)
 	// }
 }
+
+func TestGetVMName(t *testing.T) {
+	cfg, ok := configFromEnv()
+	if !ok {
+		t.Skipf("No config found in environment")
+	}
+
+	// Create vSphere configuration object
+	vs, err := newVSphere(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
+	}
+
+	// Create context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create vSphere client
+	err = vSphereLogin(ctx, vs)
+	if err != nil {
+		t.Errorf("Failed to create vSpere client: %s", err)
+	}
+	defer vs.client.Logout(ctx)
+
+	// Get VM name
+	vmName, err := getVMName(vs.client, &cfg)
+	if err != nil {
+		t.Fatalf("Failed to get VM name: %s", err)
+	}
+	if vmName != "vmname" {
+		t.Errorf("Expect VM name 'vmname', got: %s", vmName)
+	}
+}

@@ -4,19 +4,19 @@ metadata:
   name: kube-registry-v0
   namespace: kube-system
   labels:
-    k8s-app: kube-registry
+    k8s-app: kube-registry-upstream
     version: v0
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   replicas: 1
   selector:
-    k8s-app: kube-registry
+    k8s-app: kube-registry-upstream
     version: v0
   template:
     metadata:
       labels:
-        k8s-app: kube-registry
+        k8s-app: kube-registry-upstream
         version: v0
         kubernetes.io/cluster-service: "true"
     spec:

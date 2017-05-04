@@ -2,7 +2,7 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
+load("@io_bazel//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 filegroup(
     name = "package-srcs",

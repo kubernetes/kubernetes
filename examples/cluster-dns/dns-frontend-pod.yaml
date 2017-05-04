@@ -11,6 +11,6 @@ spec:
       command:
         - python
         - client.py
-        - http://dns-backend.development.cluster.local:8000
+        - http://dns-backend.development.svc.cluster.local:8000
       imagePullPolicy: Always
   restartPolicy: Never

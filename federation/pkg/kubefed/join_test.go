@@ -73,7 +73,6 @@ func TestJoinFederation(t *testing.T) {
 		{
 			cluster:            "syndicate",
 			clusterCtx:         "",
-			secret:             "",
 			server:             "https://10.20.30.40",
 			token:              "badge",
 			kubeconfigGlobal:   fakeKubeFiles[0],
@@ -84,7 +83,6 @@ func TestJoinFederation(t *testing.T) {
 		{
 			cluster:            "ally",
 			clusterCtx:         "",
-			secret:             "",
 			server:             "ally256.example.com:80",
 			token:              "souvenir",
 			kubeconfigGlobal:   fakeKubeFiles[0],
@@ -95,13 +93,32 @@ func TestJoinFederation(t *testing.T) {
 		{
 			cluster:            "confederate",
 			clusterCtx:         "",
-			secret:             "",
 			server:             "10.8.8.8",
 			token:              "totem",
 			kubeconfigGlobal:   fakeKubeFiles[1],
 			kubeconfigExplicit: fakeKubeFiles[2],
 			expectedServer:     "https://10.8.8.8",
 			expectedErr:        "",
+		},
+		{
+			cluster:            "associate",
+			clusterCtx:         "confederate",
+			server:             "10.8.8.8",
+			token:              "totem",
+			kubeconfigGlobal:   fakeKubeFiles[1],
+			kubeconfigExplicit: fakeKubeFiles[2],
+			expectedServer:     "https://10.8.8.8",
+			expectedErr:        "",
+		},
+		{
+			cluster:            "affiliate",
+			clusterCtx:         "",
+			server:             "https://10.20.30.40",
+			token:              "badge",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			expectedServer:     "https://10.20.30.40",
+			expectedErr:        fmt.Sprintf("error: cluster context %q not found", "affiliate"),
 		},
 		{
 			cluster:            "associate",
@@ -113,17 +130,6 @@ func TestJoinFederation(t *testing.T) {
 			kubeconfigExplicit: fakeKubeFiles[2],
 			expectedServer:     "https://10.8.8.8",
 			expectedErr:        "",
-		},
-		{
-			cluster:            "affiliate",
-			clusterCtx:         "",
-			secret:             "",
-			server:             "https://10.20.30.40",
-			token:              "badge",
-			kubeconfigGlobal:   fakeKubeFiles[0],
-			kubeconfigExplicit: "",
-			expectedServer:     "https://10.20.30.40",
-			expectedErr:        fmt.Sprintf("error: cluster context %q not found", "affiliate"),
 		},
 	}
 
@@ -183,9 +189,6 @@ func TestJoinFederation(t *testing.T) {
 }
 
 func testJoinFederationFactory(clusterName, secretName, server string) cmdutil.Factory {
-	if secretName == "" {
-		secretName = clusterName
-	}
 
 	want := fakeCluster(clusterName, secretName, server)
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
@@ -206,6 +209,13 @@ func testJoinFederationFactory(clusterName, secretName, server string) cmdutil.F
 				if err != nil {
 					return nil, err
 				}
+				// If the secret name was generated, test it separately.
+				if secretName == "" {
+					if got.Spec.SecretRef.Name == "" {
+						return nil, fmt.Errorf("expected a generated secret name, got \"\"")
+					}
+					got.Spec.SecretRef.Name = ""
+				}
 				if !apiequality.Semantic.DeepEqual(got, want) {
 					return nil, fmt.Errorf("Unexpected cluster object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
@@ -222,9 +232,6 @@ func testJoinFederationFactory(clusterName, secretName, server string) cmdutil.F
 func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token string) (cmdutil.Factory, error) {
 	if clusterCtx == "" {
 		clusterCtx = clusterName
-	}
-	if secretName == "" {
-		secretName = clusterName
 	}
 
 	kubeconfig := clientcmdapi.Config{
@@ -251,13 +258,17 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 		return nil, err
 	}
 
+	placeholderSecretName := secretName
+	if placeholderSecretName == "" {
+		placeholderSecretName = "secretName"
+	}
 	secretObject := v1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
+			Name:      placeholderSecretName,
 			Namespace: util.DefaultFederationSystemNamespace,
 			Annotations: map[string]string{
 				federation.FederationNameAnnotation: testFederationName,
@@ -312,6 +323,15 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 				if err != nil {
 					return nil, err
 				}
+
+				// If the secret name was generated, test it separately.
+				if secretName == "" {
+					if got.Name == "" {
+						return nil, fmt.Errorf("expected a generated secret name, got \"\"")
+					}
+					got.Name = placeholderSecretName
+				}
+
 				if !apiequality.Semantic.DeepEqual(got, secretObject) {
 					return nil, fmt.Errorf("Unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, secretObject))
 				}

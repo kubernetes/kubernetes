@@ -27,13 +27,11 @@ import (
 )
 
 const (
-	// TODO(crassirostris): Once test is stable, decrease allowed loses
-	loadTestMaxAllowedLostFraction    = 0.05
+	loadTestMaxAllowedLostFraction    = 0.001
 	loadTestMaxAllowedFluentdRestarts = 1
 )
 
-// TODO(crassirostris): Remove Flaky once test is stable
-var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]", func() {
+var _ = framework.KubeDescribe("Cluster level logging using GCL [Feature:StackdriverLogging]", func() {
 	f := framework.NewDefaultFramework("gcl-logging-load")
 
 	It("should create a constant load with long-living pods and ensure logs delivery", func() {
@@ -46,7 +44,7 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		loggingDuration := 10 * time.Minute
 		linesPerSecond := 1000 * nodeCount
 		linesPerPod := linesPerSecond * int(loggingDuration.Seconds()) / podCount
-		ingestionTimeout := 30 * time.Minute
+		ingestionTimeout := 60 * time.Minute
 
 		By("Running logs generator pods")
 		pods := []*loggingPod{}
@@ -86,7 +84,7 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		jobDuration := 1 * time.Minute
 		linesPerPodPerSecond := 100
 		testDuration := 10 * time.Minute
-		ingestionTimeout := 30 * time.Minute
+		ingestionTimeout := 60 * time.Minute
 
 		podRunDelay := time.Duration(int64(jobDuration) / int64(maxPodCount))
 		podRunCount := int(testDuration.Seconds())/int(podRunDelay.Seconds()) - 1

@@ -622,7 +622,7 @@ func (pc *PCCloud) DiskIsAttached(pdID string, nodeName k8stypes.NodeName) (bool
 	}
 
 	for _, vm := range disk.VMs {
-		if strings.Compare(vm, vmID) == 0 {
+		if vm == vmID {
 			return true, nil
 		}
 	}

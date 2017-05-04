@@ -119,8 +119,8 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 	for _, mount := range container.VolumeMounts {
 		mountEtcHostsFile = mountEtcHostsFile && (mount.MountPath != etcHostsPath)
 		vol, ok := podVolumes[mount.Name]
-		if !ok {
-			glog.Warningf("Mount cannot be satisfied for container %q, because the volume is missing: %q", container.Name, mount)
+		if !ok || vol.Mounter == nil {
+			glog.Warningf("Mount cannot be satisfied for container %q, because the volume is missing or the volume mounter is nil: %q", container.Name, mount)
 			continue
 		}
 
@@ -181,7 +181,8 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		})
 	}
 	if mountEtcHostsFile {
-		hostsMount, err := makeHostsMount(podDir, podIP, hostName, hostDomain)
+		hostAliases := pod.Spec.HostAliases
+		hostsMount, err := makeHostsMount(podDir, podIP, hostName, hostDomain, hostAliases)
 		if err != nil {
 			return nil, err
 		}
@@ -192,9 +193,9 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 
 // makeHostsMount makes the mountpoint for the hosts file that the containers
 // in a pod are injected with.
-func makeHostsMount(podDir, podIP, hostName, hostDomainName string) (*kubecontainer.Mount, error) {
+func makeHostsMount(podDir, podIP, hostName, hostDomainName string, hostAliases []v1.HostAlias) (*kubecontainer.Mount, error) {
 	hostsFilePath := path.Join(podDir, "etc-hosts")
-	if err := ensureHostsFile(hostsFilePath, podIP, hostName, hostDomainName); err != nil {
+	if err := ensureHostsFile(hostsFilePath, podIP, hostName, hostDomainName, hostAliases); err != nil {
 		return nil, err
 	}
 	return &kubecontainer.Mount{
@@ -208,11 +209,17 @@ func makeHostsMount(podDir, podIP, hostName, hostDomainName string) (*kubecontai
 
 // ensureHostsFile ensures that the given host file has an up-to-date ip, host
 // name, and domain name.
-func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string) error {
+func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string, hostAliases []v1.HostAlias) error {
 	if _, err := os.Stat(fileName); os.IsExist(err) {
 		glog.V(4).Infof("kubernetes-managed etc-hosts file exits. Will not be recreated: %q", fileName)
 		return nil
 	}
+	content := hostsFileContent(hostIP, hostName, hostDomainName, hostAliases)
+	return ioutil.WriteFile(fileName, content, 0644)
+}
+
+// hostsFileContent is the content of the managed etc hosts
+func hostsFileContent(hostIP, hostName, hostDomainName string, hostAliases []v1.HostAlias) []byte {
 	var buffer bytes.Buffer
 	buffer.WriteString("# Kubernetes-managed hosts file.\n")
 	buffer.WriteString("127.0.0.1\tlocalhost\n")                      // ipv4 localhost
@@ -226,7 +233,13 @@ func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string) error {
 	} else {
 		buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostIP, hostName))
 	}
-	return ioutil.WriteFile(fileName, buffer.Bytes(), 0644)
+	// write each IP/hostname pair as an entry into hosts file
+	for _, hostAlias := range hostAliases {
+		for _, hostname := range hostAlias.Hostnames {
+			buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostAlias.IP, hostname))
+		}
+	}
+	return buffer.Bytes()
 }
 
 // truncatePodHostnameIfNeeded truncates the pod hostname if it's longer than 63 chars.

@@ -112,6 +112,9 @@ write_files:
       [Unit]
       Description=Kubernetes
 
+      [Install]
+      WantedBy=multi-user.target
+
 runcmd:
  - systemctl daemon-reload
  - systemctl enable kube-node-installation.service
@@ -120,4 +123,5 @@ runcmd:
  - systemctl enable kubelet-monitor.service
  - systemctl enable kube-logrotate.timer
  - systemctl enable kube-logrotate.service
+ - systemctl enable kubernetes.target
  - systemctl start kubernetes.target

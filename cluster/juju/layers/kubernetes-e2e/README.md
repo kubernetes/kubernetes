@@ -73,7 +73,7 @@ a deployed cluster. The following example will skip the `Flaky`, `Slow`, and
 `Feature` labeled tests:
 
 ```shell
-juju run-action kubernetes-e2e/0 skip='\[(Flaky|Slow|Feature:.*)\]'
+juju run-action kubernetes-e2e/0 test skip='\[(Flaky|Slow|Feature:.*)\]'
 ```
 
 > Note: the escaping of the regex due to how bash handles brackets.

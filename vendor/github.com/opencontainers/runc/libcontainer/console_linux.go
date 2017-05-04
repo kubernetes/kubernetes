@@ -44,7 +44,7 @@ func newConsoleFromPath(slavePath string) *linuxConsole {
 	}
 }
 
-// linuxConsole is a linux psuedo TTY for use within a container.
+// linuxConsole is a linux pseudo TTY for use within a container.
 type linuxConsole struct {
 	master    *os.File
 	slavePath string

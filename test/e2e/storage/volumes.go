@@ -47,14 +47,14 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 func DeleteCinderVolume(name string) error {
@@ -518,7 +518,11 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 			volumeName, err := framework.CreatePDWithRetry()
 			Expect(err).NotTo(HaveOccurred())
 			defer func() {
-				framework.ExpectNoError(framework.DeletePDWithRetry(volumeName))
+				// - Get NodeName from the pod spec to which the volume is mounted.
+				// - Force detach and delete.
+				pod, err := f.PodClient().Get(config.Prefix+"-client", metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred(), "Failed getting pod %q.", config.Prefix+"-client")
+				detachAndDeletePDs(volumeName, []types.NodeName{types.NodeName(pod.Spec.NodeName)})
 			}()
 
 			defer func() {
@@ -673,6 +677,56 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 					// Randomize index.html to make sure we don't see the
 					// content from previous test runs.
 					ExpectedContent: "Hello from vSphere from namespace " + namespace.Name,
+				},
+			}
+
+			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
+
+			fsGroup := int64(1234)
+			framework.TestVolumeClient(cs, config, &fsGroup, tests)
+		})
+	})
+	////////////////////////////////////////////////////////////////////////
+	// Azure Disk
+	////////////////////////////////////////////////////////////////////////
+	framework.KubeDescribe("Azure Disk [Feature:Volumes]", func() {
+		It("should be mountable [Slow]", func() {
+			framework.SkipUnlessProviderIs("azure")
+			config := framework.VolumeTestConfig{
+				Namespace: namespace.Name,
+				Prefix:    "azure",
+			}
+
+			By("creating a test azure disk volume")
+			volumeName, err := framework.CreatePDWithRetry()
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				framework.DeletePDWithRetry(volumeName)
+			}()
+
+			defer func() {
+				if clean {
+					framework.Logf("Running volumeTestCleanup")
+					framework.VolumeTestCleanup(f, config)
+				}
+			}()
+			fsType := "ext4"
+			readOnly := false
+			diskName := volumeName[(strings.LastIndex(volumeName, "/") + 1):]
+			tests := []framework.VolumeTest{
+				{
+					Volume: v1.VolumeSource{
+						AzureDisk: &v1.AzureDiskVolumeSource{
+							DiskName:    diskName,
+							DataDiskURI: volumeName,
+							FSType:      &fsType,
+							ReadOnly:    &readOnly,
+						},
+					},
+					File: "index.html",
+					// Randomize index.html to make sure we don't see the
+					// content from previous test runs.
+					ExpectedContent: "Hello from Azure from namespace " + volumeName,
 				},
 			}
 

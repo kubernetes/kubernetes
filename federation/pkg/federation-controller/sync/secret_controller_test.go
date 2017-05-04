@@ -40,12 +40,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	clusters string = "clusters"
-	secrets  string = "secrets"
-)
-
 func TestSecretController(t *testing.T) {
+	clusters := "clusters"
+	secrets := "secrets"
+
 	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 
@@ -102,8 +100,8 @@ func TestSecretController(t *testing.T) {
 	secretWatch.Add(&secret1)
 	// There should be an update to add both the finalizers.
 	updatedSecret := GetSecretFromChan(secretUpdateChan)
-	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, metav1.FinalizerOrphanDependents))
+	AssertHasFinalizer(t, updatedSecret, deletionhelper.FinalizerDeleteFromUnderlyingClusters)
+	AssertHasFinalizer(t, updatedSecret, metav1.FinalizerOrphanDependents)
 	secret1 = *updatedSecret
 
 	// Verify that the secret is created in underlying cluster1.

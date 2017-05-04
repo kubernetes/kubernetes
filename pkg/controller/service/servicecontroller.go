@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
@@ -85,7 +86,6 @@ type ServiceController struct {
 	kubeClient          clientset.Interface
 	clusterName         string
 	balancer            cloudprovider.LoadBalancer
-	zone                cloudprovider.Zone
 	cache               *serviceCache
 	serviceLister       corelisters.ServiceLister
 	serviceListerSynced cache.InformerSynced
@@ -218,15 +218,6 @@ func (s *ServiceController) init() error {
 	}
 	s.balancer = balancer
 
-	zones, ok := s.cloud.Zones()
-	if !ok {
-		return fmt.Errorf("the cloud provider does not support zone enumeration, which is required for creating load balancers.")
-	}
-	zone, err := zones.GetZone()
-	if err != nil {
-		return fmt.Errorf("failed to get zone from cloud provider, will not be able to create load balancers: %v", err)
-	}
-	s.zone = zone
 	return nil
 }
 
@@ -599,10 +590,16 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 	return func(node *v1.Node) bool {
 		// We add the master to the node list, but its unschedulable.  So we use this to filter
 		// the master.
-		// TODO: Use a node annotation to indicate the master
 		if node.Spec.Unschedulable {
 			return false
 		}
+
+		// As of 1.6, we will taint the master, but not necessarily mark it unschedulable.
+		// Recognize nodes labeled as master, and filter them also, as we were doing previously.
+		if _, hasMasterRoleLabel := node.Labels[constants.LabelNodeRoleMaster]; hasMasterRoleLabel {
+			return false
+		}
+
 		// If we have no info, don't accept
 		if len(node.Status.Conditions) == 0 {
 			return false

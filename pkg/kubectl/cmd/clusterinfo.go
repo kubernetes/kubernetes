@@ -38,7 +38,7 @@ var (
   Display addresses of the master and services with label kubernetes.io/cluster-service=true
   To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.`))
 
-	clusterinfo_example = templates.Examples(i18n.T(`
+	clusterinfoExample = templates.Examples(i18n.T(`
 		# Print the address of the master and cluster services
 		kubectl cluster-info`))
 )
@@ -50,7 +50,7 @@ func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Aliases: []string{"clusterinfo"},
 		Short:   i18n.T("Display cluster info"),
 		Long:    longDescr,
-		Example: clusterinfo_example,
+		Example: clusterinfoExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunClusterInfo(f, out, cmd)
 			cmdutil.CheckErr(err)

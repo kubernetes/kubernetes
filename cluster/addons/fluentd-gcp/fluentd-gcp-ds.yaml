@@ -88,6 +88,16 @@ spec:
               then
                 exit 1;
               fi;
+      - name: prometheus-to-sd-exporter
+        image: gcr.io/google-containers/prometheus-to-sd:v0.1.0
+        command:
+          - /monitor
+          - --component=fluentd
+          - --stackdriver-prefix=container.googleapis.com/internal/addons
+          - --whitelisted-metrics=logging_line_count,logging_entry_count
+        volumeMounts:
+        - name: ssl-certs
+          mountPath: /etc/ssl/certs
       nodeSelector:
         beta.kubernetes.io/fluentd-ds-ready: "true"
       tolerations:
@@ -107,3 +117,6 @@ spec:
       - name: config-volume
         configMap:
           name: fluentd-gcp-config
+      - name: ssl-certs
+        hostPath:
+          path: /etc/ssl/certs

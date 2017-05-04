@@ -25,6 +25,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/github.com/containernetworking/cni/pkg/types/020:all-srcs",
+        "//vendor/github.com/containernetworking/cni/pkg/types/current:all-srcs",
+    ],
     tags = ["automanaged"],
 )

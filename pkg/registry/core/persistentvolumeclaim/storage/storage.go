@@ -35,12 +35,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against persistent volume claims.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
-		NewFunc:     func() runtime.Object { return &api.PersistentVolumeClaim{} },
-		NewListFunc: func() runtime.Object { return &api.PersistentVolumeClaimList{} },
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*api.PersistentVolumeClaim).Name, nil
-		},
+		Copier:            api.Scheme,
+		NewFunc:           func() runtime.Object { return &api.PersistentVolumeClaim{} },
+		NewListFunc:       func() runtime.Object { return &api.PersistentVolumeClaimList{} },
 		PredicateFunc:     persistentvolumeclaim.MatchPersistentVolumeClaim,
 		QualifiedResource: api.Resource("persistentvolumeclaims"),
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("persistentvolumeclaims"),

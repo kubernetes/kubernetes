@@ -18,7 +18,6 @@ package handlers
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -77,7 +77,7 @@ func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Reque
 
 // getterFunc performs a get request with the given context and object name. The request
 // may be used to deserialize an options object to pass to the getter.
-type getterFunc func(ctx request.Context, name string, req *http.Request) (runtime.Object, error)
+type getterFunc func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error)
 
 // MaxRetryWhenPatchConflicts is the maximum number of conflicts retry during a patch operation before returning failure
 const MaxRetryWhenPatchConflicts = 5
@@ -86,6 +86,9 @@ const MaxRetryWhenPatchConflicts = 5
 // passed-in getterFunc to perform the actual get.
 func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		trace := utiltrace.New("Get " + req.URL.Path)
+		defer trace.LogIfLong(500 * time.Millisecond)
+
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			scope.err(err, w, req)
@@ -94,7 +97,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
 
-		result, err := getter(ctx, name, req)
+		result, err := getter(ctx, name, req, trace)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -103,6 +106,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 			scope.err(err, w, req)
 			return
 		}
+		trace.Step("About to write a response")
 		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
@@ -110,11 +114,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 // GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
 func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.HandlerFunc {
 	return getResourceHandler(scope,
-		func(ctx request.Context, name string, req *http.Request) (runtime.Object, error) {
-			// For performance tracking purposes.
-			trace := utiltrace.New("Get " + req.URL.Path)
-			defer trace.LogIfLong(500 * time.Millisecond)
-
+		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
 			// check for export
 			options := metav1.GetOptions{}
 			if values := req.URL.Query(); len(values) > 0 {
@@ -132,7 +132,9 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 					return nil, err
 				}
 			}
-
+			if trace != nil {
+				trace.Step("About to Get from storage")
+			}
 			return r.Get(ctx, name, &options)
 		})
 }
@@ -140,10 +142,14 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 // GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
 func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, isSubresource bool) http.HandlerFunc {
 	return getResourceHandler(scope,
-		func(ctx request.Context, name string, req *http.Request) (runtime.Object, error) {
+		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
 			opts, subpath, subpathKey := r.NewGetOptions()
+			trace.Step("About to process Get options")
 			if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
 				return nil, err
+			}
+			if trace != nil {
+				trace.Step("About to Get from storage")
 			}
 			return r.Get(ctx, name, opts)
 		})

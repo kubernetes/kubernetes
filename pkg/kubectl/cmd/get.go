@@ -52,7 +52,7 @@ var (
 	get_long = templates.LongDesc(`
 		Display one or many resources.
 
-		` + valid_resources + `
+		` + validResources + `
 
 		This command will hide resources that have completed, such as pods that are
 		in the Succeeded or Failed phases. You can see the full results for any
@@ -131,6 +131,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+	cmdutil.AddOpenAPIFlags(cmd)
 	cmd.Flags().StringVar(&options.Raw, "raw", options.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	return cmd
 }
@@ -174,7 +175,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	}
 
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
-		fmt.Fprint(errOut, "You must specify the type of resource to get. ", valid_resources)
+		fmt.Fprint(errOut, "You must specify the type of resource to get. ", validResources)
 
 		fullCmdName := cmd.Parent().CommandPath()
 		usageString := "Required resource not specified."
@@ -362,8 +363,10 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				},
 			}
 			if listMeta, err := meta.ListAccessor(obj); err == nil {
-				list.Object["selfLink"] = listMeta.GetSelfLink()
-				list.Object["resourceVersion"] = listMeta.GetResourceVersion()
+				list.Object["metadata"] = map[string]interface{}{
+					"selfLink":        listMeta.GetSelfLink(),
+					"resourceVersion": listMeta.GetResourceVersion(),
+				}
 			}
 
 			for _, item := range items {

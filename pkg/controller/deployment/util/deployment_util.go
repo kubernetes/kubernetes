@@ -418,17 +418,6 @@ func MaxUnavailable(deployment extensions.Deployment) int32 {
 	return maxUnavailable
 }
 
-// MaxUnavailableInternal returns the maximum unavailable pods a rolling deployment can take.
-// TODO: remove the duplicate
-func MaxUnavailableInternal(deployment internalextensions.Deployment) int32 {
-	if !(deployment.Spec.Strategy.Type == internalextensions.RollingUpdateDeploymentStrategyType) || deployment.Spec.Replicas == 0 {
-		return int32(0)
-	}
-	// Error caught by validation
-	_, maxUnavailable, _ := ResolveFenceposts(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, &deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
-	return maxUnavailable
-}
-
 // MinAvailable returns the minimum available pods of a given deployment
 func MinAvailable(deployment *extensions.Deployment) int32 {
 	if !IsRollingUpdate(deployment) {
@@ -839,12 +828,12 @@ func IsRollingUpdate(deployment *extensions.Deployment) bool {
 	return deployment.Spec.Strategy.Type == extensions.RollingUpdateDeploymentStrategyType
 }
 
-// DeploymentComplete considers a deployment to be complete once its desired replicas equals its
-// updatedReplicas, no old pods are running, and it doesn't violate minimum availability.
+// DeploymentComplete considers a deployment to be complete once all of its desired replicas
+// are updated and available, and no old pods are running.
 func DeploymentComplete(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	return newStatus.UpdatedReplicas == *(deployment.Spec.Replicas) &&
 		newStatus.Replicas == *(deployment.Spec.Replicas) &&
-		newStatus.AvailableReplicas >= *(deployment.Spec.Replicas)-MaxUnavailable(*deployment) &&
+		newStatus.AvailableReplicas == *(deployment.Spec.Replicas) &&
 		newStatus.ObservedGeneration >= deployment.Generation
 }
 
@@ -931,7 +920,8 @@ func NewRSNewReplicas(deployment *extensions.Deployment, allRSs []*extensions.Re
 
 // IsSaturated checks if the new replica set is saturated by comparing its size with its deployment size.
 // Both the deployment and the replica set have to believe this replica set can own all of the desired
-// replicas in the deployment and the annotation helps in achieving that.
+// replicas in the deployment and the annotation helps in achieving that. All pods of the ReplicaSet
+// need to be available.
 func IsSaturated(deployment *extensions.Deployment, rs *extensions.ReplicaSet) bool {
 	if rs == nil {
 		return false
@@ -941,7 +931,9 @@ func IsSaturated(deployment *extensions.Deployment, rs *extensions.ReplicaSet) b
 	if err != nil {
 		return false
 	}
-	return *(rs.Spec.Replicas) == *(deployment.Spec.Replicas) && int32(desired) == *(deployment.Spec.Replicas)
+	return *(rs.Spec.Replicas) == *(deployment.Spec.Replicas) &&
+		int32(desired) == *(deployment.Spec.Replicas) &&
+		rs.Status.AvailableReplicas == *(deployment.Spec.Replicas)
 }
 
 // WaitForObservedDeployment polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.

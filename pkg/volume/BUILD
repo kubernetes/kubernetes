@@ -27,8 +27,6 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/util/chmod:go_default_library",
-        "//pkg/util/chown:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume/util:go_default_library",

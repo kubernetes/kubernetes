@@ -393,7 +393,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			GetContext:         ctxFn,
 			SelfLinker:         a.group.Linker,
 			ClusterScoped:      true,
-			SelfLinkPathPrefix: gpath.Join(a.prefix, resourcePath, "/"),
+			SelfLinkPathPrefix: gpath.Join(a.prefix, resource) + "/",
 			SelfLinkPathSuffix: suffix,
 		}
 
