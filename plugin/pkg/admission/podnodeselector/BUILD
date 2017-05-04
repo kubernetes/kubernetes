@@ -18,12 +18,12 @@ go_library(
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/client/listers/core/internalversion:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
-        "//vendor:k8s.io/apimachinery/pkg/util/yaml",
-        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 
@@ -38,9 +38,9 @@ go_test(
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
-        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 

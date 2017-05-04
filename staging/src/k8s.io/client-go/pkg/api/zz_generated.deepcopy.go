@@ -65,7 +65,6 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerStateTerminated, InType: reflect.TypeOf(&ContainerStateTerminated{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerStateWaiting, InType: reflect.TypeOf(&ContainerStateWaiting{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerStatus, InType: reflect.TypeOf(&ContainerStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ConversionError, InType: reflect.TypeOf(&ConversionError{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DaemonEndpoint, InType: reflect.TypeOf(&DaemonEndpoint{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DeleteOptions, InType: reflect.TypeOf(&DeleteOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DownwardAPIProjection, InType: reflect.TypeOf(&DownwardAPIProjection{})},
@@ -93,6 +92,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_HTTPGetAction, InType: reflect.TypeOf(&HTTPGetAction{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_HTTPHeader, InType: reflect.TypeOf(&HTTPHeader{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Handler, InType: reflect.TypeOf(&Handler{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_HostAlias, InType: reflect.TypeOf(&HostAlias{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_HostPathVolumeSource, InType: reflect.TypeOf(&HostPathVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ISCSIVolumeSource, InType: reflect.TypeOf(&ISCSIVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_KeyToPath, InType: reflect.TypeOf(&KeyToPath{})},
@@ -707,31 +707,6 @@ func DeepCopy_api_ContainerStatus(in interface{}, out interface{}, c *conversion
 	}
 }
 
-func DeepCopy_api_ConversionError(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ConversionError)
-		out := out.(*ConversionError)
-		*out = *in
-		// in.In is kind 'Interface'
-		if in.In != nil {
-			if newVal, err := c.DeepCopy(&in.In); err != nil {
-				return err
-			} else {
-				out.In = *newVal.(*interface{})
-			}
-		}
-		// in.Out is kind 'Interface'
-		if in.Out != nil {
-			if newVal, err := c.DeepCopy(&in.Out); err != nil {
-				return err
-			} else {
-				out.Out = *newVal.(*interface{})
-			}
-		}
-		return nil
-	}
-}
-
 func DeepCopy_api_DaemonEndpoint(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DaemonEndpoint)
@@ -1202,6 +1177,20 @@ func DeepCopy_api_Handler(in interface{}, out interface{}, c *conversion.Cloner)
 			in, out := &in.TCPSocket, &out.TCPSocket
 			*out = new(TCPSocketAction)
 			**out = **in
+		}
+		return nil
+	}
+}
+
+func DeepCopy_api_HostAlias(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*HostAlias)
+		out := out.(*HostAlias)
+		*out = *in
+		if in.Hostnames != nil {
+			in, out := &in.Hostnames, &out.Hostnames
+			*out = make([]string, len(*in))
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -2463,6 +2452,15 @@ func DeepCopy_api_PodSpec(in interface{}, out interface{}, c *conversion.Cloner)
 			*out = make([]Toleration, len(*in))
 			for i := range *in {
 				if err := DeepCopy_api_Toleration(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		if in.HostAliases != nil {
+			in, out := &in.HostAliases, &out.HostAliases
+			*out = make([]HostAlias, len(*in))
+			for i := range *in {
+				if err := DeepCopy_api_HostAlias(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}

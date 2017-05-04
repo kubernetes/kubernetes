@@ -33,7 +33,6 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -47,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -122,7 +122,7 @@ type Config struct {
 	BuildHandlerChainFunc func(apiHandler http.Handler, c *Config) (secure http.Handler)
 	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
 	// always reported
-	DiscoveryAddresses DiscoveryAddresses
+	DiscoveryAddresses discovery.Addresses
 	// The default set of healthz checks. There might be more added via AddHealthzChecks dynamically.
 	HealthzChecks []healthz.HealthzChecker
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
@@ -321,7 +321,7 @@ func (c *Config) Complete() completedConfig {
 		}
 	}
 	if c.DiscoveryAddresses == nil {
-		c.DiscoveryAddresses = DefaultDiscoveryAddresses{DefaultAddress: c.ExternalAddress}
+		c.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: c.ExternalAddress}
 	}
 
 	// If the loopbackclientconfig is specified AND it has a token for use against the API server
@@ -408,8 +408,6 @@ func (c completedConfig) constructServer() (*GenericAPIServer, error) {
 		SecureServingInfo: c.SecureServingInfo,
 		ExternalAddress:   c.ExternalAddress,
 
-		apiGroupsForDiscovery: map[string]metav1.APIGroup{},
-
 		HandlerContainer:   handlerContainer,
 		FallThroughHandler: c.FallThroughHandler,
 
@@ -422,6 +420,8 @@ func (c completedConfig) constructServer() (*GenericAPIServer, error) {
 		disabledPostStartHooks: c.DisabledPostStartHooks,
 
 		healthzChecks: c.HealthzChecks,
+
+		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
 	}
 
 	return s, nil
@@ -479,7 +479,15 @@ func (c completedConfig) buildHandlers(s *GenericAPIServer, delegate http.Handle
 		}
 	}
 
-	installAPI(s, c.Config, delegate)
+	installAPI(s, c.Config)
+	if delegate != nil {
+		s.FallThroughHandler.NotFoundHandler(delegate)
+	} else if c.EnableIndex {
+		s.FallThroughHandler.NotFoundHandler(routes.IndexLister{
+			StatusCode:   http.StatusNotFound,
+			PathProvider: s.listedPathProvider,
+		})
+	}
 
 	s.Handler = c.BuildHandlerChainFunc(s.HandlerContainer.ServeMux, c.Config)
 
@@ -500,15 +508,9 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	return handler
 }
 
-func installAPI(s *GenericAPIServer, c *Config, delegate http.Handler) {
-	switch {
-	case c.EnableIndex:
-		routes.Index{}.Install(s.listedPathProvider, c.FallThroughHandler, delegate)
-
-	case delegate != nil:
-		// if we have a delegate, allow it to handle everything that's unmatched even if
-		// the index is disabled.
-		s.FallThroughHandler.UnlistedHandleFunc("/", delegate.ServeHTTP)
+func installAPI(s *GenericAPIServer, c *Config) {
+	if c.EnableIndex {
+		routes.Index{}.Install(s.listedPathProvider, c.FallThroughHandler)
 	}
 	if c.SwaggerConfig != nil && c.EnableSwaggerUI {
 		routes.SwaggerUI{}.Install(s.FallThroughHandler)
@@ -529,7 +531,7 @@ func installAPI(s *GenericAPIServer, c *Config, delegate http.Handler) {
 	routes.Version{Version: c.Version}.Install(s.HandlerContainer)
 
 	if c.EnableDiscovery {
-		s.HandlerContainer.Add(s.DynamicApisDiscovery())
+		s.HandlerContainer.Add(s.DiscoveryGroupManager.WebService())
 	}
 }
 

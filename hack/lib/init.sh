@@ -37,7 +37,6 @@ export no_proxy=127.0.0.1,localhost
 THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/cluster/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/logging.sh"
 
 kube::log::install_errexit

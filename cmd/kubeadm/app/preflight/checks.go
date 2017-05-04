@@ -515,7 +515,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		// Only do etcd related checks when no external endpoints were specified
 		checks = append(checks,
 			PortOpenCheck{port: 2379},
-			DirAvailableCheck{Path: "/var/lib/etcd"},
+			DirAvailableCheck{Path: cfg.Etcd.DataDir},
 		)
 	} else {
 		// Only check etcd version when external endpoints are specified

@@ -207,9 +207,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		})
 
 	fdc.deletionHelper = deletionhelper.NewDeletionHelper(
-		fdc.hasFinalizerFunc,
-		fdc.removeFinalizerFunc,
-		fdc.addFinalizerFunc,
+		fdc.updateDeployment,
 		// objNameFunc
 		func(obj runtime.Object) string {
 			deployment := obj.(*extensionsv1.Deployment)
@@ -224,52 +222,11 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 	return fdc
 }
 
-// Returns true if the given object has the given finalizer in its ObjectMeta.
-func (fdc *DeploymentController) hasFinalizerFunc(obj runtime.Object, finalizer string) bool {
-	deployment := obj.(*extensionsv1.Deployment)
-	for i := range deployment.ObjectMeta.Finalizers {
-		if string(deployment.ObjectMeta.Finalizers[i]) == finalizer {
-			return true
-		}
-	}
-	return false
-}
-
-// Removes the finalizers from the given objects ObjectMeta.
+// Sends the given updated object to apiserver.
 // Assumes that the given object is a deployment.
-func (fdc *DeploymentController) removeFinalizerFunc(obj runtime.Object, finalizers []string) (runtime.Object, error) {
+func (fdc *DeploymentController) updateDeployment(obj runtime.Object) (runtime.Object, error) {
 	deployment := obj.(*extensionsv1.Deployment)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range deployment.ObjectMeta.Finalizers {
-		if !deletionhelper.ContainsString(finalizers, deployment.ObjectMeta.Finalizers[i]) {
-			newFinalizers = append(newFinalizers, deployment.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	deployment.ObjectMeta.Finalizers = newFinalizers
-	deployment, err := fdc.fedClient.Extensions().Deployments(deployment.Namespace).Update(deployment)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizers %v from deployment %s: %v", finalizers, deployment.Name, err)
-	}
-	return deployment, nil
-}
-
-// Adds the given finalizers to the given objects ObjectMeta.
-// Assumes that the given object is a deployment.
-func (fdc *DeploymentController) addFinalizerFunc(obj runtime.Object, finalizers []string) (runtime.Object, error) {
-	deployment := obj.(*extensionsv1.Deployment)
-	deployment.ObjectMeta.Finalizers = append(deployment.ObjectMeta.Finalizers, finalizers...)
-	deployment, err := fdc.fedClient.Extensions().Deployments(deployment.Namespace).Update(deployment)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizers %v to deployment %s: %v", finalizers, deployment.Name, err)
-	}
-	return deployment, nil
+	return fdc.fedClient.Extensions().Deployments(deployment.Namespace).Update(deployment)
 }
 
 func (fdc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {

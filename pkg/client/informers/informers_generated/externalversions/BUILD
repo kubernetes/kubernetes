@@ -41,9 +41,9 @@ go_library(
         "//pkg/client/informers/informers_generated/externalversions/rbac:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/settings:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/storage:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 

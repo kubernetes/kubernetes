@@ -24,13 +24,7 @@ import (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	RegisterDefaults(scheme)
-	return scheme.AddDefaultingFuncs(
-		SetDefaults_DaemonSet,
-		SetDefaults_Deployment,
-		SetDefaults_ReplicaSet,
-		SetDefaults_NetworkPolicy,
-	)
+	return RegisterDefaults(scheme)
 }
 
 func SetDefaults_DaemonSet(obj *DaemonSet) {
@@ -127,7 +121,6 @@ func SetDefaults_ReplicaSet(obj *ReplicaSet) {
 func SetDefaults_NetworkPolicy(obj *NetworkPolicy) {
 	// Default any undefined Protocol fields to TCP.
 	for _, i := range obj.Spec.Ingress {
-		// TODO: Update Ports to be a pointer to slice as soon as auto-generation supports it.
 		for _, p := range i.Ports {
 			if p.Protocol == nil {
 				proto := v1.ProtocolTCP

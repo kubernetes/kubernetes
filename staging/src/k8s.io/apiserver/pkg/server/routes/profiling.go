@@ -17,6 +17,7 @@ limitations under the License.
 package routes
 
 import (
+	"net/http"
 	"net/http/pprof"
 
 	"k8s.io/apiserver/pkg/server/mux"
@@ -27,7 +28,8 @@ type Profiling struct{}
 
 // Install adds the Profiling webservice to the given mux.
 func (d Profiling) Install(c *mux.PathRecorderMux) {
-	c.UnlistedHandleFunc("/debug/pprof/", pprof.Index)
+	c.UnlistedHandle("/debug/pprof", http.HandlerFunc(pprof.Index))
+	c.UnlistedHandlePrefix("/debug/pprof/", http.HandlerFunc(pprof.Index))
 	c.UnlistedHandleFunc("/debug/pprof/profile", pprof.Profile)
 	c.UnlistedHandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	c.UnlistedHandleFunc("/debug/pprof/trace", pprof.Trace)

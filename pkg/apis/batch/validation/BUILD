@@ -16,11 +16,11 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/batch:go_default_library",
-        "//vendor:github.com/robfig/cron",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/validation",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
-        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor/github.com/robfig/cron:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/validation:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 
@@ -32,8 +32,8 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 

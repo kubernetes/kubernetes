@@ -23,7 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	corev1client "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 )
 
 // TODO: This is almost a exact replica of Endpoints lock.
@@ -35,7 +35,7 @@ type ConfigMapLock struct {
 	// ConfigMapMeta should contain a Name and a Namespace of an
 	// ConfigMapMeta object that the Leadercmlector will attempt to lead.
 	ConfigMapMeta metav1.ObjectMeta
-	Client        clientset.Interface
+	Client        corev1client.ConfigMapsGetter
 	LockConfig    ResourceLockConfig
 	cm            *v1.ConfigMap
 }
@@ -44,7 +44,7 @@ type ConfigMapLock struct {
 func (cml *ConfigMapLock) Get() (*LeaderElectionRecord, error) {
 	var record LeaderElectionRecord
 	var err error
-	cml.cm, err = cml.Client.Core().ConfigMaps(cml.ConfigMapMeta.Namespace).Get(cml.ConfigMapMeta.Name, metav1.GetOptions{})
+	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Get(cml.ConfigMapMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (cml *ConfigMapLock) Create(ler LeaderElectionRecord) error {
 	if err != nil {
 		return err
 	}
-	cml.cm, err = cml.Client.Core().ConfigMaps(cml.ConfigMapMeta.Namespace).Create(&v1.ConfigMap{
+	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Create(&v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cml.ConfigMapMeta.Name,
 			Namespace: cml.ConfigMapMeta.Namespace,
@@ -87,7 +87,7 @@ func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
 		return err
 	}
 	cml.cm.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
-	cml.cm, err = cml.Client.Core().ConfigMaps(cml.ConfigMapMeta.Namespace).Update(cml.cm)
+	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(cml.cm)
 	return err
 }
 

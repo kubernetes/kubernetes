@@ -53,7 +53,7 @@ import (
 
 const (
 	// The primary user agent
-	primaryUA = "grpc-go/0.11"
+	primaryUA = "grpc-go/1.0"
 	// http2MaxFrameLen specifies the max length of a HTTP2 frame.
 	http2MaxFrameLen = 16384 // 16KB frame
 	// http://http2.github.io/http2-spec/#SettingValues
@@ -162,7 +162,7 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 	switch f.Name {
 	case "content-type":
 		if !validContentType(f.Value) {
-			d.setErr(StreamErrorf(codes.FailedPrecondition, "transport: received the unexpected content-type %q", f.Value))
+			d.setErr(streamErrorf(codes.FailedPrecondition, "transport: received the unexpected content-type %q", f.Value))
 			return
 		}
 	case "grpc-encoding":
@@ -170,7 +170,7 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 	case "grpc-status":
 		code, err := strconv.Atoi(f.Value)
 		if err != nil {
-			d.setErr(StreamErrorf(codes.Internal, "transport: malformed grpc-status: %v", err))
+			d.setErr(streamErrorf(codes.Internal, "transport: malformed grpc-status: %v", err))
 			return
 		}
 		d.statusCode = codes.Code(code)
@@ -181,7 +181,7 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 		var err error
 		d.timeout, err = decodeTimeout(f.Value)
 		if err != nil {
-			d.setErr(StreamErrorf(codes.Internal, "transport: malformed time-out: %v", err))
+			d.setErr(streamErrorf(codes.Internal, "transport: malformed time-out: %v", err))
 			return
 		}
 	case ":path":
@@ -253,6 +253,9 @@ func div(d, r time.Duration) int64 {
 
 // TODO(zhaoq): It is the simplistic and not bandwidth efficient. Improve it.
 func encodeTimeout(t time.Duration) string {
+	if t <= 0 {
+		return "0n"
+	}
 	if d := div(t, time.Nanosecond); d <= maxTimeoutValue {
 		return strconv.FormatInt(d, 10) + "n"
 	}
@@ -349,7 +352,7 @@ func decodeGrpcMessageUnchecked(msg string) string {
 	for i := 0; i < lenMsg; i++ {
 		c := msg[i]
 		if c == percentByte && i+2 < lenMsg {
-			parsed, err := strconv.ParseInt(msg[i+1:i+3], 16, 8)
+			parsed, err := strconv.ParseUint(msg[i+1:i+3], 16, 8)
 			if err != nil {
 				buf.WriteByte(c)
 			} else {

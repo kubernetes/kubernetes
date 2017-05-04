@@ -21,12 +21,14 @@ package util
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -46,7 +48,10 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 }
 
 func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error) {
-	mapper, typer := f.objectMappingFactory.Object()
+	mapper, typer, err := f.objectMappingFactory.UnstructuredObject()
+	if err != nil {
+		return nil, false, err
+	}
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
 	return PrinterForCommand(cmd, mapper, typer, decoders)
@@ -129,4 +134,23 @@ func (f *ring2Factory) NewBuilder() *resource.Builder {
 	categoryExpander := f.objectMappingFactory.CategoryExpander()
 
 	return resource.NewBuilder(mapper, categoryExpander, typer, resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping), f.clientAccessFactory.Decoder(true))
+}
+
+// PluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.
+// If this env var is not set, it defaults to
+//   "~/.kube/plugins", plus
+//  "./kubectl/plugins" directory under the "data dir" directory specified by the XDG
+// system directory structure spec for the given platform.
+func (f *ring2Factory) PluginLoader() plugins.PluginLoader {
+	if len(os.Getenv("KUBECTL_PLUGINS_PATH")) > 0 {
+		return plugins.PluginsEnvVarPluginLoader()
+	}
+	return plugins.TolerantMultiPluginLoader{
+		plugins.XDGDataPluginLoader(),
+		plugins.UserDirPluginLoader(),
+	}
+}
+
+func (f *ring2Factory) PluginRunner() plugins.PluginRunner {
+	return &plugins.ExecPluginRunner{}
 }

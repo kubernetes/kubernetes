@@ -15,7 +15,7 @@ go_library(
         ":bindata",
     ],
     deps = [
-        "//vendor:github.com/golang/glog",
+        "//vendor/github.com/golang/glog:go_default_library",
     ],
 )
 
@@ -29,14 +29,14 @@ genrule(
     ],
     outs = ["bindata.go"],
     cmd = """
-$(location //vendor:github.com/jteeuwen/go-bindata/go-bindata_bin) \
+$(location //vendor/github.com/jteeuwen/go-bindata/go-bindata:go-bindata) \
   -nometadata -o "$(OUTS)" -pkg generated \
   -prefix $$(pwd) \
   -ignore .jpg -ignore .png -ignore .md \
   $(SRCS)
 """,
     tools = [
-        "//vendor:github.com/jteeuwen/go-bindata/go-bindata_bin",
+        "//vendor/github.com/jteeuwen/go-bindata/go-bindata",
     ],
 )
 

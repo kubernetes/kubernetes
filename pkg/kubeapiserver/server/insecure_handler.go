@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apiserver/pkg/authentication/user"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server"
@@ -35,6 +36,7 @@ import (
 
 func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
 	handler := genericapifilters.WithAudit(apiHandler, c.RequestContextMapper, c.AuditWriter)
+	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, insecureSuperuser{}, nil)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithPanicRecovery(handler)
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
@@ -110,4 +112,16 @@ func serveInsecurely(insecureServingInfo *InsecureServingInfo, insecureHandler h
 	var err error
 	_, err = server.RunServer(insecureServer, insecureServingInfo.BindNetwork, stopCh)
 	return err
+}
+
+// insecureSuperuser implements authenticator.Request to always return a superuser.
+// This is functionally equivalent to skipping authentication and authorization,
+// but allows apiserver code to stop special-casing a nil user to skip authorization checks.
+type insecureSuperuser struct{}
+
+func (insecureSuperuser) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+	return &user.DefaultInfo{
+		Name:   "system:unsecured",
+		Groups: []string{user.SystemPrivilegedGroup, user.AllAuthenticated},
+	}, true, nil
 }

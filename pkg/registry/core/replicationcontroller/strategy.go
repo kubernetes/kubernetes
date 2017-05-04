@@ -20,10 +20,10 @@ package replicationcontroller
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +34,7 @@ import (
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/validation"
 )
 
@@ -80,7 +81,7 @@ func (rcStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runti
 	// status its own object, and even if we don't, writes may be the result of a
 	// read-update-write loop, so the contents of spec may not actually be the spec that
 	// the controller has *seen*.
-	if !reflect.DeepEqual(oldController.Spec, newController.Spec) {
+	if !apiequality.Semantic.DeepEqual(oldController.Spec, newController.Spec) {
 		newController.Generation = oldController.Generation + 1
 	}
 }
@@ -110,7 +111,7 @@ func (rcStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime
 	updateErrorList := validation.ValidateReplicationControllerUpdate(newRc, oldRc)
 	errs := append(validationErrorList, updateErrorList...)
 
-	for key, value := range api.NonConvertibleFields(oldRc.Annotations) {
+	for key, value := range helper.NonConvertibleFields(oldRc.Annotations) {
 		parts := strings.Split(key, "/")
 		if len(parts) != 2 {
 			continue
@@ -119,7 +120,7 @@ func (rcStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime
 
 		switch {
 		case strings.Contains(brokenField, "selector"):
-			if !reflect.DeepEqual(oldRc.Spec.Selector, newRc.Spec.Selector) {
+			if !apiequality.Semantic.DeepEqual(oldRc.Spec.Selector, newRc.Spec.Selector) {
 				errs = append(errs, field.Invalid(field.NewPath("spec").Child("selector"), newRc.Spec.Selector, "cannot update non-convertible selector"))
 			}
 		default:

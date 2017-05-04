@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 )
 
@@ -345,7 +346,7 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 			case v1.ResourceNvidiaGPU:
 				res.NvidiaGPU += rQuant.Value()
 			default:
-				if v1.IsOpaqueIntResourceName(rName) {
+				if v1helper.IsOpaqueIntResourceName(rName) {
 					res.AddOpaque(rName, rQuant.Value())
 				}
 			}
@@ -387,7 +388,7 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 		case v1.ResourcePods:
 			n.allowedPodNumber = int(rQuant.Value())
 		default:
-			if v1.IsOpaqueIntResourceName(rName) {
+			if v1helper.IsOpaqueIntResourceName(rName) {
 				n.allocatableResource.SetOpaque(rName, rQuant.Value())
 			}
 		}

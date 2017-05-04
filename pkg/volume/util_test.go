@@ -362,7 +362,7 @@ func TestMountOptionFromSpec(t *testing.T) {
 
 func createVolumeSpecWithMountOption(name string, mountOptions string, spec v1.PersistentVolumeSpec) *Spec {
 	annotations := map[string]string{
-		MountOptionAnnotation: mountOptions,
+		v1.MountOptionAnnotation: mountOptions,
 	}
 	objMeta := metav1.ObjectMeta{
 		Name:        name,

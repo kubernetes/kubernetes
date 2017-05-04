@@ -432,6 +432,17 @@ func (g TestGroup) ResourcePath(resource, namespace, name string) string {
 	return g.ResourcePathWithPrefix("", resource, namespace, name)
 }
 
+// SubResourcePath returns the appropriate path for the given resource, namespace,
+// name and subresource.
+func (g TestGroup) SubResourcePath(resource, namespace, name, sub string) string {
+	path := g.ResourcePathWithPrefix("", resource, namespace, name)
+	if sub != "" {
+		path = path + "/" + sub
+	}
+
+	return path
+}
+
 func (g TestGroup) RESTMapper() meta.RESTMapper {
 	return api.Registry.RESTMapper()
 }

@@ -43,6 +43,7 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -351,7 +352,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 				addressType = v1.NodeInternalIP
 			}
 
-			v1.AddToNodeAddresses(&addrs,
+			v1helper.AddToNodeAddresses(&addrs,
 				v1.NodeAddress{
 					Type:    addressType,
 					Address: props.Addr,
@@ -362,7 +363,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 
 	// AccessIPs are usually duplicates of "public" addresses.
 	if srv.AccessIPv4 != "" {
-		v1.AddToNodeAddresses(&addrs,
+		v1helper.AddToNodeAddresses(&addrs,
 			v1.NodeAddress{
 				Type:    v1.NodeExternalIP,
 				Address: srv.AccessIPv4,
@@ -371,7 +372,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 	}
 
 	if srv.AccessIPv6 != "" {
-		v1.AddToNodeAddresses(&addrs,
+		v1helper.AddToNodeAddresses(&addrs,
 			v1.NodeAddress{
 				Type:    v1.NodeExternalIP,
 				Address: srv.AccessIPv6,

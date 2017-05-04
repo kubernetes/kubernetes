@@ -33,6 +33,8 @@ type FakeClusterRoleBindings struct {
 
 var clusterrolebindingsResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "", Resource: "clusterrolebindings"}
 
+var clusterrolebindingsKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "", Kind: "ClusterRoleBinding"}
+
 func (c *FakeClusterRoleBindings) Create(clusterRoleBinding *rbac.ClusterRoleBinding) (result *rbac.ClusterRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(clusterrolebindingsResource, clusterRoleBinding), &rbac.ClusterRoleBinding{})
@@ -75,7 +77,7 @@ func (c *FakeClusterRoleBindings) Get(name string, options v1.GetOptions) (resul
 
 func (c *FakeClusterRoleBindings) List(opts v1.ListOptions) (result *rbac.ClusterRoleBindingList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clusterrolebindingsResource, opts), &rbac.ClusterRoleBindingList{})
+		Invokes(testing.NewRootListAction(clusterrolebindingsResource, clusterrolebindingsKind, opts), &rbac.ClusterRoleBindingList{})
 	if obj == nil {
 		return nil, err
 	}

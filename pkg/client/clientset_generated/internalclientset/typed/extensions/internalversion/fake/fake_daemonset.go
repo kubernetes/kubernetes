@@ -34,6 +34,8 @@ type FakeDaemonSets struct {
 
 var daemonsetsResource = schema.GroupVersionResource{Group: "extensions", Version: "", Resource: "daemonsets"}
 
+var daemonsetsKind = schema.GroupVersionKind{Group: "extensions", Version: "", Kind: "DaemonSet"}
+
 func (c *FakeDaemonSets) Create(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(daemonsetsResource, c.ns, daemonSet), &extensions.DaemonSet{})
@@ -90,7 +92,7 @@ func (c *FakeDaemonSets) Get(name string, options v1.GetOptions) (result *extens
 
 func (c *FakeDaemonSets) List(opts v1.ListOptions) (result *extensions.DaemonSetList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(daemonsetsResource, c.ns, opts), &extensions.DaemonSetList{})
+		Invokes(testing.NewListAction(daemonsetsResource, daemonsetsKind, c.ns, opts), &extensions.DaemonSetList{})
 
 	if obj == nil {
 		return nil, err

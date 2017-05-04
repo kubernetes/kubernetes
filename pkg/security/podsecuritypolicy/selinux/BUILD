@@ -20,7 +20,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 

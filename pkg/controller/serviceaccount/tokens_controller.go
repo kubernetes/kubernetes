@@ -259,15 +259,15 @@ func (e *TokensController) syncServiceAccount() {
 		// service account no longer exists, so delete related tokens
 		glog.V(4).Infof("syncServiceAccount(%s/%s), service account deleted, removing tokens", saInfo.namespace, saInfo.name)
 		sa = &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: saInfo.namespace, Name: saInfo.name, UID: saInfo.uid}}
-		if retriable, err := e.deleteTokens(sa); err != nil {
+		retry, err = e.deleteTokens(sa)
+		if err != nil {
 			glog.Errorf("error deleting serviceaccount tokens for %s/%s: %v", saInfo.namespace, saInfo.name, err)
-			retry = retriable
 		}
 	default:
 		// ensure a token exists and is referenced by this service account
-		if retriable, err := e.ensureReferencedToken(sa); err != nil {
+		retry, err = e.ensureReferencedToken(sa)
+		if err != nil {
 			glog.Errorf("error synchronizing serviceaccount %s/%s: %v", saInfo.namespace, saInfo.name, err)
-			retry = retriable
 		}
 	}
 }
@@ -367,19 +367,12 @@ func (e *TokensController) deleteToken(ns, name string, uid types.UID) ( /*retry
 
 // ensureReferencedToken makes sure at least one ServiceAccountToken secret exists, and is included in the serviceAccount's Secrets list
 func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccount) ( /* retry */ bool, error) {
-	if len(serviceAccount.Secrets) > 0 {
-		allSecrets, err := e.listTokenSecrets(serviceAccount)
-		if err != nil {
-			// Don't retry cache lookup errors
-			return false, err
-		}
-		referencedSecrets := getSecretReferences(serviceAccount)
-		for _, secret := range allSecrets {
-			if referencedSecrets.Has(secret.Name) {
-				// A service account token already exists, and is referenced, short-circuit
-				return false, nil
-			}
-		}
+	if hasToken, err := e.hasReferencedToken(serviceAccount); err != nil {
+		// Don't retry cache lookup errors
+		return false, err
+	} else if hasToken {
+		// A service account token already exists, and is referenced, short-circuit
+		return false, nil
 	}
 
 	// We don't want to update the cache's copy of the service account
@@ -387,14 +380,13 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	serviceAccounts := e.client.Core().ServiceAccounts(serviceAccount.Namespace)
 	liveServiceAccount, err := serviceAccounts.Get(serviceAccount.Name, metav1.GetOptions{})
 	if err != nil {
-		// Retry for any error other than a NotFound
-		return !apierrors.IsNotFound(err), err
+		// Retry if we cannot fetch the live service account (for a NotFound error, either the live lookup or our cache are stale)
+		return true, err
 	}
 	if liveServiceAccount.ResourceVersion != serviceAccount.ResourceVersion {
-		// our view of the service account is not up to date
-		// we'll get notified of an update event later and get to try again
-		glog.V(2).Infof("serviceaccount %s/%s is not up to date, skipping token creation", serviceAccount.Namespace, serviceAccount.Name)
-		return false, nil
+		// Retry if our liveServiceAccount doesn't match our cache's resourceVersion (either the live lookup or our cache are stale)
+		glog.V(4).Infof("liveServiceAccount.ResourceVersion (%s) does not match cache (%s), retrying", liveServiceAccount.ResourceVersion, serviceAccount.ResourceVersion)
+		return true, nil
 	}
 
 	// Build the secret
@@ -433,16 +425,53 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	// This prevents the service account update (below) triggering another token creation, if the referenced token couldn't be found in the store
 	e.secrets.Add(createdToken)
 
-	liveServiceAccount.Secrets = append(liveServiceAccount.Secrets, v1.ObjectReference{Name: secret.Name})
+	// Try to add a reference to the newly created token to the service account
+	addedReference := false
+	err = clientretry.RetryOnConflict(clientretry.DefaultRetry, func() error {
+		// refresh liveServiceAccount on every retry
+		defer func() { liveServiceAccount = nil }()
 
-	if _, err = serviceAccounts.Update(liveServiceAccount); err != nil {
+		// fetch the live service account if needed, and verify the UID matches and that we still need a token
+		if liveServiceAccount == nil {
+			liveServiceAccount, err = serviceAccounts.Get(serviceAccount.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if liveServiceAccount.UID != serviceAccount.UID {
+				// If we don't have the same service account, stop trying to add a reference to the token made for the old service account.
+				return nil
+			}
+
+			if hasToken, err := e.hasReferencedToken(liveServiceAccount); err != nil {
+				// Don't retry cache lookup errors
+				return nil
+			} else if hasToken {
+				// A service account token already exists, and is referenced, short-circuit
+				return nil
+			}
+		}
+
+		// Try to add a reference to the token
+		liveServiceAccount.Secrets = append(liveServiceAccount.Secrets, v1.ObjectReference{Name: secret.Name})
+		if _, err := serviceAccounts.Update(liveServiceAccount); err != nil {
+			return err
+		}
+
+		addedReference = true
+		return nil
+	})
+
+	if !addedReference {
 		// we weren't able to use the token, try to clean it up.
 		glog.V(2).Infof("deleting secret %s/%s because reference couldn't be added (%v)", secret.Namespace, secret.Name, err)
 		deleteOpts := &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &createdToken.UID}}
 		if deleteErr := e.client.Core().Secrets(createdToken.Namespace).Delete(createdToken.Name, deleteOpts); deleteErr != nil {
 			glog.Error(deleteErr) // if we fail, just log it
 		}
+	}
 
+	if err != nil {
 		if apierrors.IsConflict(err) || apierrors.IsNotFound(err) {
 			// if we got a Conflict error, the service account was updated by someone else, and we'll get an update notification later
 			// if we got a NotFound error, the service account no longer exists, and we don't need to create a token for it
@@ -453,6 +482,24 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	}
 
 	// success!
+	return false, nil
+}
+
+// hasReferencedToken returns true if the serviceAccount references a service account token secret
+func (e *TokensController) hasReferencedToken(serviceAccount *v1.ServiceAccount) (bool, error) {
+	if len(serviceAccount.Secrets) == 0 {
+		return false, nil
+	}
+	allSecrets, err := e.listTokenSecrets(serviceAccount)
+	if err != nil {
+		return false, err
+	}
+	referencedSecrets := getSecretReferences(serviceAccount)
+	for _, secret := range allSecrets {
+		if referencedSecrets.Has(secret.Name) {
+			return true, nil
+		}
+	}
 	return false, nil
 }
 

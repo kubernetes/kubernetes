@@ -78,6 +78,10 @@ func (wb watcherBatch) add(w *watcher, ev mvccpb.Event) {
 // newWatcherBatch maps watchers to their matched events. It enables quick
 // events look up by watcher.
 func newWatcherBatch(wg *watcherGroup, evs []mvccpb.Event) watcherBatch {
+	if len(wg.watchers) == 0 {
+		return nil
+	}
+
 	wb := make(watcherBatch)
 	for _, ev := range evs {
 		for w := range wg.watcherSetByKey(string(ev.Kv.Key)) {

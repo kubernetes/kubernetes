@@ -27,9 +27,9 @@ import (
 	"github.com/renstrom/dedent"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/pkg/api"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // Server serves HTTP endpoints for each service name, with results
@@ -196,6 +196,7 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	h.hcs.lock.Lock()
 	count := h.hcs.services[h.name].endpoints
 	h.hcs.lock.Unlock()
+
 	resp.Header().Set("Content-Type", "application/json")
 	if count == 0 {
 		resp.WriteHeader(http.StatusServiceUnavailable)
@@ -224,6 +225,11 @@ func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) erro
 		}
 		glog.V(3).Infof("Reporting %d endpoints for healthcheck %q", count, nsn.String())
 		hcs.services[nsn].endpoints = count
+	}
+	for nsn, hci := range hcs.services {
+		if _, found := newEndpoints[nsn]; !found {
+			hci.endpoints = 0
+		}
 	}
 	return nil
 }

@@ -38,32 +38,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
 
 RUN cp /usr/bin/nsenter /nsenter
 
-# Manifests for the docker guide
-COPY static-pods/master.json \
-     static-pods/etcd.json \
-     static-pods/addon-manager-singlenode.json \
-     static-pods/kube-proxy.json \
-        /etc/kubernetes/manifests/
-
-# Manifests for the docker-multinode guide
-COPY static-pods/master-multi.json \
-     static-pods/addon-manager-multinode.json \
-        /etc/kubernetes/manifests-multi/
-
-# Copy over all addons
-COPY addons /etc/kubernetes/addons
-
-# Copy other required scripts for the setup
-COPY setup-files.sh make-ca-cert.sh copy-addons.sh /
-
-# easy-rsa package required by make-ca-cert
-ADD https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz /root/kube/
-
 # Copy the the cni-bin folder into /opt/cni/bin
 COPY cni-bin/bin /opt/cni/bin
-
-# Copy overlay configuration to default directory
-COPY cni-conf /etc/cni/net.d
 
 # Create symlinks for each hyperkube server
 # Also create symlinks to /usr/local/bin/ where the server image binaries live, so the hyperkube image may be 

@@ -275,7 +275,7 @@ func TestSortingPrinter(t *testing.T) {
 					"kind":       "List",
 					"apiVersion": "v1",
 				},
-				Items: []*unstructured.Unstructured{
+				Items: []unstructured.Unstructured{
 					{
 						Object: map[string]interface{}{
 							"kind":       "ReplicationController",
@@ -308,7 +308,7 @@ func TestSortingPrinter(t *testing.T) {
 					"kind":       "List",
 					"apiVersion": "v1",
 				},
-				Items: []*unstructured.Unstructured{
+				Items: []unstructured.Unstructured{
 					{
 						Object: map[string]interface{}{
 							"kind":       "ReplicationController",
@@ -345,7 +345,7 @@ func TestSortingPrinter(t *testing.T) {
 					"kind":       "List",
 					"apiVersion": "v1",
 				},
-				Items: []*unstructured.Unstructured{
+				Items: []unstructured.Unstructured{
 					{
 						Object: map[string]interface{}{
 							"kind":       "ReplicationController",

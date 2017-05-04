@@ -68,7 +68,7 @@ func mountInChroot(rootfsPath string, args []string) error {
 	args = append([]string{rootfsPath, mountCmd}, args...)
 	output, err := exec.Command(chrootCmd, args...).CombinedOutput()
 	if err == nil {
-		return err
+		return nil
 	}
 
 	if !strings.EqualFold(string(output), nfsRPCBindErrMsg) {

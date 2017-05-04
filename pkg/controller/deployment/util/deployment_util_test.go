@@ -25,8 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -668,7 +666,7 @@ func TestResolveFenceposts(t *testing.T) {
 		desired           int32
 		expectSurge       int32
 		expectUnavailable int32
-		expectError       string
+		expectError       bool
 	}{
 		{
 			maxSurge:          "0%",
@@ -676,7 +674,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           0,
 			expectSurge:       0,
 			expectUnavailable: 1,
-			expectError:       "",
+			expectError:       false,
 		},
 		{
 			maxSurge:          "39%",
@@ -684,7 +682,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           10,
 			expectSurge:       4,
 			expectUnavailable: 3,
-			expectError:       "",
+			expectError:       false,
 		},
 		{
 			maxSurge:          "oops",
@@ -692,7 +690,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 0,
-			expectError:       "invalid value for IntOrString: invalid value \"oops\": strconv.ParseInt: parsing \"oops\": invalid syntax",
+			expectError:       true,
 		},
 		{
 			maxSurge:          "55%",
@@ -700,7 +698,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 0,
-			expectError:       "invalid value for IntOrString: invalid value \"urg\": strconv.ParseInt: parsing \"urg\": invalid syntax",
+			expectError:       true,
 		},
 	}
 
@@ -708,16 +706,11 @@ func TestResolveFenceposts(t *testing.T) {
 		maxSurge := intstr.FromString(test.maxSurge)
 		maxUnavail := intstr.FromString(test.maxUnavailable)
 		surge, unavail, err := ResolveFenceposts(&maxSurge, &maxUnavail, test.desired)
-		if err != nil {
-			if test.expectError == "" {
-				t.Errorf("unexpected error %v", err)
-			} else {
-				assert := assert.New(t)
-				assert.EqualError(err, test.expectError)
-			}
+		if err != nil && !test.expectError {
+			t.Errorf("unexpected error %v", err)
 		}
-		if err == nil && test.expectError != "" {
-			t.Errorf("missing error %v", test.expectError)
+		if err == nil && test.expectError {
+			t.Error("expected error")
 		}
 		if surge != test.expectSurge || unavail != test.expectUnavailable {
 			t.Errorf("#%v got %v:%v, want %v:%v", num, surge, unavail, test.expectSurge, test.expectUnavailable)
@@ -960,35 +953,41 @@ func TestDeploymentComplete(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "complete",
+			name: "not complete: min but not all pods become available",
 
 			d:        deployment(5, 5, 5, 4, 1, 0),
-			expected: true,
+			expected: false,
 		},
 		{
-			name: "not complete",
+			name: "not complete: min availability is not honored",
 
 			d:        deployment(5, 5, 5, 3, 1, 0),
 			expected: false,
 		},
 		{
-			name: "complete #2",
+			name: "complete",
 
 			d:        deployment(5, 5, 5, 5, 0, 0),
 			expected: true,
 		},
 		{
-			name: "not complete #2",
+			name: "not complete: all pods are available but not updated",
 
 			d:        deployment(5, 5, 4, 5, 0, 0),
 			expected: false,
 		},
 		{
-			name: "not complete #3",
+			name: "not complete: still running old pods",
 
 			// old replica set: spec.replicas=1, status.replicas=1, status.availableReplicas=1
 			// new replica set: spec.replicas=1, status.replicas=1, status.availableReplicas=0
 			d:        deployment(1, 2, 1, 1, 0, 1),
+			expected: false,
+		},
+		{
+			name: "not complete: one replica deployment never comes up",
+
+			d:        deployment(1, 1, 1, 0, 1, 1),
 			expected: false,
 		},
 	}

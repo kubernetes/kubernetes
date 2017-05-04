@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -152,10 +153,10 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer rsc.queue.ShutDown()
 
-	glog.Infof("Starting ReplicaSet controller")
+	glog.Infof("Starting replica set controller")
+	defer glog.Infof("Shutting down replica set Controller")
 
-	if !cache.WaitForCacheSync(stopCh, rsc.podListerSynced, rsc.rsListerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("replica set", stopCh, rsc.podListerSynced, rsc.rsListerSynced) {
 		return
 	}
 
@@ -164,7 +165,6 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
-	glog.Infof("Shutting down ReplicaSet Controller")
 }
 
 // getPodReplicaSets returns a list of ReplicaSets matching the given pod.
@@ -219,8 +219,8 @@ func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
 	// this function), but in general extra resyncs shouldn't be
 	// that bad as ReplicaSets that haven't met expectations yet won't
 	// sync, and all the listing is done using local stores.
-	if oldRS.Status.Replicas != curRS.Status.Replicas {
-		glog.V(4).Infof("Observed updated replica count for ReplicaSet: %v, %d->%d", curRS.Name, oldRS.Status.Replicas, curRS.Status.Replicas)
+	if *(oldRS.Spec.Replicas) != *(curRS.Spec.Replicas) {
+		glog.V(4).Infof("Replica set %v updated. Desired pod count change: %d->%d", curRS.Name, *(oldRS.Spec.Replicas), *(curRS.Spec.Replicas))
 	}
 	rsc.enqueueReplicaSet(cur)
 }
@@ -318,7 +318,7 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		// a Pod transitioned to Ready.
 		// Note that this still suffers from #29229, we are just moving the problem one level
 		// "closer" to kubelet (from the deployment to the replica set controller).
-		if !v1.IsPodReady(oldPod) && v1.IsPodReady(curPod) && rs.Spec.MinReadySeconds > 0 {
+		if !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod) && rs.Spec.MinReadySeconds > 0 {
 			glog.V(2).Infof("ReplicaSet %q will be enqueued after %ds for availability check", rs.Name, rs.Spec.MinReadySeconds)
 			// Add a second to avoid milliseconds skew in AddAfter.
 			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.

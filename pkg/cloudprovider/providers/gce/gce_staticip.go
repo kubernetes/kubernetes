@@ -16,33 +16,46 @@ limitations under the License.
 
 package gce
 
-import compute "google.golang.org/api/compute/v1"
+import (
+	"time"
 
-// Global static IP management
+	compute "google.golang.org/api/compute/v1"
+)
+
+func newStaticIPMetricContext(request string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"staticip_" + request, unusedMetricLabel, unusedMetricLabel},
+	}
+}
 
 // ReserveGlobalStaticIP creates a global static IP.
 // Caller is allocated a random IP if they do not specify an ipAddress. If an
 // ipAddress is specified, it must belong to the current project, eg: an
 // ephemeral IP associated with a global forwarding rule.
 func (gce *GCECloud) ReserveGlobalStaticIP(name, ipAddress string) (address *compute.Address, err error) {
+	mc := newStaticIPMetricContext("reserve")
 	op, err := gce.service.GlobalAddresses.Insert(gce.projectID, &compute.Address{Name: name, Address: ipAddress}).Do()
+
 	if err != nil {
+		return nil, mc.Observe(err)
+	}
+
+	if err := gce.waitForGlobalOp(op, mc); err != nil {
 		return nil, err
 	}
-	if err := gce.waitForGlobalOp(op); err != nil {
-		return nil, err
-	}
-	// We have to get the address to know which IP was allocated for us.
+
 	return gce.service.GlobalAddresses.Get(gce.projectID, name).Do()
 }
 
 // DeleteGlobalStaticIP deletes a global static IP by name.
 func (gce *GCECloud) DeleteGlobalStaticIP(name string) error {
+	mc := newStaticIPMetricContext("delete")
 	op, err := gce.service.GlobalAddresses.Delete(gce.projectID, name).Do()
 	if err != nil {
-		return err
+		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op)
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // GetGlobalStaticIP returns the global static IP by name.

@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -89,7 +88,7 @@ func (s replicationControllerNamespaceLister) Get(name string) (*v1.ReplicationC
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("replicationcontroller"), name)
+		return nil, errors.NewNotFound(v1.Resource("replicationcontroller"), name)
 	}
 	return obj.(*v1.ReplicationController), nil
 }

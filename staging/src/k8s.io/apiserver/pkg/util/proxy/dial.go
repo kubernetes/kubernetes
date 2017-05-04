@@ -32,7 +32,7 @@ import (
 func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 	dialAddr := netutil.CanonicalAddr(url)
 
-	dialer, _ := utilnet.Dialer(transport)
+	dialer, _ := utilnet.DialerFor(transport)
 
 	switch url.Scheme {
 	case "http":
@@ -69,7 +69,7 @@ func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 					inferredHost = host
 				}
 				// Make a copy to avoid polluting the provided config
-				tlsConfigCopy := utilnet.CloneTLSConfig(tlsConfig)
+				tlsConfigCopy := tlsConfig.Clone()
 				tlsConfigCopy.ServerName = inferredHost
 				tlsConfig = tlsConfigCopy
 			}

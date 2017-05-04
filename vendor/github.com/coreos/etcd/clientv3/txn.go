@@ -19,6 +19,7 @@ import (
 
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 // Txn is the interface that wraps mini-transactions.
@@ -152,7 +153,12 @@ func (txn *txn) Commit() (*TxnResponse, error) {
 
 func (txn *txn) commit() (*TxnResponse, error) {
 	r := &pb.TxnRequest{Compare: txn.cmps, Success: txn.sus, Failure: txn.fas}
-	resp, err := txn.kv.remote.Txn(txn.ctx, r)
+
+	var opts []grpc.CallOption
+	if !txn.isWrite {
+		opts = []grpc.CallOption{grpc.FailFast(false)}
+	}
+	resp, err := txn.kv.remote.Txn(txn.ctx, r, opts...)
 	if err != nil {
 		return nil, err
 	}

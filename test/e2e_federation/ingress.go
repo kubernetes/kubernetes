@@ -140,7 +140,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 	})
 
 	// e2e cases for federation ingress controller
-	var _ = Describe("Federated Ingresses", func() {
+	var _ = Describe("Federated Ingresses [Slow]", func() {
 		var (
 			clusters           fedframework.ClusterSlice
 			federationName, ns string
@@ -323,7 +323,8 @@ func waitForIngressOrFail(clientset *kubeclientset.Clientset, namespace string, 
 	By(fmt.Sprintf("Fetching a federated ingress shard of ingress %q in namespace %q from cluster", ingress.Name, namespace))
 	var clusterIngress *v1beta1.Ingress
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
+		var err error
+		clusterIngress, err = clientset.Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
 			By(fmt.Sprintf("Success: shard of federated ingress %q in namespace %q in cluster is absent", ingress.Name, namespace))
 			return true, nil // Success

@@ -41,7 +41,7 @@ set -o pipefail
 
 KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
 
-KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://storage.googleapis.com/kubernetes-release/release}"
+KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://dl.k8s.io}"
 
 function detect_kube_release() {
   if [[ -n "${KUBE_VERSION:-}" ]]; then

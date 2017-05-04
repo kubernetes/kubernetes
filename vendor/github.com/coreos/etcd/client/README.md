@@ -114,4 +114,4 @@ if err != nil {
 
 3. Default etcd/client cannot handle the case that the remote server is SIGSTOPed now. TCP keepalive mechanism doesn't help in this scenario because operating system may still send TCP keep-alive packets. Over time we'd like to improve this functionality, but solving this issue isn't high priority because a real-life case in which a server is stopped, but the connection is kept alive, hasn't been brought to our attention.
 
-4. etcd/client cannot detect whether the member in use is healthy when doing read requests. If the member is isolated from the cluster, etcd/client may retrieve outdated data. As a workaround, users could monitor experimental /health endpoint for member healthy information. We are improving it at [#3265](https://github.com/coreos/etcd/issues/3265).
+4. etcd/client cannot detect whether a member is healthy with watches and non-quorum read requests. If the member is isolated from the cluster, etcd/client may retrieve outdated data. Instead, users can either issue quorum read requests or monitor the /health endpoint for member health information.

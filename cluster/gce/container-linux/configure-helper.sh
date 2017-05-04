@@ -896,7 +896,7 @@ function start-kube-apiserver {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
 
   # Enable ABAC mode unless the user explicitly opts out with ENABLE_LEGACY_ABAC=false
-  if [[ "${ENABLE_LEGACY_ABAC:-}" != "false" ]]; then  
+  if [[ "${ENABLE_LEGACY_ABAC:-}" != "false" ]]; then
     echo "Warning: Enabling legacy ABAC policy. All service accounts will have superuser API access. Set ENABLE_LEGACY_ABAC=false to disable this."
     # Create the ABAC file if it doesn't exist yet, or if we have a KUBE_USER set (to ensure the right user is given permissions)
     if [[ -n "${KUBE_USER:-}" || ! -e /etc/srv/kubernetes/abac-authz-policy.jsonl ]]; then
@@ -996,6 +996,10 @@ function start-kube-controller-manager {
   fi
   if [[ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]]; then
     params+=" --terminated-pod-gc-threshold=${TERMINATED_POD_GC_THRESHOLD}"
+  fi
+  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
+    params+=" --cidr-allocator-type=CloudAllocator"
+    params+=" --configure-cloud-routes=false"
   fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
@@ -1206,17 +1210,6 @@ function start-kube-addons {
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
 }
 
-# Starts a fluentd static pod for logging for gcp in case master is not registered.
-function start-fluentd-static-pod {
-  echo "Start fluentd pod"
-  if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
-     [[ "${LOGGING_DESTINATION:-}" == "gcp" ]] && \
-     [[ "${KUBERNETES_MASTER:-}" == "true" ]] && \
-     [[ "${REGISTER_MASTER_KUBELET:-false}" == "false" ]]; then
-    cp "${KUBE_HOME}/kube-manifests/kubernetes/fluentd-gcp.yaml" /etc/kubernetes/manifests/
-  fi
-}
-
 # Starts an image-puller - used in test clusters.
 function start-image-puller {
   echo "Start image-puller"
@@ -1379,7 +1372,6 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   start-cluster-autoscaler
   start-lb-controller
   start-rescheduler
-  start-fluentd-static-pod
 else
   start-kube-proxy
   # Kube-registry-proxy.

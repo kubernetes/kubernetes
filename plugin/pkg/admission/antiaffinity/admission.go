@@ -24,10 +24,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 func init() {
-	admission.RegisterPlugin("LimitPodHardAntiAffinityTopology", func(config io.Reader) (admission.Interface, error) {
+	kubeapiserveradmission.Plugins.Register("LimitPodHardAntiAffinityTopology", func(config io.Reader) (admission.Interface, error) {
 		return NewInterPodAntiAffinity(), nil
 	})
 }

@@ -1061,21 +1061,17 @@ type NetworkPolicySpec struct {
 type NetworkPolicyIngressRule struct {
 	// List of ports which should be made accessible on the pods selected for this rule.
 	// Each item in this list is combined using a logical OR.
-	// If this field is not provided, this rule matches all ports (traffic not restricted by port).
-	// If this field is empty, this rule matches no ports (no traffic matches).
+	// If this field is empty or missing, this rule matches all ports (traffic not restricted by port).
 	// If this field is present and contains at least one item, then this rule allows traffic
 	// only if the traffic matches at least one port in the list.
-	// TODO: Update this to be a pointer to slice as soon as auto-generation supports it.
 	// +optional
 	Ports []NetworkPolicyPort
 
 	// List of sources which should be able to access the pods selected for this rule.
 	// Items in this list are combined using a logical OR operation.
-	// If this field is not provided, this rule matches all sources (traffic not restricted by source).
-	// If this field is empty, this rule matches no sources (no traffic matches).
+	// If this field is empty or missing, this rule matches all sources (traffic not restricted by source).
 	// If this field is present and contains at least on item, this rule allows traffic only if the
 	// traffic matches at least one item in the from list.
-	// TODO: Update this to be a pointer to slice as soon as auto-generation supports it.
 	// +optional
 	From []NetworkPolicyPeer
 }
@@ -1100,7 +1096,6 @@ type NetworkPolicyPeer struct {
 
 	// This is a label selector which selects Pods in this namespace.
 	// This field follows standard label selector semantics.
-	// If not provided, this selector selects no pods.
 	// If present but empty, this selector selects all pods in this namespace.
 	// +optional
 	PodSelector *metav1.LabelSelector
@@ -1108,7 +1103,6 @@ type NetworkPolicyPeer struct {
 	// Selects Namespaces using cluster scoped-labels.  This
 	// matches all pods in all namespaces selected by this label selector.
 	// This field follows standard label selector semantics.
-	// If omitted, this selector selects no namespaces.
 	// If present but empty, this selector selects all namespaces.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector
