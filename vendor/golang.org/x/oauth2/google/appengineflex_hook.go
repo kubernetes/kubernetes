@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build appengine appenginevm
+// +build appenginevm
 
 package google
 
-import "google.golang.org/appengine"
-
 func init() {
-	appengineTokenFunc = appengine.AccessToken
-	appengineAppIDFunc = appengine.AppID
+	appengineFlex = true // Flex doesn't support appengine.AccessToken; depend on metadata server.
 }
