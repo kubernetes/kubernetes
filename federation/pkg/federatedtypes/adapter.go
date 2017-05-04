@@ -70,3 +70,8 @@ func SetAnnotation(adapter FederatedTypeAdapter, obj pkgruntime.Object, key, val
 	}
 	meta.Annotations[key] = value
 }
+
+// ObjectKey returns a cluster-unique key for the given object
+func ObjectKey(adapter FederatedTypeAdapter, obj pkgruntime.Object) string {
+	return adapter.NamespacedName(obj).String()
+}
