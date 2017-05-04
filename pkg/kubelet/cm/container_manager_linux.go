@@ -66,7 +66,7 @@ const (
 
 var (
 	// The docker version in which containerd was introduced.
-	containerdVersion = utilversion.MustParseSemantic("1.11.0")
+	containerdAPIVersion = utilversion.MustParseGeneric("1.23")
 )
 
 // A non-user container tracked by the Kubelet.
@@ -377,7 +377,7 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 
 	systemContainers := []*systemContainer{}
 	if cm.ContainerRuntime == "docker" {
-		dockerVersion := getDockerVersion(cm.cadvisorInterface)
+		dockerAPIVersion := getDockerAPIVersion(cm.cadvisorInterface)
 		if cm.EnableCRI {
 			// If kubelet uses CRI, dockershim will manage the cgroups and oom
 			// score for the docker processes.
@@ -420,13 +420,13 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 				},
 			}
 			cont.ensureStateFunc = func(manager *fs.Manager) error {
-				return EnsureDockerInContainer(dockerVersion, qos.DockerOOMScoreAdj, dockerContainer)
+				return EnsureDockerInContainer(dockerAPIVersion, qos.DockerOOMScoreAdj, dockerContainer)
 			}
 			systemContainers = append(systemContainers, cont)
 		} else {
 			cm.periodicTasks = append(cm.periodicTasks, func() {
 				glog.V(10).Infof("Adding docker daemon periodic tasks")
-				if err := EnsureDockerInContainer(dockerVersion, qos.DockerOOMScoreAdj, nil); err != nil {
+				if err := EnsureDockerInContainer(dockerAPIVersion, qos.DockerOOMScoreAdj, nil); err != nil {
 					glog.Error(err)
 					return
 				}
@@ -654,10 +654,10 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 // Temporarily export the function to be used by dockershim.
 // TODO(yujuhong): Move this function to dockershim once kubelet migrates to
 // dockershim as the default.
-func EnsureDockerInContainer(dockerVersion *utilversion.Version, oomScoreAdj int, manager *fs.Manager) error {
+func EnsureDockerInContainer(dockerAPIVersion *utilversion.Version, oomScoreAdj int, manager *fs.Manager) error {
 	type process struct{ name, file string }
 	dockerProcs := []process{{dockerProcessName, dockerPidFile}}
-	if dockerVersion.AtLeast(containerdVersion) {
+	if dockerAPIVersion.AtLeast(containerdAPIVersion) {
 		dockerProcs = append(dockerProcs, process{containerdProcessName, containerdPidFile})
 	}
 	var errs []error
@@ -818,19 +818,19 @@ func isKernelPid(pid int) bool {
 	return err != nil
 }
 
-// Helper for getting the docker version.
-func getDockerVersion(cadvisor cadvisor.Interface) *utilversion.Version {
+// Helper for getting the docker API version.
+func getDockerAPIVersion(cadvisor cadvisor.Interface) *utilversion.Version {
 	versions, err := cadvisor.VersionInfo()
 	if err != nil {
 		glog.Errorf("Error requesting cAdvisor VersionInfo: %v", err)
-		return utilversion.MustParseSemantic("0.0.0")
+		return utilversion.MustParseSemantic("0.0")
 	}
-	dockerVersion, err := utilversion.ParseSemantic(versions.DockerVersion)
+	dockerAPIVersion, err := utilversion.ParseGeneric(versions.DockerAPIVersion)
 	if err != nil {
 		glog.Errorf("Error parsing docker version %q: %v", versions.DockerVersion, err)
-		return utilversion.MustParseSemantic("0.0.0")
+		return utilversion.MustParseSemantic("0.0")
 	}
-	return dockerVersion
+	return dockerAPIVersion
 }
 
 func (m *containerManagerImpl) GetCapacity() v1.ResourceList {
