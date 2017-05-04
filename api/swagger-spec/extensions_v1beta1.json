@@ -9539,7 +9539,8 @@
      "seLinux",
      "runAsUser",
      "supplementalGroups",
-     "fsGroup"
+     "fsGroup",
+     "priority"
     ],
     "properties": {
      "privileged": {
@@ -9612,6 +9613,11 @@
      "readOnlyRootFilesystem": {
       "type": "boolean",
       "description": "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to."
+     },
+     "priority": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Priority determines which PodSecurityPolicy is used when more than one allow a particular pod. Higher priorities take precedence. PodSecurityPolicies with the same priority order themselves by name. PodSecurityPolicies without an explicit priority have an effective priority of 0."
      }
     }
    },
