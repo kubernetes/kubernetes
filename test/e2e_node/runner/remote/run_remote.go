@@ -41,7 +41,7 @@ import (
 	"github.com/pborman/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	compute "google.golang.org/api/compute/v0_beta"
+	compute "google.golang.org/api/compute/v0.beta"
 )
 
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
@@ -102,11 +102,11 @@ type ImageConfig struct {
 
 type Accelerator struct {
 	Type  string `json:"type,omitempty"`
-	Count int    `json:"count, omitempty"`
+	Count int64  `json:"count, omitempty"`
 }
 
 type Resources struct {
-	Accelerators []Accelerator `json:"nvidia_gpus,omitempty"`
+	Accelerators []Accelerator `json:"accelerators,omitempty"`
 }
 
 type GCEImage struct {
@@ -118,8 +118,8 @@ type GCEImage struct {
 	// If the number of existing previous images is lesser than what is desired, the test will use that is available.
 	PreviousImages int `json:"previous_images, omitempty"`
 
-	Machine   string `json:"machine, omitempty"`
-	Resources Resources
+	Machine   string    `json:"machine, omitempty"`
+	Resources Resources `json:"resources, omitempty"`
 	// This test is for benchmark (no limit verification, more result log, node name has format 'machine-image-uuid') if 'Tests' is non-empty.
 	Tests []string `json:"tests, omitempty"`
 }
@@ -131,7 +131,7 @@ type internalImageConfig struct {
 type internalGCEImage struct {
 	image     string
 	project   string
-	resources Resources
+	resources *Resources
 	metadata  *compute.Metadata
 	machine   string
 	tests     []string
@@ -203,11 +203,12 @@ func main() {
 			}
 			for _, image := range images {
 				gceImage := internalGCEImage{
-					image:    image,
-					project:  imageConfig.Project,
-					metadata: getImageMetadata(imageConfig.Metadata),
-					machine:  imageConfig.Machine,
-					tests:    imageConfig.Tests,
+					image:     image,
+					project:   imageConfig.Project,
+					metadata:  getImageMetadata(imageConfig.Metadata),
+					machine:   imageConfig.Machine,
+					tests:     imageConfig.Tests,
+					resources: &imageConfig.Resources,
 				}
 				if isRegex && len(images) > 1 {
 					// Use image name when shortName is not unique.
@@ -358,7 +359,7 @@ func getImageMetadata(input string) *compute.Metadata {
 		val := v
 		metadataItems = append(metadataItems, &compute.MetadataItems{
 			Key:   k,
-			Value: &val,
+			Value: val,
 		})
 	}
 	ret := compute.Metadata{Items: metadataItems}
@@ -534,20 +535,28 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 				AutomaticRestart:  true,
 			}
 		}
+		aType := fmt.Sprintf("https://www.googleapis.com/compute/beta/projects/%s/zones/%s/acceleratorTypes/%s", *project, *zone, accelerator.Type)
 		ac := &compute.AcceleratorConfig{
 			AcceleratorCount: accelerator.Count,
-			AcceleratorType:  accelerator.Type,
+			AcceleratorType:  aType,
 		}
 		i.GuestAccelerators = append(i.GuestAccelerators, ac)
 	}
 
+	var err error
 	i.Metadata = imageConfig.metadata
-	op, err := computeService.Instances.Insert(*project, *zone, i).Do()
-	if err != nil {
-		return "", err
-	}
-	if op.Error != nil {
-		return "", fmt.Errorf("could not create instance %s: %+v", name, op.Error)
+	if _, err := computeService.Instances.Get(*project, *zone, i.Name).Do(); err != nil {
+		op, err := computeService.Instances.Insert(*project, *zone, i).Do()
+		if err != nil {
+			ret := fmt.Sprintf("could not create instance %s: API error: %v", name, err)
+			if op != nil {
+				ret = fmt.Sprintf("%s: %v", ret, op.Error)
+			}
+			return "", fmt.Errorf(ret)
+		}
+		if op.Error != nil {
+			return "", fmt.Errorf("could not create instance %s: %+v", name, op.Error)
+		}
 	}
 
 	instanceRunning := false

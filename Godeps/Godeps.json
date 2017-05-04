@@ -2704,6 +2704,11 @@
 			"ImportPath": "google.golang.org/api/compute/v0.alpha",
 			"Rev": "64485db7e8c8be51e572801d06cdbcfadd3546c1"
 		},
+	    	{
+			"ImportPath": "google.golang.org/api/compute/v0.beta",
+			"Rev": "fbbaff1827317122a8a0e1b24de25df8417ce87b"
+		},
+
 		{
 			"ImportPath": "google.golang.org/api/compute/v1",
 			"Rev": "64485db7e8c8be51e572801d06cdbcfadd3546c1"
