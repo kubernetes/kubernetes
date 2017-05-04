@@ -229,7 +229,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	)
 
 	// Federated ingress updater along with Create/Update/Delete operations.
-	ic.federatedIngressUpdater = util.NewFederatedUpdater(ic.ingressFederatedInformer,
+	ic.federatedIngressUpdater = util.NewFederatedUpdater(ic.ingressFederatedInformer, "ingress", ic.eventRecorder,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			ingress := obj.(*extensionsv1beta1.Ingress)
 			glog.V(4).Infof("Attempting to create Ingress: %v", ingress)
@@ -261,7 +261,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		})
 
 	// Federated configmap updater along with Create/Update/Delete operations.  Only Update should ever be called.
-	ic.federatedConfigMapUpdater = util.NewFederatedUpdater(ic.configMapFederatedInformer,
+	ic.federatedConfigMapUpdater = util.NewFederatedUpdater(ic.configMapFederatedInformer, "configmap", ic.eventRecorder,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			configMap := obj.(*v1.ConfigMap)
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
@@ -294,10 +294,9 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
 			ingress := obj.(*extensionsv1beta1.Ingress)
-			return ingress.Name
+			return fmt.Sprintf("%s/%s", ingress.Namespace, ingress.Name)
 		},
 		ic.updateTimeout,
-		ic.eventRecorder,
 		ic.ingressFederatedInformer,
 		ic.federatedIngressUpdater,
 	)
@@ -566,12 +565,12 @@ func (ic *IngressController) reconcileConfigMap(cluster *federationapi.Cluster, 
 			Type:        util.OperationTypeUpdate,
 			Obj:         configMap,
 			ClusterName: cluster.Name,
+			Key:         configMapNsName.String(),
 		}}
 		glog.V(4).Infof("Calling federatedConfigMapUpdater.Update() - operations: %v", operations)
 		err := ic.federatedConfigMapUpdater.Update(operations, ic.updateTimeout)
 		if err != nil {
-			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
-			glog.Errorf("Failed to execute update of ConfigMap %q on cluster %q: %v", configMapName, cluster.Name, err)
+			glog.Errorf("Failed to execute update of ConfigMap %q on cluster %q: %v", configMapNsName, cluster.Name, err)
 			ic.configMapDeliverer.DeliverAfter(cluster.Name, nil, ic.configMapReviewDelay)
 		}
 	}
@@ -770,8 +769,6 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 			glog.V(4).Infof("No existing Ingress %s in cluster %s - checking if appropriate to queue a create operation", ingress, cluster.Name)
 			// We can't supply server-created fields when creating a new object.
 			desiredIngress.ObjectMeta = util.DeepCopyRelevantObjectMeta(baseIngress.ObjectMeta)
-			ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "CreateInCluster",
-				"Creating ingress in cluster %s", cluster.Name)
 
 			// We always first create an ingress in the first available cluster. Once that ingress
 			// has been created and allocated a global IP (visible via an annotation),
@@ -797,6 +794,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 					Type:        util.OperationTypeAdd,
 					Obj:         desiredIngress,
 					ClusterName: cluster.Name,
+					Key:         key,
 				})
 			} else {
 				glog.V(4).Infof("No annotation %q exists on ingress %q in federation and waiting for ingress in cluster %s. Not queueing create operation for ingress until annotation exists", staticIPNameKeyWritable, ingress, firstClusterName)
@@ -867,13 +865,12 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 				for key, val := range baseIngress.ObjectMeta.Labels {
 					desiredIngress.ObjectMeta.Labels[key] = val
 				}
-				ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "UpdateInCluster",
-					"Updating ingress in cluster %s", cluster.Name)
 
 				operations = append(operations, util.FederatedOperation{
 					Type:        util.OperationTypeUpdate,
 					Obj:         desiredIngress,
 					ClusterName: cluster.Name,
+					Key:         key,
 				})
 				// TODO: Transfer any readonly (target-proxy, url-map etc) annotations from the master cluster to the federation, if this is the master cluster.
 				// This is only for consistency, so that the federation ingress metadata matches the underlying clusters.  It's not actually required				}
@@ -887,10 +884,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		return
 	}
 	glog.V(4).Infof("Calling federatedUpdater.Update() - operations: %v", operations)
-	err = ic.federatedIngressUpdater.UpdateWithOnError(operations, ic.updateTimeout, func(op util.FederatedOperation, operror error) {
-		ic.eventRecorder.Eventf(baseIngress, api.EventTypeWarning, "FailedClusterUpdate",
-			"Ingress update in cluster %s failed: %v", op.ClusterName, operror)
-	})
+	err = ic.federatedIngressUpdater.Update(operations, ic.updateTimeout)
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", ingress, err)
 		ic.deliverIngress(ingress, ic.ingressReviewDelay, true)
