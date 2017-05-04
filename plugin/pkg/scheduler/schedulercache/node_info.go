@@ -90,9 +90,11 @@ func (r *Resource) Clone() *Resource {
 		Memory:    r.Memory,
 		NvidiaGPU: r.NvidiaGPU,
 	}
-	res.OpaqueIntResources = make(map[v1.ResourceName]int64)
-	for k, v := range r.OpaqueIntResources {
-		res.OpaqueIntResources[k] = v
+	if r.OpaqueIntResources != nil {
+		res.OpaqueIntResources = make(map[v1.ResourceName]int64)
+		for k, v := range r.OpaqueIntResources {
+			res.OpaqueIntResources[k] = v
+		}
 	}
 	return res
 }
@@ -220,13 +222,13 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		taintsErr:               n.taintsErr,
 		memoryPressureCondition: n.memoryPressureCondition,
 		diskPressureCondition:   n.diskPressureCondition,
+		usedPorts:               make(map[int]bool),
 		generation:              n.generation,
 	}
 	if len(n.pods) > 0 {
 		clone.pods = append([]*v1.Pod(nil), n.pods...)
 	}
 	if len(n.usedPorts) > 0 {
-		clone.usedPorts = make(map[int]bool)
 		for k, v := range n.usedPorts {
 			clone.usedPorts[k] = v
 		}
@@ -246,7 +248,8 @@ func (n *NodeInfo) String() string {
 	for i, pod := range n.pods {
 		podKeys[i] = pod.Name
 	}
-	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v}", podKeys, n.requestedResource, n.nonzeroRequest, n.usedPorts)
+	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v, AllocatableResource: %#v}",
+		podKeys, n.requestedResource, n.nonzeroRequest, n.usedPorts, n.allocatableResource)
 }
 
 func hasPodAffinityConstraints(pod *v1.Pod) bool {

@@ -437,8 +437,7 @@ func TestRemovePod(t *testing.T) {
 	nodeName := "node"
 	basePod := makeBasePod(nodeName, "test", "100m", "500", []v1.ContainerPort{{HostPort: 80}})
 	tests := []struct {
-		pod *v1.Pod
-
+		pod       *v1.Pod
 		wNodeInfo *NodeInfo
 	}{{
 		pod: basePod,
@@ -503,6 +502,142 @@ func TestForgetPod(t *testing.T) {
 		if n := cache.nodes[nodeName]; n != nil {
 			t.Errorf("#%d: expecting pod deleted and nil node info, get=%s", i, n)
 		}
+	}
+}
+
+func TestAddNode(t *testing.T) {
+	// Test data
+	nodeName := "test-node"
+	cpu_1 := resource.MustParse("1000m")
+	mem_100m := resource.MustParse("100m")
+	cpu_half := resource.MustParse("500m")
+	mem_50m := resource.MustParse("50m")
+	resourceFooName := "pod.alpha.kubernetes.io/opaque-int-resource-foo"
+	resourceFoo := resource.MustParse("1")
+
+	cache := newSchedulerCache(time.Second, time.Second, nil)
+
+	test := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+		},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:                   cpu_1,
+				v1.ResourceMemory:                mem_100m,
+				v1.ResourceName(resourceFooName): resourceFoo,
+			},
+		},
+		Spec: v1.NodeSpec{
+			Taints: []v1.Taint{
+				{
+					Key:    "test-key",
+					Value:  "test-value",
+					Effect: v1.TaintEffectPreferNoSchedule,
+				},
+			},
+		},
+	}
+
+	expected := NewNodeInfo()
+	// Simulate AddNode.
+	expected.node = test
+	expected.allocatableResource = &Resource{
+		MilliCPU: cpu_1.MilliValue(),
+		Memory:   mem_100m.Value(),
+		OpaqueIntResources: map[v1.ResourceName]int64{
+			v1.ResourceName(resourceFooName): resourceFoo.Value(),
+		},
+	}
+	expected.taints = []v1.Taint{
+		{
+			Key:    "test-key",
+			Value:  "test-value",
+			Effect: v1.TaintEffectPreferNoSchedule,
+		},
+	}
+	expected.generation++
+
+	// Add Node into cache.
+	cache.AddNode(test)
+
+	// Simulate AddPod
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			NodeName: nodeName,
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu_half,
+							v1.ResourceMemory: mem_50m,
+						},
+					},
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "http",
+							HostPort:      80,
+							ContainerPort: 80,
+						},
+					},
+				},
+			},
+		},
+	}
+	expected.pods = append(expected.pods, pod)
+	expected.requestedResource = &Resource{
+		MilliCPU: cpu_half.MilliValue(),
+		Memory:   mem_50m.Value(),
+	}
+	expected.nonzeroRequest = &Resource{
+		MilliCPU: cpu_half.MilliValue(),
+		Memory:   mem_50m.Value(),
+	}
+	expected.usedPorts[80] = true
+	expected.generation++
+
+	// Add pod into cache.
+	cache.AddPod(pod)
+
+	// Case 1: the node was added into cache successfully.
+	got, found := cache.nodes[test.Name]
+	if !found {
+		t.Errorf("Failed to find node %v in schedulercache.", nodeName)
+	}
+
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("Failed to add node into schedulercache:\n got: %+v \nexpected: %+v", got, expected)
+	}
+
+	// Case 2: dump cached nodes successfully.
+	cachedNodes := map[string]*NodeInfo{}
+	cache.UpdateNodeNameToInfoMap(cachedNodes)
+	newNode, found := cachedNodes[nodeName]
+	if !found || len(cachedNodes) != 1 {
+		t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes, cache.nodes)
+	}
+	if !reflect.DeepEqual(newNode, expected) {
+		t.Errorf("Failed to clone node:\n got: %+v, \n expected: %+v", newNode, expected)
+	}
+
+	// Case 3: update node attribute successfully.
+	test.Status.Allocatable[v1.ResourceMemory] = mem_50m
+	expected.allocatableResource.Memory = mem_50m.Value()
+	expected.generation++
+	cache.UpdateNode(nil, test)
+	got, found = cache.nodes[test.Name]
+	if !found {
+		t.Errorf("Failed to find node %v in schedulercache after UpdateNode.", nodeName)
+	}
+
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("Failed to update node in schedulercache:\n got: %+v \nexpected: %+v", got, expected)
+	}
+
+	// Case 4: the node can not be removed if pods is not empty.
+	cache.RemoveNode(test)
+	if _, found := cache.nodes[nodeName]; !found {
+		t.Errorf("The node %v should not be removed if pods is not empty.", nodeName)
 	}
 }
 

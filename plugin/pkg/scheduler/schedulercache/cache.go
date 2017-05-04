@@ -329,7 +329,10 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	n := cache.nodes[node.Name]
+	n, found := cache.nodes[node.Name]
+	if !found {
+		return fmt.Errorf("Failed to find node %v in cache.", node.Name)
+	}
 	if err := n.RemoveNode(node); err != nil {
 		return err
 	}
