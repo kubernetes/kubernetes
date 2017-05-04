@@ -203,10 +203,10 @@ func NodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (label
 	return selector, nil
 }
 
-// AddOrUpdateTolerationInPod tries to add a toleration to the pod's toleration list.
+// AddOrUpdateTolerationInPodSpec tries to add a toleration to the toleration list in PodSpec.
 // Returns true if something was updated, false otherwise.
-func AddOrUpdateTolerationInPod(pod *v1.Pod, toleration *v1.Toleration) bool {
-	podTolerations := pod.Spec.Tolerations
+func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration) bool {
+	podTolerations := spec.Tolerations
 
 	var newTolerations []v1.Toleration
 	updated := false
@@ -227,8 +227,14 @@ func AddOrUpdateTolerationInPod(pod *v1.Pod, toleration *v1.Toleration) bool {
 		newTolerations = append(newTolerations, *toleration)
 	}
 
-	pod.Spec.Tolerations = newTolerations
+	spec.Tolerations = newTolerations
 	return true
+}
+
+// AddOrUpdateTolerationInPod tries to add a toleration to the pod's toleration list.
+// Returns true if something was updated, false otherwise.
+func AddOrUpdateTolerationInPod(pod *v1.Pod, toleration *v1.Toleration) bool {
+	return AddOrUpdateTolerationInPodSpec(&pod.Spec, toleration)
 }
 
 // TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
