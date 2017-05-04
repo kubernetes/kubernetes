@@ -234,8 +234,8 @@ func movePodUidDir(c clientset.Interface, pod *v1.Pod) {
 	// excute cmd over ssh
 	result, _ := nodeExec(nodeIP, cmd)
 	framework.LogSSHResult(result)
-	Expect(result.Code).To(BeZero())
-	Expect(len(result.Stderr)).To(BeZero())
+	Expect(result.Code).To(BeZero(), "failed to `mv` pod's uid dir: %v", result.Code)
+	Expect(len(strings.TrimSpace(result.Stderr))).To(BeZero(), "unexpected stderr moving pod's uid dir: %q", result.Stderr)
 }
 
 // Checks for a lingering nfs mount and/or uid directory on the pod's host. The host IP is used
@@ -411,7 +411,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 	})
 
 	// Test host cleanup when disrupting the volume environment.
-	framework.KubeDescribe("host cleanup with volume mounts [Volume][HostCleanup][Flaky]", func() {
+	framework.KubeDescribe("host cleanup with volume mounts [Volume][HostCleanup]", func() {
 
 		type hostCleanupTest struct {
 			itDescr string
@@ -489,9 +489,11 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			// Note: the pod's vol mount (as a side effect) ends up being moved to /tmp
 			//    and can be unmounted via `umount -f`.
 			It("move NFS client pod's UID directory then delete pod", func() {
-				pod = createPodUsingNfs(f, c, ns, nfsIP, "sleep 6000")
+				// skip if gci due to it's inability to `mv` a dir that's opened
+				framework.SkipIfNodeOSDistroIs("gci")
 
 				By("Move pod's uid dir to /tmp")
+				pod = createPodUsingNfs(f, c, ns, nfsIP, "sleep 6000")
 				movePodUidDir(c, pod)
 
 				By("Delete the pod mounted to the NFS volume")
