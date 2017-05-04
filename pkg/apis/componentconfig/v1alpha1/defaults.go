@@ -431,6 +431,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.ExperimentalDockershim == nil {
 		obj.ExperimentalDockershim = boolVar(false)
 	}
+	if obj.GPUManagerRuntime == "" {
+		obj.GPUManagerRuntime = "local"
+	}
 }
 
 func boolVar(b bool) *bool {

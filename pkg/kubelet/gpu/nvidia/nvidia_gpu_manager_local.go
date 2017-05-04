@@ -46,13 +46,8 @@ const (
 	nvidiaFullpathRE            = `^/dev/nvidia[0-9]*$`
 )
 
-type activePodsLister interface {
-	// Returns a list of active pods on the node.
-	GetActivePods() []*v1.Pod
-}
-
-// nvidiaGPUManager manages nvidia gpu devices.
-type nvidiaGPUManager struct {
+// localGPUManager manages nvidia gpu devices.
+type localGPUManager struct {
 	sync.Mutex
 	// All gpus available on the Node
 	allGPUs        sets.String
@@ -61,16 +56,23 @@ type nvidiaGPUManager struct {
 	// The interface which could get GPU mapping from all the containers.
 	// TODO: Should make this independent of Docker in the future.
 	dockerClient     dockertools.DockerInterface
-	activePodsLister activePodsLister
+	activePodsLister gpu.ActivePodsLister
 }
 
-// NewNvidiaGPUManager returns a GPUManager that manages local Nvidia GPUs.
+func init() {
+	gpu.RegisterGPUManagerInitializer("local", NewLocalGPUManager)
+}
+
+// NewLocalGPUManager returns a GPUManager that manages local Nvidia GPUs.
 // TODO: Migrate to use pod level cgroups and make it generic to all runtimes.
-func NewNvidiaGPUManager(activePodsLister activePodsLister, dockerClient dockertools.DockerInterface) (gpu.GPUManager, error) {
+func NewLocalGPUManager(
+	activePodsLister gpu.ActivePodsLister,
+	dockerClient dockertools.DockerInterface,
+	_ string) (gpu.GPUManager, error) {
 	if dockerClient == nil {
 		return nil, fmt.Errorf("invalid docker client specified")
 	}
-	return &nvidiaGPUManager{
+	return &localGPUManager{
 		allGPUs:          sets.NewString(),
 		dockerClient:     dockerClient,
 		activePodsLister: activePodsLister,
@@ -78,12 +80,12 @@ func NewNvidiaGPUManager(activePodsLister activePodsLister, dockerClient dockert
 }
 
 // Initialize the GPU devices, so far only needed to discover the GPU paths.
-func (ngm *nvidiaGPUManager) Start() error {
-	if ngm.dockerClient == nil {
+func (lgm *localGPUManager) Start() error {
+	if lgm.dockerClient == nil {
 		return fmt.Errorf("Invalid docker client specified in GPU Manager")
 	}
-	ngm.Lock()
-	defer ngm.Unlock()
+	lgm.Lock()
+	defer lgm.Unlock()
 
 	if _, err := os.Stat(nvidiaCtlDevice); err != nil {
 		return err
@@ -92,24 +94,24 @@ func (ngm *nvidiaGPUManager) Start() error {
 	if _, err := os.Stat(nvidiaUVMDevice); err != nil {
 		return err
 	}
-	ngm.defaultDevices = []string{nvidiaCtlDevice, nvidiaUVMDevice}
+	lgm.defaultDevices = []string{nvidiaCtlDevice, nvidiaUVMDevice}
 	_, err := os.Stat(nvidiaUVMToolsDevice)
 	if !os.IsNotExist(err) {
-		ngm.defaultDevices = append(ngm.defaultDevices, nvidiaUVMToolsDevice)
+		lgm.defaultDevices = append(lgm.defaultDevices, nvidiaUVMToolsDevice)
 	}
 
-	if err := ngm.discoverGPUs(); err != nil {
+	if err := lgm.discoverGPUs(); err != nil {
 		return err
 	}
 	// It's possible that the runtime isn't available now.
-	ngm.allocated = ngm.gpusInUse()
+	lgm.allocated = lgm.gpusInUse()
 	// We ignore errors when identifying allocated GPUs because it is possible that the runtime interfaces may be not be logically up.
 	return nil
 }
 
 // Get how many GPU cards we have.
-func (ngm *nvidiaGPUManager) Capacity() v1.ResourceList {
-	gpus := resource.NewQuantity(int64(len(ngm.allGPUs)), resource.DecimalSI)
+func (lgm *localGPUManager) Capacity() v1.ResourceList {
+	gpus := resource.NewQuantity(int64(len(lgm.allGPUs)), resource.DecimalSI)
 	return v1.ResourceList{
 		v1.ResourceNvidiaGPU: *gpus,
 	}
@@ -129,31 +131,28 @@ func (ngm *nvidiaGPUManager) Capacity() v1.ResourceList {
 // This is a sub-optimal solution and a better alternative would be that of using pod level cgroups instead.
 // GPUs allocated to containers should be reflected in pod level device cgroups before completing allocations.
 // The pod level cgroups will then serve as a checkpoint of GPUs in use.
-func (ngm *nvidiaGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) ([]string, error) {
+func (lgm *localGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) ([]string, error) {
 	gpusNeeded := container.Resources.Limits.NvidiaGPU().Value()
 	if gpusNeeded == 0 {
 		return []string{}, nil
 	}
-	ngm.Lock()
-	defer ngm.Unlock()
-	if ngm.allocated == nil {
+	lgm.Lock()
+	defer lgm.Unlock()
+	if lgm.allocated == nil {
 		// Initialization is not complete. Try now. Failures can no longer be tolerated.
-		ngm.allocated = ngm.gpusInUse()
-	} else {
-		// update internal list of GPUs in use prior to allocating new GPUs.
-		ngm.updateAllocatedGPUs()
+		lgm.allocated = lgm.gpusInUse()
 	}
 	// Check if GPUs have already been allocated. If so return them right away.
 	// This can happen if a container restarts for example.
-	if devices := ngm.allocated.getGPUs(string(pod.UID), container.Name); devices != nil {
+	if devices := lgm.allocated.getGPUs(string(pod.UID), container.Name); devices != nil {
 		glog.V(2).Infof("Found pre-allocated GPUs for container %q in Pod %q: %v", container.Name, pod.UID, devices.List())
-		return append(devices.List(), ngm.defaultDevices...), nil
+		return append(devices.List(), lgm.defaultDevices...), nil
 	}
 	// Get GPU devices in use.
-	devicesInUse := ngm.allocated.devices()
+	devicesInUse := lgm.allocated.devices()
 	glog.V(5).Infof("gpus in use: %v", devicesInUse.List())
 	// Get a list of available GPUs.
-	available := ngm.allGPUs.Difference(devicesInUse)
+	available := lgm.allGPUs.Difference(devicesInUse)
 	glog.V(5).Infof("gpus available: %v", available.List())
 	if int64(available.Len()) < gpusNeeded {
 		return nil, fmt.Errorf("requested number of GPUs unavailable. Requested: %d, Available: %d", gpusNeeded, available.Len())
@@ -161,27 +160,12 @@ func (ngm *nvidiaGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) (
 	ret := available.UnsortedList()[:gpusNeeded]
 	for _, device := range ret {
 		// Update internal allocated GPU cache.
-		ngm.allocated.insert(string(pod.UID), container.Name, device)
+		lgm.allocated.insert(string(pod.UID), container.Name, device)
 	}
 	// Add standard devices files that needs to be exposed.
-	ret = append(ret, ngm.defaultDevices...)
+	ret = append(ret, lgm.defaultDevices...)
 
 	return ret, nil
-}
-
-// updateAllocatedGPUs updates the list of GPUs in use.
-// It gets a list of active pods and then frees any GPUs that are bound to terminated pods.
-// Returns error on failure.
-func (ngm *nvidiaGPUManager) updateAllocatedGPUs() {
-	activePods := ngm.activePodsLister.GetActivePods()
-	activePodUids := sets.NewString()
-	for _, pod := range activePods {
-		activePodUids.Insert(string(pod.UID))
-	}
-	allocatedPodUids := ngm.allocated.pods()
-	podsToBeRemoved := allocatedPodUids.Difference(activePodUids)
-	glog.V(5).Infof("pods to be removed: %v", podsToBeRemoved.List())
-	ngm.allocated.delete(podsToBeRemoved.List())
 }
 
 // discoverGPUs identifies allGPUs NVIDIA GPU devices available on the local node by walking `/dev` directory.
@@ -190,7 +174,7 @@ func (ngm *nvidiaGPUManager) updateAllocatedGPUs() {
 // family name. Need to support NVML in the future. But we do not need NVML until
 // we want more features, features like schedule containers according to GPU family
 // name.
-func (ngm *nvidiaGPUManager) discoverGPUs() error {
+func (lgm *localGPUManager) discoverGPUs() error {
 	reg := regexp.MustCompile(nvidiaDeviceRE)
 	files, err := ioutil.ReadDir(devDirectory)
 	if err != nil {
@@ -202,7 +186,7 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 		}
 		if reg.MatchString(f.Name()) {
 			glog.V(2).Infof("Found Nvidia GPU %q", f.Name())
-			ngm.allGPUs.Insert(path.Join(devDirectory, f.Name()))
+			lgm.allGPUs.Insert(path.Join(devDirectory, f.Name()))
 		}
 	}
 
@@ -210,8 +194,8 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 }
 
 // gpusInUse returns a list of GPUs in use along with the respective pods that are using it.
-func (ngm *nvidiaGPUManager) gpusInUse() *podGPUs {
-	pods := ngm.activePodsLister.GetActivePods()
+func (lgm *localGPUManager) gpusInUse() *podGPUs {
+	pods := lgm.activePodsLister.GetActivePods()
 	type containerIdentifier struct {
 		id   string
 		name string
@@ -248,7 +232,7 @@ func (ngm *nvidiaGPUManager) gpusInUse() *podGPUs {
 	ret := newPodGPUs()
 	for _, podContainer := range podContainersToInspect {
 		for _, containerIdentifier := range podContainer.containers {
-			containerJSON, err := ngm.dockerClient.InspectContainer(containerIdentifier.id)
+			containerJSON, err := lgm.dockerClient.InspectContainer(containerIdentifier.id)
 			if err != nil {
 				glog.V(3).Infof("Failed to inspect container %q in pod %q while attempting to reconcile nvidia gpus in use", containerIdentifier.id, podContainer.uid)
 				continue
@@ -268,6 +252,15 @@ func (ngm *nvidiaGPUManager) gpusInUse() *podGPUs {
 		}
 	}
 	return ret
+}
+
+func (lgm *localGPUManager) FreeGPU(pod *v1.Pod) {
+	if pod == nil {
+		return
+	}
+	podsToBeRemoved := sets.NewString(string(pod.UID))
+	glog.V(5).Infof("pods to be removed: %v", podsToBeRemoved.List())
+	lgm.allocated.delete(podsToBeRemoved.List())
 }
 
 func isValidPath(path string) bool {

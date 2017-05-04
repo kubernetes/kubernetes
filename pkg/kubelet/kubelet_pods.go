@@ -675,6 +675,10 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 		return fmt.Errorf("one of the two arguments must be non-nil: runningPod, status")
 	}
 
+	if kl.gpuManager != nil {
+		kl.gpuManager.FreeGPU(pod)
+	}
+
 	// Call the container runtime KillPod method which stops all running containers of the pod
 	if err := kl.containerRuntime.KillPod(pod, p, gracePeriodOverride); err != nil {
 		return err

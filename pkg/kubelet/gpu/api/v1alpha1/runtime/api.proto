@@ -1,0 +1,61 @@
+// To regenerate api.pb.go run hack/update-generated-runtime.sh
+syntax = 'proto3';
+
+package gpu;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.goproto_getters_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_unrecognized_all) = false;
+
+service GPUAllocatorService {
+  // Capacity returns the capacity of GPU resource
+  rpc Capacity(CapacityRequest) returns (CapacityResponse) {}
+  // AllocateGPU returns allocated GPU resource
+  rpc AllocateGPU(AllocateGPURequest) returns (AllocateGPUResponse) {}
+  // FreeGPU attempts to free GPU resource in specified Pod
+  rpc FreeGPU(FreeGPURequest) returns (FreeGPUResponse) {}
+}
+
+message CapacityRequest {}
+
+message CapacityResponse {
+  // Capacity of GPU resource
+  uint64 capacity = 1;
+}
+
+message AllocateGPURequest {
+  // Request number of GPU resources
+  uint64 request_num = 1;
+  // Pod UID
+  string pod_uid = 2;
+  // Container name
+  string container_name = 3;
+  // Labels of Pod
+  map<string, string> labels = 4;
+  // Annotation of Pod
+  map<string, string> annotations = 5;
+}
+
+message AllocateGPUResponse {
+  // Allocated GPU resource
+  repeated Device devices = 1;
+}
+
+message Device {
+  string path_on_host = 1;
+  string path_in_container = 2;
+  string cgroup_permissions = 3;
+}
+
+message FreeGPURequest {
+  // Pod UIDs
+  repeated string pod_uids = 1;
+}
+
+message FreeGPUResponse {}

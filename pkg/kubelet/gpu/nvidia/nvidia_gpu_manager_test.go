@@ -63,7 +63,7 @@ func makeTestPod(numContainers, gpusPerContainer int) *v1.Pod {
 func TestMultiContainerPodGPUAllocation(t *testing.T) {
 	podLister := &testActivePodsLister{}
 
-	testGpuManager := &nvidiaGPUManager{
+	testGpuManager := &localGPUManager{
 		activePodsLister: podLister,
 		allGPUs:          sets.NewString("/dev/nvidia0", "/dev/nvidia1"),
 		allocated:        newPodGPUs(),
@@ -94,6 +94,7 @@ func TestMultiContainerPodGPUAllocation(t *testing.T) {
 	devices1, err = testGpuManager.AllocateGPU(newPod, &newPod.Spec.Containers[0])
 	as.NotNil(err, "expected gpu allocation to fail. got: %v", devices1)
 
+	testGpuManager.FreeGPU(pod)
 	// Now terminate the original pod and observe that GPU allocation for new pod succeeds.
 	podLister.activePods = podLister.activePods[:0]
 
@@ -113,7 +114,7 @@ func TestMultiContainerPodGPUAllocation(t *testing.T) {
 func TestMultiPodGPUAllocation(t *testing.T) {
 	podLister := &testActivePodsLister{}
 
-	testGpuManager := &nvidiaGPUManager{
+	testGpuManager := &localGPUManager{
 		activePodsLister: podLister,
 		allGPUs:          sets.NewString("/dev/nvidia0", "/dev/nvidia1"),
 		allocated:        newPodGPUs(),
@@ -145,7 +146,7 @@ func TestMultiPodGPUAllocation(t *testing.T) {
 func TestPodContainerRestart(t *testing.T) {
 	podLister := &testActivePodsLister{}
 
-	testGpuManager := &nvidiaGPUManager{
+	testGpuManager := &localGPUManager{
 		activePodsLister: podLister,
 		allGPUs:          sets.NewString("/dev/nvidia0", "/dev/nvidia1"),
 		allocated:        newPodGPUs(),

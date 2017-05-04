@@ -25,5 +25,6 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 # If the output set is changed update that function.
 
 ${KUBE_ROOT}/build/run.sh hack/update-generated-runtime-dockerized.sh "$@"
+${KUBE_ROOT}/build/run.sh hack/update-generated-runtime-gpu-dockerized.sh "$@"
 
 # ex: ts=2 sw=2 et filetype=sh

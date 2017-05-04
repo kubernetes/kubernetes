@@ -9,16 +9,9 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "factory.go",
-        "gpu_manager_stub.go",
-        "types.go",
-    ],
+    srcs = ["register.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/kubelet/dockertools:go_default_library",
-    ],
+    deps = ["//pkg/kubelet/gpu/nvidia:go_default_library"],
 )
 
 filegroup(
@@ -30,11 +23,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/kubelet/gpu/api/v1alpha1/runtime:all-srcs",
-        "//pkg/kubelet/gpu/nvidia:all-srcs",
-        "//pkg/kubelet/gpu/register:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
