@@ -165,21 +165,26 @@ func (o *EditOptions) Run() error {
 		containsError := false
 
 		if o.EditMode == ApplyEditMode {
+			var tempInfos []*resource.Info
 			for i := range infos {
 				data, err := kubectl.GetOriginalConfiguration(infos[i].Mapping, infos[i].Object)
 				if err != nil {
 					return err
 				}
 				if data == nil {
-					return fmt.Errorf("no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation")
+					continue
 				}
 
 				annotationInfos, err := o.updatedResultGetter(data).Infos()
 				if err != nil {
 					return err
 				}
-				infos[i] = annotationInfos[0]
+				tempInfos = append(tempInfos, annotationInfos[0])
 			}
+			if len(tempInfos) == 0 {
+				return fmt.Errorf("no last-applied-configuration annotation found on resources, to create the annotation, run the command with --create-annotation")
+			}
+			infos = tempInfos
 		}
 
 		// loop until we succeed or cancel editing
