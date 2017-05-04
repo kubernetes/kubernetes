@@ -319,32 +319,17 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		return redeliver
 	}
 
-	glog.V(3).Infof("Syncing %s %q in underlying clusters", kind, key)
-
-	clusters, err := s.informer.GetReadyClusters()
-	if err != nil {
-		glog.Errorf("Failed to get cluster list: %v", err)
-		return redeliverForClusterReadiness
-	}
-
-	operations, err := clusterOperations(s.adapter, clusters, obj, key, func(clusterName string) (interface{}, bool, error) {
-		return s.informer.GetTargetStore().GetByKey(clusterName, key)
-	})
-	if err != nil {
-		glog.Error(err)
-		return redeliverForFailure
-	}
-	if len(operations) == 0 {
-		return reconciled
-	}
-
-	err = s.updater.Update(operations)
-	if err != nil {
-		glog.Errorf("Failed to execute updates for %s %q: %v", kind, key, err)
-		return redeliverForFailure
-	}
-
-	return reconciled
+	return syncToClusters(
+		s.informer.GetReadyClusters,
+		func(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, obj pkgruntime.Object) ([]util.FederatedOperation, error) {
+			return clusterOperations(adapter, clusters, obj, func(clusterName string) (interface{}, bool, error) {
+				return s.informer.GetTargetStore().GetByKey(clusterName, key)
+			})
+		},
+		s.updater.Update,
+		s.adapter,
+		obj,
+	)
 }
 
 func (s *FederationSyncController) objFromCache(kind, key string) (pkgruntime.Object, error) {
@@ -399,10 +384,46 @@ func (s *FederationSyncController) delete(obj pkgruntime.Object, kind string, na
 	return nil
 }
 
-type clusterAccessor func(clusterName string) (interface{}, bool, error)
+type clustersAccessorFunc func() ([]*federationapi.Cluster, error)
+type operationsFunc func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, pkgruntime.Object) ([]util.FederatedOperation, error)
+type executionFunc func([]util.FederatedOperation) error
+
+// syncToClusters ensures that the state of the given object is synchronized to member clusters.
+func syncToClusters(clustersAccessor clustersAccessorFunc, operationsAccessor operationsFunc, execute executionFunc, adapter federatedtypes.FederatedTypeAdapter, obj pkgruntime.Object) reconcileStatus {
+	kind := adapter.Kind()
+	key := federatedtypes.ObjectKey(adapter, obj)
+
+	glog.V(3).Infof("Syncing %s %q in underlying clusters", kind, key)
+
+	clusters, err := clustersAccessor()
+	if err != nil {
+		glog.Errorf("Failed to get cluster list: %v", err)
+		return redeliverForClusterReadiness
+	}
+
+	operations, err := operationsAccessor(adapter, clusters, obj)
+	if err != nil {
+		glog.Error(err)
+		return redeliverForFailure
+	}
+	if len(operations) == 0 {
+		return reconciled
+	}
+
+	err = execute(operations)
+	if err != nil {
+		glog.Errorf("Failed to execute updates for %s %q: %v", kind, key, err)
+		return redeliverForFailure
+	}
+
+	return reconciled
+}
+
+type clusterObjectAccessorFunc func(clusterName string) (interface{}, bool, error)
 
 // clusterOperations returns the list of operations needed to synchronize the state of the given object to the provided clusters
-func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, obj pkgruntime.Object, key string, accessor clusterAccessor) ([]util.FederatedOperation, error) {
+func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, obj pkgruntime.Object, accessor clusterObjectAccessorFunc) ([]util.FederatedOperation, error) {
+	key := federatedtypes.ObjectKey(adapter, obj)
 	operations := make([]util.FederatedOperation, 0)
 	for _, cluster := range clusters {
 		clusterObj, found, err := accessor(cluster.Name)

@@ -17,7 +17,7 @@ limitations under the License.
 package sync
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
@@ -29,6 +29,70 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+var awfulError error = errors.New("Something bad happened")
+
+func TestSyncToClusters(t *testing.T) {
+	adapter := &federatedtypes.SecretAdapter{}
+	obj := adapter.NewTestObject("foo")
+
+	testCases := map[string]struct {
+		clusterError    bool
+		operationsError bool
+		executionError  bool
+		operations      []util.FederatedOperation
+		status          reconcileStatus
+	}{
+		"Error listing clusters redelivers with cluster delay": {
+			clusterError: true,
+			status:       redeliverForClusterReadiness,
+		},
+		"Error retrieving cluster operations redelivers with backoff": {
+			operationsError: true,
+			status:          redeliverForFailure,
+		},
+		"No operations returns reconciled status": {
+			status: reconciled,
+		},
+		"Execution error redelivers with backoff": {
+			executionError: true,
+			operations:     []util.FederatedOperation{{}},
+			status:         redeliverForFailure,
+		},
+		"Successful update returns reconciled status": {
+			operations: []util.FederatedOperation{{}},
+			status:     reconciled,
+		},
+	}
+
+	for testName, testCase := range testCases {
+		t.Run(testName, func(t *testing.T) {
+			status := syncToClusters(
+				func() ([]*federationapi.Cluster, error) {
+					if testCase.clusterError {
+						return nil, awfulError
+					}
+					return nil, nil
+				},
+				func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, pkgruntime.Object) ([]util.FederatedOperation, error) {
+					if testCase.operationsError {
+						return nil, awfulError
+					}
+					return testCase.operations, nil
+				},
+				func([]util.FederatedOperation) error {
+					if testCase.executionError {
+						return awfulError
+					}
+					return nil
+				},
+				adapter,
+				obj,
+			)
+			require.Equal(t, testCase.status, status, "Unexpected status!")
+		})
+	}
+}
 
 func TestClusterOperations(t *testing.T) {
 	adapter := &federatedtypes.SecretAdapter{}
@@ -58,9 +122,9 @@ func TestClusterOperations(t *testing.T) {
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			clusters := []*federationapi.Cluster{fedtest.NewCluster("cluster1", apiv1.ConditionTrue)}
-			operations, err := clusterOperations(adapter, clusters, obj, "key", func(string) (interface{}, bool, error) {
+			operations, err := clusterOperations(adapter, clusters, obj, func(string) (interface{}, bool, error) {
 				if testCase.expectedErr {
-					return nil, false, fmt.Errorf("Not found!")
+					return nil, false, awfulError
 				}
 				return testCase.clusterObject, (testCase.clusterObject != nil), nil
 			})
