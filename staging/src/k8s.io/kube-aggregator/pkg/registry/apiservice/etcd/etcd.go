@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -55,11 +56,11 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST
 // NewStatusREST makes a RESTStorage for status that has more limited options.
 // It is based on the original REST so that we can share the same underlying store
 func NewStatusREST(scheme *runtime.Scheme, rest *REST) *StatusREST {
-	statusStore := *rest.store
+	statusStore := *rest.Store
 	statusStore.CreateStrategy = nil
 	statusStore.DeleteStrategy = nil
 	statusStore.UpdateStrategy = apiservice.NewStatusStrategy(scheme)
-	return &REST{store: statusStore}
+	return &StatusREST{store: &statusStore}
 }
 
 type StatusREST struct {
@@ -69,7 +70,7 @@ type StatusREST struct {
 var _ = rest.Updater(&StatusREST{})
 
 func (r *StatusREST) New() runtime.Object {
-	return &extensions.Deployment{}
+	return &apiregistration.APIService{}
 }
 
 // Update alters the status subset of an object.
