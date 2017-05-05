@@ -21,7 +21,7 @@ import "time"
 func newClustersMetricContext(request, zone string) *metricContext {
 	return &metricContext{
 		start:      time.Now(),
-		attributes: []string{"clusters" + request, unusedMetricLabel, zone},
+		attributes: []string{"clusters_" + request, unusedMetricLabel, zone},
 	}
 }
 
