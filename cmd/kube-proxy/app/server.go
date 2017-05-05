@@ -302,11 +302,8 @@ type ProxyServer struct {
 	ResourceContainer      string
 	ConfigSyncPeriod       time.Duration
 	ServiceEventHandler    proxyconfig.ServiceHandler
-	// TODO: Migrate all handlers to ServiceHandler types and
-	// get rid of this one.
-	ServiceHandler        proxyconfig.ServiceConfigHandler
-	EndpointsEventHandler proxyconfig.EndpointsHandler
-	HealthzServer         *healthcheck.HealthzServer
+	EndpointsEventHandler  proxyconfig.EndpointsHandler
+	HealthzServer          *healthcheck.HealthzServer
 }
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
@@ -397,9 +394,6 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 
 	var proxier proxy.ProxyProvider
 	var serviceEventHandler proxyconfig.ServiceHandler
-	// TODO: Migrate all handlers to ServiceHandler types and
-	// get rid of this one.
-	var serviceHandler proxyconfig.ServiceConfigHandler
 	var endpointsEventHandler proxyconfig.EndpointsHandler
 
 	proxyMode := getProxyMode(string(config.Mode), iptInterface, iptables.LinuxKernelCompatTester{})
@@ -517,7 +511,6 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		ResourceContainer:      config.ResourceContainer,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		ServiceEventHandler:    serviceEventHandler,
-		ServiceHandler:         serviceHandler,
 		EndpointsEventHandler:  endpointsEventHandler,
 		HealthzServer:          healthzServer,
 	}, nil
@@ -621,12 +614,7 @@ func (s *ProxyServer) Run() error {
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
 	serviceConfig := proxyconfig.NewServiceConfig(informerFactory.Core().InternalVersion().Services(), s.ConfigSyncPeriod)
-	if s.ServiceHandler != nil {
-		serviceConfig.RegisterHandler(s.ServiceHandler)
-	}
-	if s.ServiceEventHandler != nil {
-		serviceConfig.RegisterEventHandler(s.ServiceEventHandler)
-	}
+	serviceConfig.RegisterEventHandler(s.ServiceEventHandler)
 	go serviceConfig.Run(wait.NeverStop)
 
 	endpointsConfig := proxyconfig.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), s.ConfigSyncPeriod)
