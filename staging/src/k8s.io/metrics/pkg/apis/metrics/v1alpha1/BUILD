@@ -14,7 +14,6 @@ go_library(
         "generated.pb.go",
         "register.go",
         "types.go",
-        "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
@@ -26,8 +25,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api:go_default_library",
         "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
-        "//vendor/k8s.io/metrics/pkg/apis/metrics:go_default_library",
     ],
 )
