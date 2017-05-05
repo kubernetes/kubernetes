@@ -3,11 +3,11 @@ shortDesc: "Plugin with a tree of commands"
 tree:
   - name: "child1"
     shortDesc: "The first child of a tree"
-    command: echo child1
+    command: echo child one
   - name: "child2"
     shortDesc: "The second child of a tree"
-    command: echo child2
+    command: echo child two
   - name: "child3"
     shortDesc: "The third child of a tree"
-    command: echo child3
+    command: echo child three
 
