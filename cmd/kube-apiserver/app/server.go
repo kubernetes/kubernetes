@@ -373,7 +373,8 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 		pluginInitializer,
 		genericConfig.Authorizer,
 		genericConfig.LoopbackClientConfig,
-		genericConfig)
+		genericConfig,
+		genericConfig.SharedInformerFactory)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize admission: %v", err)
 	}

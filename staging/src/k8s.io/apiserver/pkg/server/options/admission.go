@@ -60,19 +60,18 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 // ApplyTo adds the admission chain to the server configuration
 // note that pluginIntializer is optional, a generic plugin intializer will always be provided and appended
 // to the list of plugin initializers.
-func (a *AdmissionOptions) ApplyTo(pluginInitializer admission.PluginInitializer, authz authorizer.Authorizer, restConfig *rest.Config, serverCfg *server.Config) error {
+func (a *AdmissionOptions) ApplyTo(pluginInitializer admission.PluginInitializer, authz authorizer.Authorizer, restConfig *rest.Config, serverCfg *server.Config, sharedInformers informers.SharedInformerFactory) error {
 	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(a.PluginsNames, a.ConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
 	}
 
-	// initi generic plugin initalizer
+	// init generic plugin initalizer
 	if a.genericPluginInitializer == nil {
 		clientset, err := kubernetes.NewForConfig(restConfig)
 		if err != nil {
 			return err
 		}
-		sharedInformers := informers.NewSharedInformerFactory(clientset, restConfig.Timeout)
 		genericInitializer, err := initializer.New(clientset, sharedInformers, authz)
 		if err != nil {
 			return err

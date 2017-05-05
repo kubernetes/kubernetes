@@ -55,6 +55,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 
@@ -113,6 +114,8 @@ type Config struct {
 	// FallThroughHandler is the final HTTP handler in the chain.  If it is nil, one will be created for you.
 	// It comes after all filters and the API handling
 	FallThroughHandler *mux.PathRecorderMux
+	// SharedInformerFactory provides shared informers for resources
+	SharedInformerFactory informers.SharedInformerFactory
 
 	//===========================================================================
 	// Fields you probably don't care about changing

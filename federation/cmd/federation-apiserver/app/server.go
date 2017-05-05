@@ -199,6 +199,7 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		apiAuthorizer,
 		genericConfig.LoopbackClientConfig,
 		genericConfig,
+		genericConfig.SharedInformerFactory,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize plugins: %v", err)
