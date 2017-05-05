@@ -44,6 +44,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "set_image_test.go",
+        "set_resources_test.go",
         "set_selector_test.go",
         "set_subject_test.go",
         "set_test.go",
