@@ -21,7 +21,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/api/certificates/v1beta1"
+	v1beta1 "k8s.io/api/certificates/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 

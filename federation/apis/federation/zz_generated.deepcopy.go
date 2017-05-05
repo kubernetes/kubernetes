@@ -21,13 +21,12 @@ limitations under the License.
 package federation
 
 import (
-	reflect "reflect"
-
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
+	reflect "reflect"
 )
 
 func init() {
@@ -121,7 +120,7 @@ func DeepCopy_federation_ClusterServiceIngress(in interface{}, out interface{}, 
 		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
-			*out = make([]api_v1.LoadBalancerIngress, len(*in))
+			*out = make([]core_v1.LoadBalancerIngress, len(*in))
 			copy(*out, *in)
 		}
 		return nil

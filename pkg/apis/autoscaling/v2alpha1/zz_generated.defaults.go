@@ -21,7 +21,7 @@ limitations under the License.
 package v2alpha1
 
 import (
-	"k8s.io/api/autoscaling/v2alpha1"
+	v2alpha1 "k8s.io/api/autoscaling/v2alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 

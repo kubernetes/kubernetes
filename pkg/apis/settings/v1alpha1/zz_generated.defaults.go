@@ -21,9 +21,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/api/settings/v1alpha1"
+	v1alpha1 "k8s.io/api/settings/v1alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -40,53 +40,53 @@ func SetObjectDefaults_PodPreset(in *v1alpha1.PodPreset) {
 		a := &in.Spec.Env[i]
 		if a.ValueFrom != nil {
 			if a.ValueFrom.FieldRef != nil {
-				k8s_api_v1.SetDefaults_ObjectFieldSelector(a.ValueFrom.FieldRef)
+				v1.SetDefaults_ObjectFieldSelector(a.ValueFrom.FieldRef)
 			}
 		}
 	}
 	for i := range in.Spec.Volumes {
 		a := &in.Spec.Volumes[i]
-		k8s_api_v1.SetDefaults_Volume(a)
+		v1.SetDefaults_Volume(a)
 		if a.VolumeSource.Secret != nil {
-			k8s_api_v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			k8s_api_v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 		}
 		if a.VolumeSource.RBD != nil {
-			k8s_api_v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
 		if a.VolumeSource.DownwardAPI != nil {
-			k8s_api_v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
+			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
 				b := &a.VolumeSource.DownwardAPI.Items[j]
 				if b.FieldRef != nil {
-					k8s_api_v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
 				}
 			}
 		}
 		if a.VolumeSource.ConfigMap != nil {
-			k8s_api_v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			k8s_api_v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 		if a.VolumeSource.Projected != nil {
-			k8s_api_v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
 				b := &a.VolumeSource.Projected.Sources[j]
 				if b.DownwardAPI != nil {
 					for k := range b.DownwardAPI.Items {
 						c := &b.DownwardAPI.Items[k]
 						if c.FieldRef != nil {
-							k8s_api_v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
 						}
 					}
 				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			k8s_api_v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 }

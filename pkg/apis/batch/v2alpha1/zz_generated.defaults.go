@@ -21,9 +21,9 @@ limitations under the License.
 package v2alpha1
 
 import (
-	"k8s.io/api/batch/v2alpha1"
+	v2alpha1 "k8s.io/api/batch/v2alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -38,132 +38,132 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 	SetDefaults_CronJob(in)
-	k8s_api_v1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
+	v1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.Volumes[i]
-		k8s_api_v1.SetDefaults_Volume(a)
+		v1.SetDefaults_Volume(a)
 		if a.VolumeSource.Secret != nil {
-			k8s_api_v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			k8s_api_v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 		}
 		if a.VolumeSource.RBD != nil {
-			k8s_api_v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
 		if a.VolumeSource.DownwardAPI != nil {
-			k8s_api_v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
+			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
 				b := &a.VolumeSource.DownwardAPI.Items[j]
 				if b.FieldRef != nil {
-					k8s_api_v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
 				}
 			}
 		}
 		if a.VolumeSource.ConfigMap != nil {
-			k8s_api_v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			k8s_api_v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 		if a.VolumeSource.Projected != nil {
-			k8s_api_v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
 				b := &a.VolumeSource.Projected.Sources[j]
 				if b.DownwardAPI != nil {
 					for k := range b.DownwardAPI.Items {
 						c := &b.DownwardAPI.Items[k]
 						if c.FieldRef != nil {
-							k8s_api_v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
 						}
 					}
 				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			k8s_api_v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.InitContainers[i]
-		k8s_api_v1.SetDefaults_Container(a)
+		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			k8s_api_v1.SetDefaults_ContainerPort(b)
+			v1.SetDefaults_ContainerPort(b)
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					k8s_api_v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
 			}
 		}
-		k8s_api_v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		k8s_api_v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			k8s_api_v1.SetDefaults_Probe(a.LivenessProbe)
+			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
-				k8s_api_v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
 			}
 		}
 		if a.ReadinessProbe != nil {
-			k8s_api_v1.SetDefaults_Probe(a.ReadinessProbe)
+			v1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.Handler.HTTPGet != nil {
-				k8s_api_v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
 			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					k8s_api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					k8s_api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
 	}
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Containers {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.Containers[i]
-		k8s_api_v1.SetDefaults_Container(a)
+		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			k8s_api_v1.SetDefaults_ContainerPort(b)
+			v1.SetDefaults_ContainerPort(b)
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					k8s_api_v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
 			}
 		}
-		k8s_api_v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		k8s_api_v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			k8s_api_v1.SetDefaults_Probe(a.LivenessProbe)
+			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
-				k8s_api_v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
 			}
 		}
 		if a.ReadinessProbe != nil {
-			k8s_api_v1.SetDefaults_Probe(a.ReadinessProbe)
+			v1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.Handler.HTTPGet != nil {
-				k8s_api_v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
 			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					k8s_api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					k8s_api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
@@ -178,132 +178,132 @@ func SetObjectDefaults_CronJobList(in *v2alpha1.CronJobList) {
 }
 
 func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
-	k8s_api_v1.SetDefaults_PodSpec(&in.Template.Spec.Template.Spec)
+	v1.SetDefaults_PodSpec(&in.Template.Spec.Template.Spec)
 	for i := range in.Template.Spec.Template.Spec.Volumes {
 		a := &in.Template.Spec.Template.Spec.Volumes[i]
-		k8s_api_v1.SetDefaults_Volume(a)
+		v1.SetDefaults_Volume(a)
 		if a.VolumeSource.Secret != nil {
-			k8s_api_v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			k8s_api_v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 		}
 		if a.VolumeSource.RBD != nil {
-			k8s_api_v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
 		if a.VolumeSource.DownwardAPI != nil {
-			k8s_api_v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
+			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
 				b := &a.VolumeSource.DownwardAPI.Items[j]
 				if b.FieldRef != nil {
-					k8s_api_v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
 				}
 			}
 		}
 		if a.VolumeSource.ConfigMap != nil {
-			k8s_api_v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			k8s_api_v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 		if a.VolumeSource.Projected != nil {
-			k8s_api_v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
 				b := &a.VolumeSource.Projected.Sources[j]
 				if b.DownwardAPI != nil {
 					for k := range b.DownwardAPI.Items {
 						c := &b.DownwardAPI.Items[k]
 						if c.FieldRef != nil {
-							k8s_api_v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
 						}
 					}
 				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			k8s_api_v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Template.Spec.Template.Spec.InitContainers {
 		a := &in.Template.Spec.Template.Spec.InitContainers[i]
-		k8s_api_v1.SetDefaults_Container(a)
+		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			k8s_api_v1.SetDefaults_ContainerPort(b)
+			v1.SetDefaults_ContainerPort(b)
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					k8s_api_v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
 			}
 		}
-		k8s_api_v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		k8s_api_v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			k8s_api_v1.SetDefaults_Probe(a.LivenessProbe)
+			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
-				k8s_api_v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
 			}
 		}
 		if a.ReadinessProbe != nil {
-			k8s_api_v1.SetDefaults_Probe(a.ReadinessProbe)
+			v1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.Handler.HTTPGet != nil {
-				k8s_api_v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
 			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					k8s_api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					k8s_api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
 	}
 	for i := range in.Template.Spec.Template.Spec.Containers {
 		a := &in.Template.Spec.Template.Spec.Containers[i]
-		k8s_api_v1.SetDefaults_Container(a)
+		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			k8s_api_v1.SetDefaults_ContainerPort(b)
+			v1.SetDefaults_ContainerPort(b)
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					k8s_api_v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
 			}
 		}
-		k8s_api_v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		k8s_api_v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			k8s_api_v1.SetDefaults_Probe(a.LivenessProbe)
+			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
-				k8s_api_v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
 			}
 		}
 		if a.ReadinessProbe != nil {
-			k8s_api_v1.SetDefaults_Probe(a.ReadinessProbe)
+			v1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.Handler.HTTPGet != nil {
-				k8s_api_v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
 			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					k8s_api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					k8s_api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
