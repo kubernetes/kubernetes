@@ -25,19 +25,27 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 )
 
+// defaultWatchCacheSize is the default size of a watch catch per resource in number of entries.
+const defaultWatchCacheSize = 100
+
 var _ generic.StorageDecorator = StorageWithCacher
 
 // Creates a cacher based given storageConfig.
 func StorageWithCacher(
 	copier runtime.ObjectCopier,
 	storageConfig *storagebackend.Config,
-	capacity int,
+	requestedSize *int,
 	objectType runtime.Object,
 	resourcePrefix string,
 	keyFunc func(obj runtime.Object) (string, error),
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,
 	triggerFunc storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
+
+	capacity := defaultWatchCacheSize
+	if requestedSize != nil && *requestedSize > 0 {
+		capacity = *requestedSize
+	}
 
 	s, d := generic.NewRawStorage(storageConfig)
 	// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.

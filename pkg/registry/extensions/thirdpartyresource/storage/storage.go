@@ -40,7 +40,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	}
 
 	// We explicitly do NOT do any decoration here yet. // TODO determine why we do not want to cache here
-	opts.Decorator = generic.UndecoratedStorage // TODO use watchCacheSize=-1 to signal UndecoratedStorage
+	opts.Decorator = generic.UndecoratedStorage
 
 	store := &genericregistry.Store{
 		Copier:            api.Scheme,
