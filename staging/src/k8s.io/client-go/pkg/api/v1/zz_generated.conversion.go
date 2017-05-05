@@ -429,6 +429,7 @@ func Convert_api_Affinity_To_v1_Affinity(in *api.Affinity, out *Affinity, s conv
 func autoConvert_v1_AttachedVolume_To_api_AttachedVolume(in *AttachedVolume, out *api.AttachedVolume, s conversion.Scope) error {
 	out.Name = api.UniqueVolumeName(in.Name)
 	out.DevicePath = in.DevicePath
+	out.IsAttached = in.IsAttached
 	return nil
 }
 
@@ -440,6 +441,7 @@ func Convert_v1_AttachedVolume_To_api_AttachedVolume(in *AttachedVolume, out *ap
 func autoConvert_api_AttachedVolume_To_v1_AttachedVolume(in *api.AttachedVolume, out *AttachedVolume, s conversion.Scope) error {
 	out.Name = UniqueVolumeName(in.Name)
 	out.DevicePath = in.DevicePath
+	out.IsAttached = in.IsAttached
 	return nil
 }
 

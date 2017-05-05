@@ -3295,6 +3295,9 @@ type AttachedVolume struct {
 
 	// DevicePath represents the device path where the volume should be available
 	DevicePath string `json:"devicePath" protobuf:"bytes,2,rep,name=devicePath"`
+
+	// Has the process of attaching the volume finished already?
+	IsAttached bool `json:"isAttached" protobuf:"varint,3,opt,name=isAttached"`
 }
 
 // AvoidPods describes pods that should avoid this node. This is the value for a
