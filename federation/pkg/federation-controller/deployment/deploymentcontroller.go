@@ -188,7 +188,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		),
 	)
 
-	fdc.fedUpdater = fedutil.NewFederatedUpdater(fdc.fedDeploymentInformer,
+	fdc.fedUpdater = fedutil.NewFederatedUpdater(fdc.fedDeploymentInformer, "deployment", fdc.eventRecorder,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.Deployment)
 			_, err := client.Extensions().Deployments(rs.Namespace).Create(rs)
@@ -211,10 +211,9 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		// objNameFunc
 		func(obj runtime.Object) string {
 			deployment := obj.(*extensionsv1.Deployment)
-			return deployment.Name
+			return fmt.Sprintf("%s/%s", deployment.Namespace, deployment.Name)
 		},
 		updateTimeout,
-		fdc.eventRecorder,
 		fdc.fedDeploymentInformer,
 		fdc.fedUpdater,
 	)
@@ -526,13 +525,11 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 
 		if !exists {
 			if replicas > 0 {
-				fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "CreateInCluster",
-					"Creating deployment in cluster %s", clusterName)
-
 				operations = append(operations, fedutil.FederatedOperation{
 					Type:        fedutil.OperationTypeAdd,
 					Obj:         ld,
 					ClusterName: clusterName,
+					Key:         key,
 				})
 			}
 		} else {
@@ -541,13 +538,11 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 			currentLd := ldObj.(*extensionsv1.Deployment)
 			// Update existing replica set, if needed.
 			if !fedutil.DeploymentEquivalent(ld, currentLd) {
-				fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "UpdateInCluster",
-					"Updating deployment in cluster %s", clusterName)
-
 				operations = append(operations, fedutil.FederatedOperation{
 					Type:        fedutil.OperationTypeUpdate,
 					Obj:         ld,
 					ClusterName: clusterName,
+					Key:         key,
 				})
 				glog.Infof("Updating %s in %s", currentLd.Name, clusterName)
 			}
@@ -572,10 +567,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		// Everything is in order
 		return statusAllOk, nil
 	}
-	err = fdc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
-		fdc.eventRecorder.Eventf(fd, api.EventTypeWarning, "FailedUpdateInCluster",
-			"Deployment update in cluster %s failed: %v", op.ClusterName, operror)
-	})
+	err = fdc.fedUpdater.Update(operations, updateTimeout)
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", key, err)
 		return statusError, err

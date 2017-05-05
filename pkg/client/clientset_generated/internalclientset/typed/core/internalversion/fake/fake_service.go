@@ -34,6 +34,8 @@ type FakeServices struct {
 
 var servicesResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "services"}
 
+var servicesKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "Service"}
+
 func (c *FakeServices) Create(service *api.Service) (result *api.Service, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(servicesResource, c.ns, service), &api.Service{})
@@ -90,7 +92,7 @@ func (c *FakeServices) Get(name string, options v1.GetOptions) (result *api.Serv
 
 func (c *FakeServices) List(opts v1.ListOptions) (result *api.ServiceList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(servicesResource, c.ns, opts), &api.ServiceList{})
+		Invokes(testing.NewListAction(servicesResource, servicesKind, c.ns, opts), &api.ServiceList{})
 
 	if obj == nil {
 		return nil, err

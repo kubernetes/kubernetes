@@ -2063,7 +2063,7 @@ __EOF__
   kubectl delete service redis-master "${kube_flags[@]}"
   kubectl delete service "service-v1-test" "${kube_flags[@]}"
   if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
-    kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+    kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   fi
   # Post-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
@@ -2089,7 +2089,7 @@ __EOF__
   # Command
   kubectl delete services redis-master redis-slave "${kube_flags[@]}" # delete multiple services at once
   if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
-    kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+    kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   fi
   # Post-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
@@ -2943,7 +2943,7 @@ runTests() {
 
   # Make sure the UI can be proxied
   start-proxy
-  check-curl-proxy-code /ui 301
+  check-curl-proxy-code /ui 307
   check-curl-proxy-code /api/ui 404
   check-curl-proxy-code /api/v1/namespaces 200
   if kube::test::if_supports_resource "${metrics}" ; then
@@ -2962,7 +2962,7 @@ runTests() {
 
   # Custom paths let you see everything.
   start-proxy /custom
-  check-curl-proxy-code /custom/ui 301
+  check-curl-proxy-code /custom/ui 307
   if kube::test::if_supports_resource "${metrics}" ; then
     check-curl-proxy-code /custom/metrics 200
   fi

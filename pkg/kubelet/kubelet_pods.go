@@ -210,10 +210,6 @@ func makeHostsMount(podDir, podIP, hostName, hostDomainName string, hostAliases 
 // ensureHostsFile ensures that the given host file has an up-to-date ip, host
 // name, and domain name.
 func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string, hostAliases []v1.HostAlias) error {
-	if _, err := os.Stat(fileName); os.IsExist(err) {
-		glog.V(4).Infof("kubernetes-managed etc-hosts file exits. Will not be recreated: %q", fileName)
-		return nil
-	}
 	content := hostsFileContent(hostIP, hostName, hostDomainName, hostAliases)
 	return ioutil.WriteFile(fileName, content, 0644)
 }
