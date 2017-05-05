@@ -71,7 +71,7 @@ type prefixHandler struct {
 	handler http.Handler
 }
 
-// NewPathRecorderMux creates a new PathRecorderMux with the given mux as the base mux.
+// NewPathRecorderMux creates a new PathRecorderMux
 func NewPathRecorderMux() *PathRecorderMux {
 	ret := &PathRecorderMux{
 		pathToHandler:   map[string]http.Handler{},
