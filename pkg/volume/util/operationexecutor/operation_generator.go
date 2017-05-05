@@ -278,17 +278,26 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 				volumeToAttach.VolumeSpec.Name(),
 				volumeToAttach.NodeName,
 				attachErr)
-			for _, pod := range volumeToAttach.ScheduledPods {
-				og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedMountVolume, err.Error())
-			}
+
+			og.recorder.Eventf(&v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: string(volumeToAttach.NodeName),
+				},
+			}, v1.EventTypeWarning, kevents.FailedAttachVolume, err.Error())
+
 			return err
 		}
 
-		glog.Infof(
+		msg := fmt.Sprintf(
 			"AttachVolume.Attach succeeded for volume %q (spec.Name: %q) from node %q.",
 			volumeToAttach.VolumeName,
 			volumeToAttach.VolumeSpec.Name(),
 			volumeToAttach.NodeName)
+		og.recorder.Eventf(&v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: string(volumeToAttach.NodeName),
+			},
+		}, v1.EventTypeNormal, kevents.SuccessfulAttachVolume, msg)
 
 		// Update actual state of world
 		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
