@@ -26,7 +26,7 @@ import (
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
+	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 )
 
 const (
@@ -107,7 +107,7 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 	cpuQuota, cpuPeriod := MilliCPUToQuota(cpuLimits)
 
 	// determine the qos class
-	qosClass := qos.GetPodQOS(pod)
+	qosClass := v1qos.GetPodQOS(pod)
 
 	// build the result
 	result := &ResourceConfig{}

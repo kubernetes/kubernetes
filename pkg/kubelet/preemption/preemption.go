@@ -24,12 +24,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -231,7 +231,7 @@ func (a admissionRequirementList) toString() string {
 func sortPodsByQOS(pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod) {
 	for _, pod := range pods {
 		if !kubetypes.IsCriticalPod(pod) {
-			switch qos.GetPodQOS(pod) {
+			switch v1qos.GetPodQOS(pod) {
 			case v1.PodQOSBestEffort:
 				bestEffort = append(bestEffort, pod)
 			case v1.PodQOSBurstable:

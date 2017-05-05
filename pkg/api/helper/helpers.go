@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// NOTE: DO NOT use those helper functions through client-go, the
+// package path will be changed in the future.
 package helper
 
 import (
