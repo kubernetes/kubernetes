@@ -141,20 +141,20 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		if err != nil {
 			glog.Fatalf("Cloud provider could not be initialized: %v", err)
 		}
-		glog.Infof("Loading client config for service controller %q", servicecontroller.UserAgentName)
+		glog.V(3).Infof("Loading client config for service controller %q", servicecontroller.UserAgentName)
 		scClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.UserAgentName))
 		servicecontroller := servicecontroller.New(scClientset, dns, s.FederationName, s.ServiceDnsSuffix, s.ZoneName, s.ZoneID)
-		glog.Infof("Running service controller")
+		glog.V(3).Infof("Running service controller")
 		if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
 			glog.Fatalf("Failed to start service controller: %v", err)
 		}
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, namespacecontroller.ControllerName, namespacecontroller.RequiredResources, true) {
-		glog.Infof("Loading client config for namespace controller %q", "namespace-controller")
-		nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "namespace-controller"))
-		namespaceController := namespacecontroller.NewNamespaceController(nsClientset, dynamic.NewDynamicClientPool(restclient.AddUserAgent(restClientCfg, "namespace-controller")))
-		glog.Infof("Running namespace controller")
+		glog.V(3).Infof("Loading client config for namespace controller %q", namespacecontroller.UserAgentName)
+		nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, namespacecontroller.UserAgentName))
+		namespaceController := namespacecontroller.NewNamespaceController(nsClientset, dynamic.NewDynamicClientPool(restclient.AddUserAgent(restClientCfg, namespacecontroller.UserAgentName)))
+		glog.V(3).Infof("Running namespace controller")
 		namespaceController.Run(wait.NeverStop)
 	}
 
@@ -165,23 +165,27 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, replicasetcontroller.ControllerName, replicasetcontroller.RequiredResources, true) {
+		glog.V(3).Infof("Loading client config for replica set controller %q", replicasetcontroller.UserAgentName)
 		replicaSetClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, replicasetcontroller.UserAgentName))
 		replicaSetController := replicasetcontroller.NewReplicaSetController(replicaSetClientset)
+		glog.V(3).Infof("Running replica set controller")
 		go replicaSetController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, deploymentcontroller.ControllerName, deploymentcontroller.RequiredResources, true) {
+		glog.V(3).Infof("Loading client config for deployment controller %q", deploymentcontroller.UserAgentName)
 		deploymentClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, deploymentcontroller.UserAgentName))
 		deploymentController := deploymentcontroller.NewDeploymentController(deploymentClientset)
-		// TODO: rename s.ConcurentReplicaSetSyncs
+		glog.V(3).Infof("Running deployment controller")
+		// TODO: rename s.ConcurrentReplicaSetSyncs
 		go deploymentController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, ingresscontroller.ControllerName, ingresscontroller.RequiredResources, true) {
-		glog.Infof("Loading client config for ingress controller %q", "ingress-controller")
-		ingClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "ingress-controller"))
+		glog.V(3).Infof("Loading client config for ingress controller %q", ingresscontroller.UserAgentName)
+		ingClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, ingresscontroller.UserAgentName))
 		ingressController := ingresscontroller.NewIngressController(ingClientset)
-		glog.Infof("Running ingress controller")
+		glog.V(3).Infof("Running ingress controller")
 		ingressController.Run(wait.NeverStop)
 	}
 

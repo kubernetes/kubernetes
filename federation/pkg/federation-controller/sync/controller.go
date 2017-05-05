@@ -88,7 +88,7 @@ type FederationSyncController struct {
 
 // StartFederationSyncController starts a new sync controller for a type adapter
 func StartFederationSyncController(kind string, adapterFactory federatedtypes.AdapterFactory, config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
-	restclient.AddUserAgent(config, fmt.Sprintf("%s-controller", kind))
+	restclient.AddUserAgent(config, fmt.Sprintf("federation-%s-controller", kind))
 	client := federationclientset.NewForConfigOrDie(config)
 	adapter := adapterFactory(client)
 	controller := newFederationSyncController(client, adapter)
@@ -103,7 +103,7 @@ func StartFederationSyncController(kind string, adapterFactory federatedtypes.Ad
 func newFederationSyncController(client federationclientset.Interface, adapter federatedtypes.FederatedTypeAdapter) *FederationSyncController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: fmt.Sprintf("federated-%v-controller", adapter.Kind())})
+	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: fmt.Sprintf("federation-%v-controller", adapter.Kind())})
 
 	s := &FederationSyncController{
 		reviewDelay:           time.Second * 10,
