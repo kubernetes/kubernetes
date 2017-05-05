@@ -24,7 +24,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/emicklei/go-restful/swagger"
+	"github.com/emicklei/go-restful-swagger12"
 	ejson "github.com/exponent-io/jsonpath"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
