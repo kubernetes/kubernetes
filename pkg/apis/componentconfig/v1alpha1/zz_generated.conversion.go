@@ -818,6 +818,7 @@ func autoConvert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderE
 	out.LeaseDuration = in.LeaseDuration
 	out.RenewDeadline = in.RenewDeadline
 	out.RetryPeriod = in.RetryPeriod
+	out.LockType = in.LockType
 	return nil
 }
 
@@ -833,6 +834,7 @@ func autoConvert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderE
 	out.LeaseDuration = in.LeaseDuration
 	out.RenewDeadline = in.RenewDeadline
 	out.RetryPeriod = in.RetryPeriod
+	out.LockType = in.LockType
 	return nil
 }
 

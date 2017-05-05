@@ -685,6 +685,9 @@ type LeaderElectionConfiguration struct {
 	// acquisition and renewal of a leadership. This is only applicable if
 	// leader election is enabled.
 	RetryPeriod metav1.Duration
+	// LockType indicates the type of locking to use for leadership election.
+	// Supported options are `endpoints` (default) and `configmap`.
+	LockType string
 }
 
 type KubeControllerManagerConfiguration struct {
