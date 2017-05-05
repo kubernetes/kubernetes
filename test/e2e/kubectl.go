@@ -131,6 +131,10 @@ var (
 	// Returning container command exit codes in kubectl run/exec was introduced in #26541 (v1.4)
 	// so we don't expect tests that verifies return code to work on kubectl clients before that.
 	kubectlContainerExitCodeVersion = version.MustParse("v1.4.0-alpha.3")
+
+	// The behavior of kubectl describe rc has changed in #42283 (v1.6).
+	// We don't expect this test work with kubectl with v1.6.0 or later.
+	kubectlDescriberVersion = version.MustParse("v1.6.0-beta.1")
 )
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
@@ -545,6 +549,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	framework.KubeDescribe("Kubectl describe", func() {
 		It("should check if kubectl describe prints relevant information for rc and pods [Conformance]", func() {
 			framework.SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
+			framework.SkipUnlessKubectlVersionLTE(kubectlDescriberVersion)
 			controllerJson := readTestFileOrDie(redisControllerFilename)
 			serviceJson := readTestFileOrDie(redisServiceFilename)
 
