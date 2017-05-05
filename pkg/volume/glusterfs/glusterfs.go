@@ -389,7 +389,7 @@ type provisionerConfig struct {
 	secretNamespace string
 	secretName      string
 	secretValue     string
-	clusterId       string
+	clusterID       string
 	gidMin          int
 	gidMax          int
 	volumeType      gapi.VolumeDurabilityInfo
@@ -583,7 +583,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	var err error
 	glog.V(2).Infof("glusterfs: delete volume: %s ", d.glusterfsMounter.path)
 	volumeName := d.glusterfsMounter.path
-	volumeId := dstrings.TrimPrefix(volumeName, volPrefix)
+	volumeID := dstrings.TrimPrefix(volumeName, volPrefix)
 	class, err := volutil.GetClassForVolume(d.plugin.host.GetKubeClient(), d.spec)
 	if err != nil {
 		return err
@@ -595,7 +595,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	}
 	d.provisionerConfig = *cfg
 
-	glog.V(4).Infof("glusterfs: deleting volume %q with configuration %+v", volumeId, d.provisionerConfig)
+	glog.V(4).Infof("glusterfs: deleting volume %q with configuration %+v", volumeID, d.provisionerConfig)
 
 	gid, exists, err := d.getGid()
 	if err != nil {
@@ -617,7 +617,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 		glog.Errorf("glusterfs: failed to create glusterfs rest client")
 		return fmt.Errorf("glusterfs: failed to create glusterfs rest client, REST server authentication failed")
 	}
-	err = cli.VolumeDelete(volumeId)
+	err = cli.VolumeDelete(volumeID)
 	if err != nil {
 		glog.Errorf("glusterfs: error when deleting the volume :%v", err)
 		return err
@@ -738,7 +738,7 @@ func (p *glusterfsVolumeProvisioner) GetClusterNodes(cli *gcli.Client, cluster s
 }
 
 func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolumeSource, size int, err error) {
-	var clusterIds []string
+	var clusterIDs []string
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
@@ -752,12 +752,12 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		glog.Errorf("glusterfs: failed to create glusterfs rest client")
 		return nil, 0, fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
 	}
-	if p.provisionerConfig.clusterId != "" {
-		clusterIds = dstrings.Split(p.clusterId, ",")
-		glog.V(4).Infof("glusterfs: provided clusterids: %v", clusterIds)
+	if p.provisionerConfig.clusterID != "" {
+		clusterIDs = dstrings.Split(p.clusterID, ",")
+		glog.V(4).Infof("glusterfs: provided clusterIDs: %v", clusterIDs)
 	}
 	gid64 := int64(gid)
-	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Clusters: clusterIds, Gid: gid64, Durability: p.volumeType}
+	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Clusters: clusterIDs, Gid: gid64, Durability: p.volumeType}
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
 		glog.Errorf("glusterfs: error creating volume %v ", err)
@@ -907,7 +907,7 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 			cfg.secretNamespace = v
 		case "clusterid":
 			if len(v) != 0 {
-				cfg.clusterId = v
+				cfg.clusterID = v
 			}
 		case "restauthenabled":
 			authEnabled = dstrings.ToLower(v) == "true"
