@@ -31,7 +31,7 @@ type FakePodMetricses struct {
 	ns   string
 }
 
-var podmetricsesResource = schema.GroupVersionResource{Group: "metrics", Version: "v1alpha1", Resource: "podmetricses"}
+var podmetricsesResource = schema.GroupVersionResource{Group: "metrics", Version: "v1alpha1", Resource: "pods"}
 
 var podmetricsesKind = schema.GroupVersionKind{Group: "metrics", Version: "v1alpha1", Kind: "PodMetrics"}
 
