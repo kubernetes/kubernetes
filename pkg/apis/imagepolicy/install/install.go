@@ -38,7 +38,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  imagepolicy.GroupName,
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/imagepolicy",
+			ImportPrefix:               "k8s.io/api/imagepolicy",
 			RootScopedKinds:            sets.NewString("ImageReview"),
 			AddInternalObjectsToScheme: imagepolicy.AddToScheme,
 		},

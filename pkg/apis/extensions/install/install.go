@@ -38,7 +38,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  extensions.GroupName,
 			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/extensions",
+			ImportPrefix:               "k8s.io/api/extensions",
 			RootScopedKinds:            sets.NewString("PodSecurityPolicy", "ThirdPartyResource"),
 			AddInternalObjectsToScheme: extensions.AddToScheme,
 		},

@@ -39,7 +39,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  storage.GroupName,
 			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v1beta1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/storage",
+			ImportPrefix:               "k8s.io/api/storage",
 			RootScopedKinds:            sets.NewString("StorageClass"),
 			AddInternalObjectsToScheme: storage.AddToScheme,
 		},
