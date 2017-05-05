@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 const (
@@ -4259,7 +4260,7 @@ func TestValidatePod(t *testing.T) {
 				Name:      "pod-forgiveness-invalid",
 				Namespace: "ns",
 			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.alpha.kubernetes.io/notReady", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: algorithm.TaintNodeNotReady, Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
 		},
 		{ // docker default seccomp profile
 			ObjectMeta: metav1.ObjectMeta{
@@ -4787,7 +4788,7 @@ func TestValidatePod(t *testing.T) {
 					Name:      "pod-forgiveness-invalid",
 					Namespace: "ns",
 				},
-				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.alpha.kubernetes.io/notReady", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
+				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: algorithm.TaintNodeNotReady, Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
 			},
 		},
 		"must be a valid pod seccomp profile": {

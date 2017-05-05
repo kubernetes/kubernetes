@@ -76,7 +76,7 @@ const (
 	Accelerators utilfeature.Feature = "Accelerators"
 
 	// owner: @gmarek
-	// alpha: v1.6
+	// beta: v1.7
 	//
 	// Changes the logic behind evicting Pods from not ready Nodes
 	// to take advantage of NoExecute Taints and Tolerations.
@@ -137,7 +137,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
-	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
+	TaintBasedEvictions:                         {Default: true, PreRelease: utilfeature.Beta},
 	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletClientCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
 	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
