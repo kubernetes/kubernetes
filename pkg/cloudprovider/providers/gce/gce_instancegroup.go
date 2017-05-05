@@ -40,7 +40,6 @@ func (gce *GCECloud) CreateInstanceGroup(name string, zone string) (*compute.Ins
 
 	op, err := gce.service.InstanceGroups.Insert(
 		gce.projectID, zone, &compute.InstanceGroup{Name: name}).Do()
-
 	if err != nil {
 		mc.Observe(err)
 		return nil, err
@@ -59,7 +58,6 @@ func (gce *GCECloud) DeleteInstanceGroup(name string, zone string) error {
 
 	op, err := gce.service.InstanceGroups.Delete(
 		gce.projectID, zone, name).Do()
-
 	if err != nil {
 		mc.Observe(err)
 		return err
@@ -70,31 +68,28 @@ func (gce *GCECloud) DeleteInstanceGroup(name string, zone string) error {
 
 // ListInstanceGroups lists all InstanceGroups in the project and
 // zone.
-func (gce *GCECloud) ListInstanceGroups(zone string) (v *compute.InstanceGroupList, err error) {
+func (gce *GCECloud) ListInstanceGroups(zone string) (*compute.InstanceGroupList, error) {
 	mc := newInstanceGroupMetricContext("list", zone)
-	defer mc.Observe(err)
 	// TODO: use PageToken to list all not just the first 500
-	v, err = gce.service.InstanceGroups.List(gce.projectID, zone).Do()
-	return
+	v, err := gce.service.InstanceGroups.List(gce.projectID, zone).Do()
+	return v, mc.Observe(err)
 }
 
 // ListInstancesInInstanceGroup lists all the instances in a given
 // instance group and state.
-func (gce *GCECloud) ListInstancesInInstanceGroup(name string, zone string, state string) (v *compute.InstanceGroupsListInstances, err error) {
+func (gce *GCECloud) ListInstancesInInstanceGroup(name string, zone string, state string) (*compute.InstanceGroupsListInstances, error) {
 	mc := newInstanceGroupMetricContext("list_instances", zone)
-	defer mc.Observe(err)
 	// TODO: use PageToken to list all not just the first 500
-	v, err = gce.service.InstanceGroups.ListInstances(
+	v, err := gce.service.InstanceGroups.ListInstances(
 		gce.projectID, zone, name,
 		&compute.InstanceGroupsListInstancesRequest{InstanceState: state}).Do()
-	return
+	return v, mc.Observe(err)
 }
 
 // AddInstancesToInstanceGroup adds the given instances to the given
 // instance group.
 func (gce *GCECloud) AddInstancesToInstanceGroup(name string, zone string, instanceNames []string) error {
 	mc := newInstanceGroupMetricContext("add_instances", zone)
-
 	if len(instanceNames) == 0 {
 		return nil
 	}
@@ -121,10 +116,10 @@ func (gce *GCECloud) AddInstancesToInstanceGroup(name string, zone string, insta
 // the instance group.
 func (gce *GCECloud) RemoveInstancesFromInstanceGroup(name string, zone string, instanceNames []string) error {
 	mc := newInstanceGroupMetricContext("remove_instances", zone)
-
 	if len(instanceNames) == 0 {
 		return nil
 	}
+
 	instances := []*compute.InstanceReference{}
 	for _, ins := range instanceNames {
 		instanceLink := makeHostURL(gce.projectID, zone, ins)
@@ -152,7 +147,6 @@ func (gce *GCECloud) RemoveInstancesFromInstanceGroup(name string, zone string, 
 // AddPortToInstanceGroup adds a port to the given instance group.
 func (gce *GCECloud) AddPortToInstanceGroup(ig *compute.InstanceGroup, port int64) (*compute.NamedPort, error) {
 	mc := newInstanceGroupMetricContext("add_port", ig.Zone)
-
 	for _, np := range ig.NamedPorts {
 		if np.Port == port {
 			glog.V(3).Infof("Instance group %v already has named port %+v", ig.Name, np)
@@ -188,9 +182,8 @@ func (gce *GCECloud) AddPortToInstanceGroup(ig *compute.InstanceGroup, port int6
 }
 
 // GetInstanceGroup returns an instance group by name.
-func (gce *GCECloud) GetInstanceGroup(name string, zone string) (v *compute.InstanceGroup, err error) {
+func (gce *GCECloud) GetInstanceGroup(name string, zone string) (*compute.InstanceGroup, error) {
 	mc := newInstanceGroupMetricContext("get", zone)
-	defer mc.Observe(err)
-	v, err = gce.service.InstanceGroups.Get(gce.projectID, zone, name).Do()
-	return
+	v, err := gce.service.InstanceGroups.Get(gce.projectID, zone, name).Do()
+	return v, mc.Observe(err)
 }

@@ -197,7 +197,7 @@ func (gce *GCECloud) GetAllZones() (sets.String, error) {
 
 	// TODO: Parallelize, although O(zones) so not too bad (N <= 3 typically)
 	for _, zone := range gce.managedZones {
-		mc := newInstancesMetricContext("list_zone", zone)
+		mc := newInstancesMetricContext("list", zone)
 		// We only retrieve one page in each zone - we only care about existence
 		listCall := gce.service.Instances.List(gce.projectID, zone)
 
@@ -214,11 +214,12 @@ func (gce *GCECloud) GetAllZones() (sets.String, error) {
 
 		// Just a minimal set of fields - we only care about existence
 		listCall = listCall.Fields("items(name)")
-
 		res, err := listCall.Do()
 		if err != nil {
 			return nil, mc.Observe(err)
 		}
+		mc.Observe(nil)
+
 		if len(res.Items) != 0 {
 			zones.Insert(zone)
 		}
