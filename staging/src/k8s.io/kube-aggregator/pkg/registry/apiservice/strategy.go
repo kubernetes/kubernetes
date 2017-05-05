@@ -46,7 +46,7 @@ func (apiServerStrategy) NamespaceScoped() bool {
 }
 
 func (apiServerStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
-	apiservice = obj.(*apiregistration.APIService)
+	apiservice := obj.(*apiregistration.APIService)
 	apiservice.Status = apiregistration.APIServiceStatus{}
 }
 
@@ -81,14 +81,14 @@ type apiServerStatusStrategy struct {
 }
 
 func NewStatusStrategy(typer runtime.ObjectTyper) apiServerStatusStrategy {
-	return apiServerStrategy{typer, names.SimpleNameGenerator}
+	return apiServerStatusStrategy{typer, names.SimpleNameGenerator}
 }
 
-func (apiServerStrategy) NamespaceScoped() bool {
+func (apiServerStatusStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func (apiServerStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (apiServerStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newAPIService := obj.(*apiregistration.APIService)
 	oldAPIService := old.(*apiregistration.APIService)
 	newAPIService.Spec = oldAPIService.Spec
@@ -98,18 +98,18 @@ func (apiServerStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 	newAPIService.OwnerReferences = oldAPIService.OwnerReferences
 }
 
-func (apiServerStrategy) AllowCreateOnUpdate() bool {
+func (apiServerStatusStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (apiServerStrategy) AllowUnconditionalUpdate() bool {
+func (apiServerStatusStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 
-func (apiServerStrategy) Canonicalize(obj runtime.Object) {
+func (apiServerStatusStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (apiServerStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (apiServerStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateAPIServiceStatusUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
 }
 

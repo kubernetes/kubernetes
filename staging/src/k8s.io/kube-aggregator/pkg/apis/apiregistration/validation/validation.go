@@ -18,7 +18,6 @@ package validation
 
 import (
 	"fmt"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/api/validation/path"
@@ -101,7 +100,8 @@ func ValidateAPIServiceStatus(status *apiregistration.APIServiceStatus, fldPath 
 		if condition.Status != apiregistration.ConditionTrue &&
 			condition.Status != apiregistration.ConditionFalse &&
 			condition.Status != apiregistration.ConditionUnknown {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("conditions").Index(i).Child("status"), condition.Status, []string{apiregistration.ConditionTrue, apiregistration.ConditionFalse, apiregistration.ConditionUnknown}))
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("conditions").Index(i).Child("status"), condition.Status, []string{
+				string(apiregistration.ConditionTrue), string(apiregistration.ConditionFalse), string(apiregistration.ConditionUnknown)}))
 		}
 	}
 
@@ -109,7 +109,7 @@ func ValidateAPIServiceStatus(status *apiregistration.APIServiceStatus, fldPath 
 }
 
 func ValidateAPIServiceStatusUpdate(newAPIService *apiregistration.APIService, oldAPIService *apiregistration.APIService) field.ErrorList {
-	allErrs := validation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateAPIServiceStatus(&update.Status, field.NewPath("status"))...)
+	allErrs := validation.ValidateObjectMetaUpdate(&newAPIService.ObjectMeta, &oldAPIService.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateAPIServiceStatus(&newAPIService.Status, field.NewPath("status"))...)
 	return allErrs
 }
