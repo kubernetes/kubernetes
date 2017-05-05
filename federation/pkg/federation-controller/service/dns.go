@@ -159,6 +159,16 @@ func getRrset(dnsName string, rrsetsInterface dnsprovider.ResourceRecordSets) (d
 	return rrsetsInterface.Get(dnsName)
 }
 
+// Helper to deduplicate endpoints in a multizone cluster, preventing errors which occur when trying to add duplicate values to a single A record
+func dedupeEndpoints(str string, list []string) bool {
+	for _, v := range list {
+		if v == str {
+			return true
+		}
+	}
+	return false
+}
+
 /* getResolvedEndpoints performs DNS resolution on the provided slice of endpoints (which might be DNS names or IPv4 addresses)
    and returns a list of IPv4 addresses.  If any of the endpoints are neither valid IPv4 addresses nor resolvable DNS names,
    non-nil error is also returned (possibly along with a partially complete list of resolved endpoints.
@@ -174,12 +184,18 @@ func getResolvedEndpoints(endpoints []string) ([]string, error) {
 				return resolvedEndpoints, err
 			}
 			resolvedEndpoints = append(resolvedEndpoints, ipAddrs...)
-
 		} else {
 			resolvedEndpoints = append(resolvedEndpoints, endpoint)
 		}
 	}
-	return resolvedEndpoints, nil
+	deduped := []string{}
+
+	for _, value := range resolvedEndpoints {
+		if !dedupeEndpoints(value, deduped) {
+			deduped = append(deduped, value)
+		}
+	}
+	return deduped, nil
 }
 
 /* ensureDnsRrsets ensures (idempotently, and with minimum mutations) that all of the DNS resource record sets for dnsName are consistent with endpoints.
