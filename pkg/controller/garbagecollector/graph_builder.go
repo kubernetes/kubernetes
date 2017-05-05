@@ -92,7 +92,7 @@ type GraphBuilder struct {
 	absentOwnerCache *UIDCache
 }
 
-func listWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *cache.ListWatch {
+func listWatcher(client dynamic.Client, resource schema.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			// APIResource.Kind is not used by the dynamic client, so

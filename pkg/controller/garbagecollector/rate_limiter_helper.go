@@ -46,7 +46,7 @@ func NewRegisteredRateLimiter(resources map[schema.GroupVersionResource]struct{}
 	return &RegisteredRateLimiter{rateLimiters: rateLimiters}
 }
 
-func (r *RegisteredRateLimiter) registerIfNotPresent(gv schema.GroupVersion, client *dynamic.Client, prefix string) {
+func (r *RegisteredRateLimiter) registerIfNotPresent(gv schema.GroupVersion, client dynamic.Client, prefix string) {
 	once, found := r.rateLimiters[gv]
 	if !found {
 		return
