@@ -31,6 +31,7 @@ package extensions
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -948,15 +949,23 @@ type RunAsUserStrategyOptions struct {
 	Rule RunAsUserStrategy
 	// Ranges are the allowed ranges of uids that may be used.
 	// +optional
-	Ranges []IDRange
+	Ranges []UserIDRange
 }
 
-// IDRange provides a min/max of an allowed range of IDs.
-type IDRange struct {
+// UserIDRange provides a min/max of an allowed range of UserIDs.
+type UserIDRange struct {
 	// Min is the start of the range, inclusive.
-	Min int64
+	Min types.UnixUserID
 	// Max is the end of the range, inclusive.
-	Max int64
+	Max types.UnixUserID
+}
+
+// GroupIDRange provides a min/max of an allowed range of GroupIDs.
+type GroupIDRange struct {
+	// Min is the start of the range, inclusive.
+	Min types.UnixGroupID
+	// Max is the end of the range, inclusive.
+	Max types.UnixGroupID
 }
 
 // RunAsUserStrategy denotes strategy types for generating RunAsUser values for a
@@ -980,7 +989,7 @@ type FSGroupStrategyOptions struct {
 	// Ranges are the allowed ranges of fs groups.  If you would like to force a single
 	// fs group then supply a single range with the same start and end.
 	// +optional
-	Ranges []IDRange
+	Ranges []GroupIDRange
 }
 
 // FSGroupStrategyType denotes strategy types for generating FSGroup values for a
@@ -1002,7 +1011,7 @@ type SupplementalGroupsStrategyOptions struct {
 	// Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
 	// supplemental group then supply a single range with the same start and end.
 	// +optional
-	Ranges []IDRange
+	Ranges []GroupIDRange
 }
 
 // SupplementalGroupsStrategyType denotes strategy types for determining valid supplemental

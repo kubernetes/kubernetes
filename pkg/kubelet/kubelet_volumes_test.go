@@ -452,10 +452,10 @@ func (f *stubVolume) CanMount() error {
 	return nil
 }
 
-func (f *stubVolume) SetUp(fsGroup *int64) error {
+func (f *stubVolume) SetUp(fsGroup *types.UnixGroupID) error {
 	return nil
 }
 
-func (f *stubVolume) SetUpAt(dir string, fsGroup *int64) error {
+func (f *stubVolume) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	return nil
 }

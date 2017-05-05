@@ -298,12 +298,12 @@ func (b *cinderVolumeMounter) CanMount() error {
 	return nil
 }
 
-func (b *cinderVolumeMounter) SetUp(fsGroup *int64) error {
+func (b *cinderVolumeMounter) SetUp(fsGroup *types.UnixGroupID) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // SetUp bind mounts to the volume path.
-func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	glog.V(5).Infof("Cinder SetUp %s to %s", b.pdName, dir)
 
 	b.plugin.volumeLocks.LockKey(b.pdName)

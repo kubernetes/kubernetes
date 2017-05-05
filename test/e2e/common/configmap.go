@@ -22,13 +22,13 @@ import (
 	"path"
 	"time"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("ConfigMap", func() {
@@ -523,6 +523,9 @@ func newEnvFromConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 }
 
 func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
+	userID := types.UnixUserID(uid)
+	groupID := types.UnixGroupID(fsGroup)
+
 	var (
 		name            = "configmap-test-volume-" + string(uuid.NewUUID())
 		volumeName      = "configmap-volume"
@@ -573,13 +576,14 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 		},
 	}
 
-	if uid != 0 {
-		pod.Spec.SecurityContext.RunAsUser = &uid
+	if userID != 0 {
+		pod.Spec.SecurityContext.RunAsUser = &userID
 	}
 
-	if fsGroup != 0 {
-		pod.Spec.SecurityContext.FSGroup = &fsGroup
+	if groupID != 0 {
+		pod.Spec.SecurityContext.FSGroup = &groupID
 	}
+
 	if defaultMode != nil {
 		pod.Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode = defaultMode
 	} else {
@@ -596,6 +600,9 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 }
 
 func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
+	userID := types.UnixUserID(uid)
+	groupID := types.UnixGroupID(fsGroup)
+
 	var (
 		name            = "configmap-test-volume-map-" + string(uuid.NewUUID())
 		volumeName      = "configmap-volume"
@@ -653,13 +660,14 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 		},
 	}
 
-	if uid != 0 {
-		pod.Spec.SecurityContext.RunAsUser = &uid
+	if userID != 0 {
+		pod.Spec.SecurityContext.RunAsUser = &userID
 	}
 
-	if fsGroup != 0 {
-		pod.Spec.SecurityContext.FSGroup = &fsGroup
+	if groupID != 0 {
+		pod.Spec.SecurityContext.FSGroup = &groupID
 	}
+
 	if itemMode != nil {
 		pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items[0].Mode = itemMode
 	} else {

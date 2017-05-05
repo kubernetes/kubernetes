@@ -24,6 +24,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -115,7 +116,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			expected:      []int64{777},
 		},
 		{
-			gidAnnotation: strconv.FormatInt(existingGid, 10),
+			gidAnnotation: strconv.FormatInt(int64(existingGid), 10),
 			expected:      []int64{},
 		},
 		{
@@ -240,7 +241,7 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 				},
 			},
 			SecurityContext: &v1.PodSecurityContext{
-				SupplementalGroups: []int64{555},
+				SupplementalGroups: []kubetypes.UnixGroupID{555},
 			},
 		},
 	}
