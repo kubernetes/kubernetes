@@ -302,6 +302,7 @@ type Proxier struct {
 	portMapper     portOpener
 	recorder       record.EventRecorder
 	healthChecker  healthcheck.Server
+	healthzServer  healthcheck.HealthzUpdater
 }
 
 type localPort struct {
@@ -352,6 +353,7 @@ func NewProxier(ipt utiliptables.Interface,
 	hostname string,
 	nodeIP net.IP,
 	recorder record.EventRecorder,
+	healthzServer healthcheck.HealthzUpdater,
 ) (*Proxier, error) {
 	// check valid user input
 	if minSyncPeriod > syncPeriod {
@@ -415,6 +417,7 @@ func NewProxier(ipt utiliptables.Interface,
 		portMapper:       &listenPortOpener{},
 		recorder:         recorder,
 		healthChecker:    healthChecker,
+		healthzServer:    healthzServer,
 	}, nil
 }
 
@@ -514,6 +517,10 @@ func (proxier *Proxier) Sync() {
 func (proxier *Proxier) SyncLoop() {
 	t := time.NewTicker(proxier.syncPeriod)
 	defer t.Stop()
+	// Update healthz timestamp at beginning in case Sync() never succeeds.
+	if proxier.healthzServer != nil {
+		proxier.healthzServer.UpdateTimestamp()
+	}
 	for {
 		<-t.C
 		glog.V(6).Infof("Periodic sync")
@@ -1494,6 +1501,11 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 		}
 	}
 	proxier.portsMap = replacementPortsMap
+
+	// Update healthz timestamp if it is periodic sync.
+	if proxier.healthzServer != nil && reason == syncReasonForce {
+		proxier.healthzServer.UpdateTimestamp()
+	}
 
 	// Update healthchecks.  The endpoints list might include services that are
 	// not "OnlyLocal", but the services list will not, and the healthChecker

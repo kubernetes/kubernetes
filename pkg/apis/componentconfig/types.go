@@ -96,8 +96,11 @@ type KubeProxyConfiguration struct {
 	// for all interfaces)
 	BindAddress string
 	// healthzBindAddress is the IP address and port for the health check server to serve on,
-	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
+	// defaulting to 0.0.0.0:10256
 	HealthzBindAddress string
+	// metricsBindAddress is the IP address and port for the metrics server to serve on,
+	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
+	MetricsBindAddress string
 	// clusterCIDR is the CIDR range of the pods in the cluster. It is used to
 	// bridge traffic coming from outside of the cluster. If not provided,
 	// no off-cluster bridging will be performed.
