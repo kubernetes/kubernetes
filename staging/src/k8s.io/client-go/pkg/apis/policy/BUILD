@@ -24,22 +24,3 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
 )
-
-filegroup(
-    name = "package-srcs",
-    srcs = glob(["**"]),
-    tags = ["automanaged"],
-    visibility = ["//visibility:private"],
-)
-
-filegroup(
-    name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/apis/policy/install:all-srcs",
-        "//pkg/apis/policy/v1alpha1:all-srcs",
-        "//pkg/apis/policy/v1beta1:all-srcs",
-        "//pkg/apis/policy/validation:all-srcs",
-    ],
-    tags = ["automanaged"],
-)

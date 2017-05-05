@@ -12,26 +12,13 @@ go_library(
     srcs = ["install.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/storage:go_default_library",
-        "//pkg/apis/storage/v1:go_default_library",
-        "//pkg/apis/storage/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/api:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/apis/storage:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/apis/storage/v1:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/apis/storage/v1beta1:go_default_library",
     ],
-)
-
-filegroup(
-    name = "package-srcs",
-    srcs = glob(["**"]),
-    tags = ["automanaged"],
-    visibility = ["//visibility:private"],
-)
-
-filegroup(
-    name = "all-srcs",
-    srcs = [":package-srcs"],
-    tags = ["automanaged"],
 )
