@@ -338,6 +338,7 @@ staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/allow
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth
 staging/src/k8s.io/client-go/discovery
 staging/src/k8s.io/client-go/examples/in-cluster
+staging/src/k8s.io/client-go/examples/informer
 staging/src/k8s.io/client-go/examples/out-of-cluster
 staging/src/k8s.io/client-go/informers
 staging/src/k8s.io/client-go/informers/apps
