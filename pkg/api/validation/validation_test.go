@@ -6304,7 +6304,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6322,7 +6322,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6339,7 +6339,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6378,7 +6378,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6466,7 +6466,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6485,7 +6485,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6504,7 +6504,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6747,7 +6747,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
+					{Type: api.NodeExternalIP, Address: "1.2.3.4"},
 				},
 			},
 		}, api.Node{
