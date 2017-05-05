@@ -30,6 +30,7 @@ const (
 	PodWorkerLatencyKey           = "pod_worker_latency_microseconds"
 	SyncPodsLatencyKey            = "sync_pods_latency_microseconds"
 	PodStartLatencyKey            = "pod_start_latency_microseconds"
+	PodDeletionLatencyKey         = "pod_deletion_latency_microseconds"
 	PodStatusLatencyKey           = "generate_pod_status_latency_microseconds"
 	ContainerManagerOperationsKey = "container_manager_latency_microseconds"
 	CgroupManagerOperationsKey    = "cgroup_manager_latency_microseconds"
@@ -75,6 +76,13 @@ var (
 			Subsystem: KubeletSubsystem,
 			Name:      PodStartLatencyKey,
 			Help:      "Latency in microseconds for a single pod to go from pending to running. Broken down by podname.",
+		},
+	)
+	PodDeletionLatency = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      PodDeletionLatencyKey,
+			Help:      "Latency in microseconds between when a single pod's deletion timestamp is set, and the pod is removed from etcd",
 		},
 	)
 	PodStatusLatency = prometheus.NewSummary(
@@ -197,6 +205,7 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(PodWorkerLatency)
 		prometheus.MustRegister(PodStartLatency)
+		prometheus.MustRegister(PodDeletionLatency)
 		prometheus.MustRegister(PodStatusLatency)
 		prometheus.MustRegister(DockerOperationsLatency)
 		prometheus.MustRegister(ContainerManagerLatency)
