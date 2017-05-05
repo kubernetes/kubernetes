@@ -230,7 +230,6 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSche
 	out.PolicyConfigMapName = in.PolicyConfigMapName
 	out.PolicyConfigMapNamespace = in.PolicyConfigMapNamespace
 	out.UseLegacyPolicyConfig = in.UseLegacyPolicyConfig
-	out.EnableControllerTaint = in.EnableControllerTaint
 	return nil
 }
 
@@ -262,7 +261,6 @@ func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSche
 	out.PolicyConfigMapName = in.PolicyConfigMapName
 	out.PolicyConfigMapNamespace = in.PolicyConfigMapNamespace
 	out.UseLegacyPolicyConfig = in.UseLegacyPolicyConfig
-	out.EnableControllerTaint = in.EnableControllerTaint
 	return nil
 }
 
