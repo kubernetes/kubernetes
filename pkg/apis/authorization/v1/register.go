@@ -18,8 +18,6 @@ package v1
 
 import (
 	"k8s.io/api/authorization/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -43,17 +41,5 @@ func init() {
 	// We only register manually written functions here. The registration of the
 	// generated functions takes place in the generated files. The separation
 	// makes the code compile even when the generated files are missing.
-	localSchemeBuilder.Register(addKnownTypes, addDefaultingFuncs, addConversionFuncs)
-}
-
-// Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&v1.SelfSubjectAccessReview{},
-		&v1.SubjectAccessReview{},
-		&v1.LocalSubjectAccessReview{},
-	)
-
-	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
-	return nil
+	localSchemeBuilder.Register(v1.AddKnownTypes, addDefaultingFuncs, addConversionFuncs)
 }
