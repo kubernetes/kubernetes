@@ -25,8 +25,8 @@ const (
 	// Every feature gate should add method here following this template:
 	//
 	// // owner: @username
-	// // alpha: v1.4
-	// MyFeature() bool
+	// // alpha: v1.X
+	// MyFeature utilfeature.Feature = "MyFeature"
 
 	// owner: @timstclair
 	// beta: v1.4
