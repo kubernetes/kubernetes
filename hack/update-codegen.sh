@@ -66,42 +66,49 @@ ${clientgen} --clientset-name="clientset" --input="${GV_DIRS_CSV}" "$@"
 ${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/","batch/","autoscaling/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,extensions/Deployment,extensions/DaemonSet,api/ConfigMap,api/Event,batch/Job,autoscaling/HorizontalPodAutoscaler"   "$@"
 ${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","core/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="core/v1/Service,core/v1/Namespace,extensions/v1beta1/ReplicaSet,core/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,core/v1/ConfigMap,core/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
 
-LISTERGEN_APIS=(
+listergen_kubernetes_apis=(
 pkg/api
-pkg/api/v1
 $(
   cd ${KUBE_ROOT}
   find pkg/apis -name types.go | xargs -n1 dirname | sort
 )
 )
+listergen_kubernetes_apis=(${listergen_kubernetes_apis[@]/#/k8s.io/kubernetes/})
+listergen_staging_apis=(
+$(
+  cd ${KUBE_ROOT}/staging/src
+  find k8s.io/api -name types.go | xargs -n1 dirname | sort
+)
+)
 
-LISTERGEN_APIS=(${LISTERGEN_APIS[@]/#/k8s.io/kubernetes/})
-LISTERGEN_APIS=$(IFS=,; echo "${LISTERGEN_APIS[*]}")
-# TODO: remove this hack when all apis are moved to k8s.io/api
-LISTERGEN_APIS=$(echo ${LISTERGEN_APIS} | sed "s|k8s.io/kubernetes/pkg/api/v1|k8s.io/api/core/v1|g")
-
+LISTERGEN_APIS=$(IFS=,; echo "${listergen_kubernetes_apis[*]}"; echo "${listergen_staging_apis[*]}")
 ${listergen} --input-dirs "${LISTERGEN_APIS}" "$@"
 
-INFORMERGEN_APIS=(
+informergen_kubernetes_apis=(
 pkg/api
-pkg/api/v1
 $(
   cd ${KUBE_ROOT}
   # because client-gen doesn't do policy/v1alpha1, we have to skip it too
   find pkg/apis -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
 )
 )
+informergen_kubernetes_apis=(${informergen_kubernetes_apis[@]/#/k8s.io/kubernetes/})
+informergen_staging_apis=(
+$(
+  cd ${KUBE_ROOT}/staging/src
+  # because client-gen doesn't do policy/v1alpha1, we have to skip it too
+  find k8s.io/api -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
+)
+)
 
-INFORMERGEN_APIS=(${INFORMERGEN_APIS[@]/#/k8s.io/kubernetes/})
-INFORMERGEN_APIS=$(IFS=,; echo "${INFORMERGEN_APIS[*]}")
-# TODO: remove this hack when all apis are moved to k8s.io/api
-INFORMERGEN_APIS=$(echo ${INFORMERGEN_APIS} | sed "s|k8s.io/kubernetes/pkg/api/v1|k8s.io/api/core/v1|g")
+INFORMERGEN_APIS=$(IFS=,; echo "${informergen_kubernetes_apis[*]}"; echo "${informergen_staging_apis[*]}")
 ${informergen} \
   --input-dirs "${INFORMERGEN_APIS}" \
   --versioned-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/clientset \
   --internal-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset \
   --listers-package k8s.io/kubernetes/pkg/client/listers \
   "$@"
+
 
 # You may add additional calls of code generators like set-gen above.
 
