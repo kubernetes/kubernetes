@@ -5,6 +5,7 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -24,6 +25,10 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/batch/v1:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/ugorji/go/codec:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -33,9 +38,31 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/apis/batch:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/apis/batch/v1:go_default_library",
     ],
+)
+
+go_test(
+    name = "go_default_xtest",
+    srcs = ["defaults_test.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/install:go_default_library",
+        "//pkg/apis/batch/install:go_default_library",
+        "//pkg/apis/batch/v2alpha1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )
