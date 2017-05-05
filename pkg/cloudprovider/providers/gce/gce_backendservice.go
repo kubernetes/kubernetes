@@ -32,7 +32,9 @@ func newBackendServiceMetricContext(request string) *metricContext {
 
 // GetBackendService retrieves a backend by name.
 func (gce *GCECloud) GetBackendService(name string) (*compute.BackendService, error) {
-	return gce.service.BackendServices.Get(gce.projectID, name).Do()
+	mc := newBackendServiceMetricContext("get")
+	v, err := gce.service.BackendServices.Get(gce.projectID, name).Do()
+	return v, mc.Observe(err)
 }
 
 // UpdateBackendService applies the given BackendService as an update to an existing service.

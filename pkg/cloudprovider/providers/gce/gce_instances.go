@@ -36,10 +36,10 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
-func newInstancesMetricContext(request string) *metricContext {
+func newInstancesMetricContext(request, zone string) *metricContext {
 	return &metricContext{
 		start:      time.Now(),
-		attributes: []string{"instances_" + request, unusedMetricLabel, unusedMetricLabel},
+		attributes: []string{"instances_" + request, unusedMetricLabel, zone},
 	}
 }
 
@@ -164,7 +164,7 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 				})
 		}
 
-		mc := newInstancesMetricContext("add_ssh_key")
+		mc := newInstancesMetricContext("add_ssh_key", "")
 		op, err := gce.service.Projects.SetCommonInstanceMetadata(
 			gce.projectID, project.CommonInstanceMetadata).Do()
 
@@ -197,6 +197,7 @@ func (gce *GCECloud) GetAllZones() (sets.String, error) {
 
 	// TODO: Parallelize, although O(zones) so not too bad (N <= 3 typically)
 	for _, zone := range gce.managedZones {
+		mc := newInstancesMetricContext("list", zone)
 		// We only retrieve one page in each zone - we only care about existence
 		listCall := gce.service.Instances.List(gce.projectID, zone)
 
@@ -213,11 +214,12 @@ func (gce *GCECloud) GetAllZones() (sets.String, error) {
 
 		// Just a minimal set of fields - we only care about existence
 		listCall = listCall.Fields("items(name)")
-
 		res, err := listCall.Do()
 		if err != nil {
-			return nil, err
+			return nil, mc.Observe(err)
 		}
+		mc.Observe(nil)
+
 		if len(res.Items) != 0 {
 			zones.Insert(zone)
 		}
@@ -338,7 +340,9 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 	// Avoid changing behaviour when not managing multiple zones
 	for _, zone := range gce.managedZones {
 		name = canonicalizeInstanceName(name)
+		mc := newInstancesMetricContext("get", zone)
 		res, err := gce.service.Instances.Get(gce.projectID, zone, name).Do()
+		mc.Observe(err)
 		if err != nil {
 			glog.Errorf("getInstanceByName: failed to get instance %s; err: %v", name, err)
 
