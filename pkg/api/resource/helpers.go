@@ -70,6 +70,29 @@ func PodRequestsAndLimits(pod *api.Pod) (reqs map[api.ResourceName]resource.Quan
 			}
 		}
 	}
+	// defer containers define the minimum of any resource
+	for _, container := range pod.Spec.DeferContainers {
+		for name, quantity := range container.Resources.Requests {
+			value, ok := reqs[name]
+			if !ok {
+				reqs[name] = *quantity.Copy()
+				continue
+			}
+			if quantity.Cmp(value) > 0 {
+				reqs[name] = *quantity.Copy()
+			}
+		}
+		for name, quantity := range container.Resources.Limits {
+			value, ok := limits[name]
+			if !ok {
+				limits[name] = *quantity.Copy()
+				continue
+			}
+			if quantity.Cmp(value) > 0 {
+				limits[name] = *quantity.Copy()
+			}
+		}
+	}
 	return
 }
 

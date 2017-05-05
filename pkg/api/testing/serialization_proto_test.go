@@ -102,6 +102,9 @@ func TestProtobufRoundTrip(t *testing.T) {
 	// InitContainers are turned into annotations by conversion.
 	obj.Spec.InitContainers = nil
 	obj.Status.InitContainerStatuses = nil
+	// deferContainers are turned into annotations by conversion
+	obj.Spec.DeferContainers = nil
+	obj.Status.DeferContainerStatuses = nil
 	data, err := obj.Marshal()
 	if err != nil {
 		t.Fatal(err)

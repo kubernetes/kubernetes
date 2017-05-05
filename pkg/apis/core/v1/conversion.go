@@ -19,6 +19,7 @@ package v1
 import (
 	"fmt"
 	"reflect"
+	"encoding/json"
 
 	"k8s.io/api/core/v1"
 
@@ -349,17 +350,129 @@ func Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(in *
 	return nil
 }
 
+func Convert_core_PodStatusResult_To_v1_PodStatusResult(in *core.PodStatusResult, out *v1.PodStatusResult, s conversion.Scope) error {
+	if err := autoConvert_core_PodStatusResult_To_v1_PodStatusResult(in, out, s); err != nil {
+		return err
+	}
+
+	if old := out.Annotations; old != nil {
+		out.Annotations = make(map[string]string, len(old))
+		for k, v := range old {
+			out.Annotations[k] = v
+		}
+	}
+
+	//Now do the samething for deferContainers too
+	if len(out.Status.DeferContainerStatuses) > 0 {
+		if out.Annotations == nil {
+			out.Annotations = make(map[string]string)
+		}
+		value, err := json.Marshal(out.Status.DeferContainerStatuses)
+		if err != nil {
+			return err
+		}
+		out.Annotations[v1.PodDeferContainersStatusesKey] = string(value)
+	} else {
+		delete(out.Annotations, v1.PodDeferContainersStatusesKey)
+	}
+	return nil
+}
+
+func Convert_v1_PodStatusResult_To_core_PodStatusResult(in *v1.PodStatusResult, out *core.PodStatusResult, s conversion.Scope) error {
+	// TODO: sometime after we move init container to stable, remove these conversions
+	//Move the deferContainer Annotation to inernal repr. field
+	if value, ok := in.Annotations[v1.PodDeferContainersStatusesKey]; ok {
+		var values []v1.ContainerStatus
+		if err := json.Unmarshal([]byte(value), &values); err != nil {
+			return err
+		}
+		// Conversion from external to internal version exists more to
+		// satisfy the needs of the decoder than it does to be a general
+		// purpose tool. And Decode always creates an intermediate object
+		// to decode to. Thus the caller of UnsafeConvertToVersion is
+		// taking responsibility to ensure mutation of in is not exposed
+		// back to the caller.
+		in.Status.DeferContainerStatuses = values
+	}
+
+	if err := autoConvert_v1_PodStatusResult_To_core_PodStatusResult(in, out, s); err != nil {
+		return err
+	}
+	if len(out.Annotations) > 0 {
+		old := out.Annotations
+		out.Annotations = make(map[string]string, len(old))
+		for k, v := range old {
+			out.Annotations[k] = v
+		}
+		delete(out.Annotations, v1.PodDeferContainersStatusesKey)
+	}
+	return nil
+}
+
 func Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(in *core.PodTemplateSpec, out *v1.PodTemplateSpec, s conversion.Scope) error {
 	if err := autoConvert_core_PodTemplateSpec_To_v1_PodTemplateSpec(in, out, s); err != nil {
 		return err
+	}
+
+	// TODO: sometime after we move init container to stable, remove these conversions.
+	// DeferContainers related code
+	if old := out.Annotations; old != nil {
+		out.Annotations = make(map[string]string, len(old))
+		for k, v := range old {
+			out.Annotations[k] = v
+		}
+	}
+	if len(out.Spec.DeferContainers) > 0 {
+		if out.Annotations == nil {
+			out.Annotations = make(map[string]string)
+		}
+		value, err := json.Marshal(out.Spec.DeferContainers)
+		if err != nil {
+			return err
+		}
+		out.Annotations[v1.PodDeferContainersAnnotationKey] = string(value)
+	} else {
+		delete(out.Annotations, v1.PodDeferContainersAnnotationKey)
 	}
 
 	return nil
 }
 
 func Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in *v1.PodTemplateSpec, out *core.PodTemplateSpec, s conversion.Scope) error {
+
+
+	// Move the defer Container annotation to the internal repr. field
+	if value, ok := in.Annotations[v1.PodDeferContainersAnnotationKey]; ok {
+		var values []v1.Container
+		if err := json.Unmarshal([]byte(value), &values); err != nil {
+			return err
+		}
+		// Conversion from external to internal version exists more to
+		// satisfy the needs of the decoder than it does to be a general
+		// purpose tool. And Decode always creates an intermediate object
+		// to decode to. Thus the caller of UnsafeConvertToVersion is
+		// taking responsibility to ensure mutation of in is not exposed
+		// back to the caller.
+		in.Spec.DeferContainers = values
+
+		// Call defaulters explicitly until annotations are removed
+		for i := range in.Spec.DeferContainers {
+			c := &in.Spec.DeferContainers[i]
+			SetDefaults_Container(c)
+		}
+	}
+
 	if err := autoConvert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in, out, s); err != nil {
 		return err
+	}
+
+	if len(out.Annotations) > 0 {
+		old := out.Annotations
+		out.Annotations = make(map[string]string, len(old))
+		for k, v := range old {
+			out.Annotations[k] = v
+		}
+		delete(out.Annotations, v1.PodDeferContainersAnnotationKey)
 	}
 
 	return nil
@@ -422,12 +535,64 @@ func Convert_core_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) e
 		for k, v := range old {
 			out.Annotations[k] = v
 		}
-		delete(out.Annotations, "pod.beta.kubernetes.io/init-containers")
-		delete(out.Annotations, "pod.alpha.kubernetes.io/init-containers")
-		delete(out.Annotations, "pod.beta.kubernetes.io/init-container-statuses")
-		delete(out.Annotations, "pod.alpha.kubernetes.io/init-container-statuses")
+		//Annotation keys
+		delete(out.Annotations, v1.PodDeferContainersAnnotationKey)
+		delete(out.Annotations, v1.PodDeferContainersStatusesKey)
+
 	}
 
+	return nil
+}
+
+func Convert_v1_Pod_To_core_Pod(in *v1.Pod, out *core.Pod, s conversion.Scope) error {
+	// Annotation conversion for deferContainers
+	if value, ok := in.Annotations[v1.PodDeferContainersAnnotationKey]; ok {
+		var values []v1.Container
+		if err := json.Unmarshal([]byte(value), &values); err != nil {
+			return err
+		}
+		// Conversion from external to internal version exists more to
+		// satisfy the needs of the decoder than it does to be a general
+		// purpose tool. And Decode always creates an intermediate object
+		// to decode to. Thus the caller of UnsafeConvertToVersion is
+		// taking responsibility to ensure mutation of in is not exposed
+		// back to the caller.
+		in.Spec.DeferContainers = values
+		// Call defaulters explicitly until annotations are removed
+		for i := range in.Spec.DeferContainers {
+			c := &in.Spec.DeferContainers[i]
+			SetDefaults_Container(c)
+		}
+	}
+
+	//DeferContainer related conversion code
+	if value, ok := in.Annotations[v1.PodDeferContainersStatusesKey]; ok {
+		var values []v1.ContainerStatus
+		if err := json.Unmarshal([]byte(value), &values); err != nil {
+			return err
+		}
+		// Conversion from external to internal version exists more to
+		// satisfy the needs of the decoder than it does to be a general
+		// purpose tool. And Decode always creates an intermediate object
+		// to decode to. Thus the caller of UnsafeConvertToVersion is
+		// taking responsibility to ensure mutation of in is not exposed
+		// back to the caller.
+		in.Status.DeferContainerStatuses = values
+	}
+
+	if err := autoConvert_v1_Pod_To_core_Pod(in, out, s); err != nil {
+		return err
+	}
+
+	if len(out.Annotations) > 0 {
+		old := out.Annotations
+		out.Annotations = make(map[string]string, len(old))
+		for k, v := range old {
+			out.Annotations[k] = v
+		}
+		delete(out.Annotations, v1.PodDeferContainersStatusesKey)
+		delete(out.Annotations, v1.PodDeferContainersAnnotationKey)
+	}
 	return nil
 }
 

@@ -2473,6 +2473,8 @@ type PodSpec struct {
 	InitContainers []Container
 	// List of containers belonging to the pod.
 	Containers []Container
+	// List of termination containers belonging to the pod.
+	DeferContainers []Container
 	// +optional
 	RestartPolicy RestartPolicy
 	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
@@ -2717,6 +2719,9 @@ type PodStatus struct {
 	// when we have done this.
 	// +optional
 	ContainerStatuses []ContainerStatus
+	//Similar to init containers statuses for deferContainers the only difference is they will be
+	//in waiting state throughout pod's execution until the pod is getting terminated
+	DeferContainerStatuses []ContainerStatus
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

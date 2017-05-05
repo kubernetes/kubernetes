@@ -2714,6 +2714,16 @@ const (
 	TolerationOpEqual  TolerationOperator = "Equal"
 )
 
+
+const (
+	// This annotation key will contain an array of JSON encoded containers for deferContainers,
+	// The is key is only recognized by version >= 1.7.
+	PodDeferContainersAnnotationKey = "pod.alpha.kubernetes.io/defer-containers"
+	// This annotation key will contain an array of JSON encoded containers for deferContainerStatues
+	// This will be recognized by version >= 1.7
+	PodDeferContainersStatusesKey = "pod.alpha.kubernetes.io/defer-container-statuses"
+)
+
 // PodSpec is a description of a pod.
 type PodSpec struct {
 	// List of volumes that can be mounted by containers belonging to the pod.
@@ -2745,6 +2755,10 @@ type PodSpec struct {
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	Containers []Container `json:"containers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=containers"`
+	//List of termination Containers, those will be executed when during the TerminationGracePeriod of the pod
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	DeferContainers []Container `json:"deferContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,24,rep,name=deferContainers"`
 	// Restart policy for all containers within the pod.
 	// One of Always, OnFailure, Never.
 	// Default to Always.
@@ -3003,12 +3017,14 @@ type PodStatus struct {
 	// startTime set.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
 	InitContainerStatuses []ContainerStatus `json:"initContainerStatuses,omitempty" protobuf:"bytes,10,rep,name=initContainerStatuses"`
-
 	// The list has one entry per container in the manifest. Each entry is currently the output
 	// of `docker inspect`.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
 	// +optional
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" protobuf:"bytes,8,rep,name=containerStatuses"`
+	// This list has one entry per defer Contianer in the manifest.  These containers wont be run until the pod is being
+	// terminated, we need ready but in waiting stage, will be updated with start time as and when they are started.
+	DeferContainerStatuses []ContainerStatus `json:"deferContainerStatuses,omitempty" protobuf:"bytes,11,rep,name=deferContainerStatuses"`
 	// The Quality of Service (QOS) classification assigned to the pod based on resource requirements
 	// See PodQOSClass type for available QOS classes
 	// More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md
