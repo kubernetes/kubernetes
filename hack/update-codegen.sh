@@ -61,10 +61,10 @@ GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
 # update- and verify- scripts.
 ${clientgen} "$@"
 ${clientgen} -t "$@"
-${clientgen} --clientset-name="clientset" --input="${GV_DIRS_CSV}" "$@"
+${clientgen} --clientset-name="clientset" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" "$@"
 # Clientgen for federation clientset.
 ${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/","batch/","autoscaling/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,extensions/Deployment,extensions/DaemonSet,api/ConfigMap,api/Event,batch/Job,autoscaling/HorizontalPodAutoscaler"   "$@"
-${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","core/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="core/v1/Service,core/v1/Namespace,extensions/v1beta1/ReplicaSet,core/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,core/v1/ConfigMap,core/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
+${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="../../../federation/apis/federation/v1beta1","core/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="core/v1/Service,core/v1/Namespace,extensions/v1beta1/ReplicaSet,core/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,core/v1/ConfigMap,core/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
 
 listergen_kubernetes_apis=(
 pkg/api
@@ -81,7 +81,9 @@ $(
 )
 )
 
-LISTERGEN_APIS=$(IFS=,; echo "${listergen_kubernetes_apis[*]}"; echo "${listergen_staging_apis[*]}")
+LISTERGEN_APIS=$(IFS=,; echo "${listergen_kubernetes_apis[*]}")
+LISTERGEN_APIS+=","
+LISTERGEN_APIS+=$(IFS=,; echo "${listergen_staging_apis[*]}")
 ${listergen} --input-dirs "${LISTERGEN_APIS}" "$@"
 
 informergen_kubernetes_apis=(
@@ -101,7 +103,11 @@ $(
 )
 )
 
-INFORMERGEN_APIS=$(IFS=,; echo "${informergen_kubernetes_apis[*]}"; echo "${informergen_staging_apis[*]}")
+
+INFORMERGEN_APIS=$(IFS=,; echo "${informergen_kubernetes_apis[*]}")
+INFORMERGEN_APIS+=","
+INFORMERGEN_APIS+=$(IFS=,; echo "${informergen_staging_apis[*]}")
+
 ${informergen} \
   --input-dirs "${INFORMERGEN_APIS}" \
   --versioned-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/clientset \
