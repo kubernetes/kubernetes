@@ -97,7 +97,7 @@ func getThresholdEvents(eventfd int, eventCh chan<- struct{}, stopCh <-chan stru
 		if err != nil {
 			return
 		}
-		
+
 		select {
 		case eventCh <- struct{}{}:
 		case <-stopCh:
