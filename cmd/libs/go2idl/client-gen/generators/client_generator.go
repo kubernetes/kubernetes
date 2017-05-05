@@ -29,6 +29,7 @@ import (
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/fake"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/scheme"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/path"
 	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 
 	"github.com/golang/glog"
@@ -221,7 +222,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 	gvToTypes := map[clientgentypes.GroupVersion][]*types.Type{}
 	for gv, inputDir := range customArgs.GroupVersionToInputPath {
-		p := context.Universe.Package(inputDir)
+		// Package are indexed with the vendor prefix stripped
+		p := context.Universe.Package(path.Vendorless(inputDir))
 		for n, t := range p.Types {
 			// filter out types which are not included in user specified overrides.
 			typesOverride, ok := includedTypesOverrides[gv]
