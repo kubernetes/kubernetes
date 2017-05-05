@@ -24,6 +24,7 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/path"
 )
 
 // genFakeForType produces a file for each top-level type.
@@ -99,7 +100,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	}
 
 	// allow user to define a group name that's different from the one parsed from the directory.
-	p := c.Universe.Package(g.inputPackage)
+	p := c.Universe.Package(path.Vendorless(g.inputPackage))
 	if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
 		groupName = override[0]
 	}
