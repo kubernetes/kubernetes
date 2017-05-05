@@ -80,6 +80,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 		StorageConfig:           options.RecommendedOptions.Etcd.StorageConfig,
 		StoragePrefix:           options.RecommendedOptions.Etcd.StorageConfig.Prefix,
 		EnableWatchCache:        options.RecommendedOptions.Etcd.EnableWatchCache,
+		DefaultWatchCacheSize:   options.RecommendedOptions.Etcd.DefaultWatchCacheSize,
 		EnableGarbageCollection: options.RecommendedOptions.Etcd.EnableGarbageCollection,
 		DeleteCollectionWorkers: options.RecommendedOptions.Etcd.DeleteCollectionWorkers,
 	}
