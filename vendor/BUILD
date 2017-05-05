@@ -343,6 +343,7 @@ filegroup(
         "//vendor/golang.org/x/time/rate:all-srcs",
         "//vendor/google.golang.org/api/cloudmonitoring/v2beta2:all-srcs",
         "//vendor/google.golang.org/api/compute/v0.alpha:all-srcs",
+        "//vendor/google.golang.org/api/compute/v0.beta:all-srcs",
         "//vendor/google.golang.org/api/compute/v1:all-srcs",
         "//vendor/google.golang.org/api/container/v1:all-srcs",
         "//vendor/google.golang.org/api/dns/v1:all-srcs",
