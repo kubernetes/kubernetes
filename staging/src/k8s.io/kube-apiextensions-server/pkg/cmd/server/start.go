@@ -99,6 +99,7 @@ func (o CustomResourcesServerOptions) Config() (*apiserver.Config, error) {
 		StorageConfig:           o.RecommendedOptions.Etcd.StorageConfig,
 		StoragePrefix:           o.RecommendedOptions.Etcd.StorageConfig.Prefix,
 		EnableWatchCache:        o.RecommendedOptions.Etcd.EnableWatchCache,
+		DefaultWatchCacheSize:   o.RecommendedOptions.Etcd.DefaultWatchCacheSize,
 		EnableGarbageCollection: o.RecommendedOptions.Etcd.EnableGarbageCollection,
 		DeleteCollectionWorkers: o.RecommendedOptions.Etcd.DeleteCollectionWorkers,
 	}

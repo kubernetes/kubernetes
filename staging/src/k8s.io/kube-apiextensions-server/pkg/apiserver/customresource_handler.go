@@ -353,6 +353,7 @@ type CustomResourceRESTOptionsGetter struct {
 	StorageConfig           storagebackend.Config
 	StoragePrefix           string
 	EnableWatchCache        bool
+	DefaultWatchCacheSize   int
 	EnableGarbageCollection bool
 	DeleteCollectionWorkers int
 }
@@ -366,7 +367,7 @@ func (t CustomResourceRESTOptionsGetter) GetRESTOptions(resource schema.GroupRes
 		ResourcePrefix:          t.StoragePrefix + "/" + resource.Group + "/" + resource.Resource,
 	}
 	if t.EnableWatchCache {
-		ret.Decorator = genericregistry.StorageWithCacher
+		ret.Decorator = genericregistry.StorageWithCacher(t.DefaultWatchCacheSize)
 	}
 	return ret, nil
 }
