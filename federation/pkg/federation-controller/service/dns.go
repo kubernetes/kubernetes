@@ -342,12 +342,18 @@ func getResolvedEndpoints(endpoints []string) ([]string, error) {
 				return resolvedEndpoints, err
 			}
 			resolvedEndpoints = append(resolvedEndpoints, ipAddrs...)
-
 		} else {
 			resolvedEndpoints = append(resolvedEndpoints, endpoint)
 		}
 	}
-	return resolvedEndpoints, nil
+	deduped := []string{}
+
+	for _, value := range resolvedEndpoints {
+		if !dedupeEndpoints(value, deduped) {
+			deduped = append(deduped, value)
+		}
+	}
+	return deduped, nil
 }
 
 /* ensureDNSRrsets ensures (idempotently, and with minimum mutations) that all of the DNS resource record sets for dnsName are consistent with endpoints.
