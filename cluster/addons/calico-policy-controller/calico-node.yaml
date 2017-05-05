@@ -1,20 +1,20 @@
 kind: DaemonSet
 apiVersion: extensions/v1beta1
 metadata:
-  name: calico
+  name: calico-node
   namespace: kube-system
   labels:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    k8s-app: calico
+    k8s-app: calico-node
 spec:
   selector:
     matchLabels:
-      k8s-app: calico
+      k8s-app: calico-node
   template:
     metadata:
       labels:
-        k8s-app: calico
+        k8s-app: calico-node
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
         scheduler.alpha.kubernetes.io/tolerations: |
@@ -27,38 +27,50 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: calico/node:v1.1.0
+          image: calico/node:v1.1.3
           env:
-            - name: DATASTORE_TYPE
-              value: "kubernetes"
-            - name: FELIX_LOGSEVERITYSCREEN
-              value: "info"
+            - name: CALICO_DISABLE_FILE_LOGGING
+              value: "true"
             - name: CALICO_NETWORKING_BACKEND
               value: "none"
             - name: CALICO_IPV4POOL_CIDR
               value: "__CLUSTER_CIDR__"
-            - name: WAIT_FOR_DATASTORE
-              value: "true"
-            - name: CALICO_DISABLE_FILE_LOGGING
-              value: "true"
+            - name: CALICO_IPV4POOL_IPIP
+              value: "off"
+            - name: DATASTORE_TYPE
+              value: "kubernetes"
+            - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
+              value: "ACCEPT"
             - name: FELIX_IPV6SUPPORT
               value: "false"
+            - name: FELIX_LOGSEVERITYSYS
+              value: "none"
+            - name: FELIX_PROMETHEUSMETRICSENABLED
+              value: "true"
+            - name: IP
+              value: ""
             - name: NODENAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-            - name: IP
-              value: ""
+            - name: WAIT_FOR_DATASTORE
+              value: "true"
           securityContext:
             privileged: true
+          resources:
+            requests:
+              cpu: 250m
           volumeMounts:
             - mountPath: /lib/modules
               name: lib-modules
               readOnly: true
+            - mountPath: /etc/calico
+              name: etc-calico
+              readOnly: true
         # This container installs the Calico CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: calico/cni:v1.6.1
+          image: calico/cni:v1.8.0
           command: ["/install-cni.sh"]
           env:
             - name: CNI_NETWORK_CONFIG
@@ -96,6 +108,10 @@ spec:
         - name: lib-modules
           hostPath:
             path: /lib/modules
+        # Mount in the Felix config file from the host.
+        - name: etc-calico
+          hostPath:
+            path: /etc/calico
         # Used to install CNI binaries.
         - name: cni-bin-dir
           hostPath:
