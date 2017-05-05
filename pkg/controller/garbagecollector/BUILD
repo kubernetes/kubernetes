@@ -23,7 +23,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/client/retry:go_default_library",
         "//pkg/controller:go_default_library",
