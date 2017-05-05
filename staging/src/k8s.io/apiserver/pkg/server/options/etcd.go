@@ -39,7 +39,11 @@ type EtcdOptions struct {
 	DefaultStorageMediaType string
 	DeleteCollectionWorkers int
 	EnableGarbageCollection bool
+
+	// Set EnableWatchCache to false to disable all watch caches
 	EnableWatchCache        bool
+	// Set DefaultWatchCacheSize to zero to disable watch caches for those resources that have no explicit cache size set
+	DefaultWatchCacheSize   int
 }
 
 func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
@@ -49,6 +53,7 @@ func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 		DeleteCollectionWorkers: 1,
 		EnableGarbageCollection: true,
 		EnableWatchCache:        true,
+		DefaultWatchCacheSize:   100,
 	}
 }
 
@@ -129,7 +134,7 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 		ResourcePrefix:          f.Options.StorageConfig.Prefix + "/" + resource.Group + "/" + resource.Resource,
 	}
 	if f.Options.EnableWatchCache {
-		ret.Decorator = genericregistry.StorageWithCacher
+		ret.Decorator = genericregistry.StorageWithCacher(f.Options.DefaultWatchCacheSize)
 	}
 	return ret, nil
 }
@@ -153,8 +158,9 @@ func (f *storageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		ResourcePrefix:          f.StorageFactory.ResourcePrefix(resource),
 	}
 	if f.Options.EnableWatchCache {
-		ret.Decorator = genericregistry.StorageWithCacher
+		ret.Decorator = genericregistry.StorageWithCacher(f.Options.DefaultWatchCacheSize)
 	}
 
 	return ret, nil
 }
+

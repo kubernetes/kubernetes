@@ -25,41 +25,49 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 )
 
-var _ generic.StorageDecorator = StorageWithCacher
-
 // Creates a cacher based given storageConfig.
-func StorageWithCacher(
-	copier runtime.ObjectCopier,
-	storageConfig *storagebackend.Config,
-	capacity int,
-	objectType runtime.Object,
-	resourcePrefix string,
-	keyFunc func(obj runtime.Object) (string, error),
-	newListFunc func() runtime.Object,
-	getAttrsFunc storage.AttrFunc,
-	triggerFunc storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
+func StorageWithCacher(defaultCapacity int) generic.StorageDecorator {
+	return func(
+		copier runtime.ObjectCopier,
+		storageConfig *storagebackend.Config,
+		requestedSize *int,
+		objectType runtime.Object,
+		resourcePrefix string,
+		keyFunc func(obj runtime.Object) (string, error),
+		newListFunc func() runtime.Object,
+		getAttrsFunc storage.AttrFunc,
+		triggerFunc storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
 
-	s, d := generic.NewRawStorage(storageConfig)
-	// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
-	// Currently it has two layers of same storage interface -- cacher and low level kv.
-	cacherConfig := storage.CacherConfig{
-		CacheCapacity:        capacity,
-		Storage:              s,
-		Versioner:            etcdstorage.APIObjectVersioner{},
-		Copier:               copier,
-		Type:                 objectType,
-		ResourcePrefix:       resourcePrefix,
-		KeyFunc:              keyFunc,
-		NewListFunc:          newListFunc,
-		GetAttrsFunc:         getAttrsFunc,
-		TriggerPublisherFunc: triggerFunc,
-		Codec:                storageConfig.Codec,
-	}
-	cacher := storage.NewCacherFromConfig(cacherConfig)
-	destroyFunc := func() {
-		cacher.Stop()
-		d()
-	}
+		capacity := defaultCapacity
+		if requestedSize != nil && *requestedSize == 0 {
+			panic("StorageWithCacher must not be called with zero cache size")
+		}
+		if requestedSize != nil {
+			capacity = *requestedSize
+		}
 
-	return cacher, destroyFunc
+		s, d := generic.NewRawStorage(storageConfig)
+		// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
+		// Currently it has two layers of same storage interface -- cacher and low level kv.
+		cacherConfig := storage.CacherConfig{
+			CacheCapacity:        capacity,
+			Storage:              s,
+			Versioner:            etcdstorage.APIObjectVersioner{},
+			Copier:               copier,
+			Type:                 objectType,
+			ResourcePrefix:       resourcePrefix,
+			KeyFunc:              keyFunc,
+			NewListFunc:          newListFunc,
+			GetAttrsFunc:         getAttrsFunc,
+			TriggerPublisherFunc: triggerFunc,
+			Codec:                storageConfig.Codec,
+		}
+		cacher := storage.NewCacherFromConfig(cacherConfig)
+		destroyFunc := func() {
+			cacher.Stop()
+			d()
+		}
+
+		return cacher, destroyFunc
+	}
 }
