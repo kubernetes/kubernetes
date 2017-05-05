@@ -183,7 +183,7 @@ func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, se
 
 	if info.onlyNodeLocalEndpoints {
 		p := apiservice.GetServiceHealthCheckNodePort(service)
-		if p == 0 {
+		if p == 0 && service.Spec.Type == api.ServiceTypeLoadBalancer {
 			glog.Errorf("Service does not contain necessary annotation %v",
 				apiservice.BetaAnnotationHealthCheckNodePort)
 		} else {
