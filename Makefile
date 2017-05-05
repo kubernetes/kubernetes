@@ -276,19 +276,16 @@ define CLEAN_HELP_INFO
 # Example:
 #   make clean
 #
-# TODO(thockin): call clean_generated when we stop committing generated code.
 endef
 .PHONY: clean
 ifeq ($(PRINT_HELP),y)
 clean:
 	@echo "$$CLEAN_HELP_INFO"
 else
-clean: clean_meta
+clean: clean_meta clean_generated
 	build/make-clean.sh
 	rm -rf $(OUT_DIR)
 	rm -rf Godeps/_workspace # Just until we are sure it is gone
-	# TODO(thockin): Remove this when we call clean_generated.
-	rm -f pkg/generated/openapi/zz_generated.openapi.go
 endif
 
 define CLEAN_META_HELP_INFO
