@@ -286,6 +286,18 @@ func TestValidate(t *testing.T) {
 			},
 			expectErr: false,
 		},
+		"test-valid-case-with-additional-resource": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"impersonate"},
+				Resources: []ResourceOptions{
+					{
+						Resource: "users",
+					},
+				},
+			},
+			expectErr: false,
+		},
 	}
 
 	for name, test := range tests {

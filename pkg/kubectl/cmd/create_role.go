@@ -53,6 +53,9 @@ var (
 
 	// Valid resource verb list for validation.
 	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "redirect", "deletecollection", "use", "bind", "impersonate"}
+
+	// Additional resource and apiGroup
+	additionalResources = map[string]string{"users":"", "groups":"", "userextras":"authentication.k8s.io"}
 )
 
 type ResourceOptions struct {
@@ -202,6 +205,9 @@ func (c *CreateRoleOptions) Validate() error {
 		if len(r.Resource) == 0 {
 			return fmt.Errorf("resource must be specified if apiGroup/subresource specified")
 		}
+		if _, ok := additionalResources[r.Resource]; ok {
+			continue
+		}
 		if _, err := c.Mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group}); err != nil {
 			return err
 		}
@@ -254,10 +260,16 @@ func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resourc
 	// 1. Constructs groupResourceMapping based on input resources.
 	// 2. Prevents pointing to non-existent resources.
 	// 3. Transfers resource short name to long name. E.g. rs.extensions is transferred to replicasets.extensions
+	var err error
 	for _, r := range resources {
-		resource, err := mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group})
-		if err != nil {
-			return []rbac.PolicyRule{}, err
+		resource := schema.GroupVersionResource{}
+		if group, ok := additionalResources[r.Resource]; ok {
+			resource = schema.GroupVersionResource{Resource: r.Resource, Group: group}
+		} else {
+			resource, err = mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group})
+			if err != nil {
+				return []rbac.PolicyRule{}, err
+			}
 		}
 		if len(r.SubResource) > 0 {
 			resource.Resource = resource.Resource + "/" + r.SubResource
