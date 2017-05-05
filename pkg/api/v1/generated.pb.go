@@ -1285,6 +1285,12 @@ func (m *AzureDiskVolumeSource) MarshalTo(dAtA []byte) (int, error) {
 		}
 		i++
 	}
+	if m.Kind != nil {
+		data[i] = 0x32
+		i++
+		i = encodeVarintGenerated(data, i, uint64(len(*m.Kind)))
+		i += copy(data[i:], *m.Kind)
+	}
 	return i, nil
 }
 
@@ -9220,6 +9226,10 @@ func (m *AzureDiskVolumeSource) Size() (n int) {
 	if m.ReadOnly != nil {
 		n += 2
 	}
+	if m.Kind != nil {
+		l = len(*m.Kind)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -12167,6 +12177,7 @@ func (this *AzureDiskVolumeSource) String() string {
 		`CachingMode:` + valueToStringGenerated(this.CachingMode) + `,`,
 		`FSType:` + valueToStringGenerated(this.FSType) + `,`,
 		`ReadOnly:` + valueToStringGenerated(this.ReadOnly) + `,`,
+		`Kind:` + valueToStringGenerated(this.Kind) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -15153,6 +15164,36 @@ func (m *AzureDiskVolumeSource) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.ReadOnly = &b
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Kind", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := AzureDataDiskKind(data[iNdEx:postIndex])
+			m.Kind = &s
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

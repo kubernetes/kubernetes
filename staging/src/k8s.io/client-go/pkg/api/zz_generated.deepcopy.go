@@ -295,6 +295,11 @@ func DeepCopy_api_AzureDiskVolumeSource(in interface{}, out interface{}, c *conv
 			*out = new(bool)
 			**out = **in
 		}
+		if in.Kind != nil {
+			in, out := &in.Kind, &out.Kind
+			*out = new(AzureDataDiskKind)
+			**out = **in
+		}
 		return nil
 	}
 }

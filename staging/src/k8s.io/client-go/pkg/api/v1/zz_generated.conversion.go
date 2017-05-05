@@ -474,6 +474,7 @@ func autoConvert_v1_AzureDiskVolumeSource_To_api_AzureDiskVolumeSource(in *Azure
 	out.CachingMode = (*api.AzureDataDiskCachingMode)(unsafe.Pointer(in.CachingMode))
 	out.FSType = (*string)(unsafe.Pointer(in.FSType))
 	out.ReadOnly = (*bool)(unsafe.Pointer(in.ReadOnly))
+	out.Kind = (*api.AzureDataDiskKind)(unsafe.Pointer(in.Kind))
 	return nil
 }
 
@@ -488,6 +489,7 @@ func autoConvert_api_AzureDiskVolumeSource_To_v1_AzureDiskVolumeSource(in *api.A
 	out.CachingMode = (*AzureDataDiskCachingMode)(unsafe.Pointer(in.CachingMode))
 	out.FSType = (*string)(unsafe.Pointer(in.FSType))
 	out.ReadOnly = (*bool)(unsafe.Pointer(in.ReadOnly))
+	out.Kind = (*AzureDataDiskKind)(unsafe.Pointer(in.Kind))
 	return nil
 }
 

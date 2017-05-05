@@ -12,7 +12,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "azure.go",
-        "azure_blob.go",
         "azure_file.go",
         "azure_instances.go",
         "azure_loadbalancer.go",
@@ -22,7 +21,6 @@ go_library(
         "azure_util.go",
         "azure_wrap.go",
         "azure_zones.go",
-        "vhd.go",
     ],
     tags = ["automanaged"],
     deps = [
