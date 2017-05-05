@@ -42,6 +42,7 @@ func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, err
 	pageToken := ""
 	page := 0
 	for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
+		mc := newRoutesMetricContext("list_page")
 		listCall := gce.service.Routes.List(gce.projectID)
 
 		prefix := truncateClusterName(clusterName)
@@ -50,6 +51,7 @@ func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, err
 			listCall = listCall.PageToken(pageToken)
 		}
 		res, err := listCall.Do()
+		mc.Observe(err)
 		if err != nil {
 			glog.Errorf("Error getting routes from GCE: %v", err)
 			return nil, err
@@ -110,7 +112,7 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 }
 
 func (gce *GCECloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
-	mc := newRoutesMetricContext("create")
+	mc := newRoutesMetricContext("delete")
 	deleteOp, err := gce.service.Routes.Delete(gce.projectID, route.Name).Do()
 	if err != nil {
 		return mc.Observe(err)

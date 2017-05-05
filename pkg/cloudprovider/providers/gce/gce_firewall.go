@@ -34,7 +34,14 @@ func newFirewallMetricContext(request string, region string) *metricContext {
 
 // GetFirewall returns the Firewall by name.
 func (gce *GCECloud) GetFirewall(name string) (*compute.Firewall, error) {
-	return gce.service.Firewalls.Get(gce.projectID, name).Do()
+	region, err := GetGCERegion(gce.localZone)
+	if err != nil {
+		return nil, err
+	}
+
+	mc := newFirewallMetricContext("get", region)
+	v, err := gce.service.Firewalls.Get(gce.projectID, name).Do()
+	return v, mc.Observe(err)
 }
 
 // CreateFirewall creates the given firewall rule.
@@ -45,7 +52,6 @@ func (gce *GCECloud) CreateFirewall(name, desc string, sourceRanges netsets.IPNe
 	}
 
 	mc := newFirewallMetricContext("create", region)
-
 	// TODO: This completely breaks modularity in the cloudprovider but
 	// the methods shared with the TCPLoadBalancer take v1.ServicePorts.
 	svcPorts := []v1.ServicePort{}
@@ -90,7 +96,6 @@ func (gce *GCECloud) UpdateFirewall(name, desc string, sourceRanges netsets.IPNe
 	}
 
 	mc := newFirewallMetricContext("update", region)
-
 	// TODO: This completely breaks modularity in the cloudprovider but
 	// the methods shared with the TCPLoadBalancer take v1.ServicePorts.
 	svcPorts := []v1.ServicePort{}

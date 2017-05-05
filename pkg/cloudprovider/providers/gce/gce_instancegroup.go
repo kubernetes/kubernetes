@@ -70,18 +70,24 @@ func (gce *GCECloud) DeleteInstanceGroup(name string, zone string) error {
 
 // ListInstanceGroups lists all InstanceGroups in the project and
 // zone.
-func (gce *GCECloud) ListInstanceGroups(zone string) (*compute.InstanceGroupList, error) {
+func (gce *GCECloud) ListInstanceGroups(zone string) (v *compute.InstanceGroupList, err error) {
+	mc := newInstanceGroupMetricContext("list", zone)
+	defer mc.Observe(err)
 	// TODO: use PageToken to list all not just the first 500
-	return gce.service.InstanceGroups.List(gce.projectID, zone).Do()
+	v, err = gce.service.InstanceGroups.List(gce.projectID, zone).Do()
+	return
 }
 
 // ListInstancesInInstanceGroup lists all the instances in a given
 // instance group and state.
-func (gce *GCECloud) ListInstancesInInstanceGroup(name string, zone string, state string) (*compute.InstanceGroupsListInstances, error) {
+func (gce *GCECloud) ListInstancesInInstanceGroup(name string, zone string, state string) (v *compute.InstanceGroupsListInstances, err error) {
+	mc := newInstanceGroupMetricContext("list_instances", zone)
+	defer mc.Observe(err)
 	// TODO: use PageToken to list all not just the first 500
-	return gce.service.InstanceGroups.ListInstances(
+	v, err = gce.service.InstanceGroups.ListInstances(
 		gce.projectID, zone, name,
 		&compute.InstanceGroupsListInstancesRequest{InstanceState: state}).Do()
+	return
 }
 
 // AddInstancesToInstanceGroup adds the given instances to the given
@@ -182,6 +188,9 @@ func (gce *GCECloud) AddPortToInstanceGroup(ig *compute.InstanceGroup, port int6
 }
 
 // GetInstanceGroup returns an instance group by name.
-func (gce *GCECloud) GetInstanceGroup(name string, zone string) (*compute.InstanceGroup, error) {
-	return gce.service.InstanceGroups.Get(gce.projectID, zone, name).Do()
+func (gce *GCECloud) GetInstanceGroup(name string, zone string) (v *compute.InstanceGroup, err error) {
+	mc := newInstanceGroupMetricContext("get", zone)
+	defer mc.Observe(err)
+	v, err = gce.service.InstanceGroups.Get(gce.projectID, zone, name).Do()
+	return
 }
