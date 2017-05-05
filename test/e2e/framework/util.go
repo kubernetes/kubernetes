@@ -101,6 +101,8 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
+const sshPort = "22"
+
 const (
 	// How long to wait for the pod to be listable
 	PodListTimeout = time.Minute
@@ -3781,7 +3783,7 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 
 	sshHosts := make([]string, 0, len(hosts))
 	for _, h := range hosts {
-		sshHosts = append(sshHosts, net.JoinHostPort(h, "22"))
+		sshHosts = append(sshHosts, net.JoinHostPort(h, sshPort))
 	}
 	return sshHosts, nil
 }
@@ -3793,6 +3795,13 @@ type SSHResult struct {
 	Stdout string
 	Stderr string
 	Code   int
+}
+
+// NodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
+// eg: the name returned by framework.GetMasterHost(). This is also not guaranteed to work across
+// cloud providers since it involves ssh.
+func NodeExec(nodeName, cmd string) (SSHResult, error) {
+	return SSH(cmd, fmt.Sprintf("%v:%v", nodeName, sshPort), TestContext.Provider)
 }
 
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
@@ -3835,7 +3844,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult,
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP {
-			host = a.Address + ":22"
+			host = fmt.Sprintf("%v:%v", a.Address, sshPort)
 			break
 		}
 	}
@@ -4413,7 +4422,7 @@ func sshRestartMaster() error {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
 	Logf("Restarting master via ssh, running: %v", command)
-	result, err := SSH(command, GetMasterHost()+":22", TestContext.Provider)
+	result, err := SSH(command, fmt.Sprintf("%v:%v", GetMasterHost(), sshPort), TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		LogSSHResult(result)
 		return fmt.Errorf("couldn't restart apiserver: %v", err)
@@ -5382,7 +5391,7 @@ func GetNodeExternalIP(node *v1.Node) string {
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP {
-			host = a.Address + ":22"
+			host = fmt.Sprintf("%v:%v", a.Address, sshPort)
 			break
 		}
 	}
