@@ -47,6 +47,7 @@ go_test(
         "set_selector_test.go",
         "set_subject_test.go",
         "set_test.go",
+        "set_resources_test.go",
     ],
     data = [
         "//examples:config",
