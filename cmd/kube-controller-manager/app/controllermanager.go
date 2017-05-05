@@ -21,6 +21,7 @@ limitations under the License.
 package app
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -192,17 +193,34 @@ func Run(s *options.CMServer) error {
 		return err
 	}
 
-	// TODO: enable other lock types
-	rl := resourcelock.EndpointsLock{
-		EndpointsMeta: metav1.ObjectMeta{
-			Namespace: "kube-system",
-			Name:      "kube-controller-manager",
-		},
-		Client: leaderElectionClient,
-		LockConfig: resourcelock.ResourceLockConfig{
-			Identity:      id,
-			EventRecorder: recorder,
-		},
+	var rl resourcelock.Interface
+	switch s.LockType {
+	case "endpoints":
+		rl = resourcelock.EndpointsLock{
+			EndpointsMeta: metav1.ObjectMeta{
+				Namespace: "kube-system",
+				Name:      "kube-controller-manager",
+			},
+			Client: leaderElectionClient,
+			LockConfig: resourcelock.ResourceLockConfig{
+				Identity:      id,
+				EventRecorder: recorder,
+			},
+		}
+	case "configmap":
+		rl = resourcelock.ConfigMapLock{
+			ConfigMapMeta: metav1.ObjectMeta{
+				Namespace: "kube-system",
+				Name:      "kube-controller-manager",
+			},
+			Client: leaderElectionClient,
+			LockConfig: resourcelock.ResourceLockConfig{
+				Identity:      id,
+				EventRecorder: recorder,
+			},
+		}
+	default:
+		return errors.New("Invalid lock-type provided: %s. Supported types are `endpoints` and `configmap`")
 	}
 
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{

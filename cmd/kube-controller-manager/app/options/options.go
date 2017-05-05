@@ -108,6 +108,7 @@ func NewCMServer() *CMServer {
 			ReconcilerSyncLoopPeriod:              metav1.Duration{Duration: 60 * time.Second},
 			EnableTaintManager:                    true,
 			HorizontalPodAutoscalerUseRESTClients: false,
+			LockType: "endpoints",
 		},
 	}
 	s.LeaderElection.LeaderElect = true
@@ -214,6 +215,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.DurationVar(&s.ReconcilerSyncLoopPeriod.Duration, "attach-detach-reconcile-sync-period", s.ReconcilerSyncLoopPeriod.Duration, "The reconciler sync wait time between volume attach detach. This duration must be larger than one second, and increasing this value from the default may allow for volumes to be mismatched with pods.")
 	fs.BoolVar(&s.EnableTaintManager, "enable-taint-manager", s.EnableTaintManager, "WARNING: Beta feature. If set to true enables NoExecute Taints and will evict all not-tolerating Pod running on Nodes tainted with this kind of Taints.")
 	fs.BoolVar(&s.HorizontalPodAutoscalerUseRESTClients, "horizontal-pod-autoscaler-use-rest-clients", s.HorizontalPodAutoscalerUseRESTClients, "WARNING: alpha feature.  If set to true, causes the horizontal pod autoscaler controller to use REST clients through the kube-aggregator, instead of using the legacy metrics client through the API server proxy.  This is required for custom metrics support in the horizonal pod autoscaler.")
+	fs.StringVar(&s.LockType, "lock-type", s.LockType, "Indicates the type of locking to use for leadership election. Supported options are `endpoints` (default) and `configmap`.")
 
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 

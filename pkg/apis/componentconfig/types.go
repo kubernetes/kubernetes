@@ -896,6 +896,8 @@ type KubeControllerManagerConfiguration struct {
 	// through the kube-aggregator when enabled, instead of using the legacy metrics client
 	// through the API server proxy.
 	HorizontalPodAutoscalerUseRESTClients bool
+	// Indicates what type of lock will be used for leadership election.
+	LockType string
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume
