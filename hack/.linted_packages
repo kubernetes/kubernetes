@@ -199,6 +199,7 @@ pkg/kubelet/volumemanager/cache
 pkg/kubelet/volumemanager/populator
 pkg/kubelet/volumemanager/reconciler
 pkg/labels
+pkg/master/ports
 pkg/printers
 pkg/proxy/config
 pkg/proxy/healthcheck
