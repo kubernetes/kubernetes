@@ -187,7 +187,7 @@ func (ds *dockerService) ListLegacyPodSandbox(filter *runtimeapi.PodSandboxFilte
 	}
 
 	// Convert docker containers to runtime api sandboxes.
-	result := []*runtimeapi.PodSandbox{}
+	result := make([]*runtimeapi.PodSandbox, 0, len(containers))
 	for i := range containers {
 		c := containers[i]
 		// Skip new containers with containerTypeLabelKey label.
@@ -242,7 +242,7 @@ func (ds *dockerService) ListLegacyContainers(filter *runtimeapi.ContainerFilter
 	}
 
 	// Convert docker to runtime api containers.
-	result := []*runtimeapi.Container{}
+	result := make([]*runtimeapi.Container, 0, len(containers))
 	for i := range containers {
 		c := containers[i]
 		// Skip new containers with containerTypeLabelKey label.

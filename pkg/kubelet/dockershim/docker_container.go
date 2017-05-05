@@ -350,7 +350,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 	imageID := toPullableImageID(r.Image, ir)
 
 	// Convert the mounts.
-	mounts := []*runtimeapi.Mount{}
+	mounts := make([]*runtimeapi.Mount, 0, len(r.Mounts))
 	for i := range r.Mounts {
 		m := r.Mounts[i]
 		readonly := !m.RW

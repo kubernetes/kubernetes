@@ -40,7 +40,7 @@ func (ds *dockerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimea
 		return nil, err
 	}
 
-	result := []*runtimeapi.Image{}
+	result := make([]*runtimeapi.Image, 0, len(images))
 	for _, i := range images {
 		apiImage, err := imageToRuntimeAPIImage(&i)
 		if err != nil {

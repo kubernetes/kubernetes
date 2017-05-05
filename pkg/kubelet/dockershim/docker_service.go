@@ -335,7 +335,7 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 		}
 	}
 
-	portMappings := []*hostport.PortMapping{}
+	portMappings := make([]*hostport.PortMapping, 0, len(checkpoint.Data.PortMappings))
 	for _, pm := range checkpoint.Data.PortMappings {
 		proto := toAPIProtocol(*pm.Protocol)
 		portMappings = append(portMappings, &hostport.PortMapping{

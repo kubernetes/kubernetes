@@ -127,7 +127,8 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 // '<HostPath>:<ContainerPath>:ro', if the path is read only, or
 // '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
 // relabeling and the pod provides an SELinux label
-func generateMountBindings(mounts []*runtimeapi.Mount) (result []string) {
+func generateMountBindings(mounts []*runtimeapi.Mount) []string {
+	result := make([]string, 0, len(mounts))
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
 		readOnly := m.Readonly
@@ -147,7 +148,7 @@ func generateMountBindings(mounts []*runtimeapi.Mount) (result []string) {
 		}
 		result = append(result, bind)
 	}
-	return
+	return result
 }
 
 func makePortsAndBindings(pm []*runtimeapi.PortMapping) (map[dockernat.Port]struct{}, map[dockernat.Port][]dockernat.PortBinding) {
