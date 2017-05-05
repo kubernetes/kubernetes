@@ -181,11 +181,10 @@ func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, se
 	copy(info.loadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges)
 	copy(info.externalIPs, service.Spec.ExternalIPs)
 
-	if info.onlyNodeLocalEndpoints {
+	if apiservice.NeedsHealthCheck(service) {
 		p := apiservice.GetServiceHealthCheckNodePort(service)
 		if p == 0 {
-			glog.Errorf("Service does not contain necessary annotation %v",
-				apiservice.BetaAnnotationHealthCheckNodePort)
+			glog.Errorf("Service %q has no healthcheck nodeport", serviceName)
 		} else {
 			info.healthCheckNodePort = int(p)
 		}
@@ -644,14 +643,8 @@ func updateServiceMap(
 	// computing this incrementally similarly to serviceMap.
 	hcServices = make(map[types.NamespacedName]uint16)
 	for svcPort, info := range serviceMap {
-		if info.onlyNodeLocalEndpoints {
+		if info.healthCheckNodePort != 0 {
 			hcServices[svcPort.NamespacedName] = uint16(info.healthCheckNodePort)
-		}
-	}
-	for nsn, port := range hcServices {
-		if port == 0 {
-			glog.Errorf("Service %q has no healthcheck nodeport", nsn)
-			delete(hcServices, nsn)
 		}
 	}
 
