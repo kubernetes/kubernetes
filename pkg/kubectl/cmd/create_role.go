@@ -53,6 +53,40 @@ var (
 
 	// Valid resource verb list for validation.
 	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "redirect", "deletecollection", "use", "bind", "impersonate"}
+
+	// Specialized verbs and GroupResources
+	specialResources = map[string][]schema.GroupResource{
+		"use": []schema.GroupResource{
+			{
+				Group:    "extensions",
+				Resource: "podsecuritypolicies",
+			},
+		},
+		"bind": []schema.GroupResource{
+			{
+				Group:    "rbac.authorization.k8s.io",
+				Resource: "roles",
+			},
+			{
+				Group:    "rbac.authorization.k8s.io",
+				Resource: "clusterroles",
+			},
+		},
+		"impersonate": []schema.GroupResource{
+			{
+				Group:    "",
+				Resource: "users",
+			},
+			{
+				Group:    "",
+				Resource: "groups",
+			},
+			{
+				Group:    "authentication.k8s.io",
+				Resource: "userextras",
+			},
+		},
+	}
 )
 
 type ResourceOptions struct {
@@ -202,7 +236,34 @@ func (c *CreateRoleOptions) Validate() error {
 		if len(r.Resource) == 0 {
 			return fmt.Errorf("resource must be specified if apiGroup/subresource specified")
 		}
-		if _, err := c.Mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group}); err != nil {
+
+		resource := schema.GroupVersionResource{Resource: r.Resource, Group: r.Group}
+		groupVersionResource, err := c.Mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group})
+		if err == nil {
+			resource = groupVersionResource
+		}
+
+		for _, v := range c.Verbs {
+			if groupResources, ok := specialResources[v]; ok {
+				match := false
+				for _, extra := range groupResources {
+					if resource.Resource == extra.Resource && (resource.Group == extra.Group || resource.Group == "") {
+						match = true
+						err = nil
+						break
+					}
+				}
+				if !match {
+					if r.Group == "" {
+						return fmt.Errorf("can not perform '%s' on '%s'", v, r.Resource)
+					} else {
+						return fmt.Errorf("can not perform '%s' on '%s' in group '%s'", v, r.Resource, r.Group)
+					}
+				}
+			}
+		}
+
+		if err != nil {
 			return err
 		}
 	}
@@ -255,10 +316,23 @@ func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resourc
 	// 2. Prevents pointing to non-existent resources.
 	// 3. Transfers resource short name to long name. E.g. rs.extensions is transferred to replicasets.extensions
 	for _, r := range resources {
-		resource, err := mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group})
-		if err != nil {
-			return []rbac.PolicyRule{}, err
+		resource := schema.GroupVersionResource{Resource: r.Resource, Group: r.Group}
+		groupVersionResource, err := mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group})
+		if err == nil {
+			resource = groupVersionResource
+		} else {
+			for _, v := range verbs {
+				if groupResources, ok := specialResources[v]; ok {
+					for _, extra := range groupResources {
+						if resource.Resource == extra.Resource {
+							resource.Group = extra.Group
+							break
+						}
+					}
+				}
+			}
 		}
+
 		if len(r.SubResource) > 0 {
 			resource.Resource = resource.Resource + "/" + r.SubResource
 		}
