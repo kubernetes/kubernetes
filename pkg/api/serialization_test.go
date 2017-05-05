@@ -30,6 +30,7 @@ import (
 	"github.com/ugorji/go/codec"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
@@ -46,7 +47,7 @@ import (
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	k8s_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate
@@ -77,7 +78,7 @@ func dataAsString(data []byte) string {
 
 func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.ReplicaSet, out *api.ReplicationController, s conversion.Scope) error {
 	intermediate1 := &extensions.ReplicaSet{}
-	if err := v1beta1.Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in, intermediate1, s); err != nil {
+	if err := k8s_v1beta1.Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in, intermediate1, s); err != nil {
 		return err
 	}
 
