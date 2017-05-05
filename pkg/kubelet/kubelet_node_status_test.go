@@ -218,7 +218,6 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Addresses: []v1.NodeAddress{
-				{Type: v1.NodeLegacyHostIP, Address: "127.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
@@ -455,7 +454,6 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Addresses: []v1.NodeAddress{
-				{Type: v1.NodeLegacyHostIP, Address: "127.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
@@ -739,7 +737,6 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Addresses: []v1.NodeAddress{
-				{Type: v1.NodeLegacyHostIP, Address: "127.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},

@@ -381,7 +381,6 @@ func (i *Instances) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, er
 	// net.ParseIP().String() is to maintain compatibility with the old code
 	parsedIP := net.ParseIP(ip).String()
 	return []v1.NodeAddress{
-		{Type: v1.NodeLegacyHostIP, Address: parsedIP},
 		{Type: v1.NodeInternalIP, Address: parsedIP},
 		{Type: v1.NodeExternalIP, Address: parsedIP},
 	}, nil
