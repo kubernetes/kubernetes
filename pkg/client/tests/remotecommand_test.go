@@ -124,7 +124,7 @@ func fakeServer(t *testing.T, testName string, exec bool, stdinData, stdoutData,
 		opts, err := remotecommand.NewOptions(req)
 		require.NoError(t, err)
 		if exec {
-			cmd := req.URL.Query()[api.ExecCommandParamm]
+			cmd := req.URL.Query()[api.ExecCommandParam]
 			remotecommand.ServeExec(w, req, executor, "pod", "uid", "container", cmd, opts, 0, 10*time.Second, serverProtocols)
 		} else {
 			remotecommand.ServeAttach(w, req, executor, "pod", "uid", "container", opts, 0, 10*time.Second, serverProtocols)

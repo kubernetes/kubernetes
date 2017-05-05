@@ -592,7 +592,7 @@ func getExecRequestParams(req *restful.Request) execRequestParams {
 		podName:       req.PathParameter("podID"),
 		podUID:        types.UID(req.PathParameter("uid")),
 		containerName: req.PathParameter("containerName"),
-		cmd:           req.Request.URL.Query()[api.ExecCommandParamm],
+		cmd:           req.Request.URL.Query()[api.ExecCommandParam],
 	}
 }
 
