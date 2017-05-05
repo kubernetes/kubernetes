@@ -32,7 +32,9 @@ func newUrlMapMetricContext(request string) *metricContext {
 
 // GetUrlMap returns the UrlMap by name.
 func (gce *GCECloud) GetUrlMap(name string) (*compute.UrlMap, error) {
-	return gce.service.UrlMaps.Get(gce.projectID, name).Do()
+	mc := newUrlMapMetricContext("get")
+	v, err := gce.service.UrlMaps.Get(gce.projectID, name).Do()
+	return v, mc.Observe(err)
 }
 
 // CreateUrlMap creates an url map, using the given backend service as the default service.
@@ -80,6 +82,8 @@ func (gce *GCECloud) DeleteUrlMap(name string) error {
 
 // ListUrlMaps lists all UrlMaps in the project.
 func (gce *GCECloud) ListUrlMaps() (*compute.UrlMapList, error) {
+	mc := newUrlMapMetricContext("list")
 	// TODO: use PageToken to list all not just the first 500
-	return gce.service.UrlMaps.List(gce.projectID).Do()
+	v, err := gce.service.UrlMaps.List(gce.projectID).Do()
+	return v, mc.Observe(err)
 }

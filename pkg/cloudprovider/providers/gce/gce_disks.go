@@ -319,6 +319,7 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 // Returns a GCEDisk for the disk, if it is found in the specified zone.
 // If not found, returns (nil, nil)
 func (gce *GCECloud) findDiskByName(diskName string, zone string) (*GCEDisk, error) {
+	mc := newDiskMetricContext("get", zone)
 	disk, err := gce.service.Disks.Get(gce.projectID, zone, diskName).Do()
 	if err == nil {
 		d := &GCEDisk{
@@ -327,12 +328,12 @@ func (gce *GCECloud) findDiskByName(diskName string, zone string) (*GCEDisk, err
 			Kind: disk.Kind,
 			Type: disk.Type,
 		}
-		return d, nil
+		return d, mc.Observe(nil)
 	}
 	if !isHTTPErrorCode(err, http.StatusNotFound) {
-		return nil, err
+		return nil, mc.Observe(err)
 	}
-	return nil, nil
+	return nil, mc.Observe(nil)
 }
 
 // Like findDiskByName, but returns an error if the disk is not found
