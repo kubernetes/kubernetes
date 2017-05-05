@@ -51,7 +51,6 @@ const metaDataPath = "/media/configdrive/openstack/latest/meta_data.json"
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
 var ErrNoAddressFound = errors.New("No address found for host")
-var ErrAttrNotFound = errors.New("Expected attribute not found")
 
 // encoding.TextUnmarshaler interface for time.Duration
 type MyDuration struct {
@@ -381,7 +380,7 @@ func (i *Instances) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, er
 	// net.ParseIP().String() is to maintain compatibility with the old code
 	parsedIP := net.ParseIP(ip).String()
 	return []v1.NodeAddress{
-		{Type: v1.NodeLegacyHostIP, Address: parsedIP},
+		{Type: v1.NodeHostName, Address: parsedIP},
 		{Type: v1.NodeInternalIP, Address: parsedIP},
 		{Type: v1.NodeExternalIP, Address: parsedIP},
 	}, nil
@@ -398,11 +397,6 @@ func (i *Instances) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddre
 // This is a simple string cast.
 func mapNodeNameToServerName(nodeName types.NodeName) string {
 	return string(nodeName)
-}
-
-// mapServerToNodeName maps a rackspace Server to an k8s NodeName
-func mapServerToNodeName(s *osservers.Server) types.NodeName {
-	return types.NodeName(s.Name)
 }
 
 // ExternalID returns the cloud provider ID of the node with the specified Name (deprecated).
