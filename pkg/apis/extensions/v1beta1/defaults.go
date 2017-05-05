@@ -17,17 +17,18 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/api/core/v1"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_DaemonSet(obj *DaemonSet) {
+func SetDefaults_DaemonSet(obj *v1beta1.DaemonSet) {
 	labels := obj.Spec.Template.Labels
 
 	// TODO: support templates defined elsewhere when we support them in the API
@@ -43,11 +44,11 @@ func SetDefaults_DaemonSet(obj *DaemonSet) {
 	}
 	updateStrategy := &obj.Spec.UpdateStrategy
 	if updateStrategy.Type == "" {
-		updateStrategy.Type = OnDeleteDaemonSetStrategyType
+		updateStrategy.Type = v1beta1.OnDeleteDaemonSetStrategyType
 	}
-	if updateStrategy.Type == RollingUpdateDaemonSetStrategyType {
+	if updateStrategy.Type == v1beta1.RollingUpdateDaemonSetStrategyType {
 		if updateStrategy.RollingUpdate == nil {
-			rollingUpdate := RollingUpdateDaemonSet{}
+			rollingUpdate := v1beta1.RollingUpdateDaemonSet{}
 			updateStrategy.RollingUpdate = &rollingUpdate
 		}
 		if updateStrategy.RollingUpdate.MaxUnavailable == nil {
@@ -58,7 +59,7 @@ func SetDefaults_DaemonSet(obj *DaemonSet) {
 	}
 }
 
-func SetDefaults_Deployment(obj *Deployment) {
+func SetDefaults_Deployment(obj *v1beta1.Deployment) {
 	// Default labels and selector to labels from pod template spec.
 	labels := obj.Spec.Template.Labels
 
@@ -70,19 +71,19 @@ func SetDefaults_Deployment(obj *Deployment) {
 			obj.Labels = labels
 		}
 	}
-	// Set DeploymentSpec.Replicas to 1 if it is not set.
+	// Set v1beta1.DeploymentSpec.Replicas to 1 if it is not set.
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
 		*obj.Spec.Replicas = 1
 	}
 	strategy := &obj.Spec.Strategy
-	// Set default DeploymentStrategyType as RollingUpdate.
+	// Set default v1beta1.DeploymentStrategyType as RollingUpdate.
 	if strategy.Type == "" {
-		strategy.Type = RollingUpdateDeploymentStrategyType
+		strategy.Type = v1beta1.RollingUpdateDeploymentStrategyType
 	}
-	if strategy.Type == RollingUpdateDeploymentStrategyType || strategy.RollingUpdate != nil {
+	if strategy.Type == v1beta1.RollingUpdateDeploymentStrategyType || strategy.RollingUpdate != nil {
 		if strategy.RollingUpdate == nil {
-			rollingUpdate := RollingUpdateDeployment{}
+			rollingUpdate := v1beta1.RollingUpdateDeployment{}
 			strategy.RollingUpdate = &rollingUpdate
 		}
 		if strategy.RollingUpdate.MaxUnavailable == nil {
@@ -98,7 +99,7 @@ func SetDefaults_Deployment(obj *Deployment) {
 	}
 }
 
-func SetDefaults_ReplicaSet(obj *ReplicaSet) {
+func SetDefaults_ReplicaSet(obj *v1beta1.ReplicaSet) {
 	labels := obj.Spec.Template.Labels
 
 	// TODO: support templates defined elsewhere when we support them in the API
@@ -118,7 +119,7 @@ func SetDefaults_ReplicaSet(obj *ReplicaSet) {
 	}
 }
 
-func SetDefaults_NetworkPolicy(obj *NetworkPolicy) {
+func SetDefaults_NetworkPolicy(obj *v1beta1.NetworkPolicy) {
 	// Default any undefined Protocol fields to TCP.
 	for _, i := range obj.Spec.Ingress {
 		for _, p := range i.Ports {

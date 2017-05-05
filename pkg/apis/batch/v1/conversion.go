@@ -19,6 +19,8 @@ package v1
 import (
 	"fmt"
 
+	"k8s.io/api/batch/v1"
+
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -41,13 +43,13 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 			case "metadata.name", "metadata.namespace", "status.successful":
 				return label, value, nil
 			default:
-				return "", "", fmt.Errorf("field label %q not supported for Job", label)
+				return "", "", fmt.Errorf("field label %q not supported for v1.Job", label)
 			}
 		},
 	)
 }
 
-func Convert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
+func Convert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *v1.JobSpec, s conversion.Scope) error {
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
@@ -65,7 +67,7 @@ func Convert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s conv
 	return nil
 }
 
-func Convert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
+func Convert_v1_JobSpec_To_batch_JobSpec(in *v1.JobSpec, out *batch.JobSpec, s conversion.Scope) error {
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds

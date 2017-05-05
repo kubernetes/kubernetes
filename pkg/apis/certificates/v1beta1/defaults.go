@@ -16,13 +16,16 @@ limitations under the License.
 
 package v1beta1
 
-import "k8s.io/apimachinery/pkg/runtime"
+import (
+	"k8s.io/api/certificates/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
+)
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
-func SetDefaults_CertificateSigningRequestSpec(obj *CertificateSigningRequestSpec) {
+func SetDefaults_CertificateSigningRequestSpec(obj *v1beta1.CertificateSigningRequestSpec) {
 	if obj.Usages == nil {
-		obj.Usages = []KeyUsage{UsageDigitalSignature, UsageKeyEncipherment}
+		obj.Usages = []v1beta1.KeyUsage{v1beta1.UsageDigitalSignature, v1beta1.UsageKeyEncipherment}
 	}
 }

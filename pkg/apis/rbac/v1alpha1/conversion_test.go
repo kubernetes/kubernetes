@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/rbac/v1alpha1"
+
 	"k8s.io/kubernetes/pkg/api"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
@@ -37,8 +39,8 @@ func TestConversion(t *testing.T) {
 				Subjects: []v1alpha1.Subject{{Kind: "User", APIVersion: v1alpha1.SchemeGroupVersion.String(), Name: "bob"}},
 			},
 			expected: &rbacapi.RoleBinding{
-				RoleRef:  rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
-				Subjects: []rbacapi.Subject{{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "bob"}},
+				v1alpha1.RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				Subjects:         []rbacapi.Subject{{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "bob"}},
 			},
 		},
 		"wildcard user matches authenticated": {
@@ -47,8 +49,8 @@ func TestConversion(t *testing.T) {
 				Subjects: []v1alpha1.Subject{{Kind: "User", APIVersion: v1alpha1.SchemeGroupVersion.String(), Name: "*"}},
 			},
 			expected: &rbacapi.RoleBinding{
-				RoleRef:  rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
-				Subjects: []rbacapi.Subject{{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "system:authenticated"}},
+				v1alpha1.RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				Subjects:         []rbacapi.Subject{{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "system:authenticated"}},
 			},
 		},
 		"missing api group gets defaulted": {
@@ -61,7 +63,7 @@ func TestConversion(t *testing.T) {
 				},
 			},
 			expected: &rbacapi.RoleBinding{
-				RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				v1alpha1.RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
 				Subjects: []rbacapi.Subject{
 					{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "myuser"},
 					{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "mygroup"},
@@ -82,7 +84,7 @@ func TestConversion(t *testing.T) {
 				},
 			},
 			expected: &rbacapi.RoleBinding{
-				RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				v1alpha1.RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
 				Subjects: []rbacapi.Subject{
 					{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "myuser"},
 					{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "mygroup"},

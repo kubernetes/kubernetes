@@ -17,6 +17,7 @@ limitations under the License.
 package v2alpha1
 
 import (
+	"k8s.io/api/batch/v2alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,12 +49,12 @@ func init() {
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&JobTemplate{},
-		&CronJob{},
-		&CronJobList{},
+		&v2alpha1.JobTemplate{},
+		&v2alpha1.CronJob{},
+		&v2alpha1.CronJobList{},
 	)
-	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("ScheduledJob"), &CronJob{})
-	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("ScheduledJobList"), &CronJobList{})
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("ScheduledJob"), &v2alpha1.CronJob{})
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("ScheduledJobList"), &v2alpha1.CronJobList{})
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

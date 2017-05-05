@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/batch/v2alpha1"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
@@ -29,29 +31,29 @@ import (
 
 func TestSetDefaultCronJob(t *testing.T) {
 	tests := map[string]struct {
-		original *CronJob
-		expected *CronJob
+		original *v2alpha1.CronJob
+		expected *v2alpha1.CronJob
 	}{
-		"empty CronJob should default ConcurrencyPolicy and Suspend": {
-			original: &CronJob{},
-			expected: &CronJob{
-				Spec: CronJobSpec{
-					ConcurrencyPolicy: AllowConcurrent,
-					Suspend:           newBool(false),
+		"empty v2alpha1.CronJob should default v2alpha1.ConcurrencyPolicy and Suspend": {
+			original: &v2alpha1.CronJob{},
+			expected: &v2alpha1.CronJob{
+				Spec: v2alpha1.CronJobSpec{
+					v2alpha1.ConcurrencyPolicy: v2alpha1.AllowConcurrent,
+					Suspend:                    newBool(false),
 				},
 			},
 		},
 		"set fields should not be defaulted": {
-			original: &CronJob{
-				Spec: CronJobSpec{
-					ConcurrencyPolicy: ForbidConcurrent,
-					Suspend:           newBool(true),
+			original: &v2alpha1.CronJob{
+				Spec: v2alpha1.CronJobSpec{
+					v2alpha1.ConcurrencyPolicy: ForbidConcurrent,
+					Suspend:                    newBool(true),
 				},
 			},
-			expected: &CronJob{
-				Spec: CronJobSpec{
-					ConcurrencyPolicy: ForbidConcurrent,
-					Suspend:           newBool(true),
+			expected: &v2alpha1.CronJob{
+				Spec: v2alpha1.CronJobSpec{
+					v2alpha1.ConcurrencyPolicy: ForbidConcurrent,
+					Suspend:                    newBool(true),
 				},
 			},
 		},
@@ -61,7 +63,7 @@ func TestSetDefaultCronJob(t *testing.T) {
 		original := test.original
 		expected := test.expected
 		obj2 := roundTrip(t, runtime.Object(original))
-		actual, ok := obj2.(*CronJob)
+		actual, ok := obj2.(*v2alpha1.CronJob)
 		if !ok {
 			t.Errorf("%s: unexpected object: %v", name, actual)
 			t.FailNow()

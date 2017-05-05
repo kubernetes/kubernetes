@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,25 +49,25 @@ func init() {
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Deployment{},
-		&DeploymentList{},
-		&DeploymentRollback{},
-		&ReplicationControllerDummy{},
-		&Scale{},
-		&ThirdPartyResource{},
-		&ThirdPartyResourceList{},
-		&DaemonSetList{},
-		&DaemonSet{},
-		&ThirdPartyResourceData{},
-		&ThirdPartyResourceDataList{},
-		&Ingress{},
-		&IngressList{},
-		&ReplicaSet{},
-		&ReplicaSetList{},
-		&PodSecurityPolicy{},
-		&PodSecurityPolicyList{},
-		&NetworkPolicy{},
-		&NetworkPolicyList{},
+		&v1beta1.Deployment{},
+		&v1beta1.DeploymentList{},
+		&v1beta1.DeploymentRollback{},
+		&v1beta1.ReplicationControllerDummy{},
+		&v1beta1.Scale{},
+		&v1beta1.ThirdPartyResource{},
+		&v1beta1.ThirdPartyResourceList{},
+		&v1beta1.DaemonSetList{},
+		&v1beta1.DaemonSet{},
+		&v1beta1.ThirdPartyResourceData{},
+		&v1beta1.ThirdPartyResourceDataList{},
+		&v1beta1.Ingress{},
+		&v1beta1.IngressList{},
+		&v1beta1.ReplicaSet{},
+		&v1beta1.ReplicaSetList{},
+		&v1beta1.PodSecurityPolicy{},
+		&v1beta1.PodSecurityPolicyList{},
+		&v1beta1.NetworkPolicy{},
+		&v1beta1.NetworkPolicyList{},
 	)
 	// Add the watch version that applies
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

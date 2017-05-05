@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/api/authorization/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,9 +49,9 @@ func init() {
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&SelfSubjectAccessReview{},
-		&SubjectAccessReview{},
-		&LocalSubjectAccessReview{},
+		&v1beta1.SelfSubjectAccessReview{},
+		&v1beta1.SubjectAccessReview{},
+		&v1beta1.LocalSubjectAccessReview{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
