@@ -38,8 +38,8 @@ func TestConversion(t *testing.T) {
 				Subjects: []v1alpha1.Subject{{Kind: "User", APIVersion: v1alpha1.SchemeGroupVersion.String(), Name: "bob"}},
 			},
 			expected: &rbacapi.RoleBinding{
-				v1alpha1.RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
-				Subjects:         []rbacapi.Subject{{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "bob"}},
+				RoleRef:  rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				Subjects: []rbacapi.Subject{{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "bob"}},
 			},
 		},
 		"wildcard user matches authenticated": {
@@ -48,8 +48,8 @@ func TestConversion(t *testing.T) {
 				Subjects: []v1alpha1.Subject{{Kind: "User", APIVersion: v1alpha1.SchemeGroupVersion.String(), Name: "*"}},
 			},
 			expected: &rbacapi.RoleBinding{
-				v1alpha1.RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
-				Subjects:         []rbacapi.Subject{{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "system:authenticated"}},
+				RoleRef:  rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				Subjects: []rbacapi.Subject{{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "system:authenticated"}},
 			},
 		},
 		"missing api group gets defaulted": {
@@ -62,7 +62,7 @@ func TestConversion(t *testing.T) {
 				},
 			},
 			expected: &rbacapi.RoleBinding{
-				v1alpha1.RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
 				Subjects: []rbacapi.Subject{
 					{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "myuser"},
 					{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "mygroup"},
@@ -83,7 +83,7 @@ func TestConversion(t *testing.T) {
 				},
 			},
 			expected: &rbacapi.RoleBinding{
-				v1alpha1.RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
 				Subjects: []rbacapi.Subject{
 					{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "myuser"},
 					{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "mygroup"},

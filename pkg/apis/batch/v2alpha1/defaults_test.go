@@ -46,13 +46,13 @@ func TestSetDefaultCronJob(t *testing.T) {
 		"set fields should not be defaulted": {
 			original: &v2alpha1.CronJob{
 				Spec: v2alpha1.CronJobSpec{
-					ConcurrencyPolicy: ForbidConcurrent,
+					ConcurrencyPolicy: v2alpha1.ForbidConcurrent,
 					Suspend:           newBool(true),
 				},
 			},
 			expected: &v2alpha1.CronJob{
 				Spec: v2alpha1.CronJobSpec{
-					ConcurrencyPolicy: ForbidConcurrent,
+					ConcurrencyPolicy: v2alpha1.ForbidConcurrent,
 					Suspend:           newBool(true),
 				},
 			},
