@@ -86,8 +86,7 @@ def write_owners(fname, owners):
     with open(fname, 'w') as f:
         out = csv.writer(f, lineterminator='\n')
         out.writerow(['name', 'owner', 'auto-assigned', 'sig'])
-        sort_key = lambda (k, v): (k != 'DEFAULT', k)  # put 'DEFAULT' first.
-        items = sorted(owners.items(), key=sort_key)
+        items = sorted(owners.items())
         for name, (owner, random_assignment, sig) in items:
             out.writerow([name, owner, int(random_assignment), sig])
 
@@ -137,7 +136,6 @@ def main():
         test_names = get_test_names_from_test_history()
     else:
         test_names = get_test_names_from_local_files()
-    test_names.add('DEFAULT')
     test_names = sorted(test_names)
     owners = load_owners(OWNERS_PATH)
 
