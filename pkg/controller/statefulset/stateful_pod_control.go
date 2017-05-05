@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/api/core/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"

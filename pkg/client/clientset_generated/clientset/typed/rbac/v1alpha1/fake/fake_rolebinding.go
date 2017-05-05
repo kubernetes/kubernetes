@@ -23,7 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 )
 
 // FakeRoleBindings implements RoleBindingInterface

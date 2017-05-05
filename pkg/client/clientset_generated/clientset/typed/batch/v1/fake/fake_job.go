@@ -23,7 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	v1 "k8s.io/api/batch/v1"
 )
 
 // FakeJobs implements JobInterface

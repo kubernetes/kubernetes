@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/cert/triple"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"

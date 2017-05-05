@@ -30,7 +30,7 @@ import (
 	fedclientfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	apiv1 "k8s.io/api/core/v1"
-	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensionsv1 "k8s.io/api/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubeclientfake "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 

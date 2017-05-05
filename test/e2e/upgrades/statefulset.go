@@ -21,7 +21,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/api/core/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/util/version"
 
 	"k8s.io/kubernetes/test/e2e/framework"

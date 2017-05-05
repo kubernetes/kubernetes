@@ -21,8 +21,9 @@ import (
 	"reflect"
 	"strings"
 
+	certificates "k8s.io/api/certificates/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	k8s_certificates_v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 )
 
 // groupApprover implements AutoApprover for signing Kubelet certificates.
@@ -58,7 +59,7 @@ func (cc *groupApprover) AutoApprove(csr *certificates.CertificateSigningRequest
 		return csr, nil
 	}
 
-	x509cr, err := certificates.ParseCSR(csr)
+	x509cr, err := k8s_certificates_v1beta1.ParseCSR(csr)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to parse csr %q: %v", csr.Name, err))
 		return csr, nil

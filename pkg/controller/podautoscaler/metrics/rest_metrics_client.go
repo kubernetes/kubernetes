@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/api/core/v1"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
+	autoscaling "k8s.io/api/autoscaling/v2alpha1"
 	customapi "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
 	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"

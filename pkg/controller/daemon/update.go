@@ -26,7 +26,7 @@ import (
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 )
 

@@ -53,7 +53,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"

@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/api/core/v1"
-	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/generated/openapi"

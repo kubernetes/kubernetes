@@ -30,7 +30,7 @@ import (
 	"k8s.io/api/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/api/v1/ref"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
+	storage "k8s.io/api/storage/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/v1"

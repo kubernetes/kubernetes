@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fed_v1b1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/api/core/v1"
-	autoscaling_v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	batch_v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	ext_v1b1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	autoscaling_v1 "k8s.io/api/autoscaling/v1"
+	batch_v1 "k8s.io/api/batch/v1"
+	ext_v1b1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/kubernetes/test/integration/federation/framework"
 )
 

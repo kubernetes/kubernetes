@@ -34,7 +34,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )

@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 )
 
 // IngressLister helps list Ingresses.

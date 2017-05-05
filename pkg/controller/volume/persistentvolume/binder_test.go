@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
+	storage "k8s.io/api/storage/v1"
 )
 
 // Test single call to syncClaim and syncVolume methods.

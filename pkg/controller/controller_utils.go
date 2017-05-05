@@ -45,7 +45,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/ref"
 	"k8s.io/kubernetes/pkg/api/validation"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	clientretry "k8s.io/kubernetes/pkg/client/retry"
 

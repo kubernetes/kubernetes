@@ -23,7 +23,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/settings"
-	settingsapiv1alpha1 "k8s.io/kubernetes/pkg/apis/settings/v1alpha1"
+	settingsapiv1alpha1 "k8s.io/api/settings/v1alpha1"
 	podpresetstore "k8s.io/kubernetes/pkg/registry/settings/podpreset/storage"
 )
 

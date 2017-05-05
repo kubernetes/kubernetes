@@ -23,7 +23,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	appsapiv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	appsapiv1beta1 "k8s.io/api/apps/v1beta1"
 	statefulsetstore "k8s.io/kubernetes/pkg/registry/apps/petset/storage"
 	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
 )

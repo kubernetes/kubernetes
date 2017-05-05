@@ -23,9 +23,9 @@ import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 )
 
 var scheme = runtime.NewScheme()

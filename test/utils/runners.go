@@ -38,9 +38,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/api/core/v1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
-	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batch "k8s.io/api/batch/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 

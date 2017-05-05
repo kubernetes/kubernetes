@@ -22,7 +22,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	scheme "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/scheme"
-	v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	v1 "k8s.io/api/autoscaling/v1"
 )
 
 // HorizontalPodAutoscalersGetter has a method to return a HorizontalPodAutoscalerInterface.

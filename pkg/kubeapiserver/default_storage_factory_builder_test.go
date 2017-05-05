@@ -26,7 +26,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/api/install"
 	apiv1 "k8s.io/api/core/v1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 )
 
 func TestParseRuntimeConfig(t *testing.T) {

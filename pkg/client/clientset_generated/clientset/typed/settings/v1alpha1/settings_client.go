@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	v1alpha1 "k8s.io/kubernetes/pkg/apis/settings/v1alpha1"
+	v1alpha1 "k8s.io/api/settings/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 

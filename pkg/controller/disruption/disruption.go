@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	policyclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
 	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"

@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/api/core/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"

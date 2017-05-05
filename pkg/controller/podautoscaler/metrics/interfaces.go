@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/api/core/v1"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
+	autoscaling "k8s.io/api/autoscaling/v2alpha1"
 )
 
 // PodMetricsInfo contains pod metric values as a map from pod names to

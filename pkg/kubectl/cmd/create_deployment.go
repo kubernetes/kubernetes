@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"

@@ -27,7 +27,7 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1beta1"
 	certificatesclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 )
 

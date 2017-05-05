@@ -20,7 +20,7 @@ import (
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	extensions_v1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensions_v1 "k8s.io/api/extensions/v1beta1"
 	deputils "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 

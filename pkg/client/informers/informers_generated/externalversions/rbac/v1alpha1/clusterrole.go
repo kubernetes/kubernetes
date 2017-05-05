@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	rbac_v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	rbac_v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/internalinterfaces"
 	v1alpha1 "k8s.io/kubernetes/pkg/client/listers/rbac/v1alpha1"

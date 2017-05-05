@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/api/core/v1"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
+	autoscaling "k8s.io/api/autoscaling/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 )

@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/api/core/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
+	storage "k8s.io/api/storage/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	storageinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/storage/v1"

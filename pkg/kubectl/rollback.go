@@ -32,7 +32,7 @@ import (
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	externalextensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	externalextensions "k8s.io/api/extensions/v1beta1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"

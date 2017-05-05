@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	jobstorage "k8s.io/kubernetes/pkg/registry/batch/job/storage"
 )
 

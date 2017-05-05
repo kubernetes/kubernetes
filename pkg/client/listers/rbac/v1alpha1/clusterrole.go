@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 )
 
 // ClusterRoleLister helps list ClusterRoles.

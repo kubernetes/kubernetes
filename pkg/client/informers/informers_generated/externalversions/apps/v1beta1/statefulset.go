@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	apps_v1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	apps_v1beta1 "k8s.io/api/apps/v1beta1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/internalinterfaces"
 	v1beta1 "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"

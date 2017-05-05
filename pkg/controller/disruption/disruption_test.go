@@ -30,9 +30,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/api/core/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
+	apps "k8s.io/api/apps/v1beta1"
+	extensions "k8s.io/api/extensions/v1beta1"
+	policy "k8s.io/api/policy/v1beta1"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 )

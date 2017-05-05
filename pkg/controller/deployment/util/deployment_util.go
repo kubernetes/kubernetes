@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/api/core/v1"
 	internalextensions "k8s.io/kubernetes/pkg/apis/extensions"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
