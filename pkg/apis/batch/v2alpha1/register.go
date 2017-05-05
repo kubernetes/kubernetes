@@ -34,10 +34,7 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
-	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
-	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
-	SchemeBuilder      runtime.SchemeBuilder
-	localSchemeBuilder = &SchemeBuilder
+	localSchemeBuilder = &v2alpha1.SchemeBuilder
 	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
