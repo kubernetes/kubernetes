@@ -252,7 +252,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: v1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
 					Strategy: v1beta1.DeploymentStrategy{
-						Type: RecreateDeploymentStrategyType,
+						Type: v1beta1.RecreateDeploymentStrategyType,
 					},
 				},
 			},
@@ -260,7 +260,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: v1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
 					Strategy: v1beta1.DeploymentStrategy{
-						Type: RecreateDeploymentStrategyType,
+						Type: v1beta1.RecreateDeploymentStrategyType,
 					},
 					Template: defaultTemplate,
 				},
@@ -271,7 +271,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: v1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
 					Strategy: v1beta1.DeploymentStrategy{
-						Type: RecreateDeploymentStrategyType,
+						Type: v1beta1.RecreateDeploymentStrategyType,
 					},
 					ProgressDeadlineSeconds: newInt32(30),
 				},
@@ -280,7 +280,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: v1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
 					Strategy: v1beta1.DeploymentStrategy{
-						Type: RecreateDeploymentStrategyType,
+						Type: v1beta1.RecreateDeploymentStrategyType,
 					},
 					Template:                defaultTemplate,
 					ProgressDeadlineSeconds: newInt32(30),

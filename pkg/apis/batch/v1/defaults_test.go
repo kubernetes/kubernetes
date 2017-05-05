@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/batch/v1"
+	batch_v1 "k8s.io/api/batch/v1"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,20 +34,20 @@ import (
 func TestSetDefaultJob(t *testing.T) {
 	defaultLabels := map[string]string{"default": "default"}
 	tests := map[string]struct {
-		original     *v1.Job
-		expected     *v1.Job
+		original     *batch_v1.Job
+		expected     *batch_v1.Job
 		expectLabels bool
 	}{
 		"both unspecified -> sets both to 1": {
-			original: &v1.Job{
-				Spec: v1.JobSpec{
+			original: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
 				},
 			},
-			expected: &v1.Job{
-				Spec: v1.JobSpec{
+			expected: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Completions: newInt32(1),
 					Parallelism: newInt32(1),
 				},
@@ -55,66 +55,66 @@ func TestSetDefaultJob(t *testing.T) {
 			expectLabels: true,
 		},
 		"both unspecified -> sets both to 1 and no default labels": {
-			original: &v1.Job{
+			original: &batch_v1.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"mylabel": "myvalue"},
 				},
-				Spec: v1.JobSpec{
+				Spec: batch_v1.JobSpec{
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
 				},
 			},
-			expected: &v1.Job{
-				Spec: v1.JobSpec{
+			expected: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Completions: newInt32(1),
 					Parallelism: newInt32(1),
 				},
 			},
 		},
 		"WQ: Parallelism explicitly 0 and completions unset -> no change": {
-			original: &v1.Job{
-				Spec: v1.JobSpec{
+			original: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Parallelism: newInt32(0),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
 				},
 			},
-			expected: &v1.Job{
-				Spec: v1.JobSpec{
+			expected: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Parallelism: newInt32(0),
 				},
 			},
 			expectLabels: true,
 		},
 		"WQ: Parallelism explicitly 2 and completions unset -> no change": {
-			original: &v1.Job{
-				Spec: v1.JobSpec{
+			original: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Parallelism: newInt32(2),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
 				},
 			},
-			expected: &v1.Job{
-				Spec: v1.JobSpec{
+			expected: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Parallelism: newInt32(2),
 				},
 			},
 			expectLabels: true,
 		},
 		"Completions explicitly 2 and parallelism unset -> parallelism is defaulted": {
-			original: &v1.Job{
-				Spec: v1.JobSpec{
+			original: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Completions: newInt32(2),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
 				},
 			},
-			expected: &v1.Job{
-				Spec: v1.JobSpec{
+			expected: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Completions: newInt32(2),
 					Parallelism: newInt32(1),
 				},
@@ -122,8 +122,8 @@ func TestSetDefaultJob(t *testing.T) {
 			expectLabels: true,
 		},
 		"Both set -> no change": {
-			original: &v1.Job{
-				Spec: v1.JobSpec{
+			original: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Completions: newInt32(10),
 					Parallelism: newInt32(11),
 					Template: v1.PodTemplateSpec{
@@ -131,8 +131,8 @@ func TestSetDefaultJob(t *testing.T) {
 					},
 				},
 			},
-			expected: &v1.Job{
-				Spec: v1.JobSpec{
+			expected: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Completions: newInt32(10),
 					Parallelism: newInt32(11),
 					Template: v1.PodTemplateSpec{
@@ -143,8 +143,8 @@ func TestSetDefaultJob(t *testing.T) {
 			expectLabels: true,
 		},
 		"Both set, flipped -> no change": {
-			original: &v1.Job{
-				Spec: v1.JobSpec{
+			original: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Completions: newInt32(11),
 					Parallelism: newInt32(10),
 					Template: v1.PodTemplateSpec{
@@ -152,8 +152,8 @@ func TestSetDefaultJob(t *testing.T) {
 					},
 				},
 			},
-			expected: &v1.Job{
-				Spec: v1.JobSpec{
+			expected: &batch_v1.Job{
+				Spec: batch_v1.JobSpec{
 					Completions: newInt32(11),
 					Parallelism: newInt32(10),
 				},
@@ -166,7 +166,7 @@ func TestSetDefaultJob(t *testing.T) {
 		original := test.original
 		expected := test.expected
 		obj2 := roundTrip(t, runtime.Object(original))
-		actual, ok := obj2.(*v1.Job)
+		actual, ok := obj2.(*batch_v1.Job)
 		if !ok {
 			t.Errorf("%s: unexpected object: %v", name, actual)
 			t.FailNow()

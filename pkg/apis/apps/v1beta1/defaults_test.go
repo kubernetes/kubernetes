@@ -125,7 +125,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: v1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
 					Strategy: v1beta1.DeploymentStrategy{
-						Type: RecreateDeploymentStrategyType,
+						Type: v1beta1.RecreateDeploymentStrategyType,
 					},
 					RevisionHistoryLimit: newInt32(0),
 				},
@@ -134,7 +134,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: v1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
 					Strategy: v1beta1.DeploymentStrategy{
-						Type: RecreateDeploymentStrategyType,
+						Type: v1beta1.RecreateDeploymentStrategyType,
 					},
 					RevisionHistoryLimit:    newInt32(0),
 					ProgressDeadlineSeconds: newInt32(600),
@@ -147,7 +147,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: v1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
 					Strategy: v1beta1.DeploymentStrategy{
-						Type: RecreateDeploymentStrategyType,
+						Type: v1beta1.RecreateDeploymentStrategyType,
 					},
 					ProgressDeadlineSeconds: newInt32(30),
 					RevisionHistoryLimit:    newInt32(2),
@@ -157,7 +157,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: v1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
 					Strategy: v1beta1.DeploymentStrategy{
-						Type: RecreateDeploymentStrategyType,
+						Type: v1beta1.RecreateDeploymentStrategyType,
 					},
 					ProgressDeadlineSeconds: newInt32(30),
 					RevisionHistoryLimit:    newInt32(2),
