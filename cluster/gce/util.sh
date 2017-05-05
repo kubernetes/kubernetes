@@ -527,10 +527,16 @@ function create-node-template() {
     "${IP_ALIAS_SUBNETWORK:-}" \
     "${IP_ALIAS_SIZE:-}")
 
+  local accelerator_args=""
+  # VMs with Accelerators cannot be live migrated.
+  # More details here - https://cloud.google.com/compute/docs/gpus/add-gpus#create-new-gpu-instance
+  if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
+      accelerator_args="--maintenance-policy TERMINATE --restart-on-failure --accelerator ${NODE_ACCELERATORS}"
+  fi
   local attempt=1
   while true; do
     echo "Attempt ${attempt} to create ${1}" >&2
-    if ! ${gcloud} compute instance-templates create \
+    if ! ${gcloud} beta compute instance-templates create \
       "$template_name" \
       --project "${PROJECT}" \
       --machine-type "${NODE_SIZE}" \
@@ -539,6 +545,7 @@ function create-node-template() {
       --image-project="${NODE_IMAGE_PROJECT}" \
       --image "${NODE_IMAGE}" \
       --tags "${NODE_TAG}" \
+      ${accelerator_args} \
       ${local_ssds} \
       --region "${REGION}" \
       ${network} \
