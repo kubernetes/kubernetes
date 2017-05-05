@@ -34,12 +34,7 @@ func newFirewallMetricContext(request string, region string) *metricContext {
 
 // GetFirewall returns the Firewall by name.
 func (gce *GCECloud) GetFirewall(name string) (*compute.Firewall, error) {
-	region, err := GetGCERegion(gce.localZone)
-	if err != nil {
-		return nil, err
-	}
-
-	mc := newFirewallMetricContext("get", region)
+	mc := newFirewallMetricContext("get", "")
 	v, err := gce.service.Firewalls.Get(gce.projectID, name).Do()
 	return v, mc.Observe(err)
 }

@@ -328,7 +328,7 @@ func (gce *GCECloud) findDiskByName(diskName string, zone string) (*GCEDisk, err
 			Kind: disk.Kind,
 			Type: disk.Type,
 		}
-		return d, mc.Observe(err)
+		return d, mc.Observe(nil)
 	}
 	if !isHTTPErrorCode(err, http.StatusNotFound) {
 		return nil, mc.Observe(err)
