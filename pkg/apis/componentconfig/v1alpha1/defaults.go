@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -63,10 +64,15 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if len(obj.BindAddress) == 0 {
 		obj.BindAddress = "0.0.0.0"
 	}
-	if len(obj.HealthzBindAddress) == 0 {
-		obj.HealthzBindAddress = "127.0.0.1:10249"
+	if obj.HealthzBindAddress == "" {
+		obj.HealthzBindAddress = fmt.Sprintf("0.0.0.0:%v", ports.ProxyHealthzPort)
 	} else if !strings.Contains(obj.HealthzBindAddress, ":") {
-		obj.HealthzBindAddress = ":10249"
+		obj.HealthzBindAddress += fmt.Sprintf(":%v", ports.ProxyHealthzPort)
+	}
+	if obj.MetricsBindAddress == "" {
+		obj.MetricsBindAddress = fmt.Sprintf("127.0.0.1:%v", ports.ProxyStatusPort)
+	} else if !strings.Contains(obj.MetricsBindAddress, ":") {
+		obj.MetricsBindAddress += fmt.Sprintf(":%v", ports.ProxyStatusPort)
 	}
 	if obj.OOMScoreAdj == nil {
 		temp := int32(qos.KubeProxyOOMScoreAdj)
