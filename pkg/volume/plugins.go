@@ -193,6 +193,11 @@ type VolumeHost interface {
 	// might not exist.
 	GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string
 
+	// getInfoFromPodVolumeDir returns podUID, pluginName and volumeName from the
+	// full path to the directory which represents the named volume under the named
+	// plugin for specified pod.
+	GetInfoFromPodVolumeDir(volumeDir string) (string, string, string, error)
+
 	// GetPodPluginDir returns the absolute path to a directory under which
 	// a given plugin may store data for a given pod.  If the specified pod
 	// does not exist, the result of this call might not exist.  This

@@ -41,6 +41,10 @@ func (ctrl *PersistentVolumeController) GetPodVolumeDir(podUID types.UID, plugin
 	return ""
 }
 
+func (ctrl *PersistentVolumeController) GetInfoFromPodVolumeDir(volumeDir string) (string, string, string, error) {
+	return "", "", "", nil
+}
+
 func (ctrl *PersistentVolumeController) GetPodPluginDir(podUID types.UID, pluginName string) string {
 	return ""
 }

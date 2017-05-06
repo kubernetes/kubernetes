@@ -19,6 +19,7 @@ package local_volume
 import (
 	"fmt"
 	"os"
+	"syscall"
 
 	"github.com/golang/glog"
 
@@ -201,6 +202,34 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
+	// If fsGroup is not nil, we need to make sure the requested fsGroup doesn't
+	// conflict with fsGroup already set for previous pod.
+	if fsGroup != nil {
+		// Check whether fsGroup has been set before.
+		bindMounted, err := m.isBindMounted()
+		if err != nil {
+			return err
+		}
+		if bindMounted {
+			info, err := os.Stat(m.globalPath)
+			if err != nil {
+				return err
+			}
+			stat, ok := info.Sys().(*syscall.Stat_t)
+			if !ok {
+				return fmt.Errorf("error converting Stat_t for path %v while checking volume fsGroup conflict", m.globalPath)
+			}
+
+			if stat == nil {
+				return fmt.Errorf("got nil stat_t for path %v while checking volume fsGroup conflict", m.globalPath)
+			}
+
+			if int64(stat.Gid) != *fsGroup {
+				return fmt.Errorf("fsGroup conflict for volume %s: setting fsGroup to %d while exist fsGroup is %d", m.volName, *fsGroup, stat.Gid)
+			}
+		}
+	}
+
 	notMnt, err := m.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("LocalVolume mount setup: PodDir(%s) VolDir(%s) Mounted(%t) Error(%v), ReadOnly(%t)", dir, m.globalPath, !notMnt, err, m.readOnly)
 	if err != nil && !os.IsNotExist(err) {
@@ -251,8 +280,22 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	// TODO: how to prevent multiple mounts with conflicting fsGroup?
 	return volume.SetVolumeOwnership(m, fsGroup)
+}
+
+// isBindMounted checks whether the volume has beend mounted before.
+func (m *localVolumeMounter) isBindMounted() (bool, error) {
+	mountpoints, err := m.mounter.List()
+	if err != nil {
+		return false, err
+	}
+	for _, mountpoint := range mountpoints {
+		_, pluginName, volumeName, _ := m.plugin.host.GetInfoFromPodVolumeDir(mountpoint.Path)
+		if volumeName == m.volName && strings.UnescapeQualifiedNameForDisk(pluginName) == m.plugin.GetPluginName() {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 type localVolumeUnmounter struct {

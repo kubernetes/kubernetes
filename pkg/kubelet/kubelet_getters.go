@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net"
 	"path/filepath"
+	"regexp"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,6 +32,11 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+)
+
+const (
+	// Number of matches for volumeDir.
+	expectedVolumeDirMatch = 4
 )
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -102,6 +108,19 @@ func (kl *Kubelet) getPodVolumesDir(podUID types.UID) string {
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	return filepath.Join(kl.getPodVolumesDir(podUID), pluginName, volumeName)
+}
+
+// getInfoFromPodVolumeDir returns podUID, pluginName and volumeName from the
+// full path to the directory which represents the named volume under the named
+// plugin for specified pod.
+func (kl *Kubelet) getInfoFromPodVolumeDir(volumeDir string) (string, string, string, error) {
+	regVolumeDir := kl.getPodVolumeDir("(?P<podUID>[^/]+)", "(?P<pluginName>[^/]+)", "(?P<volumeName>[^/]+)")
+	matches := regexp.MustCompile(regVolumeDir).FindStringSubmatch(volumeDir)
+	if len(matches) != expectedVolumeDirMatch {
+		return "", "", "", fmt.Errorf("error matching volume info from volumeDir %s: expect %d matches, got %d matches",
+			expectedVolumeDirMatch, len(matches))
+	}
+	return matches[1], matches[2], matches[3], nil
 }
 
 // getPodPluginsDir returns the full path to the per-pod data directory under

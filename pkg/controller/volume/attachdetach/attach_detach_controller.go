@@ -573,6 +573,10 @@ func (adc *attachDetachController) GetPodVolumeDir(podUID types.UID, pluginName,
 	return ""
 }
 
+func (adc *attachDetachController) GetInfoFromPodVolumeDir(volumeDir string) (string, string, string, error) {
+	return "", "", "", nil
+}
+
 func (adc *attachDetachController) GetPodPluginDir(podUID types.UID, pluginName string) string {
 	return ""
 }
