@@ -281,6 +281,9 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 				og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedMountVolume, err.Error())
 			}
 			return err
+		} else if !devicePath {
+			// do nothing and get device path next time.
+			return nil
 		}
 
 		glog.Infof(

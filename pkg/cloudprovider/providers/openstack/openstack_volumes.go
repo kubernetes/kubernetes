@@ -76,9 +76,9 @@ type VolumeCreateOpts struct {
 
 const (
 	VolumeAvailableStatus = "available"
-	VolumeInUseStatus = "in-use"
-	VolumeDeletedStatus = "deleted"
-	VolumeErrorStatus = "error"
+	VolumeInUseStatus     = "in-use"
+	VolumeDeletedStatus   = "deleted"
+	VolumeErrorStatus     = "error"
 )
 
 func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, error) {
@@ -212,11 +212,11 @@ func (os *OpenStack) OperationPending(diskName string) (bool, string, error) {
 		return false, "", err
 	}
 	volumeStatus := volume.Status
-	if (volumeStatus == VolumeErrorStatus) {
+	if volumeStatus == VolumeErrorStatus {
 		glog.Errorf("status of volume %s is %s", diskName, volumeStatus)
 		return false, volumeStatus, nil
 	}
-	if (volumeStatus == VolumeAvailableStatus || volumeStatus == VolumeInUseStatus || volumeStatus == VolumeDeletedStatus) {
+	if volumeStatus == VolumeAvailableStatus || volumeStatus == VolumeInUseStatus || volumeStatus == VolumeDeletedStatus {
 		return false, volume.Status, nil
 	}
 	return true, volumeStatus, nil
