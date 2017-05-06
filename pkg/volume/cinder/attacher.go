@@ -73,6 +73,15 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 		return "", err
 	}
 
+	pending, volumeStatus, err := attacher.cinderProvider.OperationPending(volumeID)
+	if err != nil {
+		return "", err
+	}
+	if pending {
+		glog.Infof("status of volume %q is %s, wait it to be finished", volumeID, volumeStatus)
+		return "", nil
+	}
+
 	attached, err := attacher.cinderProvider.DiskIsAttached(volumeID, instanceid)
 	if err != nil {
 		// Log error and continue with attach
@@ -89,18 +98,27 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 		if err == nil {
 			glog.Infof("Attach operation successful: volume %q attached to instance %q.", volumeID, instanceid)
 		} else {
-			glog.Infof("Attach volume %q to instance %q failed with %v", volumeID, instanceid, err)
+			glog.Infof("Attach volume %q to instance %q failed with: %v", volumeID, instanceid, err)
 			return "", err
 		}
 	}
 
-	devicePath, err := attacher.cinderProvider.GetAttachmentDiskPath(instanceid, volumeID)
+	// When volume's status is 'attaching', DiskIsAttached() return <false, nil>, and can't get device path.
+	// We should get device path next time and do not return err.
+	devicePath := ""
+	pending, _, err = attacher.cinderProvider.OperationPending(volumeID)
 	if err != nil {
-		glog.Infof("Attach volume %q to instance %q failed with %v", volumeID, instanceid, err)
 		return "", err
 	}
+	if !pending {
+		devicePath, err = attacher.cinderProvider.GetAttachmentDiskPath(instanceid, volumeID)
+		if err != nil {
+			glog.Infof("Can not get device path of volume %q which be attached to instance %q, failed with: %v", volumeID, instanceid, err)
+			return "", err
+		}
+	}
 
-	return devicePath, err
+	return devicePath, nil
 }
 
 func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {

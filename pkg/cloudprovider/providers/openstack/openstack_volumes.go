@@ -74,8 +74,14 @@ type VolumeCreateOpts struct {
 	Metadata     map[string]string
 }
 
-func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, error) {
+const (
+	VolumeAvailableStatus = "available"
+	VolumeInUseStatus     = "in-use"
+	VolumeDeletedStatus   = "deleted"
+	VolumeErrorStatus     = "error"
+)
 
+func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, error) {
 	create_opts := volumes_v1.CreateOpts{
 		Name:             opts.Name,
 		Size:             opts.Size,
@@ -92,7 +98,6 @@ func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, error) {
 }
 
 func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, error) {
-
 	create_opts := volumes_v2.CreateOpts{
 		Name:             opts.Name,
 		Size:             opts.Size,
@@ -201,11 +206,32 @@ func (volumes *VolumesV2) deleteVolume(volumeName string) error {
 	return err
 }
 
+func (os *OpenStack) OperationPending(diskName string) (bool, string, error) {
+	volume, err := os.getVolume(diskName)
+	if err != nil {
+		return false, "", err
+	}
+	volumeStatus := volume.Status
+	if volumeStatus == VolumeErrorStatus {
+		glog.Errorf("status of volume %s is %s", diskName, volumeStatus)
+		return false, volumeStatus, nil
+	}
+	if volumeStatus == VolumeAvailableStatus || volumeStatus == VolumeInUseStatus || volumeStatus == VolumeDeletedStatus {
+		return false, volume.Status, nil
+	}
+	return true, volumeStatus, nil
+}
+
 // Attaches given cinder volume to the compute running kubelet
 func (os *OpenStack) AttachDisk(instanceID string, diskName string) (string, error) {
 	volume, err := os.getVolume(diskName)
 	if err != nil {
 		return "", err
+	}
+	if volume.Status != VolumeAvailableStatus {
+		errmsg := fmt.Sprintf("volume %s status is %s, not %s, can not be attached to instance %s.", volume.Name, volume.Status, VolumeAvailableStatus, instanceID)
+		glog.Errorf(errmsg)
+		return "", errors.New(errmsg)
 	}
 	cClient, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -244,6 +270,11 @@ func (os *OpenStack) DetachDisk(instanceID string, partialDiskId string) error {
 	volume, err := os.getVolume(partialDiskId)
 	if err != nil {
 		return err
+	}
+	if volume.Status != VolumeInUseStatus {
+		errmsg := fmt.Sprintf("can not detach volume %s, its status is %s.", volume.Name, volume.Status)
+		glog.Errorf(errmsg)
+		return errors.New(errmsg)
 	}
 	cClient, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -369,6 +400,11 @@ func (os *OpenStack) GetAttachmentDiskPath(instanceID string, diskName string) (
 	if err != nil {
 		return "", err
 	}
+	if volume.Status != VolumeInUseStatus {
+		errmsg := fmt.Sprintf("can not get device path of volume %s, its status is %s.", volume.Name, volume.Status)
+		glog.Errorf(errmsg)
+		return "", errors.New(errmsg)
+	}
 	if volume.AttachedServerId != "" {
 		if instanceID == volume.AttachedServerId {
 			// Attachment[0]["device"] points to the device path
@@ -380,7 +416,7 @@ func (os *OpenStack) GetAttachmentDiskPath(instanceID string, diskName string) (
 			return "", errors.New(errMsg)
 		}
 	}
-	return "", fmt.Errorf("volume %s is not attached to %s", diskName, instanceID)
+	return "", fmt.Errorf("volume %s has not ServerId.", diskName)
 }
 
 // query if a volume is attached to a compute instance

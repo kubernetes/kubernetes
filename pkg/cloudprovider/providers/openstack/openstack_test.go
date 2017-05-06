@@ -33,10 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-const volumeAvailableStatus = "available"
-const volumeInUseStatus = "in-use"
-const volumeCreateTimeoutSeconds = 30
-const testClusterName = "testCluster"
+const VolumeCreateTimeoutSeconds = 30
+const TestClusterName = "testCluster"
 
 func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status string, timeoutSeconds int) {
 	timeout := timeoutSeconds
@@ -300,7 +298,7 @@ func TestLoadBalancer(t *testing.T) {
 			t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
 		}
 
-		_, exists, err := lb.GetLoadBalancer(testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
+		_, exists, err := lb.GetLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
 		if err != nil {
 			t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
 		}
@@ -360,7 +358,7 @@ func TestVolumes(t *testing.T) {
 	}
 	t.Logf("Volume (%s) created\n", vol)
 
-	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus, volumeCreateTimeoutSeconds)
+	WaitForVolumeStatus(t, os, vol, VolumeAvailableStatus, VolumeCreateTimeoutSeconds)
 
 	diskId, err := os.AttachDisk(os.localInstanceID, vol)
 	if err != nil {
@@ -368,7 +366,7 @@ func TestVolumes(t *testing.T) {
 	}
 	t.Logf("Volume (%s) attached, disk ID: %s\n", vol, diskId)
 
-	WaitForVolumeStatus(t, os, vol, volumeInUseStatus, volumeCreateTimeoutSeconds)
+	WaitForVolumeStatus(t, os, vol, VolumeInUseStatus, VolumeCreateTimeoutSeconds)
 
 	devicePath := os.GetDevicePath(diskId)
 	if !strings.HasPrefix(devicePath, "/dev/disk/by-id/") {
@@ -382,7 +380,7 @@ func TestVolumes(t *testing.T) {
 	}
 	t.Logf("Volume (%s) detached\n", vol)
 
-	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus, volumeCreateTimeoutSeconds)
+	WaitForVolumeStatus(t, os, vol, VolumeAvailableStatus, VolumeCreateTimeoutSeconds)
 
 	err = os.DeleteVolume(vol)
 	if err != nil {
