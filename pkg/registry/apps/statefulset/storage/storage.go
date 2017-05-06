@@ -25,7 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
 	appsapi "k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/registry/apps/petset"
+	"k8s.io/kubernetes/pkg/registry/apps/statefulset"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 
@@ -40,21 +40,21 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		Copier:            api.Scheme,
 		NewFunc:           func() runtime.Object { return &appsapi.StatefulSet{} },
 		NewListFunc:       func() runtime.Object { return &appsapi.StatefulSetList{} },
-		PredicateFunc:     petset.MatchStatefulSet,
+		PredicateFunc:     statefulset.MatchStatefulSet,
 		QualifiedResource: appsapi.Resource("statefulsets"),
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("statefulsets"),
 
-		CreateStrategy: petset.Strategy,
-		UpdateStrategy: petset.Strategy,
-		DeleteStrategy: petset.Strategy,
+		CreateStrategy: statefulset.Strategy,
+		UpdateStrategy: statefulset.Strategy,
+		DeleteStrategy: statefulset.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: petset.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: statefulset.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = petset.StatusStrategy
+	statusStore.UpdateStrategy = statefulset.StatusStrategy
 	return &REST{store}, &StatusREST{store: &statusStore}
 }
 
