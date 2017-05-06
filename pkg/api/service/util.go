@@ -105,9 +105,6 @@ func NeedsHealthCheck(service *api.Service) bool {
 
 // GetServiceHealthCheckNodePort Return health check node port annotation for service, if one exists
 func GetServiceHealthCheckNodePort(service *api.Service) int32 {
-	if !NeedsHealthCheck(service) {
-		return 0
-	}
 	// First check the alpha annotation and then the beta. This is so existing
 	// Services continue to work till the user decides to transition to beta.
 	// If they transition to beta, there's no way to go back to alpha without

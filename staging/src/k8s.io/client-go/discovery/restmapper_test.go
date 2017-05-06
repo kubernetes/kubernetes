@@ -28,7 +28,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 
-	"github.com/emicklei/go-restful/swagger"
+	"github.com/emicklei/go-restful-swagger12"
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 )

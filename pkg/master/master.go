@@ -350,7 +350,6 @@ type nodeAddressProvider struct {
 func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 	preferredAddressTypes := []apiv1.NodeAddressType{
 		apiv1.NodeExternalIP,
-		apiv1.NodeLegacyHostIP,
 	}
 	nodes, err := n.nodeClient.List(metav1.ListOptions{})
 	if err != nil {

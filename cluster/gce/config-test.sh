@@ -32,6 +32,7 @@ MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
+NODE_ACCELERATORS=${NODE_ACCELERATORS:-""}
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 KUBE_APISERVER_REQUEST_TIMEOUT=300
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
@@ -54,6 +55,11 @@ fi
 
 if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
     NODE_OS_DISTRIBUTION="gci"
+fi
+
+# GPUs supported in GCE do not have compatible drivers in Debian 7.
+if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
+    NODE_ACCELERATORS=""
 fi
 
 # By default a cluster will be started with the master on GCI and nodes on
@@ -90,6 +96,10 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
+
+if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
+    FEATURE_GATES="${FEATURE_GATES},Accelerators=true"
+fi
 
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 

@@ -54,7 +54,7 @@ import (
 const (
 	FedDeploymentPreferencesAnnotation = "federation.kubernetes.io/deployment-preferences"
 	allClustersKey                     = "THE_ALL_CLUSTER_KEY"
-	UserAgentName                      = "Federation-Deployment-Controller"
+	UserAgentName                      = "federation-deployment-controller"
 	ControllerName                     = "deployments"
 )
 
@@ -108,7 +108,7 @@ type DeploymentController struct {
 func NewDeploymentController(federationClient fedclientset.Interface) *DeploymentController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(federationClient))
-	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "federated-deployment-controller"})
+	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: UserAgentName})
 
 	fdc := &DeploymentController{
 		fedClient:           federationClient,

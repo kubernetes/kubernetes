@@ -55,7 +55,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/go-systemd/daemon:go_default_library",
-        "//vendor/github.com/emicklei/go-restful/swagger:go_default_library",
+        "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",

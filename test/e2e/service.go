@@ -1356,9 +1356,6 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 		}
 
 		ips := framework.CollectAddresses(nodes, v1.NodeExternalIP)
-		if len(ips) == 0 {
-			ips = framework.CollectAddresses(nodes, v1.NodeLegacyHostIP)
-		}
 
 		ingressIP := framework.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		svcTCPPort := int(svc.Spec.Ports[0].Port)

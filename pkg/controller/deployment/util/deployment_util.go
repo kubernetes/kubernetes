@@ -415,6 +415,9 @@ func MaxUnavailable(deployment extensions.Deployment) int32 {
 	}
 	// Error caught by validation
 	_, maxUnavailable, _ := ResolveFenceposts(deployment.Spec.Strategy.RollingUpdate.MaxSurge, deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, *(deployment.Spec.Replicas))
+	if maxUnavailable > *deployment.Spec.Replicas {
+		return *deployment.Spec.Replicas
+	}
 	return maxUnavailable
 }
 

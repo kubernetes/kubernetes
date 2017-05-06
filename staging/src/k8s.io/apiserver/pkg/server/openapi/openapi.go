@@ -132,7 +132,9 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 			SwaggerSchemaProps: item.Schema.SwaggerSchemaProps,
 		}
 		if extensions != nil {
-			schema.Extensions = spec.Extensions{}
+			if schema.Extensions == nil {
+				schema.Extensions = spec.Extensions{}
+			}
 			for k, v := range extensions {
 				schema.Extensions[k] = v
 			}

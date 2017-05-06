@@ -1,3 +1,8 @@
+# go-restful-swagger12
+
+[![Build Status](https://travis-ci.org/emicklei/go-restful-swagger12.png)](https://travis-ci.org/emicklei/go-restful-swagger12)
+[![GoDoc](https://godoc.org/github.com/emicklei/go-restful-swagger12?status.svg)](https://godoc.org/github.com/emicklei/go-restful-swagger12)
+
 How to use Swagger UI with go-restful
 =
 
@@ -74,3 +79,5 @@ Notes
 --
 - The Nickname of an Operation is automatically set by finding the name of the function. You can override it using RouteBuilder.Operation(..) 
 - The WebServices field of swagger.Config can be used to control which service you want to expose and document ; you can have multiple configs and therefore multiple endpoints.
+
+© 2017, ernestmicklei.com.  MIT License. Contributions welcome.

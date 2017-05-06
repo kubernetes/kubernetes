@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -3121,8 +3122,12 @@ func TestValidateDNSPolicy(t *testing.T) {
 
 func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSeconds := int64(30)
-	minID := int64(0)
-	maxID := int64(2147483647)
+
+	minUserID := types.UnixUserID(0)
+	maxUserID := types.UnixUserID(2147483647)
+	minGroupID := types.UnixGroupID(0)
+	maxGroupID := types.UnixGroupID(2147483647)
+
 	successCases := []api.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
@@ -3161,9 +3166,9 @@ func TestValidatePodSpec(t *testing.T) {
 		{ // Populate RunAsUser SupplementalGroups FSGroup with minID 0
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
-				SupplementalGroups: []int64{minID},
-				RunAsUser:          &minID,
-				FSGroup:            &minID,
+				SupplementalGroups: []types.UnixGroupID{minGroupID},
+				RunAsUser:          &minUserID,
+				FSGroup:            &minGroupID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3171,9 +3176,9 @@ func TestValidatePodSpec(t *testing.T) {
 		{ // Populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
-				SupplementalGroups: []int64{maxID},
-				RunAsUser:          &maxID,
-				FSGroup:            &maxID,
+				SupplementalGroups: []types.UnixGroupID{maxGroupID},
+				RunAsUser:          &maxUserID,
+				FSGroup:            &maxGroupID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3217,8 +3222,12 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 
 	activeDeadlineSeconds = int64(0)
-	minID = int64(-1)
-	maxID = int64(2147483648)
+
+	minUserID = types.UnixUserID(-1)
+	maxUserID = types.UnixUserID(2147483648)
+	minGroupID = types.UnixGroupID(-1)
+	maxGroupID = types.UnixGroupID(2147483648)
+
 	failureCases := map[string]api.PodSpec{
 		"bad volume": {
 			Volumes:       []api.Volume{{}},
@@ -3291,7 +3300,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork:        false,
-				SupplementalGroups: []int64{maxID, 1234},
+				SupplementalGroups: []types.UnixGroupID{maxGroupID, 1234},
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3300,7 +3309,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork:        false,
-				SupplementalGroups: []int64{minID, 1234},
+				SupplementalGroups: []types.UnixGroupID{minGroupID, 1234},
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3309,7 +3318,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
-				RunAsUser:   &maxID,
+				RunAsUser:   &maxUserID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3318,7 +3327,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
-				RunAsUser:   &minID,
+				RunAsUser:   &minUserID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3327,7 +3336,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
-				FSGroup:     &maxID,
+				FSGroup:     &maxGroupID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3336,7 +3345,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
-				FSGroup:     &minID,
+				FSGroup:     &minGroupID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -6295,7 +6304,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6313,7 +6322,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6330,7 +6339,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6369,7 +6378,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6457,7 +6466,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6476,7 +6485,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6495,7 +6504,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6738,7 +6747,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
+					{Type: api.NodeExternalIP, Address: "1.2.3.4"},
 				},
 			},
 		}, api.Node{
@@ -8721,7 +8730,7 @@ func TestValidateTLSSecret(t *testing.T) {
 
 func TestValidateSecurityContext(t *testing.T) {
 	priv := false
-	var runAsUser int64 = 1
+	runAsUser := types.UnixUserID(1)
 	fullValidSC := func() *api.SecurityContext {
 		return &api.SecurityContext{
 			Privileged: &priv,
@@ -8773,7 +8782,7 @@ func TestValidateSecurityContext(t *testing.T) {
 	privRequestWithGlobalDeny.Privileged = &requestPrivileged
 
 	negativeRunAsUser := fullValidSC()
-	var negativeUser int64 = -1
+	negativeUser := types.UnixUserID(-1)
 	negativeRunAsUser.RunAsUser = &negativeUser
 
 	errorCases := map[string]struct {

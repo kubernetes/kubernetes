@@ -143,6 +143,7 @@ filegroup(
         "//vendor/github.com/elazarl/go-bindata-assetfs:all-srcs",
         "//vendor/github.com/elazarl/goproxy:all-srcs",
         "//vendor/github.com/emicklei/go-restful:all-srcs",
+        "//vendor/github.com/emicklei/go-restful-swagger12:all-srcs",
         "//vendor/github.com/evanphx/json-patch:all-srcs",
         "//vendor/github.com/exponent-io/jsonpath:all-srcs",
         "//vendor/github.com/fatih/camelcase:all-srcs",

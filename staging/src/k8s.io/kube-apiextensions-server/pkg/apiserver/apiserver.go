@@ -17,6 +17,9 @@ limitations under the License.
 package apiserver
 
 import (
+	"net/http"
+	"time"
+
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,17 +27,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/install"
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
+	"k8s.io/kube-apiextensions-server/pkg/client/clientset/internalclientset"
+	internalinformers "k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion"
 	"k8s.io/kube-apiextensions-server/pkg/registry/customresource"
 
 	// make sure the generated client works
 	_ "k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset"
-	_ "k8s.io/kube-apiextensions-server/pkg/client/clientset/internalclientset"
 	_ "k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions"
 	_ "k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion"
 )
@@ -64,6 +70,8 @@ func init() {
 
 type Config struct {
 	GenericConfig *genericapiserver.Config
+
+	CustomResourceRESTOptionsGetter genericregistry.RESTOptionsGetter
 }
 
 type CustomResources struct {
@@ -76,6 +84,7 @@ type completedConfig struct {
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() completedConfig {
+	c.GenericConfig.EnableDiscovery = false
 	c.GenericConfig.Complete()
 
 	c.GenericConfig.Version = &version.Info{
@@ -92,7 +101,7 @@ func (c *Config) SkipComplete() completedConfig {
 }
 
 // New returns a new instance of CustomResources from the given config.
-func (c completedConfig) New() (*CustomResources, error) {
+func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget, stopCh <-chan struct{}) (*CustomResources, error) {
 	genericServer, err := c.Config.GenericConfig.SkipComplete().New() // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
@@ -111,6 +120,48 @@ func (c completedConfig) New() (*CustomResources, error) {
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
 	}
+
+	customResourceClient, err := internalclientset.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
+	if err != nil {
+		return nil, err
+	}
+	customResourceInformers := internalinformers.NewSharedInformerFactory(customResourceClient, 5*time.Minute)
+
+	delegateHandler := delegationTarget.UnprotectedHandler()
+	if delegateHandler == nil {
+		delegateHandler = http.NotFoundHandler()
+	}
+
+	versionDiscoveryHandler := &versionDiscoveryHandler{
+		discovery: map[schema.GroupVersion]*discovery.APIVersionHandler{},
+		delegate:  delegateHandler,
+	}
+	groupDiscoveryHandler := &groupDiscoveryHandler{
+		discovery: map[string]*discovery.APIGroupHandler{},
+		delegate:  delegateHandler,
+	}
+	customResourceHandler := NewCustomResourceHandler(
+		versionDiscoveryHandler,
+		groupDiscoveryHandler,
+		s.GenericAPIServer.RequestContextMapper(),
+		customResourceInformers.Apiextensions().InternalVersion().CustomResources().Lister(),
+		delegationTarget.UnprotectedHandler(),
+		c.CustomResourceRESTOptionsGetter,
+		c.GenericConfig.AdmissionControl,
+	)
+	s.GenericAPIServer.FallThroughHandler.Handle("/apis", customResourceHandler)
+	s.GenericAPIServer.FallThroughHandler.HandlePrefix("/apis/", customResourceHandler)
+
+	customResourceController := NewDiscoveryController(customResourceInformers.Apiextensions().InternalVersion().CustomResources(), versionDiscoveryHandler, groupDiscoveryHandler)
+
+	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
+		customResourceInformers.Start(stopCh)
+		return nil
+	})
+	s.GenericAPIServer.AddPostStartHook("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
+		go customResourceController.Run(stopCh)
+		return nil
+	})
 
 	return s, nil
 }

@@ -32,6 +32,9 @@ MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
+# Accelerators to be attached to each node. Format "type=<accelerator-type>,count=<accelerator-count>"
+# More information on available GPUs here - https://cloud.google.com/compute/docs/gpus/
+NODE_ACCELERATORS=${NODE_ACCELERATORS:-""}
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
 PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
@@ -53,6 +56,11 @@ fi
 
 if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
     NODE_OS_DISTRIBUTION="gci"
+fi
+
+# GPUs supported in GCE do not have compatible drivers in Debian 7.
+if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
+    NODE_ACCELERATORS=""
 fi
 
 # By default a cluster will be started with the master on GCI and nodes on
@@ -134,6 +142,10 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
+
+if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
+    FEATURE_GATES="${FEATURE_GATES},Accelerators=true"
+fi
 
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
@@ -233,6 +245,7 @@ ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-true}" # true, false
 # Kernel panic upon soft lockup issue
 SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-false}" # true, false
 
-# Indicates if the values (eg. kube password) in metadata should be treated as
-# canonical, and therefore disk copies ought to be recreated/clobbered.
+# Indicates if the values (i.e. KUBE_USER and KUBE_PASSWORD for basic
+# authentication) in metadata should be treated as canonical, and therefore disk
+# copies ought to be recreated/clobbered.
 METADATA_CLOBBERS_CONFIG=${METADATA_CLOBBERS_CONFIG:-false}

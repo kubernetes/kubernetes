@@ -2430,17 +2430,17 @@ func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *a
 		allErrs = append(allErrs, validateHostNetwork(securityContext.HostNetwork, spec.Containers, specPath.Child("containers"))...)
 		allErrs = append(allErrs, validateHostNetworkNoHostAliases(securityContext.HostNetwork, spec.HostAliases, specPath)...)
 		if securityContext.FSGroup != nil {
-			for _, msg := range validation.IsValidGroupId(*securityContext.FSGroup) {
+			for _, msg := range validation.IsValidGroupID(*securityContext.FSGroup) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("fsGroup"), *(securityContext.FSGroup), msg))
 			}
 		}
 		if securityContext.RunAsUser != nil {
-			for _, msg := range validation.IsValidUserId(*securityContext.RunAsUser) {
+			for _, msg := range validation.IsValidUserID(*securityContext.RunAsUser) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsUser"), *(securityContext.RunAsUser), msg))
 			}
 		}
 		for g, gid := range securityContext.SupplementalGroups {
-			for _, msg := range validation.IsValidGroupId(gid) {
+			for _, msg := range validation.IsValidGroupID(gid) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("supplementalGroups").Index(g), gid, msg))
 			}
 		}

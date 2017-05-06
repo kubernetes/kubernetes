@@ -27,6 +27,16 @@ kube::golang::setup_env
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
+# Handle case where OS has sha#sum commands, instead of shasum.
+if which shasum >/dev/null 2>&1; then
+  SHA1SUM="shasum -a1"
+elif which sha1sum >/dev/null 2>&1; then
+  SHA1SUM="sha1sum"
+else
+  echo "Failed to find shasum or sha1sum utility." >&2
+  exit 1
+fi
+
 kube::test::find_dirs() {
   (
     cd ${KUBE_ROOT}
@@ -72,7 +82,11 @@ kube::test::find_dirs() {
     find ./staging/src/k8s.io/kube-aggregator -name '*_test.go' \
       -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
 
-    find ./staging/src/k8s.io/kube-apiextensions-server -name '*_test.go' \
+    find ./staging/src/k8s.io/kube-apiextensions-server -not \( \
+        \( \
+          -o -path './test/integration/*' \
+        \) -prune \
+      \) -name '*_test.go' \
       -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
 
     find ./staging/src/k8s.io/sample-apiserver -name '*_test.go' \
@@ -189,7 +203,7 @@ junitFilenamePrefix() {
   # barely fits there and in coverage mode test names are
   # appended to generated file names, easily exceeding
   # 255 chars in length. So let's just use a sha1 hash of it.
-  local KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"|shasum -a 1|awk '{print $1}')"
+  local KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"| ${SHA1SUM} |awk '{print $1}')"
   echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_HASH}_$(kube::util::sortable_date)"
 }
 
@@ -239,7 +253,7 @@ runTests() {
   fi
 
   # Create coverage report directories.
-  KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"|shasum -a 1|awk '{print $1}')"
+  KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"| ${SHA1SUM} |awk '{print $1}')"
   cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API_HASH}/$(kube::util::sortable_date)"
   cover_profile="coverage.out"  # Name for each individual coverage profile
   kube::log::status "Saving coverage output in '${cover_report_dir}'"

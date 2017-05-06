@@ -80,7 +80,10 @@ var (
 		kubectl taint nodes foo dedicated:NoSchedule-
 
 		# Remove from node 'foo' all the taints with key 'dedicated'
-		kubectl taint nodes foo dedicated-`))
+		kubectl taint nodes foo dedicated-
+
+		# Add a taint with key 'dedicated' on nodes having label mylabel=X
+		kubectl taint node -l myLabel=X  dedicated=foo:PreferNoSchedule`))
 )
 
 func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -243,27 +246,42 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	if o.taintsToAdd, o.taintsToRemove, err = parseTaints(taintArgs); err != nil {
 		return cmdutil.UsageError(cmd, err.Error())
 	}
-
 	mapper, typer := f.Object()
 	o.builder = resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace()
+	if o.selector != "" {
+		o.builder = o.builder.SelectorParam(o.selector).ResourceTypes("node")
+	}
 	if o.all {
-		o.builder = o.builder.SelectAllParam(o.all).ResourceTypes("node")
-	} else {
-		if len(o.resources) < 2 {
-			return fmt.Errorf("at least one resource name must be specified since 'all' parameter is not set")
-		}
+		o.builder = o.builder.SelectAllParam(o.all).ResourceTypes("node").Flatten().Latest()
+	}
+	if !o.all && o.selector == "" && len(o.resources) >= 2 {
 		o.builder = o.builder.ResourceNames("node", o.resources[1:]...)
 	}
 	o.builder = o.builder.SelectorParam(o.selector).
 		Flatten().
 		Latest()
-
 	o.f = f
 	o.out = out
 	o.cmd = cmd
+	return nil
+}
 
+// validateFlags checks for the validation of flags for kubectl taints.
+func (o TaintOptions) validateFlags() error {
+	// Cannot have a non-empty selector and all flag set. They are mutually exclusive.
+	if o.all && o.selector != "" {
+		return fmt.Errorf("setting 'all' parameter with a non empty selector is prohibited.")
+	}
+	// If both selector and all are not set.
+	if !o.all && o.selector == "" {
+		if len(o.resources) < 2 {
+			return fmt.Errorf("at least one resource name must be specified since 'all' parameter is not set")
+		} else {
+			return nil
+		}
+	}
 	return nil
 }
 
@@ -297,8 +315,7 @@ func (o TaintOptions) Validate() error {
 	if len(conflictTaints) > 0 {
 		return fmt.Errorf("can not both modify and remove the following taint(s) in the same command: %s", strings.Join(conflictTaints, ", "))
 	}
-
-	return nil
+	return o.validateFlags()
 }
 
 // RunTaint does the work

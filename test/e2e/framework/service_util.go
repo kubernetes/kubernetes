@@ -258,9 +258,6 @@ func GetNodePublicIps(c clientset.Interface) ([]string, error) {
 	nodes := GetReadySchedulableNodesOrDie(c)
 
 	ips := CollectAddresses(nodes, v1.NodeExternalIP)
-	if len(ips) == 0 {
-		ips = CollectAddresses(nodes, v1.NodeLegacyHostIP)
-	}
 	return ips, nil
 }
 

@@ -59,6 +59,8 @@ func (gce *GCECloud) DeleteGlobalStaticIP(name string) error {
 }
 
 // GetGlobalStaticIP returns the global static IP by name.
-func (gce *GCECloud) GetGlobalStaticIP(name string) (address *compute.Address, err error) {
-	return gce.service.GlobalAddresses.Get(gce.projectID, name).Do()
+func (gce *GCECloud) GetGlobalStaticIP(name string) (*compute.Address, error) {
+	mc := newStaticIPMetricContext("get")
+	v, err := gce.service.GlobalAddresses.Get(gce.projectID, name).Do()
+	return v, mc.Observe(err)
 }

@@ -222,22 +222,6 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 	return rtnPod
 }
 
-// move the passed-in pod's UID directory to /tmp.
-func movePodUidDir(c clientset.Interface, pod *v1.Pod) {
-	dest := "/tmp"
-	podDir := filepath.Join("/var/lib/kubelet/pods", string(pod.UID))
-	cmd := fmt.Sprintf("sudo mv %v %v", podDir, dest)
-	// use ip rather than hostname in GCE
-	nodeIP, err := framework.GetHostExternalAddress(c, pod)
-	Expect(err).NotTo(HaveOccurred())
-
-	// excute cmd over ssh
-	result, _ := nodeExec(nodeIP, cmd)
-	framework.LogSSHResult(result)
-	Expect(result.Code).To(BeZero())
-	Expect(len(result.Stderr)).To(BeZero())
-}
-
 // Checks for a lingering nfs mount and/or uid directory on the pod's host. The host IP is used
 // so that this test runs in GCE, where it appears that SSH cannot resolve the hostname.
 // If expectClean is true then we expect the node to be cleaned up and thus commands like
@@ -483,25 +467,6 @@ var _ = framework.KubeDescribe("kubelet", func() {
 					checkPodCleanup(c, pod, true)
 				})
 			}
-
-			// Move a pod's uid dir to /tmp and delete the pod.
-			// Addresses issue #37657.
-			// Note: the pod's vol mount (as a side effect) ends up being moved to /tmp
-			//    and can be unmounted via `umount -f`.
-			It("move NFS client pod's UID directory then delete pod", func() {
-				pod = createPodUsingNfs(f, c, ns, nfsIP, "sleep 6000")
-
-				By("Move pod's uid dir to /tmp")
-				movePodUidDir(c, pod)
-
-				By("Delete the pod mounted to the NFS volume")
-				framework.DeletePodWithWait(f, c, pod)
-				// pod object is now stale, but is intentionally not nil
-				// Note: the pod's nfs mount, now in /tmp, will not be unmounted
-
-				By("Verify host running the deleted pod is cleaned up")
-				checkPodCleanup(c, pod, true)
-			})
 		})
 	})
 })

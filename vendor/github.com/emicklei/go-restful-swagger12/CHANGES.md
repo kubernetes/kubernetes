@@ -1,5 +1,8 @@
 Change history of swagger
 =
+2017-01-30
+- moved from go-restful/swagger to go-restful-swagger12
+
 2015-10-16
 - add type override mechanism for swagger models (MR 254, nathanejohnson)
 - replace uses of wildcard in generated apidocs (issue 251)

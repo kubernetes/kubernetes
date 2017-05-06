@@ -935,8 +935,6 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 			return nil, err
 		}
 		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: internalIP})
-		// Legacy compatibility: the private ip was the legacy host ip
-		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeLegacyHostIP, Address: internalIP})
 
 		externalIP, err := c.metadata.GetMetadata("public-ipv4")
 		if err != nil {
@@ -981,9 +979,6 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", orEmpty(instance.InstanceId), ipAddress)
 		}
 		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip.String()})
-
-		// Legacy compatibility: the private ip was the legacy host ip
-		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeLegacyHostIP, Address: ip.String()})
 	}
 
 	// TODO: Other IP addresses (multiple ips)?
