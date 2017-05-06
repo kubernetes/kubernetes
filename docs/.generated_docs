@@ -36,6 +36,7 @@ docs/man/man1/kubectl-config-set-credentials.1
 docs/man/man1/kubectl-config-set.1
 docs/man/man1/kubectl-config-unset.1
 docs/man/man1/kubectl-config-use-context.1
+docs/man/man1/kubectl-config-use-ns.1
 docs/man/man1/kubectl-config-view.1
 docs/man/man1/kubectl-config.1
 docs/man/man1/kubectl-convert.1
@@ -128,6 +129,7 @@ docs/user-guide/kubectl/kubectl_config_set-credentials.md
 docs/user-guide/kubectl/kubectl_config_set.md
 docs/user-guide/kubectl/kubectl_config_unset.md
 docs/user-guide/kubectl/kubectl_config_use-context.md
+docs/user-guide/kubectl/kubectl_config_use-ns.md
 docs/user-guide/kubectl/kubectl_config_view.md
 docs/user-guide/kubectl/kubectl_convert.md
 docs/user-guide/kubectl/kubectl_cordon.md

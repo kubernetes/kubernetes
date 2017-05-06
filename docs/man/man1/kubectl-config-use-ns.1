@@ -3,17 +3,17 @@
 
 .SH NAME
 .PP
-kubectl certificate \- Modify certificate resources.
+kubectl config use\-ns \- Sets the namespace in current\-context
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl certificate\fP [OPTIONS]
+\fBkubectl config use\-ns\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-Modify certificate resources.
+Sets the namespace in current\-context
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -159,7 +159,7 @@ Modify certificate resources.
 
 .PP
 \fB\-\-kubeconfig\fP=""
-    Path to the kubeconfig file to use for CLI requests.
+    use a particular kubeconfig file
 
 .PP
 \fB\-\-log\-backtrace\-at\fP=:0
@@ -258,9 +258,21 @@ Modify certificate resources.
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+  # Sets the namespace myns in current\-context
+  kubectl config use\-ns myns
+
+.fi
+.RE
+
+
 .SH SEE ALSO
 .PP
-\fBkubectl(1)\fP, \fBkubectl\-certificate\-approve(1)\fP, \fBkubectl\-certificate\-deny(1)\fP,
+\fBkubectl\-config(1)\fP,
 
 
 .SH HISTORY

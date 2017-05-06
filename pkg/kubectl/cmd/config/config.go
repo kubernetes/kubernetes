@@ -30,7 +30,7 @@ import (
 )
 
 // NewCmdConfig creates a command object for the "config" action, and adds all child commands to it.
-func NewCmdConfig(pathOptions *clientcmd.PathOptions, out, errOut io.Writer) *cobra.Command {
+func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, out, errOut io.Writer) *cobra.Command {
 	if len(pathOptions.ExplicitFileFlag) == 0 {
 		pathOptions.ExplicitFileFlag = clientcmd.RecommendedConfigPathFlag
 	}
@@ -60,6 +60,7 @@ func NewCmdConfig(pathOptions *clientcmd.PathOptions, out, errOut io.Writer) *co
 	cmd.AddCommand(NewCmdConfigUnset(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigCurrentContext(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigUseContext(out, pathOptions))
+	cmd.AddCommand(NewCmdConfigUseNamespace(f, out, pathOptions))
 	cmd.AddCommand(NewCmdConfigGetContexts(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigGetClusters(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigDeleteCluster(out, pathOptions))

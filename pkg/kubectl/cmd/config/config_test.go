@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -865,7 +866,9 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *tes
 
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdConfig(clientcmd.NewDefaultPathOptions(), buf, buf)
+	f, _, _, _ := cmdtesting.NewAPIFactory()
+
+	cmd := NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), buf, buf)
 	cmd.SetArgs(argsToUse)
 	cmd.Execute()
 
