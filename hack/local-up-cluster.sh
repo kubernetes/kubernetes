@@ -687,6 +687,7 @@ function start_kubelet {
         --volume=/var/lib/docker/:/var/lib/docker:ro \
         --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
         --volume=/dev:/dev \
+        --volume=/run/xtables.lock:/run/xtables.lock:rw \
         ${cred_bind} \
         --net=host \
         --privileged=true \

@@ -17,7 +17,10 @@ limitations under the License.
 package iptables
 
 import (
+	"net"
+	"os"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -25,6 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/dbus"
 	"k8s.io/kubernetes/pkg/util/exec"
 )
+
+const TestLockfilePath = "xtables.lock"
 
 func getIPTablesCommand(protocol Protocol) string {
 	if protocol == ProtocolIpv4 {
@@ -1036,12 +1041,12 @@ func TestRestoreAll(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	runner := newInternal(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4, TestLockfilePath)
 	defer runner.Destroy()
 
 	err := runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
 	if err != nil {
-		t.Errorf("expected success, got %v", err)
+		t.Fatalf("expected success, got %v", err)
 	}
 
 	commandSet := sets.NewString(fcmd.CombinedOutputLog[2]...)
@@ -1080,12 +1085,12 @@ func TestRestoreAllWait(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	runner := newInternal(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4, TestLockfilePath)
 	defer runner.Destroy()
 
 	err := runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
 	if err != nil {
-		t.Errorf("expected success, got %v", err)
+		t.Fatalf("expected success, got %v", err)
 	}
 
 	commandSet := sets.NewString(fcmd.CombinedOutputLog[2]...)
@@ -1125,12 +1130,12 @@ func TestRestoreAllWaitOldIptablesRestore(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	runner := newInternal(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4, TestLockfilePath)
 	defer runner.Destroy()
 
 	err := runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
 	if err != nil {
-		t.Errorf("expected success, got %v", err)
+		t.Fatalf("expected success, got %v", err)
 	}
 
 	commandSet := sets.NewString(fcmd.CombinedOutputLog[2]...)
@@ -1149,5 +1154,85 @@ func TestRestoreAllWaitOldIptablesRestore(t *testing.T) {
 	err = runner.Restore(TableNAT, []byte{}, FlushTables, RestoreCounters)
 	if err == nil {
 		t.Errorf("expected failure")
+	}
+}
+
+// TestRestoreAllGrabNewLock tests that the iptables code will grab the
+// iptables /run lock when using an iptables-restore version that does not
+// support the --wait argument
+func TestRestoreAllGrabNewLock(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			// iptables-restore version check
+			func() ([]byte, error) { return []byte("unrecognized option: --version"), nil },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+
+	runner := newInternal(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4, TestLockfilePath)
+	defer runner.Destroy()
+
+	// Grab the /run lock and ensure the RestoreAll fails
+	runLock, err := os.OpenFile(TestLockfilePath, os.O_CREATE, 0600)
+	if err != nil {
+		t.Fatalf("expected to open %s, got %v", TestLockfilePath, err)
+	}
+	defer runLock.Close()
+
+	if err := syscall.Flock(int(runLock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		t.Errorf("expected to lock %s, got %v", TestLockfilePath, err)
+	}
+
+	err = runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
+	if err == nil {
+		t.Errorf("expected failure, got success instead")
+	}
+	if !strings.Contains(err.Error(), "failed to acquire new iptables lock: timed out waiting for the condition") {
+		t.Errorf("expected timeout error, got %v", err)
+	}
+}
+
+// TestRestoreAllGrabOldLock tests that the iptables code will grab the
+// iptables @xtables abstract unix socket lock when using an iptables-restore
+// version that does not support the --wait argument
+func TestRestoreAllGrabOldLock(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			// iptables-restore version check
+			func() ([]byte, error) { return []byte("unrecognized option: --version"), nil },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+
+	runner := newInternal(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4, TestLockfilePath)
+	defer runner.Destroy()
+
+	// Grab the abstract @xtables socket
+	runLock, err := net.ListenUnix("unix", &net.UnixAddr{Name: "@xtables", Net: "unix"})
+	if err != nil {
+		t.Fatalf("expected to lock @xtables, got %v", err)
+	}
+	defer runLock.Close()
+
+	err = runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
+	if err == nil {
+		t.Errorf("expected failure, got success instead")
+	}
+	if !strings.Contains(err.Error(), "failed to acquire old iptables lock: timed out waiting for the condition") {
+		t.Errorf("expected timeout error, got %v", err)
 	}
 }

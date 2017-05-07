@@ -1655,7 +1655,7 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 		oldPods []bool
 		newPods []bool
 		// deletions - should be less then the size of the respective slice above
-		// eg. len(oldPods) > oldPodDeletions && len(newPods) > newPodDeletions
+		// e.g. len(oldPods) > oldPodDeletions && len(newPods) > newPodDeletions
 		oldPodDeletions int
 		newPodDeletions int
 		// specify additional time to wait for deployment to wait on top of the
