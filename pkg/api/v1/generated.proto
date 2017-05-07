@@ -2318,6 +2318,7 @@ message PodAffinityTerm {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
 
+  // Deprecated: please use the NamespaceSelector, this field will be removed in 1.8.
   // namespaces specifies which namespaces the labelSelector applies to (matches against);
   // null or empty list means "this pod's namespace"
   repeated string namespaces = 2;
@@ -2331,6 +2332,13 @@ message PodAffinityTerm {
   // for affinity and for RequiredDuringScheduling pod anti-affinity, empty topologyKey is not allowed.
   // +optional
   optional string topologyKey = 3;
+
+  // Selects Namespaces using cluster scoped-labels.  This
+  // matches namespaces selected by this label selector.
+  // This field follows standard label selector semantics.
+  // If present but empty, this selector selects all namespaces.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 4;
 }
 
 // Pod anti affinity is a group of inter pod anti affinity scheduling rules.
