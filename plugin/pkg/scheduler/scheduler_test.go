@@ -543,6 +543,9 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 				bindingChan <- b
 				return nil
 			}},
+			WaitForCacheSync: func() bool {
+				return true
+			},
 			NextPod: func() *v1.Pod {
 				return clientcache.Pop(queuedPodStore).(*v1.Pod)
 			},
