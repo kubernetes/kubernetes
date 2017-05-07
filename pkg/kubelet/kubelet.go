@@ -76,6 +76,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	"k8s.io/kubernetes/pkg/kubelet/policies"
 	"k8s.io/kubernetes/pkg/kubelet/preemption"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -102,15 +103,13 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
+
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
 
 const (
 	// Max amount of time to wait for the container runtime to come up.
 	maxWaitForContainerRuntime = 30 * time.Second
-
-	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
-	nodeStatusUpdateRetry = 5
 
 	// Location of container logs.
 	ContainerLogsDir = "/var/log/containers"
@@ -159,6 +158,9 @@ const (
 
 	// Minimum number of dead containers to keep in a pod
 	minDeadContainerInPod = 1
+
+	// mb is used to easily convert an int to an mb
+	mb = 1024 * 1024
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -343,7 +345,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		LowThresholdPercent:  int(kubeCfg.ImageGCLowThresholdPercent),
 	}
 
-	diskSpacePolicy := DiskSpacePolicy{
+	diskSpacePolicy := policies.DiskSpacePolicy{
 		DockerFreeDiskMB: int(kubeCfg.LowDiskSpaceThresholdMB),
 		RootFreeDiskMB:   int(kubeCfg.LowDiskSpaceThresholdMB),
 	}
@@ -390,7 +392,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		Namespace: "",
 	}
 
-	diskSpaceManager, err := newDiskSpaceManager(kubeDeps.CAdvisorInterface, diskSpacePolicy)
+	diskSpaceManager, err := policies.NewDiskSpaceManager(kubeDeps.CAdvisorInterface, diskSpacePolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
 	}
@@ -658,7 +660,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		return nil, err
 	}
 	klet.containerGC = containerGC
-	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
+	klet.containerDeletor = policies.NewPodContainerDeletor(klet.containerRuntime, integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
 	imageManager, err := images.NewImageGCManager(klet.containerRuntime, kubeDeps.CAdvisorInterface, kubeDeps.Recorder, nodeRef, imageGCPolicy)
@@ -742,7 +744,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.admitHandlers.AddPodAdmitHandler(unsafeWhitelist)
 
 	// enable active deadline handler
-	activeDeadlineHandler, err := newActiveDeadlineHandler(klet.statusManager, kubeDeps.Recorder, klet.clock)
+	activeDeadlineHandler, err := policies.NewActiveDeadlineHandler(klet.statusManager, kubeDeps.Recorder, klet.clock)
 	if err != nil {
 		return nil, err
 	}
@@ -885,7 +887,7 @@ type Kubelet struct {
 	imageManager images.ImageGCManager
 
 	// Diskspace manager.
-	diskSpaceManager diskSpaceManager
+	diskSpaceManager policies.DiskSpaceManager
 
 	// Secret manager.
 	secretManager secret.Manager
@@ -1047,7 +1049,7 @@ type Kubelet struct {
 	enableControllerAttachDetach bool
 
 	// trigger deleting containers in a pod
-	containerDeletor *podContainerDeletor
+	containerDeletor *policies.PodContainerDeletor
 
 	// config iptables util rules
 	makeIPTablesUtilChains bool
@@ -1975,7 +1977,7 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		// After an evicted pod is synced, all dead containers in the pod can be removed.
 		if eviction.PodIsEvicted(pod.Status) {
 			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
-				kl.containerDeletor.deleteContainersInPod("", podStatus, true)
+				kl.containerDeletor.DeleteContainersInPod("", podStatus, true)
 			}
 		}
 	}
@@ -2096,7 +2098,7 @@ func (kl *Kubelet) cleanUpContainersInPod(podId types.UID, exitedContainerID str
 			// When an evicted pod has already synced, all containers can be removed.
 			removeAll = eviction.PodIsEvicted(syncedPod.Status)
 		}
-		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
+		kl.containerDeletor.DeleteContainersInPod(exitedContainerID, podStatus, removeAll)
 	}
 }
 

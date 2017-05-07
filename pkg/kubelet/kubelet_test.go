@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	. "k8s.io/kubernetes/pkg/kubelet/policies"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
@@ -68,9 +69,10 @@ import (
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	_ "k8s.io/kubernetes/pkg/volume/host_path"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+
+	_ "k8s.io/kubernetes/pkg/volume/host_path"
 )
 
 func init() {
@@ -207,7 +209,7 @@ func newTestKubeletWithImageList(
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager)
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{})
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
+	diskSpaceManager, err := NewDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
 	if err != nil {
 		t.Fatalf("can't initialize disk space manager: %v", err)
 	}
@@ -293,7 +295,7 @@ func newTestKubeletWithImageList(
 	require.NoError(t, err, "Failed to initialize volume manager")
 
 	// enable active deadline handler
-	activeDeadlineHandler, err := newActiveDeadlineHandler(kubelet.statusManager, kubelet.recorder, kubelet.clock)
+	activeDeadlineHandler, err := NewActiveDeadlineHandler(kubelet.statusManager, kubelet.recorder, kubelet.clock)
 	require.NoError(t, err, "Can't initialize active deadline handler")
 
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
@@ -791,7 +793,7 @@ func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisortest.Mock, ro
 	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
 
 	dsp := DiskSpacePolicy{DockerFreeDiskMB: rootThreshold, RootFreeDiskMB: dockerThreshold}
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
+	diskSpaceManager, err := NewDiskSpaceManager(mockCadvisor, dsp)
 	if err != nil {
 		return err
 	}

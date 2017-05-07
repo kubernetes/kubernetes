@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package policies
 
 import (
 	"fmt"
@@ -27,13 +27,15 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
+// Manages policy for pod deadline for suggesting evictions.
+
 const (
 	reason  = "DeadlineExceeded"
 	message = "Pod was active on the node longer than the specified deadline"
 )
 
-// activeDeadlineHandler knows how to enforce active deadlines on pods.
-type activeDeadlineHandler struct {
+// ActiveDeadlineHandler knows how to enforce active deadlines on pods.
+type ActiveDeadlineHandler struct {
 	// the clock to use for deadline enforcement
 	clock clock.Clock
 	// the provider of pod status
@@ -43,17 +45,17 @@ type activeDeadlineHandler struct {
 }
 
 // newActiveDeadlineHandler returns an active deadline handler that can enforce pod active deadline
-func newActiveDeadlineHandler(
+func NewActiveDeadlineHandler(
 	podStatusProvider status.PodStatusProvider,
 	recorder record.EventRecorder,
 	clock clock.Clock,
-) (*activeDeadlineHandler, error) {
+) (*ActiveDeadlineHandler, error) {
 
 	// check for all required fields
 	if clock == nil || podStatusProvider == nil || recorder == nil {
 		return nil, fmt.Errorf("Required arguments must not be nil: %v, %v, %v", clock, podStatusProvider, recorder)
 	}
-	return &activeDeadlineHandler{
+	return &ActiveDeadlineHandler{
 		clock:             clock,
 		podStatusProvider: podStatusProvider,
 		recorder:          recorder,
@@ -61,22 +63,22 @@ func newActiveDeadlineHandler(
 }
 
 // ShouldSync returns true if the pod is past its active deadline.
-func (m *activeDeadlineHandler) ShouldSync(pod *v1.Pod) bool {
-	return m.pastActiveDeadline(pod)
+func (m *ActiveDeadlineHandler) ShouldSync(pod *v1.Pod) bool {
+	return m.PastActiveDeadline(pod)
 }
 
 // ShouldEvict returns true if the pod is past its active deadline.
 // It dispatches an event that the pod should be evicted if it is past its deadline.
-func (m *activeDeadlineHandler) ShouldEvict(pod *v1.Pod) lifecycle.ShouldEvictResponse {
-	if !m.pastActiveDeadline(pod) {
+func (m *ActiveDeadlineHandler) ShouldEvict(pod *v1.Pod) lifecycle.ShouldEvictResponse {
+	if !m.PastActiveDeadline(pod) {
 		return lifecycle.ShouldEvictResponse{Evict: false}
 	}
 	m.recorder.Eventf(pod, v1.EventTypeNormal, reason, message)
 	return lifecycle.ShouldEvictResponse{Evict: true, Reason: reason, Message: message}
 }
 
-// pastActiveDeadline returns true if the pod has been active for more than its ActiveDeadlineSeconds
-func (m *activeDeadlineHandler) pastActiveDeadline(pod *v1.Pod) bool {
+// PastActiveDeadline returns true if the pod has been active for more than its ActiveDeadlineSeconds
+func (m *ActiveDeadlineHandler) PastActiveDeadline(pod *v1.Pod) bool {
 	// no active deadline was specified
 	if pod.Spec.ActiveDeadlineSeconds == nil {
 		return false

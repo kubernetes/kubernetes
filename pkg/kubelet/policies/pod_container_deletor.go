@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package policies
 
 import (
 	"sort"
@@ -32,7 +32,7 @@ const (
 
 type containerStatusbyCreatedList []*kubecontainer.ContainerStatus
 
-type podContainerDeletor struct {
+type PodContainerDeletor struct {
 	worker           chan<- kubecontainer.ContainerID
 	containersToKeep int
 }
@@ -41,7 +41,7 @@ func (a containerStatusbyCreatedList) Len() int           { return len(a) }
 func (a containerStatusbyCreatedList) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a containerStatusbyCreatedList) Less(i, j int) bool { return a[i].CreatedAt.After(a[j].CreatedAt) }
 
-func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int) *podContainerDeletor {
+func NewPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int) *PodContainerDeletor {
 	buffer := make(chan kubecontainer.ContainerID, containerDeletorBufferLimit)
 	go wait.Until(func() {
 		for {
@@ -52,7 +52,7 @@ func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int)
 		}
 	}, 0, wait.NeverStop)
 
-	return &podContainerDeletor{
+	return &PodContainerDeletor{
 		worker:           buffer,
 		containersToKeep: containersToKeep,
 	}
@@ -97,7 +97,7 @@ func getContainersToDeleteInPod(filterContainerId string, podStatus *kubecontain
 }
 
 // deleteContainersInPod issues container deletion requests for containers selected by getContainersToDeleteInPod.
-func (p *podContainerDeletor) deleteContainersInPod(filterContainerId string, podStatus *kubecontainer.PodStatus, removeAll bool) {
+func (p *PodContainerDeletor) DeleteContainersInPod(filterContainerId string, podStatus *kubecontainer.PodStatus, removeAll bool) {
 	containersToKeep := p.containersToKeep
 	if removeAll {
 		containersToKeep = 0

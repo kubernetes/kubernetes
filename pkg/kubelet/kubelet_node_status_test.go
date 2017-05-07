@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/policies"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -226,7 +227,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 
 	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.NoError(t, kubelet.UpdateNodeStatusWithRetry())
 	actions := kubeClient.Actions()
 	require.Len(t, actions, 2)
 	require.True(t, actions[1].Matches("patch", "nodes"))
@@ -286,7 +287,7 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	}
 
 	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.NoError(t, kubelet.UpdateNodeStatusWithRetry())
 
 	actions := kubeClient.Actions()
 	require.Len(t, actions, 2)
@@ -472,7 +473,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 
 	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.NoError(t, kubelet.UpdateNodeStatusWithRetry())
 
 	actions := kubeClient.Actions()
 	assert.Len(t, actions, 2)
@@ -626,7 +627,7 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 		// Make kubelet report that it has sufficient disk space
 		err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, tc.rootFsAvail, tc.dockerFsAvail, 100, 100)
 		require.NoError(t, err, "can't update disk space manager")
-		assert.NoError(t, kubelet.updateNodeStatus())
+		assert.NoError(t, kubelet.UpdateNodeStatusWithRetry())
 
 		actions := kubeClient.Actions()
 		assert.Len(t, actions, 2, "test [%d]", tcIdx)
@@ -755,7 +756,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 
 	checkNodeStatus := func(status v1.ConditionStatus, reason string) {
 		kubeClient.ClearActions()
-		assert.NoError(t, kubelet.updateNodeStatus())
+		assert.NoError(t, kubelet.UpdateNodeStatusWithRetry())
 		actions := kubeClient.Actions()
 		require.Len(t, actions, 2)
 		require.True(t, actions[1].Matches("patch", "nodes"))
@@ -857,14 +858,15 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 }
 
+// TODO This unit test might be better in the kubelet itself.
 func TestUpdateNodeStatusError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	// No matching node for the kubelet
 	testKubelet.fakeKubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{}}).ReactionChain
-	assert.Error(t, kubelet.updateNodeStatus())
-	assert.Len(t, testKubelet.fakeKubeClient.Actions(), nodeStatusUpdateRetry)
+	assert.Error(t, kubelet.UpdateNodeStatusWithRetry())
+	assert.Len(t, testKubelet.fakeKubeClient.Actions(), policies.NodeStatusUpdateRetry)
 }
 
 func TestRegisterWithApiServer(t *testing.T) {
@@ -915,7 +917,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		kubelet.registerWithApiServer()
+		kubelet.registerWithApiServerWithRetry()
 		done <- struct{}{}
 	}()
 	select {

@@ -11,8 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "active_deadline.go",
-        "disk_manager.go",
         "doc.go",
         "kubelet.go",
         "kubelet_cadvisor.go",
@@ -24,7 +22,6 @@ go_library(
         "kubelet_volumes.go",
         "networks.go",
         "oom_watcher.go",
-        "pod_container_deletor.go",
         "pod_workers.go",
         "reason_cache.go",
         "runonce.go",
@@ -70,6 +67,7 @@ go_library(
         "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/pleg:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
+        "//pkg/kubelet/policies:go_default_library",
         "//pkg/kubelet/preemption:go_default_library",
         "//pkg/kubelet/prober:go_default_library",
         "//pkg/kubelet/prober/results:go_default_library",
@@ -143,8 +141,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "active_deadline_test.go",
-        "disk_manager_test.go",
         "kubelet_cadvisor_test.go",
         "kubelet_getters_test.go",
         "kubelet_network_test.go",
@@ -154,7 +150,6 @@ go_test(
         "kubelet_test.go",
         "kubelet_volumes_test.go",
         "oom_watcher_test.go",
-        "pod_container_deletor_test.go",
         "pod_workers_test.go",
         "reason_cache_test.go",
         "runonce_test.go",
@@ -181,6 +176,7 @@ go_test(
         "//pkg/kubelet/pleg:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/pod/testing:go_default_library",
+        "//pkg/kubelet/policies:go_default_library",
         "//pkg/kubelet/prober/results:go_default_library",
         "//pkg/kubelet/prober/testing:go_default_library",
         "//pkg/kubelet/secret:go_default_library",
@@ -260,6 +256,7 @@ filegroup(
         "//pkg/kubelet/network:all-srcs",
         "//pkg/kubelet/pleg:all-srcs",
         "//pkg/kubelet/pod:all-srcs",
+        "//pkg/kubelet/policies:all-srcs",
         "//pkg/kubelet/preemption:all-srcs",
         "//pkg/kubelet/prober:all-srcs",
         "//pkg/kubelet/qos:all-srcs",
