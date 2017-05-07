@@ -195,11 +195,11 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig, nil)
 
 	err = s.Admission.ApplyTo(
-		pluginInitializer,
 		apiAuthorizer,
 		genericConfig.LoopbackClientConfig,
 		genericConfig,
 		genericConfig.SharedInformerFactory,
+		pluginInitializer,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize plugins: %v", err)

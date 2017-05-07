@@ -58,9 +58,8 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo adds the admission chain to the server configuration
-// note that pluginIntializer is optional, a generic plugin intializer will always be provided and appended
-// to the list of plugin initializers.
-func (a *AdmissionOptions) ApplyTo(pluginInitializer admission.PluginInitializer, authz authorizer.Authorizer, restConfig *rest.Config, serverCfg *server.Config, sharedInformers informers.SharedInformerFactory) error {
+// the method lazily initializes a generic plugin that is appended to the list of pluginInitializers
+func (a *AdmissionOptions) ApplyTo(authz authorizer.Authorizer, restConfig *rest.Config, serverCfg *server.Config, sharedInformers informers.SharedInformerFactory, pluginInitializers ...admission.PluginInitializer) error {
 	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(a.PluginsNames, a.ConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
@@ -79,11 +78,10 @@ func (a *AdmissionOptions) ApplyTo(pluginInitializer admission.PluginInitializer
 		a.genericPluginInitializer = genericInitializer
 	}
 
-	pluginInitializers := admission.PluginInitializers{a.genericPluginInitializer}
-	if pluginInitializer != nil {
-		pluginInitializers = append(pluginInitializers, pluginInitializer)
-	}
-	admissionChain, err := a.Plugins.NewFromPlugins(a.PluginsNames, pluginsConfigProvider, pluginInitializers)
+	initializersChain := admission.PluginInitializers{}
+	pluginInitializers = append(pluginInitializers, a.genericPluginInitializer)
+	initializersChain = append(initializersChain, pluginInitializers...)
+	admissionChain, err := a.Plugins.NewFromPlugins(a.PluginsNames, pluginsConfigProvider, initializersChain)
 	if err != nil {
 		return err
 	}
