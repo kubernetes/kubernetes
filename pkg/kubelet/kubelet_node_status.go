@@ -105,7 +105,7 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 
 	existingNode, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName), metav1.GetOptions{})
 	if err != nil {
-		glog.Errorf("Unable to register node %s with API server: error getting existing node: %v", kl.nodeName, err)
+		glog.Errorf("Unable to register node %q with API server: error getting existing node: %v", kl.nodeName, err)
 		return false
 	}
 	if existingNode == nil {
