@@ -1020,7 +1020,7 @@
    },
    "v1alpha1.PodPresetSpec": {
     "id": "v1alpha1.PodPresetSpec",
-    "description": "PodPresetSpec is a description of a pod injection policy.",
+    "description": "PodPresetSpec is a description of a pod preset.",
     "properties": {
      "selector": {
       "$ref": "v1.LabelSelector",
