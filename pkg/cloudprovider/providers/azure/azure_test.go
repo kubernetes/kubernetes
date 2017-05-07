@@ -60,10 +60,8 @@ func TestReconcileLoadBalancerAddPort(t *testing.T) {
 func TestReconcileLoadBalancerNodeHealth(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("servicea", 80)
-	svc.Annotations = map[string]string{
-		serviceapi.BetaAnnotationExternalTraffic:     serviceapi.AnnotationValueExternalTrafficLocal,
-		serviceapi.BetaAnnotationHealthCheckNodePort: "32456",
-	}
+	svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+	svc.Spec.HealthCheckNodePort = int32(32456)
 	configProperties := getTestPublicFipConfigurationProperties()
 	lb := getTestLoadBalancer()
 
