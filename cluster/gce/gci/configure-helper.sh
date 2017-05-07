@@ -102,7 +102,18 @@ function ensure-local-ssds() {
 # Install nvidia drivers if required
 function install-nvidia-driver() {
     modprobe configs
-    docker run --privileged -e "LAKITU_KERNEL_SHA1=2fdf6034a0fae9794d80e4d218e237771224ba8f" -v /etc/os-release:/etc/os-release --net=host --pid=host -v /proc/sysrq-trigger:/sysrq gcr.io/google_containers/cos-nvidia-driver-install@sha256:7cd08897baad6cfbdecd5901a64634b249c70f42e77dd57f80559603cfb9121f
+    # Setup a work directory for overlay mounts
+    mkdir -p /home/kubernetes/bin/usr /home/kubernetes/bin/nvidia-overlay /home/kubernetes/bin/.work
+    mount -t overlay -o lowerdir=/usr,upperdir=/home/kubernetes/bin/usr,workdir=/home/kubernetes/bin/.work none /usr
+    docker run --privileged \
+	-e "LAKITU_KERNEL_SHA1=2fdf6034a0fae9794d80e4d218e237771224ba8f" \
+	-v /home/kubernetes/bin/nvidia-overlay:/rootfs/nvidia-overlay:rw \
+	-v /usr:/rootfs/usr:rw \
+	-v /dev:/dev:rw \
+	-v /etc/os-release:/rootfs/etc/os-release \
+	-v /proc/sysrq-trigger:/sysrq \
+	--net=host --pid=host \
+	gcr.io/google_containers/cos-nvidia-driver-install@sha256:7e0bd2662fb22190c06f2747b546bd4a8b092d95be78dee2c87be55930b32c9f
 }
 
 # Installs logrotate configuration files

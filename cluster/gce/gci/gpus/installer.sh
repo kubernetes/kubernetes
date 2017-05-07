@@ -125,6 +125,7 @@ verify_nvidia() {
 }
 
 verify_base_image() {
+    mount --bind /rootfs/etc/os-release /etc/os-release
     os_release=$(cat /etc/os-release)
     if [[ ${os_release} != *"Container-Optimized OS"* ]]; then
         echo "This installer is designed to run on Container Optimized OS only"
@@ -132,13 +133,42 @@ verify_base_image() {
     fi  
 }
 
+setup_overlay_mounts() {
+    mkdir -p /rootfs/nvidia-overlay/usr /rootfs/nvidia-overlay/.work
+    mount -t overlay -o lowerdir=/usr,upperdir=/rootfs/nvidia-overlay/usr,workdir=/rootfs/nvidia-overlay/.work none /usr
+}
+
+should_install() {
+    if verify_nvidia; then
+	echo "nvidia drivers already installed. Skipping installation"
+	sleep infinity
+	exit 0
+    fi
+}
+
+restart_kubelet() {
+    echo "Sending SIGTERM to kubelet"
+    pkill -SIGTERM kubelet
+}
+
+copy_files_to_host() {
+    mkdir -p /rootfs/usr/lib/nvidia /rootfs/usr/lib/nvidia/bin
+    cp -r /rootfs/nvidia-overlay/usr/lib/* /rootfs/usr/lib/nvidia/
+    cp -r /rootfs/nvidia-overlay/usr/bin/* /rootfs/usr/lib/nvidia/bin/
+}
+
 main() {
     verify_base_image
     check_nvidia_device
+    setup_overlay_mounts
+    should_install
     unlock_loadpin_and_reboot_if_needed
     prepare_kernel_source
     download_install_nvidia
     verify_nvidia
+    copy_files_to_host
+    restart_kubelet
+    sleep infinity
 }
 
 main "$@"
