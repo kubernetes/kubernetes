@@ -47,10 +47,8 @@ func TestMerge(t *testing.T) {
 		fragment  string
 		expected  runtime.Object
 		expectErr bool
-		kind      string
 	}{
 		{
-			kind: "Pod",
 			obj: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -67,7 +65,6 @@ func TestMerge(t *testing.T) {
 		/* TODO: uncomment this test once Merge is updated to use
 		strategic-merge-patch. See #8449.
 		{
-			kind: "Pod",
 			obj: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -105,7 +102,6 @@ func TestMerge(t *testing.T) {
 			},
 		}, */
 		{
-			kind: "Pod",
 			obj: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -136,20 +132,17 @@ func TestMerge(t *testing.T) {
 			},
 		},
 		{
-			kind:      "Pod",
 			obj:       &api.Pod{},
 			fragment:  "invalid json",
 			expected:  &api.Pod{},
 			expectErr: true,
 		},
 		{
-			kind:      "Service",
 			obj:       &api.Service{},
 			fragment:  `{ "apiVersion": "badVersion" }`,
 			expectErr: true,
 		},
 		{
-			kind: "Service",
 			obj: &api.Service{
 				Spec: api.ServiceSpec{},
 			},
@@ -168,7 +161,6 @@ func TestMerge(t *testing.T) {
 			},
 		},
 		{
-			kind: "Service",
 			obj: &api.Service{
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{
@@ -190,7 +182,7 @@ func TestMerge(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		out, err := Merge(testapi.Default.Codec(), test.obj, test.fragment, test.kind)
+		out, err := Merge(testapi.Default.Codec(), test.obj, test.fragment)
 		if !test.expectErr {
 			if err != nil {
 				t.Errorf("testcase[%d], unexpected error: %v", i, err)

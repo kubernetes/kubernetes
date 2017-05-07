@@ -15,9 +15,9 @@ go_library(
         "//federation/pkg/dnsprovider:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/leaderelection:go_default_library",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apiserver/pkg/util/flag",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
     ],
 )
 

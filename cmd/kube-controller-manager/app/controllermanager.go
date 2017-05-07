@@ -243,14 +243,14 @@ func (c ControllerContext) IsControllerEnabled(name string) bool {
 
 func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, controllers ...string) bool {
 	hasStar := false
-	for _, controller := range controllers {
-		if controller == name {
+	for _, ctrl := range controllers {
+		if ctrl == name {
 			return true
 		}
-		if controller == "-"+name {
+		if ctrl == "-"+name {
 			return false
 		}
-		if controller == "*" {
+		if ctrl == "*" {
 			hasStar = true
 		}
 	}
@@ -477,13 +477,14 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 			serviceCIDR,
 			int(s.NodeCIDRMaskSize),
 			s.AllocateNodeCIDRs,
+			nodecontroller.CIDRAllocatorType(s.CIDRAllocatorType),
 			s.EnableTaintManager,
 			utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to initialize nodecontroller: %v", err)
 		}
-		nodeController.Run()
+		go nodeController.Run(stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	} else {
 		glog.Warningf("%q is disabled", nodeControllerName)
@@ -530,23 +531,21 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	}
 
 	if ctx.IsControllerEnabled(pvBinderControllerName) {
-		alphaProvisioner, err := NewAlphaVolumeProvisioner(cloud, s.VolumeConfiguration)
-		if err != nil {
-			return fmt.Errorf("an backward-compatible provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
-		}
 		params := persistentvolumecontroller.ControllerParameters{
 			KubeClient:                clientBuilder.ClientOrDie("persistent-volume-binder"),
 			SyncPeriod:                s.PVClaimBinderSyncPeriod.Duration,
-			AlphaProvisioner:          alphaProvisioner,
 			VolumePlugins:             ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
 			Cloud:                     cloud,
 			ClusterName:               s.ClusterName,
 			VolumeInformer:            sharedInformers.Core().V1().PersistentVolumes(),
 			ClaimInformer:             sharedInformers.Core().V1().PersistentVolumeClaims(),
-			ClassInformer:             sharedInformers.Storage().V1beta1().StorageClasses(),
+			ClassInformer:             sharedInformers.Storage().V1().StorageClasses(),
 			EnableDynamicProvisioning: s.VolumeConfiguration.EnableDynamicProvisioning,
 		}
-		volumeController := persistentvolumecontroller.NewController(params)
+		volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
+		if volumeControllerErr != nil {
+			return fmt.Errorf("failed to construct persistentvolume controller: %v", volumeControllerErr)
+		}
 		go volumeController.Run(stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	} else {

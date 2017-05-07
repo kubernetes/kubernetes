@@ -1,4 +1,6 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
 // http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
@@ -61,16 +63,16 @@ given to the testgen plugin, will generate the following test code:
 	func TestAProto(t *testing.T) {
 		popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 		p := NewPopulatedA(popr, false)
-		data, err := github_com_gogo_protobuf_proto.Marshal(p)
+		dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
 		if err != nil {
 			panic(err)
 		}
 		msg := &A{}
-		if err := github_com_gogo_protobuf_proto.Unmarshal(data, msg); err != nil {
+		if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 			panic(err)
 		}
-		for i := range data {
-			data[i] = byte(popr.Intn(256))
+		for i := range dAtA {
+			dAtA[i] = byte(popr.Intn(256))
 		}
 		if err := p.VerboseEqual(msg); err != nil {
 			t.Fatalf("%#v !VerboseProto %#v, since %v", msg, p, err)
@@ -89,11 +91,11 @@ given to the testgen plugin, will generate the following test code:
 		}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			data, err := github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
+			dAtA, err := github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
 			if err != nil {
 				panic(err)
 			}
-			total += len(data)
+			total += len(dAtA)
 		}
 		b.SetBytes(int64(total / b.N))
 	}
@@ -103,11 +105,11 @@ given to the testgen plugin, will generate the following test code:
 		total := 0
 		datas := make([][]byte, 10000)
 		for i := 0; i < 10000; i++ {
-			data, err := github_com_gogo_protobuf_proto.Marshal(NewPopulatedA(popr, false))
+			dAtA, err := github_com_gogo_protobuf_proto.Marshal(NewPopulatedA(popr, false))
 			if err != nil {
 				panic(err)
 			}
-			datas[i] = data
+			datas[i] = dAtA
 		}
 		msg := &A{}
 		b.ResetTimer()
@@ -144,9 +146,9 @@ given to the testgen plugin, will generate the following test code:
 	func TestAProtoText(t *testing2.T) {
 		popr := math_rand2.New(math_rand2.NewSource(time2.Now().UnixNano()))
 		p := NewPopulatedA(popr, true)
-		data := github_com_gogo_protobuf_proto1.MarshalTextString(p)
+		dAtA := github_com_gogo_protobuf_proto1.MarshalTextString(p)
 		msg := &A{}
-		if err := github_com_gogo_protobuf_proto1.UnmarshalText(data, msg); err != nil {
+		if err := github_com_gogo_protobuf_proto1.UnmarshalText(dAtA, msg); err != nil {
 			panic(err)
 		}
 		if err := p.VerboseEqual(msg); err != nil {
@@ -160,9 +162,9 @@ given to the testgen plugin, will generate the following test code:
 	func TestAProtoCompactText(t *testing2.T) {
 		popr := math_rand2.New(math_rand2.NewSource(time2.Now().UnixNano()))
 		p := NewPopulatedA(popr, true)
-		data := github_com_gogo_protobuf_proto1.CompactTextString(p)
+		dAtA := github_com_gogo_protobuf_proto1.CompactTextString(p)
 		msg := &A{}
-		if err := github_com_gogo_protobuf_proto1.UnmarshalText(data, msg); err != nil {
+		if err := github_com_gogo_protobuf_proto1.UnmarshalText(dAtA, msg); err != nil {
 			panic(err)
 		}
 		if err := p.VerboseEqual(msg); err != nil {
@@ -268,6 +270,7 @@ func (p *testProto) Generate(imports generator.PluginImports, file *generator.Fi
 	testingPkg := imports.NewImport("testing")
 	randPkg := imports.NewImport("math/rand")
 	timePkg := imports.NewImport("time")
+	unsafePkg := imports.NewImport("unsafe")
 	protoPkg := imports.NewImport("github.com/gogo/protobuf/proto")
 	if !gogoproto.ImportsGoGoProto(file.FileDescriptorProto) {
 		protoPkg = imports.NewImport("github.com/golang/protobuf/proto")
@@ -277,31 +280,41 @@ func (p *testProto) Generate(imports generator.PluginImports, file *generator.Fi
 		if message.DescriptorProto.GetOptions().GetMapEntry() {
 			continue
 		}
+		hasUnsafe := gogoproto.IsUnsafeMarshaler(file.FileDescriptorProto, message.DescriptorProto) ||
+			gogoproto.IsUnsafeUnmarshaler(file.FileDescriptorProto, message.DescriptorProto)
 		if gogoproto.HasTestGen(file.FileDescriptorProto, message.DescriptorProto) {
 			used = true
 
 			p.P(`func Test`, ccTypeName, `Proto(t *`, testingPkg.Use(), `.T) {`)
 			p.In()
+			if hasUnsafe {
+				p.P(`var bigendian uint32 = 0x01020304`)
+				p.P(`if *(*byte)(`, unsafePkg.Use(), `.Pointer(&bigendian)) == 1 {`)
+				p.In()
+				p.P(`t.Skip("unsafe does not work on big endian architectures")`)
+				p.Out()
+				p.P(`}`)
+			}
 			p.P(`seed := `, timePkg.Use(), `.Now().UnixNano()`)
 			p.P(`popr := `, randPkg.Use(), `.New(`, randPkg.Use(), `.NewSource(seed))`)
 			p.P(`p := NewPopulated`, ccTypeName, `(popr, false)`)
-			p.P(`data, err := `, protoPkg.Use(), `.Marshal(p)`)
+			p.P(`dAtA, err := `, protoPkg.Use(), `.Marshal(p)`)
 			p.P(`if err != nil {`)
 			p.In()
 			p.P(`t.Fatalf("seed = %d, err = %v", seed, err)`)
 			p.Out()
 			p.P(`}`)
 			p.P(`msg := &`, ccTypeName, `{}`)
-			p.P(`if err := `, protoPkg.Use(), `.Unmarshal(data, msg); err != nil {`)
+			p.P(`if err := `, protoPkg.Use(), `.Unmarshal(dAtA, msg); err != nil {`)
 			p.In()
 			p.P(`t.Fatalf("seed = %d, err = %v", seed, err)`)
 			p.Out()
 			p.P(`}`)
-			p.P(`littlefuzz := make([]byte, len(data))`)
-			p.P(`copy(littlefuzz, data)`)
-			p.P(`for i := range data {`)
+			p.P(`littlefuzz := make([]byte, len(dAtA))`)
+			p.P(`copy(littlefuzz, dAtA)`)
+			p.P(`for i := range dAtA {`)
 			p.In()
-			p.P(`data[i] = byte(popr.Intn(256))`)
+			p.P(`dAtA[i] = byte(popr.Intn(256))`)
 			p.Out()
 			p.P(`}`)
 			if gogoproto.HasVerboseEqual(file.FileDescriptorProto, message.DescriptorProto) {
@@ -338,6 +351,14 @@ func (p *testProto) Generate(imports generator.PluginImports, file *generator.Fi
 			if gogoproto.IsMarshaler(file.FileDescriptorProto, message.DescriptorProto) || gogoproto.IsUnsafeMarshaler(file.FileDescriptorProto, message.DescriptorProto) {
 				p.P(`func Test`, ccTypeName, `MarshalTo(t *`, testingPkg.Use(), `.T) {`)
 				p.In()
+				if hasUnsafe {
+					p.P(`var bigendian uint32 = 0x01020304`)
+					p.P(`if *(*byte)(`, unsafePkg.Use(), `.Pointer(&bigendian)) == 1 {`)
+					p.In()
+					p.P(`t.Skip("unsafe does not work on big endian architectures")`)
+					p.Out()
+					p.P(`}`)
+				}
 				p.P(`seed := `, timePkg.Use(), `.Now().UnixNano()`)
 				p.P(`popr := `, randPkg.Use(), `.New(`, randPkg.Use(), `.NewSource(seed))`)
 				p.P(`p := NewPopulated`, ccTypeName, `(popr, false)`)
@@ -346,27 +367,27 @@ func (p *testProto) Generate(imports generator.PluginImports, file *generator.Fi
 				} else {
 					p.P(`size := p.Size()`)
 				}
-				p.P(`data := make([]byte, size)`)
-				p.P(`for i := range data {`)
+				p.P(`dAtA := make([]byte, size)`)
+				p.P(`for i := range dAtA {`)
 				p.In()
-				p.P(`data[i] = byte(popr.Intn(256))`)
+				p.P(`dAtA[i] = byte(popr.Intn(256))`)
 				p.Out()
 				p.P(`}`)
-				p.P(`_, err := p.MarshalTo(data)`)
+				p.P(`_, err := p.MarshalTo(dAtA)`)
 				p.P(`if err != nil {`)
 				p.In()
 				p.P(`t.Fatalf("seed = %d, err = %v", seed, err)`)
 				p.Out()
 				p.P(`}`)
 				p.P(`msg := &`, ccTypeName, `{}`)
-				p.P(`if err := `, protoPkg.Use(), `.Unmarshal(data, msg); err != nil {`)
+				p.P(`if err := `, protoPkg.Use(), `.Unmarshal(dAtA, msg); err != nil {`)
 				p.In()
 				p.P(`t.Fatalf("seed = %d, err = %v", seed, err)`)
 				p.Out()
 				p.P(`}`)
-				p.P(`for i := range data {`)
+				p.P(`for i := range dAtA {`)
 				p.In()
-				p.P(`data[i] = byte(popr.Intn(256))`)
+				p.P(`dAtA[i] = byte(popr.Intn(256))`)
 				p.Out()
 				p.P(`}`)
 				if gogoproto.HasVerboseEqual(file.FileDescriptorProto, message.DescriptorProto) {
@@ -402,13 +423,13 @@ func (p *testProto) Generate(imports generator.PluginImports, file *generator.Fi
 			p.P(`b.ResetTimer()`)
 			p.P(`for i := 0; i < b.N; i++ {`)
 			p.In()
-			p.P(`data, err := `, protoPkg.Use(), `.Marshal(pops[i%10000])`)
+			p.P(`dAtA, err := `, protoPkg.Use(), `.Marshal(pops[i%10000])`)
 			p.P(`if err != nil {`)
 			p.In()
 			p.P(`panic(err)`)
 			p.Out()
 			p.P(`}`)
-			p.P(`total += len(data)`)
+			p.P(`total += len(dAtA)`)
 			p.Out()
 			p.P(`}`)
 			p.P(`b.SetBytes(int64(total / b.N))`)
@@ -423,13 +444,13 @@ func (p *testProto) Generate(imports generator.PluginImports, file *generator.Fi
 			p.P(`datas := make([][]byte, 10000)`)
 			p.P(`for i := 0; i < 10000; i++ {`)
 			p.In()
-			p.P(`data, err := `, protoPkg.Use(), `.Marshal(NewPopulated`, ccTypeName, `(popr, false))`)
+			p.P(`dAtA, err := `, protoPkg.Use(), `.Marshal(NewPopulated`, ccTypeName, `(popr, false))`)
 			p.P(`if err != nil {`)
 			p.In()
 			p.P(`panic(err)`)
 			p.Out()
 			p.P(`}`)
-			p.P(`datas[i] = data`)
+			p.P(`datas[i] = dAtA`)
 			p.Out()
 			p.P(`}`)
 			p.P(`msg := &`, ccTypeName, `{}`)
@@ -543,9 +564,9 @@ func (p *testText) Generate(imports generator.PluginImports, file *generator.Fil
 			p.P(`seed := `, timePkg.Use(), `.Now().UnixNano()`)
 			p.P(`popr := `, randPkg.Use(), `.New(`, randPkg.Use(), `.NewSource(seed))`)
 			p.P(`p := NewPopulated`, ccTypeName, `(popr, true)`)
-			p.P(`data := `, protoPkg.Use(), `.MarshalTextString(p)`)
+			p.P(`dAtA := `, protoPkg.Use(), `.MarshalTextString(p)`)
 			p.P(`msg := &`, ccTypeName, `{}`)
-			p.P(`if err := `, protoPkg.Use(), `.UnmarshalText(data, msg); err != nil {`)
+			p.P(`if err := `, protoPkg.Use(), `.UnmarshalText(dAtA, msg); err != nil {`)
 			p.In()
 			p.P(`t.Fatalf("seed = %d, err = %v", seed, err)`)
 			p.Out()
@@ -571,9 +592,9 @@ func (p *testText) Generate(imports generator.PluginImports, file *generator.Fil
 			p.P(`seed := `, timePkg.Use(), `.Now().UnixNano()`)
 			p.P(`popr := `, randPkg.Use(), `.New(`, randPkg.Use(), `.NewSource(seed))`)
 			p.P(`p := NewPopulated`, ccTypeName, `(popr, true)`)
-			p.P(`data := `, protoPkg.Use(), `.CompactTextString(p)`)
+			p.P(`dAtA := `, protoPkg.Use(), `.CompactTextString(p)`)
 			p.P(`msg := &`, ccTypeName, `{}`)
-			p.P(`if err := `, protoPkg.Use(), `.UnmarshalText(data, msg); err != nil {`)
+			p.P(`if err := `, protoPkg.Use(), `.UnmarshalText(dAtA, msg); err != nil {`)
 			p.In()
 			p.P(`t.Fatalf("seed = %d, err = %v", seed, err)`)
 			p.Out()

@@ -32,6 +32,7 @@ MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
+NODE_ACCELERATORS=${NODE_ACCELERATORS:-""}
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 KUBE_APISERVER_REQUEST_TIMEOUT=300
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
@@ -54,6 +55,11 @@ fi
 
 if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
     NODE_OS_DISTRIBUTION="gci"
+fi
+
+# GPUs supported in GCE do not have compatible drivers in Debian 7.
+if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
+    NODE_ACCELERATORS=""
 fi
 
 # By default a cluster will be started with the master on GCI and nodes on
@@ -79,12 +85,21 @@ INITIAL_ETCD_CLUSTER="${MASTER_NAME}"
 ETCD_QUORUM_READ="${ENABLE_ETCD_QUORUM_READ:-false}"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 NODE_TAG="${INSTANCE_PREFIX}-minion"
-CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.180.0.0/14}"
+
+CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.100.0.0/14}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
+# NODE_IP_RANGE is used when ENABLE_IP_ALIASES=true. It is the primary range in
+# the subnet and is the range used for node instance IPs.
+NODE_IP_RANGE="${NODE_IP_RANGE:-10.40.0.0/22}"
+
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
+
+if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
+    FEATURE_GATES="${FEATURE_GATES},Accelerators=true"
+fi
 
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
@@ -197,6 +212,25 @@ fi
 
 # Optional: Enable Rescheduler
 ENABLE_RESCHEDULER="${KUBE_ENABLE_RESCHEDULER:-true}"
+
+# Optional: Enable allocation of pod IPs using IP aliases.
+#
+# ALPHA FEATURE.
+#
+# IP_ALIAS_SIZE is the size of the podCIDR allocated to a node.
+# IP_ALIAS_SUBNETWORK is the subnetwork to allocate from. If empty, a
+#   new subnetwork will be created for the cluster.
+ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-false}
+if [ ${ENABLE_IP_ALIASES} = true ]; then
+  # Size of ranges allocated to each node. gcloud alpha supports only /32 and /24.
+  IP_ALIAS_SIZE=${KUBE_GCE_IP_ALIAS_SIZE:-/24}
+  IP_ALIAS_SUBNETWORK=${KUBE_GCE_IP_ALIAS_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-default}
+  # NODE_IP_RANGE is used when ENABLE_IP_ALIASES=true. It is the primary range in
+  # the subnet and is the range used for node instance IPs.
+  NODE_IP_RANGE="${NODE_IP_RANGE:-10.40.0.0/22}"
+  # Add to the provider custom variables.
+  PROVIDER_VARS="${PROVIDER_VARS} ENABLE_IP_ALIASES"
+fi
 
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
 ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota}"

@@ -50,6 +50,7 @@ var (
 		"2.2.0": {streamTypeMsgAppV2, streamTypeMessage},
 		"2.3.0": {streamTypeMsgAppV2, streamTypeMessage},
 		"3.0.0": {streamTypeMsgAppV2, streamTypeMessage},
+		"3.1.0": {streamTypeMsgAppV2, streamTypeMessage},
 	}
 )
 
@@ -85,7 +86,7 @@ var (
 	linkHeartbeatMessage = raftpb.Message{Type: raftpb.MsgHeartbeat}
 )
 
-func isLinkHeartbeatMessage(m raftpb.Message) bool {
+func isLinkHeartbeatMessage(m *raftpb.Message) bool {
 	return m.Type == raftpb.MsgHeartbeat && m.From == 0 && m.To == 0
 }
 
@@ -147,7 +148,7 @@ func (cw *streamWriter) run() {
 	for {
 		select {
 		case <-heartbeatc:
-			err := enc.encode(linkHeartbeatMessage)
+			err := enc.encode(&linkHeartbeatMessage)
 			unflushed += linkHeartbeatMessage.Size()
 			if err == nil {
 				flusher.Flush()
@@ -159,12 +160,13 @@ func (cw *streamWriter) run() {
 
 			cw.status.deactivate(failureType{source: t.String(), action: "heartbeat"}, err.Error())
 
+			sentFailures.WithLabelValues(cw.peerID.String()).Inc()
 			cw.close()
 			plog.Warningf("lost the TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
 			heartbeatc, msgc = nil, nil
 
 		case m := <-msgc:
-			err := enc.encode(m)
+			err := enc.encode(&m)
 			if err == nil {
 				unflushed += m.Size()
 
@@ -185,11 +187,11 @@ func (cw *streamWriter) run() {
 			plog.Warningf("lost the TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
 			heartbeatc, msgc = nil, nil
 			cw.r.ReportUnreachable(m.To)
+			sentFailures.WithLabelValues(cw.peerID.String()).Inc()
 
 		case conn := <-cw.connc:
-			if cw.close() {
-				plog.Warningf("closed an existing TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
-			}
+			cw.mu.Lock()
+			closed := cw.closeUnlocked()
 			t = conn.t
 			switch conn.t {
 			case streamTypeMsgAppV2:
@@ -201,19 +203,22 @@ func (cw *streamWriter) run() {
 			}
 			flusher = conn.Flusher
 			unflushed = 0
-			cw.mu.Lock()
 			cw.status.activate()
 			cw.closer = conn.Closer
 			cw.working = true
 			cw.mu.Unlock()
+
+			if closed {
+				plog.Warningf("closed an existing TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
+			}
 			plog.Infof("established a TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
 			heartbeatc, msgc = tickc, cw.msgc
 		case <-cw.stopc:
 			if cw.close() {
 				plog.Infof("closed the TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
 			}
-			close(cw.done)
 			plog.Infof("stopped streaming with peer %s (writer)", cw.peerID)
+			close(cw.done)
 			return
 		}
 	}
@@ -228,6 +233,10 @@ func (cw *streamWriter) writec() (chan<- raftpb.Message, bool) {
 func (cw *streamWriter) close() bool {
 	cw.mu.Lock()
 	defer cw.mu.Unlock()
+	return cw.closeUnlocked()
+}
+
+func (cw *streamWriter) closeUnlocked() bool {
 	if !cw.working {
 		return false
 	}
@@ -315,8 +324,8 @@ func (cr *streamReader) run() {
 		// overhead when retry.
 		case <-time.After(100 * time.Millisecond):
 		case <-cr.stopc:
-			close(cr.done)
 			plog.Infof("stopped streaming with peer %s (%s reader)", cr.peerID, t)
+			close(cr.done)
 			return
 		}
 	}
@@ -364,7 +373,7 @@ func (cr *streamReader) decodeLoop(rc io.ReadCloser, t streamType) error {
 			continue
 		}
 
-		if isLinkHeartbeatMessage(m) {
+		if isLinkHeartbeatMessage(&m) {
 			// raft is not interested in link layer
 			// heartbeat message, so we should ignore
 			// it.
@@ -383,6 +392,7 @@ func (cr *streamReader) decodeLoop(rc io.ReadCloser, t streamType) error {
 				plog.MergeWarningf("dropped internal raft message from %s since receiving buffer is full (overloaded network)", types.ID(m.From))
 			}
 			plog.Debugf("dropped %s from %s since receiving buffer is full", m.Type, types.ID(m.From))
+			recvFailures.WithLabelValues(types.ID(m.From).String()).Inc()
 		}
 	}
 }
@@ -423,7 +433,7 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("stream reader is stopped")
 	default:
 	}
-	cr.cancel = httputil.RequestCanceler(cr.tr.streamRt, req)
+	cr.cancel = httputil.RequestCanceler(req)
 	cr.mu.Unlock()
 
 	resp, err := cr.tr.streamRt.RoundTrip(req)
@@ -444,18 +454,14 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 	case http.StatusGone:
 		httputil.GracefulClose(resp)
 		cr.picker.unreachable(u)
-		err := fmt.Errorf("the member has been permanently removed from the cluster")
-		select {
-		case cr.errorc <- err:
-		default:
-		}
-		return nil, err
+		reportCriticalError(errMemberRemoved, cr.errorc)
+		return nil, errMemberRemoved
 	case http.StatusOK:
 		return resp.Body, nil
 	case http.StatusNotFound:
 		httputil.GracefulClose(resp)
 		cr.picker.unreachable(u)
-		return nil, fmt.Errorf("peer %s faild to fine local node %s", cr.peerID, cr.tr.ID)
+		return nil, fmt.Errorf("peer %s failed to find local node %s", cr.peerID, cr.tr.ID)
 	case http.StatusPreconditionFailed:
 		b, err := ioutil.ReadAll(resp.Body)
 		if err != nil {

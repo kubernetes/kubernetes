@@ -113,6 +113,10 @@ func (m *baseControllerRefManager) claimObject(obj metav1.Object, match func(met
 		// Ignore if we're being deleted or selector doesn't match.
 		return false, nil
 	}
+	if obj.GetDeletionTimestamp() != nil {
+		// Ignore if the object is being deleted
+		return false, nil
+	}
 	// Selector matches. Try to adopt.
 	if err := adopt(obj); err != nil {
 		// If the pod no longer exists, ignore the error.

@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest/fake"
@@ -46,6 +47,7 @@ import (
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -275,13 +277,13 @@ func TestInitFederation(t *testing.T) {
 			// Actual data passed are tested in the fake secret and cluster
 			// REST clients.
 			endpoint := getEndpoint(tc.apiserverServiceType, tc.lbIP, tc.advertiseAddress)
-			want := fmt.Sprintf("Federation API server is running at: %s\n", endpoint)
+			wantedSuffix := fmt.Sprintf("Federation API server is running at: %s\n", endpoint)
 			if tc.dryRun != "" {
-				want = fmt.Sprintf("Federation control plane runs (dry run)\n")
+				wantedSuffix = fmt.Sprintf("Federation control plane runs (dry run)\n")
 			}
 
-			if got := buf.String(); got != want {
-				t.Errorf("[%d] unexpected output: got: %s, want: %s", i, got, want)
+			if got := buf.String(); !strings.HasSuffix(got, wantedSuffix) {
+				t.Errorf("[%d] unexpected output: got: %s, wanted suffix: %s", i, got, wantedSuffix)
 				if cmdErrMsg != "" {
 					t.Errorf("[%d] unexpected error message: %s", i, cmdErrMsg)
 				}
@@ -644,9 +646,10 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 			Selector: apiserverSvcSelector,
 			Ports: []v1.ServicePort{
 				{
-					Name:     "https",
-					Protocol: "TCP",
-					Port:     443,
+					Name:       "https",
+					Protocol:   "TCP",
+					Port:       443,
+					TargetPort: intstr.FromString(apiServerSecurePortName),
 				},
 			},
 		},
@@ -835,7 +838,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	apiserverArgs := []string{
 		"--bind-address=0.0.0.0",
 		"--etcd-servers=http://localhost:2379",
-		"--secure-port=443",
+		fmt.Sprintf("--secure-port=%d", apiServerSecurePort),
 		"--tls-cert-file=/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file=/etc/federation/apiserver/server.key",
 		"--admission-control=NamespaceLifecycle",
@@ -886,8 +889,8 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 							Command: apiserverCommand,
 							Ports: []v1.ContainerPort{
 								{
-									Name:          "https",
-									ContainerPort: 443,
+									Name:          apiServerSecurePortName,
+									ContainerPort: apiServerSecurePort,
 								},
 								{
 									Name:          "local",
@@ -1243,7 +1246,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, sa) {
+				if !helper.Semantic.DeepEqual(got, sa) {
 					return nil, fmt.Errorf("unexpected service account object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, sa))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &sa)}, nil
@@ -1257,7 +1260,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, role) {
+				if !helper.Semantic.DeepEqual(got, role) {
 					return nil, fmt.Errorf("unexpected role object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, role))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &role)}, nil
@@ -1271,7 +1274,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, rolebinding) {
+				if !helper.Semantic.DeepEqual(got, rolebinding) {
 					return nil, fmt.Errorf("unexpected rolebinding object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, rolebinding))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &rolebinding)}, nil

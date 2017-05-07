@@ -284,7 +284,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/storage/redis": {
 			"redis-controller":          &api.ReplicationController{},
 			"redis-master":              &api.Pod{},
-			"redis-proxy":               &api.Pod{},
 			"redis-sentinel-controller": &api.ReplicationController{},
 			"redis-sentinel-service":    &api.Service{},
 		},

@@ -196,8 +196,7 @@ func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []stri
 				}
 			}
 		} else {
-			err = addKeyFromFileToConfigMap(configMap, keyName, filePath)
-			if err != nil {
+			if err := addKeyFromFileToConfigMap(configMap, keyName, filePath); err != nil {
 				return err
 			}
 		}

@@ -444,6 +444,15 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			Spec: validPodSpecAbc,
 		},
 	}
+	validPodTemplateAbcSemanticallyEqual := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validSelector,
+			},
+			Spec: validPodSpecAbc,
+		},
+	}
+	validPodTemplateAbcSemanticallyEqual.Template.Spec.ImagePullSecrets = []api.LocalObjectReference{}
 	validPodTemplateNodeSelector := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
@@ -609,6 +618,33 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
 					TemplateGeneration: 4,
 					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &extensions.RollingUpdateDaemonSet{
+							MaxUnavailable: intstr.FromInt(1),
+						},
+					},
+				},
+			},
+		},
+		"unchanged templateGeneration upon semantically equal template update": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 4,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 4,
+					Template:           validPodTemplateAbcSemanticallyEqual.Template,
 					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 						Type: extensions.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &extensions.RollingUpdateDaemonSet{
@@ -2310,9 +2346,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	invalidUIDPSP := validPSP()
 	invalidUIDPSP.Spec.RunAsUser.Rule = extensions.RunAsUserStrategyMustRunAs
-	invalidUIDPSP.Spec.RunAsUser.Ranges = []extensions.IDRange{
-		{Min: -1, Max: 1},
-	}
+	invalidUIDPSP.Spec.RunAsUser.Ranges = []extensions.UserIDRange{{Min: -1, Max: 1}}
 
 	missingObjectMetaName := validPSP()
 	missingObjectMetaName.ObjectMeta.Name = ""
@@ -2330,17 +2364,17 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidSupGroupStratType.Spec.SupplementalGroups.Rule = "invalid"
 
 	invalidRangeMinGreaterThanMax := validPSP()
-	invalidRangeMinGreaterThanMax.Spec.FSGroup.Ranges = []extensions.IDRange{
+	invalidRangeMinGreaterThanMax.Spec.FSGroup.Ranges = []extensions.GroupIDRange{
 		{Min: 2, Max: 1},
 	}
 
 	invalidRangeNegativeMin := validPSP()
-	invalidRangeNegativeMin.Spec.FSGroup.Ranges = []extensions.IDRange{
+	invalidRangeNegativeMin.Spec.FSGroup.Ranges = []extensions.GroupIDRange{
 		{Min: -1, Max: 10},
 	}
 
 	invalidRangeNegativeMax := validPSP()
-	invalidRangeNegativeMax.Spec.FSGroup.Ranges = []extensions.IDRange{
+	invalidRangeNegativeMax.Spec.FSGroup.Ranges = []extensions.GroupIDRange{
 		{Min: 1, Max: -10},
 	}
 
@@ -2522,7 +2556,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	mustRunAs.Spec.FSGroup.Rule = extensions.FSGroupStrategyMustRunAs
 	mustRunAs.Spec.SupplementalGroups.Rule = extensions.SupplementalGroupsStrategyMustRunAs
 	mustRunAs.Spec.RunAsUser.Rule = extensions.RunAsUserStrategyMustRunAs
-	mustRunAs.Spec.RunAsUser.Ranges = []extensions.IDRange{
+	mustRunAs.Spec.RunAsUser.Ranges = []extensions.UserIDRange{
 		{Min: 1, Max: 1},
 	}
 	mustRunAs.Spec.SELinux.Rule = extensions.SELinuxStrategyMustRunAs

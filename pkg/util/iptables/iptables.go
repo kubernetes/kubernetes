@@ -19,13 +19,18 @@ package iptables
 import (
 	"bytes"
 	"fmt"
+	"net"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 
 	godbus "github.com/godbus/dbus"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
@@ -122,35 +127,54 @@ const MinCheckVersion = "1.4.11"
 const MinWaitVersion = "1.4.20"
 const MinWait2Version = "1.4.22"
 
+const LockfilePath16x = "/run/xtables.lock"
+
 // runner implements Interface in terms of exec("iptables").
 type runner struct {
-	mu       sync.Mutex
-	exec     utilexec.Interface
-	dbus     utildbus.Interface
-	protocol Protocol
-	hasCheck bool
-	waitFlag []string
+	mu              sync.Mutex
+	exec            utilexec.Interface
+	dbus            utildbus.Interface
+	protocol        Protocol
+	hasCheck        bool
+	waitFlag        []string
+	restoreWaitFlag []string
+	lockfilePath    string
 
 	reloadFuncs []func()
 	signal      chan *godbus.Signal
 }
 
-// New returns a new Interface which will exec iptables.
-func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) Interface {
+// newInternal returns a new Interface which will exec iptables, and allows the
+// caller to change the iptables-restore lockfile path
+func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol, lockfilePath string) Interface {
 	vstring, err := getIPTablesVersionString(exec)
 	if err != nil {
 		glog.Warningf("Error checking iptables version, assuming version at least %s: %v", MinCheckVersion, err)
 		vstring = MinCheckVersion
 	}
-	runner := &runner{
-		exec:     exec,
-		dbus:     dbus,
-		protocol: protocol,
-		hasCheck: getIPTablesHasCheckCommand(vstring),
-		waitFlag: getIPTablesWaitFlag(vstring),
+
+	if lockfilePath == "" {
+		lockfilePath = LockfilePath16x
 	}
+
+	runner := &runner{
+		exec:            exec,
+		dbus:            dbus,
+		protocol:        protocol,
+		hasCheck:        getIPTablesHasCheckCommand(vstring),
+		waitFlag:        getIPTablesWaitFlag(vstring),
+		restoreWaitFlag: getIPTablesRestoreWaitFlag(exec),
+		lockfilePath:    lockfilePath,
+	}
+	// TODO this needs to be moved to a separate Start() or Run() function so that New() has zero side
+	// effects.
 	runner.connectToFirewallD()
 	return runner
+}
+
+// New returns a new Interface which will exec iptables.
+func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) Interface {
+	return newInternal(exec, dbus, protocol, "")
 }
 
 // Destroy is part of Interface.
@@ -322,6 +346,71 @@ func (runner *runner) RestoreAll(data []byte, flush FlushFlag, counters RestoreC
 	return runner.restoreInternal(args, data, flush, counters)
 }
 
+type locker struct {
+	lock16 *os.File
+	lock14 *net.UnixListener
+}
+
+func (l *locker) Close() {
+	if l.lock16 != nil {
+		l.lock16.Close()
+	}
+	if l.lock14 != nil {
+		l.lock14.Close()
+	}
+}
+
+func (runner *runner) grabIptablesLocks() (*locker, error) {
+	var err error
+	var success bool
+
+	l := &locker{}
+	defer func(l *locker) {
+		// Clean up immediately on failure
+		if !success {
+			l.Close()
+		}
+	}(l)
+
+	if len(runner.restoreWaitFlag) > 0 {
+		// iptables-restore supports --wait; no need to grab locks
+		return l, nil
+	}
+
+	// Grab both 1.6.x and 1.4.x-style locks; we don't know what the
+	// iptables-restore version is if it doesn't support --wait, so we
+	// can't assume which lock method it'll use.
+
+	// Roughly duplicate iptables 1.6.x xtables_lock() function.
+	l.lock16, err = os.OpenFile(runner.lockfilePath, os.O_CREATE, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open iptables lock %s: %v", runner.lockfilePath, err)
+	}
+
+	if err := wait.PollImmediate(200*time.Millisecond, 2*time.Second, func() (bool, error) {
+		if err := syscall.Flock(int(l.lock16.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to acquire new iptables lock: %v", err)
+	}
+
+	// Roughly duplicate iptables 1.4.x xtables_lock() function.
+	if err := wait.PollImmediate(200*time.Millisecond, 2*time.Second, func() (bool, error) {
+		l.lock14, err = net.ListenUnix("unix", &net.UnixAddr{Name: "@xtables", Net: "unix"})
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to acquire old iptables lock: %v", err)
+	}
+
+	success = true
+	return l, nil
+}
+
 // restoreInternal is the shared part of Restore/RestoreAll
 func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
 	runner.mu.Lock()
@@ -334,9 +423,19 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 		args = append(args, "--counters")
 	}
 
+	// Grab the iptables lock to prevent iptables-restore and iptables
+	// from stepping on each other.  iptables-restore 1.6.2 will have
+	// a --wait option like iptables itself, but that's not widely deployed.
+	locker, err := runner.grabIptablesLocks()
+	if err != nil {
+		return err
+	}
+	defer locker.Close()
+
 	// run the command and return the output or an error including the output and error
-	glog.V(4).Infof("running iptables-restore %v", args)
-	cmd := runner.exec.Command(cmdIPTablesRestore, args...)
+	fullArgs := append(runner.restoreWaitFlag, args...)
+	glog.V(4).Infof("running iptables-restore %v", fullArgs)
+	cmd := runner.exec.Command(cmdIPTablesRestore, fullArgs...)
 	cmd.SetStdin(bytes.NewBuffer(data))
 	b, err := cmd.CombinedOutput()
 	if err != nil {
@@ -508,6 +607,46 @@ func getIPTablesWaitFlag(vstring string) []string {
 func getIPTablesVersionString(exec utilexec.Interface) (string, error) {
 	// this doesn't access mutable state so we don't need to use the interface / runner
 	bytes, err := exec.Command(cmdIPTables, "--version").CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	versionMatcher := regexp.MustCompile("v([0-9]+(\\.[0-9]+)+)")
+	match := versionMatcher.FindStringSubmatch(string(bytes))
+	if match == nil {
+		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
+	}
+	return match[1], nil
+}
+
+// Checks if iptables-restore has a "wait" flag
+// --wait support landed in v1.6.1+ right before --version support, so
+// any version of iptables-restore that supports --version will also
+// support --wait
+func getIPTablesRestoreWaitFlag(exec utilexec.Interface) []string {
+	vstring, err := getIPTablesRestoreVersionString(exec)
+	if err != nil || vstring == "" {
+		glog.V(3).Infof("couldn't get iptables-restore version; assuming it doesn't support --wait")
+		return nil
+	}
+	if _, err := utilversion.ParseGeneric(vstring); err != nil {
+		glog.V(3).Infof("couldn't parse iptables-restore version; assuming it doesn't support --wait")
+		return nil
+	}
+
+	return []string{"--wait=2"}
+}
+
+// getIPTablesRestoreVersionString runs "iptables-restore --version" to get the version string
+// in the form "X.X.X"
+func getIPTablesRestoreVersionString(exec utilexec.Interface) (string, error) {
+	// this doesn't access mutable state so we don't need to use the interface / runner
+
+	// iptables-restore hasn't always had --version, and worse complains
+	// about unrecognized commands but doesn't exit when it gets them.
+	// Work around that by setting stdin to nothing so it exits immediately.
+	cmd := exec.Command(cmdIPTablesRestore, "--version")
+	cmd.SetStdin(bytes.NewReader([]byte{}))
+	bytes, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err
 	}

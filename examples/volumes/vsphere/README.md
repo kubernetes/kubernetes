@@ -94,6 +94,11 @@
           volumePath: "[datastore1] volumes/myDisk"
           fsType: ext4
       ```
+      In the above example datastore1 is located in the root folder. If datastore is member of Datastore Cluster or located in sub folder, the folder path needs to be provided in the VolumePath as below. 
+      ```yaml
+      vsphereVolume:
+          VolumePath:	"[DatastoreCluster/datastore1] volumes/myDisk" 
+      ```
 
       [Download example](vsphere-volume-pv.yaml?raw=true)
 
@@ -233,7 +238,13 @@
       parameters:
           diskformat: zeroedthick
           datastore: VSANDatastore
-      ```
+      ```     
+      If datastore is member of DataStore Cluster or within some sub folder, the datastore folder path needs to be provided in the datastore parameter as below.
+
+       ```yaml
+       parameters:
+          datastore:	DatastoreCluster/VSANDatastore
+       ```
 
       [Download example](vsphere-volume-sc-with-datastore.yaml?raw=true)
       Creating the storageclass:

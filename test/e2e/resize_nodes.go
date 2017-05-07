@@ -32,13 +32,11 @@ import (
 )
 
 const (
-	serveHostnameImage        = "gcr.io/google_containers/serve_hostname:v1.4"
-	resizeNodeReadyTimeout    = 2 * time.Minute
-	resizeNodeNotReadyTimeout = 2 * time.Minute
-	nodeReadinessTimeout      = 3 * time.Minute
-	podNotReadyTimeout        = 1 * time.Minute
-	podReadyTimeout           = 2 * time.Minute
-	testPort                  = 9376
+	resizeNodeReadyTimeout = 2 * time.Minute
+	nodeReadinessTimeout   = 3 * time.Minute
+	podNotReadyTimeout     = 1 * time.Minute
+	podReadyTimeout        = 2 * time.Minute
+	testPort               = 9376
 )
 
 func svcByName(name string, port int) *v1.Service {
@@ -68,7 +66,7 @@ func newSVCByName(c clientset.Interface, ns, name string) error {
 func newRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64) (*v1.ReplicationController, error) {
 	By(fmt.Sprintf("creating replication controller %s", name))
 	return c.Core().ReplicationControllers(ns).Create(framework.RcByNamePort(
-		name, replicas, serveHostnameImage, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
+		name, replicas, framework.ServeHostnameImage, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
 }
 
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {

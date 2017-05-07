@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -209,7 +210,6 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			}
 		}
 		node.Spec.Taints = taints
-
 	}
 	// Initially, set NodeNetworkUnavailable to true.
 	if kl.providerRequiresNetworkingConfiguration() {
@@ -465,7 +465,6 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 			return fmt.Errorf("can't get ip address of node %s. error: %v", node.Name, err)
 		} else {
 			node.Status.Addresses = []v1.NodeAddress{
-				{Type: v1.NodeLegacyHostIP, Address: ipAddr.String()},
 				{Type: v1.NodeInternalIP, Address: ipAddr.String()},
 				{Type: v1.NodeHostName, Address: kl.GetHostname()},
 			}
@@ -532,7 +531,7 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 	// present in capacity.
 	for k := range node.Status.Allocatable {
 		_, found := node.Status.Capacity[k]
-		if !found && v1.IsOpaqueIntResourceName(k) {
+		if !found && v1helper.IsOpaqueIntResourceName(k) {
 			delete(node.Status.Allocatable, k)
 		}
 	}

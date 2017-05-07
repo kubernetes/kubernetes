@@ -127,11 +127,14 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 	}
 	if item, ok := o.definitions[name]; ok {
 		schema := spec.Schema{
+			VendorExtensible:   item.Schema.VendorExtensible,
 			SchemaProps:        item.Schema.SchemaProps,
 			SwaggerSchemaProps: item.Schema.SwaggerSchemaProps,
 		}
 		if extensions != nil {
-			schema.Extensions = spec.Extensions{}
+			if schema.Extensions == nil {
+				schema.Extensions = spec.Extensions{}
+			}
 			for k, v := range extensions {
 				schema.Extensions[k] = v
 			}

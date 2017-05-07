@@ -90,7 +90,7 @@ parameters:
 *  `aggregation_level`: specifies the number of chunks the volume would be distributed into, 0 indicates a non-aggregated volume (default: `0`)
 *  `ephemeral`: ephemeral storage [true/false] (default `false`)
 
-For a complete example refer ([Portworx Volume docs](../../volumes/portworx/README.md))
+For a complete example refer ([Portworx Volume docs](../volumes/portworx/README.md))
 
 #### GLUSTERFS
 
@@ -121,11 +121,11 @@ When both `restuserkey` and `secretNamespace` + `secretName` is specified, the s
 * `clusterid`: `630372ccdc720a92c681fb928f27b53f` is the ID of the cluster which will be used by Heketi when provisioning the volume. It can also be a list of clusterids, for ex:
 "8452344e2becec931ece4e33c4674e4e,42982310de6c63381718ccfa6d8cf397". This is an optional parameter.
 
-Example of a secret can be found in [glusterfs-provisioning-secret.yaml](glusterfs-provisioning-secret.yaml).
+Example of a secret can be found in [glusterfs-secret.yaml](glusterfs/glusterfs-secret.yaml).
 
 * `gidMin` + `gidMax` : The minimum and maximum value of GID range for the storage class. A unique value (GID) in this range ( gidMin-gidMax ) will be used for dynamically provisioned volumes. These are optional values. If not specified, the volume will be provisioned with a value between 2000-2147483647 which are defaults for gidMin and gidMax respectively.
 
-* `volumetype` : The volume type and it's parameters can be configured with this optional value. If the volume type is not mentioned, it's up to the provisioner to decide the volume type.
+* `volumetype` : The volume type and its parameters can be configured with this optional value. If the volume type is not mentioned, it's up to the provisioner to decide the volume type.
 For example:
   'Replica volume':
     `volumetype: replicate:3` where '3' is replica count.
@@ -134,8 +134,9 @@ For example:
   'Distribute volume':
     `volumetype: none`
 
-For available volume types and it's administration options refer: ([Administration Guide](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/3.1/html/Administration_Guide/part-Overview.html))
+For available volume types and its administration options refer: ([Administration Guide](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/3.1/html/Administration_Guide/part-Overview.html))
 
+Reference : ([How to configure Gluster on Kubernetes](https://github.com/gluster/gluster-kubernetes/blob/master/docs/setup-guide.md))
 Reference : ([How to configure Heketi](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
 
 When the persistent volumes are dynamically provisioned, the Gluster plugin automatically create an endpoint and a headless service in the name `gluster-dynamic-<claimname>`. This dynamic endpoint and service will be deleted automatically when the persistent volume claim is deleted.

@@ -16,10 +16,12 @@ package etcdserver
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"github.com/coreos/etcd/pkg/netutil"
 	"github.com/coreos/etcd/pkg/transport"
@@ -55,8 +57,6 @@ type ServerConfig struct {
 
 	StrictReconfigCheck bool
 
-	EnablePprof bool
-
 	// ClientCertAuthEnabled is true when cert has been signed by the client CA.
 	ClientCertAuthEnabled bool
 }
@@ -64,7 +64,10 @@ type ServerConfig struct {
 // VerifyBootstrap sanity-checks the initial config for bootstrap case
 // and returns an error for things that should never happen.
 func (c *ServerConfig) VerifyBootstrap() error {
-	if err := c.verifyLocalMember(true); err != nil {
+	if err := c.hasLocalMember(); err != nil {
+		return err
+	}
+	if err := c.advertiseMatchesCluster(); err != nil {
 		return err
 	}
 	if checkDuplicateURL(c.InitialPeerURLsMap) {
@@ -79,10 +82,9 @@ func (c *ServerConfig) VerifyBootstrap() error {
 // VerifyJoinExisting sanity-checks the initial config for join existing cluster
 // case and returns an error for things that should never happen.
 func (c *ServerConfig) VerifyJoinExisting() error {
-	// no need for strict checking since the member have announced its
-	// peer urls to the cluster before starting and do not have to set
-	// it in the configuration again.
-	if err := c.verifyLocalMember(false); err != nil {
+	// The member has announced its peer urls to the cluster before starting; no need to
+	// set the configuration again.
+	if err := c.hasLocalMember(); err != nil {
 		return err
 	}
 	if checkDuplicateURL(c.InitialPeerURLsMap) {
@@ -94,39 +96,38 @@ func (c *ServerConfig) VerifyJoinExisting() error {
 	return nil
 }
 
-// verifyLocalMember verifies the configured member is in configured
-// cluster. If strict is set, it also verifies the configured member
-// has the same peer urls as configured advertised peer urls.
-func (c *ServerConfig) verifyLocalMember(strict bool) error {
-	urls := c.InitialPeerURLsMap[c.Name]
-	// Make sure the cluster at least contains the local server.
-	if urls == nil {
+// hasLocalMember checks that the cluster at least contains the local server.
+func (c *ServerConfig) hasLocalMember() error {
+	if urls := c.InitialPeerURLsMap[c.Name]; urls == nil {
 		return fmt.Errorf("couldn't find local name %q in the initial cluster configuration", c.Name)
-	}
-
-	// Advertised peer URLs must match those in the cluster peer list
-	apurls := c.PeerURLs.StringSlice()
-	sort.Strings(apurls)
-	urls.Sort()
-	if strict {
-		if !netutil.URLStringsEqual(apurls, urls.StringSlice()) {
-			umap := map[string]types.URLs{c.Name: c.PeerURLs}
-			return fmt.Errorf("--initial-cluster must include %s given --initial-advertise-peer-urls=%s", types.URLsMap(umap).String(), strings.Join(apurls, ","))
-		}
 	}
 	return nil
 }
 
-func (c *ServerConfig) MemberDir() string { return path.Join(c.DataDir, "member") }
+// advertiseMatchesCluster confirms peer URLs match those in the cluster peer list.
+func (c *ServerConfig) advertiseMatchesCluster() error {
+	urls, apurls := c.InitialPeerURLsMap[c.Name], c.PeerURLs.StringSlice()
+	urls.Sort()
+	sort.Strings(apurls)
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+	if !netutil.URLStringsEqual(ctx, apurls, urls.StringSlice()) {
+		umap := map[string]types.URLs{c.Name: c.PeerURLs}
+		return fmt.Errorf("--initial-cluster must include %s given --initial-advertise-peer-urls=%s", types.URLsMap(umap).String(), strings.Join(apurls, ","))
+	}
+	return nil
+}
+
+func (c *ServerConfig) MemberDir() string { return filepath.Join(c.DataDir, "member") }
 
 func (c *ServerConfig) WALDir() string {
 	if c.DedicatedWALDir != "" {
 		return c.DedicatedWALDir
 	}
-	return path.Join(c.MemberDir(), "wal")
+	return filepath.Join(c.MemberDir(), "wal")
 }
 
-func (c *ServerConfig) SnapDir() string { return path.Join(c.MemberDir(), "snap") }
+func (c *ServerConfig) SnapDir() string { return filepath.Join(c.MemberDir(), "snap") }
 
 func (c *ServerConfig) ShouldDiscover() bool { return c.DiscoveryURL != "" }
 

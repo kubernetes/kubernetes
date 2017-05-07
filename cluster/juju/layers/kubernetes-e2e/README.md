@@ -20,7 +20,7 @@ and then relate the `kubernetes-e2e` charm.
 
 ```shell
 juju deploy kubernetes-core
-juju deploy kubernetes-e2e
+juju deploy cs:~containers/kubernetes-e2e
 juju add-relation kubernetes-e2e kubernetes-master
 juju add-relation kubernetes-e2e easyrsa
 ```
@@ -73,7 +73,7 @@ a deployed cluster. The following example will skip the `Flaky`, `Slow`, and
 `Feature` labeled tests:
 
 ```shell
-juju run-action kubernetes-e2e/0 skip='\[(Flaky|Slow|Feature:.*)\]'
+juju run-action kubernetes-e2e/0 test skip='\[(Flaky|Slow|Feature:.*)\]'
 ```
 
 > Note: the escaping of the regex due to how bash handles brackets.

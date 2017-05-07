@@ -322,7 +322,6 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 		return nil, err
 	}
 	network := &runtimeapi.PodSandboxNetworkStatus{Ip: IP}
-	netNS := getNetworkNamespace(r)
 	hostNetwork := sharesHostNetwork(r)
 
 	// If the sandbox has no containerTypeLabelKey label, treat it as a legacy sandbox.
@@ -351,7 +350,6 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 		Network:     network,
 		Linux: &runtimeapi.LinuxPodSandboxStatus{
 			Namespaces: &runtimeapi.Namespace{
-				Network: netNS,
 				Options: &runtimeapi.NamespaceOption{
 					HostNetwork: hostNetwork,
 					HostPid:     sharesHostPid(r),
@@ -475,7 +473,9 @@ func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig
 	}
 	hc.CgroupParent = cgroupParent
 	// Apply security context.
-	applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator)
+	if err = applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -541,7 +541,7 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	}
 
 	// Set security options.
-	securityOpts, err := getSandboxSecurityOpts(c, ds.seccompProfileRoot, securityOptSep)
+	securityOpts, err := getSeccompSecurityOpts(sandboxContainerName, c, ds.seccompProfileRoot, securityOptSep)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.Name, err)
 	}
@@ -578,7 +578,7 @@ func sharesHostIpc(container *dockertypes.ContainerJSON) bool {
 
 func setSandboxResources(hc *dockercontainer.HostConfig) {
 	hc.Resources = dockercontainer.Resources{
-		MemorySwap: dockertools.DefaultMemorySwap(),
+		MemorySwap: DefaultMemorySwap(),
 		CPUShares:  defaultSandboxCPUshares,
 		// Use docker's default cpu quota/period.
 	}

@@ -31,6 +31,7 @@ package extensions
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -948,15 +949,23 @@ type RunAsUserStrategyOptions struct {
 	Rule RunAsUserStrategy
 	// Ranges are the allowed ranges of uids that may be used.
 	// +optional
-	Ranges []IDRange
+	Ranges []UserIDRange
 }
 
-// IDRange provides a min/max of an allowed range of IDs.
-type IDRange struct {
+// UserIDRange provides a min/max of an allowed range of UserIDs.
+type UserIDRange struct {
 	// Min is the start of the range, inclusive.
-	Min int64
+	Min types.UnixUserID
 	// Max is the end of the range, inclusive.
-	Max int64
+	Max types.UnixUserID
+}
+
+// GroupIDRange provides a min/max of an allowed range of GroupIDs.
+type GroupIDRange struct {
+	// Min is the start of the range, inclusive.
+	Min types.UnixGroupID
+	// Max is the end of the range, inclusive.
+	Max types.UnixGroupID
 }
 
 // RunAsUserStrategy denotes strategy types for generating RunAsUser values for a
@@ -980,7 +989,7 @@ type FSGroupStrategyOptions struct {
 	// Ranges are the allowed ranges of fs groups.  If you would like to force a single
 	// fs group then supply a single range with the same start and end.
 	// +optional
-	Ranges []IDRange
+	Ranges []GroupIDRange
 }
 
 // FSGroupStrategyType denotes strategy types for generating FSGroup values for a
@@ -1002,7 +1011,7 @@ type SupplementalGroupsStrategyOptions struct {
 	// Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
 	// supplemental group then supply a single range with the same start and end.
 	// +optional
-	Ranges []IDRange
+	Ranges []GroupIDRange
 }
 
 // SupplementalGroupsStrategyType denotes strategy types for determining valid supplemental
@@ -1061,21 +1070,17 @@ type NetworkPolicySpec struct {
 type NetworkPolicyIngressRule struct {
 	// List of ports which should be made accessible on the pods selected for this rule.
 	// Each item in this list is combined using a logical OR.
-	// If this field is not provided, this rule matches all ports (traffic not restricted by port).
-	// If this field is empty, this rule matches no ports (no traffic matches).
+	// If this field is empty or missing, this rule matches all ports (traffic not restricted by port).
 	// If this field is present and contains at least one item, then this rule allows traffic
 	// only if the traffic matches at least one port in the list.
-	// TODO: Update this to be a pointer to slice as soon as auto-generation supports it.
 	// +optional
 	Ports []NetworkPolicyPort
 
 	// List of sources which should be able to access the pods selected for this rule.
 	// Items in this list are combined using a logical OR operation.
-	// If this field is not provided, this rule matches all sources (traffic not restricted by source).
-	// If this field is empty, this rule matches no sources (no traffic matches).
+	// If this field is empty or missing, this rule matches all sources (traffic not restricted by source).
 	// If this field is present and contains at least on item, this rule allows traffic only if the
 	// traffic matches at least one item in the from list.
-	// TODO: Update this to be a pointer to slice as soon as auto-generation supports it.
 	// +optional
 	From []NetworkPolicyPeer
 }
@@ -1100,7 +1105,6 @@ type NetworkPolicyPeer struct {
 
 	// This is a label selector which selects Pods in this namespace.
 	// This field follows standard label selector semantics.
-	// If not provided, this selector selects no pods.
 	// If present but empty, this selector selects all pods in this namespace.
 	// +optional
 	PodSelector *metav1.LabelSelector
@@ -1108,7 +1112,6 @@ type NetworkPolicyPeer struct {
 	// Selects Namespaces using cluster scoped-labels.  This
 	// matches all pods in all namespaces selected by this label selector.
 	// This field follows standard label selector semantics.
-	// If omitted, this selector selects no namespaces.
 	// If present but empty, this selector selects all namespaces.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector

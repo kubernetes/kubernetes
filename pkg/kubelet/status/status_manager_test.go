@@ -33,6 +33,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -184,7 +185,7 @@ func TestNewStatusSetsReadyTransitionTime(t *testing.T) {
 	syncer.SetPodStatus(pod, podStatus)
 	verifyUpdates(t, syncer, 1)
 	status := expectPodStatus(t, syncer, pod)
-	readyCondition := v1.GetPodReadyCondition(status)
+	readyCondition := podutil.GetPodReadyCondition(status)
 	if readyCondition.LastTransitionTime.IsZero() {
 		t.Errorf("Unexpected: last transition time not set")
 	}
@@ -237,8 +238,8 @@ func TestChangedStatusUpdatesLastTransitionTime(t *testing.T) {
 	verifyUpdates(t, syncer, 1)
 	newStatus := expectPodStatus(t, syncer, pod)
 
-	oldReadyCondition := v1.GetPodReadyCondition(oldStatus)
-	newReadyCondition := v1.GetPodReadyCondition(newStatus)
+	oldReadyCondition := podutil.GetPodReadyCondition(oldStatus)
+	newReadyCondition := podutil.GetPodReadyCondition(newStatus)
 	if newReadyCondition.LastTransitionTime.IsZero() {
 		t.Errorf("Unexpected: last transition time not set")
 	}
@@ -276,8 +277,8 @@ func TestUnchangedStatusPreservesLastTransitionTime(t *testing.T) {
 	verifyUpdates(t, syncer, 0)
 	newStatus := expectPodStatus(t, syncer, pod)
 
-	oldReadyCondition := v1.GetPodReadyCondition(oldStatus)
-	newReadyCondition := v1.GetPodReadyCondition(newStatus)
+	oldReadyCondition := podutil.GetPodReadyCondition(oldStatus)
+	newReadyCondition := podutil.GetPodReadyCondition(newStatus)
 	if newReadyCondition.LastTransitionTime.IsZero() {
 		t.Errorf("Unexpected: last transition time not set")
 	}
@@ -323,7 +324,7 @@ func TestSyncPodNoDeadlock(t *testing.T) {
 	pod := getTestPod()
 
 	// Setup fake client.
-	var ret v1.Pod
+	var ret *v1.Pod
 	var err error
 	client.AddReactor("*", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		switch action := action.(type) {
@@ -334,25 +335,26 @@ func TestSyncPodNoDeadlock(t *testing.T) {
 		default:
 			assert.Fail(t, "Unexpected Action: %+v", action)
 		}
-		return true, &ret, err
+		return true, ret, err
 	})
 
 	pod.Status.ContainerStatuses = []v1.ContainerStatus{{State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}}}
 
 	t.Logf("Pod not found.")
-	ret = *pod
+	ret = nil
 	err = errors.NewNotFound(api.Resource("pods"), pod.Name)
 	m.SetPodStatus(pod, getRandomPodStatus())
 	verifyActions(t, m, []core.Action{getAction()})
 
 	t.Logf("Pod was recreated.")
+	ret = getTestPod()
 	ret.UID = "other_pod"
 	err = nil
 	m.SetPodStatus(pod, getRandomPodStatus())
 	verifyActions(t, m, []core.Action{getAction()})
 
 	t.Logf("Pod not deleted (success case).")
-	ret = *pod
+	ret = getTestPod()
 	m.SetPodStatus(pod, getRandomPodStatus())
 	verifyActions(t, m, []core.Action{getAction(), updateAction()})
 
@@ -368,6 +370,7 @@ func TestSyncPodNoDeadlock(t *testing.T) {
 	verifyActions(t, m, []core.Action{getAction(), updateAction()})
 
 	t.Logf("Error case.")
+	ret = nil
 	err = fmt.Errorf("intentional test error")
 	m.SetPodStatus(pod, getRandomPodStatus())
 	verifyActions(t, m, []core.Action{getAction()})

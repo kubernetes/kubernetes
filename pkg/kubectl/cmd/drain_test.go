@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/ref"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -795,7 +796,7 @@ func (m *MyReq) isFor(method string, path string) bool {
 }
 
 func refJson(t *testing.T, o runtime.Object) string {
-	ref, err := api.GetReference(api.Scheme, o)
+	ref, err := ref.GetReference(api.Scheme, o)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

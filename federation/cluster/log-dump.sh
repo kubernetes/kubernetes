@@ -30,7 +30,12 @@ OUTPUT_DIR="${REPORT_DIR}/federation"
 
 # Dumps logs for all pods in a federation.
 function dump_federation_pod_logs() {
-  local -r federation_pod_names=($(kubectl get pods -l 'app=federated-cluster' --namespace=${FEDERATION_NAMESPACE} -o name))
+  local -r federation_pod_names_string="$(kubectl get pods -l 'app=federated-cluster' --namespace=${FEDERATION_NAMESPACE} -o name)"
+  if [[ -z "${federation_pod_names_string}" ]]; then
+    return
+  fi
+
+  local -r federation_pod_names=(${federation_pod_names_string})
   for pod_name in ${federation_pod_names[@]}; do
     # The API server pod has two containers
     if [[ "${pod_name}" == *apiserver* ]]; then
@@ -39,18 +44,18 @@ function dump_federation_pod_logs() {
     fi
 
     kubectl logs "${pod_name}" --namespace="${FEDERATION_NAMESPACE}" \
-        >"${OUTPUT_DIR}/${pod_name#pod/}.log"
+        >"${OUTPUT_DIR}/${pod_name#pods/}.log"
   done
 }
 
 # Dumps logs from all containers in an API server pod.
 # Arguments:
-# - the name of the API server pod, with a pod/ prefix.
+# - the name of the API server pod, with a pods/ prefix.
 function dump_apiserver_pod_logs() {
   local -r apiserver_pod_containers=(apiserver etcd)
   for container in ${apiserver_pod_containers[@]}; do
     kubectl logs "${1}" -c "${container}" --namespace="${FEDERATION_NAMESPACE}" \
-        >"${OUTPUT_DIR}/${1#pod/}-${container}.log"
+        >"${OUTPUT_DIR}/${1#pods/}-${container}.log"
   done
 }
 
@@ -58,7 +63,12 @@ function dump_apiserver_pod_logs() {
 # TODO: This currently only grabs DNS pod logs from the host cluster. It should
 # grab those logs from all clusters in the federation.
 function dump_dns_pod_logs() {
-  local -r dns_pod_names=($(kubectl get pods -l 'k8s-app=kube-dns' --namespace=kube-system -o name))
+  local -r dns_pod_names_string="$(kubectl get pods -l 'k8s-app=kube-dns' --namespace=kube-system -o name)"
+  if [[ -z "${dns_pod_names_string}" ]]; then
+    return
+  fi
+
+  local -r dns_pod_names=(${dns_pod_names_string})
   local -r dns_pod_containers=(kubedns dnsmasq sidecar)
 
   for pod_name in ${dns_pod_names[@]}; do
@@ -66,7 +76,7 @@ function dump_dns_pod_logs() {
     # it has three containers.
     for container in ${dns_pod_containers[@]}; do
       kubectl logs "${pod_name}" -c "${container}" --namespace=kube-system \
-          >"${OUTPUT_DIR}/${pod_name#pod/}-${container}.log"
+          >"${OUTPUT_DIR}/${pod_name#pods/}-${container}.log"
     done
   done
 }

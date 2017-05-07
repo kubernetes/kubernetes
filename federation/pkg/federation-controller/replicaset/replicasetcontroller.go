@@ -57,7 +57,7 @@ import (
 const (
 	FedReplicaSetPreferencesAnnotation = "federation.kubernetes.io/replica-set-preferences"
 	allClustersKey                     = "THE_ALL_CLUSTER_KEY"
-	UserAgentName                      = "Federation-replicaset-Controller"
+	UserAgentName                      = "federation-replicaset-controller"
 	ControllerName                     = "replicasets"
 )
 
@@ -113,7 +113,7 @@ type ReplicaSetController struct {
 func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSetController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(federationClient))
-	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "federated-replicaset-controller"})
+	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: UserAgentName})
 
 	frsc := &ReplicaSetController{
 		fedClient:           federationClient,
@@ -196,7 +196,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	)
 	frsc.replicaSetLister = extensionslisters.NewReplicaSetLister(replicaSetIndexer)
 
-	frsc.fedUpdater = fedutil.NewFederatedUpdater(frsc.fedReplicaSetInformer,
+	frsc.fedUpdater = fedutil.NewFederatedUpdater(frsc.fedReplicaSetInformer, "replicaset", frsc.eventRecorder,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.ReplicaSet)
 			_, err := client.Extensions().ReplicaSets(rs.Namespace).Create(rs)
@@ -215,16 +215,13 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		})
 
 	frsc.deletionHelper = deletionhelper.NewDeletionHelper(
-		frsc.hasFinalizerFunc,
-		frsc.removeFinalizerFunc,
-		frsc.addFinalizerFunc,
+		frsc.updateReplicaSet,
 		// objNameFunc
 		func(obj runtime.Object) string {
 			replicaset := obj.(*extensionsv1.ReplicaSet)
-			return replicaset.Name
+			return fmt.Sprintf("%s/%s", replicaset.Namespace, replicaset.Name)
 		},
 		updateTimeout,
-		frsc.eventRecorder,
 		frsc.fedReplicaSetInformer,
 		frsc.fedUpdater,
 	)
@@ -232,52 +229,11 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	return frsc
 }
 
-// Returns true if the given object has the given finalizer in its ObjectMeta.
-func (frsc *ReplicaSetController) hasFinalizerFunc(obj runtime.Object, finalizer string) bool {
-	replicaset := obj.(*extensionsv1.ReplicaSet)
-	for i := range replicaset.ObjectMeta.Finalizers {
-		if string(replicaset.ObjectMeta.Finalizers[i]) == finalizer {
-			return true
-		}
-	}
-	return false
-}
-
-// Removes the finalizers from the given objects ObjectMeta.
+// Sends the given updated object to apiserver.
 // Assumes that the given object is a replicaset.
-func (frsc *ReplicaSetController) removeFinalizerFunc(obj runtime.Object, finalizers []string) (runtime.Object, error) {
+func (frsc *ReplicaSetController) updateReplicaSet(obj runtime.Object) (runtime.Object, error) {
 	replicaset := obj.(*extensionsv1.ReplicaSet)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range replicaset.ObjectMeta.Finalizers {
-		if !deletionhelper.ContainsString(finalizers, replicaset.ObjectMeta.Finalizers[i]) {
-			newFinalizers = append(newFinalizers, replicaset.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	replicaset.ObjectMeta.Finalizers = newFinalizers
-	replicaset, err := frsc.fedClient.Extensions().ReplicaSets(replicaset.Namespace).Update(replicaset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizers %v from replicaset %s: %v", finalizers, replicaset.Name, err)
-	}
-	return replicaset, nil
-}
-
-// Adds the given finalizers to the given objects ObjectMeta.
-// Assumes that the given object is a replicaset.
-func (frsc *ReplicaSetController) addFinalizerFunc(obj runtime.Object, finalizers []string) (runtime.Object, error) {
-	replicaset := obj.(*extensionsv1.ReplicaSet)
-	replicaset.ObjectMeta.Finalizers = append(replicaset.ObjectMeta.Finalizers, finalizers...)
-	replicaset, err := frsc.fedClient.Extensions().ReplicaSets(replicaset.Namespace).Update(replicaset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizers %v to replicaset %s: %v", finalizers, replicaset.Name, err)
-	}
-	return replicaset, nil
+	return frsc.fedClient.Extensions().ReplicaSets(replicaset.Namespace).Update(replicaset)
 }
 
 func (frsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
@@ -586,26 +542,22 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 
 		if !exists {
 			if replicas > 0 {
-				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "CreateInCluster",
-					"Creating replicaset in cluster %s", clusterName)
-
 				operations = append(operations, fedutil.FederatedOperation{
 					Type:        fedutil.OperationTypeAdd,
 					Obj:         lrs,
 					ClusterName: clusterName,
+					Key:         key,
 				})
 			}
 		} else {
 			currentLrs := lrsObj.(*extensionsv1.ReplicaSet)
 			// Update existing replica set, if needed.
 			if !fedutil.ObjectMetaAndSpecEquivalent(lrs, currentLrs) {
-				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "UpdateInCluster",
-					"Updating replicaset in cluster %s", clusterName)
-
 				operations = append(operations, fedutil.FederatedOperation{
 					Type:        fedutil.OperationTypeUpdate,
 					Obj:         lrs,
 					ClusterName: clusterName,
+					Key:         key,
 				})
 			}
 			fedStatus.Replicas += currentLrs.Status.Replicas
@@ -627,10 +579,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		// Everything is in order
 		return statusAllOk, nil
 	}
-	err = frsc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
-		frsc.eventRecorder.Eventf(frs, api.EventTypeWarning, "FailedUpdateInCluster",
-			"Replicaset update in cluster %s failed: %v", op.ClusterName, operror)
-	})
+	err = frsc.fedUpdater.Update(operations, updateTimeout)
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", key, err)
 		return statusError, err

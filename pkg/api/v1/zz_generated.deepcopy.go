@@ -90,6 +90,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HTTPGetAction, InType: reflect.TypeOf(&HTTPGetAction{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HTTPHeader, InType: reflect.TypeOf(&HTTPHeader{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Handler, InType: reflect.TypeOf(&Handler{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HostAlias, InType: reflect.TypeOf(&HostAlias{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HostPathVolumeSource, InType: reflect.TypeOf(&HostPathVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ISCSIVolumeSource, InType: reflect.TypeOf(&ISCSIVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_KeyToPath, InType: reflect.TypeOf(&KeyToPath{})},
@@ -1174,6 +1175,20 @@ func DeepCopy_v1_Handler(in interface{}, out interface{}, c *conversion.Cloner) 
 			in, out := &in.TCPSocket, &out.TCPSocket
 			*out = new(TCPSocketAction)
 			**out = **in
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_HostAlias(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*HostAlias)
+		out := out.(*HostAlias)
+		*out = *in
+		if in.Hostnames != nil {
+			in, out := &in.Hostnames, &out.Hostnames
+			*out = make([]string, len(*in))
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -2302,7 +2317,7 @@ func DeepCopy_v1_PodSecurityContext(in interface{}, out interface{}, c *conversi
 		}
 		if in.RunAsUser != nil {
 			in, out := &in.RunAsUser, &out.RunAsUser
-			*out = new(int64)
+			*out = new(types.UnixUserID)
 			**out = **in
 		}
 		if in.RunAsNonRoot != nil {
@@ -2312,12 +2327,12 @@ func DeepCopy_v1_PodSecurityContext(in interface{}, out interface{}, c *conversi
 		}
 		if in.SupplementalGroups != nil {
 			in, out := &in.SupplementalGroups, &out.SupplementalGroups
-			*out = make([]int64, len(*in))
+			*out = make([]types.UnixGroupID, len(*in))
 			copy(*out, *in)
 		}
 		if in.FSGroup != nil {
 			in, out := &in.FSGroup, &out.FSGroup
-			*out = new(int64)
+			*out = new(types.UnixGroupID)
 			**out = **in
 		}
 		return nil
@@ -2419,6 +2434,15 @@ func DeepCopy_v1_PodSpec(in interface{}, out interface{}, c *conversion.Cloner) 
 			*out = make([]Toleration, len(*in))
 			for i := range *in {
 				if err := DeepCopy_v1_Toleration(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		if in.HostAliases != nil {
+			in, out := &in.HostAliases, &out.HostAliases
+			*out = make([]HostAlias, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1_HostAlias(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -3052,7 +3076,7 @@ func DeepCopy_v1_SecurityContext(in interface{}, out interface{}, c *conversion.
 		}
 		if in.RunAsUser != nil {
 			in, out := &in.RunAsUser, &out.RunAsUser
-			*out = new(int64)
+			*out = new(types.UnixUserID)
 			**out = **in
 		}
 		if in.RunAsNonRoot != nil {
@@ -3200,11 +3224,6 @@ func DeepCopy_v1_ServiceSpec(in interface{}, out interface{}, c *conversion.Clon
 		}
 		if in.ExternalIPs != nil {
 			in, out := &in.ExternalIPs, &out.ExternalIPs
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.DeprecatedPublicIPs != nil {
-			in, out := &in.DeprecatedPublicIPs, &out.DeprecatedPublicIPs
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}

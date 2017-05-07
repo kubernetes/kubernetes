@@ -32,6 +32,9 @@ MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
+# Accelerators to be attached to each node. Format "type=<accelerator-type>,count=<accelerator-count>"
+# More information on available GPUs here - https://cloud.google.com/compute/docs/gpus/
+NODE_ACCELERATORS=${NODE_ACCELERATORS:-""}
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
 PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
@@ -53,6 +56,11 @@ fi
 
 if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
     NODE_OS_DISTRIBUTION="gci"
+fi
+
+# GPUs supported in GCE do not have compatible drivers in Debian 7.
+if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
+    NODE_ACCELERATORS=""
 fi
 
 # By default a cluster will be started with the master on GCI and nodes on
@@ -77,14 +85,15 @@ INITIAL_ETCD_CLUSTER="${MASTER_NAME}"
 ETCD_QUORUM_READ="${ENABLE_ETCD_QUORUM_READ:-false}"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 NODE_TAG="${INSTANCE_PREFIX}-minion"
-MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
+
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.244.0.0/14}"
+MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
+
 if [[ "${FEDERATION:-}" == true ]]; then
     NODE_SCOPES="${NODE_SCOPES:-compute-rw,monitoring,logging-write,storage-ro,https://www.googleapis.com/auth/ndev.clouddns.readwrite}"
 else
     NODE_SCOPES="${NODE_SCOPES:-compute-rw,monitoring,logging-write,storage-ro}"
 fi
-
 
 # Extra docker options for nodes.
 EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-}"
@@ -134,6 +143,10 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 
+if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
+    FEATURE_GATES="${FEATURE_GATES},Accelerators=true"
+fi
+
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="${KUBE_DNS_SERVER_IP:-10.0.0.10}"
@@ -172,6 +185,25 @@ fi
 
 # Optional: Enable Rescheduler
 ENABLE_RESCHEDULER="${KUBE_ENABLE_RESCHEDULER:-true}"
+
+# Optional: Enable allocation of pod IPs using IP aliases.
+#
+# ALPHA FEATURE.
+#
+# IP_ALIAS_SIZE is the size of the podCIDR allocated to a node.
+# IP_ALIAS_SUBNETWORK is the subnetwork to allocate from. If empty, a
+#   new subnetwork will be created for the cluster.
+ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-false}
+if [ ${ENABLE_IP_ALIASES} = true ]; then
+  # Size of ranges allocated to each node. gcloud alpha supports only /32 and /24.
+  IP_ALIAS_SIZE=${KUBE_GCE_IP_ALIAS_SIZE:-/24}
+  IP_ALIAS_SUBNETWORK=${KUBE_GCE_IP_ALIAS_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-default}
+  # NODE_IP_RANGE is used when ENABLE_IP_ALIASES=true. It is the primary range in
+  # the subnet and is the range used for node instance IPs.
+  NODE_IP_RANGE="${NODE_IP_RANGE:-10.40.0.0/22}"
+  # Add to the provider custom variables.
+  PROVIDER_VARS="${PROVIDER_VARS} ENABLE_IP_ALIASES"
+fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
@@ -213,6 +245,7 @@ ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-true}" # true, false
 # Kernel panic upon soft lockup issue
 SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-false}" # true, false
 
-# Indicates if the values (eg. kube password) in metadata should be treated as
-# canonical, and therefore disk copies ought to be recreated/clobbered.
+# Indicates if the values (i.e. KUBE_USER and KUBE_PASSWORD for basic
+# authentication) in metadata should be treated as canonical, and therefore disk
+# copies ought to be recreated/clobbered.
 METADATA_CLOBBERS_CONFIG=${METADATA_CLOBBERS_CONFIG:-false}

@@ -68,7 +68,7 @@ function updateGodepManifest() {
     GOPATH="${TMP_GOPATH}:${GOPATH}:${KUBE_ROOT}/staging" godep save ${V} ./... 2>&1 | sed 's/^/  /'
 
     echo "Rewriting Godeps.json to remove commits that don't really exist because we haven't pushed the prereqs yet"
-    go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" --client-go-import-path="k8s.io/${repo}"
+    go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" --override-import-path="k8s.io/${repo}"
 
     # commit so that following repos do not see this repo as dirty
     git add vendor >/dev/null
@@ -81,6 +81,10 @@ mkdir -p "${TMP_GOPATH}/src/k8s.io"
 for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
   # we have to skip client-go because it does unusual manipulation of its godeps
   if [ "${repo}" == "client-go" ]; then
+    continue
+  fi
+  # we skip metrics because it's synced to the real repo manually
+  if [ "${repo}" == "metrics" ]; then
     continue
   fi
 

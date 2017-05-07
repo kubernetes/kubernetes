@@ -106,9 +106,14 @@ func ProbeNetworkPlugins(pluginDir, cniConfDir, cniBinDir string) []network.Netw
 	if cniConfDir == "" {
 		cniConfDir = pluginDir
 	}
+
+	binDir := cniBinDir
+	if binDir == "" {
+		binDir = pluginDir
+	}
 	// for each existing plugin, add to the list
-	allPlugins = append(allPlugins, cni.ProbeNetworkPlugins(cniConfDir, cniBinDir)...)
-	allPlugins = append(allPlugins, kubenet.NewPlugin(pluginDir))
+	allPlugins = append(allPlugins, cni.ProbeNetworkPlugins(cniConfDir, binDir)...)
+	allPlugins = append(allPlugins, kubenet.NewPlugin(binDir))
 
 	return allPlugins
 }

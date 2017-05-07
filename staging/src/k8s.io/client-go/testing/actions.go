@@ -47,20 +47,22 @@ func NewGetAction(resource schema.GroupVersionResource, namespace, name string) 
 	return action
 }
 
-func NewRootListAction(resource schema.GroupVersionResource, opts interface{}) ListActionImpl {
+func NewRootListAction(resource schema.GroupVersionResource, kind schema.GroupVersionKind, opts interface{}) ListActionImpl {
 	action := ListActionImpl{}
 	action.Verb = "list"
 	action.Resource = resource
+	action.Kind = kind
 	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
 	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
 
 	return action
 }
 
-func NewListAction(resource schema.GroupVersionResource, namespace string, opts interface{}) ListActionImpl {
+func NewListAction(resource schema.GroupVersionResource, kind schema.GroupVersionKind, namespace string, opts interface{}) ListActionImpl {
 	action := ListActionImpl{}
 	action.Verb = "list"
 	action.Resource = resource
+	action.Kind = kind
 	action.Namespace = namespace
 	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
 	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
@@ -375,7 +377,12 @@ func (a GetActionImpl) GetName() string {
 
 type ListActionImpl struct {
 	ActionImpl
+	Kind             schema.GroupVersionKind
 	ListRestrictions ListRestrictions
+}
+
+func (a ListActionImpl) GetKind() schema.GroupVersionKind {
+	return a.Kind
 }
 
 func (a ListActionImpl) GetListRestrictions() ListRestrictions {

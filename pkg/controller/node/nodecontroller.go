@@ -40,6 +40,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
@@ -109,11 +111,13 @@ type nodeStatusData struct {
 
 type NodeController struct {
 	allocateNodeCIDRs bool
-	cloud             cloudprovider.Interface
-	clusterCIDR       *net.IPNet
-	serviceCIDR       *net.IPNet
-	knownNodeSet      map[string]*v1.Node
-	kubeClient        clientset.Interface
+	allocatorType     CIDRAllocatorType
+
+	cloud        cloudprovider.Interface
+	clusterCIDR  *net.IPNet
+	serviceCIDR  *net.IPNet
+	knownNodeSet map[string]*v1.Node
+	kubeClient   clientset.Interface
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
 	// Value used if sync_nodes_status=False. NodeController will not proactively
@@ -162,9 +166,8 @@ type NodeController struct {
 
 	podInformerSynced cache.InformerSynced
 
-	// allocate/recycle CIDRs for node if allocateNodeCIDRs == true
 	cidrAllocator CIDRAllocator
-	// manages taints
+
 	taintManager *NoExecuteTaintManager
 
 	forcefullyDeletePod        func(*v1.Pod) error
@@ -210,6 +213,7 @@ func NewNodeController(
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSize int,
 	allocateNodeCIDRs bool,
+	allocatorType CIDRAllocatorType,
 	runTaintManager bool,
 	useTaintBasedEvictions bool) (*NodeController, error) {
 	eventBroadcaster := record.NewBroadcaster()
@@ -254,6 +258,7 @@ func NewNodeController(
 		clusterCIDR:                     clusterCIDR,
 		serviceCIDR:                     serviceCIDR,
 		allocateNodeCIDRs:               allocateNodeCIDRs,
+		allocatorType:                   allocatorType,
 		forcefullyDeletePod:             func(p *v1.Pod) error { return forcefullyDeletePod(kubeClient, p) },
 		nodeExistsInCloudProvider:       func(nodeName types.NodeName) (bool, error) { return nodeExistsInCloudProvider(cloud, nodeName) },
 		evictionLimiterQPS:              evictionLimiterQPS,
@@ -309,7 +314,6 @@ func NewNodeController(
 	})
 	nc.podInformerSynced = podInformer.Informer().HasSynced
 
-	nodeEventHandlerFuncs := cache.ResourceEventHandlerFuncs{}
 	if nc.allocateNodeCIDRs {
 		var nodeList *v1.NodeList
 		var err error
@@ -328,30 +332,24 @@ func NewNodeController(
 		}); pollErr != nil {
 			return nil, fmt.Errorf("Failed to list all nodes in %v, cannot proceed without updating CIDR map", apiserverStartupGracePeriod)
 		}
-		nc.cidrAllocator, err = NewCIDRRangeAllocator(kubeClient, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, nodeList)
+
+		switch nc.allocatorType {
+		case RangeAllocatorType:
+			nc.cidrAllocator, err = NewCIDRRangeAllocator(
+				kubeClient, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, nodeList)
+		case CloudAllocatorType:
+			nc.cidrAllocator, err = NewCloudCIDRAllocator(kubeClient, cloud)
+		default:
+			return nil, fmt.Errorf("Invalid CIDR allocator type: %v", nc.allocatorType)
+		}
+
 		if err != nil {
 			return nil, err
 		}
 
-		nodeEventHandlerFuncs = cache.ResourceEventHandlerFuncs{
-			AddFunc: func(originalObj interface{}) {
-				obj, err := api.Scheme.DeepCopy(originalObj)
-				if err != nil {
-					utilruntime.HandleError(err)
-					return
-				}
-				node := obj.(*v1.Node)
-
-				if err := nc.cidrAllocator.AllocateOrOccupyCIDR(node); err != nil {
-					utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
-				}
-				if nc.taintManager != nil {
-					nc.taintManager.NodeUpdated(nil, node)
-				}
-			},
-			UpdateFunc: func(oldNode, newNode interface{}) {
-				node := newNode.(*v1.Node)
-				prevNode := oldNode.(*v1.Node)
+		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: createAddNodeHandler(nc.cidrAllocator.AllocateOrOccupyCIDR),
+			UpdateFunc: createUpdateNodeHandler(func(_, newNode *v1.Node) error {
 				// If the PodCIDR is not empty we either:
 				// - already processed a Node that already had a CIDR after NC restarted
 				//   (cidr is marked as used),
@@ -371,104 +369,33 @@ func NewNodeController(
 				// which prevents it from being assigned to any new node. The cluster
 				// state is correct.
 				// Restart of NC fixes the issue.
-				if node.Spec.PodCIDR == "" {
-					nodeCopy, err := api.Scheme.Copy(node)
-					if err != nil {
-						utilruntime.HandleError(err)
-						return
-					}
-
-					if err := nc.cidrAllocator.AllocateOrOccupyCIDR(nodeCopy.(*v1.Node)); err != nil {
-						utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
-					}
+				if newNode.Spec.PodCIDR == "" {
+					return nc.cidrAllocator.AllocateOrOccupyCIDR(newNode)
 				}
-				if nc.taintManager != nil {
-					nc.taintManager.NodeUpdated(prevNode, node)
-				}
-			},
-			DeleteFunc: func(originalObj interface{}) {
-				obj, err := api.Scheme.DeepCopy(originalObj)
-				if err != nil {
-					utilruntime.HandleError(err)
-					return
-				}
-
-				node, isNode := obj.(*v1.Node)
-				// We can get DeletedFinalStateUnknown instead of *v1.Node here and we need to handle that correctly. #34692
-				if !isNode {
-					deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
-					if !ok {
-						glog.Errorf("Received unexpected object: %v", obj)
-						return
-					}
-					node, ok = deletedState.Obj.(*v1.Node)
-					if !ok {
-						glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
-						return
-					}
-				}
-				if nc.taintManager != nil {
-					nc.taintManager.NodeUpdated(node, nil)
-				}
-				if err := nc.cidrAllocator.ReleaseCIDR(node); err != nil {
-					glog.Errorf("Error releasing CIDR: %v", err)
-				}
-			},
-		}
-	} else {
-		nodeEventHandlerFuncs = cache.ResourceEventHandlerFuncs{
-			AddFunc: func(originalObj interface{}) {
-				obj, err := api.Scheme.DeepCopy(originalObj)
-				if err != nil {
-					utilruntime.HandleError(err)
-					return
-				}
-				node := obj.(*v1.Node)
-				if nc.taintManager != nil {
-					nc.taintManager.NodeUpdated(nil, node)
-				}
-			},
-			UpdateFunc: func(oldNode, newNode interface{}) {
-				node := newNode.(*v1.Node)
-				prevNode := oldNode.(*v1.Node)
-				if nc.taintManager != nil {
-					nc.taintManager.NodeUpdated(prevNode, node)
-
-				}
-			},
-			DeleteFunc: func(originalObj interface{}) {
-				obj, err := api.Scheme.DeepCopy(originalObj)
-				if err != nil {
-					utilruntime.HandleError(err)
-					return
-				}
-
-				node, isNode := obj.(*v1.Node)
-				// We can get DeletedFinalStateUnknown instead of *v1.Node here and we need to handle that correctly. #34692
-				if !isNode {
-					deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
-					if !ok {
-						glog.Errorf("Received unexpected object: %v", obj)
-						return
-					}
-					node, ok = deletedState.Obj.(*v1.Node)
-					if !ok {
-						glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
-						return
-					}
-				}
-				if nc.taintManager != nil {
-					nc.taintManager.NodeUpdated(node, nil)
-				}
-			},
-		}
+				return nil
+			}),
+			DeleteFunc: createDeleteNodeHandler(nc.cidrAllocator.ReleaseCIDR),
+		})
 	}
 
 	if nc.runTaintManager {
+		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: createAddNodeHandler(func(node *v1.Node) error {
+				nc.taintManager.NodeUpdated(nil, node)
+				return nil
+			}),
+			UpdateFunc: createUpdateNodeHandler(func(oldNode, newNode *v1.Node) error {
+				nc.taintManager.NodeUpdated(oldNode, newNode)
+				return nil
+			}),
+			DeleteFunc: createDeleteNodeHandler(func(node *v1.Node) error {
+				nc.taintManager.NodeUpdated(node, nil)
+				return nil
+			}),
+		})
 		nc.taintManager = NewNoExecuteTaintManager(kubeClient)
 	}
 
-	nodeInformer.Informer().AddEventHandler(nodeEventHandlerFuncs)
 	nc.nodeLister = nodeInformer.Lister()
 	nc.nodeInformerSynced = nodeInformer.Informer().HasSynced
 
@@ -525,7 +452,7 @@ func (nc *NodeController) doTaintingPass() {
 				zone := utilnode.GetZoneKey(node)
 				EvictionsNumber.WithLabelValues(zone).Inc()
 			}
-			_, condition := v1.GetNodeCondition(&node.Status, v1.NodeReady)
+			_, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 			// Because we want to mimic NodeStatus.Condition["Ready"] we make "unreachable" and "not ready" taints mutually exclusive.
 			taintToAdd := v1.Taint{}
 			oppositeTaint := v1.Taint{}
@@ -547,37 +474,39 @@ func (nc *NodeController) doTaintingPass() {
 }
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
-func (nc *NodeController) Run() {
-	go func() {
-		defer utilruntime.HandleCrash()
+func (nc *NodeController) Run(stopCh <-chan struct{}) {
+	defer utilruntime.HandleCrash()
 
-		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
-			utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
-			return
+	glog.Infof("Starting node controller")
+	defer glog.Infof("Shutting down node controller")
+
+	if !controller.WaitForCacheSync("node", stopCh, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
+		return
+	}
+
+	// Incorporate the results of node status pushed from kubelet to master.
+	go wait.Until(func() {
+		if err := nc.monitorNodeStatus(); err != nil {
+			glog.Errorf("Error monitoring node status: %v", err)
 		}
+	}, nc.nodeMonitorPeriod, wait.NeverStop)
 
-		// Incorporate the results of node status pushed from kubelet to master.
-		go wait.Until(func() {
-			if err := nc.monitorNodeStatus(); err != nil {
-				glog.Errorf("Error monitoring node status: %v", err)
-			}
-		}, nc.nodeMonitorPeriod, wait.NeverStop)
+	if nc.runTaintManager {
+		go nc.taintManager.Run(wait.NeverStop)
+	}
 
-		if nc.runTaintManager {
-			go nc.taintManager.Run(wait.NeverStop)
-		}
+	if nc.useTaintBasedEvictions {
+		// Handling taint based evictions. Because we don't want a dedicated logic in TaintManager for NC-originated
+		// taints and we normally don't rate limit evictions caused by taints, we need to rate limit adding taints.
+		go wait.Until(nc.doTaintingPass, nodeEvictionPeriod, wait.NeverStop)
+	} else {
+		// Managing eviction of nodes:
+		// When we delete pods off a node, if the node was not empty at the time we then
+		// queue an eviction watcher. If we hit an error, retry deletion.
+		go wait.Until(nc.doEvictionPass, nodeEvictionPeriod, wait.NeverStop)
+	}
 
-		if nc.useTaintBasedEvictions {
-			// Handling taint based evictions. Because we don't want a dedicated logic in TaintManager for NC-originated
-			// taints and we normally don't rate limit evictions caused by taints, we need to rate limit adding taints.
-			go wait.Until(nc.doTaintingPass, nodeEvictionPeriod, wait.NeverStop)
-		} else {
-			// Managing eviction of nodes:
-			// When we delete pods off a node, if the node was not empty at the time we then
-			// queue an eviction watcher. If we hit an error, retry deletion.
-			go wait.Until(nc.doEvictionPass, nodeEvictionPeriod, wait.NeverStop)
-		}
-	}()
+	<-stopCh
 }
 
 // monitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
@@ -665,7 +594,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if observedReadyCondition.Status == v1.ConditionFalse {
 				if nc.useTaintBasedEvictions {
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
-					if v1.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
+					if v1helper.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
 						taintToAdd := *NotReadyTaintTemplate
 						if !swapNodeControllerTaint(nc.kubeClient, &taintToAdd, UnreachableTaintTemplate, node) {
 							glog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
@@ -692,7 +621,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if observedReadyCondition.Status == v1.ConditionUnknown {
 				if nc.useTaintBasedEvictions {
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
-					if v1.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
+					if v1helper.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
 						taintToAdd := *UnreachableTaintTemplate
 						if !swapNodeControllerTaint(nc.kubeClient, &taintToAdd, NotReadyTaintTemplate, node) {
 							glog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
@@ -900,7 +829,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 	var err error
 	var gracePeriod time.Duration
 	var observedReadyCondition v1.NodeCondition
-	_, currentReadyCondition := v1.GetNodeCondition(&node.Status, v1.NodeReady)
+	_, currentReadyCondition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 	if currentReadyCondition == nil {
 		// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
 		// A fake ready condition is created, where LastProbeTime and LastTransitionTime is set
@@ -940,9 +869,9 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 	//     if that's the case, but it does not seem necessary.
 	var savedCondition *v1.NodeCondition
 	if found {
-		_, savedCondition = v1.GetNodeCondition(&savedNodeStatus.status, v1.NodeReady)
+		_, savedCondition = nodeutil.GetNodeCondition(&savedNodeStatus.status, v1.NodeReady)
 	}
-	_, observedCondition := v1.GetNodeCondition(&node.Status, v1.NodeReady)
+	_, observedCondition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 	if !found {
 		glog.Warningf("Missing timestamp for Node %s. Assuming now as a timestamp.", node.Name)
 		savedNodeStatus = nodeStatusData{
@@ -1019,7 +948,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 		remainingNodeConditionTypes := []v1.NodeConditionType{v1.NodeOutOfDisk, v1.NodeMemoryPressure, v1.NodeDiskPressure}
 		nowTimestamp := nc.now()
 		for _, nodeConditionType := range remainingNodeConditionTypes {
-			_, currentCondition := v1.GetNodeCondition(&node.Status, nodeConditionType)
+			_, currentCondition := nodeutil.GetNodeCondition(&node.Status, nodeConditionType)
 			if currentCondition == nil {
 				glog.V(2).Infof("Condition %v of node %v was never updated by kubelet", nodeConditionType, node.Name)
 				node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
@@ -1042,7 +971,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 			}
 		}
 
-		_, currentCondition := v1.GetNodeCondition(&node.Status, v1.NodeReady)
+		_, currentCondition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 		if !apiequality.Semantic.DeepEqual(currentCondition, &observedReadyCondition) {
 			if _, err = nc.kubeClient.Core().Nodes().UpdateStatus(node); err != nil {
 				glog.Errorf("Error updating node %s: %v", node.Name, err)

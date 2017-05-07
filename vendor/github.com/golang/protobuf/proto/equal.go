@@ -54,13 +54,17 @@ Equality is defined in this way:
     in a proto3 .proto file, fields are not "set"; specifically,
     zero length proto3 "bytes" fields are equal (nil == {}).
   - Two repeated fields are equal iff their lengths are the same,
-    and their corresponding elements are equal (a "bytes" field,
-    although represented by []byte, is not a repeated field)
+    and their corresponding elements are equal. Note a "bytes" field,
+    although represented by []byte, is not a repeated field and the
+    rule for the scalar fields described above applies.
   - Two unset fields are equal.
   - Two unknown field sets are equal if their current
     encoded state is equal.
   - Two extension sets are equal iff they have corresponding
     elements that are pairwise equal.
+  - Two map fields are equal iff their lengths are the same,
+    and they contain the same set of elements. Zero-length map
+    fields are equal.
   - Every other combination of things are not equal.
 
 The return value is undefined if a and b are not protocol buffers.

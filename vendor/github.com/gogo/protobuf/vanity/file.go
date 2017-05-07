@@ -1,7 +1,7 @@
-// Extensions for Protocol Buffers to create more go like structures.
+// Protocol Buffers for Go with Gadgets
 //
-// Copyright (c) 2015, Vastech SA (PTY) LTD. All rights reserved.
-// http://github.com/gogo/protobuf/gogoproto
+// Copyright (c) 2015, The GoGo Authors. All rights reserved.
+// http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -29,15 +29,17 @@
 package vanity
 
 import (
-	"strings"
+	"path/filepath"
 
 	"github.com/gogo/protobuf/gogoproto"
 	"github.com/gogo/protobuf/proto"
 	descriptor "github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
 )
 
-func NotInPackageGoogleProtobuf(file *descriptor.FileDescriptorProto) bool {
-	return !strings.HasPrefix(file.GetPackage(), "google.protobuf")
+func NotGoogleProtobufDescriptorProto(file *descriptor.FileDescriptorProto) bool {
+	// can not just check if file.GetName() == "google/protobuf/descriptor.proto" because we do not want to assume compile path
+	_, fileName := filepath.Split(file.GetName())
+	return !(file.GetPackage() == "google.protobuf" && fileName == "descriptor.proto")
 }
 
 func FilterFiles(files []*descriptor.FileDescriptorProto, f func(file *descriptor.FileDescriptorProto) bool) []*descriptor.FileDescriptorProto {
@@ -172,4 +174,8 @@ func TurnOffGoUnrecognizedAll(file *descriptor.FileDescriptorProto) {
 
 func TurnOffGogoImport(file *descriptor.FileDescriptorProto) {
 	SetBoolFileOption(gogoproto.E_GogoprotoImport, false)(file)
+}
+
+func TurnOnCompareAll(file *descriptor.FileDescriptorProto) {
+	SetBoolFileOption(gogoproto.E_CompareAll, true)(file)
 }

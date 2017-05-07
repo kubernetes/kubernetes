@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sort"
 
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 
@@ -101,7 +101,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 
 	// if the current number of replicas has changed update the statefulSets replicas
 	if set.Status.Replicas != int32(ready) || set.Status.ObservedGeneration == nil || set.Generation > *set.Status.ObservedGeneration {
-		obj, err := api.Scheme.Copy(set)
+		obj, err := scheme.Scheme.Copy(set)
 		if err != nil {
 			return fmt.Errorf("unable to copy set: %v", err)
 		}
@@ -132,6 +132,13 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		if !isCreated(replicas[i]) {
 			return ssc.podControl.CreateStatefulPod(set, replicas[i])
 		}
+		// If we find a Pod that is currently terminating, we must wait until graceful deletion
+		// completes before we continue to make  progress.
+		if isTerminating(replicas[i]) {
+			glog.V(2).Infof("StatefulSet %s is waiting for Pod %s to Terminate",
+				set.Name, replicas[i].Name)
+			return nil
+		}
 		// If we have a Pod that has been created but is not running and ready we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Running and Ready.
@@ -145,7 +152,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 			continue
 		}
 		// Make a deep copy so we don't mutate the shared cache
-		copy, err := api.Scheme.DeepCopy(replicas[i])
+		copy, err := scheme.Scheme.DeepCopy(replicas[i])
 		if err != nil {
 			return err
 		}

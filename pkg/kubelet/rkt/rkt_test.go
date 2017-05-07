@@ -972,10 +972,10 @@ func TestSetApp(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	rootUser := int64(0)
-	nonRootUser := int64(42)
+	rootUser := kubetypes.UnixUserID(0)
+	nonRootUser := kubetypes.UnixUserID(42)
 	runAsNonRootTrue := true
-	fsgid := int64(3)
+	fsgid := kubetypes.UnixGroupID(3)
 
 	tests := []struct {
 		container        *v1.Container
@@ -1081,8 +1081,11 @@ func TestSetApp(t *testing.T) {
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
 			podCtx: &v1.PodSecurityContext{
-				SupplementalGroups: []int64{1, 2},
-				FSGroup:            &fsgid,
+				SupplementalGroups: []kubetypes.UnixGroupID{
+					kubetypes.UnixGroupID(1),
+					kubetypes.UnixGroupID(2),
+				},
+				FSGroup: &fsgid,
 			},
 			supplementalGids: []int64{4},
 			expect: &appctypes.App{
@@ -1143,8 +1146,11 @@ func TestSetApp(t *testing.T) {
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
 			podCtx: &v1.PodSecurityContext{
-				SupplementalGroups: []int64{1, 2},
-				FSGroup:            &fsgid,
+				SupplementalGroups: []kubetypes.UnixGroupID{
+					kubetypes.UnixGroupID(1),
+					kubetypes.UnixGroupID(2),
+				},
+				FSGroup: &fsgid,
 			},
 			supplementalGids: []int64{4},
 			expect: &appctypes.App{

@@ -28,8 +28,8 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
     ],
 )
 
@@ -46,8 +46,6 @@ filegroup(
         ":package-srcs",
         "//pkg/util/async:all-srcs",
         "//pkg/util/bandwidth:all-srcs",
-        "//pkg/util/chmod:all-srcs",
-        "//pkg/util/chown:all-srcs",
         "//pkg/util/config:all-srcs",
         "//pkg/util/configz:all-srcs",
         "//pkg/util/crlf:all-srcs",

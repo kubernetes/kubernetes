@@ -78,12 +78,12 @@ func (v *sioVolume) CanMount() error {
 	return nil
 }
 
-func (v *sioVolume) SetUp(fsGroup *int64) error {
+func (v *sioVolume) SetUp(fsGroup *types.UnixGroupID) error {
 	return v.SetUpAt(v.GetPath(), fsGroup)
 }
 
 // SetUp bind mounts the disk global mount to the volume path.
-func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
+func (v *sioVolume) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	v.plugin.volumeMtx.LockKey(v.volSpecName)
 	defer v.plugin.volumeMtx.UnlockKey(v.volSpecName)
 

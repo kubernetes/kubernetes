@@ -60,7 +60,7 @@ function start_kube-aggregator {
 	kubectl delete clusterrolebinding kube-aggregator:system:kube-aggregator > /dev/null 2>&1 || true
 	kubectl create clusterrolebinding kube-aggregator:system:auth-delegator --clusterrole=system:auth-delegator --serviceaccount=kube-public:kube-aggregator
 	kubectl create clusterrolebinding kube-aggregator:system:kube-aggregator --clusterrole=system:kube-aggregator --serviceaccount=kube-public:kube-aggregator
-	kubectl delete rolebinding kube-aggregator:authentication-reader > /dev/null 2>&1 || true
+	kubectl delete rolebinding -n kube-system kube-aggregator:authentication-reader > /dev/null 2>&1 || true
 	kubectl create rolebinding -n kube-system kube-aggregator:authentication-reader --role=extension-apiserver-authentication-reader --serviceaccount=kube-public:kube-aggregator
 
 	# make sure the resources we're about to create don't exist

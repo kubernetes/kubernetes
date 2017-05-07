@@ -78,9 +78,6 @@ const (
 	// Name of the default http backend service
 	defaultBackendName = "default-http-backend"
 
-	// GCEL7SrcRange is the IP src range from which the GCE L7 performs health checks.
-	GCEL7SrcRange = "130.211.0.0/22"
-
 	// Cloud resources created by the ingress controller older than this
 	// are automatically purged to prevent running out of quota.
 	// TODO(37335): write soak tests and bump this up to a week.
@@ -982,7 +979,7 @@ func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressCo
 
 	fw := compute.Firewall{}
 	fw.Name = gceController.GetFirewallRuleName()
-	fw.SourceRanges = []string{GCEL7SrcRange}
+	fw.SourceRanges = gcecloud.LoadBalancerSrcRanges()
 	fw.TargetTags = nodeTags.Items
 	fw.Allowed = []*compute.FirewallAllowed{
 		{

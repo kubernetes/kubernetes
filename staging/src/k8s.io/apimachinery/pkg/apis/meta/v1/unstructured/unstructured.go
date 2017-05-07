@@ -406,6 +406,10 @@ func (u *Unstructured) GetDeletionTimestamp() *metav1.Time {
 }
 
 func (u *Unstructured) SetDeletionTimestamp(timestamp *metav1.Time) {
+	if timestamp == nil {
+		u.setNestedField(nil, "metadata", "deletionTimestamp")
+		return
+	}
 	ts, _ := timestamp.MarshalQueryParameter()
 	u.setNestedField(ts, "metadata", "deletionTimestamp")
 }
@@ -471,7 +475,7 @@ type UnstructuredList struct {
 	Object map[string]interface{}
 
 	// Items is a list of unstructured objects.
-	Items []*Unstructured `json:"items"`
+	Items []Unstructured `json:"items"`
 }
 
 // MarshalJSON ensures that the unstructured list object produces proper
@@ -672,7 +676,7 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 			unstruct.SetKind(itemKind)
 			unstruct.SetAPIVersion(listAPIVersion)
 		}
-		list.Items = append(list.Items, unstruct)
+		list.Items = append(list.Items, *unstruct)
 	}
 	return nil
 }

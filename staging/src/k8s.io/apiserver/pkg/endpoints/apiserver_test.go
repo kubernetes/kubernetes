@@ -679,6 +679,29 @@ func (r *GetWithOptionsRESTStorage) NewGetOptions() (runtime.Object, bool, strin
 
 var _ rest.GetterWithOptions = &GetWithOptionsRESTStorage{}
 
+type GetWithOptionsRootRESTStorage struct {
+	*SimpleTypedStorage
+	optionsReceived runtime.Object
+	takesPath       string
+}
+
+func (r *GetWithOptionsRootRESTStorage) Get(ctx request.Context, name string, options runtime.Object) (runtime.Object, error) {
+	if _, ok := options.(*genericapitesting.SimpleGetOptions); !ok {
+		return nil, fmt.Errorf("Unexpected options object: %#v", options)
+	}
+	r.optionsReceived = options
+	return r.SimpleTypedStorage.Get(ctx, name, &metav1.GetOptions{})
+}
+
+func (r *GetWithOptionsRootRESTStorage) NewGetOptions() (runtime.Object, bool, string) {
+	if len(r.takesPath) > 0 {
+		return &genericapitesting.SimpleGetOptions{}, true, r.takesPath
+	}
+	return &genericapitesting.SimpleGetOptions{}, false, ""
+}
+
+var _ rest.GetterWithOptions = &GetWithOptionsRootRESTStorage{}
+
 type NamedCreaterRESTStorage struct {
 	*SimpleRESTStorage
 	createdName string
@@ -1248,6 +1271,63 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 	}
 }
 
+func TestRootSelfLink(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := GetWithOptionsRootRESTStorage{
+		SimpleTypedStorage: &SimpleTypedStorage{
+			baseType: &genericapitesting.SimpleRoot{}, // a root scoped type
+			item: &genericapitesting.SimpleRoot{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Other:      "foo",
+			},
+		},
+		takesPath: "atAPath",
+	}
+	storage["simple"] = &simpleStorage
+	storage["simple/sub"] = &simpleStorage
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	testCases := []struct {
+		url      string
+		selfLink string
+	}{
+		{
+			url:      server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo",
+			selfLink: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo",
+		},
+		{
+			url:      server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo/sub",
+			selfLink: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo/sub",
+		},
+	}
+
+	for _, test := range testCases {
+		resp, err := http.Get(test.url)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			t.Logf("Data: %s", string(body))
+		}
+		var out genericapitesting.SimpleRoot
+		if _, err := extractBody(resp, &out); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if out.SelfLink != test.selfLink {
+			t.Errorf("unexpected self link: %#v", out.SelfLink)
+		}
+	}
+}
+
 func TestMetadata(t *testing.T) {
 	simpleStorage := &MetadataRESTStorage{&SimpleRESTStorage{}, []string{"text/plain"}}
 	h := handle(map[string]rest.Storage{"simple": simpleStorage})
@@ -1519,87 +1599,123 @@ func TestGetWithOptionsRouteParams(t *testing.T) {
 }
 
 func TestGetWithOptions(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := GetWithOptionsRESTStorage{
-		SimpleRESTStorage: &SimpleRESTStorage{
-			item: genericapitesting.Simple{
-				Other: "foo",
-			},
+
+	tests := []struct {
+		name         string
+		rootScoped   bool
+		requestURL   string
+		expectedPath string
+	}{
+		{
+			name:         "basic",
+			requestURL:   "/namespaces/default/simple/id?param1=test1&param2=test2",
+			expectedPath: "",
+		},
+		{
+			name:         "with path",
+			requestURL:   "/namespaces/default/simple/id/a/different/path?param1=test1&param2=test2",
+			expectedPath: "a/different/path",
+		},
+		{
+			name:         "as subresource",
+			requestURL:   "/namespaces/default/simple/id/subresource/another/different/path?param1=test1&param2=test2",
+			expectedPath: "another/different/path",
+		},
+		{
+			name:         "cluster-scoped basic",
+			rootScoped:   true,
+			requestURL:   "/simple/id?param1=test1&param2=test2",
+			expectedPath: "",
+		},
+		{
+			name:         "cluster-scoped basic with path",
+			rootScoped:   true,
+			requestURL:   "/simple/id/a/cluster/path?param1=test1&param2=test2",
+			expectedPath: "a/cluster/path",
+		},
+		{
+			name:         "cluster-scoped basic as subresource",
+			rootScoped:   true,
+			requestURL:   "/simple/id/subresource/another/cluster/path?param1=test1&param2=test2",
+			expectedPath: "another/cluster/path",
 		},
 	}
-	storage["simple"] = &simpleStorage
-	handler := handle(storage)
-	server := httptest.NewServer(handler)
-	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id?param1=test1&param2=test2")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
-	var itemOut genericapitesting.Simple
-	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	for _, test := range tests {
+		simpleStorage := GetWithOptionsRESTStorage{
+			SimpleRESTStorage: &SimpleRESTStorage{
+				item: genericapitesting.Simple{
+					Other: "foo",
+				},
+			},
+			takesPath: "atAPath",
+		}
+		simpleRootStorage := GetWithOptionsRootRESTStorage{
+			SimpleTypedStorage: &SimpleTypedStorage{
+				baseType: &genericapitesting.SimpleRoot{}, // a root scoped type
+				item: &genericapitesting.SimpleRoot{
+					Other: "foo",
+				},
+			},
+			takesPath: "atAPath",
+		}
 
-	if itemOut.Name != simpleStorage.item.Name {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
-	}
+		storage := map[string]rest.Storage{}
+		if test.rootScoped {
+			storage["simple"] = &simpleRootStorage
+			storage["simple/subresource"] = &simpleRootStorage
+		} else {
+			storage["simple"] = &simpleStorage
+			storage["simple/subresource"] = &simpleStorage
+		}
+		handler := handle(storage)
+		server := httptest.NewServer(handler)
+		defer server.Close()
 
-	opts, ok := simpleStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
-	if !ok {
-		t.Errorf("Unexpected options object received: %#v", simpleStorage.optionsReceived)
-		return
-	}
-	if opts.Param1 != "test1" || opts.Param2 != "test2" {
-		t.Errorf("Did not receive expected options: %#v", opts)
+		resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + test.requestURL)
+		if err != nil {
+			t.Errorf("%s: %v", test.name, err)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("%s: unexpected response: %#v", test.name, resp)
+			continue
+		}
+		var itemOut genericapitesting.Simple
+		body, err := extractBody(resp, &itemOut)
+		if err != nil {
+			t.Errorf("%s: %v", test.name, err)
+			continue
+		}
+
+		if itemOut.Name != simpleStorage.item.Name {
+			t.Errorf("%s: Unexpected data: %#v, expected %#v (%s)", test.name, itemOut, simpleStorage.item, string(body))
+			continue
+		}
+
+		var opts *genericapitesting.SimpleGetOptions
+		var ok bool
+		if test.rootScoped {
+			opts, ok = simpleRootStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
+		} else {
+			opts, ok = simpleStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
+
+		}
+		if !ok {
+			t.Errorf("%s: Unexpected options object received: %#v", test.name, simpleStorage.optionsReceived)
+			continue
+		}
+		if opts.Param1 != "test1" || opts.Param2 != "test2" {
+			t.Errorf("%s: Did not receive expected options: %#v", test.name, opts)
+			continue
+		}
+		if opts.Path != test.expectedPath {
+			t.Errorf("%s: Unexpected path value. Expected: %s. Actual: %s.", test.name, test.expectedPath, opts.Path)
+			continue
+		}
 	}
 }
 
-func TestGetWithOptionsAndPath(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := GetWithOptionsRESTStorage{
-		SimpleRESTStorage: &SimpleRESTStorage{
-			item: genericapitesting.Simple{
-				Other: "foo",
-			},
-		},
-		takesPath: "atAPath",
-	}
-	storage["simple"] = &simpleStorage
-	handler := handle(storage)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id/a/different/path?param1=test1&param2=test2&atAPath=not")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
-	var itemOut genericapitesting.Simple
-	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if itemOut.Name != simpleStorage.item.Name {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
-	}
-
-	opts, ok := simpleStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
-	if !ok {
-		t.Errorf("Unexpected options object received: %#v", simpleStorage.optionsReceived)
-		return
-	}
-	if opts.Param1 != "test1" || opts.Param2 != "test2" || opts.Path != "a/different/path" {
-		t.Errorf("Did not receive expected options: %#v", opts)
-	}
-}
 func TestGetAlternateSelfLink(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{

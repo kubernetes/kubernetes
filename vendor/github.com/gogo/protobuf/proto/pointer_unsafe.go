@@ -29,7 +29,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// +build !appengine
+// +build !appengine,!js
 
 // This file contains the implementation of the proto field accesses using package unsafe.
 
@@ -126,6 +126,10 @@ func structPointer_StringSlice(p structPointer, f field) *[]string {
 }
 
 // ExtMap returns the address of an extension map field in the struct.
+func structPointer_Extensions(p structPointer, f field) *XXX_InternalExtensions {
+	return (*XXX_InternalExtensions)(unsafe.Pointer(uintptr(p) + uintptr(f)))
+}
+
 func structPointer_ExtMap(p structPointer, f field) *map[int32]Extension {
 	return (*map[int32]Extension)(unsafe.Pointer(uintptr(p) + uintptr(f)))
 }

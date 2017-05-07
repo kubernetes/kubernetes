@@ -278,7 +278,9 @@ func TestBind(t *testing.T) {
 			continue
 		}
 		expectedBody := runtime.EncodeOrDie(testapi.Default.Codec(), item.binding)
-		handler.ValidateRequest(t, testapi.Default.ResourcePath("bindings", metav1.NamespaceDefault, ""), "POST", &expectedBody)
+		handler.ValidateRequest(t,
+			testapi.Default.SubResourcePath("pods", metav1.NamespaceDefault, "foo", "binding"),
+			"POST", &expectedBody)
 	}
 }
 
