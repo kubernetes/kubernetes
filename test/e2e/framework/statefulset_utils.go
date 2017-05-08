@@ -482,12 +482,10 @@ func IsStatefulSetPodInitialized(pod v1.Pod) bool {
 
 // NewStatefulSetPVC returns a PersistentVolumeClaim named name, for testing StatefulSets.
 func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
+    classAnything := "anything" 
 	return v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
-			Annotations: map[string]string{
-				"volume.alpha.kubernetes.io/storage-class": "anything",
-			},
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{
@@ -498,6 +496,7 @@ func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 					v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 				},
 			},
+			StorageClassName: &classAnything,
 		},
 	}
 }
