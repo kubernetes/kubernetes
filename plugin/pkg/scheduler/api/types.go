@@ -24,6 +24,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
+const (
+	MaxUint          = ^uint(0)
+	MaxInt           = int(MaxUint >> 1)
+	MaxTotalPriority = MaxInt
+	MaxPriority      = 10
+	MaxWeight        = MaxInt / MaxPriority
+)
+
 type Policy struct {
 	metav1.TypeMeta
 	// Holds the information to configure the fit predicate functions
