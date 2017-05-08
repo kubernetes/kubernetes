@@ -88,7 +88,7 @@ func TestNewWithDelegate(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	wrappingServer.PrepareRun()
-	wrappingServer.RunPostStartHooks()
+	wrappingServer.RunPostStartHooks(stopCh)
 
 	server := httptest.NewServer(wrappingServer.Handler)
 	defer server.Close()

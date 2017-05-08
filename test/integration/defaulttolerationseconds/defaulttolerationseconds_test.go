@@ -34,8 +34,8 @@ func TestAdmission(t *testing.T) {
 	masterConfig.GenericConfig.EnableProfiling = true
 	masterConfig.GenericConfig.EnableMetrics = true
 	masterConfig.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
