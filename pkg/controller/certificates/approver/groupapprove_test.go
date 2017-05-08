@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package certificates
+package approver
 
 import (
 	"testing"
 
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	api "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 )
 
 func TestHasKubeletUsages(t *testing.T) {
 	cases := []struct {
-		usages   []certificates.KeyUsage
+		usages   []api.KeyUsage
 		expected bool
 	}{
 		{
@@ -32,36 +32,36 @@ func TestHasKubeletUsages(t *testing.T) {
 			expected: false,
 		},
 		{
-			usages:   []certificates.KeyUsage{},
+			usages:   []api.KeyUsage{},
 			expected: false,
 		},
 		{
-			usages: []certificates.KeyUsage{
-				certificates.UsageKeyEncipherment,
-				certificates.UsageDigitalSignature,
+			usages: []api.KeyUsage{
+				api.UsageKeyEncipherment,
+				api.UsageDigitalSignature,
 			},
 			expected: false,
 		},
 		{
-			usages: []certificates.KeyUsage{
-				certificates.UsageKeyEncipherment,
-				certificates.UsageDigitalSignature,
-				certificates.UsageServerAuth,
+			usages: []api.KeyUsage{
+				api.UsageKeyEncipherment,
+				api.UsageDigitalSignature,
+				api.UsageServerAuth,
 			},
 			expected: false,
 		},
 		{
-			usages: []certificates.KeyUsage{
-				certificates.UsageKeyEncipherment,
-				certificates.UsageDigitalSignature,
-				certificates.UsageClientAuth,
+			usages: []api.KeyUsage{
+				api.UsageKeyEncipherment,
+				api.UsageDigitalSignature,
+				api.UsageClientAuth,
 			},
 			expected: true,
 		},
 	}
 	for _, c := range cases {
-		if hasExactUsages(&certificates.CertificateSigningRequest{
-			Spec: certificates.CertificateSigningRequestSpec{
+		if hasExactUsages(&api.CertificateSigningRequest{
+			Spec: api.CertificateSigningRequestSpec{
 				Usages: c.usages,
 			},
 		}, kubeletClientUsages) != c.expected {
