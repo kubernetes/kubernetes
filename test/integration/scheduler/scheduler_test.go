@@ -261,8 +261,8 @@ func TestUnschedulableNodes(t *testing.T) {
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
 	informerFactory.Start(schedulerConfig.StopEverything)
-	scheduler.New(schedulerConfig).Run()
-
+	sched, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
+	sched.Run()
 	defer close(schedulerConfig.StopEverything)
 
 	DoTestUnschedulableNodes(t, clientSet, ns, schedulerConfigFactory.GetNodeLister())
@@ -543,7 +543,8 @@ func TestMultiScheduler(t *testing.T) {
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
 	informerFactory.Start(schedulerConfig.StopEverything)
-	scheduler.New(schedulerConfig).Run()
+	sched, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
+	sched.Run()
 	// default-scheduler will be stopped later
 
 	// 2. create a node
@@ -627,8 +628,9 @@ func TestMultiScheduler(t *testing.T) {
 	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(api.Scheme, clientv1.EventSource{Component: "foo-scheduler"})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet2.Core().RESTClient()).Events("")})
 	informerFactory2.Start(schedulerConfig2.StopEverything)
-	scheduler.New(schedulerConfig2).Run()
 
+	sched2, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig2}, nil...)
+	sched2.Run()
 	defer close(schedulerConfig2.StopEverything)
 
 	//	6. **check point-2**:
@@ -735,7 +737,8 @@ func TestAllocatable(t *testing.T) {
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
 	informerFactory.Start(schedulerConfig.StopEverything)
-	scheduler.New(schedulerConfig).Run()
+	sched, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
+	sched.Run()
 	// default-scheduler will be stopped later
 	defer close(schedulerConfig.StopEverything)
 
