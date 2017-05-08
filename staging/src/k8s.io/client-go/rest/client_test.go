@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/util/flowcontrol"
@@ -426,9 +425,10 @@ func restClientWithAlternateURLs(alternateURLs ...string) (*RESTClient, error) {
 	return RESTClientFor(&Config{
 		AlternateHosts: alternateURLs,
 		ContentConfig: ContentConfig{
-			GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
-			NegotiatedSerializer: api.Codecs,
+			GroupVersion:         &v1.SchemeGroupVersion,
+			NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 		},
+
 		Username: "user",
 		Password: "pass",
 	})

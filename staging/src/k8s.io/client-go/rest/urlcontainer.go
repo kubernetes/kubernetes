@@ -70,16 +70,14 @@ func (c *URLContainer) Get() *url.URL {
 
 func (c *URLContainer) renewStickyURL() {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	var urls []*url.URL
 	if c.stickyURL != nil {
-		urls = make([]*url.URL, 0, len(c.order)-1)
-		urls = append(urls, c.order[:c.stickyURLnum]...)
-		urls = append(urls, c.order[c.stickyURLnum+1:]...)
+		// if URL was once selected - we need to choose any not that one
+		c.stickyURLnum = findRngIntExcludingProvided(rng, c.stickyURLnum, len(c.order))
 	} else {
-		urls = c.order
+		// if URL wasnt selected - choose any
+		c.stickyURLnum = rng.Intn(len(c.order))
 	}
-	c.stickyURLnum = rng.Intn(len(urls))
-	c.stickyURL = urls[c.stickyURLnum]
+	c.stickyURL = c.order[c.stickyURLnum]
 }
 
 func (c *URLContainer) renewRateLimiter() {
@@ -101,5 +99,14 @@ func (c *URLContainer) Exclude(u *url.URL) {
 	if !c.ratelimiter.TryAccept() {
 		c.renewStickyURL()
 		c.renewRateLimiter()
+	}
+}
+
+func findRngIntExcludingProvided(rng *rand.Rand, toExclude, length int) int {
+	for {
+		result := rng.Intn(length)
+		if result != toExclude {
+			return result
+		}
 	}
 }

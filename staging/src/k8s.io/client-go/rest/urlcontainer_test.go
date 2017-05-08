@@ -44,11 +44,11 @@ func TestStickyURLContainer(t *testing.T) {
 	if secondURL == firstURL {
 		t.Errorf("After first exclude container should change URL from first one")
 	}
-	if container.Get() != secondURL {
-		t.Errorf("After first exclude container should use second URL as valid ")
+	if gotURL := container.Get(); gotURL != secondURL {
+		t.Errorf("After first exclude container should use second URL as valid, but got %v", gotURL)
 	}
 	container.Exclude(secondURL)
-	if container.Get() != firstURL {
-		t.Errorf("After second exclude container should return back to first URL")
+	if gotURL := container.Get(); gotURL != firstURL {
+		t.Errorf("After second exclude container should return back to first URL, but got %v", gotURL)
 	}
 }
