@@ -20,8 +20,8 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 type Policy struct {
@@ -138,10 +138,10 @@ type ExtenderConfig struct {
 // nodes for a pod.
 type ExtenderArgs struct {
 	// Pod being scheduled
-	Pod apiv1.Pod `json:"pod"`
+	Pod v1.Pod `json:"pod"`
 	// List of candidate nodes where the pod can be scheduled; to be populated
 	// only if ExtenderConfig.NodeCacheCapable == false
-	Nodes *apiv1.NodeList `json:"nodes,omitempty"`
+	Nodes *v1.NodeList `json:"nodes,omitempty"`
 	// List of candidate node names where the pod can be scheduled; to be
 	// populated only if ExtenderConfig.NodeCacheCapable == true
 	NodeNames *[]string `json:"nodenames,omitempty"`
@@ -154,7 +154,7 @@ type FailedNodesMap map[string]string
 type ExtenderFilterResult struct {
 	// Filtered set of nodes where the pod can be scheduled; to be populated
 	// only if ExtenderConfig.NodeCacheCapable == false
-	Nodes *apiv1.NodeList `json:"nodes,omitempty"`
+	Nodes *v1.NodeList `json:"nodes,omitempty"`
 	// Filtered set of nodes where the pod can be scheduled; to be populated
 	// only if ExtenderConfig.NodeCacheCapable == true
 	NodeNames *[]string `json:"nodenames,omitempty"`

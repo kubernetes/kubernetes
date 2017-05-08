@@ -19,11 +19,12 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"github.com/golang/glog"
+
+	"k8s.io/client-go/pkg/api/v1"
+
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
-
-	"github.com/golang/glog"
 )
 
 // LeastRequestedPriority is a priority function that favors nodes with fewer requested resources.

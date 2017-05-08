@@ -18,7 +18,7 @@ package util
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 func GetControllerRef(pod *v1.Pod) *metav1.OwnerReference {

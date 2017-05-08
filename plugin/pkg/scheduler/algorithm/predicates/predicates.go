@@ -25,18 +25,20 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/pkg/api/v1"
+	v1helper "k8s.io/client-go/pkg/api/v1/helper"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api/v1"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
+
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
 // predicatePrecomputations: Helper types/variables...
@@ -1230,7 +1232,7 @@ func PodToleratesNodeTaints(pod *v1.Pod, meta interface{}, nodeInfo *schedulerca
 
 // Determine if a pod is scheduled with best-effort QoS
 func isPodBestEffort(pod *v1.Pod) bool {
-	return qos.GetPodQOS(pod) == v1.PodQOSBestEffort
+	return schedutil.GetPodQOS(pod) == v1.PodQOSBestEffort
 }
 
 // CheckNodeMemoryPressurePredicate checks if a pod can be scheduled on a node

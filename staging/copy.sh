@@ -118,6 +118,7 @@ mkcp "pkg/client/informers/informers_generated/externalversions" "pkg/client/inf
 mkcp "pkg/api/helper" "pkg/api"
 mkcp "pkg/api/v1/resource" "pkg/api/v1"
 mkcp "pkg/api/v1/node" "pkg/api/v1"
+mkcp "pkg/api/v1/helper" "pkg/api/v1"
 
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
   echo "generating vendor/"
