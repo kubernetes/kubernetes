@@ -14,29 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package openapi_test
 
 import (
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 var _ = Describe("Getting the Resources", func() {
 	var client *fakeOpenAPIClient
-	var expectedData *Resources
-	var instance Getter
+	var expectedData *openapi.Resources
+	var instance openapi.Getter
 
 	BeforeEach(func() {
 		client = &fakeOpenAPIClient{}
 		d, err := data.OpenAPISchema()
 		Expect(err).To(BeNil())
 
-		expectedData, err = newOpenAPIData(d)
+		expectedData, err = openapi.NewOpenAPIData(d)
 		Expect(err).To(BeNil())
 
-		instance = NewOpenAPIGetter("", "", client)
+		instance = openapi.NewOpenAPIGetter("", "", client)
 	})
 
 	Context("when the server returns a successful result", func() {
