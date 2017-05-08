@@ -103,9 +103,9 @@ function ensure-local-ssds() {
 function prepare-for-nvidia-driver() {
     modprobe configs
     # Setup a work directory for overlay mounts
-    mkdir -p /home/kubernetes/bin/usr-overlay /home/kubernetes/bin/nvidia-overlay /home/kubernetes/bin/.work /home/kubernetes/bin/lib-overlay
-    mount -t overlay -o lowerdir=/usr,upperdir=/home/kubernetes/bin/usr-overlay,workdir=/home/kubernetes/bin/.work none /usr
-    mount -t overlay -o lowerdir=/lib,upperdir=/home/kubernetes/bin/lib-overlay,workdir=/home/kubernetes/bin/.work none /lib
+    mkdir -p /home/kubernetes/bin/usr-overlay /home/kubernetes/bin/nvidia-overlay /home/kubernetes/bin/usr-overlay-work /home/kubernetes/bin/lib-overlay /home/kubernetes/bin/lib-overlay-work
+    mount -t overlay -o lowerdir=/usr,upperdir=/home/kubernetes/bin/usr-overlay,workdir=/home/kubernetes/bin/usr-overlay-work none /usr
+    mount -t overlay -o lowerdir=/lib,upperdir=/home/kubernetes/bin/lib-overlay,workdir=/home/kubernetes/bin/lib-overlay-work none /lib
 }
 
 # Installs logrotate configuration files
