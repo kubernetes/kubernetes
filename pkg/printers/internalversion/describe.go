@@ -635,11 +635,13 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		}
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), w, "")
 		if len(pod.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\n")
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
+			w.Write(LEVEL_1, "----\t------\t------\n")
 			for _, c := range pod.Status.Conditions {
-				w.Write(LEVEL_1, "%v \t%v \n",
-					c.Type,
-					c.Status)
+				if len(c.Reason) == 0 {
+					c.Reason = "<none>"
+				}
+				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
 			}
 		}
 		describeVolumes(pod.Spec.Volumes, w, "")
@@ -1377,6 +1379,9 @@ func describeReplicationController(controller *api.ReplicationController, events
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
 			w.Write(LEVEL_1, "----\t------\t------\n")
 			for _, c := range controller.Status.Conditions {
+				if len(c.Reason) == 0 {
+					c.Reason = "<none>"
+				}
 				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
 			}
 		}
@@ -1459,6 +1464,9 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
 			w.Write(LEVEL_1, "----\t------\t------\n")
 			for _, c := range rs.Status.Conditions {
+				if len(c.Reason) == 0 {
+					c.Reason = "<none>"
+				}
 				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
 			}
 		}
@@ -1514,6 +1522,16 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		}
 		w.Write(LEVEL_0, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
 		DescribePodTemplate(&job.Spec.Template, w)
+		if len(job.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
+			w.Write(LEVEL_1, "----\t------\t------\n")
+			for _, c := range job.Status.Conditions {
+				if len(c.Reason) == 0 {
+					c.Reason = "<none>"
+				}
+				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
+			}
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -2135,19 +2153,15 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
 		if len(node.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
-			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
+			w.Write(LEVEL_1, "----\t------\t------\n")
 			for _, c := range node.Status.Conditions {
-				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
-					c.Type,
-					c.Status,
-					c.LastHeartbeatTime.Time.Format(time.RFC1123Z),
-					c.LastTransitionTime.Time.Format(time.RFC1123Z),
-					c.Reason,
-					c.Message)
+				if len(c.Reason) == 0 {
+					c.Reason = "<none>"
+				}
+				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
 			}
 		}
-
 		w.Write(LEVEL_0, "Addresses:\n")
 		for _, address := range node.Status.Addresses {
 			w.Write(LEVEL_1, "%s:\t%s\n", address.Type, address.Address)
@@ -2547,6 +2561,9 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
 			w.Write(LEVEL_1, "----\t------\t------\n")
 			for _, c := range d.Status.Conditions {
+				if len(c.Reason) == 0 {
+					c.Reason = "<none>"
+				}
 				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
 			}
 		}
@@ -2713,16 +2730,13 @@ func describeCluster(cluster *federation.Cluster) (string, error) {
 		}
 
 		if len(cluster.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastUpdateTime\tLastTransitionTime\tReason\tMessage\n")
-			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
+			w.Write(LEVEL_1, "----\t------\t------\n")
 			for _, c := range cluster.Status.Conditions {
-				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
-					c.Type,
-					c.Status,
-					c.LastProbeTime.Time.Format(time.RFC1123Z),
-					c.LastTransitionTime.Time.Format(time.RFC1123Z),
-					c.Reason,
-					c.Message)
+				if len(c.Reason) == 0 {
+					c.Reason = "<none>"
+				}
+				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
 			}
 		}
 		return nil
