@@ -1163,20 +1163,22 @@ func (kl *Kubelet) initializeModules() error {
 	// Step 5: Start container manager.
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
-		return fmt.Errorf("Kubelet failed to get node info: %v", err)
+		return fmt.Errorf("failed to get node info: %v", err)
 	}
 
 	if err := kl.containerManager.Start(node, kl.GetActivePods); err != nil {
-		return fmt.Errorf("Failed to start ContainerManager %v", err)
+		return fmt.Errorf("failed to start ContainerManager: %v", err)
 	}
 
 	// Step 6: Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
-		return fmt.Errorf("Failed to start OOM watcher %v", err)
+		return fmt.Errorf("failed to start OOM watcher: %v", err)
 	}
 
 	// Step 7: Initialize GPUs
-	kl.gpuManager.Start()
+	if err := kl.gpuManager.Start(); err != nil {
+		return fmt.Errorf("failed to start GPUManager: %v", err)
+	}
 
 	// Step 8: Start resource analyzer
 	kl.resourceAnalyzer.Start()
