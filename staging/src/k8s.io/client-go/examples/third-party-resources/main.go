@@ -35,6 +35,7 @@ import (
 
 	tprv1 "k8s.io/client-go/examples/third-party-resources/apis/tpr/v1"
 	exampleclient "k8s.io/client-go/examples/third-party-resources/client"
+	examplecontroller "k8s.io/client-go/examples/third-party-resources/controller"
 )
 
 func main() {
@@ -54,12 +55,7 @@ func main() {
 
 	// initialize third party resource if it does not exist
 	err = exampleclient.CreateTPR(clientset)
-	if err == nil {
-		// See the issue https://github.com/kubernetes/features/issues/95
-		// ("Make new TPRs available immediately after the create request succeeds")
-		fmt.Print("Sleeping to make sure the TPR is processed and available\n")
-		time.Sleep(5 * time.Second)
-	} else if !apierrors.IsAlreadyExists(err) {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		panic(err)
 	}
 
@@ -69,15 +65,17 @@ func main() {
 		panic(err)
 	}
 
-	// start a watcher on instances of our TPR
-	watcher := ExampleController{
-		clientset:     clientset,
-		exampleClient: exampleClient,
+	// wait until TPR gets processed
+	exampleclient.WaitForExampleResource(exampleClient)
+
+	// start a controller on instances of our TPR
+	controller := examplecontroller.ExampleController{
+		ExampleClient: exampleClient,
 	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	go watcher.Run(ctx)
+	go controller.Run(ctx)
 
 	// The sleep below is just to make sure that the watcher.Run() goroutine has successfully executed
 	// and the watcher is handling the events about Example TPR instances.
@@ -86,44 +84,28 @@ func main() {
 	// 2. The application with watcher would most probably keep running instead of exiting right after the watcher startup.
 	time.Sleep(5 * time.Second)
 
-	// GET/POST an instance of our TPR
-	var example tprv1.Example
-
-	err = exampleClient.Get().
+	// Create an instance of our TPR
+	example := &tprv1.Example{
+		Metadata: metav1.ObjectMeta{
+			Name: "example1",
+		},
+		Spec: tprv1.ExampleSpec{
+			Foo: "hello",
+			Bar: true,
+		},
+	}
+	var result tprv1.Example
+	err = exampleClient.Post().
 		Resource(tprv1.ExampleResourcePlural).
 		Namespace(apiv1.NamespaceDefault).
-		Name("example1").
-		Do().Into(&example)
-
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// Create an instance of our TPR
-			example := &tprv1.Example{
-				Metadata: metav1.ObjectMeta{
-					Name: "example1",
-				},
-				Spec: tprv1.ExampleSpec{
-					Foo: "hello",
-					Bar: true,
-				},
-			}
-
-			var result tprv1.Example
-			err = exampleClient.Post().
-				Resource(tprv1.ExampleResourcePlural).
-				Namespace(apiv1.NamespaceDefault).
-				Body(example).
-				Do().Into(&result)
-
-			if err != nil {
-				panic(err)
-			}
-			fmt.Printf("CREATED: %#v\n", result)
-		} else {
-			panic(err)
-		}
+		Body(example).
+		Do().Into(&result)
+	if (err == nil) {
+		fmt.Printf("CREATED: %#v\n", result)
+	} else if (apierrors.IsAlreadyExists(err)) {
+		fmt.Printf("ALREADY EXISTS: %#v\n", result)
 	} else {
-		fmt.Printf("GET: %#v\n", example)
+		panic(err)
 	}
 
 	// Fetch a list of our TPRs

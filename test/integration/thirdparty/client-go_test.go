@@ -26,6 +26,8 @@ import (
 
 	exampletprv1 "k8s.io/client-go/examples/third-party-resources/apis/tpr/v1"
 	exampleclient "k8s.io/client-go/examples/third-party-resources/client"
+	examplecontroller "k8s.io/client-go/examples/third-party-resources/controller"
+	"context"
 )
 
 func TestClientGoThirdPartyResourceExample(t *testing.T) {
@@ -53,5 +55,19 @@ func TestClientGoThirdPartyResourceExample(t *testing.T) {
 		t.Fatalf("ThirdPartyResource examples did not show up: %v", err)
 	}
 	t.Logf("TPR %q is active", exampletprv1.ExampleResourcePlural)
+
+	t.Logf("Starting a controller on instances of TPR %q", exampletprv1.ExampleResourcePlural)
+	controller := examplecontroller.ExampleController{
+		ExampleClient: exampleClient,
+	}
+
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	err = controller.Run(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error starting a TPR controller: %v", err)
+	}
+
+
 
 }

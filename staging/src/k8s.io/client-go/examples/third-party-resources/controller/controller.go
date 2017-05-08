@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package controller
 
 import (
 	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/client-go/kubernetes"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -31,16 +30,15 @@ import (
 
 // Watcher is an example of watching on resource create/update/delete events
 type ExampleController struct {
-	clientset     *kubernetes.Clientset
-	exampleClient *rest.RESTClient
+	ExampleClient *rest.RESTClient
 }
 
 // Run starts an Example resource watcher
-func (w *ExampleController) Run(ctx context.Context) error {
-	fmt.Printf("Watch Example objects\n")
+func (c *ExampleController) Run(ctx context.Context) error {
+	fmt.Print("Watch Example objects\n")
 
 	// Watch Example objects
-	_, err := watchExamples(ctx, w.exampleClient)
+	_, err := c.watchExamples(ctx)
 	if err != nil {
 		fmt.Printf("Failed to register watch for Example resource: %v\n", err)
 		return err
@@ -50,9 +48,9 @@ func (w *ExampleController) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func watchExamples(ctx context.Context, exampleClient cache.Getter) (cache.Controller, error) {
+func (c *ExampleController) watchExamples(ctx context.Context) (cache.Controller, error) {
 	source := cache.NewListWatchFromClient(
-		exampleClient,
+		c.ExampleClient,
 		tprv1.ExampleResourcePlural,
 		apiv1.NamespaceAll,
 		fields.Everything())
@@ -70,9 +68,9 @@ func watchExamples(ctx context.Context, exampleClient cache.Getter) (cache.Contr
 
 		// Your custom resource event handlers.
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    onAdd,
-			UpdateFunc: onUpdate,
-			DeleteFunc: onDelete,
+			AddFunc:    c.onAdd,
+			UpdateFunc: c.onUpdate,
+			DeleteFunc: c.onDelete,
 		})
 
 	// store can be used to List and Get
@@ -86,19 +84,19 @@ func watchExamples(ctx context.Context, exampleClient cache.Getter) (cache.Contr
 	return controller, nil
 }
 
-func onAdd(obj interface{}) {
+func (c *ExampleController) onAdd(obj interface{}) {
 	example := obj.(*tprv1.Example)
 	fmt.Printf("[WATCH] OnAdd %s\n", example.Metadata.SelfLink)
 }
 
-func onUpdate(oldObj, newObj interface{}) {
+func (c *ExampleController) onUpdate(oldObj, newObj interface{}) {
 	oldExample := oldObj.(*tprv1.Example)
 	newExample := newObj.(*tprv1.Example)
 	fmt.Printf("[WATCH] OnUpdate oldObj: %s\n", oldExample.Metadata.SelfLink)
 	fmt.Printf("[WATCH] OnUpdate newObj: %s\n", newExample.Metadata.SelfLink)
 }
 
-func onDelete(obj interface{}) {
+func (c *ExampleController) onDelete(obj interface{}) {
 	example := obj.(*tprv1.Example)
 	fmt.Printf("[WATCH] OnDelete %s\n", example.Metadata.SelfLink)
 }
