@@ -319,6 +319,11 @@ func printPodBase(pod *api.Pod, w io.Writer, options printers.PrintOptions) erro
 		reason = "Terminating"
 	}
 
+	// if the reason is "NodeLost", set the count of ready containers as 0.
+	if pod.Status.Reason == node.NodeUnreachablePodReason {
+		readyContainers = 0
+	}
+
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
 			return err
