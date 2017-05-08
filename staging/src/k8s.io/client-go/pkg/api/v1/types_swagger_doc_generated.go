@@ -814,6 +814,15 @@ func (Namespace) SwaggerDoc() map[string]string {
 	return map_Namespace
 }
 
+var map_NamespaceIngressPolicy = map[string]string{
+	"":          "NamespaceIngressPolicy describes the base policy for incoming traffic to a Namespace",
+	"isolation": "The base policy for network isolation for incoming traffic to the Namespace, which may be modified by NetworkPolicy objects. If not specified, a default policy is applied (allow all)",
+}
+
+func (NamespaceIngressPolicy) SwaggerDoc() map[string]string {
+	return map_NamespaceIngressPolicy
+}
+
 var map_NamespaceList = map[string]string{
 	"":         "NamespaceList is a list of Namespaces.",
 	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -824,9 +833,19 @@ func (NamespaceList) SwaggerDoc() map[string]string {
 	return map_NamespaceList
 }
 
+var map_NamespaceNetworkPolicy = map[string]string{
+	"":        "NamespaceNetworkPolicy describes the use of NetworkPolicy objects in a namespace",
+	"ingress": "The base policy for incoming traffic to pods in this namespace, which may be modified by NetworkPolicy objects. If not specified, default policies are applied",
+}
+
+func (NamespaceNetworkPolicy) SwaggerDoc() map[string]string {
+	return map_NamespaceNetworkPolicy
+}
+
 var map_NamespaceSpec = map[string]string{
-	"":           "NamespaceSpec describes the attributes on a Namespace.",
-	"finalizers": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers",
+	"":              "NamespaceSpec describes the attributes on a Namespace.",
+	"finalizers":    "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers",
+	"networkPolicy": "NetworkPolicy describes the use of NetworkPolicy objects in this namespace. If not specified, then default policies will be applied and NetworkPolicy objects in the Namespace will be ignored",
 }
 
 func (NamespaceSpec) SwaggerDoc() map[string]string {

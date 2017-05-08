@@ -3452,12 +3452,38 @@ const (
 	FinalizerKubernetes FinalizerName = "kubernetes"
 )
 
+// IngressIsolationPolicy gives the policy for isolating incoming network traffic to pods in a Namespace
+type IngressIsolationPolicy string
+
+const (
+	// DefaultDeny blocks all incoming traffic to pods in this namespace by default. (It can be overridden by NetworkPolicy objects.)
+	DefaultDeny IngressIsolationPolicy = "DefaultDeny"
+)
+
+// NamespaceIngressPolicy describes the base policy for incoming traffic to a Namespace
+type NamespaceIngressPolicy struct {
+	// The base policy for network isolation for incoming traffic to the Namespace, which may be modified by NetworkPolicy objects. If not specified, a default policy is applied (allow all)
+	// +optional
+	Isolation *IngressIsolationPolicy `json:"isolation,omitempty" protobuf:"bytes,1,opt,name=isolation"`
+}
+
+// NamespaceNetworkPolicy describes the use of NetworkPolicy objects in a namespace
+type NamespaceNetworkPolicy struct {
+	// The base policy for incoming traffic to pods in this namespace, which may be modified by NetworkPolicy objects. If not specified, default policies are applied
+	// +optional
+	Ingress *NamespaceIngressPolicy `json:"ingress,omitempty" protobuf:"bytes,1,opt,name=ingress"`
+}
+
 // NamespaceSpec describes the attributes on a Namespace.
 type NamespaceSpec struct {
 	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
 	// More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers
 	// +optional
 	Finalizers []FinalizerName `json:"finalizers,omitempty" protobuf:"bytes,1,rep,name=finalizers,casttype=FinalizerName"`
+
+	// NetworkPolicy describes the use of NetworkPolicy objects in this namespace. If not specified, then default policies will be applied and NetworkPolicy objects in the Namespace will be ignored
+	// +optional
+	NetworkPolicy *NamespaceNetworkPolicy `json:"networkPolicy,omitempty" protobuf:"bytes,2,opt,name=networkPolicy"`
 }
 
 // NamespaceStatus is information about the current status of a Namespace.

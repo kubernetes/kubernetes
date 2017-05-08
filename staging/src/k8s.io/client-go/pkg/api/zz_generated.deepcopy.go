@@ -108,7 +108,9 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_LocalObjectReference, InType: reflect.TypeOf(&LocalObjectReference{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NFSVolumeSource, InType: reflect.TypeOf(&NFSVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Namespace, InType: reflect.TypeOf(&Namespace{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NamespaceIngressPolicy, InType: reflect.TypeOf(&NamespaceIngressPolicy{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NamespaceList, InType: reflect.TypeOf(&NamespaceList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NamespaceNetworkPolicy, InType: reflect.TypeOf(&NamespaceNetworkPolicy{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NamespaceSpec, InType: reflect.TypeOf(&NamespaceSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NamespaceStatus, InType: reflect.TypeOf(&NamespaceStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Node, InType: reflect.TypeOf(&Node{})},
@@ -1466,6 +1468,20 @@ func DeepCopy_api_Namespace(in interface{}, out interface{}, c *conversion.Clone
 	}
 }
 
+func DeepCopy_api_NamespaceIngressPolicy(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*NamespaceIngressPolicy)
+		out := out.(*NamespaceIngressPolicy)
+		*out = *in
+		if in.Isolation != nil {
+			in, out := &in.Isolation, &out.Isolation
+			*out = new(IngressIsolationPolicy)
+			**out = **in
+		}
+		return nil
+	}
+}
+
 func DeepCopy_api_NamespaceList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NamespaceList)
@@ -1484,6 +1500,22 @@ func DeepCopy_api_NamespaceList(in interface{}, out interface{}, c *conversion.C
 	}
 }
 
+func DeepCopy_api_NamespaceNetworkPolicy(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*NamespaceNetworkPolicy)
+		out := out.(*NamespaceNetworkPolicy)
+		*out = *in
+		if in.Ingress != nil {
+			in, out := &in.Ingress, &out.Ingress
+			*out = new(NamespaceIngressPolicy)
+			if err := DeepCopy_api_NamespaceIngressPolicy(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
 func DeepCopy_api_NamespaceSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NamespaceSpec)
@@ -1493,6 +1525,13 @@ func DeepCopy_api_NamespaceSpec(in interface{}, out interface{}, c *conversion.C
 			in, out := &in.Finalizers, &out.Finalizers
 			*out = make([]FinalizerName, len(*in))
 			copy(*out, *in)
+		}
+		if in.NetworkPolicy != nil {
+			in, out := &in.NetworkPolicy, &out.NetworkPolicy
+			*out = new(NamespaceNetworkPolicy)
+			if err := DeepCopy_api_NamespaceNetworkPolicy(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
