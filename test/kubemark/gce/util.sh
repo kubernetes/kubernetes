@@ -20,10 +20,10 @@
 function run-gcloud-compute-with-retries {
   RETRIES="${RETRIES:-3}"
   for attempt in $(seq 1 ${RETRIES}); do
-    local -r gcloud_result=$(gcloud compute "$@" 2>&1)
-    local -r ret_val="$?"
+    # We don't use 'local' to declare gcloud_result as then ret_val always gets value 0.
+    gcloud_result=$(gcloud compute "$@" 2>&1) || local ret_val="$?"
     echo "${gcloud_result}"
-    if [[ "${ret_val}" -ne "0" ]]; then
+    if [[ "${ret_val:-0}" -ne "0" ]]; then
       if [[ $(echo "${gcloud_result}" | grep -c "already exists") -gt 0 ]]; then
         if [[ "${attempt}" == 1 ]]; then
           echo -e "${color_red}Failed to $1 $2 $3 as the resource hasn't been deleted from a previous run.${color_norm}" >& 2
