@@ -50,7 +50,7 @@ const (
 type reconcileStatus int
 
 const (
-	reconciled reconcileStatus = iota
+	statusOK reconcileStatus = iota
 	redeliver
 	redeliverForFailure
 	redeliverForClusterReadiness
@@ -304,7 +304,7 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		return redeliverForFailure
 	}
 	if obj == nil {
-		return reconciled
+		return statusOK
 	}
 
 	meta := s.adapter.ObjectMeta(obj)
@@ -317,6 +317,13 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 	if err != nil {
 		glog.Errorf("Failed to ensure finalizers for %s %q: %v", kind, key, err)
 		return redeliver
+	}
+
+	if _, ok := s.adapter.(federatedtypes.SchedulerAdapter); ok {
+		reconcileStatus := s.updateFedSpec(obj)
+		if reconcileStatus != statusOK {
+			return reconcileStatus
+		}
 	}
 
 	return syncToClusters(
@@ -361,7 +368,7 @@ func (s *FederationSyncController) deleteWithStatus(obj pkgruntime.Object, kind 
 		s.eventRecorder.Eventf(obj, api.EventTypeWarning, "DeleteFailed", msg, args...)
 		return redeliverForFailure
 	}
-	return reconciled
+	return statusOK
 }
 
 // delete deletes the given resource or returns error if the deletion was not complete.
@@ -382,6 +389,43 @@ func (s *FederationSyncController) delete(obj pkgruntime.Object, kind string, na
 		}
 	}
 	return nil
+}
+
+// updateFedSpec updates the spec against the federated object using the adapters UpdateFedSpecHook of need be.
+func (s *FederationSyncController) updateFedSpec(fedObj pkgruntime.Object) reconcileStatus {
+	clusters, err := s.informer.GetReadyClusters()
+	if err != nil {
+		glog.Errorf("Failed to get cluster list: %v", err)
+		return redeliverForClusterReadiness
+	}
+
+	current := make(map[string]pkgruntime.Object)
+	key := federatedtypes.ObjectKey(s.adapter, fedObj)
+	for _, cluster := range clusters {
+		clusterObj, found, err := s.informer.GetTargetStore().GetByKey(cluster.Name, key)
+		if err != nil {
+			glog.Errorf("Failed to get %s %q from target store %q: %v", s.adapter.Kind(), key, cluster.Name, err)
+			return redeliverForFailure
+		}
+		if found {
+			current[cluster.Name] = clusterObj.(pkgruntime.Object)
+		}
+	}
+
+	if len(current) == 0 {
+		return redeliver
+	}
+
+	// The scheduler adapter type implementer implements additional method which is used here.
+	// The implementation should ensure not to mutate any of the passed objects.
+	schedAdapter := s.adapter.(federatedtypes.SchedulerAdapter)
+	err = schedAdapter.FedUpdateStatus(fedObj, current)
+	if err != nil {
+		glog.Errorf("Failure in determining spec update for %s %q : %v", s.adapter.Kind(), key, err)
+		return redeliverForFailure
+	}
+
+	return statusOK
 }
 
 type clustersAccessorFunc func() ([]*federationapi.Cluster, error)
@@ -407,7 +451,7 @@ func syncToClusters(clustersAccessor clustersAccessorFunc, operationsAccessor op
 		return redeliverForFailure
 	}
 	if len(operations) == 0 {
-		return reconciled
+		return statusOK
 	}
 
 	err = execute(operations)
@@ -416,37 +460,65 @@ func syncToClusters(clustersAccessor clustersAccessorFunc, operationsAccessor op
 		return redeliverForFailure
 	}
 
-	return reconciled
+	return statusOK
 }
 
 type clusterObjectAccessorFunc func(clusterName string) (interface{}, bool, error)
 
 // clusterOperations returns the list of operations needed to synchronize the state of the given object to the provided clusters
-func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, obj pkgruntime.Object, accessor clusterObjectAccessorFunc) ([]util.FederatedOperation, error) {
-	key := federatedtypes.ObjectKey(adapter, obj)
-	operations := make([]util.FederatedOperation, 0)
+func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, fedObj pkgruntime.Object, accessor clusterObjectAccessorFunc) ([]util.FederatedOperation, error) {
+	key := federatedtypes.ObjectKey(adapter, fedObj)
+	currentObjs := make(map[string]pkgruntime.Object)
 	for _, cluster := range clusters {
 		clusterObj, found, err := accessor(cluster.Name)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get %s %q from cluster %q: %v", adapter.Kind(), key, cluster.Name, err)
 		}
-		// The data should not be modified.
-		desiredObj := adapter.Copy(obj)
 
-		var operationType util.FederatedOperationType = ""
 		if found {
-			clusterObj := clusterObj.(pkgruntime.Object)
-			if !adapter.Equivalent(desiredObj, clusterObj) {
+			currentObjs[cluster.Name] = clusterObj.(pkgruntime.Object)
+		} else {
+			currentObjs[cluster.Name] = nil
+		}
+	}
+
+	scheduledObjs := make(map[string]pkgruntime.Object)
+	if schedAdapter, ok := adapter.(federatedtypes.SchedulerAdapter); ok {
+		var err error
+		scheduledObjs, err = schedAdapter.Schedule(fedObj, currentObjs)
+		if err != nil {
+			return nil, fmt.Errorf("Failure executing Schedule Hook on %s %q: %v", adapter.Kind(), key, err)
+		}
+	} else {
+		for clusterKey := range currentObjs {
+			// The same object propagated into all clusters.
+			desiredObj := adapter.Copy(fedObj)
+			scheduledObjs[clusterKey] = desiredObj
+		}
+
+	}
+
+	operations := make([]util.FederatedOperation, 0)
+	for clusterName, currentObj := range currentObjs {
+		var operationType util.FederatedOperationType = ""
+		scheduledObj := scheduledObjs[clusterName]
+		if scheduledObj == nil {
+			continue
+		}
+
+		if exists := currentObj != nil; exists {
+			if !adapter.Equivalent(currentObj, scheduledObj) {
 				operationType = util.OperationTypeUpdate
 			}
 		} else {
 			operationType = util.OperationTypeAdd
 		}
+
 		if len(operationType) > 0 {
 			operations = append(operations, util.FederatedOperation{
 				Type:        operationType,
-				Obj:         desiredObj,
-				ClusterName: cluster.Name,
+				Obj:         scheduledObjs[clusterName],
+				ClusterName: clusterName,
 				Key:         key,
 			})
 		}

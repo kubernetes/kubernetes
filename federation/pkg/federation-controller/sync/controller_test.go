@@ -52,16 +52,16 @@ func TestSyncToClusters(t *testing.T) {
 			status:          redeliverForFailure,
 		},
 		"No operations returns reconciled status": {
-			status: reconciled,
+			status: statusOK,
 		},
 		"Execution error redelivers with backoff": {
 			executionError: true,
 			operations:     []util.FederatedOperation{{}},
 			status:         redeliverForFailure,
 		},
-		"Successful update returns reconciled status": {
+		"Successful update returns statusOK status": {
 			operations: []util.FederatedOperation{{}},
-			status:     reconciled,
+			status:     statusOK,
 		},
 	}
 

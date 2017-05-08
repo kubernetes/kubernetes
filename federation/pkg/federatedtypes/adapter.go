@@ -56,6 +56,14 @@ type FederatedTypeAdapter interface {
 	NewTestObject(namespace string) pkgruntime.Object
 }
 
+// SchedulerAdapter defines additional operations for those controllers which need
+// additional scheduling logic.
+type SchedulerAdapter interface {
+	FederatedTypeAdapter
+	Schedule(pkgruntime.Object, map[string]pkgruntime.Object) (map[string]pkgruntime.Object, error)
+	FedUpdateStatus(pkgruntime.Object, map[string]pkgruntime.Object) error
+}
+
 // AdapterFactory defines the function signature for factory methods
 // that create instances of FederatedTypeAdapter.  Such methods should
 // be registered with RegisterAdapterFactory to ensure the type
