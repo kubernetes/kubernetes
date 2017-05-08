@@ -808,6 +808,7 @@ func OutputsRawFormat(cmd *cobra.Command) bool {
 	output := GetFlagString(cmd, "output")
 	if output == "json" ||
 		output == "yaml" ||
+		output == "config" ||
 		output == "go-template" ||
 		output == "go-template-file" ||
 		output == "jsonpath" ||
