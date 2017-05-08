@@ -341,7 +341,7 @@ func TestSchedulerExtender(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientSet.Core().RESTClient()).Events("")})
-	scheduler := scheduler.New(schedulerConfig)
+	scheduler, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
 	informerFactory.Start(schedulerConfig.StopEverything)
 	scheduler.Run()
 

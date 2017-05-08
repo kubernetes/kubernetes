@@ -35,7 +35,10 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["scheduler.go"],
+    srcs = [
+        "scheduler.go",
+        "testutil.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
