@@ -185,6 +185,13 @@ func (g *GenericPLEG) relist() {
 		metrics.PLEGRelistInterval.Observe(metrics.SinceInMicroseconds(lastRelistTime))
 	}
 
+	// Get all the pods.
+	podList, err := g.runtime.GetPods(true)
+	if err != nil {
+		glog.Errorf("GenericPLEG: Unable to retrieve pods: %v", err)
+		return
+	}
+
 	timestamp := g.clock.Now()
 	// Update the relist time.
 	g.updateRelisTime(timestamp)
@@ -192,12 +199,6 @@ func (g *GenericPLEG) relist() {
 		metrics.PLEGRelistLatency.Observe(metrics.SinceInMicroseconds(timestamp))
 	}()
 
-	// Get all the pods.
-	podList, err := g.runtime.GetPods(true)
-	if err != nil {
-		glog.Errorf("GenericPLEG: Unable to retrieve pods: %v", err)
-		return
-	}
 	pods := kubecontainer.Pods(podList)
 	g.podRecords.setCurrent(pods)
 
