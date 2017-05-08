@@ -1,5 +1,4 @@
 name,owner,auto-assigned,sig
-DEFAULT,rmmh/spxtr/ixdy/apelisse/fejta,0,
 Addon update should propagate add-on file changes,eparis,1,
 AppArmor should enforce an AppArmor profile,derekwaynecarr,0,node
 AppArmor when running with AppArmor should enforce a permissive profile,yujuhong,1,node
