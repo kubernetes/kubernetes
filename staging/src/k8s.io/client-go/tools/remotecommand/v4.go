@@ -25,7 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
-	"k8s.io/client-go/pkg/util/exec"
+	"k8s.io/client-go/util/exec"
 )
 
 // streamProtocolV4 implements version 4 of the streaming protocol for attach
