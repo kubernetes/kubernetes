@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package certificates
+package signer
 
 import (
 	"crypto/x509"
@@ -27,7 +27,7 @@ import (
 )
 
 func TestSigner(t *testing.T) {
-	s, err := NewCFSSLSigner("./testdata/ca.crt", "./testdata/ca.key")
+	s, err := newCFSSLSigner("./testdata/ca.crt", "./testdata/ca.key", nil)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestSigner(t *testing.T) {
 		},
 	}
 
-	csr, err = s.Sign(csr)
+	csr, err = s.sign(csr)
 	if err != nil {
 		t.Fatalf("failed to sign CSR: %v", err)
 	}

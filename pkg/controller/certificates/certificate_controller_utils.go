@@ -21,11 +21,11 @@ import certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 // IsCertificateRequestApproved returns true if a certificate request has the
 // "Approved" condition and no "Denied" conditions; false otherwise.
 func IsCertificateRequestApproved(csr *certificates.CertificateSigningRequest) bool {
-	approved, denied := getCertApprovalCondition(&csr.Status)
+	approved, denied := GetCertApprovalCondition(&csr.Status)
 	return approved && !denied
 }
 
-func getCertApprovalCondition(status *certificates.CertificateSigningRequestStatus) (approved bool, denied bool) {
+func GetCertApprovalCondition(status *certificates.CertificateSigningRequestStatus) (approved bool, denied bool) {
 	for _, c := range status.Conditions {
 		if c.Type == certificates.CertificateApproved {
 			approved = true
