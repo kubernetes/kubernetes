@@ -54,6 +54,16 @@ type FederatedTypeAdapter interface {
 	ClusterWatch(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (watch.Interface, error)
 
 	NewTestObject(namespace string) pkgruntime.Object
+
+	// IsScheduler is used to explicitly state, if the adapter implements SchedulerAdapter interface also.
+	IsScheduler() bool
+}
+
+// SchedulerAdapter defines operations for those controllers which need
+// additional scheduling logic.
+type SchedulerAdapter interface {
+	Schedule(pkgruntime.Object, map[string]pkgruntime.Object) (map[string]pkgruntime.Object, error)
+	FedUpdateStatus(pkgruntime.Object, map[string]pkgruntime.Object) error
 }
 
 // AdapterFactory defines the function signature for factory methods
