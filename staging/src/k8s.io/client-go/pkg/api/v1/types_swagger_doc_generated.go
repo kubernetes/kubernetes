@@ -351,6 +351,24 @@ func (DaemonEndpoint) SwaggerDoc() map[string]string {
 	return map_DaemonEndpoint
 }
 
+var map_DeleteExecAction = map[string]string{
+	"":          "DeleteExecAction describes a \"run in container\" action that will be invoked inside of a container prior to sending the TERM signal to the container's entry point.",
+	"reasonEnv": "ReasonEnv is the environment variable that will be populated with the reason, if provided, for the deletion. This variable defaults to DefaultDeleteReasonEnv. Must be a C_IDENTIFIER.",
+}
+
+func (DeleteExecAction) SwaggerDoc() map[string]string {
+	return map_DeleteExecAction
+}
+
+var map_DeleteHTTPGetAction = map[string]string{
+	"":             "DeleteHTTPGetAction describes an action to take upon deletion based on HTTP GET requests.",
+	"reasonHeader": "ReasonHeader is the header that will be set to the reason for a deletion. This header defaults to DefaultDeleteReasonHeader.",
+}
+
+func (DeleteHTTPGetAction) SwaggerDoc() map[string]string {
+	return map_DeleteHTTPGetAction
+}
+
 var map_DeleteOptions = map[string]string{
 	"":                   "DeleteOptions may be provided when deleting an API object DEPRECATED: This type has been moved to meta/v1 and will be removed soon.",
 	"gracePeriodSeconds": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
@@ -1434,6 +1452,17 @@ var map_PortworxVolumeSource = map[string]string{
 
 func (PortworxVolumeSource) SwaggerDoc() map[string]string {
 	return map_PortworxVolumeSource
+}
+
+var map_PreStopHandler = map[string]string{
+	"":          "PreStopHandler invokes either a DeleteExecAction or a DeleteHTTPGetAction prior to the graceful termination of a Pod. One and only one of the fields should be specified.",
+	"exec":      "Exec specifies the action to take.",
+	"httpGet":   "HTTPGet specifies the HTTP GET request to perform.",
+	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported.",
+}
+
+func (PreStopHandler) SwaggerDoc() map[string]string {
+	return map_PreStopHandler
 }
 
 var map_Preconditions = map[string]string{

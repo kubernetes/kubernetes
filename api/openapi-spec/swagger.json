@@ -1069,6 +1069,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -1472,6 +1479,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -1877,6 +1891,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -2281,6 +2302,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -2684,6 +2712,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -3224,6 +3259,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -4749,6 +4791,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -5152,6 +5201,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -5829,6 +5885,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -6369,6 +6432,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -6772,6 +6842,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -7868,6 +7945,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -8441,6 +8525,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -9458,6 +9549,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -15506,6 +15604,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -16247,6 +16352,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -18132,6 +18244,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -19036,6 +19155,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -19975,6 +20101,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -20880,6 +21013,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -21419,6 +21559,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -22605,6 +22752,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -23576,6 +23730,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -24115,6 +24276,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -24858,6 +25026,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -25398,6 +25573,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -25801,6 +25983,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -26683,6 +26872,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -27147,6 +27343,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -29209,6 +29412,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -30123,6 +30333,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -30494,6 +30711,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -30874,6 +31098,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -31262,6 +31493,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -32664,6 +32902,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -33035,6 +33280,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -33415,6 +33667,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -33803,6 +34062,13 @@
        "type": "string",
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
        "in": "query"
       }
      ],
@@ -35262,6 +35528,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -36056,6 +36329,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -36639,6 +36919,13 @@
        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+       "name": "reason",
+       "in": "query"
       }
      ],
      "responses": {
@@ -37141,6 +37428,10 @@
      "propagationPolicy": {
       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
       "type": "string"
+     },
+     "reason": {
+      "description": "The reason for the deletion of an API Object that undergoes graceful termination upon deletion.",
+      "type": "string"
      }
     }
    },
@@ -37241,6 +37532,10 @@
       "description": "Number of seconds allowed for this object to gracefully terminate before it will be removed from the system. Only set when deletionTimestamp is also set. May only be shortened. Read-only.",
       "type": "integer",
       "format": "int64"
+     },
+     "deletionReason": {
+      "description": "The reason for the deletion of an API Object. Its purpose is to provide an extra generic signal to watchers of API Objects during the graceful termination process.",
+      "type": "string"
      },
      "deletionTimestamp": {
       "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -38275,6 +38570,57 @@
      }
     }
    },
+   "io.k8s.kubernetes.pkg.api.v1.DeleteExecAction": {
+    "description": "DeleteExecAction describes a \"run in container\" action that will be invoked inside of a container prior to sending the TERM signal to the container's entry point.",
+    "properties": {
+     "command": {
+      "description": "Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "reasonEnv": {
+      "description": "ReasonEnv is the environment variable that will be populated with the reason, if provided, for the deletion. This variable defaults to DefaultDeleteReasonEnv. Must be a C_IDENTIFIER.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.api.v1.DeleteHTTPGetAction": {
+    "description": "DeleteHTTPGetAction describes an action to take upon deletion based on HTTP GET requests.",
+    "required": [
+     "port"
+    ],
+    "properties": {
+     "host": {
+      "description": "Host name to connect to, defaults to the pod IP. You probably want to set \"Host\" in httpHeaders instead.",
+      "type": "string"
+     },
+     "httpHeaders": {
+      "description": "Custom headers to set in the request. HTTP allows repeated headers.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.HTTPHeader"
+      }
+     },
+     "path": {
+      "description": "Path to access on the HTTP server.",
+      "type": "string"
+     },
+     "port": {
+      "description": "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+     },
+     "reasonHeader": {
+      "description": "ReasonHeader is the header that will be set to the reason for a deletion. This header defaults to DefaultDeleteReasonHeader.",
+      "type": "string"
+     },
+     "scheme": {
+      "description": "Scheme to use for connecting to the host. Defaults to HTTP.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.DownwardAPIProjection": {
     "description": "Represents downward API info for projecting into a projected volume. Note that this is identical to a downwardAPI volume source without the default mode.",
     "properties": {
@@ -38972,7 +39318,7 @@
      },
      "preStop": {
       "description": "PreStop is called immediately before a container is terminated. The container is terminated after the handler completes. The reason for termination is passed to the handler. Regardless of the outcome of the handler, the container is eventually terminated. Other management of the container blocks until the hook completes. More info: http://kubernetes.io/docs/user-guide/container-environment#hook-details",
-      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Handler"
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PreStopHandler"
      }
     }
    },
@@ -40448,6 +40794,23 @@
      "volumeID": {
       "description": "VolumeID uniquely identifies a Portworx volume",
       "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.api.v1.PreStopHandler": {
+    "description": "PreStopHandler invokes either a DeleteExecAction or a DeleteHTTPGetAction prior to the graceful termination of a Pod. One and only one of the fields should be specified.",
+    "properties": {
+     "exec": {
+      "description": "Exec specifies the action to take.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.DeleteExecAction"
+     },
+     "httpGet": {
+      "description": "HTTPGet specifies the HTTP GET request to perform.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.DeleteHTTPGetAction"
+     },
+     "tcpSocket": {
+      "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.TCPSocketAction"
      }
     }
    },
