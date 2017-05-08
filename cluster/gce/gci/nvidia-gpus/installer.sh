@@ -154,7 +154,7 @@ restart_kubelet() {
 
 copy_files_to_host() {
     mkdir -p /rootfs/usr/lib/nvidia /rootfs/usr/lib/nvidia/bin
-    cp -r /rootfs/nvidia-overlay/usr/lib/* /rootfs/usr/lib/nvidia/
+    cp -r /rootfs/nvidia-overlay/usr/lib/x86_64-linux-gnu/* /rootfs/usr/lib/nvidia/
     cp -r /rootfs/nvidia-overlay/usr/bin/* /rootfs/usr/lib/nvidia/bin/
     cp -r /rootfs/nvidia-overlay/lib/modules/* /rootfs/lib/modules/
 }

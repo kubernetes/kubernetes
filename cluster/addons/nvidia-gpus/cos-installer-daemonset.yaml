@@ -35,7 +35,7 @@ spec:
           hostPath:
             path: /proc/sysrq-trigger
       containers:
-      - image: gcr.io/google_containers/cos-nvidia-driver-install@sha256:7e0bd2662fb22190c06f2747b546bd4a8b092d95be78dee2c87be55930b32c9f
+      - image: gcr.io/google_containers/cos-nvidia-driver-install@sha256:209250cf1372ee792f57bc5c5bc7a84d3f7d2bf3b56c107e47eb6ffdb8185bd5
         name: nvidia-driver-installer
         resources:
           requests:
