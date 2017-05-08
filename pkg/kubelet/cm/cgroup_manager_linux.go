@@ -228,7 +228,12 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	cgroupPaths := m.buildCgroupPaths(name)
 
 	// If even one cgroup path doesn't exist, then the cgroup doesn't exist.
-	for _, path := range cgroupPaths {
+	for mount, path := range cgroupPaths {
+		// See: https://github.com/opencontainers/runc/issues/1440
+		if mount == "openrc" {
+			glog.Warningf("Unsupported cgroup subsystem found: %v", mount)
+			continue
+		}
 		if !libcontainercgroups.PathExists(path) {
 			return false
 		}
