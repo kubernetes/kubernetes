@@ -256,12 +256,15 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 				eps.Insert(trimmed)
 			}
 		}
-		Logf("Waiting for %+v endpoints, got endpoints %+v", expectedEps.Difference(eps), eps)
 
 		// Check against i+1 so we exit if minTries == maxTries.
-		if (eps.Equal(expectedEps) || eps.Len() == 0 && expectedEps.Len() == 0) && i+1 >= minTries {
+		if eps.Equal(expectedEps) && i+1 >= minTries {
+			Logf("Found all expected endpoints: %+v", eps.List())
 			return
 		}
+
+		Logf("Waiting for %+v endpoints (expected=%+v, actual=%+v)", expectedEps.Difference(eps).List(), expectedEps.List(), eps.List())
+
 		// TODO: get rid of this delay #36281
 		time.Sleep(hitEndpointRetryDelay)
 	}
