@@ -1,0 +1,56 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+    name: cos-nvidia-installer
+    namespace: kube-system
+spec:
+  template:
+    metadata:
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+      labels:
+        name: cos-nvidia-installer
+        # Update the version tag here and `LAKITU_KERNEL_SHA1` while using against new COS releases.
+        cos-version: gci-stable-56-9000-84-2
+    spec:
+      hostNetwork: true
+      hostPID: true
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: usr
+          hostPath:
+            path: /usr
+        - name: nvidia-overlay
+          hostPath:
+            path: /home/kubernetes/bin/nvidia-overlay
+        - name: os-release
+          hostPath:
+            path: /etc/os-release
+        - name: sysrq
+          hostPath:
+            path: /proc/sysrq-trigger
+      containers:
+      - image: gcr.io/google_containers/cos-nvidia-driver-install@sha256:7e0bd2662fb22190c06f2747b546bd4a8b092d95be78dee2c87be55930b32c9f
+        name: nvidia-driver-installer
+        resources:
+          requests:
+            cpu: 0.15
+        securityContext:
+          privileged: true
+        env:
+          - name: LAKITU_KERNEL_SHA1
+            value: 2fdf6034a0fae9794d80e4d218e237771224ba8f
+        volumeMounts:
+          - name: nvidia-overlay
+            mountPath: /rootfs/nvidia-overlay
+          - name: usr
+            mountPath: /rootfs/usr
+          - name: dev
+            mountPath: /dev
+          - name: os-release
+            mountPath: /rootfs/etc/os-release
+          - name: sysrq
+            mountPath: /sysrq
+
