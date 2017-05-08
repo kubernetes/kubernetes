@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const ExampleResourcePlural = "examples"
@@ -41,6 +42,26 @@ type ExampleList struct {
 	Metadata        metav1.ListMeta `json:"metadata"`
 
 	Items []Example `json:"items"`
+}
+
+// Required to satisfy Object interface
+func (e *Example) GetObjectKind() schema.ObjectKind {
+	return &e.TypeMeta
+}
+
+// Required to satisfy ObjectMetaAccessor interface
+func (e *Example) GetObjectMeta() metav1.Object {
+	return &e.Metadata
+}
+
+// Required to satisfy Object interface
+func (el *ExampleList) GetObjectKind() schema.ObjectKind {
+	return &el.TypeMeta
+}
+
+// Required to satisfy ListMetaAccessor interface
+func (el *ExampleList) GetListMeta() metav1.List {
+	return &el.Metadata
 }
 
 // The code below is used only to work around a known problem with third-party

@@ -54,21 +54,25 @@ func main() {
 
 	// initialize third party resource if it does not exist
 	err = exampleclient.CreateTPR(clientset)
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	if err == nil {
+		// See the issue https://github.com/kubernetes/features/issues/95
+		// ("Make new TPRs available immediately after the create request succeeds")
+		fmt.Print("Sleeping to make sure the TPR is processed and available\n")
+		time.Sleep(5 * time.Second)
+	} else if !apierrors.IsAlreadyExists(err) {
 		panic(err)
 	}
 
 	// make a new config for our extension's API group, using the first config as a baseline
-	exampleClient, exampleScheme, err := NewClient(config)
+	exampleClient, _, err := exampleclient.NewClient(config)
 	if err != nil {
 		panic(err)
 	}
 
 	// start a watcher on instances of our TPR
-	watcher := Watcher{
+	watcher := ExampleController{
 		clientset:     clientset,
 		exampleClient: exampleClient,
-		exampleScheme: exampleScheme,
 	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())

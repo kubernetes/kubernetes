@@ -20,10 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
@@ -33,19 +30,17 @@ import (
 )
 
 // Watcher is an example of watching on resource create/update/delete events
-type Watcher struct {
+type ExampleController struct {
 	clientset     *kubernetes.Clientset
 	exampleClient *rest.RESTClient
-	exampleScheme *runtime.Scheme
 }
 
 // Run starts an Example resource watcher
-func (w *Watcher) Run(ctx context.Context) error {
+func (w *ExampleController) Run(ctx context.Context) error {
 	fmt.Printf("Watch Example objects\n")
 
 	// Watch Example objects
-	handler := ExampleEventHandler{}
-	_, err := watchExamples(ctx, w.exampleClient, w.exampleScheme, &handler)
+	_, err := watchExamples(ctx, w.exampleClient)
 	if err != nil {
 		fmt.Printf("Failed to register watch for Example resource: %v\n", err)
 		return err
@@ -55,15 +50,12 @@ func (w *Watcher) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func watchExamples(ctx context.Context, exampleClient cache.Getter, exampleScheme *runtime.Scheme, handler cache.ResourceEventHandler) (cache.Controller, error) {
-	parameterCodec := runtime.NewParameterCodec(exampleScheme)
-
-	source := newListWatchFromClient(
+func watchExamples(ctx context.Context, exampleClient cache.Getter) (cache.Controller, error) {
+	source := cache.NewListWatchFromClient(
 		exampleClient,
 		tprv1.ExampleResourcePlural,
 		apiv1.NamespaceAll,
-		fields.Everything(),
-		parameterCodec)
+		fields.Everything())
 
 	store, controller := cache.NewInformer(
 		source,
@@ -77,7 +69,11 @@ func watchExamples(ctx context.Context, exampleClient cache.Getter, exampleSchem
 		0,
 
 		// Your custom resource event handlers.
-		handler)
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    onAdd,
+			UpdateFunc: onUpdate,
+			DeleteFunc: onDelete,
+		})
 
 	// store can be used to List and Get
 	for _, obj := range store.List() {
@@ -90,49 +86,19 @@ func watchExamples(ctx context.Context, exampleClient cache.Getter, exampleSchem
 	return controller, nil
 }
 
-// See the issue comment: https://github.com/kubernetes/kubernetes/issues/16376#issuecomment-272167794
-// newListWatchFromClient is a copy of cache.NewListWatchFromClient() method with custom codec
-// Cannot use cache.NewListWatchFromClient() because it uses global apiv1.ParameterCodec which uses global
-// apiv1.Scheme which does not know about custom types (Example in our case) group/version.
-func newListWatchFromClient(c cache.Getter, resource string, namespace string, fieldSelector fields.Selector, paramCodec runtime.ParameterCodec) *cache.ListWatch {
-	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
-		return c.Get().
-			Namespace(namespace).
-			Resource(resource).
-			VersionedParams(&options, paramCodec).
-			FieldsSelectorParam(fieldSelector).
-			Do().
-			Get()
-	}
-	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
-		return c.Get().
-			Prefix("watch").
-			Namespace(namespace).
-			Resource(resource).
-			VersionedParams(&options, paramCodec).
-			FieldsSelectorParam(fieldSelector).
-			Watch()
-	}
-	return &cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
-}
-
-// ExampleEventHandler can handle events for Example resource
-type ExampleEventHandler struct {
-}
-
-func (h *ExampleEventHandler) OnAdd(obj interface{}) {
+func onAdd(obj interface{}) {
 	example := obj.(*tprv1.Example)
 	fmt.Printf("[WATCH] OnAdd %s\n", example.Metadata.SelfLink)
 }
 
-func (h *ExampleEventHandler) OnUpdate(oldObj, newObj interface{}) {
+func onUpdate(oldObj, newObj interface{}) {
 	oldExample := oldObj.(*tprv1.Example)
 	newExample := newObj.(*tprv1.Example)
 	fmt.Printf("[WATCH] OnUpdate oldObj: %s\n", oldExample.Metadata.SelfLink)
 	fmt.Printf("[WATCH] OnUpdate newObj: %s\n", newExample.Metadata.SelfLink)
 }
 
-func (h *ExampleEventHandler) OnDelete(obj interface{}) {
+func onDelete(obj interface{}) {
 	example := obj.(*tprv1.Example)
 	fmt.Printf("[WATCH] OnDelete %s\n", example.Metadata.SelfLink)
 }
