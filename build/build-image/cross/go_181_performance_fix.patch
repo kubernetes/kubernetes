@@ -1,0 +1,24 @@
+diff --git a/src/net/http/h2_bundle.go b/src/net/http/h2_bundle.go
+index 4536b2ff5d..84e78534a9 100644
+--- a/src/net/http/h2_bundle.go
++++ b/src/net/http/h2_bundle.go
+@@ -3536,9 +3536,17 @@ func (sc *http2serverConn) serve() {
+ 		sc.idleTimerCh = sc.idleTimer.C
+ 	}
+ 
+-	var gracefulShutdownCh <-chan struct{}
++	var gracefulShutdownCh chan struct{}
+ 	if sc.hs != nil {
+-		gracefulShutdownCh = http2h1ServerShutdownChan(sc.hs)
++		ch := http2h1ServerShutdownChan(sc.hs)
++		gracefulShutdownCh = make(chan struct{})
++		go func() {
++			select {
++			case <-sc.doneServing:
++			case <-ch:
++				close(gracefulShutdownCh)
++			}
++		}()
+ 	}
+ 
+ 	go sc.readFrames()
