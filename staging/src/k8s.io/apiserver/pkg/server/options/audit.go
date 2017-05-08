@@ -17,19 +17,18 @@ limitations under the License.
 package options
 
 import (
-	"os"
-
 	"github.com/spf13/pflag"
-	"gopkg.in/natefinch/lumberjack.v2"
-
+	"k8s.io/apiserver/pkg/auditor"
 	"k8s.io/apiserver/pkg/server"
 )
 
 type AuditLogOptions struct {
-	Path       string
-	MaxAge     int
-	MaxBackups int
-	MaxSize    int
+	Path               string
+	MaxAge             int
+	MaxBackups         int
+	MaxSize            int
+	GroupedByUser      bool
+	GroupedByNamespace bool
 }
 
 func NewAuditLogOptions() *AuditLogOptions {
@@ -45,6 +44,10 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 		"The maximum number of old audit log files to retain.")
 	fs.IntVar(&o.MaxSize, "audit-log-maxsize", o.MaxSize,
 		"The maximum size in megabytes of the audit log file before it gets rotated.")
+	fs.BoolVar(&o.GroupedByUser, "audit-grouped-by-user", o.GroupedByUser,
+		"Whether to split audit into multi log files by user. It will not work if audit-log-path is set to standard out. It conflicts with --audit-grouped-by-namespace")
+	fs.BoolVar(&o.GroupedByNamespace, "audit-grouped-by-namespace", o.GroupedByNamespace,
+		"Whether to split audit into multi log flies by namespace. It will not work if audit-log-path is set to standard out. It conflicts with --audit-grouped-by-user=true")
 }
 
 func (o *AuditLogOptions) ApplyTo(c *server.Config) error {
@@ -52,16 +55,6 @@ func (o *AuditLogOptions) ApplyTo(c *server.Config) error {
 		return nil
 	}
 
-	if o.Path == "-" {
-		c.AuditWriter = os.Stdout
-		return nil
-	}
-
-	c.AuditWriter = &lumberjack.Logger{
-		Filename:   o.Path,
-		MaxAge:     o.MaxAge,
-		MaxBackups: o.MaxBackups,
-		MaxSize:    o.MaxSize,
-	}
+	c.AuditWriter = auditor.NewGroupedAuditor(o.Path, o.MaxAge, o.MaxBackups, o.MaxSize, o.GroupedByUser, o.GroupedByNamespace)
 	return nil
 }
