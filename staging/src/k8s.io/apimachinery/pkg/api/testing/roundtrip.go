@@ -242,8 +242,15 @@ func roundTripOfExternalType(t *testing.T, scheme *runtime.Scheme, codecFactory 
 
 // roundTrip applies a single round-trip test to the given runtime object
 // using the given codec.  The round-trip test ensures that an object can be
-// deep-copied and converted from internal -> versioned -> internal without
-// loss of data.
+// deep-copied, converted, marshaled and back without loss of data.
+//
+// For internal types this means
+//
+//   internal -> external -> json/protobuf -> external -> internal.
+//
+// For external types this means
+//
+//   external -> json/protobuf -> external.
 func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object runtime.Object) {
 	printer := spew.ConfigState{DisableMethods: true}
 	original := object
