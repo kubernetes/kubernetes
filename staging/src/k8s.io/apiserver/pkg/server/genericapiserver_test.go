@@ -47,7 +47,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/server/mux"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	restclient "k8s.io/client-go/rest"
 )
@@ -90,7 +89,6 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
-	config.FallThroughHandler = mux.NewPathRecorderMux()
 
 	// TODO restore this test, but right now, eliminate our cycle
 	// config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, runtime.NewScheme())
@@ -108,7 +106,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdserver, config, assert := setUp(t)
 
-	s, err := config.Complete().New()
+	s, err := config.Complete().New(EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -140,7 +138,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
 	config.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: "ExternalAddress"}
 
-	s, err := config.SkipComplete().New()
+	s, err := config.SkipComplete().New(EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -304,7 +302,7 @@ func TestPrepareRun(t *testing.T) {
 	assert.NotNil(config.SwaggerConfig)
 	// assert.NotNil(config.OpenAPIConfig)
 
-	server := httptest.NewServer(s.HandlerContainer.ServeMux)
+	server := httptest.NewServer(s.Handler.GoRestfulContainer.ServeMux)
 	defer server.Close()
 
 	s.PrepareRun()
@@ -345,13 +343,13 @@ func TestCustomHandlerChain(t *testing.T) {
 		called = true
 	})
 
-	s, err := config.SkipComplete().New()
+	s, err := config.SkipComplete().New(EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
 
-	s.FallThroughHandler.Handle("/nonswagger", handler)
-	s.FallThroughHandler.Handle("/secret", handler)
+	s.Handler.PostGoRestfulMux.Handle("/nonswagger", handler)
+	s.Handler.PostGoRestfulMux.Handle("/secret", handler)
 
 	type Test struct {
 		handler   http.Handler
@@ -400,7 +398,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	kubeVersion := fakeVersion()
 	config.Version = &kubeVersion
 
-	s, err := config.SkipComplete().New()
+	s, err := config.SkipComplete().New(EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
