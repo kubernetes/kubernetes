@@ -272,7 +272,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 		close(internalStopCh)
 	}()
 
-	s.RunPostStartHooks()
+	s.RunPostStartHooks(stopCh)
 
 	if _, err := systemd.SdNotify(true, "READY=1\n"); err != nil {
 		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)

@@ -118,7 +118,7 @@ func (o CustomResourcesServerOptions) RunCustomResourcesServer(stopCh <-chan str
 		return err
 	}
 
-	server, err := config.Complete().New(genericapiserver.EmptyDelegate, stopCh)
+	server, err := config.Complete().New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		return err
 	}
