@@ -90,6 +90,11 @@ func (c *FakeNodeHandler) Core() v1core.CoreV1Interface {
 	return &FakeLegacyHandler{c.Clientset.Core(), c}
 }
 
+// CoreV1 returns fake CoreV1Interface
+func (c *FakeNodeHandler) CoreV1() v1core.CoreV1Interface {
+	return &FakeLegacyHandler{c.Clientset.CoreV1(), c}
+}
+
 // Nodes return fake NodeInterfaces.
 func (m *FakeLegacyHandler) Nodes() v1core.NodeInterface {
 	return m.n
