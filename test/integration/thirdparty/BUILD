@@ -9,7 +9,10 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["thirdparty_test.go"],
+    srcs = [
+        "client-go_test.go",
+        "thirdparty_test.go",
+    ],
     tags = [
         "automanaged",
         "integration",
@@ -24,6 +27,10 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/client-go/examples/third-party-resources/apis/tpr/v1:go_default_library",
+        "//vendor/k8s.io/client-go/examples/third-party-resources/client:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/api:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
