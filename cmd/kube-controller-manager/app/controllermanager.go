@@ -177,7 +177,7 @@ func Run(s *options.CMServer) error {
 			clientBuilder = rootClientBuilder
 		}
 
-		err := StartControllers(newControllerInitializers(), s, rootClientBuilder, clientBuilder, stop)
+		err := StartControllers(NewControllerInitializers(), s, rootClientBuilder, clientBuilder, stop)
 		glog.Fatalf("error running controllers: %v", err)
 		panic("unreachable")
 	}
@@ -272,7 +272,7 @@ func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, 
 type InitFunc func(ctx ControllerContext) (bool, error)
 
 func KnownControllers() []string {
-	ret := sets.StringKeySet(newControllerInitializers())
+	ret := sets.StringKeySet(NewControllerInitializers())
 
 	ret.Insert(
 		saTokenControllerName,
@@ -292,7 +292,9 @@ var ControllersDisabledByDefault = sets.NewString(
 	"tokencleaner",
 )
 
-func newControllerInitializers() map[string]InitFunc {
+// NewControllerInitializers is a public map of named controller groups (you can start more than one in an init func)
+// paired to their InitFunc.  This allows for structured downstream composition and subdivision.
+func NewControllerInitializers() map[string]InitFunc {
 	controllers := map[string]InitFunc{}
 	controllers["endpoint"] = startEndpointController
 	controllers["replicationcontroller"] = startReplicationController
@@ -319,7 +321,8 @@ func newControllerInitializers() map[string]InitFunc {
 
 // TODO: In general, any controller checking this needs to be dynamic so
 //  users don't have to restart their controller manager if they change the apiserver.
-func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
+// Until we get there, the structure here needs to be exposed for the construction of a proper ControllerContext.
+func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
 	var discoveryClient discovery.DiscoveryInterface
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
@@ -410,7 +413,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		glog.Warningf("%q is disabled", saTokenControllerName)
 	}
 
-	availableResources, err := getAvailableResources(clientBuilder)
+	availableResources, err := GetAvailableResources(clientBuilder)
 	if err != nil {
 		return err
 	}
