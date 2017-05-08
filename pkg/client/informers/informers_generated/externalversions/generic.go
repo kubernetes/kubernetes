@@ -30,6 +30,7 @@ import (
 	batch_v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	certificates_v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	extensions_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	networking_v1 "k8s.io/kubernetes/pkg/apis/networking/v1"
 	policy_v1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	rbac_v1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
@@ -137,6 +138,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1beta1().ReplicaSets().Informer()}, nil
 	case extensions_v1beta1.SchemeGroupVersion.WithResource("thirdpartyresources"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1beta1().ThirdPartyResources().Informer()}, nil
+
+		// Group=Networking, Version=V1
+	case networking_v1.SchemeGroupVersion.WithResource("networkpolicies"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1().NetworkPolicies().Informer()}, nil
 
 		// Group=Policy, Version=V1beta1
 	case policy_v1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):

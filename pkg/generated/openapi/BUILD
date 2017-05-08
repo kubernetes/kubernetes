@@ -26,6 +26,7 @@ openapi_library(
         "pkg/apis/componentconfig/v1alpha1",
         "pkg/apis/extensions/v1beta1",
         "pkg/apis/imagepolicy/v1alpha1",
+        "pkg/apis/networking/v1",
         "pkg/apis/policy/v1beta1",
         "pkg/apis/rbac/v1alpha1",
         "pkg/apis/rbac/v1beta1",

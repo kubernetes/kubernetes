@@ -31,6 +31,7 @@ import (
 	batch "k8s.io/kubernetes/pkg/apis/batch/install"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/install"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/install"
+	networking "k8s.io/kubernetes/pkg/apis/networking/install"
 	policy "k8s.io/kubernetes/pkg/apis/policy/install"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac/install"
 	settings "k8s.io/kubernetes/pkg/apis/settings/install"
@@ -60,6 +61,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	batch.Install(groupFactoryRegistry, registry, scheme)
 	certificates.Install(groupFactoryRegistry, registry, scheme)
 	extensions.Install(groupFactoryRegistry, registry, scheme)
+	networking.Install(groupFactoryRegistry, registry, scheme)
 	policy.Install(groupFactoryRegistry, registry, scheme)
 	rbac.Install(groupFactoryRegistry, registry, scheme)
 	settings.Install(groupFactoryRegistry, registry, scheme)

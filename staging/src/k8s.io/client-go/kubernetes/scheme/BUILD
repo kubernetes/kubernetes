@@ -31,6 +31,7 @@ go_library(
         "//vendor/k8s.io/client-go/pkg/apis/batch/v2alpha1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/extensions/v1beta1:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/apis/networking/v1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/policy/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/rbac/v1alpha1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/rbac/v1beta1:go_default_library",

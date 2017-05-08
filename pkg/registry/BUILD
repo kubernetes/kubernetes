@@ -69,6 +69,8 @@ filegroup(
         "//pkg/registry/extensions/rest:all-srcs",
         "//pkg/registry/extensions/thirdpartyresource:all-srcs",
         "//pkg/registry/extensions/thirdpartyresourcedata:all-srcs",
+        "//pkg/registry/networking/networkpolicy:all-srcs",
+        "//pkg/registry/networking/rest:all-srcs",
         "//pkg/registry/policy/poddisruptionbudget:all-srcs",
         "//pkg/registry/policy/rest:all-srcs",
         "//pkg/registry/rbac:all-srcs",

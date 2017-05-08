@@ -47,6 +47,8 @@ import (
 	fakecorev1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1/fake"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	fakeextensionsv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1/fake"
+	networkingv1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/networking/v1"
+	fakenetworkingv1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/networking/v1/fake"
 	policyv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
 	fakepolicyv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1/fake"
 	rbacv1alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1alpha1"
@@ -192,6 +194,16 @@ func (c *Clientset) ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Inter
 // Extensions retrieves the ExtensionsV1beta1Client
 func (c *Clientset) Extensions() extensionsv1beta1.ExtensionsV1beta1Interface {
 	return &fakeextensionsv1beta1.FakeExtensionsV1beta1{Fake: &c.Fake}
+}
+
+// NetworkingV1 retrieves the NetworkingV1Client
+func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
+	return &fakenetworkingv1.FakeNetworkingV1{Fake: &c.Fake}
+}
+
+// Networking retrieves the NetworkingV1Client
+func (c *Clientset) Networking() networkingv1.NetworkingV1Interface {
+	return &fakenetworkingv1.FakeNetworkingV1{Fake: &c.Fake}
 }
 
 // PolicyV1beta1 retrieves the PolicyV1beta1Client

@@ -30,6 +30,7 @@ import (
 	core "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/core"
 	extensions "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/extensions"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
+	networking "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/networking"
 	policy "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/policy"
 	rbac "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/rbac"
 	settings "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/settings"
@@ -102,6 +103,7 @@ type SharedInformerFactory interface {
 	Certificates() certificates.Interface
 	Core() core.Interface
 	Extensions() extensions.Interface
+	Networking() networking.Interface
 	Policy() policy.Interface
 	Rbac() rbac.Interface
 	Settings() settings.Interface
@@ -130,6 +132,10 @@ func (f *sharedInformerFactory) Core() core.Interface {
 
 func (f *sharedInformerFactory) Extensions() extensions.Interface {
 	return extensions.New(f)
+}
+
+func (f *sharedInformerFactory) Networking() networking.Interface {
+	return networking.New(f)
 }
 
 func (f *sharedInformerFactory) Policy() policy.Interface {

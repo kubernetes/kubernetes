@@ -79,6 +79,8 @@ pkg/apis/componentconfig/install
 pkg/apis/extensions/install
 pkg/apis/extensions/v1beta1
 pkg/apis/imagepolicy/install
+pkg/apis/networking/install
+pkg/apis/networking/validation
 pkg/apis/policy/install
 pkg/apis/rbac/install
 pkg/apis/rbac/v1alpha1
@@ -103,6 +105,8 @@ pkg/client/informers/informers_generated/externalversions/core
 pkg/client/informers/informers_generated/externalversions/core/v1
 pkg/client/informers/informers_generated/externalversions/extensions
 pkg/client/informers/informers_generated/externalversions/extensions/v1beta1
+pkg/client/informers/informers_generated/externalversions/networking
+pkg/client/informers/informers_generated/externalversions/networking/v1
 pkg/client/informers/informers_generated/externalversions/policy
 pkg/client/informers/informers_generated/externalversions/policy/v1beta1
 pkg/client/informers/informers_generated/externalversions/rbac
@@ -126,6 +130,8 @@ pkg/client/informers/informers_generated/internalversion/core
 pkg/client/informers/informers_generated/internalversion/core/internalversion
 pkg/client/informers/informers_generated/internalversion/extensions
 pkg/client/informers/informers_generated/internalversion/extensions/internalversion
+pkg/client/informers/informers_generated/internalversion/networking
+pkg/client/informers/informers_generated/internalversion/networking/internalversion
 pkg/client/informers/informers_generated/internalversion/policy
 pkg/client/informers/informers_generated/internalversion/policy/internalversion
 pkg/client/informers/informers_generated/internalversion/rbac
@@ -156,6 +162,8 @@ pkg/client/listers/extensions/internalversion
 pkg/client/listers/extensions/v1beta1
 pkg/client/listers/imagepolicy/internalversion
 pkg/client/listers/imagepolicy/v1alpha1
+pkg/client/listers/networking/internalversion
+pkg/client/listers/networking/v1
 pkg/client/listers/policy/internalversion
 pkg/client/listers/policy/v1alpha1
 pkg/client/listers/policy/v1beta1
@@ -354,6 +362,8 @@ staging/src/k8s.io/client-go/informers/core
 staging/src/k8s.io/client-go/informers/core/v1
 staging/src/k8s.io/client-go/informers/extensions
 staging/src/k8s.io/client-go/informers/extensions/v1beta1
+staging/src/k8s.io/client-go/informers/networking
+staging/src/k8s.io/client-go/informers/networking/v1
 staging/src/k8s.io/client-go/informers/policy
 staging/src/k8s.io/client-go/informers/policy/v1beta1
 staging/src/k8s.io/client-go/informers/rbac
@@ -372,6 +382,7 @@ staging/src/k8s.io/client-go/listers/batch/v2alpha1
 staging/src/k8s.io/client-go/listers/certificates/v1beta1
 staging/src/k8s.io/client-go/listers/core/v1
 staging/src/k8s.io/client-go/listers/extensions/v1beta1
+staging/src/k8s.io/client-go/listers/networking/v1
 staging/src/k8s.io/client-go/listers/policy/v1beta1
 staging/src/k8s.io/client-go/listers/rbac/v1alpha1
 staging/src/k8s.io/client-go/listers/rbac/v1beta1
