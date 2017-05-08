@@ -365,7 +365,13 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 				if pip, existsPip, err := az.getPublicIPAddress(pipName); err != nil {
 					return err
 				} else if existsPip {
-					if _, found := (*pip.Tags)[TagK8sManaged]; found {
+					foundTag := false
+
+					if pip.Tags != nil {
+						_, foundTag = (*pip.Tags)[TagK8sManaged]
+					}
+
+					if foundTag {
 						glog.V(5).Infof("Deleting public IP resource %q.", pipName)
 						err = az.ensurePublicIPDeleted(serviceName, pipName)
 						if err != nil {
