@@ -13,6 +13,7 @@ go_library(
         "adapter.go",
         "configmap.go",
         "daemonset.go",
+        "hooks.go",
         "registry.go",
         "secret.go",
     ],

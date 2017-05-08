@@ -54,6 +54,11 @@ type FederatedTypeAdapter interface {
 	ClusterWatch(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (watch.Interface, error)
 
 	NewTestObject(namespace string) pkgruntime.Object
+
+	// Individual adapter impl are supposed to provide the hook functions.
+	// Supposed to be nil on those adapters which don't need them (one or both).
+	GetScheduleHook() ScheduleHook
+	GetUpdateFedSpecHook() UpdateFedSpecHook
 }
 
 // AdapterFactory defines the function signature for factory methods

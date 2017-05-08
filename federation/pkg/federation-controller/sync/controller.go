@@ -319,6 +319,13 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		return redeliver
 	}
 
+	if h := s.adapter.GetUpdateFedSpecHook(); h != nil {
+		reconcileStatus := s.updateFedSpec(obj, h)
+		if reconcileStatus != reconciled {
+			return reconcileStatus
+		}
+	}
+
 	return syncToClusters(
 		s.informer.GetReadyClusters,
 		func(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, obj pkgruntime.Object) ([]util.FederatedOperation, error) {
@@ -384,6 +391,50 @@ func (s *FederationSyncController) delete(obj pkgruntime.Object, kind string, na
 	return nil
 }
 
+// updateFedSpec updates the spec against the federated object using the adapters UpdateFedSpecHook of need be.
+func (s *FederationSyncController) updateFedSpec(fedObj pkgruntime.Object, hook federatedtypes.UpdateFedSpecHook) reconcileStatus {
+	clusters, err := s.informer.GetReadyClusters()
+	if err != nil {
+		glog.Errorf("Failed to get cluster list: %v", err)
+		return redeliverForClusterReadiness
+	}
+
+	current := make(map[string]pkgruntime.Object)
+	key := federatedtypes.ObjectKey(s.adapter, fedObj)
+	for _, cluster := range clusters {
+		clusterObj, found, err := s.informer.GetTargetStore().GetByKey(cluster.Name, key)
+		if err != nil {
+			glog.Errorf("Failed to get %s %q from target store %q: %v", s.adapter.Kind(), key, cluster.Name, err)
+			return redeliverForFailure
+		}
+		if found {
+			current[cluster.Name] = clusterObj.(pkgruntime.Object)
+		}
+	}
+
+	if len(current) == 0 {
+		return redeliver
+	}
+
+	// The adapters hook implementation should return the updated object, with
+	// spec updated. If the returned object is nil, there is no update needed.
+	// The implementation should ensure not to mutate any of the passed objects.
+	updatedObj, err := hook(fedObj, current)
+	if err != nil {
+		glog.Errorf("Failure in determining spec update for %s %q : %v", s.adapter.Kind(), key, err)
+		return redeliverForFailure
+	}
+	if updatedObj != nil {
+		_, err = s.adapter.FedUpdate(updatedObj)
+		if err != nil {
+			glog.Errorf("Failure in updating spec for %s %q : %v", s.adapter.Kind(), key, err)
+			return redeliverForFailure
+		}
+	}
+
+	return reconciled
+}
+
 type clustersAccessorFunc func() ([]*federationapi.Cluster, error)
 type operationsFunc func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, pkgruntime.Object) ([]util.FederatedOperation, error)
 type executionFunc func([]util.FederatedOperation) error
@@ -424,29 +475,54 @@ type clusterObjectAccessorFunc func(clusterName string) (interface{}, bool, erro
 // clusterOperations returns the list of operations needed to synchronize the state of the given object to the provided clusters
 func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, obj pkgruntime.Object, accessor clusterObjectAccessorFunc) ([]util.FederatedOperation, error) {
 	key := federatedtypes.ObjectKey(adapter, obj)
-	operations := make([]util.FederatedOperation, 0)
+	current := make(map[string]pkgruntime.Object)
 	for _, cluster := range clusters {
 		clusterObj, found, err := accessor(cluster.Name)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get %s %q from cluster %q: %v", adapter.Kind(), key, cluster.Name, err)
 		}
-		// The data should not be modified.
-		desiredObj := adapter.Copy(obj)
 
-		var operationType util.FederatedOperationType = ""
 		if found {
-			clusterObj := clusterObj.(pkgruntime.Object)
-			if !adapter.Equivalent(desiredObj, clusterObj) {
+			current[cluster.Name] = clusterObj.(pkgruntime.Object)
+		} else {
+			current[cluster.Name] = nil
+		}
+	}
+
+	scheduled := make(map[string]pkgruntime.Object)
+	if h := adapter.GetScheduleHook(); h != nil {
+		var err error
+		// The hook implementation should ensure not to mutate the passed objects.
+		// Its recommended that implementation also keeps exactly same number of entries
+		// as current.
+		scheduled, err = h(obj, current)
+		if err != nil {
+			return nil, fmt.Errorf("Failure executing Schedule Hook on %s %q: %v", adapter.Kind(), key, err)
+		}
+	} else {
+		for clusterKey := range current {
+			// The same object propagated into all clusters.
+			desiredObj := adapter.Copy(obj)
+			scheduled[clusterKey] = desiredObj
+		}
+
+	}
+
+	operations := make([]util.FederatedOperation, 0)
+	for cluster, currentObj := range current {
+		var operationType util.FederatedOperationType = ""
+		if currentObj != nil && scheduled[cluster] != nil {
+			if !adapter.Equivalent(currentObj, scheduled[cluster]) {
 				operationType = util.OperationTypeUpdate
 			}
-		} else {
+		} else if currentObj == nil && scheduled[cluster] != nil {
 			operationType = util.OperationTypeAdd
 		}
 		if len(operationType) > 0 {
 			operations = append(operations, util.FederatedOperation{
 				Type:        operationType,
-				Obj:         desiredObj,
-				ClusterName: cluster.Name,
+				Obj:         scheduled[cluster],
+				ClusterName: cluster,
 				Key:         key,
 			})
 		}
