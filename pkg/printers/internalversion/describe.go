@@ -1073,7 +1073,11 @@ func describeContainerBasicInfo(container api.Container, status api.ContainerSta
 	if strings.Contains(portString, ",") {
 		w.Write(LEVEL_2, "Ports:\t%s\n", portString)
 	} else {
-		w.Write(LEVEL_2, "Port:\t%s\n", portString)
+		if len(portString) == 0 {
+			w.Write(LEVEL_2, "Port:\t<none>\n")
+		} else {
+			w.Write(LEVEL_2, "Port:\t%s\n", portString)
+		}
 	}
 }
 
