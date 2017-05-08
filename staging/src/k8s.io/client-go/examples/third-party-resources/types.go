@@ -23,6 +23,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+
+const (
+	ExampleDomain              = "tpr.client-go.k8s.io"
+	ExampleResourceDescription = "An Example ThirdPartyResource"
+	ExampleResourceGroup       = ExampleDomain
+
+	ExampleResourcePath         = "examples"
+	ExampleResourceName         = "example." + ExampleDomain
+	ExampleResourceVersion      = "v1"
+	ExampleResourceKind         = "Example"
+	ExampleResourceGroupVersion = ExampleResourceGroup + "/" + ExampleResourceVersion
+)
+
 type ExampleSpec struct {
 	Foo string `json:"foo"`
 	Bar bool   `json:"bar"`
