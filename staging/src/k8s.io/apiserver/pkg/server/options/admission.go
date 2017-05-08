@@ -32,7 +32,7 @@ import (
 
 // AdmissionOptions holds the admission options
 type AdmissionOptions struct {
-	PluginsNames             []string
+	PluginNames              []string
 	ConfigFile               string
 	Plugins                  *admission.Plugins
 	genericPluginInitializer admission.PluginInitializer
@@ -42,14 +42,14 @@ type AdmissionOptions struct {
 func NewAdmissionOptions(plugins *admission.Plugins) *AdmissionOptions {
 	return &AdmissionOptions{
 		Plugins:                  plugins,
-		PluginsNames:             []string{},
+		PluginNames:              []string{},
 		genericPluginInitializer: nil,
 	}
 }
 
 // AddFlags adds flags related to admission for a specific APIServer to the specified FlagSet
 func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringSliceVar(&a.PluginsNames, "admission-control", a.PluginsNames, ""+
+	fs.StringSliceVar(&a.PluginNames, "admission-control", a.PluginNames, ""+
 		"Ordered list of plug-ins to do admission control of resources into cluster. "+
 		"Comma-delimited list of: "+strings.Join(a.Plugins.Registered(), ", ")+".")
 
@@ -60,7 +60,7 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 // ApplyTo adds the admission chain to the server configuration
 // the method lazily initializes a generic plugin that is appended to the list of pluginInitializers
 func (a *AdmissionOptions) ApplyTo(authz authorizer.Authorizer, restConfig *rest.Config, serverCfg *server.Config, sharedInformers informers.SharedInformerFactory, pluginInitializers ...admission.PluginInitializer) error {
-	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(a.PluginsNames, a.ConfigFile)
+	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(a.PluginNames, a.ConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
 	}
@@ -81,7 +81,7 @@ func (a *AdmissionOptions) ApplyTo(authz authorizer.Authorizer, restConfig *rest
 	initializersChain := admission.PluginInitializers{}
 	pluginInitializers = append(pluginInitializers, a.genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializers...)
-	admissionChain, err := a.Plugins.NewFromPlugins(a.PluginsNames, pluginsConfigProvider, initializersChain)
+	admissionChain, err := a.Plugins.NewFromPlugins(a.PluginNames, pluginsConfigProvider, initializersChain)
 	if err != nil {
 		return err
 	}
