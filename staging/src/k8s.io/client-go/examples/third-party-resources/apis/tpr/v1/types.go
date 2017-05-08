@@ -14,27 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package v1
 
 import (
 	"encoding/json"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-
-const (
-	ExampleDomain              = "tpr.client-go.k8s.io"
-	ExampleResourceDescription = "An Example ThirdPartyResource"
-	ExampleResourceGroup       = ExampleDomain
-
-	ExampleResourcePath         = "examples"
-	ExampleResourceName         = "example." + ExampleDomain
-	ExampleResourceVersion      = "v1"
-	ExampleResourceKind         = "Example"
-	ExampleResourceGroupVersion = ExampleResourceGroup + "/" + ExampleResourceVersion
-)
+const ExampleResourcePlural = "examples"
 
 type ExampleSpec struct {
 	Foo string `json:"foo"`
@@ -53,26 +41,6 @@ type ExampleList struct {
 	Metadata        metav1.ListMeta `json:"metadata"`
 
 	Items []Example `json:"items"`
-}
-
-// Required to satisfy Object interface
-func (e *Example) GetObjectKind() schema.ObjectKind {
-	return &e.TypeMeta
-}
-
-// Required to satisfy ObjectMetaAccessor interface
-func (e *Example) GetObjectMeta() metav1.Object {
-	return &e.Metadata
-}
-
-// Required to satisfy Object interface
-func (el *ExampleList) GetObjectKind() schema.ObjectKind {
-	return &el.TypeMeta
-}
-
-// Required to satisfy ListMetaAccessor interface
-func (el *ExampleList) GetListMeta() metav1.List {
-	return &el.Metadata
 }
 
 // The code below is used only to work around a known problem with third-party

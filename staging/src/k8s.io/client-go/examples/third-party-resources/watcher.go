@@ -28,6 +28,8 @@ import (
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+
+	tprv1 "k8s.io/client-go/examples/third-party-resources/apis/tpr/v1"
 )
 
 // Watcher is an example of watching on resource create/update/delete events
@@ -58,7 +60,7 @@ func watchExamples(ctx context.Context, exampleClient cache.Getter, exampleSchem
 
 	source := newListWatchFromClient(
 		exampleClient,
-		ExampleResourcePath,
+		tprv1.ExampleResourcePlural,
 		apiv1.NamespaceAll,
 		fields.Everything(),
 		parameterCodec)
@@ -67,7 +69,7 @@ func watchExamples(ctx context.Context, exampleClient cache.Getter, exampleSchem
 		source,
 
 		// The object type.
-		&Example{},
+		&tprv1.Example{},
 
 		// resyncPeriod
 		// Every resyncPeriod, all resources in the cache will retrigger events.
@@ -79,7 +81,7 @@ func watchExamples(ctx context.Context, exampleClient cache.Getter, exampleSchem
 
 	// store can be used to List and Get
 	for _, obj := range store.List() {
-		example := obj.(*Example)
+		example := obj.(*tprv1.Example)
 		fmt.Printf("Existing example: %#v\n", example)
 	}
 
@@ -119,18 +121,18 @@ type ExampleEventHandler struct {
 }
 
 func (h *ExampleEventHandler) OnAdd(obj interface{}) {
-	example := obj.(*Example)
+	example := obj.(*tprv1.Example)
 	fmt.Printf("[WATCH] OnAdd %s\n", example.Metadata.SelfLink)
 }
 
 func (h *ExampleEventHandler) OnUpdate(oldObj, newObj interface{}) {
-	oldExample := oldObj.(*Example)
-	newExample := newObj.(*Example)
+	oldExample := oldObj.(*tprv1.Example)
+	newExample := newObj.(*tprv1.Example)
 	fmt.Printf("[WATCH] OnUpdate oldObj: %s\n", oldExample.Metadata.SelfLink)
 	fmt.Printf("[WATCH] OnUpdate newObj: %s\n", newExample.Metadata.SelfLink)
 }
 
 func (h *ExampleEventHandler) OnDelete(obj interface{}) {
-	example := obj.(*Example)
+	example := obj.(*tprv1.Example)
 	fmt.Printf("[WATCH] OnDelete %s\n", example.Metadata.SelfLink)
 }

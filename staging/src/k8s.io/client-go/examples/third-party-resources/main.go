@@ -23,15 +23,18 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+
+	tprv1 "k8s.io/client-go/examples/third-party-resources/apis/tpr/v1"
+	exampleclient "k8s.io/client-go/examples/third-party-resources/client"
 )
 
 func main() {
@@ -50,34 +53,9 @@ func main() {
 	}
 
 	// initialize third party resource if it does not exist
-	tpr, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Get(ExampleResourceName, metav1.GetOptions{})
-	if err != nil {
-		if errors.IsNotFound(err) {
-			tpr := &v1beta1.ThirdPartyResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: ExampleResourceName,
-				},
-				Versions: []v1beta1.APIVersion{
-					{Name: ExampleResourceVersion},
-				},
-				Description: ExampleResourceDescription,
-			}
-
-			result, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
-			if err != nil {
-				panic(err)
-			}
-			fmt.Printf("CREATED: %#v\nFROM: %#v\n", result, tpr)
-
-			// See the issue https://github.com/kubernetes/features/issues/95
-			// ("Make new TPRs available immediately after the create request succeeds")
-			fmt.Print("Sleeping to make sure the TPR is processed and available")
-			time.Sleep(5 * time.Second)
-		} else {
-			panic(err)
-		}
-	} else {
-		fmt.Printf("SKIPPING: already exists %#v\n", tpr)
+	err = exampleclient.CreateTPR(clientset)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		panic(err)
 	}
 
 	// make a new config for our extension's API group, using the first config as a baseline
@@ -105,30 +83,30 @@ func main() {
 	time.Sleep(5 * time.Second)
 
 	// GET/POST an instance of our TPR
-	var example Example
+	var example tprv1.Example
 
 	err = exampleClient.Get().
-		Resource(ExampleResourcePath).
+		Resource(tprv1.ExampleResourcePlural).
 		Namespace(apiv1.NamespaceDefault).
 		Name("example1").
 		Do().Into(&example)
 
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Create an instance of our TPR
-			example := &Example{
+			example := &tprv1.Example{
 				Metadata: metav1.ObjectMeta{
 					Name: "example1",
 				},
-				Spec: ExampleSpec{
+				Spec: tprv1.ExampleSpec{
 					Foo: "hello",
 					Bar: true,
 				},
 			}
 
-			var result Example
+			var result tprv1.Example
 			err = exampleClient.Post().
-				Resource(ExampleResourcePath).
+				Resource(tprv1.ExampleResourcePlural).
 				Namespace(apiv1.NamespaceDefault).
 				Body(example).
 				Do().Into(&result)
@@ -145,8 +123,8 @@ func main() {
 	}
 
 	// Fetch a list of our TPRs
-	exampleList := ExampleList{}
-	err = exampleClient.Get().Resource(ExampleResourcePath).Do().Into(&exampleList)
+	exampleList := tprv1.ExampleList{}
+	err = exampleClient.Get().Resource(tprv1.ExampleResourcePlural).Do().Into(&exampleList)
 	if err != nil {
 		panic(err)
 	}
