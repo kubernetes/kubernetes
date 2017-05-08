@@ -122,13 +122,24 @@ func getLastSegment(ID string) (string, error) {
 
 // returns the equivalent LoadBalancerRule, SecurityRule and LoadBalancerProbe
 // protocol types for the given Kubernetes protocol type.
-func getProtocolsFromKubernetesProtocol(protocol v1.Protocol) (network.TransportProtocol, network.SecurityRuleProtocol, network.ProbeProtocol, error) {
+func getProtocolsFromKubernetesProtocol(protocol v1.Protocol) (*network.TransportProtocol, *network.SecurityRuleProtocol, *network.ProbeProtocol, error) {
+	var transportProto network.TransportProtocol
+	var securityProto network.SecurityRuleProtocol
+	var probeProto network.ProbeProtocol
+
 	switch protocol {
 	case v1.ProtocolTCP:
-		return network.TransportProtocolTCP, network.TCP, network.ProbeProtocolTCP, nil
+		transportProto = network.TransportProtocolTCP
+		securityProto = network.TCP
+		probeProto = network.ProbeProtocolTCP
+	case v1.ProtocolUDP:
+		transportProto = network.TransportProtocolUDP
+		securityProto = network.UDP
 	default:
-		return "", "", "", fmt.Errorf("Only TCP is supported for Azure LoadBalancers")
+		return &transportProto, &securityProto, &probeProto, fmt.Errorf("Only TCP and UDP are supported for Azure LoadBalancers")
 	}
+
+	return &transportProto, &securityProto, &probeProto, nil
 }
 
 // This returns the full identifier of the primary NIC for the given VM.
