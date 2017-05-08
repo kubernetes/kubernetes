@@ -18,7 +18,6 @@ package framework
 
 import (
 	"fmt"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -31,10 +30,10 @@ import (
 )
 
 type MemberCluster struct {
-	Server *httptest.Server
-	Config *master.Config
-	Client clientset.Interface
-	Host   string
+	CloseFn framework.CloseFunc
+	Config  *master.Config
+	Client  clientset.Interface
+	Host    string
 }
 
 // FederationFixture manages a federation api server and a set of member clusters
@@ -72,7 +71,7 @@ func (f *FederationFixture) startClusters() {
 	fedClient := f.APIFixture.NewClient("federation-fixture")
 	for i := 0; i < f.DesiredClusterCount; i++ {
 		config := framework.NewMasterConfig()
-		_, server := framework.RunAMaster(config)
+		_, _, closeFn := framework.RunAMaster(config)
 		host := config.GenericConfig.LoopbackClientConfig.Host
 
 		// Use fmt to ensure the output will be visible when run with go test -v
@@ -80,10 +79,10 @@ func (f *FederationFixture) startClusters() {
 
 		clusterClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
 		f.Clusters = append(f.Clusters, &MemberCluster{
-			Server: server,
-			Config: config,
-			Client: clusterClient,
-			Host:   host,
+			CloseFn: closeFn,
+			Config:  config,
+			Client:  clusterClient,
+			Host:    host,
 		})
 
 		f.ClusterClients = append(f.ClusterClients, clusterClient)
@@ -113,7 +112,7 @@ func (f *FederationFixture) TearDown(t *testing.T) {
 		f.stopChan = nil
 	}
 	for _, cluster := range f.Clusters {
-		cluster.Server.Close()
+		cluster.CloseFn()
 	}
 	f.Clusters = nil
 	if f.APIFixture != nil {

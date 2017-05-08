@@ -89,8 +89,8 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 
 }
 
-func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, sharedInformers informers.SharedInformerFactory, stopCh <-chan struct{}) (*aggregatorapiserver.APIAggregator, error) {
-	aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(delegateAPIServer, stopCh)
+func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, sharedInformers informers.SharedInformerFactory) (*aggregatorapiserver.APIAggregator, error) {
+	aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(delegateAPIServer)
 	if err != nil {
 		return nil, err
 	}
@@ -105,8 +105,8 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	tprRegistrationController := thirdparty.NewAutoRegistrationController(sharedInformers.Extensions().InternalVersion().ThirdPartyResources(), autoRegistrationController)
 
 	aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
-		go autoRegistrationController.Run(5, stopCh)
-		go tprRegistrationController.Run(5, stopCh)
+		go autoRegistrationController.Run(5, context.StopCh)
+		go tprRegistrationController.Run(5, context.StopCh)
 		return nil
 	})
 	aggregatorServer.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("autoregister-completion", func(r *http.Request) error {
