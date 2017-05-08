@@ -146,3 +146,7 @@ func (a *SecretAdapter) NewTestObject(namespace string) pkgruntime.Object {
 		Type: apiv1.SecretTypeOpaque,
 	}
 }
+
+func (a *SecretAdapter) ImplementsReconcilePlugin() bool {
+	return false
+}

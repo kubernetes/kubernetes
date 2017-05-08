@@ -54,6 +54,15 @@ type FederatedTypeAdapter interface {
 	ClusterWatch(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (watch.Interface, error)
 
 	NewTestObject(namespace string) pkgruntime.Object
+
+	// ImplementsReconcileHook is used to explicitly state, if the adapter implements ReconcilePlugin interface also.
+	ImplementsReconcilePlugin() bool
+}
+
+// ReconcilePlugin defines additional reconcile operations for those controllers which need
+// additional reconcile logic.
+type ReconcilePlugin interface {
+	ReconcileHook(pkgruntime.Object, map[string]pkgruntime.Object) (map[string]pkgruntime.Object, error)
 }
 
 // AdapterFactory defines the function signature for factory methods

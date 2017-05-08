@@ -95,24 +95,30 @@ func TestSyncToClusters(t *testing.T) {
 }
 
 func TestClusterOperations(t *testing.T) {
-	adapter := &federatedtypes.SecretAdapter{}
-	obj := adapter.NewTestObject("foo")
-	differingObj := adapter.Copy(obj)
-	federatedtypes.SetAnnotation(adapter, differingObj, "foo", "bar")
+	defaultAdapter := &federatedtypes.SecretAdapter{}
+	reconcilePluginAdapter := &fakeReconcilePluginAdapter{}
+	obj := defaultAdapter.NewTestObject("foo")
+	differingObj := defaultAdapter.Copy(obj)
+	federatedtypes.SetAnnotation(defaultAdapter, differingObj, "foo", "bar")
 
 	testCases := map[string]struct {
-		clusterObject   pkgruntime.Object
-		expectedErr     bool
-		expectedSendErr bool
-		sendToCluster   bool
+		clusterObject                pkgruntime.Object
+		expectedErr                  bool
+		expectedSendErr              bool
+		expectedSchedObjsAccessError bool
+		sendToCluster                bool
 
 		operationType util.FederatedOperationType
+		adapter       federatedtypes.FederatedTypeAdapter
 	}{
 		"Accessor error returned": {
 			expectedErr: true,
 		},
 		"sendToCluster error returned": {
 			expectedSendErr: true,
+		},
+		"Get Scheduled Objects returns error": {
+			expectedSchedObjsAccessError: true,
 		},
 		"Missing cluster object should result in add operation": {
 			operationType: util.OperationTypeAdd,
@@ -132,13 +138,27 @@ func TestClusterOperations(t *testing.T) {
 			clusterObject: obj,
 			sendToCluster: true,
 		},
+		"Matching cluster object on scheduling type adapter does not result in an operation": {
+			clusterObject: obj,
+			sendToCluster: true,
+			adapter:       reconcilePluginAdapter,
+		},
+		"Differring cluster object on scheduling type adapter results in update operation": {
+			clusterObject: differingObj,
+			operationType: util.OperationTypeUpdate,
+			sendToCluster: true,
+			adapter:       reconcilePluginAdapter,
+		},
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			clusters := []*federationapi.Cluster{fedtest.NewCluster("cluster1", apiv1.ConditionTrue)}
-			key := federatedtypes.ObjectKey(adapter, obj)
+			if testCase.adapter == nil {
+				testCase.adapter = defaultAdapter
+			}
+			key := federatedtypes.ObjectKey(testCase.adapter, obj)
 
-			operations, err := clusterOperations(adapter, clusters, obj, key, func(string) (interface{}, bool, error) {
+			operations, err := clusterOperations(testCase.adapter, clusters, obj, key, func(string) (interface{}, bool, error) {
 				if testCase.expectedErr {
 					return nil, false, awfulError
 				}
@@ -148,8 +168,18 @@ func TestClusterOperations(t *testing.T) {
 					return false, awfulError
 				}
 				return testCase.sendToCluster, nil
+			}, func(adapter federatedtypes.FederatedTypeAdapter, fedObj pkgruntime.Object, clusterObjs map[string]pkgruntime.Object) (map[string]pkgruntime.Object, error) {
+				if testCase.expectedSchedObjsAccessError {
+					return nil, awfulError
+				}
+				scheduledObjs := make(map[string]pkgruntime.Object)
+				// No additional reconcile plugin stuff, behaves same as normal sync
+				for clusterName := range clusterObjs {
+					scheduledObjs[clusterName] = fedObj
+				}
+				return scheduledObjs, nil
 			})
-			if testCase.expectedErr || testCase.expectedSendErr {
+			if testCase.expectedErr || testCase.expectedSendErr || testCase.expectedSchedObjsAccessError {
 				require.Error(t, err, "An error was expected")
 			} else {
 				require.NoError(t, err, "An error was not expected")
