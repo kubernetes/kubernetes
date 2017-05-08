@@ -35,6 +35,9 @@ import (
 // ServiceAnnotationLoadBalancerInternal is the annotation used on the service
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/azure-load-balancer-internal"
 
+// TagK8sManaged is the tag name for k8s created resources
+const TagK8sManaged = "k8s-managed"
+
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
@@ -122,14 +125,6 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	err := az.cleanupLoadBalancer(clusterName, service, !isInternal)
 	if err != nil {
 		return nil, err
-	}
-
-	// Also clean up public ip resource, since service might be switched from public load balancer type.
-	if isInternal {
-		err = az.cleanupPublicIP(clusterName, service)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	serviceName := getServiceName(service)
@@ -288,13 +283,6 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 		return err
 	}
 
-	if !isInternal {
-		err = az.cleanupPublicIP(clusterName, service)
-		if err != nil {
-			return err
-		}
-	}
-
 	sg, existsSg, err := az.getSecurityGroup()
 	if err != nil {
 		return err
@@ -332,6 +320,22 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 		return err
 	}
 	if existsLb {
+		var publicIPToCleanup *string
+
+		if !isInternalLb {
+			// Find public ip resource to clean up from IP configuration
+			lbFrontendIPConfigName := getFrontendIPConfigName(service)
+			for _, config := range *lb.FrontendIPConfigurations {
+				if strings.EqualFold(*config.Name, lbFrontendIPConfigName) {
+					if config.PublicIPAddress != nil {
+						// Only ID property is available
+						publicIPToCleanup = config.PublicIPAddress.ID
+					}
+					break
+				}
+			}
+		}
+
 		lb, lbNeedsUpdate, reconcileErr := az.reconcileLoadBalancer(lb, nil, clusterName, service, []*v1.Node{})
 		if reconcileErr != nil {
 			return reconcileErr
@@ -352,23 +356,26 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 				}
 			}
 		}
-	}
 
-	return nil
-}
-
-func (az *Cloud) cleanupPublicIP(clusterName string, service *v1.Service) error {
-	serviceName := getServiceName(service)
-
-	// Only delete an IP address if we created it.
-	if service.Spec.LoadBalancerIP == "" {
-		pipName, err := az.getPublicIPName(clusterName, service)
-		if err != nil {
-			return err
-		}
-		err = az.ensurePublicIPDeleted(serviceName, pipName)
-		if err != nil {
-			return err
+		// Public IP can be deleted after frontend ip configuration rule deleted.
+		if publicIPToCleanup != nil {
+			// Only delete an IP address if we created it, deducing by tag.
+			if index := strings.LastIndex(*publicIPToCleanup, "/"); index != -1 {
+				pipName := (*publicIPToCleanup)[index+1:]
+				if pip, existsPip, err := az.getPublicIPAddress(pipName); err != nil {
+					return err
+				} else if existsPip {
+					if _, found := (*pip.Tags)[TagK8sManaged]; found {
+						glog.V(5).Infof("Deleting public IP resource %q.", pipName)
+						err = az.ensurePublicIPDeleted(serviceName, pipName)
+						if err != nil {
+							return err
+						}
+					} else {
+						glog.V(5).Infof("Public IP resource %q found, but it does not have %q tag, skip deleting.", pipName, TagK8sManaged)
+					}
+				}
+			}
 		}
 	}
 
@@ -389,7 +396,8 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.Pub
 	pip.PublicIPAddressPropertiesFormat = &network.PublicIPAddressPropertiesFormat{
 		PublicIPAllocationMethod: network.Static,
 	}
-	pip.Tags = &map[string]*string{"service": &serviceName}
+	trueValue := "true"
+	pip.Tags = &map[string]*string{"service": &serviceName, TagK8sManaged: &trueValue}
 
 	glog.V(3).Infof("ensure(%s): pip(%s) - creating", serviceName, *pip.Name)
 	_, err = az.PublicIPAddressesClient.CreateOrUpdate(az.ResourceGroup, *pip.Name, pip, nil)

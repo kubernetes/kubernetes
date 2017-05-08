@@ -1241,6 +1241,77 @@ var _ = framework.KubeDescribe("Services", func() {
 		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, acceptPodName, svcIP)
 		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPodName, svcIP)
 	})
+
+	It("should be able to create an internal type load balancer [Slow]", func() {
+		framework.SkipUnlessProviderIs("azure")
+
+		createTimeout := framework.LoadBalancerCreateTimeoutDefault
+		pollInterval := framework.Poll * 10
+
+		serviceAnnotationLoadBalancerInternal := "service.beta.kubernetes.io/azure-load-balancer-internal"
+		namespace := f.Namespace.Name
+		serviceName := "lb-internal"
+		jig := framework.NewServiceTestJig(cs, serviceName)
+
+		isInternalEndpoint := func(lbIngress *v1.LoadBalancerIngress) bool {
+			ingressEndpoint := framework.GetIngressPoint(lbIngress)
+			// Needs update for providers using hostname as endpoint.
+			return strings.HasPrefix(ingressEndpoint, "10.")
+		}
+
+		By("creating a service with type LoadBalancer and LoadBalancerInternal annotation set to true")
+		svc := jig.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeLoadBalancer
+			svc.ObjectMeta.Annotations = map[string]string{
+				serviceAnnotationLoadBalancerInternal: "true",
+			}
+		})
+		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, createTimeout)
+		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+		lbIngress := &svc.Status.LoadBalancer.Ingress[0]
+		// should have an internal IP.
+		Expect(isInternalEndpoint(lbIngress)).To(BeTrue())
+
+		By("switiching to external type LoadBalancer")
+		svc = jig.UpdateServiceOrFail(namespace, serviceName, func(svc *v1.Service) {
+			svc.ObjectMeta.Annotations[serviceAnnotationLoadBalancerInternal] = "false"
+		})
+		framework.Logf("Waiting up to %v for service %q to have an external LoadBalancer", createTimeout, serviceName)
+		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
+			svc, err := jig.Client.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			lbIngress = &svc.Status.LoadBalancer.Ingress[0]
+			return !isInternalEndpoint(lbIngress), nil
+		}); pollErr != nil {
+			framework.Failf("Loadbalancer IP not changed to external.")
+		}
+		// should have an external IP.
+		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+		Expect(isInternalEndpoint(lbIngress)).To(BeFalse())
+
+		By("switiching back to interal type LoadBalancer, with static IP specified.")
+		internalStaticIP := "10.240.11.11"
+		svc = jig.UpdateServiceOrFail(namespace, serviceName, func(svc *v1.Service) {
+			svc.Spec.LoadBalancerIP = internalStaticIP
+			svc.ObjectMeta.Annotations[serviceAnnotationLoadBalancerInternal] = "true"
+		})
+		framework.Logf("Waiting up to %v for service %q to have an internal LoadBalancer", createTimeout, serviceName)
+		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
+			svc, err := jig.Client.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			lbIngress = &svc.Status.LoadBalancer.Ingress[0]
+			return isInternalEndpoint(lbIngress), nil
+		}); pollErr != nil {
+			framework.Failf("Loadbalancer IP not changed to internal.")
+		}
+		// should have the given static internal IP.
+		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+		Expect(framework.GetIngressPoint(lbIngress)).To(Equal(internalStaticIP))
+	})
 })
 
 var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
