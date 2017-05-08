@@ -25,7 +25,7 @@ import (
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/listers/autoscaling/v1"
-	autoscaling_v1 "k8s.io/client-go/pkg/apis/autoscaling/v1"
+	autoscaling_v1 "k8s.io/api/autoscaling/v1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )

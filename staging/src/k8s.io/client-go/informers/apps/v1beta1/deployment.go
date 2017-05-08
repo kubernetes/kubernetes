@@ -25,7 +25,7 @@ import (
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1beta1 "k8s.io/client-go/listers/apps/v1beta1"
-	apps_v1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
+	apps_v1beta1 "k8s.io/api/apps/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )

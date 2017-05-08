@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	v1beta1 "k8s.io/client-go/pkg/apis/storage/v1beta1"
+	v1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 )
 
