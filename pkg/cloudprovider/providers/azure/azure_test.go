@@ -260,8 +260,8 @@ func TestReconcileSecurityWithSourceRanges(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
 	svc.Spec.LoadBalancerSourceRanges = []string{
-		"192.168.0.1/24",
-		"10.0.0.1/32",
+		"192.168.0.0/24",
+		"10.0.0.0/32",
 	}
 
 	sg := getTestSecurityGroup(svc)
@@ -336,7 +336,7 @@ func getTestLoadBalancer(services ...v1.Service) network.LoadBalancer {
 
 	for _, service := range services {
 		for _, port := range service.Spec.Ports {
-			ruleName := getRuleName(&service, port)
+			ruleName := getLoadBalancerRuleName(&service, port)
 			rules = append(rules, network.LoadBalancingRule{
 				Name: to.StringPtr(ruleName),
 				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
@@ -378,10 +378,9 @@ func getTestSecurityGroup(services ...v1.Service) network.SecurityGroup {
 
 	for _, service := range services {
 		for _, port := range service.Spec.Ports {
-			ruleName := getRuleName(&service, port)
-
 			sources := getServiceSourceRanges(&service)
 			for _, src := range sources {
+				ruleName := getSecurityRuleName(&service, port, src)
 				rules = append(rules, network.SecurityRule{
 					Name: to.StringPtr(ruleName),
 					SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
@@ -412,7 +411,7 @@ func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, servi
 		}
 		for _, wantedRule := range svc.Spec.Ports {
 			expectedRuleCount++
-			wantedRuleName := getRuleName(&svc, wantedRule)
+			wantedRuleName := getLoadBalancerRuleName(&svc, wantedRule)
 			foundRule := false
 			for _, actualRule := range *loadBalancer.LoadBalancingRules {
 				if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
@@ -483,8 +482,8 @@ func validateSecurityGroup(t *testing.T, securityGroup network.SecurityGroup, se
 	for _, svc := range services {
 		for _, wantedRule := range svc.Spec.Ports {
 			sources := getServiceSourceRanges(&svc)
-			wantedRuleName := getRuleName(&svc, wantedRule)
 			for _, source := range sources {
+				wantedRuleName := getSecurityRuleName(&svc, wantedRule, source)
 				expectedRuleCount++
 				foundRule := false
 				for _, actualRule := range *securityGroup.SecurityRules {
@@ -557,22 +556,28 @@ func TestProtocolTranslationTCP(t *testing.T) {
 		t.Error(err)
 	}
 
-	if transportProto != network.TransportProtocolTCP {
+	if *transportProto != network.TransportProtocolTCP {
 		t.Errorf("Expected TCP LoadBalancer Rule Protocol. Got %v", transportProto)
 	}
-	if securityGroupProto != network.TCP {
+	if *securityGroupProto != network.TCP {
 		t.Errorf("Expected TCP SecurityGroup Protocol. Got %v", transportProto)
 	}
-	if probeProto != network.ProbeProtocolTCP {
+	if *probeProto != network.ProbeProtocolTCP {
 		t.Errorf("Expected TCP LoadBalancer Probe Protocol. Got %v", transportProto)
 	}
 }
 
 func TestProtocolTranslationUDP(t *testing.T) {
 	proto := v1.ProtocolUDP
-	_, _, _, err := getProtocolsFromKubernetesProtocol(proto)
-	if err == nil {
-		t.Error("Expected an error. UDP is unsupported.")
+	transportProto, securityGroupProto, probeProto, _ := getProtocolsFromKubernetesProtocol(proto)
+	if *transportProto != network.TransportProtocolUDP {
+		t.Errorf("Expected UDP LoadBalancer Rule Protocol. Got %v", transportProto)
+	}
+	if *securityGroupProto != network.UDP {
+		t.Errorf("Expected UDP SecurityGroup Protocol. Got %v", transportProto)
+	}
+	if probeProto != nil {
+		t.Errorf("Expected UDP LoadBalancer Probe Protocol. Got %v", transportProto)
 	}
 }
 
