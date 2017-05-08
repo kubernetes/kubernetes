@@ -23,8 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	kapierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -44,8 +42,8 @@ type useNamespaceOptions struct {
 	factory      cmdutil.Factory
 }
 
-func NewCmdConfigUseNamespace(f cmdutil.Factory, out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &useNamespaceOptions{configAccess: configAccess, factory: f}
+func NewCmdConfigUseNamespace(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &useNamespaceOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:     "use-ns NAMESPACE_NAME",
@@ -107,32 +105,6 @@ func (o useNamespaceOptions) validate(config *clientcmdapi.Config) error {
 
 	if len(o.namespace) == 0 {
 		return errors.New("you must specify a namespace")
-	}
-
-	err := o.confirmNamespaceExist()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (o useNamespaceOptions) confirmNamespaceExist() error {
-	clientset, err := o.factory.ClientSet()
-	if err != nil {
-		return err
-	}
-
-	_, err = clientset.Core().Namespaces().Get(o.namespace, metav1.GetOptions{})
-	if err != nil {
-		if kapierrors.IsNotFound(err) {
-			return fmt.Errorf("no namespace exists with the name: %q, can not switch namespace\n", o.namespace)
-		}
-
-		if kapierrors.IsForbidden(err) {
-			return fmt.Errorf("permission denied with access namespace: %q, can not switch namespace\n", o.namespace)
-		}
-		return err
 	}
 
 	return nil

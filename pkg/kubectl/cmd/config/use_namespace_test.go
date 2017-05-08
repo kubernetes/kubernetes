@@ -80,7 +80,7 @@ func (test useNamespaceTest) run(t *testing.T) {
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigUseContext(buf, pathOptions)
+	cmd := NewCmdConfigUseNamespace(buf, pathOptions)
 	cmd.SetArgs(test.args)
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error executing command: %v,kubectl config use-context args: %v", err, test.args)
