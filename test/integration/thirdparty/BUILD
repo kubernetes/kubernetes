@@ -29,6 +29,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/examples/third-party-resources/apis/tpr/v1:go_default_library",
         "//vendor/k8s.io/client-go/examples/third-party-resources/client:go_default_library",
+        "//vendor/k8s.io/client-go/examples/third-party-resources/controller:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/pkg/api:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
