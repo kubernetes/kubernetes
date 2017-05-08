@@ -126,7 +126,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 
 	// reject pods when under memory pressure (if pod is best effort), or if under disk pressure.
-	glog.Warningf("Failed to admit pod %v - %s", format.Pod(attrs.Pod), "node has conditions: %v", m.nodeConditions)
+	glog.Warningf("Failed to admit pod %s - node has conditions: %v", format.Pod(attrs.Pod), m.nodeConditions)
 	return lifecycle.PodAdmitResult{
 		Admit:   false,
 		Reason:  reason,
