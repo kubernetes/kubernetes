@@ -134,8 +134,9 @@ verify_base_image() {
 }
 
 setup_overlay_mounts() {
-    mkdir -p /rootfs/nvidia-overlay/usr /rootfs/nvidia-overlay/.work
+    mkdir -p /rootfs/nvidia-overlay/usr /rootfs/nvidia-overlay/.work /rootfs/nvidia-overlay/lib
     mount -t overlay -o lowerdir=/usr,upperdir=/rootfs/nvidia-overlay/usr,workdir=/rootfs/nvidia-overlay/.work none /usr
+    mount -t overlay -o lowerdir=/lib,upperdir=/rootfs/nvidia-overlay/lib,workdir=/rootfs/nvidia-overlay/.work none /lib
 }
 
 should_install() {
@@ -155,6 +156,7 @@ copy_files_to_host() {
     mkdir -p /rootfs/usr/lib/nvidia /rootfs/usr/lib/nvidia/bin
     cp -r /rootfs/nvidia-overlay/usr/lib/* /rootfs/usr/lib/nvidia/
     cp -r /rootfs/nvidia-overlay/usr/bin/* /rootfs/usr/lib/nvidia/bin/
+    cp -r /rootfs/nvidia-overlay/lib/modules/* /rootfs/lib/modules/
 }
 
 main() {

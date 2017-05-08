@@ -22,6 +22,9 @@ spec:
         - name: usr
           hostPath:
             path: /usr
+         - name: lib
+          hostPath:
+            path: /lib
         - name: nvidia-overlay
           hostPath:
             path: /home/kubernetes/bin/nvidia-overlay
@@ -40,6 +43,7 @@ spec:
         securityContext:
           privileged: true
         env:
+          # The kernel SHA1 here should correspond to the GCI_VERSION specified by default under cluster/gce/config-default.sh 
           - name: LAKITU_KERNEL_SHA1
             value: 2fdf6034a0fae9794d80e4d218e237771224ba8f
         volumeMounts:
@@ -47,6 +51,8 @@ spec:
             mountPath: /rootfs/nvidia-overlay
           - name: usr
             mountPath: /rootfs/usr
+          - name: lib
+            mountPath: /rootfs/lib
           - name: dev
             mountPath: /dev
           - name: os-release
