@@ -161,3 +161,7 @@ func (a *DaemonSetAdapter) NewTestObject(namespace string) pkgruntime.Object {
 		},
 	}
 }
+
+func (a *DaemonSetAdapter) IsScheduler() bool {
+	return false
+}

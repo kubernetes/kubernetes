@@ -144,3 +144,7 @@ func (a *ConfigMapAdapter) NewTestObject(namespace string) pkgruntime.Object {
 		},
 	}
 }
+
+func (a *ConfigMapAdapter) IsScheduler() bool {
+	return false
+}

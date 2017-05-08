@@ -95,34 +95,45 @@ func TestSyncToClusters(t *testing.T) {
 }
 
 func TestClusterOperations(t *testing.T) {
-	adapter := &federatedtypes.SecretAdapter{}
-	obj := adapter.NewTestObject("foo")
-	differingObj := adapter.Copy(obj)
-	federatedtypes.SetAnnotation(adapter, differingObj, "foo", "bar")
+	defaultAdapter := &federatedtypes.SecretAdapter{}
+	scheduleAdapter := &fakeSchedulerAdapter{}
+	obj := defaultAdapter.NewTestObject("foo")
+	differingObj := defaultAdapter.Copy(obj)
+	federatedtypes.SetAnnotation(defaultAdapter, differingObj, "foo", "bar")
 
 	testCases := map[string]struct {
 		clusterObject pkgruntime.Object
 		expectedErr   bool
 		operationType util.FederatedOperationType
+		adapter       federatedtypes.FederatedTypeAdapter
 	}{
 		"Accessor error returned": {
 			expectedErr: true,
+			adapter:     defaultAdapter,
 		},
 		"Missing cluster object should result in add operation": {
 			operationType: util.OperationTypeAdd,
+			adapter:       defaultAdapter,
 		},
 		"Differing cluster object should result in update operation": {
 			clusterObject: differingObj,
 			operationType: util.OperationTypeUpdate,
+			adapter:       defaultAdapter,
 		},
 		"Matching cluster object should not result in an operation": {
 			clusterObject: obj,
+			adapter:       defaultAdapter,
+		},
+		"Differring cluster object on scheduling type adapter results in update operation": {
+			clusterObject: obj,
+			operationType: util.OperationTypeUpdate,
+			adapter:       scheduleAdapter,
 		},
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			clusters := []*federationapi.Cluster{fedtest.NewCluster("cluster1", apiv1.ConditionTrue)}
-			operations, err := clusterOperations(adapter, clusters, obj, func(string) (interface{}, bool, error) {
+			operations, err := clusterOperations(testCase.adapter, clusters, obj, func(string) (interface{}, bool, error) {
 				if testCase.expectedErr {
 					return nil, false, awfulError
 				}
