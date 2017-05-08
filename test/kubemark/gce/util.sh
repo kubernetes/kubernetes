@@ -20,7 +20,7 @@
 function run-gcloud-compute-with-retries {
   RETRIES="${RETRIES:-3}"
   for attempt in $(seq 1 ${RETRIES}); do
-    local -r gcloud_result=$(gcloud compute "$@" 2>&1)
+    gcloud_result=$(gcloud compute "$@" 2>&1)  # We don't use 'local -r' here as then ret_val seems to always get value 0.
     local -r ret_val="$?"
     echo "${gcloud_result}"
     if [[ "${ret_val}" -ne "0" ]]; then
