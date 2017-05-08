@@ -1349,7 +1349,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string, descri
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, err := getPodStatusForController(pc, labels.SelectorFromSet(controller.Spec.Selector))
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, labels.SelectorFromSet(controller.Spec.Selector), name)
 	if err != nil {
 		return "", err
 	}
@@ -1426,7 +1426,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, getPodErr := getPodStatusForController(pc, selector)
+	running, waiting, succeeded, failed, getPodErr := getPodStatusForController(pc, selector, name)
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
@@ -1626,7 +1626,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 	if err != nil {
 		return "", err
 	}
-	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector)
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector, name)
 	if err != nil {
 		return "", err
 	}
@@ -2222,7 +2222,7 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector)
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector, name)
 	if err != nil {
 		return "", err
 	}
@@ -2629,13 +2629,16 @@ func printReplicaSetsByLabels(matchingRSs []*versionedextension.ReplicaSet) stri
 	return list
 }
 
-func getPodStatusForController(c coreclient.PodInterface, selector labels.Selector) (running, waiting, succeeded, failed int, err error) {
+func getPodStatusForController(c coreclient.PodInterface, selector labels.Selector, name string) (running, waiting, succeeded, failed int, err error) {
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rcPods, err := c.List(options)
 	if err != nil {
 		return
 	}
 	for _, pod := range rcPods.Items {
+		if !isControllerRef(pod, name) {
+			continue
+		}
 		switch pod.Status.Phase {
 		case api.PodRunning:
 			running++
@@ -2648,6 +2651,18 @@ func getPodStatusForController(c coreclient.PodInterface, selector labels.Select
 		}
 	}
 	return
+}
+
+// isControllerRef returns true if a pod is managed by a controller or if owner
+// reference is not set; otherwise, return false.
+func isControllerRef(pod api.Pod, name string) bool {
+	for _, or := range pod.OwnerReferences {
+		fmt.Println(*or.Controller, or.Name, name)
+		if or.Controller != nil && *or.Controller == true && or.Name != name {
+			return false
+		}
+	}
+	return true
 }
 
 // ConfigMapDescriber generates information about a ConfigMap

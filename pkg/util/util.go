@@ -112,6 +112,12 @@ func Int32Ptr(i int32) *int32 {
 	return &o
 }
 
+// BoolPtr returns a pointer to a bool
+func BoolPtr(b bool) *bool {
+	o := b
+	return &o
+}
+
 // IntPtrDerefOr dereference the int ptr and returns it i not nil,
 // else returns def.
 func IntPtrDerefOr(ptr *int, def int) int {

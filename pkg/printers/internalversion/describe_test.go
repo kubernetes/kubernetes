@@ -1398,3 +1398,74 @@ URL:	http://localhost
 		}
 	}
 }
+
+func TestControllerRef(t *testing.T) {
+	f := fake.NewSimpleClientset(
+		&api.ReplicationController{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: "foo",
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "ReplicationController",
+			},
+			Spec: api.ReplicationControllerSpec{
+				Replicas: 1,
+				Selector: map[string]string{"abc": "xyz"},
+				Template: &api.PodTemplateSpec{
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{Image: "mytest-image:latest"},
+						},
+					},
+				},
+			},
+		},
+		&api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "barpod",
+				Namespace:       "foo",
+				Labels:          map[string]string{"abc": "xyz"},
+				OwnerReferences: []metav1.OwnerReference{{Name: "bar", Controller: util.BoolPtr(true)}},
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "Pod",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Image: "mytest-image:latest"},
+				},
+			},
+			Status: api.PodStatus{
+				Phase: api.PodRunning,
+			},
+		},
+		&api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "buzpod",
+				Namespace:       "foo",
+				Labels:          map[string]string{"abc": "xyz"},
+				OwnerReferences: []metav1.OwnerReference{{Name: "buz", Controller: util.BoolPtr(true)}},
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "Pod",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Image: "mytest-image:latest"},
+				},
+			},
+			Status: api.PodStatus{
+				Phase: api.PodRunning,
+			},
+		})
+	d := ReplicationControllerDescriber{f}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: false})
+	fmt.Println(string(out))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "1 Running") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
