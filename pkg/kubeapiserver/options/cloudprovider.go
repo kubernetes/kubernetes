@@ -36,11 +36,6 @@ func NewCloudProviderOptions() *CloudProviderOptions {
 	return &CloudProviderOptions{}
 }
 
-func (s *CloudProviderOptions) Validate() []error {
-	allErrors := []error{}
-	return allErrors
-}
-
 func (s *CloudProviderOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider,
 		"The provider for cloud services. Empty string for no provider.")

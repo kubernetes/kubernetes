@@ -163,11 +163,6 @@ func (s *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptio
 	return s
 }
 
-func (s *BuiltInAuthenticationOptions) Validate() []error {
-	allErrors := []error{}
-	return allErrors
-}
-
 func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	if s.Anonymous != nil {
 		fs.BoolVar(&s.Anonymous.Allow, "anonymous-auth", s.Anonymous.Allow, ""+

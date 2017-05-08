@@ -43,11 +43,6 @@ func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 	}
 }
 
-func (s *BuiltInAuthorizationOptions) Validate() []error {
-	allErrors := []error{}
-	return allErrors
-}
-
 func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Mode, "authorization-mode", s.Mode, ""+
 		"Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: "+
