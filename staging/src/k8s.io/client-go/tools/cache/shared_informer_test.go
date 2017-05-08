@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/api/core/v1"
 	fcache "k8s.io/client-go/tools/cache/testing"
 	"k8s.io/client-go/util/clock"
 )

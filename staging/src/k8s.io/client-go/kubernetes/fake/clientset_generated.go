@@ -94,16 +94,6 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ kubernetes.Interface = &Clientset{}
 
-// CoreV1 retrieves the CoreV1Client
-func (c *Clientset) CoreV1() corev1.CoreV1Interface {
-	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
-}
-
-// Core retrieves the CoreV1Client
-func (c *Clientset) Core() corev1.CoreV1Interface {
-	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
-}
-
 // AppsV1beta1 retrieves the AppsV1beta1Client
 func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
 	return &fakeappsv1beta1.FakeAppsV1beta1{Fake: &c.Fake}
@@ -182,6 +172,16 @@ func (c *Clientset) CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta
 // Certificates retrieves the CertificatesV1beta1Client
 func (c *Clientset) Certificates() certificatesv1beta1.CertificatesV1beta1Interface {
 	return &fakecertificatesv1beta1.FakeCertificatesV1beta1{Fake: &c.Fake}
+}
+
+// CoreV1 retrieves the CoreV1Client
+func (c *Clientset) CoreV1() corev1.CoreV1Interface {
+	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
+}
+
+// Core retrieves the CoreV1Client
+func (c *Clientset) Core() corev1.CoreV1Interface {
+	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
 }
 
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
