@@ -22,7 +22,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/apiserver/pkg/server/healthz"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/cmd/kube-proxy/app"
@@ -32,8 +31,6 @@ import (
 )
 
 func main() {
-	healthz.DefaultHealthz()
-
 	command := app.NewProxyCommand()
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
