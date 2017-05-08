@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -59,7 +59,7 @@ func watchExamples(ctx context.Context, exampleClient cache.Getter, exampleSchem
 	source := newListWatchFromClient(
 		exampleClient,
 		ExampleResourcePath,
-		api.NamespaceAll,
+		apiv1.NamespaceAll,
 		fields.Everything(),
 		parameterCodec)
 
@@ -90,8 +90,8 @@ func watchExamples(ctx context.Context, exampleClient cache.Getter, exampleSchem
 
 // See the issue comment: https://github.com/kubernetes/kubernetes/issues/16376#issuecomment-272167794
 // newListWatchFromClient is a copy of cache.NewListWatchFromClient() method with custom codec
-// Cannot use cache.NewListWatchFromClient() because it uses global api.ParameterCodec which uses global
-// api.Scheme which does not know about custom types (Example in our case) group/version.
+// Cannot use cache.NewListWatchFromClient() because it uses global apiv1.ParameterCodec which uses global
+// apiv1.Scheme which does not know about custom types (Example in our case) group/version.
 func newListWatchFromClient(c cache.Getter, resource string, namespace string, fieldSelector fields.Selector, paramCodec runtime.ParameterCodec) *cache.ListWatch {
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
 		return c.Get().

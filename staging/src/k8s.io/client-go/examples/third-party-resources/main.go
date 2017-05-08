@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -109,7 +109,7 @@ func main() {
 
 	err = exampleClient.Get().
 		Resource(ExampleResourcePath).
-		Namespace(api.NamespaceDefault).
+		Namespace(apiv1.NamespaceDefault).
 		Name("example1").
 		Do().Into(&example)
 
@@ -129,7 +129,7 @@ func main() {
 			var result Example
 			err = exampleClient.Post().
 				Resource(ExampleResourcePath).
-				Namespace(api.NamespaceDefault).
+				Namespace(apiv1.NamespaceDefault).
 				Body(example).
 				Do().Into(&result)
 
