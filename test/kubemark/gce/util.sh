@@ -78,6 +78,7 @@ function create-master-instance-with-resources {
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 
   run-gcloud-compute-with-retries instances add-metadata "${MASTER_NAME}" \
+    ${GCLOUD_COMMON_ARGS} \
     --metadata-from-file startup-script="${KUBE_ROOT}/test/kubemark/resources/start-kubemark-master.sh"
   
   if [ "${EVENT_PD:-false}" == "true" ]; then
