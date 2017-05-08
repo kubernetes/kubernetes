@@ -102,7 +102,7 @@ func (c *Config) SkipComplete() completedConfig {
 
 // New returns a new instance of CustomResources from the given config.
 func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget, stopCh <-chan struct{}) (*CustomResources, error) {
-	genericServer, err := c.Config.GenericConfig.SkipComplete().New() // completion is done in Complete, no need for a second time
+	genericServer, err := c.Config.GenericConfig.SkipComplete().New(genericapiserver.EmptyDelegate) // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
 	}
@@ -149,8 +149,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget,
 		c.CustomResourceRESTOptionsGetter,
 		c.GenericConfig.AdmissionControl,
 	)
-	s.GenericAPIServer.FallThroughHandler.Handle("/apis", customResourceHandler)
-	s.GenericAPIServer.FallThroughHandler.HandlePrefix("/apis/", customResourceHandler)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle("/apis", customResourceHandler)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.HandlePrefix("/apis/", customResourceHandler)
 
 	customResourceController := NewDiscoveryController(customResourceInformers.Apiextensions().InternalVersion().CustomResources(), versionDiscoveryHandler, groupDiscoveryHandler)
 

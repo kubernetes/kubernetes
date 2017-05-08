@@ -19,19 +19,12 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "container.go",
         "doc.go",
         "pathrecorder.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor/github.com/emicklei/go-restful:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
     ],
 )
