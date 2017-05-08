@@ -132,14 +132,15 @@ func getProtocolsFromKubernetesProtocol(protocol v1.Protocol) (*network.Transpor
 		transportProto = network.TransportProtocolTCP
 		securityProto = network.TCP
 		probeProto = network.ProbeProtocolTCP
+		return &transportProto, &securityProto, &probeProto, nil
 	case v1.ProtocolUDP:
 		transportProto = network.TransportProtocolUDP
 		securityProto = network.UDP
+		return &transportProto, &securityProto, nil, nil
 	default:
 		return &transportProto, &securityProto, &probeProto, fmt.Errorf("Only TCP and UDP are supported for Azure LoadBalancers")
 	}
 
-	return &transportProto, &securityProto, &probeProto, nil
 }
 
 // This returns the full identifier of the primary NIC for the given VM.
@@ -186,8 +187,13 @@ func getBackendPoolName(clusterName string) string {
 	return clusterName
 }
 
-func getRuleName(service *v1.Service, port v1.ServicePort) string {
-	return fmt.Sprintf("%s-%s-%d-%d", getRulePrefix(service), port.Protocol, port.Port, port.NodePort)
+func getLoadBalancerRuleName(service *v1.Service, port v1.ServicePort) string {
+	return fmt.Sprintf("%s-%s-%d", getRulePrefix(service), port.Protocol, port.Port)
+}
+
+func getSecurityRuleName(service *v1.Service, port v1.ServicePort, sourceAddrPrefix string) string {
+	safePrefix := strings.Replace(sourceAddrPrefix, "/", "_", -1)
+	return fmt.Sprintf("%s-%s-%d-%s", getRulePrefix(service), port.Protocol, port.Port, safePrefix)
 }
 
 // This returns a human-readable version of the Service used to tag some resources.
