@@ -161,3 +161,11 @@ func (a *DaemonSetAdapter) NewTestObject(namespace string) pkgruntime.Object {
 		},
 	}
 }
+
+func (a *DaemonSetAdapter) GetScheduleHook() ScheduleHook {
+	return nil
+}
+
+func (a *DaemonSetAdapter) GetUpdateFedSpecHook() UpdateFedSpecHook {
+	return nil
+}

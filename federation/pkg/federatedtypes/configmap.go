@@ -144,3 +144,11 @@ func (a *ConfigMapAdapter) NewTestObject(namespace string) pkgruntime.Object {
 		},
 	}
 }
+
+func (a *ConfigMapAdapter) GetScheduleHook() ScheduleHook {
+	return nil
+}
+
+func (a *ConfigMapAdapter) GetUpdateFedSpecHook() UpdateFedSpecHook {
+	return nil
+}
