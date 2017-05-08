@@ -17,8 +17,15 @@ limitations under the License.
 package v1
 
 import (
+	"math/rand"
+	"testing"
+
+	"github.com/google/gofuzz"
+
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
 var _ runtime.Object = &Example{}
@@ -26,3 +33,29 @@ var _ metav1.ObjectMetaAccessor = &Example{}
 
 var _ runtime.Object = &ExampleList{}
 var _ metav1.ListMetaAccessor = &ExampleList{}
+
+func exampleFuzzerFuncs(t apitesting.TestingCommon) []interface{} {
+	return []interface{}{
+		func(obj *ExampleList, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			obj.Items = make([]Example, c.Intn(10))
+			for i := range obj.Items {
+				c.Fuzz(&obj.Items[i])
+			}
+		},
+	}
+}
+
+func TestRoundTrip(t *testing.T) {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	AddToScheme(scheme)
+
+	seed := rand.Int63()
+	fuzzerFuncs := apitesting.MergeFuzzerFuncs(t, apitesting.GenericFuzzerFuncs(t, codecs), exampleFuzzerFuncs(t))
+	fuzzer := apitesting.FuzzerFor(fuzzerFuncs, rand.NewSource(seed))
+
+	apitesting.RoundTripSpecificKindWithoutProtobuf(t, SchemeGroupVersion.WithKind("Example"), scheme, codecs, fuzzer, nil)
+	apitesting.RoundTripSpecificKindWithoutProtobuf(t, SchemeGroupVersion.WithKind("ExampleList"), scheme, codecs, fuzzer, nil)
+}
