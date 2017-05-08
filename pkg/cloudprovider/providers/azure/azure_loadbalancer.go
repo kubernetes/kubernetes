@@ -538,6 +538,10 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 			}
 		}
 
+		loadDistribution := network.Default
+		if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
+			loadDistribution = network.SourceIP
+		}
 		expectedRules[i] = network.LoadBalancingRule{
 			Name: &lbRuleName,
 			LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
@@ -551,6 +555,7 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 				Probe: &network.SubResource{
 					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
 				},
+				LoadDistribution: loadDistribution,
 				FrontendPort:     to.Int32Ptr(port.Port),
 				BackendPort:      to.Int32Ptr(port.Port),
 				EnableFloatingIP: to.BoolPtr(true),
