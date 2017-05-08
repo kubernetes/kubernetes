@@ -1067,9 +1067,11 @@ var _ = framework.KubeDescribe("Services", func() {
 				},
 			},
 			Lifecycle: &v1.Lifecycle{
-				PreStop: &v1.Handler{
-					Exec: &v1.ExecAction{
-						Command: []string{"/bin/sleep", fmt.Sprintf("%d", terminateSeconds)},
+				PreStop: &v1.PreStopHandler{
+					Exec: &v1.DeleteExecAction{
+						ExecAction: v1.ExecAction{
+							Command: []string{"/bin/sleep", fmt.Sprintf("%d", terminateSeconds)},
+						},
 					},
 				},
 			},

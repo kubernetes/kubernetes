@@ -51,6 +51,9 @@ func (meta *ObjectMeta) GetDeletionGracePeriodSeconds() *int64 { return meta.Del
 func (meta *ObjectMeta) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds *int64) {
 	meta.DeletionGracePeriodSeconds = deletionGracePeriodSeconds
 }
+func (meta *ObjectMeta) GetDeletionReason() string { return "" }
+func (meta *ObjectMeta) SetDeletionReason(_ string) {
+}
 func (meta *ObjectMeta) GetLabels() map[string]string                 { return meta.Labels }
 func (meta *ObjectMeta) SetLabels(labels map[string]string)           { meta.Labels = labels }
 func (meta *ObjectMeta) GetAnnotations() map[string]string            { return meta.Annotations }

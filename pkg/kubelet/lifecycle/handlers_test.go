@@ -93,12 +93,16 @@ func TestRunHandlerExec(t *testing.T) {
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
 
+	action := v1.ExecAction{Command: []string{"ls", "-a"}}
 	container := v1.Container{
 		Name: containerName,
 		Lifecycle: &v1.Lifecycle{
 			PostStart: &v1.Handler{
-				Exec: &v1.ExecAction{
-					Command: []string{"ls", "-a"},
+				Exec: &action,
+			},
+			PreStop: &v1.PreStopHandler{
+				Exec: &v1.DeleteExecAction{
+					ExecAction: action,
 				},
 			},
 		},
@@ -108,12 +112,23 @@ func TestRunHandlerExec(t *testing.T) {
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []v1.Container{container}
-	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+
+	// Test PostStart handler.
+	_, err := handlerRunner.RunPostStart(containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if fakeCommandRunner.ID != containerID ||
 		!reflect.DeepEqual(container.Lifecycle.PostStart.Exec.Command, fakeCommandRunner.Cmd) {
+		t.Errorf("unexpected commands: %v", fakeCommandRunner)
+	}
+	// Test PreStop Handler.
+	_, err = handlerRunner.RunPreStop(containerID, &pod, &container, container.Lifecycle.PreStop)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fakeCommandRunner.ID != containerID ||
+		!reflect.DeepEqual(container.Lifecycle.PreStop.Exec.Command, fakeCommandRunner.Cmd) {
 		t.Errorf("unexpected commands: %v", fakeCommandRunner)
 	}
 }
@@ -136,14 +151,16 @@ func TestRunHandlerHttp(t *testing.T) {
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
 
+	action := v1.HTTPGetAction{Host: "foo", Port: intstr.FromInt(8080), Path: "bar"}
 	container := v1.Container{
 		Name: containerName,
 		Lifecycle: &v1.Lifecycle{
 			PostStart: &v1.Handler{
-				HTTPGet: &v1.HTTPGetAction{
-					Host: "foo",
-					Port: intstr.FromInt(8080),
-					Path: "bar",
+				HTTPGet: &action,
+			},
+			PreStop: &v1.PreStopHandler{
+				HTTPGet: &v1.DeleteHTTPGetAction{
+					HTTPGetAction: action,
 				},
 			},
 		},
@@ -152,8 +169,17 @@ func TestRunHandlerHttp(t *testing.T) {
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []v1.Container{container}
-	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 
+	// Test PostStart handler.
+	_, err := handlerRunner.RunPostStart(containerID, &pod, &container, container.Lifecycle.PostStart)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fakeHttp.url != "http://foo:8080/bar" {
+		t.Errorf("unexpected url: %s", fakeHttp.url)
+	}
+	// Test PreStop handler.
+	_, err = handlerRunner.RunPreStop(containerID, &pod, &container, container.Lifecycle.PreStop)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -173,13 +199,21 @@ func TestRunHandlerNil(t *testing.T) {
 		Name: containerName,
 		Lifecycle: &v1.Lifecycle{
 			PostStart: &v1.Handler{},
+			PreStop:   &v1.PreStopHandler{},
 		},
 	}
 	pod := v1.Pod{}
 	pod.ObjectMeta.Name = podName
 	pod.ObjectMeta.Namespace = podNamespace
 	pod.Spec.Containers = []v1.Container{container}
-	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+
+	// Test PostStart handler.
+	_, err := handlerRunner.RunPostStart(containerID, &pod, &container, container.Lifecycle.PostStart)
+	if err == nil {
+		t.Errorf("expect error, but got nil")
+	}
+	// Test PreStop handler.
+	_, err = handlerRunner.RunPreStop(containerID, &pod, &container, container.Lifecycle.PreStop)
 	if err == nil {
 		t.Errorf("expect error, but got nil")
 	}
@@ -187,30 +221,40 @@ func TestRunHandlerNil(t *testing.T) {
 
 func TestRunHandlerHttpFailure(t *testing.T) {
 	expectedErr := fmt.Errorf("fake http error")
-	expectedResp := http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(expectedErr.Error())),
-	}
-	fakeHttp := fakeHTTP{err: expectedErr, resp: &expectedResp}
+	fakeHttp := fakeHTTP{err: expectedErr}
 	handlerRunner := NewHandlerRunner(&fakeHttp, &fakeContainerCommandRunner{}, nil)
 	containerName := "containerFoo"
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+
+	httpGetAction := v1.HTTPGetAction{Host: "foo", Port: intstr.FromInt(8080), Path: "bar"}
 	container := v1.Container{
 		Name: containerName,
 		Lifecycle: &v1.Lifecycle{
-			PostStart: &v1.Handler{
-				HTTPGet: &v1.HTTPGetAction{
-					Host: "foo",
-					Port: intstr.FromInt(8080),
-					Path: "bar",
-				},
-			},
+			PostStart: &v1.Handler{HTTPGet: &httpGetAction},
+			PreStop:   &v1.PreStopHandler{HTTPGet: &v1.DeleteHTTPGetAction{HTTPGetAction: httpGetAction}},
 		},
 	}
 	pod := v1.Pod{}
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []v1.Container{container}
-	msg, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+
+	// Test PostStart handler.
+	fakeHttp.resp = &http.Response{Body: ioutil.NopCloser(strings.NewReader(expectedErr.Error()))}
+	msg, err := handlerRunner.RunPostStart(containerID, &pod, &container, container.Lifecycle.PostStart)
+	if err == nil {
+		t.Errorf("expected error: %v", expectedErr)
+	}
+	if msg != expectedErr.Error() {
+		t.Errorf("unexpected error message: %q; expected %q", msg, expectedErr)
+	}
+	if fakeHttp.url != "http://foo:8080/bar" {
+		t.Errorf("unexpected url: %s", fakeHttp.url)
+	}
+
+	// Test PreStop handler.
+	fakeHttp.resp = &http.Response{Body: ioutil.NopCloser(strings.NewReader(expectedErr.Error()))}
+	msg, err = handlerRunner.RunPreStop(containerID, &pod, &container, container.Lifecycle.PreStop)
 	if err == nil {
 		t.Errorf("expected error: %v", expectedErr)
 	}

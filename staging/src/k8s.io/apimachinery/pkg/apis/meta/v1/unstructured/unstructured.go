@@ -422,6 +422,14 @@ func (u *Unstructured) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds 
 	u.setNestedField(deletionGracePeriodSeconds, "metadata", "deletionGracePeriodSeconds")
 }
 
+func (u *Unstructured) GetDeletionReason() string {
+	return getNestedString(u.Object, "metadata", "deletionReason")
+}
+
+func (u *Unstructured) SetDeletionReason(deletionReason string) {
+	u.setNestedField(deletionReason, "metadata", "deletionReason")
+}
+
 func (u *Unstructured) GetLabels() map[string]string {
 	return getNestedMap(u.Object, "metadata", "labels")
 }

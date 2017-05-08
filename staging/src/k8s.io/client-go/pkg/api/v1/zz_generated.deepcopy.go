@@ -64,6 +64,8 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ContainerStateWaiting, InType: reflect.TypeOf(&ContainerStateWaiting{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ContainerStatus, InType: reflect.TypeOf(&ContainerStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DaemonEndpoint, InType: reflect.TypeOf(&DaemonEndpoint{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DeleteExecAction, InType: reflect.TypeOf(&DeleteExecAction{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DeleteHTTPGetAction, InType: reflect.TypeOf(&DeleteHTTPGetAction{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DeleteOptions, InType: reflect.TypeOf(&DeleteOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DownwardAPIProjection, InType: reflect.TypeOf(&DownwardAPIProjection{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DownwardAPIVolumeFile, InType: reflect.TypeOf(&DownwardAPIVolumeFile{})},
@@ -157,6 +159,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodTemplateList, InType: reflect.TypeOf(&PodTemplateList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodTemplateSpec, InType: reflect.TypeOf(&PodTemplateSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PortworxVolumeSource, InType: reflect.TypeOf(&PortworxVolumeSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreStopHandler, InType: reflect.TypeOf(&PreStopHandler{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Preconditions, InType: reflect.TypeOf(&Preconditions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferAvoidPodsEntry, InType: reflect.TypeOf(&PreferAvoidPodsEntry{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferredSchedulingTerm, InType: reflect.TypeOf(&PreferredSchedulingTerm{})},
@@ -714,6 +717,30 @@ func DeepCopy_v1_DaemonEndpoint(in interface{}, out interface{}, c *conversion.C
 	}
 }
 
+func DeepCopy_v1_DeleteExecAction(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*DeleteExecAction)
+		out := out.(*DeleteExecAction)
+		*out = *in
+		if err := DeepCopy_v1_ExecAction(&in.ExecAction, &out.ExecAction, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_DeleteHTTPGetAction(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*DeleteHTTPGetAction)
+		out := out.(*DeleteHTTPGetAction)
+		*out = *in
+		if err := DeepCopy_v1_HTTPGetAction(&in.HTTPGetAction, &out.HTTPGetAction, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
 func DeepCopy_v1_DeleteOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DeleteOptions)
@@ -1250,8 +1277,8 @@ func DeepCopy_v1_Lifecycle(in interface{}, out interface{}, c *conversion.Cloner
 		}
 		if in.PreStop != nil {
 			in, out := &in.PreStop, &out.PreStop
-			*out = new(Handler)
-			if err := DeepCopy_v1_Handler(*in, *out, c); err != nil {
+			*out = new(PreStopHandler)
+			if err := DeepCopy_v1_PreStopHandler(*in, *out, c); err != nil {
 				return err
 			}
 		}
@@ -2566,6 +2593,34 @@ func DeepCopy_v1_PortworxVolumeSource(in interface{}, out interface{}, c *conver
 		in := in.(*PortworxVolumeSource)
 		out := out.(*PortworxVolumeSource)
 		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_PreStopHandler(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PreStopHandler)
+		out := out.(*PreStopHandler)
+		*out = *in
+		if in.Exec != nil {
+			in, out := &in.Exec, &out.Exec
+			*out = new(DeleteExecAction)
+			if err := DeepCopy_v1_DeleteExecAction(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		if in.HTTPGet != nil {
+			in, out := &in.HTTPGet, &out.HTTPGet
+			*out = new(DeleteHTTPGetAction)
+			if err := DeepCopy_v1_DeleteHTTPGetAction(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		if in.TCPSocket != nil {
+			in, out := &in.TCPSocket, &out.TCPSocket
+			*out = new(TCPSocketAction)
+			**out = **in
+		}
 		return nil
 	}
 }

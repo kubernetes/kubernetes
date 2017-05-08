@@ -487,6 +487,16 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 			c.FuzzNoCustom(s)
 			s.Allocatable = s.Capacity
 		},
+		func(a *api.DeleteExecAction, c fuzz.Continue) {
+			c.FuzzNoCustom(a)
+			// has a default value
+			a.ReasonEnv = "KUBE_DELETE_REASON"
+		},
+		func(a *api.DeleteHTTPGetAction, c fuzz.Continue) {
+			c.FuzzNoCustom(a)
+			// has a default value
+			a.ReasonHeader = "Kube-Delete-Reason"
+		},
 	}
 }
 

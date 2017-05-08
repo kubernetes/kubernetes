@@ -139,6 +139,11 @@ message DeleteOptions {
   // metadata.finalizers and the resource-specific default policy.
   // +optional
   optional string propagationPolicy = 4;
+
+  // The reason for the deletion of an API Object that undergoes graceful
+  // termination upon deletion.
+  // +optional
+  optional string reason = 5;
 }
 
 // Duration is a wrapper around time.Duration which supports correct
@@ -464,6 +469,12 @@ message ObjectMeta {
   // This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
   // +optional
   optional string clusterName = 15;
+
+  // The reason for the deletion of an API Object. Its purpose is to provide
+  // an extra generic signal to watchers of API Objects during the graceful
+  // termination process.
+  // +optional
+  optional string deletionReason = 16;
 }
 
 // OwnerReference contains enough information to let you identify an owning

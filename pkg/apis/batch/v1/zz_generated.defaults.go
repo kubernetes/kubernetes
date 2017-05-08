@@ -118,8 +118,12 @@ func SetObjectDefaults_Job(in *Job) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.Exec != nil {
+					api_v1.SetDefaults_DeleteExecAction(a.Lifecycle.PreStop.Exec)
+				}
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					api_v1.SetDefaults_DeleteHTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					api_v1.SetDefaults_HTTPGetAction(&a.Lifecycle.PreStop.HTTPGet.HTTPGetAction)
 				}
 			}
 		}
@@ -160,8 +164,12 @@ func SetObjectDefaults_Job(in *Job) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.Exec != nil {
+					api_v1.SetDefaults_DeleteExecAction(a.Lifecycle.PreStop.Exec)
+				}
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					api_v1.SetDefaults_DeleteHTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					api_v1.SetDefaults_HTTPGetAction(&a.Lifecycle.PreStop.HTTPGet.HTTPGetAction)
 				}
 			}
 		}

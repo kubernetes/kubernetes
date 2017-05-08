@@ -35,7 +35,28 @@ func NewFakeHandlerRunner() *FakeHandlerRunner {
 	return &FakeHandlerRunner{HandlerRuns: []string{}}
 }
 
-func (hr *FakeHandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
+func (hr *FakeHandlerRunner) RunPostStart(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
+	hr.Lock()
+	defer hr.Unlock()
+
+	if hr.Err != nil {
+		return "", hr.Err
+	}
+
+	switch {
+	case handler.Exec != nil:
+		hr.HandlerRuns = append(hr.HandlerRuns, fmt.Sprintf("exec on pod: %v, container: %v: %v", format.Pod(pod), container.Name, containerID.String()))
+	case handler.HTTPGet != nil:
+		hr.HandlerRuns = append(hr.HandlerRuns, fmt.Sprintf("http-get on pod: %v, container: %v: %v", format.Pod(pod), container.Name, containerID.String()))
+	case handler.TCPSocket != nil:
+		hr.HandlerRuns = append(hr.HandlerRuns, fmt.Sprintf("tcp-socket on pod: %v, container: %v: %v", format.Pod(pod), container.Name, containerID.String()))
+	default:
+		return "", fmt.Errorf("Invalid handler: %v", handler)
+	}
+	return "", nil
+}
+
+func (hr *FakeHandlerRunner) RunPreStop(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.PreStopHandler) (string, error) {
 	hr.Lock()
 	defer hr.Unlock()
 

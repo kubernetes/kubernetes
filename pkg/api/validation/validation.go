@@ -1678,6 +1678,17 @@ func validateExecAction(exec *api.ExecAction, fldPath *field.Path) field.ErrorLi
 	return allErrors
 }
 
+func validateDeleteExecAction(exec *api.DeleteExecAction, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	allErrors = append(allErrors, validateExecAction(&exec.ExecAction, fldPath.Child("ExecAction"))...)
+	if exec.ReasonEnv != "" {
+		for _, msg := range validation.IsCIdentifier(exec.ReasonEnv) {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("reasonEnv"), exec.ReasonEnv, msg))
+		}
+	}
+	return allErrors
+}
+
 var supportedHTTPSchemes = sets.NewString(string(api.URISchemeHTTP), string(api.URISchemeHTTPS))
 
 func validateHTTPGetAction(http *api.HTTPGetAction, fldPath *field.Path) field.ErrorList {
@@ -1692,6 +1703,23 @@ func validateHTTPGetAction(http *api.HTTPGetAction, fldPath *field.Path) field.E
 	for _, header := range http.HTTPHeaders {
 		for _, msg := range validation.IsHTTPHeaderName(header.Name) {
 			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
+		}
+	}
+	return allErrors
+}
+
+func validateDeleteHTTPGetAction(http *api.DeleteHTTPGetAction, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	allErrors = append(allErrors, validateHTTPGetAction(&http.HTTPGetAction, fldPath.Child("HTTPGetAction"))...)
+	if http.ReasonHeader != "" {
+		for _, msg := range validation.IsHTTPHeaderName(http.ReasonHeader) {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("reasonHeader"), http.ReasonHeader, msg))
+		}
+		// The deletion reason header must not be present in HTTPHeaders.
+		for _, header := range http.HTTPHeaders {
+			if http.ReasonHeader == header.Name {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("reasonHeaders"), http.ReasonHeader, fmt.Sprintf("%v must not exist in httpHeaders", http.ReasonHeader)))
+			}
 		}
 	}
 	return allErrors
@@ -1750,13 +1778,38 @@ func validateHandler(handler *api.Handler, fldPath *field.Path) field.ErrorList 
 	return allErrors
 }
 
+func validatePreStopHandler(handler *api.PreStopHandler, fldPath *field.Path) field.ErrorList {
+	numHandlers := 0
+	allErrors := field.ErrorList{}
+	if handler.Exec != nil {
+		if numHandlers > 0 {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("exec"), "may not specify more than 1 handler type"))
+		} else {
+			numHandlers++
+			allErrors = append(allErrors, validateDeleteExecAction(handler.Exec, fldPath.Child("exec"))...)
+		}
+	}
+	if handler.HTTPGet != nil {
+		if numHandlers > 0 {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("httpGet"), "may not specify more than 1 handler type"))
+		} else {
+			numHandlers++
+			allErrors = append(allErrors, validateDeleteHTTPGetAction(handler.HTTPGet, fldPath.Child("httpGet"))...)
+		}
+	}
+	if numHandlers == 0 {
+		allErrors = append(allErrors, field.Required(fldPath, "must specify a handler type"))
+	}
+	return allErrors
+}
+
 func validateLifecycle(lifecycle *api.Lifecycle, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if lifecycle.PostStart != nil {
 		allErrs = append(allErrs, validateHandler(lifecycle.PostStart, fldPath.Child("postStart"))...)
 	}
 	if lifecycle.PreStop != nil {
-		allErrs = append(allErrs, validateHandler(lifecycle.PreStop, fldPath.Child("preStop"))...)
+		allErrs = append(allErrs, validatePreStopHandler(lifecycle.PreStop, fldPath.Child("preStop"))...)
 	}
 	return allErrs
 }

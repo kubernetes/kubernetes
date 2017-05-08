@@ -118,7 +118,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 			Type: m.runtimeName,
 			ID:   containerID,
 		}
-		msg, handlerErr := m.runner.Run(kubeContainerID, pod, container, container.Lifecycle.PostStart)
+		msg, handlerErr := m.runner.RunPostStart(kubeContainerID, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
 			err := fmt.Errorf("PostStart handler: %v", handlerErr)
 			m.generateContainerEvent(kubeContainerID, v1.EventTypeWarning, events.FailedPostStartHook, msg)
@@ -448,7 +448,7 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(pod *v1.Pod, containerID 
 	go func() {
 		defer close(done)
 		defer utilruntime.HandleCrash()
-		if msg, err := m.runner.Run(containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
+		if msg, err := m.runner.RunPreStop(containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
 			glog.Errorf("preStop hook for container %q failed: %v", containerSpec.Name, err)
 			m.generateContainerEvent(containerID, v1.EventTypeWarning, events.FailedPreStopHook, msg)
 		}

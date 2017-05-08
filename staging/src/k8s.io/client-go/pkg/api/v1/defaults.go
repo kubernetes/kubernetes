@@ -357,3 +357,15 @@ func SetDefaults_ScaleIOVolumeSource(obj *ScaleIOVolumeSource) {
 		obj.FSType = "xfs"
 	}
 }
+
+func SetDefaults_DeleteExecAction(obj *DeleteExecAction) {
+	if obj.ReasonEnv == "" {
+		obj.ReasonEnv = DefaultDeleteReasonEnv
+	}
+}
+
+func SetDefaults_DeleteHTTPGetAction(obj *DeleteHTTPGetAction) {
+	if obj.ReasonHeader == "" {
+		obj.ReasonHeader = DefaultDeleteReasonHeader
+	}
+}

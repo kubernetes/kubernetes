@@ -1761,6 +1761,57 @@ type Handler struct {
 	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
 }
 
+const (
+	// DefaultDeleteReasonEnv is the default environment variable that will be
+	// populated with the reason for a deletion.
+	DefaultDeleteReasonEnv = "KUBE_DELETE_REASON"
+
+	// DefaultDeleteReasonHeader is the default header that will be set to the
+	// reason for a deletion.
+	DefaultDeleteReasonHeader = "Kube-Delete-Reason"
+)
+
+// DeleteExecAction describes a "run in container" action that will be invoked
+// inside of a container prior to sending the TERM signal to the container's
+// entry point.
+type DeleteExecAction struct {
+	ExecAction `json:",inline" protobuf:"bytes,1,opt,name=execAction"`
+
+	// ReasonEnv is the environment variable that will be populated with the
+	// reason, if provided, for the deletion. This variable defaults to
+	// DefaultDeleteReasonEnv. Must be a C_IDENTIFIER.
+	// +optional
+	ReasonEnv string `json:"reasonEnv,omitempty" protobuf:"bytes,2,opt,name=reasonEnv"`
+}
+
+// DeleteHTTPGetAction describes an action to take upon deletion based on HTTP
+// GET requests.
+type DeleteHTTPGetAction struct {
+	HTTPGetAction `json:",inline" protobuf:"bytes,1,opt,name=httpGetAction"`
+
+	// ReasonHeader is the header that will be set to the reason for a
+	// deletion. This header defaults to DefaultDeleteReasonHeader.
+	// +optional
+	ReasonHeader string `json:"reasonHeader,omitempty" protobuf:"bytes,2,opt,name=reasonHeader"`
+}
+
+// PreStopHandler invokes either a DeleteExecAction or a DeleteHTTPGetAction
+// prior to the graceful termination of a Pod. One and only one of the fields
+// should be specified.
+type PreStopHandler struct {
+	// Exec specifies the action to take.
+	// +optional
+	Exec *DeleteExecAction `json:"exec,omitempty" protobuf:"bytes,1,opt,name=exec"`
+	// HTTPGet specifies the HTTP GET request to perform.
+	// +optional
+	HTTPGet *DeleteHTTPGetAction `json:"httpGet,omitempty" protobuf:"bytes,2,opt,name=httpGet"`
+	// TCPSocket specifies an action involving a TCP port.
+	// TCP hooks not yet supported.
+	// TODO: implement a realistic TCP lifecycle hook
+	// +optional
+	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
+}
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events. For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -1778,7 +1829,7 @@ type Lifecycle struct {
 	// Other management of the container blocks until the hook completes.
 	// More info: http://kubernetes.io/docs/user-guide/container-environment#hook-details
 	// +optional
-	PreStop *Handler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
+	PreStop *PreStopHandler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
 }
 
 type ConditionStatus string

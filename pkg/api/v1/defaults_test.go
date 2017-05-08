@@ -611,10 +611,12 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 								Scheme: v1.URISchemeHTTP,
 							},
 						},
-						PreStop: &v1.Handler{
-							HTTPGet: &v1.HTTPGetAction{
-								Path:   "/",
-								Scheme: v1.URISchemeHTTP,
+						PreStop: &v1.PreStopHandler{
+							HTTPGet: &v1.DeleteHTTPGetAction{
+								HTTPGetAction: v1.HTTPGetAction{
+									Path:   "/",
+									Scheme: v1.URISchemeHTTP,
+								},
 							},
 						},
 					},
@@ -1251,5 +1253,35 @@ func TestSetDefaultSchedulerName(t *testing.T) {
 	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
 	if output.Spec.SchedulerName != v1.DefaultSchedulerName {
 		t.Errorf("Expected scheduler name: %+v\ngot: %+v\n", v1.DefaultSchedulerName, output.Spec.SchedulerName)
+	}
+}
+
+func TestDeleteExecAction(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Lifecycle: &v1.Lifecycle{PreStop: &v1.PreStopHandler{Exec: &v1.DeleteExecAction{}}}},
+			},
+		},
+	}
+
+	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+	if output.Spec.Containers[0].Lifecycle.PreStop.Exec.ReasonEnv != v1.DefaultDeleteReasonEnv {
+		t.Errorf("Expected reason env name: %+v\ngot: %+v\n", v1.DefaultDeleteReasonEnv, output.Spec.Containers[0].Lifecycle.PreStop.Exec.ReasonEnv)
+	}
+}
+
+func TestDeleteHTTPGetAction(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Lifecycle: &v1.Lifecycle{PreStop: &v1.PreStopHandler{HTTPGet: &v1.DeleteHTTPGetAction{}}}},
+			},
+		},
+	}
+
+	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+	if output.Spec.Containers[0].Lifecycle.PreStop.HTTPGet.ReasonHeader != v1.DefaultDeleteReasonHeader {
+		t.Errorf("Expected reason header name: %+v\ngot: %+v\n", v1.DefaultDeleteReasonHeader, output.Spec.Containers[0].Lifecycle.PreStop.HTTPGet.ReasonHeader)
 	}
 }

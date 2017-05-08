@@ -51,6 +51,8 @@ type Object interface {
 	SetDeletionTimestamp(timestamp *Time)
 	GetDeletionGracePeriodSeconds() *int64
 	SetDeletionGracePeriodSeconds(*int64)
+	GetDeletionReason() string
+	SetDeletionReason(deletionReason string)
 	GetLabels() map[string]string
 	SetLabels(labels map[string]string)
 	GetAnnotations() map[string]string
@@ -136,6 +138,10 @@ func (meta *ObjectMeta) SetDeletionTimestamp(deletionTimestamp *Time) {
 func (meta *ObjectMeta) GetDeletionGracePeriodSeconds() *int64 { return meta.DeletionGracePeriodSeconds }
 func (meta *ObjectMeta) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds *int64) {
 	meta.DeletionGracePeriodSeconds = deletionGracePeriodSeconds
+}
+func (meta *ObjectMeta) GetDeletionReason() string { return meta.DeletionReason }
+func (meta *ObjectMeta) SetDeletionReason(deletionReason string) {
+	meta.DeletionReason = deletionReason
 }
 func (meta *ObjectMeta) GetLabels() map[string]string                 { return meta.Labels }
 func (meta *ObjectMeta) SetLabels(labels map[string]string)           { meta.Labels = labels }

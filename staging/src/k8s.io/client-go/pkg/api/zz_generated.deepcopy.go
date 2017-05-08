@@ -66,6 +66,8 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerStateWaiting, InType: reflect.TypeOf(&ContainerStateWaiting{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerStatus, InType: reflect.TypeOf(&ContainerStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DaemonEndpoint, InType: reflect.TypeOf(&DaemonEndpoint{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DeleteExecAction, InType: reflect.TypeOf(&DeleteExecAction{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DeleteHTTPGetAction, InType: reflect.TypeOf(&DeleteHTTPGetAction{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DeleteOptions, InType: reflect.TypeOf(&DeleteOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DownwardAPIProjection, InType: reflect.TypeOf(&DownwardAPIProjection{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DownwardAPIVolumeFile, InType: reflect.TypeOf(&DownwardAPIVolumeFile{})},
@@ -159,6 +161,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodTemplateList, InType: reflect.TypeOf(&PodTemplateList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodTemplateSpec, InType: reflect.TypeOf(&PodTemplateSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PortworxVolumeSource, InType: reflect.TypeOf(&PortworxVolumeSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PreStopHandler, InType: reflect.TypeOf(&PreStopHandler{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Preconditions, InType: reflect.TypeOf(&Preconditions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PreferAvoidPodsEntry, InType: reflect.TypeOf(&PreferAvoidPodsEntry{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PreferredSchedulingTerm, InType: reflect.TypeOf(&PreferredSchedulingTerm{})},
@@ -716,6 +719,30 @@ func DeepCopy_api_DaemonEndpoint(in interface{}, out interface{}, c *conversion.
 	}
 }
 
+func DeepCopy_api_DeleteExecAction(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*DeleteExecAction)
+		out := out.(*DeleteExecAction)
+		*out = *in
+		if err := DeepCopy_api_ExecAction(&in.ExecAction, &out.ExecAction, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func DeepCopy_api_DeleteHTTPGetAction(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*DeleteHTTPGetAction)
+		out := out.(*DeleteHTTPGetAction)
+		*out = *in
+		if err := DeepCopy_api_HTTPGetAction(&in.HTTPGetAction, &out.HTTPGetAction, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
 func DeepCopy_api_DeleteOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DeleteOptions)
@@ -1252,8 +1279,8 @@ func DeepCopy_api_Lifecycle(in interface{}, out interface{}, c *conversion.Clone
 		}
 		if in.PreStop != nil {
 			in, out := &in.PreStop, &out.PreStop
-			*out = new(Handler)
-			if err := DeepCopy_api_Handler(*in, *out, c); err != nil {
+			*out = new(PreStopHandler)
+			if err := DeepCopy_api_PreStopHandler(*in, *out, c); err != nil {
 				return err
 			}
 		}
@@ -2584,6 +2611,34 @@ func DeepCopy_api_PortworxVolumeSource(in interface{}, out interface{}, c *conve
 		in := in.(*PortworxVolumeSource)
 		out := out.(*PortworxVolumeSource)
 		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_api_PreStopHandler(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PreStopHandler)
+		out := out.(*PreStopHandler)
+		*out = *in
+		if in.Exec != nil {
+			in, out := &in.Exec, &out.Exec
+			*out = new(DeleteExecAction)
+			if err := DeepCopy_api_DeleteExecAction(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		if in.HTTPGet != nil {
+			in, out := &in.HTTPGet, &out.HTTPGet
+			*out = new(DeleteHTTPGetAction)
+			if err := DeepCopy_api_DeleteHTTPGetAction(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		if in.TCPSocket != nil {
+			in, out := &in.TCPSocket, &out.TCPSocket
+			*out = new(TCPSocketAction)
+			**out = **in
+		}
 		return nil
 	}
 }

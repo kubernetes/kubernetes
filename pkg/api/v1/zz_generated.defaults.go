@@ -247,8 +247,12 @@ func SetObjectDefaults_Pod(in *Pod) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.Exec != nil {
+					SetDefaults_DeleteExecAction(a.Lifecycle.PreStop.Exec)
+				}
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					SetDefaults_DeleteHTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					SetDefaults_HTTPGetAction(&a.Lifecycle.PreStop.HTTPGet.HTTPGetAction)
 				}
 			}
 		}
@@ -289,8 +293,12 @@ func SetObjectDefaults_Pod(in *Pod) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.Exec != nil {
+					SetDefaults_DeleteExecAction(a.Lifecycle.PreStop.Exec)
+				}
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					SetDefaults_DeleteHTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					SetDefaults_HTTPGetAction(&a.Lifecycle.PreStop.HTTPGet.HTTPGetAction)
 				}
 			}
 		}
@@ -395,8 +403,12 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.Exec != nil {
+					SetDefaults_DeleteExecAction(a.Lifecycle.PreStop.Exec)
+				}
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					SetDefaults_DeleteHTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					SetDefaults_HTTPGetAction(&a.Lifecycle.PreStop.HTTPGet.HTTPGetAction)
 				}
 			}
 		}
@@ -437,8 +449,12 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.Exec != nil {
+					SetDefaults_DeleteExecAction(a.Lifecycle.PreStop.Exec)
+				}
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					SetDefaults_DeleteHTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					SetDefaults_HTTPGetAction(&a.Lifecycle.PreStop.HTTPGet.HTTPGetAction)
 				}
 			}
 		}
@@ -537,8 +553,12 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 					}
 				}
 				if a.Lifecycle.PreStop != nil {
+					if a.Lifecycle.PreStop.Exec != nil {
+						SetDefaults_DeleteExecAction(a.Lifecycle.PreStop.Exec)
+					}
 					if a.Lifecycle.PreStop.HTTPGet != nil {
-						SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+						SetDefaults_DeleteHTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+						SetDefaults_HTTPGetAction(&a.Lifecycle.PreStop.HTTPGet.HTTPGetAction)
 					}
 				}
 			}
@@ -579,8 +599,12 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 					}
 				}
 				if a.Lifecycle.PreStop != nil {
+					if a.Lifecycle.PreStop.Exec != nil {
+						SetDefaults_DeleteExecAction(a.Lifecycle.PreStop.Exec)
+					}
 					if a.Lifecycle.PreStop.HTTPGet != nil {
-						SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+						SetDefaults_DeleteHTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+						SetDefaults_HTTPGetAction(&a.Lifecycle.PreStop.HTTPGet.HTTPGetAction)
 					}
 				}
 			}
