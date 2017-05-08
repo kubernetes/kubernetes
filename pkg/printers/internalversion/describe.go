@@ -1521,47 +1521,47 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 	})
 }
 
-// CronJobDescriber generates information about a scheduled job and the jobs it has created.
+// CronJobDescriber generates information about a cron job and the jobs it has created.
 type CronJobDescriber struct {
 	clientset.Interface
 }
 
 func (d *CronJobDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	scheduledJob, err := d.Batch().CronJobs(namespace).Get(name, metav1.GetOptions{})
+	cronJob, err := d.Batch().CronJobs(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		events, _ = d.Core().Events(namespace).Search(api.Scheme, scheduledJob)
+		events, _ = d.Core().Events(namespace).Search(api.Scheme, cronJob)
 	}
 
-	return describeCronJob(scheduledJob, events)
+	return describeCronJob(cronJob, events)
 }
 
-func describeCronJob(scheduledJob *batch.CronJob, events *api.EventList) (string, error) {
+func describeCronJob(cronJob *batch.CronJob, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", scheduledJob.Name)
-		w.Write(LEVEL_0, "Namespace:\t%s\n", scheduledJob.Namespace)
-		printLabelsMultiline(w, "Labels", scheduledJob.Labels)
-		printAnnotationsMultiline(w, "Annotations", scheduledJob.Annotations)
-		w.Write(LEVEL_0, "Schedule:\t%s\n", scheduledJob.Spec.Schedule)
-		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", scheduledJob.Spec.ConcurrencyPolicy)
-		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(scheduledJob.Spec.Suspend))
-		if scheduledJob.Spec.StartingDeadlineSeconds != nil {
-			w.Write(LEVEL_0, "Starting Deadline Seconds:\t%ds\n", *scheduledJob.Spec.StartingDeadlineSeconds)
+		w.Write(LEVEL_0, "Name:\t%s\n", cronJob.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", cronJob.Namespace)
+		printLabelsMultiline(w, "Labels", cronJob.Labels)
+		printAnnotationsMultiline(w, "Annotations", cronJob.Annotations)
+		w.Write(LEVEL_0, "Schedule:\t%s\n", cronJob.Spec.Schedule)
+		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", cronJob.Spec.ConcurrencyPolicy)
+		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(cronJob.Spec.Suspend))
+		if cronJob.Spec.StartingDeadlineSeconds != nil {
+			w.Write(LEVEL_0, "Starting Deadline Seconds:\t%ds\n", *cronJob.Spec.StartingDeadlineSeconds)
 		} else {
 			w.Write(LEVEL_0, "Starting Deadline Seconds:\t<unset>\n")
 		}
-		describeJobTemplate(scheduledJob.Spec.JobTemplate, w)
-		if scheduledJob.Status.LastScheduleTime != nil {
-			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", scheduledJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
+		describeJobTemplate(cronJob.Spec.JobTemplate, w)
+		if cronJob.Status.LastScheduleTime != nil {
+			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", cronJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
 		} else {
 			w.Write(LEVEL_0, "Last Schedule Time:\t<unset>\n")
 		}
-		printActiveJobs(w, "Active Jobs", scheduledJob.Status.Active)
+		printActiveJobs(w, "Active Jobs", cronJob.Status.Active)
 		if events != nil {
 			DescribeEvents(events, w)
 		}
