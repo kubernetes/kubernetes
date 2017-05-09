@@ -2082,3 +2082,7 @@ func TestTruncatePodHostname(t *testing.T) {
 		assert.Equal(t, test.output, output)
 	}
 }
+
+func TestAlwaysFail(t *testing.T) {
+	t.Fatal("this should always fail")
+}
