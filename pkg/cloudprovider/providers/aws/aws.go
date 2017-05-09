@@ -1423,10 +1423,6 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 		}
 		attachmentStatus := ""
 		for _, a := range info.Attachments {
-			if attachmentStatus != "" {
-				// Shouldn't happen; log so we know if it is
-				glog.Warningf("Found multiple attachments for volume %q: %v", d.awsID, info)
-			}
 			if a.State != nil {
 				attachment = a
 				attachmentStatus = *a.State
