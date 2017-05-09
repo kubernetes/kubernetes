@@ -1,0 +1,34 @@
+language: go
+
+go:
+  - 1.4
+  - 1.3
+
+build_image: shipimg/ubuntu1204_go:latest
+
+before_install:
+  - source $HOME/.gvm/scripts/gvm;
+  - if [[ $SHIPPABLE_GO_VERSION == "tip" ]]; then gvm install tip; gvm use tip; fi
+  - if [[ $SHIPPABLE_GO_VERSION == *release* ]]; then gvm install release; gvm use release; fi
+  - if [[ $SHIPPABLE_GO_VERSION =~ [0-9].[0-9] ]]; then gvm install go$SHIPPABLE_GO_VERSION; gvm use go$SHIPPABLE_GO_VERSION; fi
+  - export GOPATH=$SHIPPABLE_GOPATH
+
+install:
+  - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
+  - go get github.com/mattn/goveralls
+  - ./hack/travis/install-etcd.sh
+  - ./hack/verify-gofmt.sh
+  - ./hack/verify-boilerplate.sh
+  - ./hack/verify-description.sh
+  - ./hack/travis/install-std-race.sh
+  - ./hack/build-go.sh
+  - GOPATH=$PWD/Godeps/_workspace:$GOPATH go install ./...
+
+script:
+  - KUBE_RACE="-race" KUBE_COVER="y" KUBE_GOVERALLS_BIN="$HOME/gopath/bin/goveralls" KUBE_TIMEOUT='-timeout 300s' KUBE_COVERPROCS=8 ./hack/test-go.sh -- -p=2
+  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-cmd.sh
+  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/verify-gendocs.sh
+  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-integration.sh
+
+notifications:
+  irc: "chat.freenode.net#google-containers"
