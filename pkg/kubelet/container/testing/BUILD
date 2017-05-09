@@ -21,9 +21,11 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/client/unversioned/remotecommand:go_default_library",
+        "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",
+        "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/github.com/stretchr/testify/mock:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",

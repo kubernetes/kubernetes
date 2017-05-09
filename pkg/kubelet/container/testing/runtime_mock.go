@@ -20,7 +20,9 @@ import (
 	"io"
 	"time"
 
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/mock"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -153,6 +155,11 @@ func (r *Mock) DeleteContainer(containerID ContainerID) error {
 func (r *Mock) ImageStats() (*ImageStats, error) {
 	args := r.Called()
 	return args.Get(0).(*ImageStats), args.Error(1)
+}
+
+func (r *Mock) ImageFsInfo() (cadvisorapiv2.FsInfo, error) {
+	args := r.Called()
+	return args.Get(0).(cadvisorapiv2.FsInfo), args.Error(1)
 }
 
 // UpdatePodCIDR fulfills the cri interface.

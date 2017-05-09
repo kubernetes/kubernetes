@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -157,6 +159,8 @@ type ImageService interface {
 	RemoveImage(image ImageSpec) error
 	// Returns Image statistics.
 	ImageStats() (*ImageStats, error)
+	// ImageFsInfo gets filesytem information of images.
+	ImageFsInfo() (cadvisorapiv2.FsInfo, error)
 }
 
 type ContainerAttacher interface {
