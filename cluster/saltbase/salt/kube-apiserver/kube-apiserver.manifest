@@ -210,6 +210,9 @@
     "resources": {
       "requests": {
         "cpu": "250m"
+      },
+      "limits": {
+      	"memory": "300Mi"
       }
     },
     "command": [
