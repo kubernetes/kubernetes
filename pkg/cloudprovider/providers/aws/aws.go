@@ -2589,13 +2589,6 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 	internalELB := false
 	internalAnnotation := apiService.Annotations[ServiceAnnotationLoadBalancerInternal]
 	if internalAnnotation != "" {
-		if internalAnnotation != "0.0.0.0/0" {
-			return nil, fmt.Errorf("annotation %q=%q detected, but the only value supported currently is 0.0.0.0/0", ServiceAnnotationLoadBalancerInternal, internalAnnotation)
-		}
-		if !service.IsAllowAll(sourceRanges) {
-			// TODO: Unify the two annotations
-			return nil, fmt.Errorf("source-range annotation cannot be combined with the internal-elb annotation")
-		}
 		internalELB = true
 	}
 
