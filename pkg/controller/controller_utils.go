@@ -154,7 +154,7 @@ func (r *ControllerExpectations) DeleteExpectations(controllerKey string) {
 }
 
 // SatisfiedExpectations returns true if the required adds/dels for the given controller have been observed.
-// Add/del counts are established by the controller at sync time, and updated as controllees are observed by the controller
+// Add/del counts are established by the controller at sync time, and updated as controllers are observed by the controller
 // manager.
 func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) bool {
 	if exp, exists, err := r.GetExpectations(controllerKey); exists {
@@ -173,9 +173,9 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 	} else {
 		// When a new controller is created, it doesn't have expectations.
 		// When it doesn't see expected watch events for > TTL, the expectations expire.
-		//	- In this case it wakes up, creates/deletes controllees, and sets expectations again.
-		// When it has satisfied expectations and no controllees need to be created/destroyed > TTL, the expectations expire.
-		//	- In this case it continues without setting expectations till it needs to create/delete controllees.
+		//	- In this case it wakes up, creates/deletes controllers, and sets expectations again.
+		// When it has satisfied expectations and no controllers need to be created/destroyed > TTL, the expectations expire.
+		//	- In this case it continues without setting expectations till it needs to create/delete controllers.
 		glog.V(4).Infof("Controller %v either never recorded expectations, or the ttl expired.", controllerKey)
 	}
 	// Trigger a sync if we either encountered and error (which shouldn't happen since we're
