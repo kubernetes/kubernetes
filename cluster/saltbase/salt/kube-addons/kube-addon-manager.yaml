@@ -22,6 +22,8 @@ spec:
       requests:
         cpu: 5m
         memory: 50Mi
+      limits:
+        cpu: 5m
     volumeMounts:
     - mountPath: /etc/kubernetes/
       name: addons
