@@ -23,8 +23,18 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-echo "kube-push.sh is currently broken; see https://github.com/kubernetes/kubernetes/issues/17397"
-exit 1
+USAGE_TEXT="kube-push.sh may not work with your provider; see https://github.com/kubernetes/kubernetes/issues/17397.
+we recommend to use it only for development; proceed?
+"
+
+while true; do
+    read -p "${USAGE_TEXT}" yn
+    case $yn in
+        [Yy]* ) break;;
+        [Nn]* ) exit;;
+        * ) echo "Answer Y/n.";;
+    esac
+done
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
