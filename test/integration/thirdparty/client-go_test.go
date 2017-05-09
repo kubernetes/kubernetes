@@ -39,7 +39,7 @@ func TestClientGoThirdPartyResourceExample(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	if err := exampletprv1.AddToScheme(scheme); err != nil {
-		return nil, nil, err
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	config := &rest.Config{Host: s.URL, ContentConfig: rest.ContentConfig{
