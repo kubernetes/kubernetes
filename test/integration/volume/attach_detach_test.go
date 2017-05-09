@@ -284,9 +284,8 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		cloud,
 		plugins,
 		false,
-		time.Second*5,
-		false, /* keepTerminatedPodVolumes */
-	)
+		time.Second*5)
+
 	if err != nil {
 		t.Fatalf("Error creating AttachDetach : %v", err)
 	}

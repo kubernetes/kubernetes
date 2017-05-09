@@ -896,10 +896,6 @@ type KubeControllerManagerConfiguration struct {
 	// through the kube-aggregator when enabled, instead of using the legacy metrics client
 	// through the API server proxy.
 	HorizontalPodAutoscalerUseRESTClients bool
-
-	// KeepTerminatedPodVolumes causes terminated pod volumes attached to the node after the pod terminates.
-	// Can be useful for debugging volume related issues.
-	KeepTerminatedPodVolumes bool
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

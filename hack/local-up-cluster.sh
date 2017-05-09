@@ -566,7 +566,6 @@ function start_controller_manager {
       --cloud-config="${CLOUD_CONFIG}" \
       --kubeconfig "$CERT_DIR"/controller.kubeconfig \
       --use-service-account-credentials \
-      --keep-terminated-pod-volumes=${KEEP_TERMINATED_POD_VOLUMES} \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
