@@ -17,7 +17,7 @@ limitations under the License.
 package meta
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -25,7 +25,7 @@ import (
 // dealing with unstructured.Unstructured objects.
 func InterfacesForUnstructured(schema.GroupVersion) (*VersionInterfaces, error) {
 	return &VersionInterfaces{
-		ObjectConvertor:  &unstructured.UnstructuredObjectConverter{},
+		ObjectConvertor:  &unstructuredhelpers.ObjectConverter{},
 		MetadataAccessor: NewAccessor(),
 	}, nil
 }

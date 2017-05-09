@@ -28,6 +28,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/conversion/queryparams"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -178,13 +179,13 @@ func (rc *ResourceClient) Create(obj *unstructured.Unstructured) (*unstructured.
 // Update updates the provided resource.
 func (rc *ResourceClient) Update(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	result := new(unstructured.Unstructured)
-	if len(obj.GetName()) == 0 {
+	if len((*unstructuredhelpers.Accessor)(result).GetName()) == 0 {
 		return result, errors.New("object missing name")
 	}
 	err := rc.cl.Put().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
-		Name(obj.GetName()).
+		Name((*unstructuredhelpers.Accessor)(obj).GetName()).
 		Body(obj).
 		Do().
 		Into(result)
@@ -222,7 +223,7 @@ func (rc *ResourceClient) Patch(name string, pt types.PatchType, data []byte) (*
 type dynamicCodec struct{}
 
 func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	obj, gvk, err := unstructured.UnstructuredJSONScheme.Decode(data, gvk, obj)
+	obj, gvk, err := unstructuredhelpers.Codec.Decode(data, gvk, obj)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -239,7 +240,7 @@ func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtim
 }
 
 func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
-	return unstructured.UnstructuredJSONScheme.Encode(obj, w)
+	return unstructuredhelpers.Codec.Encode(obj, w)
 }
 
 // ContentConfig returns a restclient.ContentConfig for dynamic types.

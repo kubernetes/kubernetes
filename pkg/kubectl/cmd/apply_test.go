@@ -31,6 +31,7 @@ import (
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
@@ -445,12 +446,12 @@ func TestApplyObjectOutput(t *testing.T) {
 	if err := json.Unmarshal(currentRC, &postPatchObj.Object); err != nil {
 		t.Fatal(err)
 	}
-	postPatchLabels := postPatchObj.GetLabels()
+	postPatchLabels := (*unstructuredhelpers.Accessor)(postPatchObj).GetLabels()
 	if postPatchLabels == nil {
 		postPatchLabels = map[string]string{}
 	}
 	postPatchLabels["post-patch"] = "value"
-	postPatchObj.SetLabels(postPatchLabels)
+	(*unstructuredhelpers.Accessor)(postPatchObj).SetLabels(postPatchLabels)
 	postPatchData, err := json.Marshal(postPatchObj)
 	if err != nil {
 		t.Fatal(err)

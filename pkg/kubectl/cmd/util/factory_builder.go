@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -53,7 +53,7 @@ func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command) (printers.ResourceP
 		return nil, false, err
 	}
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
-	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
+	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructuredhelpers.Codec}
 	return PrinterForCommand(cmd, mapper, typer, decoders)
 }
 

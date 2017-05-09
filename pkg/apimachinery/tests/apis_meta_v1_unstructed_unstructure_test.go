@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
@@ -57,7 +58,7 @@ func TestDecodeUnstructured(t *testing.T) {
 			},
 		},
 	}
-	if errs := runtime.DecodeList(pl.Items, unstructured.UnstructuredJSONScheme); len(errs) == 1 {
+	if errs := runtime.DecodeList(pl.Items, unstructuredhelpers.Codec); len(errs) == 1 {
 		t.Fatalf("unexpected error %v", errs)
 	}
 	if pod, ok := pl.Items[1].(*unstructured.Unstructured); !ok || pod.Object["kind"] != "Pod" || pod.Object["metadata"].(map[string]interface{})["name"] != "test" {
@@ -110,7 +111,7 @@ func TestDecode(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		got, _, err := unstructured.UnstructuredJSONScheme.Decode(tc.json, nil, nil)
+		got, _, err := unstructuredhelpers.Codec.Decode(tc.json, nil, nil)
 		if err != nil {
 			t.Errorf("Unexpected error for %q: %v", string(tc.json), err)
 			continue
@@ -169,6 +170,7 @@ func TestUnstructuredGetters(t *testing.T) {
 			},
 		},
 	}
+	accessor := unstructuredhelpers.Accessor(unstruct)
 
 	if got, want := unstruct.GetAPIVersion(), "test_version"; got != want {
 		t.Errorf("GetAPIVersions() = %s, want %s", got, want)
@@ -178,46 +180,46 @@ func TestUnstructuredGetters(t *testing.T) {
 		t.Errorf("GetKind() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetNamespace(), "test_namespace"; got != want {
+	if got, want := accessor.GetNamespace(), "test_namespace"; got != want {
 		t.Errorf("GetNamespace() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetName(), "test_name"; got != want {
+	if got, want := accessor.GetName(), "test_name"; got != want {
 		t.Errorf("GetName() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetGenerateName(), "test_generateName"; got != want {
+	if got, want := accessor.GetGenerateName(), "test_generateName"; got != want {
 		t.Errorf("GetGenerateName() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetUID(), types.UID("test_uid"); got != want {
+	if got, want := accessor.GetUID(), types.UID("test_uid"); got != want {
 		t.Errorf("GetUID() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetResourceVersion(), "test_resourceVersion"; got != want {
+	if got, want := accessor.GetResourceVersion(), "test_resourceVersion"; got != want {
 		t.Errorf("GetResourceVersion() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetSelfLink(), "test_selfLink"; got != want {
+	if got, want := accessor.GetSelfLink(), "test_selfLink"; got != want {
 		t.Errorf("GetSelfLink() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetCreationTimestamp(), metav1.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC); !got.Equal(want) {
+	if got, want := accessor.GetCreationTimestamp(), metav1.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC); !got.Equal(want) {
 		t.Errorf("GetCreationTimestamp() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetDeletionTimestamp(), metav1.Date(2010, time.November, 10, 23, 0, 0, 0, time.UTC); got == nil || !got.Equal(want) {
+	if got, want := accessor.GetDeletionTimestamp(), metav1.Date(2010, time.November, 10, 23, 0, 0, 0, time.UTC); got == nil || !got.Equal(want) {
 		t.Errorf("GetDeletionTimestamp() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetLabels(), map[string]string{"test_label": "test_value"}; !reflect.DeepEqual(got, want) {
+	if got, want := accessor.GetLabels(), map[string]string{"test_label": "test_value"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("GetLabels() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetAnnotations(), map[string]string{"test_annotation": "test_value"}; !reflect.DeepEqual(got, want) {
+	if got, want := accessor.GetAnnotations(), map[string]string{"test_annotation": "test_value"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("GetAnnotations() = %s, want %s", got, want)
 	}
-	refs := unstruct.GetOwnerReferences()
+	refs := accessor.GetOwnerReferences()
 	expectedOwnerReferences := []metav1.OwnerReference{
 		{
 			Kind:       "Pod",
@@ -237,10 +239,10 @@ func TestUnstructuredGetters(t *testing.T) {
 	if got, want := refs, expectedOwnerReferences; !reflect.DeepEqual(got, want) {
 		t.Errorf("GetOwnerReferences()=%v, want %v", got, want)
 	}
-	if got, want := unstruct.GetFinalizers(), []string{"finalizer.1", "finalizer.2"}; !reflect.DeepEqual(got, want) {
+	if got, want := accessor.GetFinalizers(), []string{"finalizer.1", "finalizer.2"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("GetFinalizers()=%v, want %v", got, want)
 	}
-	if got, want := unstruct.GetClusterName(), "cluster123"; got != want {
+	if got, want := accessor.GetClusterName(), "cluster123"; got != want {
 		t.Errorf("GetClusterName()=%v, want %v", got, want)
 	}
 }
@@ -294,20 +296,21 @@ func TestUnstructuredSetters(t *testing.T) {
 			},
 		},
 	}
+	accessor := (*unstructuredhelpers.Accessor)(&unstruct)
 
 	unstruct.SetAPIVersion("test_version")
 	unstruct.SetKind("test_kind")
-	unstruct.SetNamespace("test_namespace")
-	unstruct.SetName("test_name")
-	unstruct.SetGenerateName("test_generateName")
-	unstruct.SetUID(types.UID("test_uid"))
-	unstruct.SetResourceVersion("test_resourceVersion")
-	unstruct.SetSelfLink("test_selfLink")
-	unstruct.SetCreationTimestamp(metav1.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC))
+	accessor.SetNamespace("test_namespace")
+	accessor.SetName("test_name")
+	accessor.SetGenerateName("test_generateName")
+	accessor.SetUID(types.UID("test_uid"))
+	accessor.SetResourceVersion("test_resourceVersion")
+	accessor.SetSelfLink("test_selfLink")
+	accessor.SetCreationTimestamp(metav1.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC))
 	date := metav1.Date(2010, time.November, 10, 23, 0, 0, 0, time.UTC)
-	unstruct.SetDeletionTimestamp(&date)
-	unstruct.SetLabels(map[string]string{"test_label": "test_value"})
-	unstruct.SetAnnotations(map[string]string{"test_annotation": "test_value"})
+	accessor.SetDeletionTimestamp(&date)
+	accessor.SetLabels(map[string]string{"test_label": "test_value"})
+	accessor.SetAnnotations(map[string]string{"test_annotation": "test_value"})
 	newOwnerReferences := []metav1.OwnerReference{
 		{
 			Kind:       "Pod",
@@ -324,9 +327,9 @@ func TestUnstructuredSetters(t *testing.T) {
 			BlockOwnerDeletion: &trueVar,
 		},
 	}
-	unstruct.SetOwnerReferences(newOwnerReferences)
-	unstruct.SetFinalizers([]string{"finalizer.1", "finalizer.2"})
-	unstruct.SetClusterName("cluster123")
+	accessor.SetOwnerReferences(newOwnerReferences)
+	accessor.SetFinalizers([]string{"finalizer.1", "finalizer.2"})
+	accessor.SetClusterName("cluster123")
 
 	if !reflect.DeepEqual(unstruct, want) {
 		t.Errorf("Wanted: \n%s\n Got:\n%s", want, unstruct)
@@ -353,11 +356,11 @@ func TestUnstructuredListGetters(t *testing.T) {
 		t.Errorf("GetKind() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetResourceVersion(), "test_resourceVersion"; got != want {
+	if got, want := (*unstructuredhelpers.ListAccessor)(&unstruct).GetResourceVersion(), "test_resourceVersion"; got != want {
 		t.Errorf("GetResourceVersion() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetSelfLink(), "test_selfLink"; got != want {
+	if got, want := (*unstructuredhelpers.ListAccessor)(&unstruct).GetSelfLink(), "test_selfLink"; got != want {
 		t.Errorf("GetSelfLink() = %s, want %s", got, want)
 	}
 }
@@ -378,8 +381,8 @@ func TestUnstructuredListSetters(t *testing.T) {
 
 	unstruct.SetAPIVersion("test_version")
 	unstruct.SetKind("test_kind")
-	unstruct.SetResourceVersion("test_resourceVersion")
-	unstruct.SetSelfLink("test_selfLink")
+	(*unstructuredhelpers.ListAccessor)(&unstruct).SetResourceVersion("test_resourceVersion")
+	(*unstructuredhelpers.ListAccessor)(&unstruct).SetSelfLink("test_selfLink")
 
 	if !reflect.DeepEqual(unstruct, want) {
 		t.Errorf("Wanted: \n%s\n Got:\n%s", unstruct, want)
@@ -416,11 +419,11 @@ func TestDecodeNumbers(t *testing.T) {
 	}
 
 	// Round-trip with unstructured codec
-	unstructuredObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, originalJSON)
+	unstructuredObj, err := runtime.Decode(unstructuredhelpers.Codec, originalJSON)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	roundtripJSON, err := runtime.Encode(unstructured.UnstructuredJSONScheme, unstructuredObj)
+	roundtripJSON, err := runtime.Encode(unstructuredhelpers.Codec, unstructuredObj)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

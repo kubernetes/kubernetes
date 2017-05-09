@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -217,7 +218,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 		return false, nil, err
 	}
 
-	if owner.GetUID() != reference.UID {
+	if (*unstructuredhelpers.Accessor)(owner).GetUID() != reference.UID {
 		glog.V(5).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		gc.absentOwnerCache.Add(reference.UID)
 		return true, nil, nil
@@ -296,7 +297,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 		return err
 	}
 
-	if latest.GetUID() != item.identity.UID {
+	if (*unstructuredhelpers.Accessor)(latest).GetUID() != item.identity.UID {
 		glog.V(5).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
 		gc.generateVirtualDeleteEvent(item.identity)
 		return nil
@@ -309,7 +310,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	}
 
 	// compute if we should delete the item
-	ownerReferences := latest.GetOwnerReferences()
+	ownerReferences := (*unstructuredhelpers.Accessor)(latest).GetOwnerReferences()
 	if len(ownerReferences) == 0 {
 		glog.V(2).Infof("object %s's doesn't have an owner, continue on next item", item.identity)
 		return nil

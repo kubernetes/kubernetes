@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	// "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	unstructoredaccessor "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	v1clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
@@ -417,7 +418,7 @@ func (d *namespacedResourcesDeleter) deleteEachItem(
 	}
 	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
 	for _, item := range unstructuredList.Items {
-		if err = dynamicClient.Resource(&apiResource, namespace).Delete(item.GetName(), nil); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
+		if err = dynamicClient.Resource(&apiResource, namespace).Delete((*unstructoredaccessor.Accessor)(&item).GetName(), nil); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
 			return err
 		}
 	}
@@ -476,8 +477,8 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	if len(unstructuredList.Items) != 0 && estimate == int64(0) {
 		// if any item has a finalizer, we treat that as a normal condition, and use a default estimation to allow for GC to complete.
 		for _, item := range unstructuredList.Items {
-			if len(item.GetFinalizers()) > 0 {
-				glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - items remaining with finalizers - namespace: %s, gvr: %v, finalizers: %v", namespace, gvr, item.GetFinalizers())
+			if len((*unstructoredaccessor.Accessor)(&item).GetFinalizers()) > 0 {
+				glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - items remaining with finalizers - namespace: %s, gvr: %v, finalizers: %v", namespace, gvr, (*unstructoredaccessor.Accessor)(&item).GetFinalizers())
 				return finalizerEstimateSeconds, nil
 			}
 		}
