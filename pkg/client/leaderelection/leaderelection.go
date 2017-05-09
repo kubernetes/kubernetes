@@ -21,9 +21,10 @@ limitations under the License.
 // This implementation does not guarantee that only one client is acting as a
 // leader (a.k.a. fencing). A client observes timestamps captured locally to
 // infer the state of the leader election. Thus the implementation is tolerant
-// to arbitrary clock skew, but is not tolerant to arbitrary clock skew rate.
+// to arbitrary clock offset, but is not tolerant to arbitrary clock skew (the
+// rate of change of the offset).
 //
-// However the level of tolerance to skew rate can be configured by setting
+// However the level of tolerance to skew can be configured by setting
 // RenewDeadline and LeaseDuration appropriately. The tolerance expressed as a
 // maximum tolerated ratio of time passed on the fastest node to time passed on
 // the slowest node can be approximately achieved with a configuration that sets
@@ -33,7 +34,7 @@ limitations under the License.
 //
 // While not required, some method of clock synchronization between nodes in the
 // cluster is highly recommended. It's important to keep in mind when configuring
-// this client that the tolerance to skew rate varies inversely to master
+// this client that the tolerance to clock skew varies inversely to master
 // availability.
 //
 // Larger clusters often have a more lenient SLA for API latency. This should be
