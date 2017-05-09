@@ -86,7 +86,7 @@ redis-master   10.0.0.170   <none>        6379/TCP   20s
 redis-slave    10.0.0.201   <none>        6379/TCP   20s
 ```
 
-Now you can access the guestbook on each node with frontend Service's `<Cluster-IP>:<PORT>`, e.g. `10.0.0.117:80` in this guide. `<Cluster-IP>` is a cluster-internal IP. If you want to access the guestbook from outside of the cluster, add `type: NodePort` to the frontend Service `spec` field. Then you can access the guestbook with `<NodeIP>:NodePort` from outside of the cluster. On cloud providers which support external load balancers, adding `type: LoadBalancer` to the frontend Service `spec` field will provision a load balancer for your Service. There are several ways for you to access the guestbook. You may learn from [Accessing services running on the cluster](../../docs/user-guide/accessing-the-cluster.md#accessing-services-running-on-the-cluster).
+Now you can access the guestbook on each node with frontend Service's `<Cluster-IP>:<PORT>`, e.g. `10.0.0.117:80` in this guide. `<Cluster-IP>` is a cluster-internal IP. If you want to access the guestbook from outside of the cluster, add `type: NodePort` to the frontend Service `spec` field. Then you can access the guestbook with `<NodeIP>:NodePort` from outside of the cluster. On cloud providers which support external load balancers, adding `type: LoadBalancer` to the frontend Service `spec` field will provision a load balancer for your Service. There are several ways for you to access the guestbook. You may learn from [Accessing services running on the cluster](http://kubernetes.io/docs/user-guide/accessing-the-cluster/).
 
 Clean up the guestbook:
 
@@ -103,14 +103,14 @@ $ kubectl delete -f examples/guestbook/
 
 ### Step One: Start up the redis master
 
-Before continuing to the gory details, we also recommend you to read [Quick walkthrough](../../docs/user-guide/#quick-walkthrough), [Thorough walkthough](../../docs/user-guide/#thorough-walkthrough) and [Concept guide](../../docs/user-guide/#concept-guide).
+Before continuing to the gory details, we also recommend you to read [Quick walkthrough](http://kubernetes.io/docs/user-guide/#quick-walkthrough), [Thorough walkthough](http://kubernetes.io/docs/user-guide/#thorough-walkthrough) and [Concept guide](http://kubernetes.io/docs/user-guide/#concept-guide).
 **Note**: The redis master in this example is *not* highly available.  Making it highly available would be an interesting, but intricate exercise — redis doesn't actually support multi-master Deployments at this point in time, so high availability would be a somewhat tricky thing to implement, and might involve periodic serialization to disk, and so on.
 
 #### Define a Deployment
 
-To start the redis master, use the file `examples/guestbook/redis-master-deployment.yaml`, which describes a single [pod](../../docs/user-guide/pods.md) running a redis key-value server in a container.
+To start the redis master, use the file `examples/guestbook/redis-master-deployment.yaml`, which describes a single [pod](http://kubernetes.io/docs/user-guide/pods/) running a redis key-value server in a container.
 
-Although we have a single instance of our redis master, we are using a [Deployment](../../docs/user-guide/deployments.md) to enforce that exactly one pod keeps running. E.g., if the node were to go down, the Deployment will ensure that the redis master gets restarted on a healthy node. (In our simplified example, this could result in data loss.)
+Although we have a single instance of our redis master, we are using a [Deployment](http://kubernetes.io/docs/user-guide/deployments/) to enforce that exactly one pod keeps running. E.g., if the node were to go down, the Deployment will ensure that the redis master gets restarted on a healthy node. (In our simplified example, this could result in data loss.)
 
 The file `examples/guestbook/redis-master-deployment.yaml` defines the redis master Deployment:
 
@@ -161,7 +161,7 @@ spec:
 
 #### Define a Service
 
-A Kubernetes [Service](../../docs/user-guide/services.md) is a named load balancer that proxies traffic to one or more containers. This is done using the [labels](../../docs/user-guide/labels.md) metadata that we defined in the `redis-master` pod above.  As mentioned, we have only one redis master, but we nevertheless want to create a Service for it. Why? Because it gives us a deterministic way to route to the single master using an elastic IP.
+A Kubernetes [Service](http://kubernetes.github.io/docs/user-guide/services/) is a named load balancer that proxies traffic to one or more containers. This is done using the [labels](http://kubernetes.github.io/docs/user-guide/labels/) metadata that we defined in the `redis-master` pod above.  As mentioned, we have only one redis master, but we nevertheless want to create a Service for it. Why? Because it gives us a deterministic way to route to the single master using an elastic IP.
 
 Services find the pods to load balance based on the pods' labels.
 The selector field of the Service description determines which pods will receive the traffic sent to the Service, and the `port` and `targetPort` information defines what port the Service proxy will run at.
@@ -195,7 +195,7 @@ spec:
 
 #### Create a Service
 
-According to the [config best practices](../../docs/user-guide/config-best-practices.md), create a Service before corresponding Deployments so that the scheduler can spread the pods comprising the Service. So we first create the Service by running:
+According to the [config best practices](http://kubernetes.github.io/docs/user-guide/config-best-practices/), create a Service before corresponding Deployments so that the scheduler can spread the pods comprising the Service. So we first create the Service by running:
 
 ```console
 $ kubectl create -f examples/guestbook/redis-master-service.yaml
@@ -219,7 +219,7 @@ The traffic flow from slaves to masters can be described in two steps:
   - A *redis slave* will connect to `port` on the *redis master Service*
   - Traffic will be forwarded from the Service `port` (on the Service node) to the `targetPort` on the pod that the Service listens to.
 
-For more details, please see [Connecting applications](../../docs/user-guide/connecting-applications.md).
+For more details, please see [Connecting applications](http://kubernetes.github.io/docs/user-guide/connecting-applications/).
 
 #### Finding a Service
 
@@ -228,11 +228,11 @@ Kubernetes supports two primary modes of finding a Service — environment varia
 
 ##### Environment variables
 
-The services in a Kubernetes cluster are discoverable inside other containers [via environment variables](../../docs/user-guide/services.md#environment-variables).
+The services in a Kubernetes cluster are discoverable inside other containers [via environment variables](http://kubernetes.io/docs/user-guide/services/#environment-variables).
 
 ##### DNS service
 
-An alternative is to use the [cluster's DNS service](../../docs/user-guide/services.md#dns), if it has been enabled for the cluster.  This lets all pods do name resolution of services automatically, based on the Service name.
+An alternative is to use the [cluster's DNS service](http://kubernetes.io/docs/user-guide/services/#dns), if it has been enabled for the cluster.  This lets all pods do name resolution of services automatically, based on the Service name.
 
 This example has been configured to use the DNS service by default.
 
@@ -278,13 +278,13 @@ redis-master-2353460263-1ecey   1/1       Running   0          1m
 
 (Note that an initial `docker pull` to grab a container image may take a few minutes, depending on network conditions. A pod will be reported as `Pending` while its image is being downloaded.)
 
-`kubectl get pods` will show only the pods in the default [namespace](../../docs/user-guide/namespaces.md).  To see pods in all namespaces, run:
+`kubectl get pods` will show only the pods in the default [namespace](http://kubernetes.github.io/docs/user-guide/namespaces/).  To see pods in all namespaces, run:
 
 ```
 kubectl get pods --all-namespaces
 ```
 
-For more details, please see [Configuring containers](../../docs/user-guide/configuring-containers.md) and [Deploying applications](../../docs/user-guide/deploying-applications.md).
+For more details, please see [Configuring containers](http://kubernetes.github.io/docs/user-guide/configuring-containers/) and [Deploying applications](http://kubernetes.github.io/docs/user-guide/deploying-applications/).
 
 #### Optional Interlude
 
@@ -349,7 +349,7 @@ In Kubernetes, a Deployment is responsible for managing multiple instances of a 
 
 Just like the master, we want to have a Service to proxy connections to the redis slaves. In this case, in addition to discovery, the slave Service will provide transparent load balancing to web app clients.
 
-This time we put the Service and Deployment into one [file](../../docs/user-guide/managing-deployments.md#organizing-resource-configurations). Grouping related objects together in a single file is often better than having separate files.
+This time we put the Service and Deployment into one [file](http://kubernetes.github.io/docs/user-guide/managing-deployments/). Grouping related objects together in a single file is often better than having separate files.
 The specification for the slaves is in `examples/guestbook/all-in-one/redis-slave.yaml`:
 
 <!-- BEGIN MUNGE: EXAMPLE all-in-one/redis-slave.yaml -->
@@ -422,7 +422,7 @@ spec:
 [Download example](all-in-one/redis-slave.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE all-in-one/redis-slave.yaml -->
 
-This time the selector for the Service is `app=redis,role=slave,tier=backend`, because that identifies the pods running redis slaves. It is generally helpful to set labels on your Service itself as we've done here to make it easy to locate them with the `kubectl get services -l "app=redis,role=slave,tier=backend"` command. For more information on the usage of labels, see [using-labels-effectively](../../docs/user-guide/managing-deployments.md#using-labels-effectively).
+This time the selector for the Service is `app=redis,role=slave,tier=backend`, because that identifies the pods running redis slaves. It is generally helpful to set labels on your Service itself as we've done here to make it easy to locate them with the `kubectl get services -l "app=redis,role=slave,tier=backend"` command. For more information on the usage of labels, see [using-labels-effectively](http://kubernetes.io/docs/user-guide/managing-deployments/#using-labels-effectively).
 
 Now that you have created the specification, create the Service in your cluster by running:
 
@@ -657,7 +657,7 @@ Then, see the [troubleshooting documentation](../../docs/troubleshooting.md) for
 
 You'll want to set up your guestbook Service so that it can be accessed from outside of the internal Kubernetes network. Above, we introduced one way to do that, by setting `type: LoadBalancer` to Service `spec`.
 
-More generally, Kubernetes supports two ways of exposing a Service onto an external IP address: `NodePort`s and `LoadBalancer`s , as described [here](../../docs/user-guide/services.md#publishing-services---service-types).
+More generally, Kubernetes supports two ways of exposing a Service onto an external IP address: `NodePort`s and `LoadBalancer`s , as described [here](http://kubernetes.io/docs/user-guide/services/#publishing-services---service-types).
 
 If the `LoadBalancer` specification is used, it can take a short period for an external IP to show up in `kubectl get services` output, but you should then see it listed as well, e.g. like this:
 
@@ -695,7 +695,7 @@ In Google Compute Engine, you also may need to open the firewall for port 80 usi
 $ gcloud compute firewall-rules create --allow=tcp:80 --target-tags=kubernetes-minion kubernetes-minion-80
 ```
 
-For GCE Kubernetes startup details, see the [Getting started on Google Compute Engine](../../docs/getting-started-guides/gce.md)
+For GCE Kubernetes startup details, see the [Getting started on Google Compute Engine](http://kubernetes.github.io/docs/getting-started-guides/gce/)
 
 For Google Compute Engine details about limiting traffic to specific sources, see the [Google Compute Engine firewall documentation][gce-firewall-docs].
 
