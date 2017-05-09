@@ -191,6 +191,12 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	return cmd
 }
 
+// SetFactory sets factory to be used inside the command. Useful for reusing drain logic
+// outside the command.
+func (o *DrainOptions) SetFactory(factory *cmdutil.Factory) {
+	o.factory = factory
+}
+
 // SetupDrain populates some fields from the factory, grabs command line
 // arguments and looks up the node using Builder
 func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
