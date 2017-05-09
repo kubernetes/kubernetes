@@ -53,3 +53,15 @@ if [[ -n "${diff}" ]]; then
   echo "${diff}"
   exit 1
 fi
+
+# Find comments not prefaced with a space.  gofmt doesn't do this.
+# Multiple grep statements is easier to extend debug, although not elegant.
+bad_files=$(find_files | xargs grep '//[^ ]' | grep -v "://" | grep -v swagger | grep -v "\"")
+bad_files_count="`echo \"${bad_files}\" | wc -l`"
+if [[ ${bad_files_count} -ne "0" ]]; then
+  echo "Comments in the above files need to be in idiomatic format i.e. '// hello kube'"
+  echo "We found $bad_files_count files with unidiomatic comments" 
+  echo "EXAMPLES: ${bad_files}" | head -5
+  echo "Currently, this will not cause the build to fail, but over time we want to decrease this number"
+  ### Don't exit 1 yet, because it would break the build. 
+fi
