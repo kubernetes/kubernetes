@@ -271,10 +271,13 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 // otherwise it returns a no-op manager which essentially does nothing
 func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 	if cm.NodeConfig.CgroupsPerQOS {
+		eventDispatcher := newEventDispatcher()
+
 		return &podContainerManagerImpl{
 			qosContainersInfo: cm.GetQOSContainersInfo(),
 			subsystems:        cm.subsystems,
-			cgroupManager:     cm.cgroupManager,
+			cgroupManager:     NewCgroupManager(cm.subsystems, cm.NodeConfig.CgroupDriver),
+			eventDispatcher:   eventDispatcher,
 		}
 	}
 	return &podContainerManagerNoop{

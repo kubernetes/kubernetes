@@ -1,0 +1,75 @@
+// To regenerate api.pb.go run hack/update-generated-runtime.sh
+syntax = 'proto3';
+
+package lifecycle;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.goproto_getters_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_unrecognized_all) = false;
+
+service EventDispatcher {
+  rpc Register(RegisterRequest) returns (RegisterReply) {}
+  rpc Unregister(UnregisterRequest) returns (UnregisterReply) {}
+}
+
+message RegisterRequest {
+  // For example: localhost:10321
+  string socketAddress = 1;
+  string name = 2;
+}
+
+message RegisterReply {
+  string error = 1;
+}
+
+message UnregisterRequest {
+  string name = 1;
+}
+
+message UnregisterReply {
+  string error = 1;
+}
+
+service Isolator {
+  rpc Notify(Event) returns (EventReply) {}
+}
+
+message Event {
+  enum Kind {
+    POD_PRE_START = 0;
+    POD_POST_STOP = 1;
+  };
+  Kind kind = 1;
+  CgroupInfo cgroup_info = 2;
+  bytes Pod = 3;
+}
+
+message EventReply {
+  string error = 1;
+  CgroupInfo cgroup_info = 2;
+  repeated CgroupResource cgroup_resource = 3;
+}
+
+message CgroupInfo {
+  enum Kind {
+    QOS = 0;
+    POD = 1;
+    CONTAINER = 2;
+  };
+  Kind kind = 1;
+  string path = 2;
+}
+
+message CgroupResource {
+  enum CgroupSubsystem {
+    CPUSET_CPUS = 0;
+  };
+  CgroupSubsystem cgroup_subsystem = 1;
+  string value = 2;
+}

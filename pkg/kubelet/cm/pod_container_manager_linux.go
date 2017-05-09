@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
 
@@ -45,6 +46,8 @@ type podContainerManagerImpl struct {
 	// cgroupManager is the cgroup Manager Object responsible for managing all
 	// pod cgroups.
 	cgroupManager CgroupManager
+	// eventDispatcher manages delegation to external lifecycle event handlers.
+	eventDispatcher EventDispatcher
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -52,9 +55,21 @@ var _ PodContainerManager = &podContainerManagerImpl{}
 
 // applyLimits sets pod cgroup resource limits
 // It also updates the resource limits on top level qos containers.
-func (m *podContainerManagerImpl) applyLimits(pod *v1.Pod) error {
+func (m *podContainerManagerImpl) applyLimits(pod *v1.Pod, resources *ResourceConfig) error {
 	// This function will house the logic for setting the resource parameters
 	// on the pod container config and updating top level qos container configs
+	//TODO: Code duplication to EnsureExists.
+	//TODO: Decide whether move creating cgroupconfig above if !alreadyExists  statement
+	podContainerName, _ := m.GetPodContainerName(pod)
+	containerConfig := &CgroupConfig{
+		Name:               podContainerName,
+		ResourceParameters: resources,
+	}
+
+	if err := m.cgroupManager.Update(containerConfig); err != nil {
+		return fmt.Errorf("failed to update container for %v : %v", pod.Name, err)
+	}
+
 	return nil
 }
 
@@ -68,24 +83,32 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 // pod cgroup exists if qos cgroup hierarchy flag is enabled.
 // If the pod level container doesen't already exist it is created.
 func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
+	var err error
 	podContainerName, _ := m.GetPodContainerName(pod)
 	// check if container already exist
 	alreadyExists := m.Exists(pod)
+	var reply *lifecycle.EventReply
 	if !alreadyExists {
 		// Create the pod container
 		containerConfig := &CgroupConfig{
 			Name:               podContainerName,
 			ResourceParameters: ResourceConfigForPod(pod),
 		}
-		if err := m.cgroupManager.Create(containerConfig); err != nil {
+		if err = m.cgroupManager.Create(containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
+		// Dispatch events to subscribed event handlers, if any.
+		// TODO(CD): Ensure it's ok to do this before calling applyLimits
+		if reply, err = m.eventDispatcher.PreStartPod(pod, string(podContainerName)); err != nil {
+			return fmt.Errorf("failed to execute PreStartPod hook for: %v: %v", pod.Name, err)
+		}
 	}
+	resources := m.eventDispatcher.ResourceConfigFromReplies(reply, ResourceConfigForPod(pod))
 	// Apply appropriate resource limits on the pod container
 	// Top level qos containers limits are not updated
 	// until we figure how to maintain the desired state in the kubelet.
 	// Because maintaining the desired state is difficult without checkpointing.
-	if err := m.applyLimits(pod); err != nil {
+	if err = m.applyLimits(pod, resources); err != nil {
 		return fmt.Errorf("failed to apply resource limits on container for %v : %v", podContainerName, err)
 	}
 	return nil
@@ -164,6 +187,7 @@ func (m *podContainerManagerImpl) Destroy(podCgroup CgroupName) error {
 		Name:               podCgroup,
 		ResourceParameters: &ResourceConfig{},
 	}
+	// TODO(CD): Invoke pod post-stop lifecycle hook.
 	if err := m.cgroupManager.Destroy(containerConfig); err != nil {
 		return fmt.Errorf("failed to delete cgroup paths for %v : %v", podCgroup, err)
 	}
