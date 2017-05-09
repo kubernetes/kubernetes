@@ -104,8 +104,6 @@ func (realConntracker) setIntSysCtl(name string, value int) error {
 
 // isSysFSWritable checks /proc/mounts to see whether sysfs is 'rw' or not.
 func isSysFSWritable() (bool, error) {
-	const permWritable = "rw"
-	const sysfsDevice = "sysfs"
 	m := mount.New("" /* default mount path */)
 	mountPoints, err := m.List()
 	if err != nil {
