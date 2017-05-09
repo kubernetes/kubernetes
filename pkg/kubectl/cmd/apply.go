@@ -271,9 +271,9 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				}
 				if uid, err := info.Mapping.UID(info.Object); err != nil {
 					return err
-				} else {
-					visitedUids.Insert(string(uid))
 				}
+				visitedUids.Insert(string(uid))
+
 			}
 
 			count++
@@ -327,9 +327,9 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			if uid, err := info.Mapping.UID(info.Object); err != nil {
 				return err
-			} else {
-				visitedUids.Insert(string(uid))
 			}
+			visitedUids.Insert(string(uid))
+
 		}
 		count++
 		if len(output) > 0 && !shortOutput {

@@ -494,9 +494,9 @@ func getRestartPolicy(cmd *cobra.Command, interactive bool) (api.RestartPolicy, 
 	if len(restart) == 0 {
 		if interactive {
 			return api.RestartPolicyOnFailure, nil
-		} else {
-			return api.RestartPolicyAlways, nil
 		}
+		return api.RestartPolicyAlways, nil
+
 	}
 	switch api.RestartPolicy(restart) {
 	case api.RestartPolicyAlways:
