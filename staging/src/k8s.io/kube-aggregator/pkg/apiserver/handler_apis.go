@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	v1listers "k8s.io/client-go/listers/core/v1"
 
 	apiregistrationapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	apiregistrationv1alpha1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
@@ -37,9 +36,6 @@ import (
 type apisHandler struct {
 	codecs serializer.CodecFactory
 	lister listers.APIServiceLister
-
-	serviceLister   v1listers.ServiceLister
-	endpointsLister v1listers.EndpointsLister
 }
 
 var discoveryGroup = metav1.APIGroup{
@@ -74,7 +70,7 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if len(apiGroupServers[0].Spec.Group) == 0 {
 			continue
 		}
-		discoveryGroup := convertToDiscoveryAPIGroup(apiGroupServers, r.serviceLister, r.endpointsLister)
+		discoveryGroup := convertToDiscoveryAPIGroup(apiGroupServers)
 		if discoveryGroup != nil {
 			discoveryGroupList.Groups = append(discoveryGroupList.Groups, *discoveryGroup)
 		}
@@ -85,33 +81,14 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // convertToDiscoveryAPIGroup takes apiservices in a single group and returns a discovery compatible object.
 // if none of the services are available, it will return nil.
-func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService, serviceLister v1listers.ServiceLister, endpointsLister v1listers.EndpointsLister) *metav1.APIGroup {
+func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService) *metav1.APIGroup {
 	apiServicesByGroup := apiregistrationapi.SortedByGroup(apiServices)[0]
 
 	var discoveryGroup *metav1.APIGroup
 
 	for _, apiService := range apiServicesByGroup {
-		if apiService.Spec.Service != nil {
-			// skip any API services without actual services
-			if _, err := serviceLister.Services(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name); err != nil {
-				continue
-			}
-
-			hasActiveEndpoints := false
-			endpoints, err := endpointsLister.Endpoints(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
-			// skip any API services without endpoints
-			if err != nil {
-				continue
-			}
-			for _, subset := range endpoints.Subsets {
-				if len(subset.Addresses) > 0 {
-					hasActiveEndpoints = true
-					break
-				}
-			}
-			if !hasActiveEndpoints {
-				continue
-			}
+		if !apiregistrationapi.IsAPIServiceConditionTrue(apiService, apiregistrationapi.Available) {
+			continue
 		}
 
 		// the first APIService which is valid becomes the default
@@ -143,9 +120,6 @@ type apiGroupHandler struct {
 
 	lister listers.APIServiceLister
 
-	serviceLister   v1listers.ServiceLister
-	endpointsLister v1listers.EndpointsLister
-
 	delegate http.Handler
 }
 
@@ -172,7 +146,7 @@ func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	discoveryGroup := convertToDiscoveryAPIGroup(apiServicesForGroup, r.serviceLister, r.endpointsLister)
+	discoveryGroup := convertToDiscoveryAPIGroup(apiServicesForGroup)
 	if discoveryGroup == nil {
 		http.Error(w, "", http.StatusNotFound)
 		return
