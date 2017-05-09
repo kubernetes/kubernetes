@@ -292,7 +292,7 @@ func MultipleErrors(prefix string, errs []error) string {
 func messageForError(err error) string {
 	msg, ok := StandardErrorMessage(err)
 	if !ok {
-		msg = err.Error()
+		msg = fmt.Sprintf("error: %s\n", err.Error())
 	}
 	return msg
 }
