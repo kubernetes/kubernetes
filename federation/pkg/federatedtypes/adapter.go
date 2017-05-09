@@ -21,7 +21,9 @@ import (
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
@@ -54,6 +56,14 @@ type FederatedTypeAdapter interface {
 	ClusterWatch(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (watch.Interface, error)
 
 	NewTestObject(namespace string) pkgruntime.Object
+}
+
+// ObjectUpdatingAdapter defines operations for interacting with a
+// federated type that requires more complex synchronization logic.
+type ObjectUpdatingAdapter interface {
+	PrepareForUpdate(obj pkgruntime.Object, key string, clusters []*federationapi.Cluster, informer fedutil.FederatedInformer) (interface{}, error)
+	UpdateObject(cluster *federationapi.Cluster, clusterObj pkgruntime.Object, federationObjCopy pkgruntime.Object, userInfo interface{}) (pkgruntime.Object, bool, error)
+	UpdateFinished(obj pkgruntime.Object, userInfo interface{}) error
 }
 
 // AdapterFactory defines the function signature for factory methods
