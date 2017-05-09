@@ -94,7 +94,7 @@ func (c *ExampleController) onAdd(obj interface{}) {
 
 	exampleCopy := copyObj.(*tprv1.Example)
 	exampleCopy.Status = tprv1.ExampleStatus{
-		State: tprv1.ExampleStateProcessed,
+		State:   tprv1.ExampleStateProcessed,
 		Message: "Successfully processed by controller",
 	}
 

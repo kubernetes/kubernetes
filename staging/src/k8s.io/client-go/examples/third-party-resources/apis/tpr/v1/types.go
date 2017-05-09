@@ -23,10 +23,10 @@ import (
 const ExampleResourcePlural = "examples"
 
 type Example struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
-	Spec ExampleSpec `json:"spec"`
-	Status ExampleStatus `json:"status,omitempty"`
+	Spec              ExampleSpec   `json:"spec"`
+	Status            ExampleStatus `json:"status,omitempty"`
 }
 
 type ExampleSpec struct {
@@ -49,5 +49,5 @@ const (
 type ExampleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
-	Items []Example `json:"items"`
+	Items           []Example `json:"items"`
 }

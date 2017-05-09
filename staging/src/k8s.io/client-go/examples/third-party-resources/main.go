@@ -90,7 +90,7 @@ func main() {
 			Bar: true,
 		},
 		Status: tprv1.ExampleStatus{
-			State: tprv1.ExampleStateCreated,
+			State:   tprv1.ExampleStateCreated,
 			Message: "Created, not processed yet",
 		},
 	}
