@@ -40,7 +40,6 @@ import (
 	deploymentcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/deployment"
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
 	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
-	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	synccontroller "k8s.io/kubernetes/federation/pkg/federation-controller/sync"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -164,14 +163,6 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		if controllerEnabled(s.Controllers, serverResources, federatedType.ControllerName, federatedType.RequiredResources, true) {
 			synccontroller.StartFederationSyncController(kind, federatedType.AdapterFactory, restClientCfg, stopChan, minimizeLatency)
 		}
-	}
-
-	if controllerEnabled(s.Controllers, serverResources, replicasetcontroller.ControllerName, replicasetcontroller.RequiredResources, true) {
-		glog.V(3).Infof("Loading client config for replica set controller %q", replicasetcontroller.UserAgentName)
-		replicaSetClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, replicasetcontroller.UserAgentName))
-		replicaSetController := replicasetcontroller.NewReplicaSetController(replicaSetClientset)
-		glog.V(3).Infof("Running replica set controller")
-		go replicaSetController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, deploymentcontroller.ControllerName, deploymentcontroller.RequiredResources, true) {

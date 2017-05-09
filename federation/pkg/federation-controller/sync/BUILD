@@ -42,17 +42,28 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["controller_test.go"],
+    srcs = [
+        "controller_test.go",
+        "replicasetcontroller_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
+        "//federation/client/clientset_generated/federation_clientset/fake:go_default_library",
         "//federation/pkg/federatedtypes:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
         "//federation/pkg/federation-controller/util/test:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/client-go/testing:go_default_library",
     ],
 )
 

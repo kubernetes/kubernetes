@@ -74,7 +74,7 @@ func TestSyncToClusters(t *testing.T) {
 					}
 					return nil, nil
 				},
-				func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, pkgruntime.Object) ([]util.FederatedOperation, error) {
+				func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, pkgruntime.Object, string, interface{}) ([]util.FederatedOperation, error) {
 					if testCase.operationsError {
 						return nil, awfulError
 					}
@@ -87,6 +87,7 @@ func TestSyncToClusters(t *testing.T) {
 					return nil
 				},
 				adapter,
+				nil,
 				obj,
 			)
 			require.Equal(t, testCase.status, status, "Unexpected status!")
@@ -138,7 +139,8 @@ func TestClusterOperations(t *testing.T) {
 			clusters := []*federationapi.Cluster{fedtest.NewCluster("cluster1", apiv1.ConditionTrue)}
 			key := federatedtypes.ObjectKey(adapter, obj)
 
-			operations, err := clusterOperations(adapter, clusters, obj, key, func(string) (interface{}, bool, error) {
+			// TODO: Tests for UpdateObject on type adapter
+			operations, err := clusterOperations(adapter, clusters, obj, key, nil, func(string) (interface{}, bool, error) {
 				if testCase.expectedErr {
 					return nil, false, awfulError
 				}
