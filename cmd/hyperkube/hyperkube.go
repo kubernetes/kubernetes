@@ -226,6 +226,7 @@ func (hk *HyperKube) MakeSymlinks(command string) error {
 		if err != nil {
 			errs = true
 			hk.Println(err)
+			break
 		}
 	}
 
