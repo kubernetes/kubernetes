@@ -161,7 +161,7 @@ func (rc *reconciler) reconcile() {
 	for _, mountedVolume := range rc.actualStateOfWorld.GetMountedVolumes() {
 		if !rc.desiredStateOfWorld.PodExistsInVolume(mountedVolume.PodName, mountedVolume.VolumeName) {
 			// Volume is mounted, unmount it
-			glog.V(12).Infof(mountedVolume.GenerateMsgDetailed("MountedVolume.UnmountVolume attempting",""))
+			glog.V(12).Infof(mountedVolume.GenerateMsgDetailed("MountedVolume.UnmountVolume attempting", ""))
 			err := rc.operationExecutor.UnmountVolume(
 				mountedVolume.MountedVolume, rc.actualStateOfWorld)
 			if err != nil &&
@@ -169,10 +169,10 @@ func (rc *reconciler) reconcile() {
 				!exponentialbackoff.IsExponentialBackoff(err) {
 				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
-				glog.Errorf(mountedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.UnmountVolume failed (controllerAttachDetachEnabled %v)",rc.controllerAttachDetachEnabled), err).Error())
+				glog.Errorf(mountedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.UnmountVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 			}
 			if err == nil {
-				glog.Infof(mountedVolume.GenerateMsgDetailed("operationExecutor.UnmountVolume started",""))
+				glog.Infof(mountedVolume.GenerateMsgDetailed("operationExecutor.UnmountVolume started", ""))
 			}
 		}
 	}
@@ -185,7 +185,7 @@ func (rc *reconciler) reconcile() {
 			if rc.controllerAttachDetachEnabled || !volumeToMount.PluginIsAttachable {
 				// Volume is not attached (or doesn't implement attacher), kubelet attach is disabled, wait
 				// for controller to finish attaching volume.
-				glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("MountVolume.VerifyControllerAttachedVolume attempting",""))
+				glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("MountVolume.VerifyControllerAttachedVolume attempting", ""))
 				err := rc.operationExecutor.VerifyControllerAttachedVolume(
 					volumeToMount.VolumeToMount,
 					rc.nodeName,
@@ -195,7 +195,7 @@ func (rc *reconciler) reconcile() {
 					!exponentialbackoff.IsExponentialBackoff(err) {
 					// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
-					glog.Errorf(volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.VerifyControllerAttachedVolume failed (controllerAttachDetachEnabled %v)",rc.controllerAttachDetachEnabled), err).Error())
+					glog.Errorf(volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.VerifyControllerAttachedVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 				}
 				if err == nil {
 					glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.VerifyControllerAttachedVolume started", ""))
@@ -208,17 +208,17 @@ func (rc *reconciler) reconcile() {
 					VolumeSpec: volumeToMount.VolumeSpec,
 					NodeName:   rc.nodeName,
 				}
-				glog.V(12).Infof(volumeToAttach.GenerateMsgDetailed("operationExecutor.AttachVolume attempting",""))
+				glog.V(12).Infof(volumeToAttach.GenerateMsgDetailed("operationExecutor.AttachVolume attempting", ""))
 				err := rc.operationExecutor.AttachVolume(volumeToAttach, rc.actualStateOfWorld)
 				if err != nil &&
 					!nestedpendingoperations.IsAlreadyExists(err) &&
 					!exponentialbackoff.IsExponentialBackoff(err) {
 					// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
-					glog.Errorf(volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.AttachVolume failed (controllerAttachDetachEnabled %v)",rc.controllerAttachDetachEnabled), err).Error())
+					glog.Errorf(volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.AttachVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 				}
 				if err == nil {
-					glog.Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.AttachVolume started",""))
+					glog.Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.AttachVolume started", ""))
 				}
 			}
 		} else if !volMounted || cache.IsRemountRequiredError(err) {
@@ -227,7 +227,7 @@ func (rc *reconciler) reconcile() {
 			if cache.IsRemountRequiredError(err) {
 				remountingLogStr = "Volume is already mounted to pod, but remount was requested."
 			}
-			glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("MountVolume attempting",remountingLogStr))
+			glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("MountVolume attempting", remountingLogStr))
 			err := rc.operationExecutor.MountVolume(
 				rc.waitForAttachTimeout,
 				volumeToMount.VolumeToMount,
@@ -237,13 +237,13 @@ func (rc *reconciler) reconcile() {
 				!exponentialbackoff.IsExponentialBackoff(err) {
 				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
-				glog.Errorf(volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.MountVolume failed (controllerAttachDetachEnabled %v)",rc.controllerAttachDetachEnabled), err).Error())
+				glog.Errorf(volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.MountVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 			}
 			if err == nil {
 				if remountingLogStr == "" {
-					glog.V(1).Infof(volumeToMount.GenerateMsgDetailed("MountVolume started",remountingLogStr))
+					glog.V(1).Infof(volumeToMount.GenerateMsgDetailed("MountVolume started", remountingLogStr))
 				} else {
-					glog.V(5).Infof(volumeToMount.GenerateMsgDetailed("MountVolume started",remountingLogStr))
+					glog.V(5).Infof(volumeToMount.GenerateMsgDetailed("MountVolume started", remountingLogStr))
 				}
 			}
 		}
@@ -256,7 +256,7 @@ func (rc *reconciler) reconcile() {
 			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName) {
 			if attachedVolume.GloballyMounted {
 				// Volume is globally mounted to device, unmount it
-				glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("UnmountDevice attempting",""))
+				glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("UnmountDevice attempting", ""))
 				err := rc.operationExecutor.UnmountDevice(
 					attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.mounter)
 				if err != nil &&
@@ -264,10 +264,10 @@ func (rc *reconciler) reconcile() {
 					!exponentialbackoff.IsExponentialBackoff(err) {
 					// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
-					glog.Errorf(attachedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.UnmountDevice failed (controllerAttachDetachEnabled %v)",rc.controllerAttachDetachEnabled), err).Error())
+					glog.Errorf(attachedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.UnmountDevice failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 				}
 				if err == nil {
-					glog.Infof(attachedVolume.GenerateMsgDetailed("operationExecutor.UnmountDevice started",""))
+					glog.Infof(attachedVolume.GenerateMsgDetailed("operationExecutor.UnmountDevice started", ""))
 				}
 			} else {
 				// Volume is attached to node, detach it
@@ -277,7 +277,7 @@ func (rc *reconciler) reconcile() {
 					glog.Infof(attachedVolume.GenerateMsgDetailed("Volume detached", fmt.Sprintf("DevicePath %q", attachedVolume.DevicePath)))
 				} else {
 					// Only detach if kubelet detach is enabled
-					glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("DetachVolume attempting",""))
+					glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("DetachVolume attempting", ""))
 					err := rc.operationExecutor.DetachVolume(
 						attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld)
 					if err != nil &&
@@ -285,10 +285,10 @@ func (rc *reconciler) reconcile() {
 						!exponentialbackoff.IsExponentialBackoff(err) {
 						// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
 						// Log all other errors.
-						glog.Errorf(attachedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.DetachVolume failed (controllerAttachDetachEnabled %v)",rc.controllerAttachDetachEnabled), err).Error())
+						glog.Errorf(attachedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.DetachVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 					}
 					if err == nil {
-						glog.Infof(attachedVolume.GenerateMsgDetailed("operationExecutor.DetachVolume started",""))
+						glog.Infof(attachedVolume.GenerateMsgDetailed("operationExecutor.DetachVolume started", ""))
 					}
 				}
 			}

@@ -143,7 +143,7 @@ func (rc *reconciler) reconcile() {
 			timeout := elapsedTime > rc.maxWaitForUnmountDuration
 			// Check whether volume is still mounted. Skip detach if it is still mounted unless timeout
 			if attachedVolume.MountedByNode && !timeout {
-				glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Cannot detach volume because it is still mounted",""))
+				glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Cannot detach volume because it is still mounted", ""))
 				continue
 			}
 
@@ -161,14 +161,14 @@ func (rc *reconciler) reconcile() {
 
 			// Trigger detach volume which requires verifing safe to detach step
 			// If timeout is true, skip verifySafeToDetach check
-			glog.V(5).Infof(attachedVolume.GenerateMsgDetailed("DetachVolume attempting",""))
+			glog.V(5).Infof(attachedVolume.GenerateMsgDetailed("DetachVolume attempting", ""))
 			verifySafeToDetach := !timeout
 			err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
 				if !timeout {
-					glog.Infof(attachedVolume.GenerateMsgDetailed("DetachVolume started",""))
+					glog.Infof(attachedVolume.GenerateMsgDetailed("DetachVolume started", ""))
 				} else {
-					glog.Infof(attachedVolume.GenerateMsgDetailed("DetachVolume started",fmt.Sprintf("This volume is not safe to detach, but maxWaitForUnmountDuration %v expired, force detaching",rc.maxWaitForUnmountDuration)))
+					glog.Infof(attachedVolume.GenerateMsgDetailed("DetachVolume started", fmt.Sprintf("This volume is not safe to detach, but maxWaitForUnmountDuration %v expired, force detaching", rc.maxWaitForUnmountDuration)))
 				}
 			}
 			if err != nil &&
@@ -186,14 +186,14 @@ func (rc *reconciler) reconcile() {
 		if rc.actualStateOfWorld.VolumeNodeExists(
 			volumeToAttach.VolumeName, volumeToAttach.NodeName) {
 			// Volume/Node exists, touch it to reset detachRequestedTime
-			glog.V(5).Infof(volumeToAttach.GenerateMsgDetailed("Volume attached--touching",""))
+			glog.V(5).Infof(volumeToAttach.GenerateMsgDetailed("Volume attached--touching", ""))
 			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 		} else {
 			// Volume/Node doesn't exist, spawn a goroutine to attach it
 			glog.V(5).Infof("Attempting to start AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
 			if err == nil {
-				glog.Infof(volumeToAttach.GenerateMsgDetailed("AttachVolume attempting",""))
+				glog.Infof(volumeToAttach.GenerateMsgDetailed("AttachVolume attempting", ""))
 			}
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&

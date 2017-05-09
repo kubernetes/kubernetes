@@ -212,7 +212,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			continue
 		}
 
-		glog.V(5).Infof(volumeToMount.GenerateMsgDetailed("Removing volume from desired state",""))
+		glog.V(5).Infof(volumeToMount.GenerateMsgDetailed("Removing volume from desired state", ""))
 
 		dswp.desiredStateOfWorld.DeletePodFromVolume(
 			volumeToMount.PodName, volumeToMount.VolumeName)
