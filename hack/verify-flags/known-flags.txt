@@ -99,6 +99,7 @@ clientset-path
 cloud-config
 cloud-config-file
 cloud-provider
+cloud-provider-gce-lb-nodes-healthcheck-port
 cloud-provider-gce-lb-src-cidrs
 cluster-cidr
 cluster-context

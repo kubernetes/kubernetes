@@ -17,8 +17,10 @@ limitations under the License.
 package gce
 
 import (
+	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 
@@ -111,4 +113,23 @@ func (gce *GCECloud) UpdateFirewall(name, desc string, sourceRanges netsets.IPNe
 	}
 
 	return mc.Observe(gce.updateFirewall(name, region, desc, sourceRanges, svcPorts, hosts))
+}
+
+// PackProtocolsPortsFromFirewall packs protocols and ports in an unified way for verification.
+func PackProtocolsPortsFromFirewall(alloweds []*compute.FirewallAllowed) []string {
+	protocolPorts := []string{}
+	for _, allowed := range alloweds {
+		for _, port := range allowed.Ports {
+			protocolPorts = append(protocolPorts, strings.ToLower(allowed.IPProtocol+":"+port))
+		}
+	}
+	return protocolPorts
+}
+
+// SameStringArray verifies whether two string arrays have the same strings, order
+// does not matter.
+func SameStringArray(result, expected []string) bool {
+	res := sets.NewString(result...)
+	exp := sets.NewString(expected...)
+	return res.Equal(exp)
 }

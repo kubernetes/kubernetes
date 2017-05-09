@@ -18,6 +18,7 @@ package gce
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -99,4 +100,12 @@ func GetGCERegion(zone string) (string, error) {
 func isHTTPErrorCode(err error, code int) bool {
 	apiErr, ok := err.(*googleapi.Error)
 	return ok && apiErr.Code == code
+}
+
+func isInUsedByError(err error) bool {
+	apiErr, ok := err.(*googleapi.Error)
+	if !ok || apiErr.Code != http.StatusBadRequest {
+		return false
+	}
+	return strings.Contains(apiErr.Message, "being used by")
 }
