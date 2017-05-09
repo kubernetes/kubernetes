@@ -34,13 +34,22 @@ var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 // state where the pod indicates it's still running, but its container is already terminated
 var ErrContainerTerminated = fmt.Errorf("container terminated")
 
+// checkDeletedTypeEvent returns error if event type is Deleted, nil if event type is others.
+func checkDeletedTypeEvent(event watch.Event, resource string) error {
+	switch event.Type {
+	case watch.Deleted:
+		return errors.NewNotFound(schema.GroupResource{Resource: resource}, "")
+	}
+	return nil
+}
+
 // PodRunning returns true if the pod is running, false if the pod has not yet reached running state,
 // returns ErrPodCompleted if the pod has run to completion, or an error in any other case.
 func PodRunning(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
-		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+	if err := checkDeletedTypeEvent(event, "pods"); err != nil {
+		return false, err
 	}
+
 	switch t := event.Object.(type) {
 	case *v1.Pod:
 		switch t.Status.Phase {
@@ -56,10 +65,10 @@ func PodRunning(event watch.Event) (bool, error) {
 // PodCompleted returns true if the pod has run to completion, false if the pod has not yet
 // reached running state, or an error in any other case.
 func PodCompleted(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
-		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+	if err := checkDeletedTypeEvent(event, "pods"); err != nil {
+		return false, err
 	}
+
 	switch t := event.Object.(type) {
 	case *v1.Pod:
 		switch t.Status.Phase {
@@ -74,10 +83,10 @@ func PodCompleted(event watch.Event) (bool, error) {
 // yet reached those states, returns ErrPodCompleted if the pod has run to completion, or
 // an error in any other case.
 func PodRunningAndReady(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
-		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+	if err := checkDeletedTypeEvent(event, "pods"); err != nil {
+		return false, err
 	}
+
 	switch t := event.Object.(type) {
 	case *v1.Pod:
 		switch t.Status.Phase {
@@ -93,10 +102,10 @@ func PodRunningAndReady(event watch.Event) (bool, error) {
 // PodNotPending returns true if the pod has left the pending state, false if it has not,
 // or an error in any other case (such as if the pod was deleted).
 func PodNotPending(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
-		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+	if err := checkDeletedTypeEvent(event, "pods"); err != nil {
+		return false, err
 	}
+
 	switch t := event.Object.(type) {
 	case *v1.Pod:
 		switch t.Status.Phase {
@@ -113,9 +122,8 @@ func PodNotPending(event watch.Event) (bool, error) {
 // and will return an error if the pod is deleted, runs to completion, or the container pod is not available.
 func PodContainerRunning(containerName string) watch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
-		switch event.Type {
-		case watch.Deleted:
-			return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+		if err := checkDeletedTypeEvent(event, "pods"); err != nil {
+			return false, err
 		}
 		switch t := event.Object.(type) {
 		case *v1.Pod:
@@ -153,10 +161,10 @@ func PodContainerRunning(containerName string) watch.ConditionFunc {
 // ServiceAccountHasSecrets returns true if the service account has at least one secret,
 // false if it does not, or an error.
 func ServiceAccountHasSecrets(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
-		return false, errors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, "")
+	if err := checkDeletedTypeEvent(event, "serviceaccounts"); err != nil {
+		return false, err
 	}
+
 	switch t := event.Object.(type) {
 	case *v1.ServiceAccount:
 		return len(t.Secrets) > 0, nil
