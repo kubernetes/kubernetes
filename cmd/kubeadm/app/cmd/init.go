@@ -199,10 +199,11 @@ func (i *Init) Validate() error {
 func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 1: Generate certificates
-	err := certphase.CreatePKIAssets(i.cfg)
+	results, err := certphase.CreatePKIAssets(i.cfg)
 	if err != nil {
 		return err
 	}
+	fmt.Printf("%v", results)
 
 	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
 
