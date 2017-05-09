@@ -102,7 +102,7 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 	// TODO: should use a dynamic RESTMapper built from the discovery results.
 	restMapper := api.Registry.RESTMapper()
 
-	// Find the list of namespaced resources via discovery that the namespace controller must manage
+	// Find the list of namespace resources via discovery that the namespace controller must manage
 	namespaceKubeClient := ctx.ClientBuilder.ClientOrDie("namespace-controller")
 	namespaceClientPool := dynamic.NewClientPool(ctx.ClientBuilder.ConfigOrDie("namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
 	// TODO: consider using a list-watch + cache here rather than polling
