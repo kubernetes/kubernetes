@@ -329,7 +329,7 @@ func ParseDockerName(name string) (dockerName *KubeletContainerName, hash uint64
 		err = fmt.Errorf("failed to parse Docker container name %q into parts", name)
 		return nil, 0, err
 	}
-	if len(parts) < 6 {
+	if len(parts) < 5 {
 		// We have at least 5 fields.  We may have more in the future.
 		// Anything with less fields than this is not something we can
 		// manage.
