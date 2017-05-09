@@ -59,11 +59,15 @@ process_content () {
                # licenses (except to "see license file")
                ensure_pattern="license|copyright"
                ;;
-    # We search READMEs for copyrights and this includes notice files as well
-    # Look in as many places as we find files matching
-    COPYRIGHT) find_names=(-iname 'notice*' -o -iname 'readme*')
+      # We search READMEs for copyrights and this includes notice files as well
+      # Look in as many places as we find files matching
+      COPYRIGHT) find_names=(-iname 'notice*' -o -iname 'readme*')
                find_maxdepth=3
                ensure_pattern="copyright"
+               ;;
+      COPYING) find_names=(-iname 'COPYING')
+               find_maxdepth=1
+               ensure_pattern="License|Copyright"
                ;;
   esac
 
@@ -81,6 +85,7 @@ process_content () {
   esac
 
   # Find files - only root and package level
+
   local_files=($(
     for dir_root in ${package} ${package_root}; do
       [[ -d ${DEPS_DIR}/${dir_root} ]] || continue
@@ -151,6 +156,7 @@ for PACKAGE in $(cat Godeps/Godeps.json | \
                  sort -f); do
   process_content ${PACKAGE} LICENSE
   process_content ${PACKAGE} COPYRIGHT
+  process_content ${PACKAGE} COPYING
 
   # display content
   echo
@@ -163,6 +169,8 @@ for PACKAGE in $(cat Godeps/Godeps.json | \
       file="${CONTENT[${PACKAGE}-LICENSE]-}"
   elif [[ -n "${CONTENT[${PACKAGE}-COPYRIGHT]-}" ]]; then
       file="${CONTENT[${PACKAGE}-COPYRIGHT]-}"
+  elif [[ -n "${CONTENT[${PACKAGE}-COPYING]-}" ]]; then
+      file="${CONTENT[${PACKAGE}-COPYING]-}" 
   fi
   if [[ -z "${file}" ]]; then
       cat > /dev/stderr << __EOF__
