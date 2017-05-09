@@ -430,11 +430,11 @@ func (gc *GarbageCollector) attemptToOrphanWorker() bool {
 	}
 	// we don't need to lock each element, because they never get updated
 	owner.dependentsLock.RLock()
+	defer owner.dependentsLock.RUnlock()
 	dependents := make([]*node, 0, len(owner.dependents))
 	for dependent := range owner.dependents {
 		dependents = append(dependents, dependent)
 	}
-	owner.dependentsLock.RUnlock()
 
 	err := gc.orphanDependents(owner.identity, dependents)
 	if err != nil {
