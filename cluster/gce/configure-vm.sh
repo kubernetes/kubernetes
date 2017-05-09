@@ -172,6 +172,13 @@ for k,v in yaml.load(sys.stdin).iteritems():
   ' < """${kube_env_yaml}""")"
 }
 
+function upgrade-docker() {
+    echo "== Installing docker v1.8.2-rc1 =="
+    curl -o /tmp/docker-1.8.2-rc1 https://test.docker.com/builds/Linux/x86_64/docker-1.8.2-rc1
+    chmod 0755 /tmp/docker-1.8.2-rc1
+    mv /tmp/docker-1.8.2-rc1 /usr/bin/docker
+}
+
 function remove-docker-artifacts() {
   echo "== Deleting docker0 =="
   apt-get-install bridge-utils
@@ -844,6 +851,7 @@ if [[ -z "${is_push}" ]]; then
   download-release
   configure-salt
   remove-docker-artifacts
+  upgrade-docker
   run-salt
   reset-motd
 
