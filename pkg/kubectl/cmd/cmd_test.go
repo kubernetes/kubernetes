@@ -192,6 +192,7 @@ type testFactory struct {
 	Validator    validation.Schema
 	Namespace    string
 	ClientConfig *restclient.Config
+	JSONEncoder  runtime.Encoder
 	Err          error
 }
 
@@ -305,7 +306,11 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec, runtime.Neg
 			return testapi.Default.Codec()
 		},
 		JSONEncoder: func() runtime.Encoder {
-			return testapi.Default.Codec()
+			if t.JSONEncoder != nil {
+				return t.JSONEncoder
+			} else {
+				return testapi.Default.Codec()
+			}
 		},
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err

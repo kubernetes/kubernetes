@@ -32,7 +32,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/annotations"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -56,9 +59,11 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 }
 
 const (
-	filenameRC    = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
-	filenameSVC   = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
-	filenameRCSVC = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
+	filenameRC       = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
+	filenameSVC      = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
+	filenameTPR      = "../../../test/fixtures/pkg/kubectl/cmd/apply/third-party-resource.yaml"
+	filenameTPREntry = "../../../test/fixtures/pkg/kubectl/cmd/apply/third-party-resource-entry.yaml"
+	filenameRCSVC    = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
 )
 
 func readBytesFromFile(t *testing.T, filename string) []byte {
@@ -97,6 +102,15 @@ func readServiceFromFile(t *testing.T, filename string) *api.Service {
 	return &svc
 }
 
+func readTPRFromFile(t *testing.T, filename string) *extensions.ThirdPartyResource {
+	data := readBytesFromFile(t, filename)
+	tpr := extensions.ThirdPartyResource{}
+	if err := yaml.Unmarshal(data, &tpr); err != nil {
+		t.Fatal(err)
+	}
+	return &tpr
+}
+
 func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object, kind string) (string, []byte) {
 	originalAccessor, err := meta.Accessor(originalObj)
 	if err != nil {
@@ -104,8 +118,10 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	}
 
 	originalLabels := originalAccessor.GetLabels()
-	originalLabels["DELETE_ME"] = "DELETE_ME"
-	originalAccessor.SetLabels(originalLabels)
+	if originalLabels != nil {
+		originalLabels["DELETE_ME"] = "DELETE_ME"
+		originalAccessor.SetLabels(originalLabels)
+	}
 	original, err := json.Marshal(originalObj)
 	if err != nil {
 		t.Fatal(err)
@@ -140,6 +156,12 @@ func readAndAnnotateService(t *testing.T, filename string) (string, []byte) {
 	svc1 := readServiceFromFile(t, filename)
 	svc2 := readServiceFromFile(t, filename)
 	return annotateRuntimeObject(t, svc1, svc2, "Service")
+}
+
+func readAndAnnotateTPR(t *testing.T, filename string) (string, []byte) {
+	tpr1 := readTPRFromFile(t, filename)
+	tpr2 := readTPRFromFile(t, filename)
+	return annotateRuntimeObject(t, tpr1, tpr2, "ThirdPartyResrouce")
 }
 
 func validatePatchApplication(t *testing.T, req *http.Request) {
@@ -213,6 +235,62 @@ func TestApplyObject(t *testing.T) {
 	expectRC := "replicationcontroller/" + nameRC + "\n"
 	if buf.String() != expectRC {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
+	}
+}
+
+// TestApplyTPR uses apply commad with ThirdPartyResources.
+func TestApplyTPR(t *testing.T) {
+	initTestErrorHandler(t)
+	nameTPR, currentTPR := readAndAnnotateTPR(t, filenameTPR)
+	pathTPR := "/thirdpartyresources/" + nameTPR
+
+	f, tf, _, ns := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.JSONEncoder = testapi.Extensions.Codec()
+	tf.Client = &fake.RESTClient{
+		ContentConfig: restclient.ContentConfig{
+			ContentType: runtime.ContentTypeJSON,
+			GroupVersion: &unversioned.GroupVersion{
+				Group:   extensions.GroupName,
+				Version: "v1beta1",
+			},
+			NegotiatedSerializer: ns,
+		},
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == pathTPR && m == "GET":
+				bodyTPR := ioutil.NopCloser(bytes.NewReader(currentTPR))
+				return &http.Response{
+					StatusCode: 200,
+					Header:     defaultHeader(),
+					Body:       bodyTPR,
+				}, nil
+			case p == pathTPR && m == "PATCH":
+				bodyTPR := ioutil.NopCloser(bytes.NewReader(currentTPR))
+				return &http.Response{
+					StatusCode: 200,
+					Header:     defaultHeader(),
+					Body:       bodyTPR,
+				}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdApply(f, buf)
+	cmd.Flags().Set("filename", filenameTPR)
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{})
+
+	// Check the output of the kubectl apply command.
+	expectTPR := "thirdpartyresource/" + nameTPR + "\n"
+	if buf.String() != expectTPR {
+		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectTPR)
 	}
 }
 

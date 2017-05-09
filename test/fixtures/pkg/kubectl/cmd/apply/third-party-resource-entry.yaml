@@ -1,0 +1,7 @@
+apiVersion: "unit-test.test.com/v1"
+kind: TestTpr
+metadata:
+  name: "test-tpr-entry"
+  namespace: "test"
+key : "value"
+
