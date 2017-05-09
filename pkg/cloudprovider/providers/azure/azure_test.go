@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -678,26 +677,5 @@ func TestDecodeInstanceInfo(t *testing.T) {
 
 	if *faultDomain != "99" {
 		t.Error("got incorrect fault domain")
-	}
-}
-
-func TestFilterNodes(t *testing.T) {
-	nodes := []compute.VirtualMachine{
-		{Name: to.StringPtr("test")},
-		{Name: to.StringPtr("test2")},
-		{Name: to.StringPtr("3test")},
-	}
-
-	filteredNodes, err := filterNodes(nodes, "^test$")
-	if err != nil {
-		t.Errorf("Unexpeted error when filtering: %q", err)
-	}
-
-	if len(filteredNodes) != 1 {
-		t.Error("Got too many nodes after filtering")
-	}
-
-	if *filteredNodes[0].Name != "test" {
-		t.Error("Get the wrong node after filtering")
 	}
 }
