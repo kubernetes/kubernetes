@@ -163,7 +163,8 @@ func (e *EndpointController) getPodServiceMemberships(pod *v1.Pod) (sets.String,
 	for i := range services {
 		key, err := keyFunc(services[i])
 		if err != nil {
-			return nil, err
+			glog.Errorf("Unable to get key for service %#v", &services[i])
+			continue
 		}
 		set.Insert(key)
 	}
