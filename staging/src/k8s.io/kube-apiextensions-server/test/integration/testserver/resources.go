@@ -40,6 +40,7 @@ func NewNoxuCustomResourceDefinition() *apiextensionsv1alpha1.CustomResource {
 				Kind:     "WishIHadChosenNoxu",
 				ListKind: "NoxuItemList",
 			},
+			Scope: apiextensionsv1alpha1.NamespaceScoped,
 		},
 	}
 }

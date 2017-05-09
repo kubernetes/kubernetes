@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
+	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/validation"
 )
 
 type apiServerStrategy struct {
@@ -51,7 +52,7 @@ func (apiServerStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 }
 
 func (apiServerStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
-	return field.ErrorList{}
+	return validation.ValidateCustomResource(obj.(*apiextensions.CustomResource))
 }
 
 func (apiServerStrategy) AllowCreateOnUpdate() bool {
@@ -66,7 +67,7 @@ func (apiServerStrategy) Canonicalize(obj runtime.Object) {
 }
 
 func (apiServerStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	return field.ErrorList{}
+	return validation.ValidateCustomResourceUpdate(obj.(*apiextensions.CustomResource), old.(*apiextensions.CustomResource))
 }
 
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {

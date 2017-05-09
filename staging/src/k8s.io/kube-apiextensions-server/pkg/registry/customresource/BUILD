@@ -25,5 +25,6 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions:go_default_library",
+        "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/validation:go_default_library",
     ],
 )
