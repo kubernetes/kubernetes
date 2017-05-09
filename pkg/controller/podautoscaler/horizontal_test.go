@@ -40,11 +40,11 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
-	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
+	metricsfake "k8s.io/kubernetes/third_party/forked/metrics/pkg/client/clientset_generated/clientset/fake"
+	cmfake "k8s.io/kubernetes/third_party/forked/metrics/pkg/client/custom_metrics/fake"
 
-	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	cmapi "k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/custom_metrics/v1alpha1"
+	metricsapi "k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
 

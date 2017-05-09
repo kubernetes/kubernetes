@@ -28,9 +28,9 @@ import (
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
-	customapi "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
-	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1"
-	customclient "k8s.io/metrics/pkg/client/custom_metrics"
+	customapi "k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/custom_metrics/v1alpha1"
+	resourceclient "k8s.io/kubernetes/third_party/forked/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1"
+	customclient "k8s.io/kubernetes/third_party/forked/metrics/pkg/client/custom_metrics"
 )
 
 func NewRESTMetricsClient(resourceClient resourceclient.PodMetricsesGetter, customClient customclient.CustomMetricsClient) MetricsClient {

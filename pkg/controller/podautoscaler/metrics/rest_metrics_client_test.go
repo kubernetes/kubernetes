@@ -31,11 +31,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	kv1 "k8s.io/kubernetes/pkg/api/v1"
 	autoscalingapi "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
-	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
-	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
+	metricsfake "k8s.io/kubernetes/third_party/forked/metrics/pkg/client/clientset_generated/clientset/fake"
+	cmfake "k8s.io/kubernetes/third_party/forked/metrics/pkg/client/custom_metrics/fake"
 
-	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	cmapi "k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/custom_metrics/v1alpha1"
+	metricsapi "k8s.io/kubernetes/third_party/forked/metrics/pkg/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
 
