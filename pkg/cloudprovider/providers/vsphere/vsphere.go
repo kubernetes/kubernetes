@@ -527,12 +527,14 @@ func (i *Instances) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress,
 			addressType = v1.NodeInternalIP
 		}
 		for _, ip := range v.IpAddress {
-			v1.AddToNodeAddresses(&addrs,
-				v1.NodeAddress{
-					Type:    addressType,
-					Address: ip,
-				},
-			)
+			if net.ParseIP(ip).To4() != nil {
+				v1helper.AddToNodeAddresses(&addrs,
+					v1.NodeAddress{
+						Type:    addressType,
+						Address: ip,
+					},
+				)
+			}
 		}
 	}
 	return addrs, nil
