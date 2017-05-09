@@ -63,7 +63,7 @@ func TestSubCmdCertsCreateFiles(t *testing.T) {
 			expectedFiles: []string{kubeadmconstants.CACertName, kubeadmconstants.CAKeyName, kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName},
 		},
 		{
-			subCmds:       []string{"ca", "apiserver-client"},
+			subCmds:       []string{"ca", "apiserver-kubelet-client"},
 			expectedFiles: []string{kubeadmconstants.CACertName, kubeadmconstants.CAKeyName, kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName},
 		},
 		{
@@ -71,11 +71,11 @@ func TestSubCmdCertsCreateFiles(t *testing.T) {
 			expectedFiles: []string{kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName},
 		},
 		{
-			subCmds:       []string{"frontproxy"},
+			subCmds:       []string{"front-proxy-ca"},
 			expectedFiles: []string{kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName},
 		},
 		{
-			subCmds:       []string{"frontproxy", "frontproxy-client"},
+			subCmds:       []string{"front-proxy-ca", "front-proxy-client"},
 			expectedFiles: []string{kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName, kubeadmconstants.FrontProxyClientCertName, kubeadmconstants.FrontProxyClientKeyName},
 		},
 	}
@@ -170,7 +170,7 @@ func TestSubCmdReadsConfig(t *testing.T) {
 			expectedFileCount: 12,
 		},
 		{
-			subCmds:           []string{"ca", "apiserver", "apiserver-client"},
+			subCmds:           []string{"ca", "apiserver", "apiserver-kubelet-client"},
 			expectedFileCount: 6,
 		},
 		{
@@ -178,7 +178,7 @@ func TestSubCmdReadsConfig(t *testing.T) {
 			expectedFileCount: 2,
 		},
 		{
-			subCmds:           []string{"frontproxy", "frontproxy-client"},
+			subCmds:           []string{"front-proxy-ca", "front-proxy-client"},
 			expectedFileCount: 4,
 		},
 	}

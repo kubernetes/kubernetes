@@ -81,7 +81,7 @@ func newSubCmdCerts() []*cobra.Command {
 			createCertFunc: wrapCreateCertFunc(certphase.CreateAPIServerCertAndKey),
 		},
 		{
-			use:            "apiserver-client",
+			use:            "apiserver-kubelet-client",
 			short:          "Generate a client certificate for the apiservers to connect to the kubelets securely.",
 			createCertFunc: wrapCreateCertFunc(certphase.CreateAPIServerKubeletClientCertAndKey),
 		},
@@ -91,12 +91,12 @@ func newSubCmdCerts() []*cobra.Command {
 			createCertFunc: wrapCreateCertFunc(certphase.CreateServiceAccountKeyAndPublicKey),
 		},
 		{
-			use:            "frontproxy",
+			use:            "front-proxy-ca",
 			short:          "Generate front proxy CA certificate and key for a Kubernetes cluster.",
 			createCertFunc: wrapCreateCertFunc(certphase.CreateFrontProxyCACertAndKey),
 		},
 		{
-			use:            "frontproxy-client",
+			use:            "front-proxy-client",
 			short:          "Generate front proxy CA client certificate and key for a Kubernetes cluster.",
 			createCertFunc: wrapCreateCertFunc(certphase.CreateFrontProxyClientCertAndKey),
 		},
