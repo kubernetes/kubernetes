@@ -460,7 +460,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		hostExec := framework.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
 		// Even if the node-ip:node-port check above passed, this hostexec pod
 		// might fall on a node with a laggy kube-proxy.
-		cmd := fmt.Sprintf(`for i in $(seq 1 300); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 1; done; exit 1`, nodePort)
+		cmd := fmt.Sprintf(`for i in $(seq 1 300); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 1; done; ss -ant46 'sport = :%d'; exit 1`, nodePort, nodePort)
 		stdout, err := framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 		if err != nil {
 			framework.Failf("expected node port %d to be in use, stdout: %v. err: %v", nodePort, stdout, err)
