@@ -32,14 +32,14 @@ type PeriodicRunner struct {
 	maxInterval time.Duration // the max time between runs
 
 	mu      sync.Mutex
-	fn      func()
+	fn      func(...interface{})
 	lastRun time.Time
 	timer   *time.Timer
 	limiter RateLimiter
 }
 
 // NewPeriodicRunner creates a new PeriodicRunner.
-func NewPeriodicRunner(fn func(), minInterval, maxInterval time.Duration, burst int) *PeriodicRunner {
+func NewPeriodicRunner(fn func(...interface{}), minInterval, maxInterval time.Duration, burst int) *PeriodicRunner {
 	pr := &PeriodicRunner{
 		fn:          fn,
 		minInterval: minInterval,
@@ -86,16 +86,16 @@ func (pr *PeriodicRunner) tick() {
 // If this is called while Run() is not running, the call may be deferred
 // indefinitely.
 // This function is non-blocking.
-func (pr *PeriodicRunner) CallFunction() {
+func (pr *PeriodicRunner) CallFunction(args ...interface{}) {
 	pr.mu.Lock()
 	defer pr.mu.Unlock()
-	pr.callFunction()
+	pr.callFunction(args...)
 }
 
 // assumes the lock is held.
-func (pr *PeriodicRunner) callFunction() {
+func (pr *PeriodicRunner) callFunction(args ...interface{}) {
 	if pr.limiter.TryAccept() {
-		pr.fn()
+		pr.fn(args...)
 		pr.lastRun = time.Now()
 		return
 	}

@@ -409,7 +409,7 @@ func NewProxier(ipt utiliptables.Interface,
 
 	burstSyncs := 2
 	glog.V(3).Infof("minSyncInterval: %v, syncPeriod: %v, burstSyncs: %d", minSyncInterval, syncPeriod, burstSyncs)
-	proxier.syncRunner = flowcontrol.NewPeriodicRunner(proxier.Sync, minSyncInterval, syncPeriod, burstSyncs)
+	proxier.syncRunner = flowcontrol.NewPeriodicRunner(proxier.syncProxyRules, minSyncInterval, syncPeriod, burstSyncs)
 	return proxier, nil
 }
 
@@ -507,7 +507,7 @@ func (proxier *Proxier) Sync() {
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
-	// Update healthz timestamp at beginning in case Sync() never succeeds.
+	// Update healthz timestamp at beginning in case syncProxyRules() never succeeds.
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.UpdateTimestamp()
 	}
@@ -518,24 +518,21 @@ func (proxier *Proxier) OnServiceAdd(service *api.Service) {
 	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	proxier.serviceChanges.update(&namespacedName, nil, service)
 
-	// FIXME: we need to pass a reason syncReasonServices.
-	proxier.syncRunner.CallFunction()
+	proxier.syncRunner.CallFunction(syncReasonServices)
 }
 
 func (proxier *Proxier) OnServiceUpdate(oldService, service *api.Service) {
 	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	proxier.serviceChanges.update(&namespacedName, oldService, service)
 
-	// FIXME: we need to pass a reason syncReasonServices.
-	proxier.syncRunner.CallFunction()
+	proxier.syncRunner.CallFunction(syncReasonServices)
 }
 
 func (proxier *Proxier) OnServiceDelete(service *api.Service) {
 	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	proxier.serviceChanges.update(&namespacedName, service, nil)
 
-	// FIXME: we need to pass a reason syncReasonServices.
-	proxier.syncRunner.CallFunction()
+	proxier.syncRunner.CallFunction(syncReasonServices)
 }
 
 func (proxier *Proxier) OnServiceSynced() {
@@ -543,8 +540,7 @@ func (proxier *Proxier) OnServiceSynced() {
 	proxier.servicesSynced = true
 	proxier.mu.Unlock()
 
-	// FIXME: we need to pass a reason syncReasonServices.
-	proxier.syncRunner.CallFunction()
+	proxier.syncRunner.CallFunction(syncReasonServices)
 }
 
 func shouldSkipService(svcName types.NamespacedName, service *api.Service) bool {
@@ -653,24 +649,21 @@ func (proxier *Proxier) OnEndpointsAdd(endpoints *api.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 	proxier.endpointsChanges.update(&namespacedName, nil, endpoints)
 
-	// FIXME: we need to pass a reason syncReasonEndpoints.
-	proxier.syncRunner.CallFunction()
+	proxier.syncRunner.CallFunction(syncReasonEndpoints)
 }
 
 func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 	proxier.endpointsChanges.update(&namespacedName, oldEndpoints, endpoints)
 
-	// FIXME: we need to pass a reason syncReasonEndpoints.
-	proxier.syncRunner.CallFunction()
+	proxier.syncRunner.CallFunction(syncReasonEndpoints)
 }
 
 func (proxier *Proxier) OnEndpointsDelete(endpoints *api.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 	proxier.endpointsChanges.update(&namespacedName, endpoints, nil)
 
-	// FIXME: we need to pass a reason syncReasonEndpoints.
-	proxier.syncRunner.CallFunction()
+	proxier.syncRunner.CallFunction(syncReasonEndpoints)
 }
 
 func (proxier *Proxier) OnEndpointsSynced() {
@@ -678,8 +671,7 @@ func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.endpointsSynced = true
 	proxier.mu.Unlock()
 
-	// FIXME: we need to pass a reason syncReasonEndpoints.
-	proxier.syncRunner.CallFunction()
+	proxier.syncRunner.CallFunction(syncReasonEndpoints)
 }
 
 // <endpointsMap> is updated by this function (based on the given changes).
@@ -877,7 +869,17 @@ const syncReasonForce syncReason = "Force"
 // This is where all of the iptables-save/restore calls happen.
 // The only other iptables rules are those that are setup in iptablesInit()
 // assumes proxier.mu is held
-func (proxier *Proxier) syncProxyRules(reason syncReason) {
+func (proxier *Proxier) syncProxyRules(args ...interface{}) {
+	if len(args) != 1 {
+		glog.Errorf("Incorrect number of arguments to syncProxyRules: %v", args)
+		return
+	}
+	reason, ok := args[0].(syncReason)
+	if !ok {
+		glog.Errorf("Incorrect argument to syncProxyRules: %v", args[0])
+		return
+	}
+
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 

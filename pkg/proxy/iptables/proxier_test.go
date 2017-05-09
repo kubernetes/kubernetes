@@ -398,7 +398,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		portMapper:       &fakePortOpener{[]*localPort{}},
 		healthChecker:    newFakeHealthChecker(),
 	}
-	p.syncRunner = flowcontrol.NewPeriodicRunner(p.Sync, 0, time.Minute, 1)
+	p.syncRunner = flowcontrol.NewPeriodicRunner(p.syncProxyRules, 0, time.Minute, 1)
 	return p
 }
 
