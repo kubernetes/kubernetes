@@ -4077,14 +4077,14 @@
      "add": {
       "type": "array",
       "items": {
-       "$ref": "v1.Capability"
+       "type": "string"
       },
       "description": "Added capabilities"
      },
      "drop": {
       "type": "array",
       "items": {
-       "$ref": "v1.Capability"
+       "type": "string"
       },
       "description": "Removed capabilities"
      }
