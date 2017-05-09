@@ -123,18 +123,14 @@ func (r *rangeAllocator) nextFreePort() int {
 	}
 
 	// search sequentially
-	for i := j + 1; i < r.Size; i++ {
-		if b := r.used.Bit(i); b == 0 {
-			r.used.SetBit(&r.used, i, 1)
-			return i + r.Base
+	for i := 0; i < r.Size; i++ {
+		next := (j + i) % r.Size
+		if r.used.Bit(next) == 0 {
+			r.used.SetBit(&r.used, next, 1)
+			return next + r.Base
 		}
 	}
-	for i := 0; i < j; i++ {
-		if b := r.used.Bit(i); b == 0 {
-			r.used.SetBit(&r.used, i, 1)
-			return i + r.Base
-		}
-	}
+
 	return -1
 }
 
