@@ -71,6 +71,12 @@ service RuntimeService {
     // PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
     rpc PortForward(PortForwardRequest) returns (PortForwardResponse) {}
 
+    // ContainerStats returns stats of the container. If the container does not
+    // exist, the call returns an error.
+    rpc ContainerStats(ContainerStatsRequest) returns (ContainerStatsResponse) {}
+    // ListContainerStats returns stats of all running containers. 
+    rpc ListContainerStats(ListContainerStatsRequest) returns (ListContainerStatsResponse) {}
+
     // UpdateRuntimeConfig updates the runtime configuration based on the given request.
     rpc UpdateRuntimeConfig(UpdateRuntimeConfigRequest) returns (UpdateRuntimeConfigResponse) {}
 
@@ -1007,3 +1013,60 @@ message ImageFsInfoResponse {
     // filesystem information of images.
     FsInfo fs_info = 1;
 }
+
+message ContainerStatsRequest{
+    // ID of the container for which to retrieve stats.
+    string container_id = 1;
+}
+
+message ContainerStatsResponse {
+    // Stats of the container.
+    ContainerStats stats = 1;
+}
+
+message ListContainerStatsRequest{
+}
+
+message ListContainerStatsResponse {
+    // Stats of the container.
+    repeated ContainerStats stats = 1;
+}
+
+// ContainerStats provides the resource usage statistics for a container.
+message ContainerStats {
+    // Information of the container.
+    Container container = 1;
+    // CPU usage gathered from the container.
+    CpuUsage cpu_usage = 2;
+    // Memory usage gathered from the container.
+    MemoryUsage memory_usage = 3;
+    // Root filesystem usage gathered from the container.
+    FilesystemUsage root_filesystem_usage = 4;
+}
+
+// CpuUsage provides the CPU usage information.
+message CpuUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // Cumulative CPU usage (sum of all cores) since object creation.
+    UInt64Value UsageCoreNanoSeocnds = 2;
+}
+
+// CpuUsage provides the memory usage information.
+message MemoryUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // The amount of working set memory in bytes.
+    UInt64Value WorkingSetBytes  = 2;
+}
+
+// FilesystemUsage provides the filesystem usage information.
+message FilesystemUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // UsedBytes represents the disk space consumed in bytes.
+    UInt64Value used_bytes = 2;
+    // UsedInodes represents the number of inodes consumed.
+    UInt64Value used_inodes = 3;
+}
+
