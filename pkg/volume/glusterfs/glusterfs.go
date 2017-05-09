@@ -612,7 +612,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 		}
 	}
 
-	cli := gcli.NewClient(d.url, d.user, d.secretValue)
+	cli := openClientConnection(d.url, d.user, d.secretValue)
 	if cli == nil {
 		glog.Errorf("glusterfs: failed to create glusterfs rest client")
 		return fmt.Errorf("glusterfs: failed to create glusterfs rest client, REST server authentication failed")
@@ -747,7 +747,8 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		glog.Errorf("glusterfs : rest server endpoint is empty")
 		return nil, 0, fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
 	}
-	cli := gcli.NewClient(p.url, p.user, p.secretValue)
+
+	cli := openClientConnection(p.url, p.user, p.secretValue)
 	if cli == nil {
 		glog.Errorf("glusterfs: failed to create glusterfs rest client")
 		return nil, 0, fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
@@ -1010,4 +1011,17 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 	}
 
 	return &cfg, nil
+}
+
+// openClientConnection() open a connection to heketi server and returns
+// a client object.
+func openClientConnection(url string, user string, secret string) *gcli.Client {
+
+	cli := gcli.NewClient(url, user, secret)
+	if cli == nil {
+		return nil
+	}
+
+	return cli
+
 }
