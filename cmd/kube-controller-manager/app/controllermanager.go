@@ -128,6 +128,8 @@ func Run(s *options.CMServer) error {
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = s.KubeAPIQPS
 	kubeconfig.Burst = int(s.KubeAPIBurst)
+
+	// Create a Rest Client Object used to access the Kubernetes api Server provides API services
 	kubeClient, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "controller-manager"))
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
