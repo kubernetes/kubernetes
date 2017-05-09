@@ -9,6 +9,7 @@ This document serves both as a reference to the values, and as a coordination po
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
 - [Well-Known Labels, Annotations and Taints](#well-known-labels-annotations-and-taints)
+  - [kubernetes.io/role](#kubernetesiorole)
   - [beta.kubernetes.io/arch](#betakubernetesioarch)
   - [beta.kubernetes.io/os](#betakubernetesioos)
   - [kubernetes.io/hostname](#kubernetesiohostname)
@@ -18,6 +19,29 @@ This document serves both as a reference to the values, and as a coordination po
 
 <!-- END MUNGE: GENERATED_TOC -->
 
+## kubernetes.io/role
+
+Also `kubeadm.alpha.kubernetes.io/role`
+
+Examples:
+* `kubernetes.io/role=master`
+* `kubernetes.io/role=node`
+* `kubeadm.alpha.kubernetes.io/role=master`
+* `kubeadm.alpha.kubernetes.io/role=node`
+
+Used on: Node
+
+Nodes can be labelled to indicate that they are intended to serve a certain purpose.  This is particularly important
+as the master becomes a "standard" node with taints, instead of just being marked unschedulable.  Isolating the
+master remains important for security or performance isolation concerns - for example on AWS the master will likely
+have a more permissive IAM policy, and thus it can be good practice to avoid running user workloads on master nodes.
+
+Well-known roles:
+
+* `master` indicates that the node is a master node, and runs kubernetes system components and should not run general
+  user workloads.
+* `node` indicates that the node is a general node, suitable for user workloads.  This can usually be inferred from
+  "not master", but declaring it explicitly can be clearer and allow for easier node selection.
 
 ## beta.kubernetes.io/arch
 
