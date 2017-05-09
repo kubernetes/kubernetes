@@ -134,6 +134,7 @@ func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		cfg, err := readConfig(config)
 		if err != nil {
+			glog.Errorf("Failed to initialize openstack cloudprovider: %s", err)
 			return nil, err
 		}
 		return newOpenStack(cfg)
