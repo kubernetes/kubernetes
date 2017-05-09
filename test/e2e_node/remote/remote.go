@@ -39,6 +39,7 @@ var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environm
 var sshUser = flag.String("ssh-user", "", "Use predefined user for ssh.")
 var testTimeoutSeconds = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
 var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
+var sshUser = flag.String("ssh-user", "", "Use predefined user for ssh.")
 
 var sshOptionsMap map[string]string
 
@@ -218,8 +219,10 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 
 	// Extract the archive
 	cmd = getSshCommand(" && ", fmt.Sprintf("cd %s", tmp), fmt.Sprintf("tar -xzvf ./%s", archiveName))
-	glog.Infof("Extracting tar on %s", host)
-	output, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", cmd)
+	glog.V(2).Infof("Extracting tar on %q", host)
+	// Do not use sudo here, because `sudo tar -x` will recover the file ownership inside the tar ball, but
+	// we want the extracted files to be owned by the current user.
+	output, err := SSHNoSudo(host, "sh", "-c", cmd)
 	if err != nil {
 		// Exit failure with the error
 		return "", false, err
