@@ -38,7 +38,9 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/master/ports:go_default_library",
         "//pkg/util/net/sets:go_default_library",
+        "//pkg/util/version:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor/cloud.google.com/go/compute/metadata:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -61,7 +63,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["gce_test.go"],
+    srcs = [
+        "gce_healthchecks_test.go",
+        "gce_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
 )
