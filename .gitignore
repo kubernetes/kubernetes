@@ -20,6 +20,8 @@
 /output*/
 /_output*/
 /_output
+/_tmp/**
+/_tmp
 
 # Emacs save files
 *~
