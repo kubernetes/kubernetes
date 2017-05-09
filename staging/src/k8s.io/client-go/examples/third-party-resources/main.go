@@ -21,7 +21,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,29 +59,26 @@ func main() {
 	}
 
 	// make a new config for our extension's API group, using the first config as a baseline
-	exampleClient, _, err := exampleclient.NewClient(config)
+	exampleClient, exampleScheme, err := exampleclient.NewClient(config)
 	if err != nil {
 		panic(err)
 	}
 
 	// wait until TPR gets processed
-	exampleclient.WaitForExampleResource(exampleClient)
+	err = exampleclient.WaitForExampleResource(exampleClient)
+	if err != nil {
+		panic(err)
+	}
 
 	// start a controller on instances of our TPR
 	controller := examplecontroller.ExampleController{
 		ExampleClient: exampleClient,
+		ExampleScheme: exampleScheme,
 	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
 	go controller.Run(ctx)
-
-	// The sleep below is just to make sure that the watcher.Run() goroutine has successfully executed
-	// and the watcher is handling the events about Example TPR instances.
-	// In the normal application there is no need for it, because:
-	// 1. It's unlikely to create a watcher and a TPR instance at the same time in the same application.
-	// 2. The application with watcher would most probably keep running instead of exiting right after the watcher startup.
-	time.Sleep(5 * time.Second)
 
 	// Create an instance of our TPR
 	example := &tprv1.Example{
@@ -93,6 +89,10 @@ func main() {
 			Foo: "hello",
 			Bar: true,
 		},
+		Status: tprv1.ExampleStatus{
+			State: tprv1.ExampleStateCreated,
+			Message: "Created, not processed yet",
+		},
 	}
 	var result tprv1.Example
 	err = exampleClient.Post().
@@ -100,13 +100,20 @@ func main() {
 		Namespace(apiv1.NamespaceDefault).
 		Body(example).
 		Do().Into(&result)
-	if (err == nil) {
+	if err == nil {
 		fmt.Printf("CREATED: %#v\n", result)
-	} else if (apierrors.IsAlreadyExists(err)) {
+	} else if apierrors.IsAlreadyExists(err) {
 		fmt.Printf("ALREADY EXISTS: %#v\n", result)
 	} else {
 		panic(err)
 	}
+
+	// Poll until Example object is handled by controller and gets status updated to "Processed"
+	err = exampleclient.WaitForExampleInstanceProcessed(exampleClient, "example1")
+	if (err != nil) {
+		panic(err)
+	}
+	fmt.Print("PROCESSED\n")
 
 	// Fetch a list of our TPRs
 	exampleList := tprv1.ExampleList{}

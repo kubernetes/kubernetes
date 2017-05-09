@@ -19,8 +19,10 @@ package thirdparty
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/integration/framework"
 
@@ -52,7 +54,7 @@ func TestClientGoThirdPartyResourceExample(t *testing.T) {
 
 	t.Logf("Waiting for TPR %q to show up", exampletprv1.ExampleResourcePlural)
 	if err := exampleclient.WaitForExampleResource(exampleClient); err != nil {
-		t.Fatalf("ThirdPartyResource examples did not show up: %v", err)
+		t.Fatalf("TPR examples did not show up: %v", err)
 	}
 	t.Logf("TPR %q is active", exampletprv1.ExampleResourcePlural)
 
@@ -63,11 +65,37 @@ func TestClientGoThirdPartyResourceExample(t *testing.T) {
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	err = controller.Run(ctx)
+	go controller.Run(ctx)
+
+	// Create an instance of our TPR
+	t.Logf("Creating instance of TPR %q", exampletprv1.ExampleResourcePlural)
+	example := &exampletprv1.Example{
+		Metadata: metav1.ObjectMeta{
+			Name: "example1",
+		},
+		Spec: exampletprv1.ExampleSpec{
+			Foo: "hello",
+			Bar: true,
+		},
+		Status: exampletprv1.ExampleStatus{
+			State: exampletprv1.ExampleStateCreated,
+			Message: "Created, not processed yet",
+		},
+	}
+	var result exampletprv1.Example
+	err = exampleClient.Post().
+		Resource(exampletprv1.ExampleResourcePlural).
+		Namespace(apiv1.NamespaceDefault).
+		Body(example).
+		Do().Into(&result)
 	if err != nil {
-		t.Fatalf("unexpected error starting a TPR controller: %v", err)
+		t.Fatalf("Failed to create an instance of TPR: %v", err)
 	}
 
-
+	t.Logf("Waiting for TPR %q instance to be processed", exampletprv1.ExampleResourcePlural)
+	if err := exampleclient.WaitForExampleInstanceProcessed(exampleClient, "example1"); err != nil {
+		t.Fatalf("TPR example was not processed correctly: %v", err)
+	}
+	t.Logf("TPR %q instance is processed", exampletprv1.ExampleResourcePlural)
 
 }

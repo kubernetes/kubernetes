@@ -25,25 +25,39 @@ import (
 
 const ExampleResourcePlural = "examples"
 
+type Example struct {
+	metav1.TypeMeta `json:",inline"`
+	// WARNING: Don't call the field below ObjectMeta to avoid the issue with ugorji
+	// https://github.com/kubernetes/client-go/issues/8#issuecomment-285333502
+	Metadata metav1.ObjectMeta `json:"metadata"`
+
+	Spec ExampleSpec `json:"spec"`
+
+	Status ExampleStatus `json:"status,omitempty"`
+}
+
 type ExampleSpec struct {
 	Foo string `json:"foo"`
 	Bar bool   `json:"bar"`
 }
 
-type Example struct {
-	metav1.TypeMeta `json:",inline"`
-	// WARNING: Don't call the field below ObjectMeta to avoid the issue with ugorji
-	// https://github.com/kubernetes/client-go/issues/8#issuecomment-285333502
-	Metadata        metav1.ObjectMeta `json:"metadata"`
-
-	Spec ExampleSpec `json:"spec"`
+type ExampleStatus struct {
+	State   ExampleState `json:"state,omitempty"`
+	Message string       `json:"message,omitempty"`
 }
+
+type ExampleState string
+
+const (
+	ExampleStateCreated   ExampleState = "Created"
+	ExampleStateProcessed ExampleState = "Processed"
+)
 
 type ExampleList struct {
 	metav1.TypeMeta `json:",inline"`
 	// WARNING: Don't call the field below ListMeta to avoid the issue with ugorji
 	// https://github.com/kubernetes/client-go/issues/8#issuecomment-285333502
-	Metadata        metav1.ListMeta `json:"metadata"`
+	Metadata metav1.ListMeta `json:"metadata"`
 
 	Items []Example `json:"items"`
 }

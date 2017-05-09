@@ -21,14 +21,15 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	tprv1 "k8s.io/client-go/examples/third-party-resources/apis/tpr/v1"
 	"k8s.io/client-go/kubernetes"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func CreateTPR(clientset kubernetes.Interface) error {
@@ -47,13 +48,30 @@ func CreateTPR(clientset kubernetes.Interface) error {
 
 func WaitForExampleResource(exampleClient *rest.RESTClient) error {
 	return wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
-		_, err := exampleClient.Get().Namespace("default").Resource(tprv1.ExampleResourcePlural).DoRaw()
+		_, err := exampleClient.Get().Namespace(apiv1.NamespaceDefault).Resource(tprv1.ExampleResourcePlural).DoRaw()
 		if err == nil {
 			return true, nil
 		}
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
+		return false, err
+	})
+}
+
+func WaitForExampleInstanceProcessed(exampleClient *rest.RESTClient, name string) error {
+	return wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+		var example tprv1.Example
+		err := exampleClient.Get().
+			Resource(tprv1.ExampleResourcePlural).
+			Namespace(apiv1.NamespaceDefault).
+			Name(name).
+			Do().Into(&example)
+
+		if err == nil && example.Status.State == tprv1.ExampleStateProcessed {
+			return true, nil
+		}
+
 		return false, err
 	})
 }

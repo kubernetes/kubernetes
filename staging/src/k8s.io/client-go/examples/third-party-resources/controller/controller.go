@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -31,9 +32,10 @@ import (
 // Watcher is an example of watching on resource create/update/delete events
 type ExampleController struct {
 	ExampleClient *rest.RESTClient
+	ExampleScheme *runtime.Scheme
 }
 
-// Run starts an Example resource watcher
+// Run starts an Example resource controller
 func (c *ExampleController) Run(ctx context.Context) error {
 	fmt.Print("Watch Example objects\n")
 
@@ -55,7 +57,7 @@ func (c *ExampleController) watchExamples(ctx context.Context) (cache.Controller
 		apiv1.NamespaceAll,
 		fields.Everything())
 
-	store, controller := cache.NewInformer(
+	_, controller := cache.NewInformer(
 		source,
 
 		// The object type.
@@ -73,30 +75,52 @@ func (c *ExampleController) watchExamples(ctx context.Context) (cache.Controller
 			DeleteFunc: c.onDelete,
 		})
 
-	// store can be used to List and Get
-	for _, obj := range store.List() {
-		example := obj.(*tprv1.Example)
-		fmt.Printf("Existing example: %#v\n", example)
-	}
-
 	go controller.Run(ctx.Done())
-
 	return controller, nil
 }
 
 func (c *ExampleController) onAdd(obj interface{}) {
 	example := obj.(*tprv1.Example)
-	fmt.Printf("[WATCH] OnAdd %s\n", example.Metadata.SelfLink)
+	fmt.Printf("[CONTROLLER] OnAdd %s\n", example.Metadata.SelfLink)
+
+	// NEVER modify objects from the store. It's a read-only, local cache.
+	// You can use exampleScheme.Copy() to make a deep copy of original object and modify this copy
+	// Or create a copy manually for better performance
+	copyObj, err := c.ExampleScheme.Copy(example)
+	if (err != nil) {
+		fmt.Printf("ERROR creating a deep copy of example object: %v\n", err)
+		return
+	}
+
+	exampleCopy := copyObj.(*tprv1.Example)
+	exampleCopy.Status = tprv1.ExampleStatus{
+		State: tprv1.ExampleStateProcessed,
+		Message: "Successfully processed by controller",
+	}
+
+	err = c.ExampleClient.Put().
+		Name(example.Metadata.Name).
+		Namespace(example.Metadata.Namespace).
+		Resource(tprv1.ExampleResourcePlural).
+		Body(exampleCopy).
+		Do().
+		Error()
+
+	if err != nil {
+		fmt.Printf("ERROR updating status: %v\n", err)
+	} else {
+		fmt.Printf("UPDATED status: %#v\n", exampleCopy)
+	}
 }
 
 func (c *ExampleController) onUpdate(oldObj, newObj interface{}) {
 	oldExample := oldObj.(*tprv1.Example)
 	newExample := newObj.(*tprv1.Example)
-	fmt.Printf("[WATCH] OnUpdate oldObj: %s\n", oldExample.Metadata.SelfLink)
-	fmt.Printf("[WATCH] OnUpdate newObj: %s\n", newExample.Metadata.SelfLink)
+	fmt.Printf("[CONTROLLER] OnUpdate oldObj: %s\n", oldExample.Metadata.SelfLink)
+	fmt.Printf("[CONTROLLER] OnUpdate newObj: %s\n", newExample.Metadata.SelfLink)
 }
 
 func (c *ExampleController) onDelete(obj interface{}) {
 	example := obj.(*tprv1.Example)
-	fmt.Printf("[WATCH] OnDelete %s\n", example.Metadata.SelfLink)
+	fmt.Printf("[CONTROLLER] OnDelete %s\n", example.Metadata.SelfLink)
 }
