@@ -82,7 +82,7 @@ func GetCloudProvider(name string, config io.Reader) (Interface, error) {
 	defer providersMutex.Unlock()
 	f, found := providers[name]
 	if !found {
-		return nil, nil
+		return nil, fmt.Errorf("Cloud provider %s wasn't registered.", name)
 	}
 	return f(config)
 }
@@ -98,8 +98,7 @@ func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 	var err error
 
 	if name == "" {
-		glog.Info("No cloud provider specified.")
-		return nil, nil
+		return nil, fmt.Errorf("No cloud provider specified.")
 	}
 
 	if IsExternal(name) {
