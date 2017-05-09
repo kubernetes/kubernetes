@@ -3399,6 +3399,94 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 	}
 }
 
+func TestPodSchedulesOnNodeWithNoImageWithPullNever(t *testing.T) {
+	// specify a node with no disk pressure condition on
+	existImage := "gcr.io/image1:v1"
+	nonExistImage := "gcr.io/image1:v2"
+	node := &v1.Node{
+		Status: v1.NodeStatus{
+			Images: []v1.ContainerImage{
+				{
+					Names: []string{
+						existImage,
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		pod      *v1.Pod
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		name     string
+	}{
+		{
+			pod:      createPodWithContainerImage(nonExistImage, "Never", false),
+			nodeInfo: makeEmptyNodeInfo(node),
+			fits:     false,
+			name:     "pod not schedulable on node without image(in container) with policy Never",
+		},
+		{
+			pod:      createPodWithContainerImage(nonExistImage, "Never", true),
+			nodeInfo: makeEmptyNodeInfo(node),
+			fits:     false,
+			name:     "pod not schedulable on node without image with(in initContainer) policy Never",
+		},
+		{
+			pod:      createPodWithContainerImage(existImage, "Never", false),
+			nodeInfo: makeEmptyNodeInfo(node),
+			fits:     true,
+			name:     "pod schedulable on node with image with policy Never",
+		},
+		{
+			pod:      createPodWithContainerImage(nonExistImage, "Always", false),
+			nodeInfo: makeEmptyNodeInfo(node),
+			fits:     true,
+			name:     "pod schedulable on node without image with policy Always",
+		},
+		{
+			pod:      createPodWithContainerImage(existImage, "Always", false),
+			nodeInfo: makeEmptyNodeInfo(node),
+			fits:     true,
+			name:     "pod schedulable on node with image with policy Always",
+		},
+	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrImageNotPresent}
+
+	for _, test := range tests {
+		fits, reasons, err := CheckImageNotPresentPredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.name, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.name, reasons, expectedFailureReasons)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
+		}
+	}
+}
+
+func createPodWithContainerImage(image string, pullPolicy v1.PullPolicy, initContainer bool) *v1.Pod {
+	containers := []v1.Container{
+		{
+			Name:            "container",
+			Image:           image,
+			ImagePullPolicy: pullPolicy,
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "default", Namespace: "default"},
+	}
+	if initContainer {
+		pod.Spec.InitContainers = containers
+	} else {
+		pod.Spec.Containers = containers
+	}
+	return pod
+}
+
 func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: pod, Namespace: "default"},

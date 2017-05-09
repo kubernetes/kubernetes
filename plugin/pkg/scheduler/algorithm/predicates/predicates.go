@@ -1264,3 +1264,37 @@ func CheckNodeDiskPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *sch
 	}
 	return true, nil, nil
 }
+
+// CheckImageNotPresentPredicate check if a pod can be scheduled on a node
+// If an image with PullNever policy doesn't present on node, predication will fail
+func CheckImageNotPresentPredicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return false, nil, fmt.Errorf("node not found")
+	}
+	for i := range pod.Spec.InitContainers {
+		if !checkContainerImageOnNode(node, &pod.Spec.InitContainers[i]) {
+			return false, []algorithm.PredicateFailureReason{ErrImageNotPresent}, nil
+		}
+	}
+	for i := range pod.Spec.Containers {
+		if !checkContainerImageOnNode(node, &pod.Spec.Containers[i]) {
+			return false, []algorithm.PredicateFailureReason{ErrImageNotPresent}, nil
+		}
+	}
+	return true, nil, nil
+}
+
+func checkContainerImageOnNode(node *v1.Node, container *v1.Container) bool {
+	if container.ImagePullPolicy != v1.PullNever {
+		return true
+	}
+	for _, image := range node.Status.Images {
+		for _, name := range image.Names {
+			if name == container.Image {
+				return true
+			}
+		}
+	}
+	return false
+}
