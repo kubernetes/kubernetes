@@ -3522,6 +3522,10 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 			}
 		}
 	}
+	quantity, found := requirements.Limits[api.ResourceMemory]
+	if found && quantity.Value() < 4*1024*1024 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("resources.limits[memory]", quantity.String(), "Memory must be at least 4Mb"))
+	}
 	for resourceName, quantity := range requirements.Requests {
 		fldPath := reqPath.Key(string(resourceName))
 		// Validate resource name.
