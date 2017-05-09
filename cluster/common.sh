@@ -181,6 +181,7 @@ function tear_down_alive_resources() {
   "${kubectl}" delete pods --all || true
   "${kubectl}" delete svc --all || true
   "${kubectl}" delete pvc --all || true
+  "${kubectl}" delete secret --all || true 
 }
 
 # Gets username, password for the current-context in kubeconfig, if they exist.
