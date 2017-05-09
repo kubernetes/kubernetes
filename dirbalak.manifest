@@ -1,0 +1,3 @@
+# Tell jenkins not to run install inside chroot
+DONT_USE_CHROOT: True
+MAKEFILE_FILENAME: Makefile.strato

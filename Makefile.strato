@@ -1,0 +1,27 @@
+
+all: build
+
+.PHONY: release-skip-tests quick-release
+release-skip-tests quick-release:
+	make quick-release
+
+build-container:
+	docker build -t rackattack-nas.dc1:5000/stratoscale/kubernetes-binaries:$(shell git rev-parse --short HEAD) --rm .
+
+build: quick-release build-container
+
+
+push: build
+	@if ! git diff --exit-code --quiet; then echo "Please commit any local changes prior to pushing the image"; false; fi
+	@if ! git diff --exit-code --cached --quiet; then echo "Please commit any local staged changes prior to pushing the image"; false; fi
+	docker push rackattack-nas.dc1:5000/stratoscale/kubernetes-binaries:$(shell git rev-parse --short HEAD)
+
+submit: push
+	# This target is called by jenkins-slave
+
+approve:
+	# This target is called by jenkins-slave
+
+clean:
+	make clean
+	docker rmi rackattack-nas.dc1:5000/stratoscale/kubernetes-binaries:$(shell git rev-parse --short HEAD)
