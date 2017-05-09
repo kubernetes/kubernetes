@@ -32,6 +32,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/jsonmergepatch"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
@@ -245,12 +246,17 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	// Create the versioned struct from the type defined in the restmapping
 	// (which is the API version we'll be submitting the patch to)
 	versionedObject, err := api.Scheme.New(p.mapping.GroupVersionKind)
-	if err != nil {
+	var patch []byte
+	switch {
+	// If there is no schema, create a generic json merge patch.
+	case runtime.IsNotRegisteredError(err):
+		patch, err = jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, current, p.overwrite)
+	case err == nil:
+		// Compute a three way strategic merge patch to send to server.
+		patch, err = strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite)
+	case err != nil:
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
 	}
-
-	// Compute a three way strategic merge patch to send to server.
-	patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite)
 	if err != nil {
 		format := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current), source, err)
