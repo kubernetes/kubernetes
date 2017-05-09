@@ -133,15 +133,13 @@ func (rc *reconciler) reconcile() {
 		if !rc.desiredStateOfWorld.VolumeExists(
 			attachedVolume.VolumeName, attachedVolume.NodeName) {
 			// Set the detach request time
-			elapsedTime, err := rc.actualStateOfWorld.SetDetachRequestTime(attachedVolume.VolumeName, attachedVolume.NodeName)
+			_, err := rc.actualStateOfWorld.SetDetachRequestTime(attachedVolume.VolumeName, attachedVolume.NodeName)
 			if err != nil {
 				glog.Errorf("Cannot trigger detach because it fails to set detach request time with error %v", err)
 				continue
 			}
-			// Check whether timeout has reached the maximum waiting time
-			timeout := elapsedTime > rc.maxWaitForUnmountDuration
-			// Check whether volume is still mounted. Skip detach if it is still mounted unless timeout
-			if attachedVolume.MountedByNode && !timeout {
+			// Check whether volume is still mounted. Skip detach if it is still mounted.
+			if attachedVolume.MountedByNode {
 				glog.V(12).Infof("Cannot trigger detach for volume %q on node %q because volume is still mounted",
 					attachedVolume.VolumeName,
 					attachedVolume.NodeName)
@@ -164,19 +162,10 @@ func (rc *reconciler) reconcile() {
 			}
 
 			// Trigger detach volume which requires verifing safe to detach step
-			// If timeout is true, skip verifySafeToDetach check
 			glog.V(5).Infof("Attempting to start DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
-			verifySafeToDetach := !timeout
-			err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
+			err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, true /* verifySafeToDetach */, rc.actualStateOfWorld)
 			if err == nil {
-				if !timeout {
-					glog.Infof("Started DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
-				} else {
-					glog.Infof("Started DetachVolume for volume %q from node %q. This volume is not safe to detach, but maxWaitForUnmountDuration %v expired, force detaching",
-						attachedVolume.VolumeName,
-						attachedVolume.NodeName,
-						rc.maxWaitForUnmountDuration)
-				}
+				glog.Infof("Started DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
 			}
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
