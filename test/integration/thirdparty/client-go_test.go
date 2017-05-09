@@ -17,11 +17,13 @@ limitations under the License.
 package thirdparty
 
 import (
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -29,14 +31,20 @@ import (
 	exampletprv1 "k8s.io/client-go/examples/third-party-resources/apis/tpr/v1"
 	exampleclient "k8s.io/client-go/examples/third-party-resources/client"
 	examplecontroller "k8s.io/client-go/examples/third-party-resources/controller"
-	"context"
 )
 
 func TestClientGoThirdPartyResourceExample(t *testing.T) {
 	_, s := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer s.Close()
 
-	config := &rest.Config{Host: s.URL, ContentConfig: rest.ContentConfig{NegotiatedSerializer: api.Codecs}}
+	scheme := runtime.NewScheme()
+	if err := exampletprv1.AddToScheme(scheme); err != nil {
+		return nil, nil, err
+	}
+
+	config := &rest.Config{Host: s.URL, ContentConfig: rest.ContentConfig{
+		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: serializer.NewCodecFactory(scheme)},
+	}}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
