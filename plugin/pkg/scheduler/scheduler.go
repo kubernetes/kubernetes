@@ -20,9 +20,12 @@ package scheduler
 // contrib/mesos/pkg/scheduler/.
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -30,6 +33,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
 	"github.com/golang/glog"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 // Binder knows how to write a binding.
@@ -39,6 +43,10 @@ type Binder interface {
 
 type PodConditionUpdater interface {
 	Update(pod *api.Pod, podCondition *api.PodCondition) error
+}
+
+type PodUpdater interface {
+	Update(pod *api.Pod) error
 }
 
 // Scheduler watches for new unscheduled pods. It attempts to find
@@ -59,6 +67,7 @@ type Config struct {
 	// handler so that binding and setting PodCondition it is atomic.
 	PodConditionUpdater PodConditionUpdater
 
+	PodUpdater PodUpdater
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
@@ -72,6 +81,7 @@ type Config struct {
 	// Recorder is the EventRecorder to use
 	Recorder record.EventRecorder
 
+	HostPortRange utilnet.PortRange
 	// Close this to shut down the scheduler.
 	StopEverything chan struct{}
 }
@@ -90,6 +100,82 @@ func (s *Scheduler) Run() {
 	go wait.Until(s.scheduleOne, 0, s.config.StopEverything)
 }
 
+func getUsedPorts(pods ...*api.Pod) map[int]bool {
+	// TODO: Aggregate it at the NodeInfo level.
+	ports := make(map[int]bool)
+	for _, pod := range pods {
+		for _, container := range pod.Spec.Containers {
+			for _, podPort := range container.Ports {
+				// "0" is explicitly ignored in PodFitsHostPorts,
+				// which is the only function that uses this value.
+				if podPort.HostPort != 0 {
+					ports[int(podPort.HostPort)] = true
+				}
+			}
+		}
+	}
+	return ports
+}
+
+func getAvaPort(allocated map[int]bool, base, max, count int) (int, bool) {
+	if count >= max {
+		return 0, false
+	}
+	for i := 0; i < max; i++ {
+		if allocated[base+i] != true {
+			return base + i, true
+		}
+	}
+	return 0, false
+}
+
+func (s *Scheduler) AssignPort(pod *api.Pod, dest string) error {
+	_, autoport := pod.ObjectMeta.Annotations[utilpod.PodAutoPortAnnotation]
+	if !autoport {
+		return nil
+	}
+
+	nodeNameToInfo := make(map[string]*schedulercache.NodeInfo)
+	err := s.config.SchedulerCache.UpdateNodeNameToInfoMap(nodeNameToInfo)
+	if err != nil {
+		return err
+	}
+
+	nodeInfo := nodeNameToInfo[dest]
+	usedPorts := getUsedPorts(nodeInfo.Pods()...)
+	for i := range pod.Spec.Containers {
+		for j := range pod.Spec.Containers[i].Ports {
+			if pod.Spec.Containers[i].Ports[j].HostPort == 0 {
+				port, isAssigned := getAvaPort(usedPorts, s.config.HostPortRange.Base, s.config.HostPortRange.Size,
+					len(usedPorts))
+				if isAssigned {
+					pod.Spec.Containers[i].Ports[j].HostPort = int32(port)
+					if pod.Spec.SecurityContext.HostNetwork {
+						pod.Spec.Containers[i].Ports[j].ContainerPort = int32(port)
+					}
+					usedPorts[port] = true
+				} else {
+					glog.V(1).Infof("no hostport can be assigned")
+					return errors.New("no hostport can be assigned")
+				}
+			}
+			envVariable := api.EnvVar{
+				Name:  fmt.Sprintf("PORT%d", j),
+				Value: fmt.Sprintf("%d", pod.Spec.Containers[i].Ports[j].HostPort),
+			}
+			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, envVariable)
+			if j == 0 {
+				pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, api.EnvVar{
+					Name:  "PORT",
+					Value: fmt.Sprintf("%d", pod.Spec.Containers[i].Ports[j].HostPort),
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
 func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
 
@@ -100,6 +186,18 @@ func (s *Scheduler) scheduleOne() {
 		glog.V(1).Infof("Failed to schedule pod: %v/%v", pod.Namespace, pod.Name)
 		s.config.Error(pod, err)
 		s.config.Recorder.Eventf(pod, api.EventTypeWarning, "FailedScheduling", "%v", err)
+		s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
+			Type:   api.PodScheduled,
+			Status: api.ConditionFalse,
+			Reason: "Unschedulable",
+		})
+		return
+	}
+	portErr := s.AssignPort(pod, dest)
+	if portErr != nil {
+		glog.V(1).Infof("Failed to schedule: %+v, failed to assign host port.", pod)
+		s.config.Error(pod, portErr)
+		s.config.Recorder.Eventf(pod, api.EventTypeWarning, "FailedScheduling", "%v", portErr)
 		s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
 			Type:   api.PodScheduled,
 			Status: api.ConditionFalse,
@@ -129,6 +227,18 @@ func (s *Scheduler) scheduleOne() {
 	go func() {
 		defer metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 
+		errUpdate := s.config.PodUpdater.Update(pod)
+		if errUpdate != nil {
+			glog.V(1).Infof("Failed to Update pod: %v/%v %v", pod.Namespace, pod.Name, errUpdate)
+			s.config.Error(pod, errUpdate)
+			s.config.Recorder.Eventf(pod, api.EventTypeNormal, "FailedScheduling", "Update failed: %v", errUpdate)
+			s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
+				Type:   api.PodScheduled,
+				Status: api.ConditionFalse,
+				Reason: "BindingRejected",
+			})
+			return
+		}
 		b := &api.Binding{
 			ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
 			Target: api.ObjectReference{

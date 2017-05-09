@@ -1262,7 +1262,7 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *api.PersistentVol
 
 var supportedPortProtocols = sets.NewString(string(api.ProtocolTCP), string(api.ProtocolUDP))
 
-func validateContainerPorts(ports []api.ContainerPort, fldPath *field.Path) field.ErrorList {
+func validateContainerPorts(isHostNetWork bool, ports []api.ContainerPort, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allNames := sets.String{}
@@ -1280,7 +1280,9 @@ func validateContainerPorts(ports []api.ContainerPort, fldPath *field.Path) fiel
 			}
 		}
 		if port.ContainerPort == 0 {
-			allErrs = append(allErrs, field.Required(idxPath.Child("containerPort"), ""))
+			if !isHostNetWork {
+				allErrs = append(allErrs, field.Required(idxPath.Child("containerPort"), ""))
+			}
 		} else {
 			for _, msg := range validation.IsValidPortNum(int(port.ContainerPort)) {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("containerPort"), port.ContainerPort, msg))
@@ -1629,10 +1631,10 @@ func validatePullPolicy(policy api.PullPolicy, fldPath *field.Path) field.ErrorL
 	return allErrors
 }
 
-func validateInitContainers(containers, otherContainers []api.Container, volumes sets.String, fldPath *field.Path) field.ErrorList {
+func validateInitContainers(isHostNetwork bool, containers, otherContainers []api.Container, volumes sets.String, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(containers) > 0 {
-		allErrs = append(allErrs, validateContainers(containers, volumes, fldPath)...)
+		allErrs = append(allErrs, validateContainers(isHostNetwork, containers, volumes, fldPath)...)
 	}
 
 	allNames := sets.String{}
@@ -1660,7 +1662,7 @@ func validateInitContainers(containers, otherContainers []api.Container, volumes
 	return allErrs
 }
 
-func validateContainers(containers []api.Container, volumes sets.String, fldPath *field.Path) field.ErrorList {
+func validateContainers(isHostNetWork bool, containers []api.Container, volumes sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(containers) == 0 {
@@ -1694,7 +1696,7 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 		}
 
 		allErrs = append(allErrs, validateProbe(ctr.ReadinessProbe, idxPath.Child("readinessProbe"))...)
-		allErrs = append(allErrs, validateContainerPorts(ctr.Ports, idxPath.Child("ports"))...)
+		allErrs = append(allErrs, validateContainerPorts(isHostNetWork, ctr.Ports, idxPath.Child("ports"))...)
 		allErrs = append(allErrs, validateEnv(ctr.Env, idxPath.Child("env"))...)
 		allErrs = append(allErrs, validateVolumeMounts(ctr.VolumeMounts, volumes, idxPath.Child("volumeMounts"))...)
 		allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, idxPath.Child("imagePullPolicy"))...)
@@ -1840,8 +1842,8 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 
 	allVolumes, vErrs := validateVolumes(spec.Volumes, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
-	allErrs = append(allErrs, validateContainers(spec.Containers, allVolumes, fldPath.Child("containers"))...)
-	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, allVolumes, fldPath.Child("initContainers"))...)
+	allErrs = append(allErrs, validateContainers(spec.SecurityContext.HostNetwork, spec.Containers, allVolumes, fldPath.Child("containers"))...)
+	allErrs = append(allErrs, validateInitContainers(spec.SecurityContext.HostNetwork, spec.InitContainers, spec.Containers, allVolumes, fldPath.Child("initContainers"))...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy, fldPath.Child("restartPolicy"))...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy, fldPath.Child("dnsPolicy"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
@@ -2322,7 +2324,8 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 		activeDeadlineSeconds := *oldPod.Spec.ActiveDeadlineSeconds
 		mungedPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
 	}
-	if !api.Semantic.DeepEqual(mungedPod.Spec, oldPod.Spec) {
+	_, autoport := oldPod.ObjectMeta.Annotations[utilpod.PodAutoPortAnnotation]
+	if !autoport && !api.Semantic.DeepEqual(mungedPod.Spec, oldPod.Spec) {
 		//TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
 		allErrs = append(allErrs, field.Forbidden(specPath, "pod updates may not change fields other than `containers[*].image` or `spec.activeDeadlineSeconds`"))
 	}
