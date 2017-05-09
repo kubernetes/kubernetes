@@ -252,7 +252,10 @@ function upload-server-tars() {
     # Ensure the buckets are created
     if ! gsutil ls "${staging_bucket}" >/dev/null; then
       echo "Creating ${staging_bucket}"
-      gsutil mb -l "${region}" "${staging_bucket}"
+      # The `-o ...` bit is a temporary workaround for
+      # https://github.com/GoogleCloudPlatform/gsutil/issues/348
+      # It can safely be removed once that issue is resolved.
+      gsutil -o "GSUtil:prefer_api=xml" mb -l "${region}" "${staging_bucket}"
     fi
 
     local staging_path="${staging_bucket}/${INSTANCE_PREFIX}-devel"
