@@ -372,8 +372,8 @@ func (m *manager) syncBatch() {
 	var updatedStatuses []podStatusSyncRequest
 	podToMirror, mirrorToPod := m.podManager.GetUIDTranslations()
 	func() { // Critical section
-		m.podStatusesLock.RLock()
-		defer m.podStatusesLock.RUnlock()
+		m.podStatusesLock.Lock()
+		defer m.podStatusesLock.Unlock()
 
 		// Clean up orphaned versions.
 		for uid := range m.apiStatusVersions {
