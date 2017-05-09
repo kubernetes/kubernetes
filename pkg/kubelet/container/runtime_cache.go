@@ -47,7 +47,7 @@ func NewRuntimeCache(getter podsGetter) (RuntimeCache, error) {
 // (and can be slightly older). The timestamp always moves forward. Callers are
 // expected not to modify the pods returned from GetPods.
 type runtimeCache struct {
-	sync.Mutex
+	sync.RWMutex
 	// The underlying container runtime used to update the cache.
 	getter podsGetter
 	// Last time when cache was updated.
@@ -59,19 +59,19 @@ type runtimeCache struct {
 // GetPods returns the cached pods if they are not outdated; otherwise, it
 // retrieves the latest pods and return them.
 func (r *runtimeCache) GetPods() ([]*Pod, error) {
-	r.Lock()
-	defer r.Unlock()
+
 	if time.Since(r.cacheTime) > defaultCachePeriod {
 		if err := r.updateCache(); err != nil {
 			return nil, err
 		}
 	}
+	r.RLock()
+	defer r.RUnlock()
 	return r.pods, nil
 }
 
 func (r *runtimeCache) ForceUpdateIfOlder(minExpectedCacheTime time.Time) error {
-	r.Lock()
-	defer r.Unlock()
+
 	if r.cacheTime.Before(minExpectedCacheTime) {
 		return r.updateCache()
 	}
@@ -79,6 +79,8 @@ func (r *runtimeCache) ForceUpdateIfOlder(minExpectedCacheTime time.Time) error 
 }
 
 func (r *runtimeCache) updateCache() error {
+	r.Lock()
+	defer r.Unlock()
 	pods, timestamp, err := r.getPodsWithTimestamp()
 	if err != nil {
 		return err
