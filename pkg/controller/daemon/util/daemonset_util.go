@@ -27,10 +27,30 @@ import (
 )
 
 // GetPodTemplateWithHash returns copy of provided template with additional
-// label which contains hash of provided template
+// label which contains hash of provided template and sets default daemon tolerations.
 func GetPodTemplateWithGeneration(template v1.PodTemplateSpec, generation int64) v1.PodTemplateSpec {
 	obj, _ := api.Scheme.DeepCopy(template)
 	newTemplate := obj.(v1.PodTemplateSpec)
+	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
+	// Add infinite toleration for taint notReady:NoExecute here
+	// to survive taint-based eviction enforced by NodeController
+	// when node turns not ready.
+	v1.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
+		Key:      metav1.TaintNodeNotReady,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoExecute,
+	})
+
+	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
+	// Add infinite toleration for taint unreachable:NoExecute here
+	// to survive taint-based eviction enforced by NodeController
+	// when node turns unreachable.
+	v1.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
+		Key:      metav1.TaintNodeUnreachable,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoExecute,
+	})
+
 	templateGenerationStr := fmt.Sprint(generation)
 	newTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
 		template.ObjectMeta.Labels,
