@@ -24,8 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -134,6 +136,18 @@ func (a *DaemonSetAdapter) ClusterUpdate(client kubeclientset.Interface, obj pkg
 
 func (a *DaemonSetAdapter) ClusterWatch(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (watch.Interface, error) {
 	return client.Extensions().DaemonSets(namespace).Watch(options)
+}
+
+func (a *DaemonSetAdapter) PrepareForUpdateFunc() func(obj pkgruntime.Object, key string, clusters []*federationapi.Cluster, informer fedutil.FederatedInformer) (interface{}, error) {
+	return nil
+}
+
+func (a *DaemonSetAdapter) UpdateObjectFunc() func(cluster *federationapi.Cluster, clusterObj pkgruntime.Object, federationObjCopy pkgruntime.Object, userInfo interface{}) (pkgruntime.Object, error) {
+	return nil
+}
+
+func (a *DaemonSetAdapter) UpdateFinishedFunc() func(obj pkgruntime.Object, userInfo interface{}) error {
+	return nil
 }
 
 func (a *DaemonSetAdapter) NewTestObject(namespace string) pkgruntime.Object {

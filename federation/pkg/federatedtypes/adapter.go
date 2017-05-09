@@ -21,7 +21,9 @@ import (
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
@@ -52,6 +54,11 @@ type FederatedTypeAdapter interface {
 	ClusterList(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (pkgruntime.Object, error)
 	ClusterUpdate(client kubeclientset.Interface, obj pkgruntime.Object) (pkgruntime.Object, error)
 	ClusterWatch(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (watch.Interface, error)
+
+	// The following operations allow the adapter to modify objects before they are propogated
+	PrepareForUpdateFunc() func(obj pkgruntime.Object, key string, clusters []*federationapi.Cluster, informer fedutil.FederatedInformer) (interface{}, error)
+	UpdateObjectFunc() func(cluster *federationapi.Cluster, clusterObj pkgruntime.Object, federationObjCopy pkgruntime.Object, userInfo interface{}) (pkgruntime.Object, error)
+	UpdateFinishedFunc() func(obj pkgruntime.Object, userInfo interface{}) error
 
 	NewTestObject(namespace string) pkgruntime.Object
 }
