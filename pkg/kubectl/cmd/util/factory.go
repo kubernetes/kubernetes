@@ -63,7 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
+	"k8s.io/kubernetes/pkg/registry/schemaless"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -253,7 +253,7 @@ func makeInterfacesFor(versionList []unversioned.GroupVersion) func(version unve
 		for ix := range versionList {
 			if versionList[ix].String() == version.String() {
 				return &meta.VersionInterfaces{
-					ObjectConvertor:  thirdpartyresourcedata.NewThirdPartyObjectConverter(api.Scheme),
+					ObjectConvertor:  schemaless.NewSchemalessObjectConverter(api.Scheme),
 					MetadataAccessor: accessor,
 				}, nil
 			}
@@ -291,6 +291,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if cfg.GroupVersion != nil {
 				cmdApiVersion = *cfg.GroupVersion
 			}
+			var typer runtime.ObjectTyper = api.Scheme
 			if discoverDynamicAPIs {
 				client, err := clients.ClientForVersion(&unversioned.GroupVersion{Version: "v1"})
 				checkErrWithPrefix("failed to find client for version v1: ", err)
@@ -309,6 +310,10 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				checkErrWithPrefix("failed to get third-party group versions: ", err)
 				if len(versions) > 0 {
+
+					// Extend the typer
+					typer = runtime.MultiObjectTyper{typer, discovery.NewUnstructuredObjectTyperFromGVKs(gvks)}
+
 					priorityMapper, ok := mapper.RESTMapper.(meta.PriorityRESTMapper)
 					if !ok {
 						CheckErr(fmt.Errorf("expected PriorityMapper, saw: %v", mapper.RESTMapper))
@@ -366,7 +371,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				priorityRESTMapper.ResourcePriority = append(priorityRESTMapper.ResourcePriority, unversioned.GroupVersionResource{Group: group, Version: meta.AnyVersion, Resource: meta.AnyResource})
 				priorityRESTMapper.KindPriority = append(priorityRESTMapper.KindPriority, unversioned.GroupVersionKind{Group: group, Version: meta.AnyVersion, Kind: meta.AnyKind})
 			}
-			return priorityRESTMapper, api.Scheme
+
+			return priorityRESTMapper, typer
 		},
 		UnstructuredObject: func() (meta.RESTMapper, runtime.ObjectTyper, error) {
 			cfg, err := clients.ClientConfigForVersion(nil)
@@ -429,7 +435,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			gv := gvk.GroupVersion()
 			cfg.GroupVersion = &gv
 			if registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
-				cfg.NegotiatedSerializer = thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, gvk.Kind, gv, gv)
+				cfg.NegotiatedSerializer = schemaless.NewNegotiatedSerializer(api.Codecs, gvk.Kind, gv, gv)
 			}
 			return restclient.RESTClientFor(cfg)
 		},
@@ -477,8 +483,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			} else {
 				decoder = api.Codecs.UniversalDeserializer()
 			}
-			return thirdpartyresourcedata.NewDecoder(decoder, "")
-
+			return schemaless.NewDecoder(decoder, "")
 		},
 		JSONEncoder: func() runtime.Encoder {
 			return api.Codecs.LegacyCodec(registered.EnabledVersions()...)
