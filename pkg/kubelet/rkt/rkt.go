@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -155,6 +156,7 @@ type Runtime struct {
 	config     *Config
 	// TODO(yifan): Refactor this to be generic keyring.
 	dockerKeyring credentialprovider.DockerKeyring
+	cadvisor      cadvisor.Interface
 
 	containerRefManager *kubecontainer.RefManager
 	podGetter           podGetter
@@ -220,6 +222,7 @@ func New(
 	imagePullQPS float32,
 	imagePullBurst int,
 	requestTimeout time.Duration,
+	cadvisor cadvisor.Interface,
 ) (*Runtime, error) {
 	// Create dbus connection.
 	systemd, err := newSystemd()
@@ -263,6 +266,7 @@ func New(
 		apisvcConn:          apisvcConn,
 		apisvc:              rktapi.NewPublicAPIClient(apisvcConn),
 		config:              config,
+		cadvisor:            cadvisor,
 		dockerKeyring:       credentialprovider.NewDockerKeyring(),
 		containerRefManager: containerRefManager,
 		podGetter:           podGetter,

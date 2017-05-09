@@ -32,6 +32,7 @@ import (
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -289,4 +290,9 @@ func (r *Runtime) ImageStats() (*kubecontainer.ImageStats, error) {
 		imageStat.TotalStorageBytes = imageStat.TotalStorageBytes + uint64(image.Size)
 	}
 	return &imageStat, nil
+}
+
+// ImageFsInfo gets filesytem information of images.
+func (r *Runtime) ImageFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return r.cadvisor.ImagesFsInfo()
 }
