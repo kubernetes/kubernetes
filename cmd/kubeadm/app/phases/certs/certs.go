@@ -51,6 +51,7 @@ type CreateCertResult struct {
 // Bulck create cert function are implemented composing "atomic" create cert actions
 type BulkCreateCertFunc func(cfg *kubeadmapi.MasterConfiguration) (BulkCreateCertResult, error)
 
+// BulkCreateCertResult represents outcomes of an BulkCreateCert action
 type BulkCreateCertResult []*CreateCertResult
 
 // NewCreateCertResult create a new instance of CreateCertResult
