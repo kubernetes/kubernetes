@@ -32,7 +32,13 @@ func NewKubeControllerManager() *Server {
 		SimpleUsage:     "controller-manager",
 		Long:            "A server that runs a set of active components. This includes replication controllers, service endpoints and nodes.",
 		Run: func(_ *Server, args []string) error {
-			return app.Run(s)
+
+			// Exception: app.Run(s) Function
+			if err := app.Run(s); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+			}
+
+			return err
 		},
 	}
 	s.AddFlags(hks.Flags(), app.KnownControllers(), app.ControllersDisabledByDefault.List())
