@@ -522,6 +522,7 @@ func (i *Instances) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress,
 			)
 		}
 	}
+	glog.V(1).Info("balu - The vSphere cloud provider NodeAddresses is %+v", addrs)
 	return addrs, nil
 }
 
@@ -1671,4 +1672,102 @@ func getFolder(ctx context.Context, c *govmomi.Client, datacenterName string, fo
 	}
 
 	return resultFolder, nil
+}
+
+func (vs *VSphere) CreateVMWithAdmissionPlugin(vmName string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	glog.V(1).Infof("balu - createVMWithAdmissionPlugin vsphere struct is - %+v", vs)
+	// Ensure client is logged in and session is valid
+	err := vSphereLogin(ctx, vs)
+	if err != nil {
+		glog.Errorf("balu - createVMWithAdmissionPlugin, Failed to login into vCenter - %v", err)
+		return err
+	}
+
+	// Create a new finder
+	f := find.NewFinder(vs.client.Client, true)
+
+	// Fetch and set data center
+	dc, err := f.Datacenter(ctx, vs.cfg.Global.Datacenter)
+	if err != nil {
+		glog.Errorf("balu - createVMWithAdmissionPlugin, Failed to get the datacenter - %+q", vs.cfg.Global.Datacenter)
+		return err
+	}
+	f.SetDatacenter(dc)
+
+	dcFolders, err := dc.Folders(ctx)
+	resourcepool, err := f.ResourcePool(ctx, "*"+"cluster-vsan-1"+"/Resources")
+	if err != nil {
+		glog.Errorf("balu - createVMWithAdmissionPlugin, Failed to get the resourcepool")
+		return err
+	}
+
+	vmVirtualMachineConfigSpec := types.VirtualMachineConfigSpec{
+		Name: vmName,
+		Files: &types.VirtualMachineFileInfo{
+			VmPathName: "[vsanDatastore]",
+		},
+		NumCPUs:  1,
+		MemoryMB: 4,
+	}
+
+	task, err := dcFolders.VmFolder.CreateVM(ctx, vmVirtualMachineConfigSpec, resourcepool, nil)
+	if err != nil {
+		glog.Errorf("balu - createVMWithAdmissionPlugin, Failed to create the VM - %+q", vmName)
+		return err
+	}
+
+	err = task.Wait(ctx)
+	if err != nil {
+		glog.Errorf("balu - createVMWithAdmissionPlugin, Failed to create the VM in wait state - %+q", vmName)
+		return err
+	}
+
+	return nil
+}
+
+func (vs *VSphere) DeleteVMWithAdmissionPlugin(vmName string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	glog.V(1).Infof("balu - DeleteVMWithAdmissionPlugin vsphere struct is - %+v", vs)
+	// Ensure client is logged in and session is valid
+	err := vSphereLogin(ctx, vs)
+	if err != nil {
+		glog.Errorf("balu - DeleteVMWithAdmissionPlugin, Failed to login into vCenter - %v", err)
+		return err
+	}
+
+	// Create a new finder
+	f := find.NewFinder(vs.client.Client, true)
+
+	// Fetch and set data center
+	dc, err := f.Datacenter(ctx, vs.cfg.Global.Datacenter)
+	if err != nil {
+		glog.Errorf("balu - DeleteVMWithAdmissionPlugin, Failed to get the datacenter - %+q", vs.cfg.Global.Datacenter)
+		return err
+	}
+	f.SetDatacenter(dc)
+
+	vmRef, err := f.VirtualMachine(ctx, vmName)
+	if err != nil {
+		glog.Errorf("balu - DeleteVMWithAdmissionPlugin, Failed to get VM - %+q", vmName)
+		return err
+	}
+
+	destroyTask, err := vmRef.Destroy(ctx)
+	if err != nil {
+		glog.Errorf("balu - DeleteVMWithAdmissionPlugin, Failed to destroy VM - %+q", vmName)
+		return err
+	}
+
+	err = destroyTask.Wait(ctx)
+	if err != nil {
+		glog.Errorf("balu - DeleteVMWithAdmissionPlugin, Failed to destroy the VM in wait state - %+q", vmName)
+		return err
+	}
+
+	return nil
 }

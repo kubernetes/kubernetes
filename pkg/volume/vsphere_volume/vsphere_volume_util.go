@@ -39,6 +39,7 @@ const (
 	Fstype             = "fstype"
 	diskformat         = "diskformat"
 	datastore          = "datastore"
+	vmName             = "vmName"
 
 	HostFailuresToTolerateCapability    = "hostfailurestotolerate"
 	ForceProvisioningCapability         = "forceprovisioning"
@@ -103,6 +104,8 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPa
 		case Fstype:
 			fstype = value
 			glog.V(4).Infof("Setting fstype as %q", fstype)
+		case vmName:
+			glog.V(4).Infof("balu - Setting vmName as %q", value)
 		case HostFailuresToTolerateCapability, ForceProvisioningCapability,
 			CacheReservationCapability, DiskStripesCapability,
 			ObjectSpaceReservationCapability, IopsLimitCapability:
