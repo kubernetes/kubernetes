@@ -8,13 +8,21 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 )
 
-// GetResult temporarily holds the response from a Get call.
-type GetResult struct {
+type commonResult struct {
 	gophercloud.Result
 }
 
-// Extract provides access to the individual Flavor returned by the Get function.
-func (r GetResult) Extract() (*Flavor, error) {
+type CreateResult struct {
+	commonResult
+}
+
+// GetResult temporarily holds the response from a Get call.
+type GetResult struct {
+	commonResult
+}
+
+// Extract provides access to the individual Flavor returned by the Get and Create functions.
+func (r commonResult) Extract() (*Flavor, error) {
 	var s struct {
 		Flavor *Flavor `json:"flavor"`
 	}
@@ -40,41 +48,32 @@ type Flavor struct {
 	VCPUs int `json:"vcpus"`
 }
 
-func (f *Flavor) UnmarshalJSON(b []byte) error {
-	var flavor struct {
-		ID         string      `json:"id"`
-		Disk       int         `json:"disk"`
-		RAM        int         `json:"ram"`
-		Name       string      `json:"name"`
-		RxTxFactor float64     `json:"rxtx_factor"`
-		Swap       interface{} `json:"swap"`
-		VCPUs      int         `json:"vcpus"`
+func (r *Flavor) UnmarshalJSON(b []byte) error {
+	type tmp Flavor
+	var s struct {
+		tmp
+		Swap interface{} `json:"swap"`
 	}
-	err := json.Unmarshal(b, &flavor)
+	err := json.Unmarshal(b, &s)
 	if err != nil {
 		return err
 	}
 
-	f.ID = flavor.ID
-	f.Disk = flavor.Disk
-	f.RAM = flavor.RAM
-	f.Name = flavor.Name
-	f.RxTxFactor = flavor.RxTxFactor
-	f.VCPUs = flavor.VCPUs
+	*r = Flavor(s.tmp)
 
-	switch t := flavor.Swap.(type) {
+	switch t := s.Swap.(type) {
 	case float64:
-		f.Swap = int(t)
+		r.Swap = int(t)
 	case string:
 		switch t {
 		case "":
-			f.Swap = 0
+			r.Swap = 0
 		default:
 			swap, err := strconv.ParseFloat(t, 64)
 			if err != nil {
 				return err
 			}
-			f.Swap = int(swap)
+			r.Swap = int(swap)
 		}
 	}
 
