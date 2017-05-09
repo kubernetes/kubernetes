@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This will generally always be unique, per machine.
+# This allows people to run kube-up multiple times even if they
+# Are using the same group account.
+GCLOUD_HASH=`gcloud info | grep 'Account\|Project\|Configuration'` && GENERATED_ID="${GCLOUD_HASH:27}"
+
 # TODO(jbeda): Provide a way to override project
 # gcloud multiplexing for shared GCE/GKE tests.
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
@@ -78,7 +83,7 @@ RKT_VERSION=${KUBE_RKT_VERSION:-1.23.0}
 RKT_STAGE1_IMAGE=${KUBE_RKT_STAGE1_IMAGE:-coreos.com/rkt/stage1-coreos}
 
 NETWORK=${KUBE_GCE_NETWORK:-default}
-INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-kubernetes}"
+INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-kubernetes-$GENERATED_ID}"
 CLUSTER_NAME="${CLUSTER_NAME:-${INSTANCE_PREFIX}}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 INITIAL_ETCD_CLUSTER="${MASTER_NAME}"
