@@ -355,6 +355,18 @@ function ssh-to-node() {
   gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --ssh-flag="-o ConnectTimeout=30" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"
 }
 
+
+# Create a temp dir that'll be deleted at the end of this bash session.
+#
+# Vars set:
+#   KUBE_TEMP
+function ensure-temp-dir() {
+  if [[ -z ${KUBE_TEMP-} ]]; then
+    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
+    trap 'rm -rf "${KUBE_TEMP}"' EXIT
+  fi
+}
+
 # Execute after running tests to perform any required clean-up.  This is called
 # from hack/e2e.go. This calls kube-down, so the cluster still exists when this
 # is called.

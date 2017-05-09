@@ -77,7 +77,11 @@ function set-federation-zone-vars {
   elif [[ "$KUBERNETES_PROVIDER" == "gke"  ]];then
 
     export CLUSTER_NAME="${USER}-${zone}"
+    export ZONE="${zone}"
+    export KUBE_GKE_NETWORK="${CLUSTER_NAME}-network"
+    export OVERRIDE_CONTEXT="gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
 
+    source "${KUBE_ROOT}/cluster/gke/util.sh"
   elif [[ "$KUBERNETES_PROVIDER" == "aws"  ]];then
 
     export KUBE_AWS_ZONE="$zone"

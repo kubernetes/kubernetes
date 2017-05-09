@@ -185,6 +185,7 @@ function create-federation-api-objects {
 	# we check for ingress.ip and ingress.hostname, so should work for any loadbalancer-providing provider
 	# allows 30x5 = 150 seconds for loadbalancer creation
 	$template "${manifests_root}/federation-apiserver-lb-service.yaml" | $host_kubectl create -f -
+	set +e
 	for i in {1..30};do
 	    echo "attempting to get federation-apiserver loadbalancer hostname ($i / 30)"
 	    LB_STATUS=`${host_kubectl} get -o=jsonpath svc/${FEDERATION_APISERVER_DEPLOYMENT_NAME} --template '{.status.loadBalancer}'`
@@ -196,8 +197,8 @@ function create-federation-api-objects {
 	    fi
 	    for field in ip hostname;do
 		FEDERATION_API_HOST=`${host_kubectl} get -o=jsonpath svc/${FEDERATION_APISERVER_DEPLOYMENT_NAME} --template '{.status.loadBalancer.ingress[*].'"${field}}"`
-		if [[ ! -z "${FEDERATION_API_HOST// }" ]];then
-		    break 2
+		if [[ $? -eq 0 && ! -z "${FEDERATION_API_HOST// }" ]];then
+		  break 2
 		fi
 	    done
 	    if [[ $i -eq 30 ]];then
@@ -206,6 +207,7 @@ function create-federation-api-objects {
 	    fi
 	    sleep 5
 	done
+	set -e
 	KUBE_MASTER_IP="${FEDERATION_API_HOST}:443"
     else
 	echo "provider ${KUBERNETES_PROVIDER} is not (yet) supported for e2e testing"
