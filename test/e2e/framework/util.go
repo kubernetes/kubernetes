@@ -1811,6 +1811,16 @@ func KubectlVersionGTE(v semver.Version) (bool, error) {
 	return kv.GTE(v), nil
 }
 
+func SkipUnlessKubectlVersionLTE(v semver.Version) {
+	gte, err := KubectlVersionGTE(v)
+	if err != nil {
+		Failf("Failed to get kubectl version: %v", err)
+	}
+	if gte {
+		Skipf("Not supported for kubectl versions after %q", v)
+	}
+}
+
 // KubectlVersion gets the version of kubectl that's currently being used (see
 // --kubectl-path in e2e.go to use an alternate kubectl).
 func KubectlVersion() (semver.Version, error) {
