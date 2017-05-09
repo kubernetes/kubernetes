@@ -110,7 +110,7 @@ func main() {
 
 	// Poll until Example object is handled by controller and gets status updated to "Processed"
 	err = exampleclient.WaitForExampleInstanceProcessed(exampleClient, "example1")
-	if (err != nil) {
+	if err != nil {
 		panic(err)
 	}
 	fmt.Print("PROCESSED\n")

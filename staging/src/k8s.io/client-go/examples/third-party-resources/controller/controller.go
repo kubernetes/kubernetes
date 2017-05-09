@@ -87,7 +87,7 @@ func (c *ExampleController) onAdd(obj interface{}) {
 	// You can use exampleScheme.Copy() to make a deep copy of original object and modify this copy
 	// Or create a copy manually for better performance
 	copyObj, err := c.ExampleScheme.Copy(example)
-	if (err != nil) {
+	if err != nil {
 		fmt.Printf("ERROR creating a deep copy of example object: %v\n", err)
 		return
 	}
