@@ -147,7 +147,7 @@ $ sudo -E chown -R ${USER} ${OPENSHIFT_CONFIG}
 Then run the following command to collapse them into a Kubernetes secret.
 
 ```sh
-$ docker run -it --privileged -e="KUBECONFIG=/config/admin.kubeconfig" -v ${OPENSHIFT_CONFIG}:/config openshift/origin cli secrets new openshift-config /config -o json &> examples/openshift-origin/secret.json
+$ docker run -it --privileged -e KUBECONFIG=/kubeconfig -v ~/.kube/config:/kubeconfig -v ${OPENSHIFT_CONFIG}:/config openshift/origin:v1.0.3 cli secrets new openshift-config /config -o json &> ${OPENSHIFT_EXAMPLE}/secret.json
 ```
 
 Now, lets create the secret in your Kubernetes cluster.

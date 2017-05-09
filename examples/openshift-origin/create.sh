@@ -53,7 +53,7 @@ echo Made dir ${OPENSHIFT_CONFIG}
 echo
 
 echo "===> Setting up OpenShift-Origin namespace:"
-kubectl create -f ${OPENSHIFT_EXAMPLE}/openshift-origin-namespace.yaml
+kubectl --validate=false create -f ${OPENSHIFT_EXAMPLE}/openshift-origin-namespace.yaml
 echo
 
 echo "===> Setting up etcd-discovery:"
@@ -64,18 +64,18 @@ export ETCD_INITIAL_CLUSTER_TOKEN=$(python -c "import string; import random; pri
 export ETCD_DISCOVERY_TOKEN=$(python -c "import string; import random; print(\"etcd-cluster-\" + ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5)))")
 sed -i.bak -e "s/INSERT_ETCD_INITIAL_CLUSTER_TOKEN/\"${ETCD_INITIAL_CLUSTER_TOKEN}\"/g" -e "s/INSERT_ETCD_DISCOVERY_TOKEN/\"${ETCD_DISCOVERY_TOKEN}\"/g" ${OPENSHIFT_EXAMPLE}/etcd-controller.yaml
 
-kubectl create -f ${OPENSHIFT_EXAMPLE}/etcd-discovery-controller.yaml --namespace='openshift-origin'
-kubectl create -f ${OPENSHIFT_EXAMPLE}/etcd-discovery-service.yaml --namespace='openshift-origin'
+kubectl --validate=false create -f ${OPENSHIFT_EXAMPLE}/etcd-discovery-controller.yaml --namespace='openshift-origin'
+kubectl --validate=false create -f ${OPENSHIFT_EXAMPLE}/etcd-discovery-service.yaml --namespace='openshift-origin'
 echo
 
 echo "===> Setting up etcd:"
-kubectl create -f ${OPENSHIFT_EXAMPLE}/etcd-controller.yaml --namespace='openshift-origin'
-kubectl create -f ${OPENSHIFT_EXAMPLE}/etcd-service.yaml --namespace='openshift-origin'
+kubectl --validate=false create -f ${OPENSHIFT_EXAMPLE}/etcd-controller.yaml --namespace='openshift-origin'
+kubectl --validate=false create -f ${OPENSHIFT_EXAMPLE}/etcd-service.yaml --namespace='openshift-origin'
 echo
 
 echo "===> Setting up openshift-origin:"
 kubectl config view --output=yaml --flatten=true --minify=true > ${OPENSHIFT_CONFIG}/kubeconfig
-kubectl create -f ${OPENSHIFT_EXAMPLE}/openshift-service.yaml --namespace='openshift-origin'
+kubectl --validate=false create -f ${OPENSHIFT_EXAMPLE}/openshift-service.yaml --namespace='openshift-origin'
 echo
 
 export PUBLIC_OPENSHIFT_IP=""
@@ -110,12 +110,12 @@ echo "sudo cat /srv/kubernetes/server.key; exit;" | gcloud compute ssh ${KUBE_GC
 # The following insertion will fail if indentation changes
 sed -i -e 's/publicKeyFiles:.*$/publicKeyFiles:/g' -e '/publicKeyFiles:/a \ \ - serviceaccounts.private.key' ${OPENSHIFT_CONFIG}/master-config.yaml
 
-docker run -it --privileged -e="KUBECONFIG=/config/admin.kubeconfig" -v ${OPENSHIFT_CONFIG}:/config openshift/origin cli secrets new openshift-config /config -o json &> ${OPENSHIFT_EXAMPLE}/secret.json
-kubectl create -f ${OPENSHIFT_EXAMPLE}/secret.json --namespace='openshift-origin'
+docker run -it --privileged -e KUBECONFIG=/kubeconfig -v ${HOME}/.kube/config:/kubeconfig -v ${OPENSHIFT_CONFIG}:/config openshift/origin:v1.0.3 cli secrets new openshift-config /config -o json &> ${OPENSHIFT_EXAMPLE}/secret.json
+kubectl --validate=false create -f ${OPENSHIFT_EXAMPLE}/secret.json --namespace='openshift-origin'
 echo
 
 echo "===> Running OpenShift Master:"
-kubectl create -f ${OPENSHIFT_EXAMPLE}/openshift-controller.yaml --namespace='openshift-origin'
+kubectl --validate=false create -f ${OPENSHIFT_EXAMPLE}/openshift-controller.yaml --namespace='openshift-origin'
 echo
 
 echo Done.
