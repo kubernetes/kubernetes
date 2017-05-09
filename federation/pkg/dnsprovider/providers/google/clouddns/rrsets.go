@@ -30,21 +30,41 @@ type ResourceRecordSets struct {
 	impl interfaces.ResourceRecordSetsService
 }
 
-func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error) {
-	response, err := rrsets.impl.List(rrsets.project(), rrsets.zone.impl.Name()).Do()
+func (rrsets ResourceRecordSets) List(filterName string, filterType rrstype.RrsType) ([]dnsprovider.ResourceRecordSet, error) {
+	request := rrsets.impl.List(rrsets.project(), rrsets.zone.impl.Name())
+	if filterName != "" {
+		request = request.Name(filterName)
+
+		// filterType can only be pushed down to google clouddns when name is also provided
+		if filterType != "" {
+			request = request.Name(string(filterType))
+		}
+	}
+
+	response, err := request.Do()
 	if err != nil {
 		return nil, err
 	}
-	list := make([]dnsprovider.ResourceRecordSet, len(response.Rrsets()))
-	for i, rrset := range response.Rrsets() {
-		list[i] = ResourceRecordSet{rrset, &rrsets}
+	list := make([]dnsprovider.ResourceRecordSet, 0, len(response.Rrsets()))
+	for _, rrset := range response.Rrsets() {
+		rrs := ResourceRecordSet{rrset, &rrsets}
+
+		// We repeat the type filtering, in case name was not set
+		if filterType != "" && rrs.Type() != filterType {
+			continue
+		}
+
+		list = append(list, rrs)
 	}
+
+	// TODO: NextPageToken support for paginated results
+
 	return list, nil
 }
 
 func (rrsets ResourceRecordSets) Get(name string) (dnsprovider.ResourceRecordSet, error) {
 	var newRrset dnsprovider.ResourceRecordSet
-	rrsetList, err := rrsets.List()
+	rrsetList, err := rrsets.List(name, "")
 	if err != nil {
 		return nil, err
 	}

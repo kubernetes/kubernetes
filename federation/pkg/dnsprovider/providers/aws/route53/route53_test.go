@@ -111,7 +111,7 @@ func rrs(t *testing.T, zone dnsprovider.Zone) (r dnsprovider.ResourceRecordSets)
 }
 
 func listRrsOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets) []dnsprovider.ResourceRecordSet {
-	rrset, err := rrsets.List()
+	rrset, err := rrsets.List("", "")
 	if err != nil {
 		t.Fatalf("Failed to list recordsets: %v", err)
 	} else {
