@@ -40,20 +40,6 @@ func verifyCalls(t *testing.T, fakeDocker *FakeDockerClient, calls []string) {
 	assert.New(t).NoError(fakeDocker.AssertCalls(calls))
 }
 
-func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
-	invalid := len(actual) != len(expected)
-	if !invalid {
-		for ix, value := range actual {
-			if expected[ix] != value {
-				invalid = true
-			}
-		}
-	}
-	if invalid {
-		t.Errorf("Expected: %#v, Actual: %#v", expected, actual)
-	}
-}
-
 func findPodContainer(dockerContainers []*dockertypes.Container, podFullName string, uid types.UID, containerName string) (*dockertypes.Container, bool, uint64) {
 	for _, dockerContainer := range dockerContainers {
 		if len(dockerContainer.Names) == 0 {
