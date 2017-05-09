@@ -597,7 +597,7 @@ func DefaultContainerLabels(container *info.ContainerInfo) map[string]string {
 func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric) {
 	containers, err := c.infoProvider.SubcontainersInfo("/", &info.ContainerInfoRequest{NumStats: 1})
 	if err != nil {
-		c.errors.Set(1)
+		c.errors.Inc()
 		glog.Warningf("Couldn't get containers: %s", err)
 		return
 	}
@@ -647,7 +647,7 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 func (c *PrometheusCollector) collectVersionInfo(ch chan<- prometheus.Metric) {
 	versionInfo, err := c.infoProvider.GetVersionInfo()
 	if err != nil {
-		c.errors.Set(1)
+		c.errors.Inc()
 		glog.Warningf("Couldn't get version info: %s", err)
 		return
 	}
@@ -657,7 +657,7 @@ func (c *PrometheusCollector) collectVersionInfo(ch chan<- prometheus.Metric) {
 func (c *PrometheusCollector) collectMachineInfo(ch chan<- prometheus.Metric) {
 	machineInfo, err := c.infoProvider.GetMachineInfo()
 	if err != nil {
-		c.errors.Set(1)
+		c.errors.Inc()
 		glog.Warningf("Couldn't get machine info: %s", err)
 		return
 	}
