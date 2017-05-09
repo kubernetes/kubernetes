@@ -75,3 +75,9 @@ else
 fi
 
 sha256sum _output/release-tars/kubernetes*.tar.gz
+
+if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
+  echo "!!! Tree is dirty after build!"
+  git status
+  exit 1
+fi
