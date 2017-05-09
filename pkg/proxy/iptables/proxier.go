@@ -423,6 +423,7 @@ func NewProxier(ipt utiliptables.Interface,
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
 func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
+	var errors []error
 	// Unlink the services chain.
 	args := []string{
 		"-m", "comment", "--comment", "kubernetes service portals",
@@ -440,8 +441,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	for _, tc := range tableChainsWithJumpServices {
 		if err := ipt.DeleteRule(tc.table, tc.chain, args...); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
-				glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
-				encounteredError = true
+				errors = append(errors, fmt.Errorf("Error removing pure-iptables proxy rule: %v", err))
 			}
 		}
 	}
@@ -453,15 +453,13 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	}
 	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
 		if !utiliptables.IsNotFoundError(err) {
-			glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
-			encounteredError = true
+			errors = append(errors, fmt.Errorf("Error removing pure-iptables proxy rule: %v", err))
 		}
 	}
 
 	// Flush and remove all of our chains.
 	if iptablesSaveRaw, err := ipt.Save(utiliptables.TableNAT); err != nil {
-		glog.Errorf("Failed to execute iptables-save for %s: %v", utiliptables.TableNAT, err)
-		encounteredError = true
+		errors = append(errors, fmt.Errorf("Failed to execute iptables-save for %s: %v", utiliptables.TableNAT, err))
 	} else {
 		existingNATChains := utiliptables.GetChainLines(utiliptables.TableNAT, iptablesSaveRaw)
 		natChains := bytes.NewBuffer(nil)
@@ -488,8 +486,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		// Write it.
 		err = ipt.Restore(utiliptables.TableNAT, natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 		if err != nil {
-			glog.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableNAT, err)
-			encounteredError = true
+			errors = append(errors, fmt.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableNAT, err))
 		}
 	}
 	{
@@ -500,9 +497,13 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		writeLine(filterBuf, "COMMIT")
 		// Write it.
 		if err := ipt.Restore(utiliptables.TableFilter, filterBuf.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters); err != nil {
-			glog.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableFilter, err)
-			encounteredError = true
+			errors = append(errors, fmt.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableFilter, err))
 		}
+	}
+
+	if len(errors) != 0 {
+		glog.Errorf("Cleanup iptables encounter errors: %v", errors)
+		encounteredError = true
 	}
 	return encounteredError
 }
