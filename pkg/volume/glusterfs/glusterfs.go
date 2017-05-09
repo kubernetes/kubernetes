@@ -567,6 +567,77 @@ func (p *glusterfsPlugin) getGidTable(className string, min int, max int) (*MinM
 	return newGidTable, nil
 }
 
+//createEndpointService create an endpoint and service in provided namespace.
+func (p *glusterfsPlugin) createEndpointService(namespace string, epServiceName string, hostips []string, pvcname string) (endpoint *v1.Endpoints, service *v1.Service, err error) {
+
+	addrlist := make([]v1.EndpointAddress, len(hostips))
+	for i, v := range hostips {
+		addrlist[i].IP = v
+	}
+	endpoint = &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      epServiceName,
+			Labels: map[string]string{
+				"gluster.kubernetes.io/provisioned-for-pvc": pvcname,
+			},
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: addrlist,
+			Ports:     []v1.EndpointPort{{Port: 1, Protocol: "TCP"}},
+		}},
+	}
+	kubeClient := p.host.GetKubeClient()
+	if kubeClient == nil {
+		return nil, nil, fmt.Errorf("glusterfs: failed to get kube client when creating endpoint service")
+	}
+	_, err = kubeClient.Core().Endpoints(namespace).Create(endpoint)
+	if err != nil && errors.IsAlreadyExists(err) {
+		glog.V(1).Infof("glusterfs: endpoint [%s] already exist in namespace [%s]", endpoint, namespace)
+		err = nil
+	}
+	if err != nil {
+		glog.Errorf("glusterfs: failed to create endpoint: %v", err)
+		return nil, nil, fmt.Errorf("error creating endpoint: %v", err)
+	}
+	service = &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      epServiceName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"gluster.kubernetes.io/provisioned-for-pvc": pvcname,
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{Protocol: "TCP", Port: 1}}}}
+	_, err = kubeClient.Core().Services(namespace).Create(service)
+	if err != nil && errors.IsAlreadyExists(err) {
+		glog.V(1).Infof("glusterfs: service [%s] already exist in namespace [%s]", service, namespace)
+		err = nil
+	}
+	if err != nil {
+		glog.Errorf("glusterfs: failed to create service: %v", err)
+		return nil, nil, fmt.Errorf("error creating service: %v", err)
+	}
+	return endpoint, service, nil
+}
+
+// deleteEndpointService delete the endpoint and service from the provided namespace.
+func (p *glusterfsPlugin) deleteEndpointService(namespace string, epServiceName string) (err error) {
+	kubeClient := p.host.GetKubeClient()
+	if kubeClient == nil {
+		return fmt.Errorf("glusterfs: failed to get kube client when deleting endpoint service")
+	}
+	err = kubeClient.Core().Services(namespace).Delete(epServiceName, nil)
+	if err != nil {
+		glog.Errorf("glusterfs: error deleting service %s/%s: %v", namespace, epServiceName, err)
+		return fmt.Errorf("error deleting service %s/%s: %v", namespace, epServiceName, err)
+	}
+	glog.V(1).Infof("glusterfs: service/endpoint %s/%s deleted successfully", namespace, epServiceName)
+	return nil
+}
+
 func (d *glusterfsVolumeDeleter) getGid() (int, bool, error) {
 	gidStr, ok := d.spec.Annotations[volumehelper.VolumeGidAnnotationKey]
 
@@ -640,7 +711,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 		dynamicEndpoint = pvSpec.Glusterfs.EndpointsName
 	}
 	glog.V(3).Infof("glusterfs: dynamic namespace and endpoint : [%v/%v]", dynamicNamespace, dynamicEndpoint)
-	err = d.deleteEndpointService(dynamicNamespace, dynamicEndpoint)
+	err = d.plugin.deleteEndpointService(dynamicNamespace, dynamicEndpoint)
 	if err != nil {
 		glog.Errorf("glusterfs: error when deleting endpoint/service :%v", err)
 	} else {
@@ -749,7 +820,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	// of volume creation.
 	epServiceName := dynamicEpSvcPrefix + p.options.PVC.Name
 	epNamespace := p.options.PVC.Namespace
-	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
+	endpoint, service, err := p.plugin.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
 	if err != nil {
 		glog.Errorf("glusterfs: failed to create endpoint/service: %v", err)
 		deleteErr := cli.VolumeDelete(volume.Id)
@@ -764,75 +835,6 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		Path:          volume.Name,
 		ReadOnly:      false,
 	}, sz, nil
-}
-
-func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epServiceName string, hostips []string, pvcname string) (endpoint *v1.Endpoints, service *v1.Service, err error) {
-
-	addrlist := make([]v1.EndpointAddress, len(hostips))
-	for i, v := range hostips {
-		addrlist[i].IP = v
-	}
-	endpoint = &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      epServiceName,
-			Labels: map[string]string{
-				"gluster.kubernetes.io/provisioned-for-pvc": pvcname,
-			},
-		},
-		Subsets: []v1.EndpointSubset{{
-			Addresses: addrlist,
-			Ports:     []v1.EndpointPort{{Port: 1, Protocol: "TCP"}},
-		}},
-	}
-	kubeClient := p.plugin.host.GetKubeClient()
-	if kubeClient == nil {
-		return nil, nil, fmt.Errorf("glusterfs: failed to get kube client when creating endpoint service")
-	}
-	_, err = kubeClient.Core().Endpoints(namespace).Create(endpoint)
-	if err != nil && errors.IsAlreadyExists(err) {
-		glog.V(1).Infof("glusterfs: endpoint [%s] already exist in namespace [%s]", endpoint, namespace)
-		err = nil
-	}
-	if err != nil {
-		glog.Errorf("glusterfs: failed to create endpoint: %v", err)
-		return nil, nil, fmt.Errorf("error creating endpoint: %v", err)
-	}
-	service = &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      epServiceName,
-			Namespace: namespace,
-			Labels: map[string]string{
-				"gluster.kubernetes.io/provisioned-for-pvc": pvcname,
-			},
-		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{Protocol: "TCP", Port: 1}}}}
-	_, err = kubeClient.Core().Services(namespace).Create(service)
-	if err != nil && errors.IsAlreadyExists(err) {
-		glog.V(1).Infof("glusterfs: service [%s] already exist in namespace [%s]", service, namespace)
-		err = nil
-	}
-	if err != nil {
-		glog.Errorf("glusterfs: failed to create service: %v", err)
-		return nil, nil, fmt.Errorf("error creating service: %v", err)
-	}
-	return endpoint, service, nil
-}
-
-func (d *glusterfsVolumeDeleter) deleteEndpointService(namespace string, epServiceName string) (err error) {
-	kubeClient := d.plugin.host.GetKubeClient()
-	if kubeClient == nil {
-		return fmt.Errorf("glusterfs: failed to get kube client when deleting endpoint service")
-	}
-	err = kubeClient.Core().Services(namespace).Delete(epServiceName, nil)
-	if err != nil {
-		glog.Errorf("glusterfs: error deleting service %s/%s: %v", namespace, epServiceName, err)
-		return fmt.Errorf("error deleting service %s/%s: %v", namespace, epServiceName, err)
-	}
-	glog.V(1).Infof("glusterfs: service/endpoint %s/%s deleted successfully", namespace, epServiceName)
-	return nil
 }
 
 // parseSecret finds a given Secret instance and reads user password from it.
