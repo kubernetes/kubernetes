@@ -84,7 +84,7 @@ $ kubectl get pods --sort-by=.status.containerStatuses[0].restartCount
 $ kubectl get pods --selector=app=cassandra rc -o 'jsonpath={.items[*].metadata.labels.version}'
 
 # Get ExternalIPs of all nodes
-$ kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=ExternalIP)].address}'
+$ kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="ExternalIP")].address}'
 
 # List Names of Pods that belong to Particular RC
 # "jq" command useful for transformations that are too complex for jsonpath
