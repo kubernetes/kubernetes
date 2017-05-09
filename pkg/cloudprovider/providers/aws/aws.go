@@ -72,6 +72,7 @@ const TagNameSubnetPublicELB = "kubernetes.io/role/elb"
 // Currently we accept only the value "0.0.0.0/0" - other values are an error.
 // This lets us define more advanced semantics in future.
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/aws-load-balancer-internal"
+const ServiceAnnotationLoadBalancerName = "service.beta.kubernetes.io/aws-load-balancer-name"
 
 // ServiceAnnotationLoadBalancerProxyProtocol is the annotation used on the
 // service to enable the proxy protocol on an ELB. Right now we only accept the
@@ -2719,7 +2720,14 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, fmt.Errorf("could not find any suitable subnets for creating the ELB")
 	}
 
-	loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
+	loadBalancerName := annotations[ServiceAnnotationLoadBalancerName]
+	if loadBalancerName != "" {
+		if len(loadBalancerName) > 32 {
+			return nil, fmt.Errorf("annotation %q=%q detected, but AWS only allows load balancer names up to 32 bytes", ServiceAnnotationLoadBalancerName, loadBalancerName)
+		}
+	} else {
+		loadBalancerName = cloudprovider.GetLoadBalancerName(apiService)
+	}
 	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
 
 	// Create a security group for the load balancer
