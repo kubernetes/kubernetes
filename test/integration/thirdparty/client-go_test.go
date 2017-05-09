@@ -86,7 +86,7 @@ func TestClientGoThirdPartyResourceExample(t *testing.T) {
 			Bar: true,
 		},
 		Status: exampletprv1.ExampleStatus{
-			State: exampletprv1.ExampleStateCreated,
+			State:   exampletprv1.ExampleStateCreated,
 			Message: "Created, not processed yet",
 		},
 	}
