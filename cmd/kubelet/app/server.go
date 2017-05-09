@@ -966,9 +966,13 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
 	}
 
+	cadvisorInterface, err := cadvisor.New(uint(c.CAdvisorPort), "docker", c.RootDirectory)
+	if err != nil {
+		return err
+	}
 	ds, err := dockershim.NewDockerService(dockerClient, c.SeccompProfileRoot, c.PodInfraContainerImage,
 		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, c.DockerExecHandlerName, dockershimRootDir,
-		!c.DockerEnableSharedPID)
+		!c.DockerEnableSharedPID, cadvisorInterface)
 	if err != nil {
 		return err
 	}

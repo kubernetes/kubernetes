@@ -126,5 +126,14 @@ func (r *FakeImageService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
 
 	r.Called = append(r.Called, "ImageFsInfo")
 
-	return nil, nil
+	var totalBytes uint64
+	for _, img := range r.Images {
+		totalBytes += img.Size_
+	}
+
+	return &runtimeapi.FsInfo{
+		UsedBytes: &runtimeapi.UInt64Value{
+			Value: totalBytes,
+		},
+	}, nil
 }

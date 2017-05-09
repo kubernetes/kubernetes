@@ -167,6 +167,7 @@ go_test(
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//pkg/kubelet/cadvisor/fake:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/config:go_default_library",
