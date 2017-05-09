@@ -129,6 +129,15 @@ func printService(out io.Writer, name, link string) {
 	fmt.Fprintf(out, " is running at ")
 	ct.ChangeColor(ct.Yellow, false, ct.None, false)
 	fmt.Fprint(out, link)
+	// TODO: Remove the special case for services which need to be accessed
+	// by tools like curl when the bug that requires a trailing slash
+	// is fixed.
+	if name == "Elasticsearch" {
+		fmt.Fprintf(out, "/ ")
+	}
 	ct.ResetColor()
+	if name == "Elasticsearch" {
+		fmt.Fprint(out, " (note the trailing slash)")
+	}
 	fmt.Fprintln(out, "")
 }
