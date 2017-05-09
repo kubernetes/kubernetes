@@ -613,67 +613,22 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	redirector := rest.Redirector(storage)
 
 	// Test a simple id.
-	location, _, err := redirector.ResourceLocation(ctx, "foo")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "//1.2.3.4:80", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
+	checkLocation(redirector, ctx, "foo", "//1.2.3.4:80", t)
 
 	// Test a name + port.
-	location, _, err = redirector.ResourceLocation(ctx, "foo:p")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "//1.2.3.4:93", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
+	checkLocation(redirector, ctx, "foo:p", "//1.2.3.4:93", t)
 
 	// Test a name + port number (service port 93 -> target port 80)
-	location, _, err = redirector.ResourceLocation(ctx, "foo:93")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "//1.2.3.4:80", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
+	checkLocation(redirector, ctx, "foo:93", "//1.2.3.4:80", t)
 
 	// Test a name + port number (service port 9393 -> target port "p" -> endpoint port 93)
-	location, _, err = redirector.ResourceLocation(ctx, "foo:9393")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "//1.2.3.4:93", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
+	checkLocation(redirector, ctx, "foo:9393", "//1.2.3.4:93", t)
 
 	// Test a scheme + name + port.
-	location, _, err = redirector.ResourceLocation(ctx, "https:foo:p")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "https://1.2.3.4:93", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
+	checkLocation(redirector, ctx, "https:foo:p", "https://1.2.3.4:93", t)
 
 	// Test a non-existent name + port.
-	location, _, err = redirector.ResourceLocation(ctx, "foo:q")
+	_, _, err := redirector.ResourceLocation(ctx, "foo:q")
 	if err == nil {
 		t.Errorf("Unexpected nil error")
 	}
@@ -681,6 +636,19 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	// Test error path
 	if _, _, err = redirector.ResourceLocation(ctx, "bar"); err == nil {
 		t.Errorf("unexpected nil error")
+	}
+}
+
+func checkLocation(r rest.Redirector, ctx api.Context, id, e string, t *testing.T) {
+	location, _, err := r.ResourceLocation(ctx, id)
+	if err != nil {
+		t.Errorf("Unexpected error: %v, id is: %s", err, id)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v, id is: %s", location, id)
+	}
+	if a := location.String(); e != a {
+		t.Errorf("Expected %v, but got %v, id is: %s", e, a, id)
 	}
 }
 
