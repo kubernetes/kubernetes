@@ -392,6 +392,10 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 		}
 	}
 
+	if cfg.API.PortRange != "" {
+		command = append(command, "--service-node-port-range="+cfg.API.PortRange)
+	}
+
 	return command
 }
 

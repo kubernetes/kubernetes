@@ -62,6 +62,7 @@ type API struct {
 	AdvertiseAddress string
 	// BindPort sets the secure port for the API Server to bind to
 	BindPort int32
+	PortRange          string
 }
 
 type TokenDiscovery struct {

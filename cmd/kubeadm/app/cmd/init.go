@@ -140,6 +140,11 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.TokenTTL, "token-ttl", cfg.TokenTTL,
 		"The duration before the bootstrap token is automatically deleted. 0 means 'never expires'.")
 
+	cmd.PersistentFlags().StringVar(
+		&cfg.API.PortRange, "service-node-port-range", cfg.API.PortRange,
+		`A port range to reserve for services with NodePort visibility. Example: '30000-32767'. Inclusive at both ends of the range. (default 30000-32767)"`,
+	)
+
 	return cmd
 }
 
