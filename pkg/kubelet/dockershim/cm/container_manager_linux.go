@@ -85,7 +85,7 @@ func (m *containerManager) doWork() {
 		glog.Errorf("Unable to get docker version: %v", err)
 		return
 	}
-	version, err := utilversion.ParseSemantic(v.Version)
+	version, err := utilversion.ParseGeneric(v.Version)
 	if err != nil {
 		glog.Errorf("Unable to parse docker version %q: %v", v.Version, err)
 		return
