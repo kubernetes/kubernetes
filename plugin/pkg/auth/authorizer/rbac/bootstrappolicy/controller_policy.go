@@ -27,71 +27,64 @@ import (
 
 const saRolePrefix = "system:controller:"
 
-var (
-	// controllerRoles is a slice of roles used for controllers
-	controllerRoles = []rbac.ClusterRole{}
-	// controllerRoleBindings is a slice of roles used for controllers
-	controllerRoleBindings = []rbac.ClusterRoleBinding{}
-)
-
-func addControllerRole(role rbac.ClusterRole) {
+func addControllerRole(role rbac.ClusterRole, roles []rbac.ClusterRole, bindings []rbac.ClusterRoleBinding) ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 	if !strings.HasPrefix(role.Name, saRolePrefix) {
 		glog.Fatalf(`role %q must start with %q`, role.Name, saRolePrefix)
 	}
 
-	for _, existingRole := range controllerRoles {
+	for _, existingRole := range roles {
 		if role.Name == existingRole.Name {
 			glog.Fatalf("role %q was already registered", role.Name)
 		}
 	}
 
-	controllerRoles = append(controllerRoles, role)
-	addClusterRoleLabel(controllerRoles)
+	roles = append(roles, role)
+	addClusterRoleLabel(roles)
 
-	controllerRoleBindings = append(controllerRoleBindings,
+	bindings = append(bindings,
 		rbac.NewClusterBinding(role.Name).SAs("kube-system", role.Name[len(saRolePrefix):]).BindingOrDie())
-	addClusterRoleBindingLabel(controllerRoleBindings)
+	addClusterRoleBindingLabel(bindings)
+	return roles, bindings
 }
 
 func eventsRule() rbac.PolicyRule {
 	return rbac.NewRule("create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie()
 }
 
-func init() {
-	addControllerRole(rbac.ClusterRole{
+func controllerPolicy(pspEnabled bool) ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
+	roles := []rbac.ClusterRole{}
+	bindings := []rbac.ClusterRoleBinding{}
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "attachdetach-controller"},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("persistentvolumes", "persistentvolumeclaims").RuleOrDie(),
+		Rules: addPodSecurityPolicy(pspEnabled, "privileged", rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("persistentvolumes", "persistentvolumeclaims").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			rbac.NewRule("patch", "update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
 			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
-		},
-	})
-	addControllerRole(rbac.ClusterRole{
+		),
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "cronjob-controller"},
-		Rules: []rbac.PolicyRule{
+		Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 			rbac.NewRule("get", "list", "watch", "update").Groups(batchGroup).Resources("cronjobs").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch", "create", "update", "delete", "patch").Groups(batchGroup).Resources("jobs").RuleOrDie(),
 			rbac.NewRule("update").Groups(batchGroup).Resources("cronjobs/status").RuleOrDie(),
 			rbac.NewRule("list", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
-		},
-	})
-	addControllerRole(rbac.ClusterRole{
+		),
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "daemon-set-controller"},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "watch").Groups(extensionsGroup).Resources("daemonsets").RuleOrDie(),
+		Rules: addPodSecurityPolicy(pspEnabled, "privileged", rbac.NewRule("get", "list", "watch").Groups(extensionsGroup).Resources("daemonsets").RuleOrDie(),
 			rbac.NewRule("update").Groups(extensionsGroup).Resources("daemonsets/status").RuleOrDie(),
 			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			rbac.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("create").Groups(legacyGroup).Resources("pods/binding").RuleOrDie(),
-			eventsRule(),
-		},
-	})
-	addControllerRole(rbac.ClusterRole{
+			eventsRule()),
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "deployment-controller"},
-		Rules: []rbac.PolicyRule{
+		Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 			rbac.NewRule("get", "list", "watch", "update").Groups(extensionsGroup, appsGroup).Resources("deployments").RuleOrDie(),
 			rbac.NewRule("update").Groups(extensionsGroup, appsGroup).Resources("deployments/status").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch", "create", "update", "patch", "delete").Groups(extensionsGroup).Resources("replicasets").RuleOrDie(),
@@ -99,9 +92,9 @@ func init() {
 			// https://github.com/kubernetes/kubernetes/issues/36897 is resolved.
 			rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
-		},
-	})
-	addControllerRole(rbac.ClusterRole{
+		),
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "disruption-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch").Groups(extensionsGroup, appsGroup).Resources("deployments").RuleOrDie(),
@@ -112,8 +105,8 @@ func init() {
 			rbac.NewRule("update").Groups(policyGroup).Resources("poddisruptionbudgets/status").RuleOrDie(),
 			eventsRule(),
 		},
-	})
-	addControllerRole(rbac.ClusterRole{
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "endpoint-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("services", "pods").RuleOrDie(),
@@ -121,18 +114,18 @@ func init() {
 			rbac.NewRule("create").Groups(legacyGroup).Resources("endpoints/restricted").RuleOrDie(),
 			eventsRule(),
 		},
-	})
-	addControllerRole(rbac.ClusterRole{
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "generic-garbage-collector"},
-		Rules: []rbac.PolicyRule{
+		Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 			// the GC controller needs to run list/watches, selective gets, and updates against any resource
 			rbac.NewRule("get", "list", "watch", "patch", "update", "delete").Groups("*").Resources("*").RuleOrDie(),
 			eventsRule(),
-		},
-	})
-	addControllerRole(rbac.ClusterRole{
+		),
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "horizontal-pod-autoscaler"},
-		Rules: []rbac.PolicyRule{
+		Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 			rbac.NewRule("get", "list", "watch").Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 			rbac.NewRule("update").Groups(autoscalingGroup).Resources("horizontalpodautoscalers/status").RuleOrDie(),
 			rbac.NewRule("get", "update").Groups(legacyGroup).Resources("replicationcontrollers/scale").RuleOrDie(),
@@ -144,38 +137,36 @@ func init() {
 			rbac.NewRule("proxy").Groups(legacyGroup).Resources("services").Names("https:heapster:", "http:heapster:").RuleOrDie(),
 			// TODO: restrict this to the appropriate namespace
 			rbac.NewRule("get").Groups(legacyGroup).Resources("services/proxy").Names("https:heapster:", "http:heapster:").RuleOrDie(),
-			eventsRule(),
-		},
-	})
-	addControllerRole(rbac.ClusterRole{
+			eventsRule()),
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "job-controller"},
-		Rules: []rbac.PolicyRule{
+		Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 			rbac.NewRule("get", "list", "watch", "update").Groups(batchGroup).Resources("jobs").RuleOrDie(),
 			rbac.NewRule("update").Groups(batchGroup).Resources("jobs/status").RuleOrDie(),
 			rbac.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			eventsRule(),
-		},
-	})
-	addControllerRole(rbac.ClusterRole{
+			eventsRule()),
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "namespace-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 			rbac.NewRule("update").Groups(legacyGroup).Resources("namespaces/finalize", "namespaces/status").RuleOrDie(),
 			rbac.NewRule("get", "list", "delete", "deletecollection").Groups("*").Resources("*").RuleOrDie(),
 		},
-	})
-	addControllerRole(rbac.ClusterRole{
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "node-controller"},
-		Rules: []rbac.PolicyRule{
+		Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 			rbac.NewRule("get", "list", "update", "delete", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			rbac.NewRule("patch", "update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
 			// used for pod eviction
 			rbac.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
 			rbac.NewRule("list", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
-		},
-	})
-	addControllerRole(rbac.ClusterRole{
+		),
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "persistent-volume-binder"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch", "update", "create", "delete").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
@@ -194,34 +185,33 @@ func init() {
 
 			eventsRule(),
 		},
-	})
-	addControllerRole(rbac.ClusterRole{
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pod-garbage-collector"},
-		Rules: []rbac.PolicyRule{
+		Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 			rbac.NewRule("list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-		},
-	})
-	addControllerRole(rbac.ClusterRole{
+		),
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "replicaset-controller"},
-		Rules: []rbac.PolicyRule{
+		Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 			rbac.NewRule("get", "list", "watch", "update").Groups(extensionsGroup).Resources("replicasets").RuleOrDie(),
 			rbac.NewRule("update").Groups(extensionsGroup).Resources("replicasets/status").RuleOrDie(),
 			rbac.NewRule("list", "watch", "patch", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
-		},
-	})
-	addControllerRole(rbac.ClusterRole{
+		),
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "replication-controller"},
-		Rules: []rbac.PolicyRule{
+		Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 			// 1.0 controllers needed get, update, so without these old controllers break on new servers
 			rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("replicationcontrollers").RuleOrDie(),
 			rbac.NewRule("update").Groups(legacyGroup).Resources("replicationcontrollers/status").RuleOrDie(),
 			rbac.NewRule("list", "watch", "patch", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			eventsRule(),
-		},
-	})
-	addControllerRole(rbac.ClusterRole{
+			eventsRule()),
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resourcequota-controller"},
 		Rules: []rbac.PolicyRule{
 			// quota can count quota on anything for reconcilation, so it needs full viewing powers
@@ -229,23 +219,23 @@ func init() {
 			rbac.NewRule("update").Groups(legacyGroup).Resources("resourcequotas/status").RuleOrDie(),
 			eventsRule(),
 		},
-	})
-	addControllerRole(rbac.ClusterRole{
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "route-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			rbac.NewRule("patch").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
 			eventsRule(),
 		},
-	})
-	addControllerRole(rbac.ClusterRole{
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "service-account-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie(),
 			eventsRule(),
 		},
-	})
-	addControllerRole(rbac.ClusterRole{
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "service-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("services").RuleOrDie(),
@@ -253,41 +243,32 @@ func init() {
 			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			eventsRule(),
 		},
-	})
-	addControllerRole(rbac.ClusterRole{
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "statefulset-controller"},
-		Rules: []rbac.PolicyRule{
+		Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch").Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
 			rbac.NewRule("update").Groups(appsGroup).Resources("statefulsets/status").RuleOrDie(),
 			rbac.NewRule("get", "create", "delete", "update", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("get", "create").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
 			eventsRule(),
-		},
-	})
-	addControllerRole(rbac.ClusterRole{
+		),
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "ttl-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("update", "patch", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			eventsRule(),
 		},
-	})
-	addControllerRole(rbac.ClusterRole{
+	}, roles, bindings)
+	roles, bindings = addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "certificate-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 			rbac.NewRule("update").Groups(certificatesGroup).Resources("certificatesigningrequests/status", "certificatesigningrequests/approval").RuleOrDie(),
 			eventsRule(),
 		},
-	})
-}
-
-// ControllerRoles returns the cluster roles used by controllers
-func ControllerRoles() []rbac.ClusterRole {
-	return controllerRoles
-}
-
-// ControllerRoleBindings returns the role bindings used by controllers
-func ControllerRoleBindings() []rbac.ClusterRoleBinding {
-	return controllerRoleBindings
+	}, roles, bindings)
+	return roles, bindings
 }

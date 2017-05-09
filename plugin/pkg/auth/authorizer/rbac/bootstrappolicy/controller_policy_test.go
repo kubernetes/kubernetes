@@ -24,6 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+var (
+	pspEnabledControllerTest = true
+)
+
 // rolesWithAllowStar are the controller roles which are allowed to contain a *.  These are
 // namespace lifecycle and GC which have to delete anything.  If you're adding to this list
 // tag sig-auth
@@ -37,7 +41,9 @@ var rolesWithAllowStar = sets.NewString(
 // or resources.  There are two known exceptions, namespace lifecycle and GC which have to
 // delete anything
 func TestNoStarsForControllers(t *testing.T) {
-	for _, role := range ControllerRoles() {
+	policy := GetPolicy(pspEnabledControllerTest)
+	roles := policy.ControllerRoles
+	for _, role := range roles {
 		if rolesWithAllowStar.Has(role.Name) {
 			continue
 		}
@@ -63,7 +69,8 @@ func TestNoStarsForControllers(t *testing.T) {
 }
 
 func TestControllerRoleLabel(t *testing.T) {
-	roles := ControllerRoles()
+	policy := GetPolicy(pspEnabledControllerTest)
+	roles := policy.ControllerRoles
 	for i := range roles {
 		role := roles[i]
 		accessor, err := meta.Accessor(&role)
@@ -75,7 +82,7 @@ func TestControllerRoleLabel(t *testing.T) {
 		}
 	}
 
-	rolebindings := ControllerRoleBindings()
+	rolebindings := policy.ControllerRoleBindings
 	for i := range rolebindings {
 		rolebinding := rolebindings[i]
 		accessor, err := meta.Accessor(&rolebinding)

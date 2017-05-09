@@ -86,16 +86,23 @@ func addClusterRoleBindingLabel(rolebindings []rbac.ClusterRoleBinding) {
 	return
 }
 
+func addPodSecurityPolicy(enabled bool, name string, rules ...rbac.PolicyRule) []rbac.PolicyRule {
+	if enabled {
+		rules = append(rules, rbac.NewRule("use").Groups(extensionsGroup).Resources("podsecuritypolicies").Names(name).RuleOrDie())
+	}
+	return rules
+}
+
 // ClusterRoles returns the cluster roles to bootstrap an API server with
-func ClusterRoles() []rbac.ClusterRole {
+func ClusterRoles(pspEnabled bool) []rbac.ClusterRole {
 	roles := []rbac.ClusterRole{
 		{
 			// a "root" role which can do absolutely anything
 			ObjectMeta: metav1.ObjectMeta{Name: "cluster-admin"},
-			Rules: []rbac.PolicyRule{
+			Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 				rbac.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
 				rbac.NewRule("*").URLs("*").RuleOrDie(),
-			},
+			),
 		},
 		{
 			// a role which provides just enough power to determine if the server is ready and discover API versions for negotiation
@@ -116,7 +123,7 @@ func ClusterRoles() []rbac.ClusterRole {
 		{
 			// a role for a namespace level admin.  It is `edit` plus the power to grant permissions to other users.
 			ObjectMeta: metav1.ObjectMeta{Name: "admin"},
-			Rules: []rbac.PolicyRule{
+			Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
 					"services", "services/proxy", "endpoints", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
@@ -141,14 +148,14 @@ func ClusterRoles() []rbac.ClusterRole {
 				// additional admin powers
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("localsubjectaccessreviews").RuleOrDie(),
 				rbac.NewRule(ReadWrite...).Groups(rbacGroup).Resources("roles", "rolebindings").RuleOrDie(),
-			},
+			),
 		},
 		{
 			// a role for a namespace level editor.  It grants access to all user level actions in a namespace.
 			// It does not grant powers for "privileged" resources which are domain of the system: `/status`
 			// subresources or `quota`/`limits` which are used to control namespaces
 			ObjectMeta: metav1.ObjectMeta{Name: "edit"},
-			Rules: []rbac.PolicyRule{
+			Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
 					"services", "services/proxy", "endpoints", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
@@ -169,7 +176,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
 					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
 					"replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
-			},
+			),
 		},
 		{
 			// a role for namespace level viewing.  It grants Read-only access to non-escalating resources in
@@ -296,7 +303,7 @@ func ClusterRoles() []rbac.ClusterRole {
 			// a role to use for bootstrapping the kube-controller-manager so it can create the shared informers
 			// service accounts, and secrets that we need to create separate identities for other controllers
 			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-controller-manager"},
-			Rules: []rbac.PolicyRule{
+			Rules: addPodSecurityPolicy(pspEnabled, "privileged",
 				eventsRule(),
 				rbac.NewRule("create").Groups(legacyGroup).Resources("endpoints", "secrets", "serviceaccounts").RuleOrDie(),
 				rbac.NewRule("delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
@@ -331,7 +338,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("list", "watch").Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
-			},
+			),
 		},
 		{
 			// a role to use for the kube-scheduler

@@ -162,6 +162,14 @@ items:
     - patch
     - update
     - watch
+  - apiGroups:
+    - extensions
+    resourceNames:
+    - privileged
+    resources:
+    - podsecuritypolicies
+    verbs:
+    - use
 - apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
@@ -182,6 +190,14 @@ items:
     - '*'
     verbs:
     - '*'
+  - apiGroups:
+    - extensions
+    resourceNames:
+    - privileged
+    resources:
+    - podsecuritypolicies
+    verbs:
+    - use
 - apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
@@ -324,6 +340,14 @@ items:
     - patch
     - update
     - watch
+  - apiGroups:
+    - extensions
+    resourceNames:
+    - privileged
+    resources:
+    - podsecuritypolicies
+    verbs:
+    - use
 - apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
@@ -555,6 +579,14 @@ items:
     verbs:
     - list
     - watch
+  - apiGroups:
+    - extensions
+    resourceNames:
+    - privileged
+    resources:
+    - podsecuritypolicies
+    verbs:
+    - use
 - apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:

@@ -357,6 +357,8 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 		return nil, nil, nil, fmt.Errorf("invalid authorization config: %v", err)
 	}
 	if !sets.NewString(s.Authorization.Modes()...).Has(modes.ModeRBAC) {
+		// TODO(q-lee): PostStartHook to create PodSecurityPolicies for controllers.
+		// TODO(q-lee): pass PodSecurityPolicy enabled in to the rbac hook
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
