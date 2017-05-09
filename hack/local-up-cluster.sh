@@ -77,6 +77,7 @@ ALLOW_ANY_TOKEN=${ALLOW_ANY_TOKEN:-false}
 ENABLE_RBAC=${ENABLE_RBAC:-false}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
+ENABLE_ANONYMOUS_AUTH=${ENABLE_ANONYMOUS_AUTH:-true}
 
 # Install a default storage class (enabled by default)
 DEFAULT_STORAGE_CLASS=${KUBE_DEFAULT_STORAGE_CLASS:-true}
@@ -424,7 +425,12 @@ function start_apiserver {
     fi
     authorizer_arg=""
     if [[ "${ENABLE_RBAC}" = true ]]; then
+      ENABLE_ANONYMOUS_AUTH=false
       authorizer_arg="--authorization-mode=RBAC "
+    fi
+    anonymous_auth_arg=""
+    if [[ "${ENABLE_ANONYMOUS_AUTH}" = false ]]; then
+      anonymous_auth_arg="--anonymous-auth=false"
     fi
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
@@ -477,6 +483,7 @@ function start_apiserver {
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
+      ${anonymous_auth_arg} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
