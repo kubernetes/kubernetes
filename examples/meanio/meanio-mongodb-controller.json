@@ -1,0 +1,27 @@
+{
+  "id": "meanio-mongodb-controller",
+  "kind": "ReplicationController",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "replicas": 1,
+    "replicaSelector": {"name": "meanio-mongodb"},
+    "podTemplate": {
+      "desiredState": {
+         "manifest": {
+           "version": "v1beta1",
+           "id": "meanio-mongodb",
+           "containers": [{
+             "name": "meanio-mongodb",
+             "image": "mongo:2.6.8",
+             "ports": [{"containerPort": 27017}]
+           }]
+         }
+      },
+      "labels": {
+        "name": "meanio-mongodb",
+        "app": "mongodb"
+      }
+    }
+  },
+  "labels": {"name": "meanio-mongodb"}
+}
