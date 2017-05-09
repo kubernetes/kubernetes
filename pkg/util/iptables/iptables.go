@@ -53,10 +53,14 @@ type Interface interface {
 	FlushChain(table Table, chain Chain) error
 	// DeleteChain deletes the specified chain.  If the chain did not exist, return error.
 	DeleteChain(table Table, chain Chain) error
+	// RenameChain renames chain from oldChain to newChain. If the old chain did not exist or new chain had conflict, return error.
+	RenameChain(table Table, oldChain, newChain Chain) error
 	// EnsureRule checks if the specified rule is present and, if not, creates it.  If the rule existed, return true.
 	EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error)
 	// DeleteRule checks if the specified rule is present and, if so, deletes it.
 	DeleteRule(table Table, chain Chain, args ...string) error
+	// ListRules lists all rules in the selected chain. If no chain is selected, all chains are listed like iptables-save.
+	ListRules(table Table, chain Chain, args ...string) ([]byte, error)
 	// IsIpv6 returns true if this is managing ipv6 tables
 	IsIpv6() bool
 	// Save calls `iptables-save` for table.
@@ -265,6 +269,18 @@ func (runner *runner) DeleteChain(table Table, chain Chain) error {
 	return nil
 }
 
+// RenameChain is part of Interface.
+func (runner *runner) RenameChain(table Table, oldChain, newChain Chain) error {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	out, err := runner.run(opRenameChain, []string{string(oldChain), string(newChain), "-t", string(table)})
+	if err != nil {
+		return fmt.Errorf("error renaming chain from %q to %q: %v: %s", oldChain, newChain, err, out)
+	}
+	return nil
+}
+
 // EnsureRule is part of Interface.
 func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error) {
 	fullArgs := makeFullArgs(table, chain, args...)
@@ -305,6 +321,21 @@ func (runner *runner) DeleteRule(table Table, chain Chain, args ...string) error
 		return fmt.Errorf("error deleting rule: %v: %s", err, out)
 	}
 	return nil
+}
+
+// ListRules is part of Interface
+func (runner *runner) ListRules(table Table, chain Chain, args ...string) ([]byte, error) {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	var fullArgs []string
+	if string(chain) != "" /* only append chain name if it exists */ {
+		fullArgs = append(fullArgs, string(chain))
+	}
+	if len(args) != 0 {
+		fullArgs = append(fullArgs, args...)
+	}
+	return runner.run(opListRules, append(fullArgs, "-t", string(table)))
 }
 
 func (runner *runner) IsIpv6() bool {
@@ -552,6 +583,8 @@ const (
 	opAppendRule  operation = "-A"
 	opCheckRule   operation = "-C"
 	opDeleteRule  operation = "-D"
+	opRenameChain operation = "-E"
+	opListRules   operation = "-S"
 )
 
 func makeFullArgs(table Table, chain Chain, args ...string) []string {
