@@ -198,8 +198,7 @@ func (g *GenericPLEG) relist() {
 		glog.Errorf("GenericPLEG: Unable to retrieve pods: %v", err)
 		return
 	}
-	pods := kubecontainer.Pods(podList)
-	g.podRecords.setCurrent(pods)
+	g.podRecords.setCurrent(podList)
 
 	// Compare the old and the current pods, and generate events.
 	eventsByPodID := map[types.UID][]*PodLifecycleEvent{}
