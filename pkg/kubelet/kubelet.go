@@ -2162,6 +2162,12 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 	if err != nil {
 		glog.Errorf("Cannot get Node info: %v", err)
 		return false, "InvalidNodeInfo", "Kubelet cannot get node info."
+  }
+
+	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 {
+		if !podUsesHostNetwork(pod) {
+			return false, "NetworkNotReady", fmt.Sprintf("Network is not ready: %v", rs)
+		}
 	}
 
 	// the kubelet will invoke each pod admit handler in sequence
@@ -2239,7 +2245,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	defer housekeepingTicker.Stop()
 	plegCh := kl.pleg.Watch()
 	for {
-		if rs := kl.runtimeState.errors(); len(rs) != 0 {
+		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
 			glog.Infof("skipping pod synchronization - %v", rs)
 			time.Sleep(5 * time.Second)
 			continue
