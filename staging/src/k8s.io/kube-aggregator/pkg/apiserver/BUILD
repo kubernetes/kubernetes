@@ -81,6 +81,7 @@ go_library(
         "//vendor/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/controllers:go_default_library",
+        "//vendor/k8s.io/kube-aggregator/pkg/controllers/status:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/registry/apiservice/etcd:go_default_library",
     ],
 )

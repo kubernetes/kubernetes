@@ -38,7 +38,7 @@ var _ Getter = &synchronizedOpenAPIGetter{}
 
 // Getter is an interface for fetching openapi specs and parsing them into an Resources struct
 type Getter interface {
-	// openAPIData returns the parsed openAPIData
+	// OpenAPIData returns the parsed OpenAPIData
 	Get() (*Resources, error)
 }
 
@@ -55,8 +55,8 @@ func NewOpenAPIGetter(cacheDir, serverVersion string, openAPIClient discovery.Op
 // Resources implements Getter
 func (g *synchronizedOpenAPIGetter) Get() (*Resources, error) {
 	g.Do(func() {
-		client := newCachingOpenAPIClient(g.openAPIClient, g.serverVersion, g.cacheDir)
-		result, err := client.openAPIData()
+		client := NewCachingOpenAPIClient(g.openAPIClient, g.serverVersion, g.cacheDir)
+		result, err := client.OpenAPIData()
 		if err != nil {
 			g.err = err
 			return

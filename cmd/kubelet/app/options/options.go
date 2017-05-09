@@ -77,6 +77,10 @@ type KubeletFlags struct {
 	// DockershimRootDirectory is the path to the dockershim root directory. Defaults to
 	// /var/lib/dockershim if unset. Exposed for integration testing (e.g. in OpenShift).
 	DockershimRootDirectory string
+
+	// This flag, if set, sets the unique id of the instance that an external provider (i.e. cloudprovider)
+	// can use to identify a specific node
+	ProviderID string
 }
 
 // KubeletServer encapsulates all of the parameters necessary for starting up
@@ -136,6 +140,7 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&f.NodeIP, "node-ip", f.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
 
 	fs.StringVar(&f.DockershimRootDirectory, "experimental-dockershim-root-directory", f.DockershimRootDirectory, "Path to the dockershim root directory.")
+	fs.StringVar(&f.ProviderID, "provider-id", f.ProviderID, "Unique identifier for identifying the node in a machine database, i.e cloudprovider")
 	fs.MarkHidden("experimental-dockershim-root-directory")
 }
 

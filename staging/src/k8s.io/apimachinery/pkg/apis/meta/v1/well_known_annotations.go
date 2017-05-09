@@ -14,15 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package v1
 
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+const (
+	// When kubelet is started with the "external" cloud provider, then
+	// it sets this annotation on the node to denote an ip address set from the
+	// cmd line flag. This ip is verified with the cloudprovider as valid by
+	// the cloud-controller-manager
+	AnnotationProvidedIPAddr = "alpha.kubernetes.io/provided-node-ip"
 )
-
-var _ runtime.Object = &Example{}
-var _ metav1.ObjectMetaAccessor = &Example{}
-
-var _ runtime.Object = &ExampleList{}
-var _ metav1.ListMetaAccessor = &ExampleList{}

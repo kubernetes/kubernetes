@@ -23,13 +23,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
-
-	"github.com/golang/glog"
 )
 
 // PluginFactoryArgs are passed to all plugin factory functions.
@@ -356,7 +355,23 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]al
 			})
 		}
 	}
+	if err := validateSelectedConfigs(configs); err != nil {
+		return nil, err
+	}
 	return configs, nil
+}
+
+// validateSelectedConfigs validates the config weights to avoid the overflow.
+func validateSelectedConfigs(configs []algorithm.PriorityConfig) error {
+	var totalPriority int
+	for _, config := range configs {
+		// Checks totalPriority against MaxTotalPriority to avoid overflow
+		if config.Weight*schedulerapi.MaxPriority > schedulerapi.MaxTotalPriority-totalPriority {
+			return fmt.Errorf("Total priority of priority functions has overflown")
+		}
+		totalPriority += config.Weight * schedulerapi.MaxPriority
+	}
+	return nil
 }
 
 var validName = regexp.MustCompile("^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])$")

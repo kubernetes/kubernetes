@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package openapi_test
 
 import (
 	"fmt"
@@ -24,14 +24,15 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
-	var instance *Resources
+	var instance *openapi.Resources
 	BeforeEach(func() {
 		s, err := data.OpenAPISchema()
 		Expect(err).To(BeNil())
-		instance, err = newOpenAPIData(s)
+		instance, err = openapi.NewOpenAPIData(s)
 		Expect(err).To(BeNil())
 	})
 
@@ -48,7 +49,7 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 		Expect(name).To(Equal(deploymentName))
 	})
 
-	var definition Kind
+	var definition openapi.Kind
 	It("should find the definition by name", func() {
 		var found bool
 		definition, found = instance.NameToDefinition[deploymentName]
@@ -73,31 +74,31 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 
 	It("should find the definition fields", func() {
 		By("for 'kind'")
-		Expect(definition.Fields).To(HaveKeyWithValue("kind", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("kind", openapi.Type{
 			TypeName:    "string",
 			IsPrimitive: true,
 		}))
 
 		By("for 'apiVersion'")
-		Expect(definition.Fields).To(HaveKeyWithValue("apiVersion", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("apiVersion", openapi.Type{
 			TypeName:    "string",
 			IsPrimitive: true,
 		}))
 
 		By("for 'metadata'")
-		Expect(definition.Fields).To(HaveKeyWithValue("metadata", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("metadata", openapi.Type{
 			TypeName: "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
 			IsKind:   true,
 		}))
 
 		By("for 'spec'")
-		Expect(definition.Fields).To(HaveKeyWithValue("spec", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("spec", openapi.Type{
 			TypeName: "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentSpec",
 			IsKind:   true,
 		}))
 
 		By("for 'status'")
-		Expect(definition.Fields).To(HaveKeyWithValue("status", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("status", openapi.Type{
 			TypeName: "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentStatus",
 			IsKind:   true,
 		}))
@@ -105,17 +106,17 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 })
 
 var _ = Describe("Reading apps/v1beta1/DeploymentStatus from openAPIData", func() {
-	var instance *Resources
+	var instance *openapi.Resources
 	BeforeEach(func() {
 		d, err := data.OpenAPISchema()
 		Expect(err).To(BeNil())
-		instance, err = newOpenAPIData(d)
+		instance, err = openapi.NewOpenAPIData(d)
 		Expect(err).To(BeNil())
 	})
 
 	deploymentStatusName := "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentStatus"
 
-	var definition Kind
+	var definition openapi.Kind
 	It("should find the definition by name", func() {
 		var found bool
 		definition, found = instance.NameToDefinition[deploymentStatusName]
@@ -135,16 +136,16 @@ var _ = Describe("Reading apps/v1beta1/DeploymentStatus from openAPIData", func(
 
 	It("should find the definition fields", func() {
 		By("for 'availableReplicas'")
-		Expect(definition.Fields).To(HaveKeyWithValue("availableReplicas", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("availableReplicas", openapi.Type{
 			TypeName:    "integer",
 			IsPrimitive: true,
 		}))
 
 		By("for 'conditions'")
-		Expect(definition.Fields).To(HaveKeyWithValue("conditions", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("conditions", openapi.Type{
 			TypeName: "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentCondition array",
 			IsArray:  true,
-			ElementType: &Type{
+			ElementType: &openapi.Type{
 				TypeName: "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentCondition",
 				IsKind:   true,
 			},
@@ -157,17 +158,17 @@ var _ = Describe("Reading apps/v1beta1/DeploymentStatus from openAPIData", func(
 })
 
 var _ = Describe("Reading apps/v1beta1/DeploymentSpec from openAPIData", func() {
-	var instance *Resources
+	var instance *openapi.Resources
 	BeforeEach(func() {
 		d, err := data.OpenAPISchema()
 		Expect(err).To(BeNil())
-		instance, err = newOpenAPIData(d)
+		instance, err = openapi.NewOpenAPIData(d)
 		Expect(err).To(BeNil())
 	})
 
 	deploymentSpecName := "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentSpec"
 
-	var definition Kind
+	var definition openapi.Kind
 	It("should find the definition by name", func() {
 		var found bool
 		definition, found = instance.NameToDefinition[deploymentSpecName]
@@ -187,7 +188,7 @@ var _ = Describe("Reading apps/v1beta1/DeploymentSpec from openAPIData", func() 
 
 	It("should find the definition fields", func() {
 		By("for 'template'")
-		Expect(definition.Fields).To(HaveKeyWithValue("template", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("template", openapi.Type{
 			TypeName: "io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec",
 			IsKind:   true,
 		}))
@@ -195,17 +196,17 @@ var _ = Describe("Reading apps/v1beta1/DeploymentSpec from openAPIData", func() 
 })
 
 var _ = Describe("Reading v1/ObjectMeta from openAPIData", func() {
-	var instance *Resources
+	var instance *openapi.Resources
 	BeforeEach(func() {
 		d, err := data.OpenAPISchema()
 		Expect(err).To(BeNil())
-		instance, err = newOpenAPIData(d)
+		instance, err = openapi.NewOpenAPIData(d)
 		Expect(err).To(BeNil())
 	})
 
 	objectMetaName := "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
 
-	var definition Kind
+	var definition openapi.Kind
 	It("should find the definition by name", func() {
 		var found bool
 		definition, found = instance.NameToDefinition[objectMetaName]
@@ -225,10 +226,10 @@ var _ = Describe("Reading v1/ObjectMeta from openAPIData", func() {
 
 	It("should find the definition fields", func() {
 		By("for 'finalizers'")
-		Expect(definition.Fields).To(HaveKeyWithValue("finalizers", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("finalizers", openapi.Type{
 			TypeName: "string array",
 			IsArray:  true,
-			ElementType: &Type{
+			ElementType: &openapi.Type{
 				TypeName:    "string",
 				IsPrimitive: true,
 			},
@@ -238,10 +239,10 @@ var _ = Describe("Reading v1/ObjectMeta from openAPIData", func() {
 		}))
 
 		By("for 'ownerReferences'")
-		Expect(definition.Fields).To(HaveKeyWithValue("ownerReferences", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("ownerReferences", openapi.Type{
 			TypeName: "io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference array",
 			IsArray:  true,
-			ElementType: &Type{
+			ElementType: &openapi.Type{
 				TypeName: "io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference",
 				IsKind:   true,
 			},
@@ -252,10 +253,10 @@ var _ = Describe("Reading v1/ObjectMeta from openAPIData", func() {
 		}))
 
 		By("for 'labels'")
-		Expect(definition.Fields).To(HaveKeyWithValue("labels", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("labels", openapi.Type{
 			TypeName: "string map",
 			IsMap:    true,
-			ElementType: &Type{
+			ElementType: &openapi.Type{
 				TypeName:    "string",
 				IsPrimitive: true,
 			},
@@ -264,17 +265,17 @@ var _ = Describe("Reading v1/ObjectMeta from openAPIData", func() {
 })
 
 var _ = Describe("Reading v1/NodeStatus from openAPIData", func() {
-	var instance *Resources
+	var instance *openapi.Resources
 	BeforeEach(func() {
 		d, err := data.OpenAPISchema()
 		Expect(err).To(BeNil())
-		instance, err = newOpenAPIData(d)
+		instance, err = openapi.NewOpenAPIData(d)
 		Expect(err).To(BeNil())
 	})
 
 	nodeStatusName := "io.k8s.kubernetes.pkg.api.v1.NodeStatus"
 
-	var definition Kind
+	var definition openapi.Kind
 	It("should find the definition by name", func() {
 		var found bool
 		definition, found = instance.NameToDefinition[nodeStatusName]
@@ -294,10 +295,10 @@ var _ = Describe("Reading v1/NodeStatus from openAPIData", func() {
 
 	It("should find the definition fields", func() {
 		By("for 'allocatable'")
-		Expect(definition.Fields).To(HaveKeyWithValue("allocatable", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("allocatable", openapi.Type{
 			TypeName: "io.k8s.apimachinery.pkg.api.resource.Quantity map",
 			IsMap:    true,
-			ElementType: &Type{
+			ElementType: &openapi.Type{
 				TypeName: "io.k8s.apimachinery.pkg.api.resource.Quantity",
 				IsKind:   true,
 			},
@@ -306,16 +307,16 @@ var _ = Describe("Reading v1/NodeStatus from openAPIData", func() {
 })
 
 var _ = Describe("Reading Utility Definitions from openAPIData", func() {
-	var instance *Resources
+	var instance *openapi.Resources
 	BeforeEach(func() {
 		d, err := data.OpenAPISchema()
 		Expect(err).To(BeNil())
-		instance, err = newOpenAPIData(d)
+		instance, err = openapi.NewOpenAPIData(d)
 		Expect(err).To(BeNil())
 	})
 
 	Context("for util.intstr.IntOrString", func() {
-		var definition Kind
+		var definition openapi.Kind
 		It("should find the definition by name", func() {
 			intOrStringName := "io.k8s.apimachinery.pkg.util.intstr.IntOrString"
 			var found bool
@@ -327,7 +328,7 @@ var _ = Describe("Reading Utility Definitions from openAPIData", func() {
 	})
 
 	Context("for apis.meta.v1.Time", func() {
-		var definition Kind
+		var definition openapi.Kind
 		It("should find the definition by name", func() {
 			intOrStringName := "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
 			var found bool
@@ -340,11 +341,11 @@ var _ = Describe("Reading Utility Definitions from openAPIData", func() {
 })
 
 var _ = Describe("When parsing the openAPIData", func() {
-	var instance *Resources
+	var instance *openapi.Resources
 	BeforeEach(func() {
 		d, err := data.OpenAPISchema()
 		Expect(err).To(BeNil())
-		instance, err = newOpenAPIData(d)
+		instance, err = openapi.NewOpenAPIData(d)
 		Expect(err).To(BeNil())
 	})
 
@@ -369,17 +370,17 @@ var _ = Describe("When parsing the openAPIData", func() {
 })
 
 var _ = Describe("Reading authorization/v1/SubjectAccessReviewSpec from openAPIData", func() {
-	var instance *Resources
+	var instance *openapi.Resources
 	BeforeEach(func() {
 		d, err := data.OpenAPISchema()
 		Expect(err).To(BeNil())
-		instance, err = newOpenAPIData(d)
+		instance, err = openapi.NewOpenAPIData(d)
 		Expect(err).To(BeNil())
 	})
 
 	subjectAccessReviewSpecName := "io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewSpec"
 
-	var definition Kind
+	var definition openapi.Kind
 	It("should find the definition by name", func() {
 		var found bool
 		definition, found = instance.NameToDefinition[subjectAccessReviewSpecName]
@@ -390,13 +391,13 @@ var _ = Describe("Reading authorization/v1/SubjectAccessReviewSpec from openAPID
 
 	It("should find the definition fields", func() {
 		By("for 'allocatable'")
-		Expect(definition.Fields).To(HaveKeyWithValue("extra", Type{
+		Expect(definition.Fields).To(HaveKeyWithValue("extra", openapi.Type{
 			TypeName: "string array map",
 			IsMap:    true,
-			ElementType: &Type{
+			ElementType: &openapi.Type{
 				TypeName: "string array",
 				IsArray:  true,
-				ElementType: &Type{
+				ElementType: &openapi.Type{
 					TypeName:    "string",
 					IsPrimitive: true,
 				},

@@ -545,6 +545,7 @@ private-mountns
 prom-push-gateway
 protect-kernel-defaults
 proto-import
+provider-id
 proxy-bindall
 proxy-client-cert-file
 proxy-client-key-file

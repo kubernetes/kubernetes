@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
-const ProviderName = "fake"
+const defaultProviderName = "fake"
 
 // FakeBalancer is a fake storage of balancer information
 type FakeBalancer struct {
@@ -61,6 +61,8 @@ type FakeCloud struct {
 	UpdateCalls   []FakeUpdateBalancerCall
 	RouteMap      map[string]*FakeRoute
 	Lock          sync.Mutex
+	Provider      string
+	addCallLock   sync.Mutex
 	cloudprovider.Zone
 }
 
@@ -70,6 +72,8 @@ type FakeRoute struct {
 }
 
 func (f *FakeCloud) addCall(desc string) {
+	f.addCallLock.Lock()
+	defer f.addCallLock.Unlock()
 	f.Calls = append(f.Calls, desc)
 }
 
@@ -92,7 +96,10 @@ func (f *FakeCloud) Clusters() (cloudprovider.Clusters, bool) {
 
 // ProviderName returns the cloud provider ID.
 func (f *FakeCloud) ProviderName() string {
-	return ProviderName
+	if f.Provider == "" {
+		return defaultProviderName
+	}
+	return f.Provider
 }
 
 // ScrubDNS filters DNS settings for pods.
