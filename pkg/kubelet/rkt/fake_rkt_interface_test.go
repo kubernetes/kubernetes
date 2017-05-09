@@ -192,16 +192,28 @@ func (f fakePodGetter) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 	return p, found
 }
 
-type fakeNetNs struct {
+type fakeUnitGetter struct {
 	networkNamespace kubecontainer.ContainerID
+	callServices     []string
 }
 
-func newFakeNetNs() *fakeNetNs {
-	return &fakeNetNs{
+func newfakeUnitGetter() *fakeUnitGetter {
+	return &fakeUnitGetter{
 		networkNamespace: kubecontainer.ContainerID{},
 	}
 }
 
-func (f *fakeNetNs) fromRunningUnitFiles(uid kubetypes.UID, latestPod *rktapi.Pod) (kubecontainer.ContainerID, error) {
+func (f *fakeUnitGetter) getNetworkNamespace(uid kubetypes.UID, latestPod *rktapi.Pod) (kubecontainer.ContainerID, error) {
 	return kubecontainer.ContainerID{ID: "42"}, nil
+}
+
+func (f *fakeUnitGetter) getKubernetesDirective(serviceFilePath string) (podServiceDirective, error) {
+	podService := podServiceDirective{
+		id:               "fake",
+		name:             "fake",
+		namespace:        "fake",
+		hostNetwork:      true,
+		networkNamespace: kubecontainer.ContainerID{ID: "42"},
+	}
+	return podService, nil
 }
