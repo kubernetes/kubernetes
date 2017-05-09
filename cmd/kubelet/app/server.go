@@ -245,7 +245,7 @@ func startKubeletConfigSyncLoop(s *options.KubeletServer, currentKC string) {
 					os.Exit(0)
 				}
 			} else {
-				glog.Infof("Did not find a configuration for this Kubelet via API server: %v", err)
+				glog.Errorf("Did not find a configuration for this Kubelet via API server: %v", err)
 			}
 			return false, nil // Always return (false, nil) so we poll forever.
 		})
