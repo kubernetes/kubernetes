@@ -25,7 +25,7 @@ import (
 var _ MetricsProvider = &metricsStatFS{}
 
 // metricsStatFS represents a MetricsProvider that calculates the used and available
-// Volume space by stat'ing and gathering filesystem info for the Volume path.
+// Volume space and gathering filesystem info for the Volume path.
 type metricsStatFS struct {
 	// the directory path the volume is mounted to.
 	path string
