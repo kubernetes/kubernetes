@@ -55,7 +55,7 @@ func TestClientGoThirdPartyResourceExample(t *testing.T) {
 		t.Fatalf("unexpected error creating the ThirdPartyResource: %v", err)
 	}
 
-	exampleClient, _, err := exampleclient.NewClient(config)
+	exampleClient, exampleScheme, err := exampleclient.NewClient(config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -69,6 +69,7 @@ func TestClientGoThirdPartyResourceExample(t *testing.T) {
 	t.Logf("Starting a controller on instances of TPR %q", exampletprv1.ExampleResourcePlural)
 	controller := examplecontroller.ExampleController{
 		ExampleClient: exampleClient,
+		ExampleScheme: exampleScheme,
 	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
