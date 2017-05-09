@@ -237,15 +237,6 @@ type KubeletDeps struct {
 // makePodSourceConfig creates a config.PodConfig from the given
 // KubeletConfiguration or returns an error.
 func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, nodeName types.NodeName) (*config.PodConfig, error) {
-	manifestURLHeader := make(http.Header)
-	if kubeCfg.ManifestURLHeader != "" {
-		pieces := strings.Split(kubeCfg.ManifestURLHeader, ":")
-		if len(pieces) != 2 {
-			return nil, fmt.Errorf("manifest-url-header must have a single ':' key-value separator, got %q", kubeCfg.ManifestURLHeader)
-		}
-		manifestURLHeader.Set(pieces[0], pieces[1])
-	}
-
 	// source of all configuration
 	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kubeDeps.Recorder)
 
@@ -257,6 +248,14 @@ func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps
 
 	// define url config source
 	if kubeCfg.ManifestURL != "" {
+		manifestURLHeader := make(http.Header)
+		if kubeCfg.ManifestURLHeader != "" {
+			pieces := strings.Split(kubeCfg.ManifestURLHeader, ":")
+			if len(pieces) != 2 {
+				return nil, fmt.Errorf("manifest-url-header must have a single ':' key-value separator, got %q", kubeCfg.ManifestURLHeader)
+			}
+			manifestURLHeader.Set(pieces[0], pieces[1])
+		}
 		glog.Infof("Adding manifest url %q with HTTP header %v", kubeCfg.ManifestURL, manifestURLHeader)
 		config.NewSourceURL(kubeCfg.ManifestURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
 	}
