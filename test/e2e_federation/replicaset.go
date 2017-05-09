@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/federation/apis/federation"
-	fedreplicsetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
+	federatedtypes "k8s.io/kubernetes/federation/pkg/federatedtypes"
 )
 
 const (
@@ -513,7 +513,7 @@ func newReplicaSetObj(namespace string, replicas int32, pref *federation.Federat
 	if pref != nil {
 		prefBytes, _ := json.Marshal(pref)
 		prefString := string(prefBytes)
-		rs.Annotations[fedreplicsetcontroller.FedReplicaSetPreferencesAnnotation] = prefString
+		rs.Annotations[federatedtypes.FedReplicaSetPreferencesAnnotation] = prefString
 	}
 	return rs
 

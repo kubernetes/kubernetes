@@ -56,6 +56,7 @@ go_test(
     srcs = [
         "configmap_controller_test.go",
         "daemonset_controller_test.go",
+        "replicasetcontroller_test.go",
         "secret_controller_test.go",
     ],
     library = ":go_default_library",
@@ -77,5 +78,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/client-go/testing:go_default_library",
     ],
 )
