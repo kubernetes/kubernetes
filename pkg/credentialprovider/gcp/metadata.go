@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	metadataUrl              = "http://metadata.google.internal./computeMetadata/v1/"
+	metadataUrl              = "http://metadata.google.internal/computeMetadata/v1/"
 	metadataAttributes       = metadataUrl + "instance/attributes/"
 	dockerConfigKey          = metadataAttributes + "google-dockercfg"
 	dockerConfigUrlKey       = metadataAttributes + "google-dockercfg-url"
