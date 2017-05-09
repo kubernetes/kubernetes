@@ -488,6 +488,9 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		return statusError, err
 	}
 	podStatus, err := podanalyzer.AnalysePods(fd.Spec.Selector, allPods, time.Now())
+	if err != nil {
+		return statusError, err
+	}
 	current := make(map[string]int64)
 	estimatedCapacity := make(map[string]int64)
 	for _, cluster := range clusters {
