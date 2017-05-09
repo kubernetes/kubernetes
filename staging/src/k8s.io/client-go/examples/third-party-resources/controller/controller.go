@@ -81,7 +81,7 @@ func (c *ExampleController) watchExamples(ctx context.Context) (cache.Controller
 
 func (c *ExampleController) onAdd(obj interface{}) {
 	example := obj.(*tprv1.Example)
-	fmt.Printf("[CONTROLLER] OnAdd %s\n", example.Metadata.SelfLink)
+	fmt.Printf("[CONTROLLER] OnAdd %s\n", example.ObjectMeta.SelfLink)
 
 	// NEVER modify objects from the store. It's a read-only, local cache.
 	// You can use exampleScheme.Copy() to make a deep copy of original object and modify this copy
@@ -99,8 +99,8 @@ func (c *ExampleController) onAdd(obj interface{}) {
 	}
 
 	err = c.ExampleClient.Put().
-		Name(example.Metadata.Name).
-		Namespace(example.Metadata.Namespace).
+		Name(example.ObjectMeta.Name).
+		Namespace(example.ObjectMeta.Namespace).
 		Resource(tprv1.ExampleResourcePlural).
 		Body(exampleCopy).
 		Do().
@@ -116,11 +116,11 @@ func (c *ExampleController) onAdd(obj interface{}) {
 func (c *ExampleController) onUpdate(oldObj, newObj interface{}) {
 	oldExample := oldObj.(*tprv1.Example)
 	newExample := newObj.(*tprv1.Example)
-	fmt.Printf("[CONTROLLER] OnUpdate oldObj: %s\n", oldExample.Metadata.SelfLink)
-	fmt.Printf("[CONTROLLER] OnUpdate newObj: %s\n", newExample.Metadata.SelfLink)
+	fmt.Printf("[CONTROLLER] OnUpdate oldObj: %s\n", oldExample.ObjectMeta.SelfLink)
+	fmt.Printf("[CONTROLLER] OnUpdate newObj: %s\n", newExample.ObjectMeta.SelfLink)
 }
 
 func (c *ExampleController) onDelete(obj interface{}) {
 	example := obj.(*tprv1.Example)
-	fmt.Printf("[CONTROLLER] OnDelete %s\n", example.Metadata.SelfLink)
+	fmt.Printf("[CONTROLLER] OnDelete %s\n", example.ObjectMeta.SelfLink)
 }

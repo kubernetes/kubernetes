@@ -82,7 +82,7 @@ func main() {
 
 	// Create an instance of our TPR
 	example := &tprv1.Example{
-		Metadata: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "example1",
 		},
 		Spec: tprv1.ExampleSpec{

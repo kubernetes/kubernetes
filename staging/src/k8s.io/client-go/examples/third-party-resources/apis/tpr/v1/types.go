@@ -17,22 +17,15 @@ limitations under the License.
 package v1
 
 import (
-	"encoding/json"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const ExampleResourcePlural = "examples"
 
 type Example struct {
 	metav1.TypeMeta `json:",inline"`
-	// WARNING: Don't call the field below ObjectMeta to avoid the issue with ugorji
-	// https://github.com/kubernetes/client-go/issues/8#issuecomment-285333502
-	Metadata metav1.ObjectMeta `json:"metadata"`
-
+	metav1.ObjectMeta `json:"metadata"`
 	Spec ExampleSpec `json:"spec"`
-
 	Status ExampleStatus `json:"status,omitempty"`
 }
 
@@ -55,58 +48,6 @@ const (
 
 type ExampleList struct {
 	metav1.TypeMeta `json:",inline"`
-	// WARNING: Don't call the field below ListMeta to avoid the issue with ugorji
-	// https://github.com/kubernetes/client-go/issues/8#issuecomment-285333502
-	Metadata metav1.ListMeta `json:"metadata"`
-
+	metav1.ListMeta `json:"metadata"`
 	Items []Example `json:"items"`
-}
-
-// The code below is used only to work around a known problem with third-party
-// resources and ugorji. If/when these issues are resolved, the code below
-// should no longer be required.
-
-// Required to satisfy Object interface
-func (e *Example) GetObjectKind() schema.ObjectKind {
-	return &e.TypeMeta
-}
-
-// Required to satisfy ObjectMetaAccessor interface
-func (e *Example) GetObjectMeta() metav1.Object {
-	return &e.Metadata
-}
-
-// Required to satisfy Object interface
-func (el *ExampleList) GetObjectKind() schema.ObjectKind {
-	return &el.TypeMeta
-}
-
-// Required to satisfy ListMetaAccessor interface
-func (el *ExampleList) GetListMeta() metav1.List {
-	return &el.Metadata
-}
-
-type ExampleListCopy ExampleList
-type ExampleCopy Example
-
-func (e *Example) UnmarshalJSON(data []byte) error {
-	tmp := ExampleCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	tmp2 := Example(tmp)
-	*e = tmp2
-	return nil
-}
-
-func (el *ExampleList) UnmarshalJSON(data []byte) error {
-	tmp := ExampleListCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	tmp2 := ExampleList(tmp)
-	*el = tmp2
-	return nil
 }

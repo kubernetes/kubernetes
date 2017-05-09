@@ -78,7 +78,7 @@ func TestClientGoThirdPartyResourceExample(t *testing.T) {
 	// Create an instance of our TPR
 	t.Logf("Creating instance of TPR %q", exampletprv1.ExampleResourcePlural)
 	example := &exampletprv1.Example{
-		Metadata: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "example1",
 		},
 		Spec: exampletprv1.ExampleSpec{
@@ -105,5 +105,4 @@ func TestClientGoThirdPartyResourceExample(t *testing.T) {
 		t.Fatalf("TPR example was not processed correctly: %v", err)
 	}
 	t.Logf("TPR %q instance is processed", exampletprv1.ExampleResourcePlural)
-
 }
