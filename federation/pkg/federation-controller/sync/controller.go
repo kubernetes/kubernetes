@@ -83,10 +83,11 @@ type FederationSyncController struct {
 
 	deletionHelper *deletionhelper.DeletionHelper
 
-	reviewDelay           time.Duration
-	clusterAvailableDelay time.Duration
-	smallDelay            time.Duration
-	updateTimeout         time.Duration
+	reviewDelay             time.Duration
+	clusterAvailableDelay   time.Duration
+	clusterUnavailableDelay time.Duration
+	smallDelay              time.Duration
+	updateTimeout           time.Duration
 
 	adapter federatedtypes.FederatedTypeAdapter
 }
@@ -111,14 +112,15 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: fmt.Sprintf("federated-%v-controller", adapter.Kind())})
 
 	s := &FederationSyncController{
-		reviewDelay:           time.Second * 10,
-		clusterAvailableDelay: time.Second * 20,
-		smallDelay:            time.Second * 3,
-		updateTimeout:         time.Second * 30,
-		workQueue:             workqueue.New(),
-		backoff:               flowcontrol.NewBackOff(5*time.Second, time.Minute),
-		eventRecorder:         recorder,
-		adapter:               adapter,
+		reviewDelay:             time.Second * 10,
+		clusterAvailableDelay:   time.Second * 20,
+		clusterUnavailableDelay: time.Second * 60,
+		smallDelay:              time.Second * 3,
+		updateTimeout:           time.Second * 30,
+		workQueue:               workqueue.New(),
+		backoff:                 flowcontrol.NewBackOff(5*time.Second, time.Minute),
+		eventRecorder:           recorder,
+		adapter:                 adapter,
 	}
 
 	// Build delivereres for triggering reconciliations.
@@ -168,6 +170,10 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 				// When new cluster becomes available process all the target resources again.
 				s.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(s.clusterAvailableDelay))
 			},
+			// When a cluster becomes unavailable process all the target resources again.
+			ClusterUnavailable: func(cluster *federationapi.Cluster, _ []interface{}) {
+				s.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(s.clusterUnavailableDelay))
+			},
 		},
 	)
 
@@ -206,6 +212,7 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 // minimizeLatency reduces delays and timeouts to make the controller more responsive (useful for testing).
 func (s *FederationSyncController) minimizeLatency() {
 	s.clusterAvailableDelay = time.Second
+	s.clusterUnavailableDelay = time.Second
 	s.reviewDelay = 50 * time.Millisecond
 	s.smallDelay = 20 * time.Millisecond
 	s.updateTimeout = 5 * time.Second
@@ -330,6 +337,11 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 
 	key := namespacedName.String()
 	kind := s.adapter.Kind()
+
+	glog.V(4).Infof("Starting to reconcile %v %v", kind, key)
+	startTime := time.Now()
+	defer glog.V(4).Infof("Finished reconciling %v %v (duration: %v)", kind, key, time.Now().Sub(startTime))
+
 	cachedObj, exist, err := s.store.GetByKey(key)
 	if err != nil {
 		return statusError, fmt.Errorf("failed to query main %s store for %v: %v", kind, key, err)
@@ -377,6 +389,15 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		return statusNotSynced, fmt.Errorf("failed to get cluster list: %v", err)
 	}
 
+	prepareFunc := s.adapter.PrepareForUpdateFunc()
+	var userInfo interface{}
+	if prepareFunc != nil {
+		userInfo, err = prepareFunc(obj, key, clusters, s.informer)
+		if err != nil {
+			return statusError, err
+		}
+	}
+
 	operations := make([]util.FederatedOperation, 0)
 	for _, cluster := range clusters {
 		clusterObj, found, err := s.informer.GetTargetStore().GetByKey(cluster.Name, key)
@@ -387,15 +408,29 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		// The data should not be modified.
 		desiredObj := s.adapter.Copy(obj)
 
-		if !found {
-			s.eventRecorder.Eventf(obj, api.EventTypeNormal, "CreateInCluster",
-				"Creating %s in cluster %s", kind, cluster.Name)
+		// If the adapter has a special way of creating operations, do it.
+		updateFunc := s.adapter.UpdateObjectFunc()
+		if updateFunc != nil {
+			var clusterTypedObj pkgruntime.Object = nil
+			if clusterObj != nil {
+				clusterTypedObj = clusterObj.(pkgruntime.Object)
+			}
+			desiredObj, err = updateFunc(cluster, clusterTypedObj, desiredObj, userInfo)
+			if err != nil {
+				return statusError, nil
+			}
+		}
 
-			operations = append(operations, util.FederatedOperation{
-				Type:        util.OperationTypeAdd,
-				Obj:         desiredObj,
-				ClusterName: cluster.Name,
-			})
+		if !found {
+			if desiredObj != nil {
+				s.eventRecorder.Eventf(obj, api.EventTypeNormal, "CreateInCluster",
+					"Creating %s in cluster %s", kind, cluster.Name)
+				operations = append(operations, util.FederatedOperation{
+					Type:        util.OperationTypeAdd,
+					Obj:         desiredObj,
+					ClusterName: cluster.Name,
+				})
+			}
 		} else {
 			clusterObj := clusterObj.(pkgruntime.Object)
 
@@ -411,6 +446,15 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 			}
 		}
 	}
+
+	glog.V(4).Infof("almostFinalObj: %#v", obj)
+	updateFinishedFunc := s.adapter.UpdateFinishedFunc()
+	if updateFinishedFunc != nil {
+		if err = updateFinishedFunc(obj, userInfo); err != nil {
+			return statusError, err
+		}
+	}
+	glog.V(4).Infof("finalObj: %#v", obj)
 
 	if len(operations) == 0 {
 		// Everything is in order
