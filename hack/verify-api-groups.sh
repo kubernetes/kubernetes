@@ -69,6 +69,7 @@ groups_without_codegen=(
 	"abac"
 	"componentconfig"
 	"imagepolicy"
+	"admission"
 )
 client_gen_file="${KUBE_ROOT}/cmd/libs/go2idl/client-gen/main.go"
 
@@ -92,6 +93,7 @@ done
 # them.  This happens for types that aren't served from the API server
 packages_without_install=(
 	"k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/kubernetes/pkg/apis/admission"
 )
 known_version_files=(
 	"pkg/master/import_known_versions.go"
@@ -116,7 +118,7 @@ for expected_install_package in "${expected_install_packages[@]}"; do
 	done
 done
 
-# check all groupversions to make sure they're in the init.sh file.  This isn't perfect, but its slightly 
+# check all groupversions to make sure they're in the init.sh file.  This isn't perfect, but its slightly
 # better than nothing
 for external_group_version in "${external_group_versions[@]}"; do
 	if ! grep -q "${external_group_version}" "${KUBE_ROOT}/hack/lib/init.sh" ; then
