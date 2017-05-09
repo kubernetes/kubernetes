@@ -139,7 +139,7 @@ func (m Mount) GetThisCgroupDir(cgroups map[string]string) (string, error) {
 	return getControllerPath(m.Subsystems[0], cgroups)
 }
 
-func getCgroupMountsHelper(ss map[string]bool, mi io.Reader, all bool) ([]Mount, error) {
+func getCgroupMountsHelper(ss map[string]bool, mi io.Reader) ([]Mount, error) {
 	res := make([]Mount, 0, len(ss))
 	scanner := bufio.NewScanner(mi)
 	numFound := 0
@@ -166,9 +166,7 @@ func getCgroupMountsHelper(ss map[string]bool, mi io.Reader, all bool) ([]Mount,
 			} else {
 				m.Subsystems = append(m.Subsystems, opt)
 			}
-			if !all {
-				numFound++
-			}
+			numFound++
 		}
 		res = append(res, m)
 	}
@@ -178,25 +176,23 @@ func getCgroupMountsHelper(ss map[string]bool, mi io.Reader, all bool) ([]Mount,
 	return res, nil
 }
 
-// GetCgroupMounts returns the mounts for the cgroup subsystems.
-// all indicates whether to return just the first instance or all the mounts.
-func GetCgroupMounts(all bool) ([]Mount, error) {
+func GetCgroupMounts() ([]Mount, error) {
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	allSubsystems, err := ParseCgroupFile("/proc/self/cgroup")
+	all, err := ParseCgroupFile("/proc/self/cgroup")
 	if err != nil {
 		return nil, err
 	}
 
 	allMap := make(map[string]bool)
-	for s := range allSubsystems {
+	for s := range all {
 		allMap[s] = true
 	}
-	return getCgroupMountsHelper(allMap, f, all)
+	return getCgroupMountsHelper(allMap, f)
 }
 
 // GetAllSubsystems returns all the cgroup subsystems supported by the kernel

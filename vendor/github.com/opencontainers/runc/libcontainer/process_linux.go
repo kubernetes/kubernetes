@@ -32,7 +32,7 @@ type parentProcess interface {
 	// wait waits on the process returning the process state.
 	wait() (*os.ProcessState, error)
 
-	// startTime returns the process start time.
+	// startTime return's the process start time.
 	startTime() (string, error)
 
 	signal(os.Signal) error
@@ -356,7 +356,7 @@ loop:
 		}
 	}
 	if !sentRun {
-		return newSystemErrorWithCause(ierr, "container init")
+		return newSystemErrorWithCause(ierr, "container init failed")
 	}
 	if p.config.Config.Namespaces.Contains(configs.NEWNS) && !sentResume {
 		return newSystemError(fmt.Errorf("could not synchronise after executing prestart hooks with container process"))

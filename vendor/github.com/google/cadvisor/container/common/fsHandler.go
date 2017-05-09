@@ -16,7 +16,6 @@
 package common
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -27,85 +26,71 @@ import (
 
 type FsHandler interface {
 	Start()
-	Usage() FsUsage
+	Usage() (baseUsageBytes uint64, totalUsageBytes uint64)
 	Stop()
-}
-
-type FsUsage struct {
-	BaseUsageBytes  uint64
-	TotalUsageBytes uint64
-	InodeUsage      uint64
 }
 
 type realFsHandler struct {
 	sync.RWMutex
-	lastUpdate time.Time
-	usage      FsUsage
-	period     time.Duration
-	minPeriod  time.Duration
-	rootfs     string
-	extraDir   string
-	fsInfo     fs.FsInfo
+	lastUpdate     time.Time
+	usageBytes     uint64
+	baseUsageBytes uint64
+	period         time.Duration
+	minPeriod      time.Duration
+	rootfs         string
+	extraDir       string
+	fsInfo         fs.FsInfo
 	// Tells the container to stop.
 	stopChan chan struct{}
 }
 
 const (
-	longOp           = time.Second
-	timeout          = 2 * time.Minute
-	maxBackoffFactor = 20
+	longDu             = time.Second
+	duTimeout          = time.Minute
+	maxDuBackoffFactor = 20
 )
-
-const DefaultPeriod = time.Minute
 
 var _ FsHandler = &realFsHandler{}
 
 func NewFsHandler(period time.Duration, rootfs, extraDir string, fsInfo fs.FsInfo) FsHandler {
 	return &realFsHandler{
-		lastUpdate: time.Time{},
-		usage:      FsUsage{},
-		period:     period,
-		minPeriod:  period,
-		rootfs:     rootfs,
-		extraDir:   extraDir,
-		fsInfo:     fsInfo,
-		stopChan:   make(chan struct{}, 1),
+		lastUpdate:     time.Time{},
+		usageBytes:     0,
+		baseUsageBytes: 0,
+		period:         period,
+		minPeriod:      period,
+		rootfs:         rootfs,
+		extraDir:       extraDir,
+		fsInfo:         fsInfo,
+		stopChan:       make(chan struct{}, 1),
 	}
 }
 
 func (fh *realFsHandler) update() error {
 	var (
-		baseUsage, extraDirUsage, inodeUsage    uint64
-		rootDiskErr, rootInodeErr, extraDiskErr error
+		baseUsage, extraDirUsage uint64
+		err                      error
 	)
 	// TODO(vishh): Add support for external mounts.
 	if fh.rootfs != "" {
-		baseUsage, rootDiskErr = fh.fsInfo.GetDirDiskUsage(fh.rootfs, timeout)
-		inodeUsage, rootInodeErr = fh.fsInfo.GetDirInodeUsage(fh.rootfs, timeout)
+		baseUsage, err = fh.fsInfo.GetDirUsage(fh.rootfs, duTimeout)
+		if err != nil {
+			return err
+		}
 	}
 
 	if fh.extraDir != "" {
-		extraDirUsage, extraDiskErr = fh.fsInfo.GetDirDiskUsage(fh.extraDir, timeout)
+		extraDirUsage, err = fh.fsInfo.GetDirUsage(fh.extraDir, duTimeout)
+		if err != nil {
+			return err
+		}
 	}
 
-	// Wait to handle errors until after all operartions are run.
-	// An error in one will not cause an early return, skipping others
 	fh.Lock()
 	defer fh.Unlock()
 	fh.lastUpdate = time.Now()
-	if rootDiskErr == nil && fh.rootfs != "" {
-		fh.usage.InodeUsage = inodeUsage
-	}
-	if rootInodeErr == nil && fh.rootfs != "" {
-		fh.usage.TotalUsageBytes = baseUsage + extraDirUsage
-	}
-	if extraDiskErr == nil && fh.extraDir != "" {
-		fh.usage.BaseUsageBytes = baseUsage
-	}
-	// Combine errors into a single error to return
-	if rootDiskErr != nil || rootInodeErr != nil || extraDiskErr != nil {
-		return fmt.Errorf("rootDiskErr: %v, rootInodeErr: %v, extraDiskErr: %v", rootDiskErr, rootInodeErr, extraDiskErr)
-	}
+	fh.usageBytes = baseUsage + extraDirUsage
+	fh.baseUsageBytes = baseUsage
 	return nil
 }
 
@@ -120,15 +105,15 @@ func (fh *realFsHandler) trackUsage() {
 			if err := fh.update(); err != nil {
 				glog.Errorf("failed to collect filesystem stats - %v", err)
 				fh.period = fh.period * 2
-				if fh.period > maxBackoffFactor*fh.minPeriod {
-					fh.period = maxBackoffFactor * fh.minPeriod
+				if fh.period > maxDuBackoffFactor*fh.minPeriod {
+					fh.period = maxDuBackoffFactor * fh.minPeriod
 				}
 			} else {
 				fh.period = fh.minPeriod
 			}
 			duration := time.Since(start)
-			if duration > longOp {
-				glog.V(2).Infof("du and find on following dirs took %v: %v", duration, []string{fh.rootfs, fh.extraDir})
+			if duration > longDu {
+				glog.V(2).Infof("`du` on following dirs took %v: %v", duration, []string{fh.rootfs, fh.extraDir})
 			}
 		}
 	}
@@ -142,8 +127,8 @@ func (fh *realFsHandler) Stop() {
 	close(fh.stopChan)
 }
 
-func (fh *realFsHandler) Usage() FsUsage {
+func (fh *realFsHandler) Usage() (baseUsageBytes, totalUsageBytes uint64) {
 	fh.RLock()
 	defer fh.RUnlock()
-	return fh.usage
+	return fh.baseUsageBytes, fh.usageBytes
 }

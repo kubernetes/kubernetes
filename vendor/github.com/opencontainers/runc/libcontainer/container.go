@@ -75,8 +75,8 @@ type BaseContainer interface {
 	// Returns the current status of the container.
 	//
 	// errors:
-	// ContainerNotExists - Container no longer exists,
-	// Systemerror - System error.
+	// ContainerDestroyed - Container no longer exists,
+	// SystemError - System error.
 	Status() (Status, error)
 
 	// State returns the current container's state information.
@@ -91,8 +91,8 @@ type BaseContainer interface {
 	// Returns the PIDs inside this container. The PIDs are in the namespace of the calling process.
 	//
 	// errors:
-	// ContainerNotExists - Container no longer exists,
-	// Systemerror - System error.
+	// ContainerDestroyed - Container no longer exists,
+	// SystemError - System error.
 	//
 	// Some of the returned PIDs may no longer refer to processes in the Container, unless
 	// the Container state is PAUSED in which case every PID in the slice is valid.
@@ -101,8 +101,8 @@ type BaseContainer interface {
 	// Returns statistics for the container.
 	//
 	// errors:
-	// ContainerNotExists - Container no longer exists,
-	// Systemerror - System error.
+	// ContainerDestroyed - Container no longer exists,
+	// SystemError - System error.
 	Stats() (*Stats, error)
 
 	// Set resources of container as configured
@@ -117,7 +117,7 @@ type BaseContainer interface {
 	// start. You can track process lifecycle with passed Process structure.
 	//
 	// errors:
-	// ContainerNotExists - Container no longer exists,
+	// ContainerDestroyed - Container no longer exists,
 	// ConfigInvalid - config is invalid,
 	// ContainerPaused - Container is paused,
 	// SystemError - System error.
@@ -128,7 +128,7 @@ type BaseContainer interface {
 	// opens the fifo after start returns.
 	//
 	// errors:
-	// ContainerNotExists - Container no longer exists,
+	// ContainerDestroyed - Container no longer exists,
 	// ConfigInvalid - config is invalid,
 	// ContainerPaused - Container is paused,
 	// SystemError - System error.
