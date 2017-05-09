@@ -6402,14 +6402,14 @@ the new apiVersions will still be accessible, using the old version.  You can
 continue to use your existing JSON and YAML files until you are ready to switch
 to <code>autoscaling/v1</code>.  We may remove support for HorizontalPodAutoscalers with  <code>apiVersion: extensions/v1beta1 </code>in 1.3 or 1.4.
   * Kube-Proxy now defaults to an iptables-based proxy. If the --proxy-mode flag is
-specified while starting kube-proxy (‘userspace’ or ‘iptables’), the flag value
+specified while starting kube-proxy (`userspace` or `iptables`), the flag value
 will be respected. If the flag value is not specified, the kube-proxy respects
-the Node object annotation: ‘net.beta.kubernetes.io/proxy-mode’. If the
-annotation is not specified, then ‘iptables’ mode is the default. If kube-proxy
+the Node object annotation: `net.beta.kubernetes.io/proxy-mode`. If the
+annotation is not specified, then `iptables` mode is the default. If kube-proxy
 is unable to start in iptables mode because system requirements are not met
 (kernel or iptables versions are insufficient), the kube-proxy will fall-back
 to userspace mode. Kube-proxy is much more performant and less
-resource-intensive in ‘iptables’ mode.
+resource-intensive in `iptables` mode.
   * Node stability can be improved by reserving [resources](https://github.com/kubernetes/kubernetes/blob/release-1.2/docs/proposals/node-allocatable.md) for the base operating system using --system-reserved and --kube-reserved Kubelet flags
   * Liveness and readiness probes now support more configuration parameters:
 periodSeconds, successThreshold, failureThreshold
@@ -6422,7 +6422,7 @@ of selectors to accommodate both [equality-based selectors](http://kubernetes.io
   * “kubectl run” now produces Deployments (instead of ReplicationControllers) and
 Jobs (instead of Pods) by default.
   * Pods can now consume Secret data in environment variables and inject those
-environment variables into a container’s command-line args.
+environment variables into a container's command-line args.
   * Stable version of Heapster which scales up to 1000 nodes: more metrics, reduced
 latency, reduced cpu/memory consumption (~4mb per monitored node).
   * Pods now have a security context which allows users to specify:
@@ -6432,11 +6432,11 @@ latency, reduced cpu/memory consumption (~4mb per monitored node).
         * Supplemental Groups
         * FSGroup - a special supplemental group
         * SELinux options
-     * If a pod defines an FSGroup, that Pod’s system (emptyDir, secret, configMap,
+     * If a pod defines an FSGroup, that Pod's system (emptyDir, secret, configMap,
 etc) volumes and block-device volumes will be owned by the FSGroup, and each
 container in the pod will run with the FSGroup as a supplemental group
   * Volumes that support SELinux labelling are now automatically relabeled with the
-Pod’s SELinux context, if specified
+Pod's SELinux context, if specified
   * A stable client library release\_1\_2 is added. The library is [here](pkg/client/clientset_generated/), and detailed doc is [here](docs/devel/generating-clientset.md#released-clientsets). We will keep the interface of this go client stable.
   * New Azure File Service Volume Plugin enables mounting Microsoft Azure File
 Volumes (SMB 2.1 and 3.0) into a Pod. See [example](https://github.com/kubernetes/kubernetes/blob/release-1.2/examples/azure_file/README.md) for details.
@@ -6455,11 +6455,11 @@ among the schedulers for each pod. Documentation is [here](http://kubernetes.io/
   * More expressive node affinity syntax, and support for “soft” node affinity.
 Node selectors (to constrain pods to schedule on a subset of nodes) now support
 the operators {<code>In, NotIn, Exists, DoesNotExist, Gt, Lt</code>}  instead of just conjunction of exact match on node label values. In
-addition, we’ve introduced a new “soft” kind of node selector that is just a
+addition, we've introduced a new “soft” kind of node selector that is just a
 hint to the scheduler; the scheduler will try to satisfy these requests but it
 does not guarantee they will be satisfied. Both the “hard” and “soft” variants
 of node affinity use the new syntax. Documentation is [here](http://kubernetes.io/docs/user-guide/node-selection/) (see section “Alpha feature in Kubernetes v1.2: Node Affinity“). Design doc is [here](https://github.com/kubernetes/kubernetes/blob/release-1.2/docs/design/nodeaffinity.md).
-  * A pod can specify its own Hostname and Subdomain via annotations (<code>pod.beta.kubernetes.io/hostname, pod.beta.kubernetes.io/subdomain)</code>. If the Subdomain matches the name of a [headless service](http://kubernetes.io/docs/user-guide/services/#headless-services) in the same namespace, a DNS A record is also created for the pod’s FQDN. More
+  * A pod can specify its own Hostname and Subdomain via annotations (<code>pod.beta.kubernetes.io/hostname, pod.beta.kubernetes.io/subdomain)</code>. If the Subdomain matches the name of a [headless service](http://kubernetes.io/docs/user-guide/services/#headless-services) in the same namespace, a DNS A record is also created for the pod's FQDN. More
 details can be found in the [DNS README](https://github.com/kubernetes/kubernetes/blob/release-1.2/cluster/saltbase/salt/kube-dns/README.md#a-records-and-hostname-based-on-pod-annotations---a-beta-feature-in-kubernetes-v12). Changes were introduced in PR [#20688](https://github.com/kubernetes/kubernetes/pull/20688).
   * New SchedulerExtender enables users to implement custom
 out-of-(the-scheduler)-process scheduling predicates and priority functions,
@@ -6488,7 +6488,7 @@ be enforced.
 you do this, then, at the time you re-vendor the "<code>k8s.io/kubernetes/"</code> code, you will need to set <code>job.Spec.ManualSelector = true</code>, or else set <code>job.Spec.Selector = nil.  </code>Otherwise, the jobs you create may be rejected.  See [Specifying your own pod selector](http://kubernetes.io/docs/user-guide/jobs/#specifying-your-own-pod-selector).
   * Deployment was Alpha in 1.1 (though it had apiVersion extensions/v1beta1) and
 was disabled by default. Due to some non-backward-compatible API changes, any
-Deployment objects you created in 1.1 won’t work with in the 1.2 release.
+Deployment objects you created in 1.1 won't work with in the 1.2 release.
      * Before upgrading to 1.2, <strong>delete all Deployment alpha-version resources</strong>, including the Replication Controllers and Pods the Deployment manages. Then
 create Deployment Beta resources after upgrading to 1.2. Not deleting the
 Deployment objects may cause the deployment controller to mistakenly match
@@ -6500,15 +6500,15 @@ Deployment-related operations.
         * Scale subresource now has a new <code>targetSelector</code> field in its status. This field supports the new set-based selectors supported
 by Deployments, but in a serialized format.
      * Spec change:
-        * Deployment’s [selector](http://kubernetes.io/docs/user-guide/labels/#label-selectors) is now more general (supports set-based selector; it only supported
+        * Deployment's [selector](http://kubernetes.io/docs/user-guide/labels/#label-selectors) is now more general (supports set-based selector; it only supported
 equality-based selector in 1.1).
-        * .spec.uniqueLabelKey is removed -- users can’t customize unique label key --
+        * .spec.uniqueLabelKey is removed -- users can't customize unique label key --
 and its default value is changed from
 “deployment.kubernetes.io/podTemplateHash” to “pod-template-hash”.
         * .spec.strategy.rollingUpdate.minReadySeconds is moved to .spec.minReadySeconds
   * DaemonSet was Alpha in 1.1 (though it had apiVersion extensions/v1beta1) and
 was disabled by default. Due to some non-backward-compatible API changes, any
-DaemonSet objects you created in 1.1 won’t work with in the 1.2 release.
+DaemonSet objects you created in 1.1 won't work with in the 1.2 release.
      * Before upgrading to 1.2, <strong>delete all DaemonSet alpha-version resources</strong>. If you do not want to disrupt the pods, use kubectl delete daemonset <name>
 --cascade=false. Then create DaemonSet Beta resources after upgrading to 1.2.
      * Client (kubectl) and server versions must match (both 1.1 or both 1.2) for any
@@ -6520,7 +6520,7 @@ not be evicted from nodes whose Ready condition is false.
 DaemonSet, update the pod template and then delete its pods one by one; they
 will be replaced using the updated template.
      * Spec change:
-        * DaemonSet’s [selector](http://kubernetes.io/docs/user-guide/labels/#label-selectors) is now more general (supports set-based selector; it only supported
+        * DaemonSet's [selector](http://kubernetes.io/docs/user-guide/labels/#label-selectors) is now more general (supports set-based selector; it only supported
 equality-based selector in 1.1).
   * Running against a secured etcd requires these flags to be passed to
 kube-apiserver (instead of --etcd-config):
@@ -6552,7 +6552,7 @@ MINION\_SIZE to kube-up, you should now specify NUM\_NODES or NODE\_SIZE.
   * Minimum memory limit is 4MB. This is a docker limitation
   * Minimum CPU limits is 10m. This is a Linux Kernel limitation
   * “kubectl rollout undo” (i.e. rollback) will hang on paused deployments, because
-paused deployments can’t be rolled back (this is expected), and the command
+paused deployments can't be rolled back (this is expected), and the command
 waits for rollback events to return the result. Users should use “kubectl
 rollout resume” to resume a deployment before rolling back.
   * “kubectl edit <list>” will open the editor multiple times, once for each
@@ -6568,15 +6568,15 @@ manually detached before Kubernetes can attach it to other nodes.
 again (due to kubelet restart, for example) will fail. The volume must either
 be manually detached first or the pods referencing it deleted (which would
 trigger automatic volume detach).
-  * In very large clusters it may happen that a few nodes won’t register in API
+  * In very large clusters it may happen that a few nodes won't register in API
 server in a given timeframe for whatever reasons (networking issue, machine
 failure, etc.). Normally when kube-up script will encounter even one NotReady
 node it will fail, even though the cluster most likely will be working. We
 added an environmental variable to kube-up ALLOWED\_NOTREADY\_NODES that
-defines the number of nodes that if not Ready in time won’t cause kube-up
+defines the number of nodes that if not Ready in time won't cause kube-up
 failure.
-  * “kubectl rolling-update” only supports Replication Controllers (it doesn’t
-support Replica Sets). It’s recommended to use Deployment 1.2 with “kubectl
+  * “kubectl rolling-update” only supports Replication Controllers (it doesn't
+support Replica Sets). It's recommended to use Deployment 1.2 with “kubectl
 rollout” commands instead, if you want to rolling update Replica Sets.
   * When live upgrading Kubelet to 1.2 without draining the pods running on the node,
 the containers will be restarted by Kubelet (see details in [#23104](https://github.com/kubernetes/kubernetes/issues/23104)).
@@ -6590,7 +6590,7 @@ More information [here](https://github.com/docker/docker/issues/17720)
   * Docker daemon restarts can fail. Docker checkpoints have to deleted between
 restarts. More information [here](https://github.com/kubernetes/kubernetes/issues/20995)
   * Pod IP allocation-related issues. Deleting the docker checkpoint prior to
-restarting the daemon alleviates this issue, but hasn’t been verified to
+restarting the daemon alleviates this issue, but hasn't been verified to
 completely eliminate the IP allocation issue. More information [here](https://github.com/kubernetes/kubernetes/issues/21523#issuecomment-191498969)
   * Daemon becomes unresponsive (rarely) due to kernel deadlocks. More information [here](https://github.com/kubernetes/kubernetes/issues/21866#issuecomment-189492391)
 
