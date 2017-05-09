@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -58,6 +59,42 @@ func TestAddNode(t *testing.T) {
 	}
 	if !CheckSetEq(setPattern, evictor.queue.set) {
 		t.Errorf("Invalid map. Got %v, expected %v", evictor.queue.set, setPattern)
+	}
+}
+
+func TestReplaceNode(t *testing.T) {
+	testN := 10
+	tvs := make([]TimedValue, testN)
+	for i := 0; i < testN; i++ {
+		tv := TimedValue{}
+		tv.Value = fmt.Sprintf("%d_val", i)
+		tv.ProcessAt = time.Now().Add(time.Duration(i) * time.Minute)
+		tvs[i] = tv
+	}
+
+	uq := &UniqueQueue{
+		queue: TimedQueue{},
+		set:   sets.NewString(),
+	}
+
+	// TimedQueue heap front element must be the one
+	// that was processed earliest
+
+	// iterate reversely to add the one with biggest ProcessAt value
+	for i := testN - 1; i > -1; i-- {
+		if ok := uq.Add(tvs[i]); !ok {
+			t.Errorf("uq.Add(kvs[i]) = %v, want = true", ok)
+		}
+	}
+
+	if hv, ok := uq.Head(); !ok || hv.Value != tvs[0].Value {
+		t.Errorf("uq.Head() ok = %v and Value = %s, want ok = true and Value = %s", ok, hv.Value, tvs[0].Value)
+	}
+
+	// update the first element to locate it later
+	tvs[0].ProcessAt = time.Now().Add(time.Duration(testN) * time.Hour)
+	if ok := uq.Replace(tvs[0]); !ok {
+		t.Errorf("uq.Replace(tvs[0]) = %v, want = true", ok)
 	}
 }
 
