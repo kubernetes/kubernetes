@@ -254,7 +254,7 @@ function setup-base-image() {
     source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
     # Reset the node image based on current os distro
     set-node-image
-fi
+  fi
 }
 
 # prepare-node-upgrade creates a new instance template suitable for upgrading
@@ -409,35 +409,45 @@ node_prereqs=false
 local_binaries=false
 env_os_distro=false
 
-while getopts ":MNPlho" opt; do
-  case ${opt} in
-    M)
+args=$(getopt MNPlho $@)
+if [[ $? -ne 0 ]]; then
+  >&2 echo "Failed to parse options"
+  exit 1
+fi
+eval set -- "${args}"
+
+while true; do
+  case $1 in
+    -M)
+      shift
       node_upgrade=false
       ;;
-    N)
+    -N)
+      shift
       master_upgrade=false
       ;;
-    P)
+    -P)
+      shift
       node_prereqs=true
       ;;
-    l)
+    -l)
+      shift
       local_binaries=true
       ;;
-    o)
+    -o)
+      shift
       env_os_distro=true
       ;;
-    h)
+    -h)
       usage
       exit 0
       ;;
-    \?)
-      echo "Invalid option: -$OPTARG" >&2
-      usage
-      exit 1
+    --)
+      shift
+      break;
       ;;
   esac
 done
-shift $((OPTIND-1))
 
 if [[ $# -gt 1 ]]; then
   echo "Error: Only one parameter (<version number or publication>) may be passed after the set of flags!" >&2
