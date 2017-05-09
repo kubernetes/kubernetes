@@ -1551,14 +1551,12 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 	}
 
 	// Inside the instance, the mountpoint always looks like /dev/xvdX (?)
-	hostDevice := "/dev/xvd" + string(mountDevice)
-	// We are using xvd names (so we are HVM only)
 	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
-	ec2Device := "/dev/xvd" + string(mountDevice)
+	hostDevice := "/dev/xvd" + string(mountDevice)
 
 	if !alreadyAttached {
 		request := &ec2.AttachVolumeInput{
-			Device:     aws.String(ec2Device),
+			Device:     aws.String(hostDevice),
 			InstanceId: aws.String(awsInstance.awsID),
 			VolumeId:   disk.awsID.awsString(),
 		}
@@ -1590,8 +1588,8 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 		// Impossible?
 		return "", fmt.Errorf("unexpected state: attachment nil after attached %q to %q", diskName, nodeName)
 	}
-	if ec2Device != aws.StringValue(attachment.Device) {
-		return "", fmt.Errorf("disk attachment of %q to %q failed: requested device %q but found %q", diskName, nodeName, ec2Device, aws.StringValue(attachment.Device))
+	if hostDevice != aws.StringValue(attachment.Device) {
+		return "", fmt.Errorf("disk attachment of %q to %q failed: requested device %q but found %q", diskName, nodeName, hostDevice, aws.StringValue(attachment.Device))
 	}
 	if awsInstance.awsID != aws.StringValue(attachment.InstanceId) {
 		return "", fmt.Errorf("disk attachment of %q to %q failed: requested instance %q but found %q", diskName, nodeName, awsInstance.awsID, aws.StringValue(attachment.InstanceId))
