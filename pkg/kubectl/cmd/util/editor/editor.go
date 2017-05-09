@@ -167,6 +167,7 @@ func tempFile(prefix, suffix string) (f *os.File, err error) {
 		name := filepath.Join(dir, prefix+randSeq(5)+suffix)
 		f, err = os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
 		if os.IsExist(err) {
+			f.Close()
 			continue
 		}
 		break
