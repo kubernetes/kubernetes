@@ -95,6 +95,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	utilipt "k8s.io/kubernetes/pkg/util/iptables"
@@ -1090,17 +1091,18 @@ type Kubelet struct {
 // 2.  the pods directory
 // 3.  the plugins directory
 func (kl *Kubelet) setupDataDirs() error {
+	errors := []error{}
 	kl.rootDirectory = path.Clean(kl.rootDirectory)
 	if err := os.MkdirAll(kl.getRootDir(), 0750); err != nil {
-		return fmt.Errorf("error creating root directory: %v", err)
+		errors = append(errors, fmt.Errorf("error creating root directory: %v", err))
 	}
 	if err := os.MkdirAll(kl.getPodsDir(), 0750); err != nil {
-		return fmt.Errorf("error creating pods directory: %v", err)
+		errors = append(errors, fmt.Errorf("error creating pods directory: %v", err))
 	}
 	if err := os.MkdirAll(kl.getPluginsDir(), 0750); err != nil {
-		return fmt.Errorf("error creating plugins directory: %v", err)
+		errors = append(errors, fmt.Errorf("error creating plugins directory: %v", err))
 	}
-	return nil
+	return utilerrors.NewAggregate(errors)
 }
 
 // Starts garbage collection threads.
