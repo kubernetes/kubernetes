@@ -17,8 +17,10 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
+	"os"
 )
 
 // NewKubeControllerManager creates a new hyperkube Server object that includes the
@@ -32,7 +34,14 @@ func NewKubeControllerManager() *Server {
 		SimpleUsage:     "controller-manager",
 		Long:            "A server that runs a set of active components. This includes replication controllers, service endpoints and nodes.",
 		Run: func(_ *Server, args []string) error {
-			return app.Run(s)
+
+			err := app.Run(s)
+
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+			}
+
+			return err
 		},
 	}
 	s.AddFlags(hks.Flags(), app.KnownControllers(), app.ControllersDisabledByDefault.List())
