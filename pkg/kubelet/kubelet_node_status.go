@@ -322,6 +322,8 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 	return node, nil
 }
 
+// fake commit
+
 // syncNodeStatus should be called periodically from a goroutine.
 // It synchronizes node status to master, registering the kubelet first if
 // necessary.
