@@ -18,6 +18,8 @@ package kuberuntime
 
 import (
 	"github.com/golang/glog"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -135,14 +137,40 @@ func (m *kubeGenericRuntimeManager) RemoveImage(image kubecontainer.ImageSpec) e
 // this is a known issue, and we'll address this by getting imagefs stats directly from CRI.
 // TODO: Get imagefs stats directly from CRI.
 func (m *kubeGenericRuntimeManager) ImageStats() (*kubecontainer.ImageStats, error) {
-	allImages, err := m.imageService.ListImages(nil)
+	imageFSInfo, err := m.imageService.ImageFsInfo()
 	if err != nil {
-		glog.Errorf("ListImages failed: %v", err)
+		glog.Errorf("ImageFsInfo failed: %v", err)
 		return nil, err
 	}
-	stats := &kubecontainer.ImageStats{}
-	for _, img := range allImages {
-		stats.TotalStorageBytes += img.Size_
+
+	return &kubecontainer.ImageStats{
+		TotalStorageBytes: imageFSInfo.UsedBytes.GetValue(),
+	}, nil
+}
+
+// ImageFsInfo gets filesytem information of images.
+func (m *kubeGenericRuntimeManager) ImageFsInfo() (cadvisorapiv2.FsInfo, error) {
+	imageFSInfo, err := m.imageService.ImageFsInfo()
+	if err != nil {
+		glog.Errorf("ImageFsInfo failed: %v", err)
+		return cadvisorapiv2.FsInfo{}, err
 	}
-	return stats, nil
+
+	fsInfo := cadvisorapiv2.FsInfo{
+		Device:     imageFSInfo.Device,
+		Mountpoint: imageFSInfo.Path,
+		Capacity:   imageFSInfo.CapacityBytes.GetValue(),
+		Available:  imageFSInfo.AvailableBytes.GetValue(),
+		Usage:      imageFSInfo.UsedBytes.GetValue(),
+	}
+	if imageFSInfo.InodesCapacity != nil {
+		inodes := imageFSInfo.InodesCapacity.GetValue()
+		fsInfo.Inodes = &inodes
+	}
+	if imageFSInfo.InodesAvailable != nil {
+		inodesFree := imageFSInfo.InodesAvailable.GetValue()
+		fsInfo.InodesFree = &inodesFree
+	}
+
+	return fsInfo, nil
 }
