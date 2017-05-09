@@ -958,7 +958,7 @@ metadata:
 						return false, nil
 					}
 					if len(uidToPort) > 1 {
-						Fail("Too many endpoints found")
+						framework.Failf("Too many endpoints found")
 					}
 					for _, port := range uidToPort {
 						if port[0] != redisPort {

@@ -164,6 +164,7 @@ go_library(
         "//test/e2e/chaosmonkey:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/ginkgowrapper:go_default_library",
         "//test/e2e/generated:go_default_library",
         "//test/e2e/perf:go_default_library",
         "//test/e2e/scheduling:go_default_library",

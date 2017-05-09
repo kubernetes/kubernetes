@@ -98,6 +98,7 @@ import (
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	testutil "k8s.io/kubernetes/test/utils"
 )
 
@@ -293,13 +294,13 @@ func Failf(format string, args ...interface{}) {
 func FailfWithOffset(offset int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	log("INFO", msg)
-	Fail(nowStamp()+": "+msg, 1+offset)
+	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
 }
 
 func Skipf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	log("INFO", msg)
-	Skip(nowStamp() + ": " + msg)
+	ginkgowrapper.Skip(nowStamp() + ": " + msg)
 }
 
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
