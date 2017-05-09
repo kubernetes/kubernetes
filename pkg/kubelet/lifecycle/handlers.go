@@ -88,15 +88,19 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 		return portReference.IntValue(), nil
 	}
 	portName := portReference.StrVal
-	port, err := strconv.Atoi(portName)
-	if err == nil {
-		return port, nil
-	}
-	for _, portSpec := range container.Ports {
-		if portSpec.Name == portName {
-			return int(portSpec.ContainerPort), nil
+
+	if len(portName) > 0 {
+		port, err := strconv.Atoi(portName)
+		if err == nil {
+			return port, nil
+		}
+		for _, portSpec := range container.Ports {
+			if portSpec.Name == portName {
+				return int(portSpec.ContainerPort), nil
+			}
 		}
 	}
+
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
