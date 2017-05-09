@@ -165,6 +165,12 @@ if ! hack/verify-openapi-spec.sh > /dev/null; then
   echo "To regenerate the spec, run:"
   echo "  hack/update-openapi-spec.sh"
   exit_code=1
+elif ! hack/verify-generated-deep-copies.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Some conversions functions need regeneration."
+  echo "To regenerate conversions, run:"
+  echo "  hack/update-generated-deep-copies.sh"
+  exit_code=1
 else
   echo "${green}OK"
 fi
