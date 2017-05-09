@@ -136,8 +136,7 @@ require.alias = function (from, to) {
 require.define = function (filename, fn) {
     var dirname = require._core[filename]
         ? ''
-        : require.modules.path().dirname(filename)
-    ;
+        : require.modules.path().dirname(filename);
     
     var require_ = function (file) {
         return require(file, dirname)
@@ -169,8 +168,7 @@ if (typeof process === 'undefined') process = {};
 if (!process.nextTick) process.nextTick = (function () {
     var queue = [];
     var canPost = typeof window !== 'undefined'
-        && window.postMessage && window.addEventListener
-    ;
+        && window.postMessage && window.addEventListener;
     
     if (canPost) {
         window.addEventListener('message', function (ev) {
@@ -351,8 +349,7 @@ require.define("/shred.js", function (require, module, exports, __dirname, __fil
 // has `info`, `warn`, `debug`, and `error` methods that take a string.
 var Ax = require("ax")
   , CookieJarLib = require( "cookiejar" )
-  , CookieJar = CookieJarLib.CookieJar
-;
+  , CookieJar = CookieJarLib.CookieJar;
 
 // Shred takes some options, including a logger and request defaults.
 
@@ -410,8 +407,7 @@ require.define("/node_modules/ax/package.json", function (require, module, expor
 
 require.define("/node_modules/ax/lib/ax.js", function (require, module, exports, __dirname, __filename) {
     var inspect = require("util").inspect
-  , fs = require("fs")
-;
+  , fs = require("fs");
 
 
 // this is a quick-and-dirty logger. there are other nicer loggers out there
@@ -2431,182 +2427,183 @@ require.define("/node_modules/http-browserify/package.json", function (require, 
 
 require.define("/node_modules/http-browserify/browser.js", function (require, module, exports, __dirname, __filename) {
     var http = module.exports;
-var EventEmitter = require('events').EventEmitter;
-var Request = require('./lib/request');
+    var EventEmitter = require('events').EventEmitter;
+    var Request = require('./lib/request');
 
-http.request = function (params, cb) {
-    if (!params) params = {};
-    if (!params.host) params.host = window.location.host.split(':')[0];
-    if (!params.port) params.port = window.location.port;
+    http.request = function (params, cb) {
+        if (!params) params = {};
+        if (!params.host) params.host = window.location.host.split(':')[0];
+        if (!params.port) params.port = window.location.port;
     
-    var req = new Request(new xhrHttp, params);
-    if (cb) req.on('response', cb);
-    return req;
-};
+        var req = new Request(new xhrHttp, params);
+        if (cb) req.on('response', cb);
+        return req;
+    };
 
-http.get = function (params, cb) {
-    params.method = 'GET';
-    var req = http.request(params, cb);
-    req.end();
-    return req;
-};
+    http.get = function (params, cb) {
+        params.method = 'GET';
+        var req = http.request(params, cb);
+        req.end();
+        return req;
+    };
 
-var xhrHttp = (function () {
-    if (typeof window === 'undefined') {
-        throw new Error('no window object present');
-    }
-    else if (window.XMLHttpRequest) {
-        return window.XMLHttpRequest;
-    }
-    else if (window.ActiveXObject) {
-        var axs = [
-            'Msxml2.XMLHTTP.6.0',
-            'Msxml2.XMLHTTP.3.0',
-            'Microsoft.XMLHTTP'
-        ];
-        for (var i = 0; i < axs.length; i++) {
-            try {
-                var ax = new(window.ActiveXObject)(axs[i]);
-                return function () {
-                    if (ax) {
-                        var ax_ = ax;
-                        ax = null;
-                        return ax_;
-                    }
-                    else {
-                        return new(window.ActiveXObject)(axs[i]);
-                    }
-                };
-            }
-            catch (e) {}
+    var xhrHttp = (function () {
+        if (typeof window === 'undefined') {
+            throw new Error('no window object present');
         }
-        throw new Error('ajax not supported in this browser')
-    }
-    else {
-        throw new Error('ajax not supported in this browser');
-    }
-})();
+        else if (window.XMLHttpRequest) {
+            return window.XMLHttpRequest;
+        }
+        else if (window.ActiveXObject) {
+           var axs = [
+                'Msxml2.XMLHTTP.6.0',
+                'Msxml2.XMLHTTP.3.0',
+                'Microsoft.XMLHTTP'
+            ];
+            for (var i = 0; i < axs.length; i++) {
+                try {
+                    var ax = new(window.ActiveXObject)(axs[i]);
+                    return function () {
+                        if (ax) {
+                            var ax_ = ax;
+                            ax = null;
+                            return ax_;
+                        }
+                        else {
+                            return new(window.ActiveXObject)(axs[i]);
+                        }
+                    };
+                }
+                catch (e) {}
+            }
+            throw new Error('ajax not supported in this browser')
+        }
+        else {
+            throw new Error('ajax not supported in this browser');
+        }
+    })();
 
-http.STATUS_CODES = {
-    100 : 'Continue',
-    101 : 'Switching Protocols',
-    102 : 'Processing', // RFC 2518, obsoleted by RFC 4918
-    200 : 'OK',
-    201 : 'Created',
-    202 : 'Accepted',
-    203 : 'Non-Authoritative Information',
-    204 : 'No Content',
-    205 : 'Reset Content',
-    206 : 'Partial Content',
-    207 : 'Multi-Status', // RFC 4918
-    300 : 'Multiple Choices',
-    301 : 'Moved Permanently',
-    302 : 'Moved Temporarily',
-    303 : 'See Other',
-    304 : 'Not Modified',
-    305 : 'Use Proxy',
-    307 : 'Temporary Redirect',
-    400 : 'Bad Request',
-    401 : 'Unauthorized',
-    402 : 'Payment Required',
-    403 : 'Forbidden',
-    404 : 'Not Found',
-    405 : 'Method Not Allowed',
-    406 : 'Not Acceptable',
-    407 : 'Proxy Authentication Required',
-    408 : 'Request Time-out',
-    409 : 'Conflict',
-    410 : 'Gone',
-    411 : 'Length Required',
-    412 : 'Precondition Failed',
-    413 : 'Request Entity Too Large',
-    414 : 'Request-URI Too Large',
-    415 : 'Unsupported Media Type',
-    416 : 'Requested Range Not Satisfiable',
-    417 : 'Expectation Failed',
-    418 : 'I\'m a teapot', // RFC 2324
-    422 : 'Unprocessable Entity', // RFC 4918
-    423 : 'Locked', // RFC 4918
-    424 : 'Failed Dependency', // RFC 4918
-    425 : 'Unordered Collection', // RFC 4918
-    426 : 'Upgrade Required', // RFC 2817
-    500 : 'Internal Server Error',
-    501 : 'Not Implemented',
-    502 : 'Bad Gateway',
-    503 : 'Service Unavailable',
-    504 : 'Gateway Time-out',
-    505 : 'HTTP Version not supported',
-    506 : 'Variant Also Negotiates', // RFC 2295
-    507 : 'Insufficient Storage', // RFC 4918
-    509 : 'Bandwidth Limit Exceeded',
-    510 : 'Not Extended' // RFC 2774
-};
+    http.STATUS_CODES = {
+        100 : 'Continue',
+        101 : 'Switching Protocols',
+        102 : 'Processing', // RFC 2518, obsoleted by RFC 4918
+        200 : 'OK',
+        201 : 'Created',
+        202 : 'Accepted',
+        203 : 'Non-Authoritative Information',
+        204 : 'No Content',
+        205 : 'Reset Content',
+        206 : 'Partial Content',
+        207 : 'Multi-Status', // RFC 4918
+        300 : 'Multiple Choices',
+        301 : 'Moved Permanently',
+        302 : 'Moved Temporarily',
+        303 : 'See Other',
+        304 : 'Not Modified',
+        305 : 'Use Proxy',
+        307 : 'Temporary Redirect',
+        400 : 'Bad Request',
+        401 : 'Unauthorized',
+        402 : 'Payment Required',
+        403 : 'Forbidden',
+        404 : 'Not Found',
+        405 : 'Method Not Allowed',
+        406 : 'Not Acceptable',
+        407 : 'Proxy Authentication Required',
+        408 : 'Request Time-out',
+        409 : 'Conflict',
+        410 : 'Gone',
+        411 : 'Length Required',
+        412 : 'Precondition Failed',
+        413 : 'Request Entity Too Large',
+        414 : 'Request-URI Too Large',
+        415 : 'Unsupported Media Type',
+        416 : 'Requested Range Not Satisfiable',
+        417 : 'Expectation Failed',
+        418 : 'I\'m a teapot', // RFC 2324
+        422 : 'Unprocessable Entity', // RFC 4918
+        423 : 'Locked', // RFC 4918
+        424 : 'Failed Dependency', // RFC 4918
+        425 : 'Unordered Collection', // RFC 4918
+        426 : 'Upgrade Required', // RFC 2817
+        500 : 'Internal Server Error',
+        501 : 'Not Implemented',
+        502 : 'Bad Gateway',
+        503 : 'Service Unavailable',
+        504 : 'Gateway Time-out',
+        505 : 'HTTP Version not supported',
+        506 : 'Variant Also Negotiates', // RFC 2295
+        507 : 'Insufficient Storage', // RFC 4918
+        509 : 'Bandwidth Limit Exceeded',
+        510 : 'Not Extended' // RFC 2774
+    };
 
 });
 
 require.define("/node_modules/http-browserify/lib/request.js", function (require, module, exports, __dirname, __filename) {
-    var EventEmitter = require('events').EventEmitter;
-var Response = require('./response');
-var isSafeHeader = require('./isSafeHeader');
+var EventEmitter = require('events').EventEmitter;
+    var Response = require('./response');
+    var isSafeHeader = require('./isSafeHeader');
 
-var Request = module.exports = function (xhr, params) {
-    var self = this;
-    self.xhr = xhr;
-    self.body = '';
+    var Request = module.exports = function (xhr, params) {
+        var self = this;
+        self.xhr = xhr;
+        self.body = '';
+     
+        var uri = params.host + ':' + params.port + (params.path || '/');
     
-    var uri = params.host + ':' + params.port + (params.path || '/');
+        xhr.open(
+            params.method || 'GET',
+            (params.scheme || 'http') + '://' + uri,
+            true
+        );
     
-    xhr.open(
-        params.method || 'GET',
-        (params.scheme || 'http') + '://' + uri,
-        true
-    );
-    
-    if (params.headers) {
-        Object.keys(params.headers).forEach(function (key) {
-            if (!isSafeHeader(key)) return;
-            var value = params.headers[key];
-            if (Array.isArray(value)) {
-                value.forEach(function (v) {
-                    xhr.setRequestHeader(key, v);
-                });
-            }
-            else xhr.setRequestHeader(key, value)
-        });
-    }
-    
-    var res = new Response(xhr);
-    res.on('ready', function () {
-        self.emit('response', res);
-    });
-    
-    xhr.onreadystatechange = function () {
-        res.handle(xhr);
-    };
-};
-
-Request.prototype = new EventEmitter;
-
-Request.prototype.setHeader = function (key, value) {
-    if ((Array.isArray && Array.isArray(value))
-    || value instanceof Array) {
-        for (var i = 0; i < value.length; i++) {
-            this.xhr.setRequestHeader(key, value[i]);
+        if (params.headers) {
+            Object.keys(params.headers).forEach(function (key) {
+                if (!isSafeHeader(key)) return;
+                var value = params.headers[key];
+                if (Array.isArray(value)) {
+                    value.forEach(function (v) {
+                        xhr.setRequestHeader(key, v);
+                    });
+                }
+                else
+                    xhr.setRequestHeader(key, value)
+            });
         }
-    }
-    else {
-        this.xhr.setRequestHeader(key, value);
-    }
-};
+    
+        var res = new Response(xhr);
+        res.on('ready', function () {
+            self.emit('response', res);
+        });
+    
+        xhr.onreadystatechange = function () {
+            res.handle(xhr);
+        };
+    };
 
-Request.prototype.write = function (s) {
-    this.body += s;
-};
+    Request.prototype = new EventEmitter;
 
-Request.prototype.end = function (s) {
-    if (s !== undefined) this.write(s);
-    this.xhr.send(this.body);
-};
+    Request.prototype.setHeader = function (key, value) {
+        if ((Array.isArray && Array.isArray(value))
+        || value instanceof Array) {
+            for (var i = 0; i < value.length; i++) {
+                this.xhr.setRequestHeader(key, value[i]);
+            }
+        }
+        else {
+            this.xhr.setRequestHeader(key, value);
+        }
+    };
+
+    Request.prototype.write = function (s) {
+        this.body += s;
+    };
+
+    Request.prototype.end = function (s) {
+        if (s !== undefined) this.write(s);
+        this.xhr.send(this.body);
+    };
 
 });
 
