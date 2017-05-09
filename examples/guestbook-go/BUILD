@@ -34,6 +34,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//examples/guestbook-go/_src:all-srcs",
+    ],
     tags = ["automanaged"],
 )
