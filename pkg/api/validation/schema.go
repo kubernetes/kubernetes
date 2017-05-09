@@ -389,10 +389,6 @@ func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType st
 			return append(allErrs, NewInvalidTypeError(reflect.String, reflect.TypeOf(value).Kind(), fieldName))
 		}
 	case "array":
-		arr, ok := value.([]interface{})
-		if !ok {
-			return append(allErrs, NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName))
-		}
 		var arrType string
 		if fieldDetails.Items.Ref == nil && fieldDetails.Items.Type == nil {
 			return append(allErrs, NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName))
@@ -402,6 +398,15 @@ func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType st
 		} else {
 			arrType = *fieldDetails.Items.Type
 		}
+
+		arr, ok := value.([]interface{})
+		if !ok {
+			// golang allows json base64 encoded strings to deserialize into []byte fields
+			if _, ok := value.(string); !(ok && arrType == "integer") {
+				return append(allErrs, NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName))
+			}
+		}
+
 		for ix := range arr {
 			errs := s.validateField(arr[ix], fmt.Sprintf("%s[%d]", fieldName, ix), arrType, nil)
 			if len(errs) > 0 {
