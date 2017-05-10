@@ -809,7 +809,7 @@ func containerResourceRuntimeValue(fs *v1.ResourceFieldSelector, pod *v1.Pod, co
 
 // One of the following arguments must be non-nil: runningPod, status.
 // TODO: Modify containerRuntime.KillPod() to accept the right arguments.
-func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus, gracePeriodOverride *int64) error {
+func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus, gracePeriodOverride *int64, pullSecrets []v1.Secret) error {
 	var p kubecontainer.Pod
 	if runningPod != nil {
 		p = *runningPod
@@ -820,7 +820,7 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 	}
 
 	// Call the container runtime KillPod method which stops all running containers of the pod
-	if err := kl.containerRuntime.KillPod(pod, p, gracePeriodOverride); err != nil {
+	if err := kl.containerRuntime.KillPod(pod, p, gracePeriodOverride, pullSecrets); err != nil {
 		return err
 	}
 	if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
@@ -1095,8 +1095,9 @@ func (kl *Kubelet) podKiller() {
 
 			if !exists {
 				go func(apiPod *v1.Pod, runningPod *kubecontainer.Pod) {
+					pullSecretes := kl.getPullSecretsForPod(apiPod)
 					glog.V(2).Infof("Killing unwanted pod %q", runningPod.Name)
-					err := kl.killPod(apiPod, runningPod, nil, nil)
+					err := kl.killPod(apiPod, runningPod, nil, nil, pullSecretes)
 					if err != nil {
 						glog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
 					}
@@ -1420,6 +1421,13 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		oldPodStatus.InitContainerStatuses,
 		pod.Spec.InitContainers,
 		len(pod.Spec.InitContainers) > 0,
+		true,
+	)
+	apiPodStatus.DeferContainerStatuses = kl.convertToAPIContainerStatuses(
+		pod, podStatus,
+		pod.Status.DeferContainerStatuses,
+		pod.Spec.DeferContainers,
+		len(pod.Spec.DeferContainers) > 0,
 		true,
 	)
 

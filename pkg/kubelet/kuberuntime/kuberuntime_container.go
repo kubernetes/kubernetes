@@ -79,6 +79,23 @@ func (m *kubeGenericRuntimeManager) recordContainerEvent(pod *v1.Pod, container 
 	m.recorder.Event(ref, eventType, reason, eventMessage)
 }
 
+//startContainerAndWait starts a container and waits until the container completes its execution.
+//This is a blocking call, the calling goroutine will be blocked. until the container is created and finishes execution.
+func (m *kubeGenericRuntimeManager) startContainerAndWait(podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, container *v1.Container, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string) (string, error) {
+
+	containerID, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP)
+	if err != nil {
+		return containerID, err
+	}
+
+	err = m.runtimeService.WaitForContainer(containerID)
+	if err != nil {
+		return containerID, err
+	}
+	return containerID, nil
+
+}
+
 // startContainer starts a container and returns a message indicates why it is failed on error.
 // It starts the container through the following steps:
 // * pull the image
@@ -169,7 +186,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		}
 	}
 
-	return "", nil
+	return containerID, nil
 }
 
 // generateContainerConfig generates container config for kubelet runtime v1.
@@ -550,11 +567,43 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID 
 	return pod, container, nil
 }
 
+func calculateGracePeriod(pod *v1.Pod) int64 {
+
+	gracePeriod := int64(minimumGracePeriodInSeconds)
+	switch {
+	case pod.DeletionGracePeriodSeconds != nil:
+		gracePeriod = *pod.DeletionGracePeriodSeconds
+	case pod.Spec.TerminationGracePeriodSeconds != nil:
+		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+	}
+
+	return gracePeriod
+}
+
+func updateGracePeriod(pod *v1.Pod, gracePeriod int64) {
+	if pod.DeletionGracePeriodSeconds == nil && pod.Spec.TerminationGracePeriodSeconds == nil {
+		pod.Spec.TerminationGracePeriodSeconds = &gracePeriod
+		return
+	}
+
+	//Otherwise update the one that is configured
+	switch {
+	case pod.DeletionGracePeriodSeconds != nil:
+		*pod.DeletionGracePeriodSeconds = gracePeriod
+	case pod.Spec.TerminationGracePeriodSeconds != nil:
+		*pod.Spec.TerminationGracePeriodSeconds = gracePeriod
+	}
+
+}
+
 // killContainer kills a container through the following steps:
 // * Run the pre-stop lifecycle hooks (if applicable).
 // * Stop the container.
+// * If DeferContainers were configured PreStopHook will be skipped.
 func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubecontainer.ContainerID, containerName string, reason string, gracePeriodOverride *int64) error {
+
 	var containerSpec *v1.Container
+
 	if pod != nil {
 		if containerSpec = kubecontainer.GetContainerSpec(pod, containerName); containerSpec == nil {
 			return fmt.Errorf("failed to get containerSpec %q(id=%q) in pod %q when killing container for reason %q",
@@ -569,13 +618,13 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		pod, containerSpec = restoredPod, restoredContainer
 	}
 
-	// From this point , pod and container must be non-nil.
-	gracePeriod := int64(minimumGracePeriodInSeconds)
-	switch {
-	case pod.DeletionGracePeriodSeconds != nil:
-		gracePeriod = *pod.DeletionGracePeriodSeconds
-	case pod.Spec.TerminationGracePeriodSeconds != nil:
-		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+	// From this point , pod and container must be non-
+	gracePeriod := calculateGracePeriod(pod)
+
+	if len(pod.Spec.DeferContainers) > 0 {
+		//if defer Containers are configured do not run PreStopHooks
+		//Also make graceperiod to 0 so that the containers are killed immediately also we skip preStophook
+		gracePeriod = 0
 	}
 
 	glog.V(2).Infof("Killing container %q with %d second grace period", containerID.String(), gracePeriod)
@@ -589,10 +638,12 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil && gracePeriod > 0 {
 		gracePeriod = gracePeriod - m.executePreStopHook(pod, containerID, containerSpec, gracePeriod)
 	}
+
 	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
 	if gracePeriod < minimumGracePeriodInSeconds {
 		gracePeriod = minimumGracePeriodInSeconds
 	}
+
 	if gracePeriodOverride != nil {
 		gracePeriod = *gracePeriodOverride
 		glog.V(3).Infof("Killing container %q, but using %d second grace period override", containerID, gracePeriod)
@@ -615,11 +666,126 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	return err
 }
 
-// killContainersWithSyncResult kills all pod's containers with sync results.
-func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
-	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
-	wg := sync.WaitGroup{}
+// runWaitandRetryContainers this function will try to execute deferContainers if the container is already running it will
+// atach to it, if the container failed it will re-run until it succeeds.
+func (m *kubeGenericRuntimeManager) runWaitandRetryContainers(podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, container *v1.Container, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, attach bool, cStatus *kubecontainer.ContainerStatus) (*runtimeapi.ContainerStatus, error) {
 
+	var cID string
+	var err error
+	var resultStatus *runtimeapi.ContainerStatus
+
+	for {
+		if attach {
+			cID = cStatus.ID.ID
+			//The container is already running just attach to it for now
+			err = m.runtimeService.WaitForContainer(cID)
+			//reset the flag, if we are re-running the container in the loop
+			attach = false
+		} else {
+			cID, err = m.startContainerAndWait(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP)
+		}
+		resultStatus, _ = m.runtimeService.ContainerStatus(cID)
+		if err == nil {
+			//the Container finished successfully,
+			break
+		}
+		// TODO: Log an error ror send and event that the container failed and we are retrying.
+	}
+
+	return resultStatus, nil
+}
+
+//runDeferContainers one after the other
+func (m *kubeGenericRuntimeManager) runDeferContainers(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64, pullSecrets []v1.Secret) ([]*kubecontainer.SyncResult, int64) {
+
+	var syncResults []*kubecontainer.SyncResult
+	done := make(chan bool)
+
+	gracePeriod := calculateGracePeriod(pod)
+
+	statuses := runningPod.Statuses
+	podIP := statuses.IP
+
+	if len(statuses.ContainerStatuses) <= 0 {
+		// Need a valid SandBox at this point
+		// TODO: Log or throw an error
+		return syncResults, gracePeriod
+	}
+
+	//Get the latest Sandbox info
+	attempt := statuses.SandboxStatuses[0].Metadata.Attempt
+	sandboxID := statuses.SandboxStatuses[0].Id
+	sandboxConfig, err := m.generatePodSandboxConfig(pod, attempt)
+	if err != nil {
+		return syncResults, gracePeriod
+	}
+
+	for _, container := range pod.Spec.DeferContainers {
+		// Check if the container already has some status updated
+		cStatus := statuses.FindContainerStatusByName(container.Name)
+		if cStatus != nil {
+			// If the container is running attach to it
+			switch cStatus.State {
+			case kubecontainer.ContainerStateRunning:
+				// Wait for the container
+				go func() {
+					m.runWaitandRetryContainers(sandboxID, sandboxConfig, &container, pod, statuses, pullSecrets, podIP, true, cStatus)
+					done <- true
+				}()
+			case kubecontainer.ContainerStateExited:
+				if isContainerFailed(cStatus) {
+					//restart it the container had failed
+					go func() {
+						m.runWaitandRetryContainers(sandboxID, sandboxConfig, &container, pod, statuses, pullSecrets, podIP, false, nil)
+						done <- true
+					}()
+
+				} else {
+					//This container finished execution, go to the next one
+					continue
+				}
+			}
+		} else {
+			// If the container is not running then create it and attach to it
+			go func() {
+				m.runWaitandRetryContainers(sandboxID, sandboxConfig, &container, pod, statuses, pullSecrets, podIP, false, nil)
+				done <- true
+			}()
+		}
+
+		startTime := metav1.Now()
+		select {
+
+		case <-time.After(time.Duration(gracePeriod) * time.Second):
+			glog.V(3).Infof("deferContainer: Exhaused gracePeriod")
+			//We exhausted all of the gracePeriod proceed to Kill
+			break
+		case <-done:
+			gracePeriod = gracePeriod - int64(metav1.Now().Sub(startTime.Time).Seconds())
+			syncResult := kubecontainer.NewSyncResult(kubecontainer.DeferContainer, container.Name)
+			syncResults = append(syncResults, syncResult)
+			glog.V(3).Infof("deferContainer: Container %s finsihed execution", container.Name)
+
+		}
+	}
+
+	//update the grace period to 0 as to indicate the pod to be delete immediately
+	updateGracePeriod(pod, 0)
+	return syncResults, gracePeriod
+}
+
+// killContainersWithSyncResult kills all pod's containers with sync results.
+func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64, pullSecrets []v1.Secret) (syncResults []*kubecontainer.SyncResult) {
+
+	//If deferContainers are configured run them first only if the Pod is in running state
+	if len(pod.Spec.DeferContainers) > 0 && pod.Status.Phase == v1.PodRunning {
+		deferContainerResults, _ := m.runDeferContainers(pod, runningPod, gracePeriodOverride, pullSecrets)
+		syncResults = append(syncResults, deferContainerResults...)
+	}
+
+	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
+
+	wg := sync.WaitGroup{}
 	wg.Add(len(runningPod.Containers))
 	for _, container := range runningPod.Containers {
 		go func(container *kubecontainer.Container) {

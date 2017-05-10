@@ -95,6 +95,15 @@ func (in instrumentedRuntimeService) StartContainer(containerID string) error {
 	return err
 }
 
+func (in instrumentedRuntimeService) WaitForContainer(containerID string) error {
+	const operation = "waitFor_container"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.WaitForContainer(containerID)
+	recordError(operation, err)
+	return err
+}
+
 func (in instrumentedRuntimeService) StopContainer(containerID string, timeout int64) error {
 	const operation = "stop_container"
 	defer recordOperation(operation, time.Now())

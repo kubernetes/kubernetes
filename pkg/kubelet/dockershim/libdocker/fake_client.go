@@ -579,6 +579,48 @@ func (f *FakeDockerClient) StartContainer(id string) error {
 	return nil
 }
 
+// WaitForContainer.
+// This is similar to stopContainer, as wait is blocking and will return once the container finished execution.
+func (f *FakeDockerClient) WaitForContainer(id string) error {
+	f.Lock()
+	defer f.Unlock()
+	f.appendCalled(calledDetail{name: "wait"})
+	if err := f.popError("wait"); err != nil {
+		return err
+	}
+	f.appendContainerTrace("Waiting", id)
+	// Container status should be Updated before container moved to ExitedContainerList
+	f.updateContainerStatus(id, StatusExitedPrefix)
+	var newList []dockertypes.Container
+	for _, container := range f.RunningContainerList {
+		if container.ID == id {
+			// The newest exited container should be in front. Because we assume so in GetPodStatus()
+			f.ExitedContainerList = append([]dockertypes.Container{container}, f.ExitedContainerList...)
+			continue
+		}
+		newList = append(newList, container)
+	}
+
+	f.RunningContainerList = newList
+	container, ok := f.ContainerMap[id]
+	if !ok {
+		container = convertFakeContainer(&FakeContainer{
+			ID:         id,
+			Name:       id,
+			Running:    false,
+			StartedAt:  time.Now().Add(-time.Second),
+			FinishedAt: time.Now(),
+		})
+	} else {
+		container.State.FinishedAt = dockerTimestampToString(f.Clock.Now())
+		container.State.Running = false
+	}
+
+	f.ContainerMap[id] = container
+	f.normalSleep(200, 50, 50)
+	return nil
+}
+
 // StopContainer is a test-spy implementation of Interface.StopContainer.
 // It adds an entry "stop" to the internal method call record.
 func (f *FakeDockerClient) StopContainer(id string, timeout time.Duration) error {
@@ -600,6 +642,7 @@ func (f *FakeDockerClient) StopContainer(id string, timeout time.Duration) error
 		}
 		newList = append(newList, container)
 	}
+
 	f.RunningContainerList = newList
 	container, ok := f.ContainerMap[id]
 	if !ok {
@@ -614,6 +657,7 @@ func (f *FakeDockerClient) StopContainer(id string, timeout time.Duration) error
 		container.State.FinishedAt = dockerTimestampToString(f.Clock.Now())
 		container.State.Running = false
 	}
+
 	f.ContainerMap[id] = container
 	f.normalSleep(200, 50, 50)
 	return nil

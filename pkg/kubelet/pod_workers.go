@@ -152,6 +152,7 @@ func newPodWorkers(syncPodFn syncPodFnType, recorder record.EventRecorder, workQ
 
 func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 	var lastSyncTime time.Time
+
 	for update := range podUpdates {
 		err := func() error {
 			podUID := update.Pod.UID

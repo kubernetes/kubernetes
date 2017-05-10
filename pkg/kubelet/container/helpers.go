@@ -239,6 +239,7 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 			State: SandboxToContainerState(sandbox.State),
 		})
 	}
+	runningPod.Statuses = podStatus
 	return runningPod
 }
 

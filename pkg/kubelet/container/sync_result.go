@@ -35,13 +35,14 @@ var (
 )
 
 var (
-	ErrRunContainer     = errors.New("RunContainerError")
-	ErrKillContainer    = errors.New("KillContainerError")
-	ErrVerifyNonRoot    = errors.New("VerifyNonRootError")
-	ErrRunInitContainer = errors.New("RunInitContainerError")
-	ErrCreatePodSandbox = errors.New("CreatePodSandboxError")
-	ErrConfigPodSandbox = errors.New("ConfigPodSandboxError")
-	ErrKillPodSandbox   = errors.New("KillPodSandboxError")
+	ErrRunContainer      = errors.New("RunContainerError")
+	ErrKillContainer     = errors.New("KillContainerError")
+	ErrVerifyNonRoot     = errors.New("VerifyNonRootError")
+	ErrRunInitContainer  = errors.New("RunInitContainerError")
+	ErrCreatePodSandbox  = errors.New("CreatePodSandboxError")
+	ErrConfigPodSandbox  = errors.New("ConfigPodSandboxError")
+	ErrKillPodSandbox    = errors.New("KillPodSandboxError")
+	ErrRunDeferContainer = errors.New("RunDeferContainerError")
 )
 
 var (
@@ -62,6 +63,7 @@ const (
 	CreatePodSandbox SyncAction = "CreatePodSandbox"
 	ConfigPodSandbox SyncAction = "ConfigPodSandbox"
 	KillPodSandbox   SyncAction = "KillPodSandbox"
+	DeferContainer   SyncAction = "DeferContainer"
 )
 
 // SyncResult is the result of sync action.

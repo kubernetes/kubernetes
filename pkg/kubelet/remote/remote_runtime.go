@@ -213,6 +213,12 @@ func (r *RemoteRuntimeService) StartContainer(containerID string) error {
 	return nil
 }
 
+// WaitForContainer Waits until a container terminates. Just a dummy implementation
+func (r *RemoteRuntimeService) WaitForContainer(containerID string) error {
+
+	return nil
+}
+
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (r *RemoteRuntimeService) StopContainer(containerID string, timeout int64) error {
 	// Use timeout + default timeout (2 minutes) as timeout to leave extra time

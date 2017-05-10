@@ -93,7 +93,7 @@ type Runtime interface {
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
 	// only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 	// it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
-	KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error
+	KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64, pullSecrets []v1.Secret) error
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visble in Runtime.
 	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
@@ -186,6 +186,8 @@ type Pod struct {
 	// components. This is only populated by kuberuntime.
 	// TODO: use the runtimeApi.PodSandbox type directly.
 	Sandboxes []*Container
+	// A reference of the PodStatus to be used
+	Statuses *PodStatus
 }
 
 // PodPair contains both runtime#Pod and api#Pod

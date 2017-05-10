@@ -69,5 +69,15 @@ func fieldPath(pod *v1.Pod, container *v1.Container) (string, error) {
 			}
 		}
 	}
+	for i := range pod.Spec.DeferContainers {
+		here := &pod.Spec.DeferContainers[i]
+		if here.Name == container.Name {
+			if here.Name == "" {
+				return fmt.Sprintf("spec.deferContainers[%d]", i), nil
+			} else {
+				return fmt.Sprintf("spec.deferContainers{%s}", here.Name), nil
+			}
+		}
+	}
 	return "", fmt.Errorf("container %#v not found in pod %#v", container, pod)
 }

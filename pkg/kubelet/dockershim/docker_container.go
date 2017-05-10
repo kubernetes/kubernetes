@@ -250,6 +250,15 @@ func (ds *dockerService) StartContainer(containerID string) error {
 	return nil
 }
 
+// Wait for a Container
+func (ds *dockerService) WaitForContainer(containerID string) error {
+	err := ds.client.WaitForContainer(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to wait for the container %q: %v", containerID, err)
+	}
+	return nil
+}
+
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (ds *dockerService) StopContainer(containerID string, timeout int64) error {
 	return ds.client.StopContainer(containerID, time.Duration(timeout)*time.Second)
