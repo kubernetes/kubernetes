@@ -30,7 +30,7 @@ type FakeNodeMetricses struct {
 	Fake *FakeMetricsV1alpha1
 }
 
-var nodemetricsesResource = schema.GroupVersionResource{Group: "metrics", Version: "v1alpha1", Resource: "nodemetricses"}
+var nodemetricsesResource = schema.GroupVersionResource{Group: "metrics", Version: "v1alpha1", Resource: "nodes"}
 
 var nodemetricsesKind = schema.GroupVersionKind{Group: "metrics", Version: "v1alpha1", Kind: "NodeMetrics"}
 
