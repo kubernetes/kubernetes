@@ -20,7 +20,7 @@ FROM java:openjdk-8-jre
 
 
 ENV DEBIAN_FRONTEND noninteractive
-ENV ELASTICSEARCH_VERSION 2.4.1
+ENV ELASTICSEARCH_VERSION 5.4.0
 
 RUN apt-get update \
     && apt-get install -y curl gosu \
@@ -29,7 +29,7 @@ RUN apt-get update \
 RUN set -x \
     && cd / \
     && mkdir /elasticsearch \
-    && curl -O https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/$ELASTICSEARCH_VERSION/elasticsearch-$ELASTICSEARCH_VERSION.tar.gz \
+    && curl -O https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-$ELASTICSEARCH_VERSION.tar.gz \
     && tar xf elasticsearch-$ELASTICSEARCH_VERSION.tar.gz -C /elasticsearch --strip-components=1 \
     && rm elasticsearch-$ELASTICSEARCH_VERSION.tar.gz
 
