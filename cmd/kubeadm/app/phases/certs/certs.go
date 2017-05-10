@@ -31,24 +31,23 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
-// CreateCertFunc define the signature of methods implementing an create cert actions.
-// Each Create cert actions execute an "atomic" crate task
+// CreateCertFunc define the signature of methods implementing create cert "atomic" actions.
 type CreateCertFunc func(cfg *kubeadmapi.MasterConfiguration) (*CreateCertResult, error)
 
-// CreateCertResult represents outcomes of an CreateCert action
+// CreateCertResult represents outcomes of an CreateCertFunc action
 type CreateCertResult struct {
 	// GeneratedCertAndKeyBaseName contains the base name of generated files.
 	// Please note that this attribute can be used also as identifier of the action performed in case of
-	// bulk CreateCert actions
+	// bulk CreateCertFunc actions
 	GeneratedCertAndKeyBaseName string
 	// UsedExistingCert is true if an exixting certificate file was used (instead of creating a new one)
 	UsedExistingCert bool
-	// AdditionalMsg contains the list of extra msg documenting the performed CreateCert action
+	// AdditionalMsg contains the list of extra msg documenting the performed CreateCertFunc action
 	AdditionalMsgs []string
 }
 
-// BulkCreateCertFunc define the signature of methods implementing bulk create cert actions.
-// Bulck create cert function are implemented composing "atomic" create cert actions
+// BulkCreateCertFunc define the signature of methods implementing "bulk"" create cert actions.
+// "Bulk"" create cert function are implemented composing "atomic" create cert actions
 type BulkCreateCertFunc func(cfg *kubeadmapi.MasterConfiguration) (BulkCreateCertResult, error)
 
 // BulkCreateCertResult represents outcomes of an BulkCreateCert action
