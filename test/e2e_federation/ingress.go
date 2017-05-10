@@ -140,7 +140,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 	})
 
 	// e2e cases for federation ingress controller
-	var _ = Describe("Federated Ingresses [Slow]", func() {
+	var _ = Describe("Federated Ingresses", func() {
 		var (
 			clusters           fedframework.ClusterSlice
 			federationName, ns string
@@ -264,7 +264,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				// TODO check dns record in global dns server
 			})
 
-			PIt("should be able to connect to a federated ingress via its load balancer", func() {
+			It("should be able to connect to a federated ingress via its load balancer", func() {
 				By(fmt.Sprintf("Waiting for Federated Ingress on %v", jig.ing.Name))
 				// check the traffic on federation ingress
 				jig.waitForFederatedIngress()

@@ -741,7 +741,6 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 
 	for _, cluster := range clusters {
 		baseIPName, baseIPAnnotationExists := baseIngress.ObjectMeta.Annotations[staticIPNameKeyWritable]
-		firstClusterName, firstClusterExists := baseIngress.ObjectMeta.Annotations[firstClusterAnnotation]
 		clusterIngressObj, clusterIngressFound, err := ic.ingressFederatedInformer.GetTargetStore().GetByKey(cluster.Name, key)
 		if err != nil {
 			glog.Errorf("Failed to get cached ingress %s for cluster %s, will retry: %v", ingress, cluster.Name, err)
@@ -770,39 +769,16 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		glog.V(4).Infof("Desired Ingress: %v", desiredIngress)
 
 		if !clusterIngressFound {
-			glog.V(4).Infof("No existing Ingress %s in cluster %s - checking if appropriate to queue a create operation", ingress, cluster.Name)
 			// We can't supply server-created fields when creating a new object.
 			desiredIngress.ObjectMeta = util.DeepCopyRelevantObjectMeta(baseIngress.ObjectMeta)
 
-			// We always first create an ingress in the first available cluster. Once that ingress
-			// has been created and allocated a global IP (visible via an annotation),
-			// we record that annotation on the federated ingress, and create all other cluster
-			// ingresses with that same global IP.
-			// Note: If the first cluster becomes (e.g. temporarily) unavailable, the
-			// second cluster will become the first cluster, but eventually all ingresses
-			// will share the single global IP recorded in the annotation of the
-			// federated ingress.
-			haveFirstCluster := firstClusterExists && firstClusterName != "" && ic.isClusterReady(firstClusterName)
-			if !haveFirstCluster {
-				glog.V(4).Infof("No cluster has been chosen as the first cluster. Electing cluster %s as the first cluster to create ingress in", cluster.Name)
-				ic.updateAnnotationOnIngress(baseIngress, firstClusterAnnotation, cluster.Name)
-				return
-			}
-			if baseIPAnnotationExists || firstClusterName == cluster.Name {
-				if baseIPAnnotationExists {
-					glog.V(4).Infof("No existing Ingress %s in cluster %s and static IP annotation (%q) exists on base ingress - queuing a create operation", ingress, cluster.Name, staticIPNameKeyWritable)
-				} else {
-					glog.V(4).Infof("No existing Ingress %s in cluster %s and no static IP annotation (%q) on base ingress - queuing a create operation in first cluster", ingress, cluster.Name, staticIPNameKeyWritable)
-				}
-				operations = append(operations, util.FederatedOperation{
-					Type:        util.OperationTypeAdd,
-					Obj:         desiredIngress,
-					ClusterName: cluster.Name,
-					Key:         key,
-				})
-			} else {
-				glog.V(4).Infof("No annotation %q exists on ingress %q in federation and waiting for ingress in cluster %s. Not queueing create operation for ingress until annotation exists", staticIPNameKeyWritable, ingress, firstClusterName)
-			}
+			glog.V(4).Infof("No existing Ingress %q in cluster %q - queuing a create operation", types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, cluster.Name)
+			operations = append(operations, util.FederatedOperation{
+				Type:        util.OperationTypeAdd,
+				Obj:         desiredIngress,
+				ClusterName: cluster.Name,
+				Key:         key,
+			})
 		} else {
 			clusterIngress := clusterIngressObj.(*extensionsv1beta1.Ingress)
 			glog.V(4).Infof("Found existing Ingress %s in cluster %s - checking if update is required (in either direction)", ingress, cluster.Name)
@@ -811,7 +787,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 			clusterLBStatusExists := len(clusterIngress.Status.LoadBalancer.Ingress) > 0
 			logStr := fmt.Sprintf("Cluster ingress %q has annotation %q=%q, loadbalancer status exists? [%v], federated ingress has annotation %q=%q, loadbalancer status exists? [%v].  %%s annotation and/or loadbalancer status from cluster ingress to federated ingress.", ingress, staticIPNameKeyReadonly, clusterIPName, clusterLBStatusExists, staticIPNameKeyWritable, baseIPName, baseLBStatusExists)
 			if (!baseIPAnnotationExists && clusterIPNameExists) || (!baseLBStatusExists && clusterLBStatusExists) { // copy the IP name from the readonly annotation on the cluster ingress, to the writable annotation on the federated ingress
-				glog.V(4).Infof(logStr, "Transferring")
+				glog.V(4).Infof(logStr, "Transferring status")
 				if !baseIPAnnotationExists && clusterIPNameExists {
 					ic.updateAnnotationOnIngress(baseIngress, staticIPNameKeyWritable, clusterIPName)
 					return
