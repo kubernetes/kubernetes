@@ -276,6 +276,10 @@ var ValidateClusterName = genericvalidation.ValidateClusterName
 // (where it should be) and this file.
 var ValidateClassName = NameIsDNSSubdomain
 
+// ValidatePiorityClassName can be used to check whether the given priority
+// class name is valid.
+var ValidatePriorityClassName = NameIsDNSSubdomain
+
 // TODO update all references to these functions to point to the genericvalidation ones
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func NameIsDNSSubdomain(name string, prefix bool) []string {
@@ -2294,6 +2298,20 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 
 	if len(spec.HostAliases) > 0 {
 		allErrs = append(allErrs, ValidateHostAliases(spec.HostAliases, fldPath.Child("hostAliases"))...)
+	}
+
+	if len(spec.PriorityClassName) > 0 {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("priorityClassName"), "Pod priority is disabled by feature-gate"))
+		} else {
+			for _, msg := range ValidatePriorityClassName(spec.PriorityClassName, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("priorityClassName"), spec.PriorityClassName, msg))
+			}
+		}
+	}
+
+	if spec.Priority != nil && !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("priority"), "Pod priority is disabled by feature-gate"))
 	}
 
 	return allErrs
