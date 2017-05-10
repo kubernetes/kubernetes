@@ -9,6 +9,8 @@
 // translations/kubectl/fr_FR/LC_MESSAGES/k8s.mo
 // translations/kubectl/fr_FR/LC_MESSAGES/k8s.po
 // translations/kubectl/template.pot
+// translations/kubectl/zh_CN/LC_MESSAGES/k8s.mo
+// translations/kubectl/zh_CN/LC_MESSAGES/k8s.po
 // translations/test/default/LC_MESSAGES/k8s.mo
 // translations/test/default/LC_MESSAGES/k8s.po
 // translations/test/en_US/LC_MESSAGES/k8s.mo
@@ -9420,6 +9422,128 @@ func translationsKubectlTemplatePot() (*asset, error) {
 	return a, nil
 }
 
+var _translationsKubectlZh_cnLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x11\x00\x00\x00\x1c\x00\x00\x00\xa4\x00\x00\x00\x17\x00\x00\x00,\x01\x00\x00\x00\x00\x00\x00\x88\x01\x00\x008\x00\x00\x00\x89\x01\x00\x000\x00\x00\x00\xc2\x01\x00\x000\x00\x00\x00\xf3\x01\x00\x00\x1d\x00\x00\x00$\x02\x00\x00*\x00\x00\x00B\x02\x00\x00A\x00\x00\x00m\x02\x00\x00\x1c\x00\x00\x00\xaf\x02\x00\x00\x17\x00\x00\x00\xcc\x02\x00\x00\"\x00\x00\x00\xe4\x02\x00\x00\"\x00\x00\x00\a\x03\x00\x00\x1f\x00\x00\x00*\x03\x00\x00-\x00\x00\x00J\x03\x00\x00-\x00\x00\x00x\x03\x00\x00/\x00\x00\x00\xa6\x03\x00\x00$\x00\x00\x00\xd6\x03\x00\x00\xc5\x00\x00\x00\xfb\x03\x00\x00\xa3\x01\x00\x00\xc1\x04\x00\x00>\x00\x00\x00e\x06\x00\x001\x00\x00\x00\xa4\x06\x00\x004\x00\x00\x00\xd6\x06\x00\x00\x1e\x00\x00\x00\v\a\x00\x001\x00\x00\x00*\a\x00\x00:\x00\x00\x00\\\a\x00\x00\x18\x00\x00\x00\x97\a\x00\x00\x1c\x00\x00\x00\xb0\a\x00\x004\x00\x00\x00\xcd\a\x00\x007\x00\x00\x00\x02\b\x00\x004\x00\x00\x00:\b\x00\x001\x00\x00\x00o\b\x00\x004\x00\x00\x00\xa1\b\x00\x007\x00\x00\x00\xd6\b\x00\x00\x1b\x00\x00\x00\x0e\t\x00\x00\xb5\x00\x00\x00*\t\x00\x00\x01\x00\x00\x00\n\x00\x00\x00\v\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x11\x00\x00\x00\t\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\a\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\b\x00\x00\x00\x0e\x00\x00\x00\x00\x00\x00\x00\x0f\x00\x00\x00\f\x00\x00\x00\x05\x00\x00\x00\r\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00Apply a configuration to a resource by filename or stdin\x00Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x00Describe one or many contexts\x00Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x00Modify kubeconfig files\x00Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x00Unsets an individual value in a kubeconfig file\x00Update the annotations on a resource\x00watch is only supported on individual resources and resource collections - %d resources were found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2017-05-10 14:38+0800\nLast-Translator: Shiyang Wang <shiywang@redhat.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.8.8\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n > 1);\nLanguage: zh\n\x00\u901a\u8fc7\u6587\u4ef6\u6216\u8005\u6807\u51c6\u8f93\u5165\u7684\u8bfb\u53d6\u65b9\u5f0fapply\u4e00\u4e2a\u8d44\u6e90\x00\u4ecekubeconfig\u914d\u7f6e\u6587\u4ef6\u4e2d\u5220\u9664\u6307\u5b9a\u7684\u96c6\u7fa4\x00\u4ecekubeconfig\u914d\u7f6e\u6587\u4ef6\u4e2d\u5220\u9664\u6307\u5b9a\u7684\u4e0a\u4e0b\u6587\x00\u63cf\u8ff0\u4e00\u4e2a\u6216\u66f4\u591a\u4e0a\u4e0b\u6587\x00\u4ecekubeconfig\u914d\u7f6e\u6587\u4ef6\u4e2d\u663e\u793a\u6307\u5b9a\u7684\u96c6\u7fa4\x00\u663e\u793a\u5408\u5e76\u7684\u96c6\u7fa4\u6216\u8005\u6307\u5b9a\u7684kubeconfig\u914d\u7f6e\u6587\u4ef6\x00\u663e\u793a\u5f53\u524d\u7684\u4e0a\u4e0b\u6587\x00\u4fee\u6539kubeconfig\u914d\u7f6e\u6587\u4ef6\x00\u4ecekubeconfig\u914d\u7f6e\u6587\u4ef6\u4e2d\u8bbe\u7f6e\u4e00\u4e2a\u96c6\u7fa4\u6761\u76ee\x00\u4ecekubeconfig\u914d\u7f6e\u6587\u4ef6\u4e2d\u8bbe\u7f6e\u4e00\u4e2a\u4e0a\u4e0b\u6587\u6761\u76ee\x00\u4ecekubeconfig\u914d\u7f6e\u6587\u4ef6\u4e2d\u8bbe\u7f6e\u4e00\u4e2a\u7528\u6237\u6761\u76ee\x00\u4ecekubeconfig\u914d\u7f6e\u6587\u4ef6\u4e2d\u8bbe\u7f6e\u4e00\u4e2a\u5355\u72ec\u503c\x00\u4ecekubeconfig\u914d\u7f6e\u6587\u4ef6\u4e2d\u8bbe\u7f6e\u5f53\u524d\u7684\u4e0a\u4e0b\u6587\x00\u4ecekubeconfig\u914d\u7f6e\u6587\u4ef6\u4e2d\u53d6\u6d88\u8bbe\u7f6e\u4e00\u4e2a\u5355\u72ec\u503c\x00\u66f4\u65b0\u4e00\u4e2a\u8d44\u6e90\u7684\u6ce8\u89e3\x00watch \u4ec5\u5728\u5355\u72ec\u7684\u4e00\u4e2a\u8d44\u6e90\u6216\u8005\u4e00\u4e2a\u8d44\u6e90\u96c6\u5408\u4e0a\u88ab\u652f\u6301 -\u8d44\u6e90 %d \u88ab\u53d1\u73b0\x00watch \u4ec5\u5728\u5355\u72ec\u7684\u4e00\u4e9b\u8d44\u6e90\u6216\u8005\u4e00\u4e9b\u8d44\u6e90\u96c6\u5408\u4e0a\u88ab\u652f\u6301 -\u8d44\u6e90 %d \u88ab\u53d1\u73b0\x00")
+
+func translationsKubectlZh_cnLc_messagesK8sMoBytes() ([]byte, error) {
+	return _translationsKubectlZh_cnLc_messagesK8sMo, nil
+}
+
+func translationsKubectlZh_cnLc_messagesK8sMo() (*asset, error) {
+	bytes, err := translationsKubectlZh_cnLc_messagesK8sMoBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "translations/kubectl/zh_CN/LC_MESSAGES/k8s.mo", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _translationsKubectlZh_cnLc_messagesK8sPo = []byte(`# Test translations for unit tests.
+# Copyright (C) 2017
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR shiywang@redhat.com, 2017.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: gettext-go-examples-hello\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-12-12 20:03+0000\n"
+"PO-Revision-Date: 2017-05-10 14:38+0800\n"
+"Last-Translator: Shiyang Wang <shiywang@redhat.com>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 1.8.8\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"Language-Team: \n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"Language: zh\n"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/apply.go#L98
+msgid "Apply a configuration to a resource by filename or stdin"
+msgstr "通过文件或者标准输入的读取方式apply一个资源"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
+msgid "Delete the specified cluster from the kubeconfig"
+msgstr "从kubeconfig配置文件中删除指定的集群"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_context.go#L38
+msgid "Delete the specified context from the kubeconfig"
+msgstr "从kubeconfig配置文件中删除指定的上下文"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_contexts.go#L62
+msgid "Describe one or many contexts"
+msgstr "描述一个或更多上下文"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
+msgid "Display clusters defined in the kubeconfig"
+msgstr "从kubeconfig配置文件中显示指定的集群"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/view.go#L64
+msgid "Display merged kubeconfig settings or a specified kubeconfig file"
+msgstr "显示合并的集群或者指定的kubeconfig配置文件"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
+msgid "Displays the current-context"
+msgstr "显示当前的上下文"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
+msgid "Modify kubeconfig files"
+msgstr "修改kubeconfig配置文件"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
+msgid "Sets a cluster entry in kubeconfig"
+msgstr "从kubeconfig配置文件中设置一个集群条目"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_context.go#L57
+msgid "Sets a context entry in kubeconfig"
+msgstr "从kubeconfig配置文件中设置一个上下文条目"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_authinfo.go#L103
+msgid "Sets a user entry in kubeconfig"
+msgstr "从kubeconfig配置文件中设置一个用户条目"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
+msgid "Sets an individual value in a kubeconfig file"
+msgstr "从kubeconfig配置文件中设置一个单独值"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
+msgid "Sets the current-context in a kubeconfig file"
+msgstr "从kubeconfig配置文件中设置当前的上下文"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
+msgid "Unsets an individual value in a kubeconfig file"
+msgstr "从kubeconfig配置文件中取消设置一个单独值"
+
+msgid "Update the annotations on a resource"
+msgstr "更新一个资源的注解"
+
+msgid ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgid_plural ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgstr[0] "watch 仅在单独的一个资源或者一个资源集合上被支持 -资源 %d 被发现"
+msgstr[1] "watch 仅在单独的一些资源或者一些资源集合上被支持 -资源 %d 被发现"
+`)
+
+func translationsKubectlZh_cnLc_messagesK8sPoBytes() ([]byte, error) {
+	return _translationsKubectlZh_cnLc_messagesK8sPo, nil
+}
+
+func translationsKubectlZh_cnLc_messagesK8sPo() (*asset, error) {
+	bytes, err := translationsKubectlZh_cnLc_messagesK8sPoBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "translations/kubectl/zh_CN/LC_MESSAGES/k8s.po", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _translationsTestDefaultLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x03\x00\x00\x00\x1c\x00\x00\x004\x00\x00\x00\x05\x00\x00\x00L\x00\x00\x00\x00\x00\x00\x00`\x00\x00\x00\x17\x00\x00\x00a\x00\x00\x00\v\x00\x00\x00y\x00\x00\x00\xac\x01\x00\x00\x85\x00\x00\x00%\x00\x00\x002\x02\x00\x00\x03\x00\x00\x00X\x02\x00\x00\x01\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00test_plural\x00test_plural\x00test_string\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2016-12-13 21:35-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n != 1);\nLanguage: en\n\x00there was %d item\x00there were %d items\x00foo\x00")
 
 func translationsTestDefaultLc_messagesK8sMoBytes() ([]byte, error) {
@@ -9605,6 +9729,8 @@ var _bindata = map[string]func() (*asset, error){
 	"translations/kubectl/fr_FR/LC_MESSAGES/k8s.mo":   translationsKubectlFr_frLc_messagesK8sMo,
 	"translations/kubectl/fr_FR/LC_MESSAGES/k8s.po":   translationsKubectlFr_frLc_messagesK8sPo,
 	"translations/kubectl/template.pot":               translationsKubectlTemplatePot,
+	"translations/kubectl/zh_CN/LC_MESSAGES/k8s.mo":   translationsKubectlZh_cnLc_messagesK8sMo,
+	"translations/kubectl/zh_CN/LC_MESSAGES/k8s.po":   translationsKubectlZh_cnLc_messagesK8sPo,
 	"translations/test/default/LC_MESSAGES/k8s.mo":    translationsTestDefaultLc_messagesK8sMo,
 	"translations/test/default/LC_MESSAGES/k8s.po":    translationsTestDefaultLc_messagesK8sPo,
 	"translations/test/en_US/LC_MESSAGES/k8s.mo":      translationsTestEn_usLc_messagesK8sMo,
@@ -9675,6 +9801,12 @@ var _bintree = &bintree{nil, map[string]*bintree{
 				}},
 			}},
 			"template.pot": {translationsKubectlTemplatePot, map[string]*bintree{}},
+			"zh_CN": {nil, map[string]*bintree{
+				"LC_MESSAGES": {nil, map[string]*bintree{
+					"k8s.mo": {translationsKubectlZh_cnLc_messagesK8sMo, map[string]*bintree{}},
+					"k8s.po": {translationsKubectlZh_cnLc_messagesK8sPo, map[string]*bintree{}},
+				}},
+			}},
 		}},
 		"test": {nil, map[string]*bintree{
 			"default": {nil, map[string]*bintree{
