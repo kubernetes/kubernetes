@@ -740,14 +740,13 @@ func (nc *NodeController) handleDisruption(zoneToNodeConditions map[string][]*v1
 		// We're switching to full disruption mode
 		if allAreFullyDisrupted {
 			glog.V(0).Info("NodeController detected that all Nodes are not-Ready. Entering master disruption mode.")
-			for i := range nodes {
+			for _, node := range nodes {
 				if nc.useTaintBasedEvictions {
-					_, err := nc.markNodeAsHealthy(nodes[i])
-					if err != nil {
-						glog.Errorf("Failed to remove taints from Node %v", nodes[i].Name)
+					if _, err := nc.markNodeAsHealthy(node); err != nil {
+						glog.Errorf("Failed to remove taints from Node %v", node.Name)
 					}
 				} else {
-					nc.cancelPodEviction(nodes[i])
+					nc.cancelPodEviction(node)
 				}
 			}
 			// We stop all evictions.
@@ -769,11 +768,11 @@ func (nc *NodeController) handleDisruption(zoneToNodeConditions map[string][]*v1
 			glog.V(0).Info("NodeController detected that some Nodes are Ready. Exiting master disruption mode.")
 			// When exiting disruption mode update probe timestamps on all Nodes.
 			now := nc.now()
-			for i := range nodes {
-				v := nc.nodeStatusMap[nodes[i].Name]
+			for _, node := range nodes {
+				v := nc.nodeStatusMap[node.Name]
 				v.probeTimestamp = now
 				v.readyTransitionTimestamp = now
-				nc.nodeStatusMap[nodes[i].Name] = v
+				nc.nodeStatusMap[node.Name] = v
 			}
 			// We reset all rate limiters to settings appropriate for the given state.
 			for k := range nc.zoneStates {
@@ -991,9 +990,9 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 }
 
 func (nc *NodeController) checkForNodeAddedDeleted(nodes []*v1.Node) (added, deleted []*v1.Node) {
-	for i := range nodes {
-		if _, has := nc.knownNodeSet[nodes[i].Name]; !has {
-			added = append(added, nodes[i])
+	for _, node := range nodes {
+		if _, has := nc.knownNodeSet[node.Name]; !has {
+			added = append(added, node)
 		}
 	}
 	// If there's a difference between lengths of known Nodes and observed nodes
@@ -1003,11 +1002,11 @@ func (nc *NodeController) checkForNodeAddedDeleted(nodes []*v1.Node) (added, del
 		for k, v := range nc.knownNodeSet {
 			knowSetCopy[k] = v
 		}
-		for i := range nodes {
-			delete(knowSetCopy, nodes[i].Name)
+		for _, node := range nodes {
+			delete(knowSetCopy, node.Name)
 		}
-		for i := range knowSetCopy {
-			deleted = append(deleted, knowSetCopy[i])
+		for _, knowSetCopyItem := range knowSetCopy {
+			deleted = append(deleted, knowSetCopyItem)
 		}
 	}
 	return
@@ -1078,8 +1077,8 @@ func (nc *NodeController) ReducedQPSFunc(nodeNum int) float32 {
 func (nc *NodeController) ComputeZoneState(nodeReadyConditions []*v1.NodeCondition) (int, zoneState) {
 	readyNodes := 0
 	notReadyNodes := 0
-	for i := range nodeReadyConditions {
-		if nodeReadyConditions[i] != nil && nodeReadyConditions[i].Status == v1.ConditionTrue {
+	for _, nodeReadyCondition := range nodeReadyConditions {
+		if nodeReadyCondition != nil && nodeReadyCondition.Status == v1.ConditionTrue {
 			readyNodes++
 		} else {
 			notReadyNodes++
