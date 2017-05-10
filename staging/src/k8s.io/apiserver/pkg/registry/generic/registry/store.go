@@ -995,7 +995,15 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 		}
 		return obj, nil
 	}
-	return &metav1.Status{Status: metav1.StatusSuccess}, nil
+	// Return the UID of the deleted object, which enables the clients to
+	// verify that the object was actually deleted and not waiting for finalizers.
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	details := &metav1.StatusDetails{UID: accessor.GetUID()}
+	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
+	return status, nil
 }
 
 // Watch makes a matcher for the given label and field, and calls
