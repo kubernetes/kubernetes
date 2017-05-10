@@ -21,6 +21,7 @@ go_library(
     srcs = ["groupapprove.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/apis/authorization/v1beta1:go_default_library",
         "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/certificates/v1beta1:go_default_library",
