@@ -45,7 +45,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/howeyc/gopass:go_default_library",
         "//vendor/github.com/imdario/mergo:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -58,5 +57,6 @@ go_library(
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api/latest:go_default_library",
         "//vendor/k8s.io/client-go/util/homedir:go_default_library",
+        "//vendor/k8s.io/client-go/util/prompt:go_default_library",
     ],
 )

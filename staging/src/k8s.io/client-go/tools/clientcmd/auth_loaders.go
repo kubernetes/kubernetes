@@ -23,7 +23,7 @@ import (
 	"os"
 
 	clientauth "k8s.io/client-go/tools/auth"
-	"k8s.io/kubernetes/pkg/util/prompt"
+	"k8s.io/client-go/util/prompt"
 )
 
 // AuthLoaders are used to build clientauth.Info objects.
