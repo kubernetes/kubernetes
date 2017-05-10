@@ -607,6 +607,12 @@ message StatusDetails {
   // +optional
   optional string kind = 3;
 
+  // UID of the resource.
+  // (when there is a single resource which can be described).
+  // More info: http://kubernetes.io/docs/user-guide/identifiers#uids
+  // +optional
+  optional string uid = 6;
+
   // The Causes array includes more details associated with the StatusReason
   // failure. Not all StatusReasons may provide detailed causes.
   // +optional
