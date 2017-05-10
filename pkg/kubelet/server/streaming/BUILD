@@ -17,7 +17,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/apis/cri/v1alpha1:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
@@ -40,7 +40,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/apis/cri/v1alpha1:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",

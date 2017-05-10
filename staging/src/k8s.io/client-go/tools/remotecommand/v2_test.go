@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 type fakeReader struct {
@@ -47,7 +47,7 @@ type fakeStreamCreator struct {
 var _ streamCreator = &fakeStreamCreator{}
 
 func (f *fakeStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, error) {
-	streamType := headers.Get(api.StreamType)
+	streamType := headers.Get(v1.StreamType)
 	f.created[streamType] = true
 	return nil, f.errors[streamType]
 }
@@ -111,10 +111,10 @@ func TestV2CreateStreams(t *testing.T) {
 		conn := &fakeStreamCreator{
 			created: make(map[string]bool),
 			errors: map[string]error{
-				api.StreamTypeStdin:  test.stdinError,
-				api.StreamTypeStdout: test.stdoutError,
-				api.StreamTypeStderr: test.stderrError,
-				api.StreamTypeError:  test.errorError,
+				v1.StreamTypeStdin:  test.stdinError,
+				v1.StreamTypeStdout: test.stdoutError,
+				v1.StreamTypeStderr: test.stderrError,
+				v1.StreamTypeError:  test.errorError,
 			},
 		}
 
@@ -157,20 +157,20 @@ func TestV2CreateStreams(t *testing.T) {
 			continue
 		}
 
-		if test.stdin && !conn.created[api.StreamTypeStdin] {
+		if test.stdin && !conn.created[v1.StreamTypeStdin] {
 			t.Errorf("%s: expected stdin stream", test.name)
 		}
-		if test.stdout && !conn.created[api.StreamTypeStdout] {
+		if test.stdout && !conn.created[v1.StreamTypeStdout] {
 			t.Errorf("%s: expected stdout stream", test.name)
 		}
 		if test.stderr {
-			if test.tty && conn.created[api.StreamTypeStderr] {
+			if test.tty && conn.created[v1.StreamTypeStderr] {
 				t.Errorf("%s: unexpected stderr stream because tty is set", test.name)
-			} else if !test.tty && !conn.created[api.StreamTypeStderr] {
+			} else if !test.tty && !conn.created[v1.StreamTypeStderr] {
 				t.Errorf("%s: expected stderr stream", test.name)
 			}
 		}
-		if !conn.created[api.StreamTypeError] {
+		if !conn.created[v1.StreamTypeError] {
 			t.Errorf("%s: expected error stream", test.name)
 		}
 
