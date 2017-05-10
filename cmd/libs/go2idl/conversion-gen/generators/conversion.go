@@ -712,6 +712,16 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 		}
 
 		inMemberType, outMemberType := inMember.Type, outMember.Type
+
+		// Determine if our destination field is a slice that should be output when empty.
+		// If it is, ensure a nil source slice converts to a zero-length destination slice.
+		// See http://issue.k8s.io/43203
+		persistEmptySlice := false
+		if outMemberType.Kind == types.Slice {
+			jsonTag := reflect.StructTag(outMember.Tags).Get("json")
+			persistEmptySlice = len(jsonTag) > 0 && !strings.Contains(jsonTag, ",omitempty")
+		}
+
 		// create a copy of both underlying types but give them the top level alias name (since aliases
 		// are assignable)
 		if underlying := unwrapAlias(inMemberType); underlying != inMemberType {
@@ -723,15 +733,6 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			copied := *underlying
 			copied.Name = outMemberType.Name
 			outMemberType = &copied
-		}
-
-		// Determine if our destination field is a slice that should be output when empty.
-		// If it is, ensure a nil source slice converts to a zero-length destination slice.
-		// See http://issue.k8s.io/43203
-		persistEmptySlice := false
-		if outMemberType.Kind == types.Slice {
-			jsonTag := reflect.StructTag(outMember.Tags).Get("json")
-			persistEmptySlice = len(jsonTag) > 0 && !strings.Contains(jsonTag, ",omitempty")
 		}
 
 		args := argsFromType(inMemberType, outMemberType).With("name", inMember.Name)
