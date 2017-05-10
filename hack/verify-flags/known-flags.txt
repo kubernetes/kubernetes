@@ -196,6 +196,7 @@ enable-cri
 enable-custom-metrics
 enable-debugging-handlers
 enable-dynamic-provisioning
+enable-extended-isolation
 enable-garbage-collector
 enable-garbage-collector
 enable-garbage-collector

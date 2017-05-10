@@ -1083,6 +1083,8 @@ type Kubelet struct {
 	// dockerLegacyService contains some legacy methods for backward compatibility.
 	// It should be set only when docker is using non json-file logging driver.
 	dockerLegacyService dockershim.DockerLegacyService
+
+	eventDispacherEventChannel chan cm.EventDispatcherEvent
 }
 
 // setupDataDirs creates:
@@ -1484,6 +1486,9 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		}
 	}
 
+	// TODO(squall0): Write down documentation here
+	kl.eventDispacherEventChannel = pcm.GetEventDispatcherChan()
+
 	// Create Mirror Pod for Static Pod if it doesn't already exist
 	if kubepod.IsStaticPod(pod) {
 		podFullName := kubecontainer.GetPodFullName(pod)
@@ -1817,6 +1822,24 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		if e.Type == pleg.ContainerDied {
 			if containerID, ok := e.Data.(string); ok {
 				kl.cleanUpContainersInPod(e.ID, containerID)
+			}
+		}
+	case eventDispatcherEvent := <-kl.eventDispacherEventChannel:
+		switch eventDispatcherEvent.Type {
+		case cm.ISOLATOR_LIST_CHANGED:
+			isolatorLabel := "node.alpha.kubernetes.io/registered-isolators"
+			node, err := kl.getNodeAnyWay()
+			if err != nil {
+				glog.Errorf("update isolator list: unable to get current node: %q", err.Error())
+			}
+			if eventDispatcherEvent.Body != "" {
+				node.ObjectMeta.Labels[isolatorLabel] = eventDispatcherEvent.Body
+			} else {
+				delete(node.ObjectMeta.Labels, isolatorLabel)
+			}
+			_, err = kl.kubeClient.CoreV1().Nodes().Update(node)
+			if err != nil {
+				glog.Errorf("unable to update list of registered isolators in node: %q", err.Error())
 			}
 		}
 	case <-syncCh:

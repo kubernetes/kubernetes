@@ -17,6 +17,7 @@ limitations under the License.
 package cm
 
 import (
+	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -31,6 +32,14 @@ type ResourceConfig struct {
 	CpuQuota *int64
 	// CPU quota period.
 	CpuPeriod *int64
+	// CPU sets.
+	// List format: http://man7.org/linux/man-pages/man7/cpuset.7.html#FORMATS
+	CpusetCpus *string
+	// Memory node sets.
+	// List format: http://man7.org/linux/man-pages/man7/cpuset.7.html#FORMATS
+	CpusetMems *string
+	// Hugetlb limit (in bytes)
+	HugetlbLimit []*libcontainerconfigs.HugepageLimit
 }
 
 // CgroupName is the abstract name of a cgroup prior to any driver specific conversion.
@@ -118,4 +127,6 @@ type PodContainerManager interface {
 
 	// GetAllPodsFromCgroups enumerates the set of pod uids to their associated cgroup based on state of cgroupfs system.
 	GetAllPodsFromCgroups() (map[types.UID]CgroupName, error)
+
+	GetEventDispatcherChan() chan EventDispatcherEvent
 }

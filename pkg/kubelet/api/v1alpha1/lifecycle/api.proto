@@ -1,0 +1,82 @@
+// To regenerate api.pb.go run hack/update-generated-runtime.sh
+syntax = 'proto3';
+
+package lifecycle;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.goproto_getters_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_unrecognized_all) = false;
+
+service EventDispatcher {
+  rpc Register(RegisterRequest) returns (RegisterReply) {}
+  rpc Unregister(UnregisterRequest) returns (UnregisterReply) {}
+}
+
+message RegisterRequest {
+  // For example: localhost:10321
+  string socketAddress = 1;
+  string name = 2;
+}
+
+message RegisterReply {
+  string error = 1;
+}
+
+message UnregisterRequest {
+  string name = 1;
+}
+
+message UnregisterReply {
+  string error = 1;
+}
+
+service Isolator {
+  rpc Notify(Event) returns (EventReply) {}
+}
+
+message Event {
+  enum Kind {
+    POD_PRE_START = 0;
+    POD_POST_STOP = 1;
+    CONTAINER_PRE_START = 2;
+    CONTAINER_POST_STOP = 3;
+  };
+  Kind kind = 1;
+  string pod_name = 2;
+  string container_name = 3;
+  bytes pod = 4;
+  CgroupInfo cgroup_info = 5;
+}
+
+message EventReply {
+  string error = 1;
+  repeated IsolationControl isolation_controls = 2;
+}
+
+message CgroupInfo {
+  enum Kind {
+    QOS = 0;
+    POD = 1;
+    CONTAINER = 2;
+  };
+  Kind kind = 1;
+  string path = 2;
+}
+
+message IsolationControl {
+  enum Kind {
+    CGROUP_CPUSET_CPUS = 0;
+    CGROUP_CPUSET_MEMS = 1;
+    CONTAINER_ENV_VAR = 2;
+    CGROUP_HUGETLB_LIMIT = 3;
+  };
+  Kind kind = 1;
+  string value = 2;
+  map<string, string> map_value = 3;
+}

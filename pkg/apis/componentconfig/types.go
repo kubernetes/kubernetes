@@ -361,6 +361,10 @@ type KubeletConfiguration struct {
 	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
 	// +optional
 	CgroupRoot string
+	// Enables extended isolation eventDispatcher
+	// Requires CgroupsPerQOS
+	// +optional
+	EnableExtendedIsolation bool
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string
 	// remoteRuntimeEndpoint is the endpoint of remote runtime service

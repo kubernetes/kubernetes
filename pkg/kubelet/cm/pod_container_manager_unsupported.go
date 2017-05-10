@@ -43,6 +43,9 @@ func (m *unsupportedPodContainerManager) GetPodContainerName(_ *v1.Pod) (CgroupN
 func (m *unsupportedPodContainerManager) ReduceCPULimits(_ CgroupName) error {
 	return nil
 }
+func (m *unsupportedPodContainerManager) GetEventDispatcherChan() chan EventDispatcherEvent {
+	return nil
+}
 
 func (m *unsupportedPodContainerManager) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
 	return nil, nil

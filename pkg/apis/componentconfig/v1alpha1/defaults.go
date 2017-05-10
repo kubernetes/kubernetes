@@ -425,6 +425,10 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		temp := true
 		obj.CgroupsPerQOS = &temp
 	}
+	if obj.EnableExtendedIsolation == nil {
+		temp := false
+		obj.EnableExtendedIsolation = &temp
+	}
 	if obj.CgroupDriver == "" {
 		obj.CgroupDriver = "cgroupfs"
 	}

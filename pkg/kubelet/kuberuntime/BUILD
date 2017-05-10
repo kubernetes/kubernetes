@@ -33,6 +33,7 @@ go_library(
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/api:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/images:go_default_library",

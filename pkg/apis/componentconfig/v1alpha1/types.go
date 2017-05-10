@@ -424,6 +424,9 @@ type KubeletConfiguration struct {
 	// specific top level QoS cgroup.
 	// +optional
 	CgroupsPerQOS *bool `json:"cgroupsPerQOS,omitempty"`
+	// Enables extended isolation
+	// +optional
+	EnableExtendedIsolation *bool `json:"enableExtendedIsolation,omitempty"`
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`

@@ -1,4 +1,5 @@
 cluster/addons/fluentd-elasticsearch/es-image
+cluster/addons/iso-client
 cluster/gce/gci/mounter
 cluster/images/etcd/attachlease
 cluster/images/etcd/rollback

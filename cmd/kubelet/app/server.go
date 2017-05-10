@@ -320,8 +320,13 @@ func initConfigz(kc *componentconfig.KubeletConfiguration) (*configz.Config, err
 
 // validateConfig validates configuration of Kubelet and returns an error is the input configuration is invalid.
 func validateConfig(s *options.KubeletServer) error {
-	if !s.CgroupsPerQOS && len(s.EnforceNodeAllocatable) > 0 {
-		return fmt.Errorf("Node Allocatable enforcement is not supported unless Cgroups Per QOS feature is turned on")
+	if !s.CgroupsPerQOS {
+		if len(s.EnforceNodeAllocatable) > 0 {
+			return fmt.Errorf("Node Allocatable enforcement is not supported unless Cgroups Per QOS feature is turned on")
+		}
+		if s.EnableExtendedIsolation {
+			return fmt.Errorf("Extended Isolation is not supported unless Cgroups Per QOS feature is turned on")
+		}
 	}
 	if s.SystemCgroups != "" && s.CgroupRoot == "" {
 		return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
@@ -536,15 +541,16 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
 			cm.NodeConfig{
-				RuntimeCgroupsName:    s.RuntimeCgroups,
-				SystemCgroupsName:     s.SystemCgroups,
-				KubeletCgroupsName:    s.KubeletCgroups,
-				ContainerRuntime:      s.ContainerRuntime,
-				CgroupsPerQOS:         s.CgroupsPerQOS,
-				CgroupRoot:            s.CgroupRoot,
-				CgroupDriver:          s.CgroupDriver,
-				ProtectKernelDefaults: s.ProtectKernelDefaults,
-				EnableCRI:             s.EnableCRI,
+				RuntimeCgroupsName:      s.RuntimeCgroups,
+				SystemCgroupsName:       s.SystemCgroups,
+				KubeletCgroupsName:      s.KubeletCgroups,
+				ContainerRuntime:        s.ContainerRuntime,
+				CgroupsPerQOS:           s.CgroupsPerQOS,
+				CgroupRoot:              s.CgroupRoot,
+				CgroupDriver:            s.CgroupDriver,
+				EnableExtendedIsolation: s.EnableExtendedIsolation,
+				ProtectKernelDefaults:   s.ProtectKernelDefaults,
+				EnableCRI:               s.EnableCRI,
 				NodeAllocatableConfig: cm.NodeAllocatableConfig{
 					KubeReservedCgroupName:   s.KubeReservedCgroup,
 					SystemReservedCgroupName: s.SystemReservedCgroup,

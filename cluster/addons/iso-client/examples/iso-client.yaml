@@ -1,0 +1,24 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: coreaffinity-isolator
+  namespace: kube-system
+spec:
+  template:
+    metadata:
+      labels:
+        isolator: coreaffinity
+    spec:
+      serviceAccountName: coreaffinity-isolator-sa
+      containers:
+      - command:
+        - /coreaffinity-isolator
+        - -v
+        - "4"
+        - -logtostderr
+        image: iso-client:latest
+        name: iso-client
+        resources:
+          requests:
+            cpu: 250m
+      hostNetwork: true

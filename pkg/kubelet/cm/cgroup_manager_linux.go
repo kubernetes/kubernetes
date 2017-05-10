@@ -291,6 +291,7 @@ type subsystem interface {
 var supportedSubsystems = []subsystem{
 	&cgroupfs.MemoryGroup{},
 	&cgroupfs.CpuGroup{},
+	&cgroupfs.CpusetGroup{},
 }
 
 // setSupportedSubsytems sets cgroup resource limits only on the supported
@@ -330,6 +331,15 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	}
 	if resourceConfig.CpuPeriod != nil {
 		resources.CpuPeriod = *resourceConfig.CpuPeriod
+	}
+	if resourceConfig.CpusetCpus != nil {
+		resources.CpusetCpus = *resourceConfig.CpusetCpus
+	}
+	if resourceConfig.CpusetMems != nil {
+		resources.CpusetMems = *resourceConfig.CpusetMems
+	}
+	if resourceConfig.HugetlbLimit != nil {
+		resources.HugetlbLimit = resourceConfig.HugetlbLimit
 	}
 	return resources
 }
