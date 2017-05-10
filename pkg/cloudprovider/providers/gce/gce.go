@@ -187,6 +187,9 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 	}
 
 	client, err = newOauthClient(tokenSource)
+	if err != nil {
+		return nil, err
+	}
 	serviceAlpha, err := computealpha.New(client)
 	if err != nil {
 		return nil, err
@@ -357,4 +360,5 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 	}
 
 	return oauth2.NewClient(oauth2.NoContext, tokenSource), nil
+}
 }
