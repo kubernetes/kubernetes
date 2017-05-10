@@ -109,6 +109,11 @@ func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Co
 }
 
 func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	err := checkResources(cmd, &o.FilenameOptions, args)
+	if err != nil {
+		return err
+	}
+
 	o.Local = cmdutil.GetFlagBool(cmd, "local")
 	o.Mapper, o.Typer = f.Object()
 	o.Encoder = f.JSONEncoder()

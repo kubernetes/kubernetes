@@ -114,6 +114,11 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 }
 
 func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	err := checkResources(cmd, &o.FilenameOptions, args)
+	if err != nil {
+		return err
+	}
+
 	o.Mapper, o.Typer = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()

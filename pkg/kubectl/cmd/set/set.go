@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -47,4 +48,11 @@ func NewCmdSet(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdSubject(f, out, err))
 
 	return cmd
+}
+
+func checkResources(cmd *cobra.Command, filename *resource.FilenameOptions, args []string) error {
+	if len(filename.Filenames) == 0 && len(args) == 0 {
+		return cmdutil.UsageError(cmd, "-f option or \"TYPE NAME\" is requried")
+	}
+	return nil
 }

@@ -102,6 +102,11 @@ func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 // Complete assigns the SelectorOptions from args.
 func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	err := checkResources(cmd, &o.fileOptions, args)
+	if err != nil {
+		return err
+	}
+
 	o.local = cmdutil.GetFlagBool(cmd, "local")
 	o.all = cmdutil.GetFlagBool(cmd, "all")
 	o.record = cmdutil.GetRecordFlag(cmd)
