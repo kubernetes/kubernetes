@@ -107,7 +107,8 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			"priorities" : [
 				{"name" : "PriorityOne", "weight" : 1},
 				{"name" : "PriorityTwo", "weight" : 5}
-			]
+			],
+			"hardPodAffinitySymmetricWeight" : 10
 			}`,
 		},
 	}
