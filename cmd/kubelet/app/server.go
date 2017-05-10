@@ -968,7 +968,7 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 
 	ds, err := dockershim.NewDockerService(dockerClient, c.SeccompProfileRoot, c.PodInfraContainerImage,
 		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, c.DockerExecHandlerName, dockershimRootDir,
-		!c.DockerEnableSharedPID)
+		c.DockerDisableSharedPID)
 	if err != nil {
 		return err
 	}
