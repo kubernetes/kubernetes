@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
+	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/api/core/v1"
 	autoscaling "k8s.io/api/autoscaling/v2alpha1"
 	customapi "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"

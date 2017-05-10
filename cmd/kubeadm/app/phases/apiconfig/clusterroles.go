@@ -19,10 +19,11 @@ package apiconfig
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1beta1"
+rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
-	rbac "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
@@ -95,7 +96,7 @@ func CreateRoles(clientset *clientset.Clientset) error {
 				Namespace: metav1.NamespacePublic,
 			},
 			Rules: []rbac.PolicyRule{
-				rbac.NewRule("get").Groups("").Resources("configmaps").RuleOrDie(),
+				rbachelper.NewRule("get").Groups("").Resources("configmaps").RuleOrDie(),
 			},
 		},
 	}

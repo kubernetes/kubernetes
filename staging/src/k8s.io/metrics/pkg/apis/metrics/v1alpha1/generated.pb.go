@@ -39,7 +39,7 @@ import math "math"
 
 import k8s_io_apimachinery_pkg_api_resource "k8s.io/apimachinery/pkg/api/resource"
 
-import k8s_io_client_go_pkg_api_v1 "k8s.io/client-go/pkg/api/v1"
+import k8s_io_client_go_pkg_api_v1 "k8s.io/api/core/v1"
 
 import strings "strings"
 import reflect "reflect"

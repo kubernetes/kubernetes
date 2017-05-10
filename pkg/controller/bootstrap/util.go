@@ -22,7 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 

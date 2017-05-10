@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	clientfake "k8s.io/client-go/kubernetes/fake"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
+	clientv1 "k8s.io/api/core/v1"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
