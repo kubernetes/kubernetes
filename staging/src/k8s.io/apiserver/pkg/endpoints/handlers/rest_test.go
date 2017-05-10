@@ -597,3 +597,62 @@ func TestParseTimeout(t *testing.T) {
 		t.Errorf("10s timeout produced: %v", d)
 	}
 }
+
+func TestFinishRequest(t *testing.T) {
+	exampleObj := &example.Pod{}
+	exampleErr := fmt.Errorf("error")
+	successStatusObj := &metav1.Status{Status: metav1.StatusSuccess, Message: "success message"}
+	errorStatusObj := &metav1.Status{Status: metav1.StatusFailure, Message: "error message"}
+	testcases := []struct {
+		timeout     time.Duration
+		fn          resultFunc
+		expectedObj runtime.Object
+		expectedErr error
+	}{
+		{
+			// Expected obj is returned.
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				return exampleObj, nil
+			},
+			expectedObj: exampleObj,
+			expectedErr: nil,
+		},
+		{
+			// Expected error is returned.
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				return nil, exampleErr
+			},
+			expectedObj: nil,
+			expectedErr: exampleErr,
+		},
+		{
+			// Successful status object is returned as expected.
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				return successStatusObj, nil
+			},
+			expectedObj: successStatusObj,
+			expectedErr: nil,
+		},
+		{
+			// Error status object is converted to StatusError.
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				return errorStatusObj, nil
+			},
+			expectedObj: nil,
+			expectedErr: apierrors.FromObject(errorStatusObj),
+		},
+	}
+	for i, tc := range testcases {
+		obj, err := finishRequest(tc.timeout, tc.fn)
+		if (err == nil && tc.expectedErr != nil) || (err != nil && tc.expectedErr == nil) || (err != nil && tc.expectedErr != nil && err.Error() != tc.expectedErr.Error()) {
+			t.Errorf("%d: unexpected err. expected: %v, got: %v", i, tc.expectedErr, err)
+		}
+		if !apiequality.Semantic.DeepEqual(obj, tc.expectedObj) {
+			t.Errorf("%d: unexpected obj. expected %#v, got %#v", tc.expectedObj, obj)
+		}
+	}
+}
