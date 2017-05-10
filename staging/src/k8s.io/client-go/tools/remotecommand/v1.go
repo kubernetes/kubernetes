@@ -24,7 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 // streamProtocolV1 implements the first version of the streaming exec & attach
@@ -58,7 +58,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
 			glog.Errorf("Error copying %s: %v", s, err)
 		}
-		if s == api.StreamTypeStdout || s == api.StreamTypeStderr {
+		if s == v1.StreamTypeStdout || s == v1.StreamTypeStderr {
 			doneChan <- struct{}{}
 		}
 	}
@@ -66,7 +66,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	// set up all the streams first
 	var err error
 	headers := http.Header{}
-	headers.Set(api.StreamType, api.StreamTypeError)
+	headers.Set(v1.StreamType, v1.StreamTypeError)
 	p.errorStream, err = conn.CreateStream(headers)
 	if err != nil {
 		return err
@@ -81,7 +81,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	// gets all the streams. By creating all the streams first, we ensure that the server is ready to
 	// process data before the client starts sending any. See https://issues.k8s.io/16373 for more info.
 	if p.Stdin != nil {
-		headers.Set(api.StreamType, api.StreamTypeStdin)
+		headers.Set(v1.StreamType, v1.StreamTypeStdin)
 		p.remoteStdin, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
@@ -90,7 +90,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	}
 
 	if p.Stdout != nil {
-		headers.Set(api.StreamType, api.StreamTypeStdout)
+		headers.Set(v1.StreamType, v1.StreamTypeStdout)
 		p.remoteStdout, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
@@ -99,7 +99,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	}
 
 	if p.Stderr != nil && !p.Tty {
-		headers.Set(api.StreamType, api.StreamTypeStderr)
+		headers.Set(v1.StreamType, v1.StreamTypeStderr)
 		p.remoteStderr, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
@@ -127,7 +127,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 		// because stdin is not closed until the process exits. If we try to call
 		// stdin.Close(), it returns no error but doesn't unblock the copy. It will
 		// exit when the process exits, instead.
-		go cp(api.StreamTypeStdin, p.remoteStdin, p.Stdin)
+		go cp(v1.StreamTypeStdin, p.remoteStdin, p.Stdin)
 	}
 
 	waitCount := 0
@@ -135,12 +135,12 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 
 	if p.Stdout != nil {
 		waitCount++
-		go cp(api.StreamTypeStdout, p.Stdout, p.remoteStdout)
+		go cp(v1.StreamTypeStdout, p.Stdout, p.remoteStdout)
 	}
 
 	if p.Stderr != nil && !p.Tty {
 		waitCount++
-		go cp(api.StreamTypeStderr, p.Stderr, p.remoteStderr)
+		go cp(v1.StreamTypeStderr, p.Stderr, p.remoteStderr)
 	}
 
 Loop:

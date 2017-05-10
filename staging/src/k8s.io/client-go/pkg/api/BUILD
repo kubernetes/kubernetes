@@ -26,7 +26,6 @@ go_library(
     visibility = [
         "//vendor/k8s.io/client-go/pkg/api:__subpackages__",
         "//vendor/k8s.io/client-go/pkg/apis:__subpackages__",
-        "//vendor/k8s.io/client-go/tools/remotecommand:__subpackages__",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/install:__subpackages__",
         "//vendor/k8s.io/metrics/pkg/apis:__subpackages__",
         "//vendor/k8s.io/metrics/pkg/client:__subpackages__",
