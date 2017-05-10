@@ -563,8 +563,7 @@ func setApp(imgManifest *appcschema.ImageManifest, c *v1.Container,
 	var command, args []string
 	cmd, ok := imgManifest.Annotations.Get(appcDockerEntrypoint)
 	if ok {
-		err := json.Unmarshal([]byte(cmd), &command)
-		if err != nil {
+		if err := json.Unmarshal([]byte(cmd), &command); err != nil {
 			return fmt.Errorf("cannot unmarshal ENTRYPOINT %q: %v", cmd, err)
 		}
 	}
@@ -675,8 +674,7 @@ func (r *Runtime) makePodManifest(pod *v1.Pod, podIP string, pullSecrets []v1.Se
 	}
 
 	for _, c := range pod.Spec.Containers {
-		err := r.newAppcRuntimeApp(pod, podIP, c, requiresPrivileged, pullSecrets, manifest)
-		if err != nil {
+		if err := r.newAppcRuntimeApp(pod, podIP, c, requiresPrivileged, pullSecrets, manifest); err != nil {
 			return nil, err
 		}
 	}
