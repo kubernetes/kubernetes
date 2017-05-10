@@ -22,19 +22,18 @@ import (
 	osdclient "github.com/libopenstorage/openstorage/api/client"
 	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
 	osdspec "github.com/libopenstorage/openstorage/api/spec"
-	osdvolume "github.com/libopenstorage/openstorage/volume"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
-	osdMgmtPort         = "9001"
-	osdDriverVersion    = "v1"
-	pxdDriverName       = "pxd"
-	pwxSockName         = "pwx"
-	pvcClaimLabel       = "pvc"
-	labelNodeRoleMaster = "node-role.kubernetes.io/master"
+	osdMgmtPort      = "9001"
+	osdDriverVersion = "v1"
+	pxdDriverName    = "pxd"
+	pvcClaimLabel    = "pvc"
+	pxServiceName    = "portworx-service"
 )
 
 type PortworxVolumeUtil struct {
@@ -43,10 +42,16 @@ type PortworxVolumeUtil struct {
 
 // CreateVolume creates a Portworx volume.
 func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (string, int, map[string]string, error) {
-	client, err := util.osdClient(p.plugin.host)
-	if err != nil {
-		return "", 0, nil, err
+	if util.portworxClient == nil || !isValid(util.portworxClient) {
+		var err error
+		util.portworxClient, err = getPortworxClient(p.plugin.host)
+		if err != nil || util.portworxClient == nil {
+			glog.Errorf("Failed to get portworx client. Err: %v", err)
+			return "", 0, nil, err
+		}
 	}
+
+	driver := volumeclient.VolumeDriver(util.portworxClient)
 
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Portworx Volumes are specified in GB
@@ -65,7 +70,7 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 	// Add claim Name as a part of Portworx Volume Labels
 	locator.VolumeLabels = make(map[string]string)
 	locator.VolumeLabels[pvcClaimLabel] = p.options.PVC.Name
-	volumeID, err := client.Create(&locator, &source, spec)
+	volumeID, err := driver.Create(&locator, &source, spec)
 	if err != nil {
 		glog.V(2).Infof("Error creating Portworx Volume : %v", err)
 	}
@@ -74,12 +79,17 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 // DeleteVolume deletes a Portworx volume
 func (util *PortworxVolumeUtil) DeleteVolume(d *portworxVolumeDeleter) error {
-	client, err := util.osdClient(d.plugin.host)
-	if err != nil {
-		return err
+	if util.portworxClient == nil || !isValid(util.portworxClient) {
+		var err error
+		util.portworxClient, err = getPortworxClient(d.plugin.host)
+		if err != nil || util.portworxClient == nil {
+			glog.Errorf("Failed to get portworx client. Err: %v", err)
+			return err
+		}
 	}
 
-	err = client.Delete(d.volumeID)
+	driver := volumeclient.VolumeDriver(util.portworxClient)
+	err := driver.Delete(d.volumeID)
 	if err != nil {
 		glog.V(2).Infof("Error deleting Portworx Volume (%v): %v", d.volName, err)
 		return err
@@ -89,12 +99,17 @@ func (util *PortworxVolumeUtil) DeleteVolume(d *portworxVolumeDeleter) error {
 
 // AttachVolume attaches a Portworx Volume
 func (util *PortworxVolumeUtil) AttachVolume(m *portworxVolumeMounter) (string, error) {
-	client, err := util.osdClient(m.plugin.host)
-	if err != nil {
-		return "", err
+	if util.portworxClient == nil || !isValid(util.portworxClient) {
+		var err error
+		util.portworxClient, err = getPortworxClient(m.plugin.host)
+		if err != nil || util.portworxClient == nil {
+			glog.Errorf("Failed to get portworx client. Err: %v", err)
+			return "", err
+		}
 	}
 
-	devicePath, err := client.Attach(m.volName)
+	driver := volumeclient.VolumeDriver(util.portworxClient)
+	devicePath, err := driver.Attach(m.volName)
 	if err != nil {
 		glog.V(2).Infof("Error attaching Portworx Volume (%v): %v", m.volName, err)
 		return "", err
@@ -104,12 +119,17 @@ func (util *PortworxVolumeUtil) AttachVolume(m *portworxVolumeMounter) (string, 
 
 // DetachVolume detaches a Portworx Volume
 func (util *PortworxVolumeUtil) DetachVolume(u *portworxVolumeUnmounter) error {
-	client, err := util.osdClient(u.plugin.host)
-	if err != nil {
-		return err
+	if util.portworxClient == nil || !isValid(util.portworxClient) {
+		var err error
+		util.portworxClient, err = getPortworxClient(u.plugin.host)
+		if err != nil || util.portworxClient == nil {
+			glog.Errorf("Failed to get portworx client. Err: %v", err)
+			return err
+		}
 	}
 
-	err = client.Detach(u.volName)
+	driver := volumeclient.VolumeDriver(util.portworxClient)
+	err := driver.Detach(u.volName)
 	if err != nil {
 		glog.V(2).Infof("Error detaching Portworx Volume (%v): %v", u.volName, err)
 		return err
@@ -119,12 +139,17 @@ func (util *PortworxVolumeUtil) DetachVolume(u *portworxVolumeUnmounter) error {
 
 // MountVolume mounts a Portworx Volume on the specified mountPath
 func (util *PortworxVolumeUtil) MountVolume(m *portworxVolumeMounter, mountPath string) error {
-	client, err := util.osdClient(m.plugin.host)
-	if err != nil {
-		return err
+	if util.portworxClient == nil || !isValid(util.portworxClient) {
+		var err error
+		util.portworxClient, err = getPortworxClient(m.plugin.host)
+		if err != nil || util.portworxClient == nil {
+			glog.Errorf("Failed to get portworx client. Err: %v", err)
+			return err
+		}
 	}
 
-	err = client.Mount(m.volName, mountPath)
+	driver := volumeclient.VolumeDriver(util.portworxClient)
+	err := driver.Mount(m.volName, mountPath)
 	if err != nil {
 		glog.V(2).Infof("Error mounting Portworx Volume (%v) on Path (%v): %v", m.volName, mountPath, err)
 		return err
@@ -134,12 +159,17 @@ func (util *PortworxVolumeUtil) MountVolume(m *portworxVolumeMounter, mountPath 
 
 // UnmountVolume unmounts a Portworx Volume
 func (util *PortworxVolumeUtil) UnmountVolume(u *portworxVolumeUnmounter, mountPath string) error {
-	client, err := util.osdClient(u.plugin.host)
-	if err != nil {
-		return err
+	if util.portworxClient == nil || !isValid(util.portworxClient) {
+		var err error
+		util.portworxClient, err = getPortworxClient(u.plugin.host)
+		if err != nil || util.portworxClient == nil {
+			glog.Errorf("Failed to get portworx client. Err: %v", err)
+			return err
+		}
 	}
 
-	err = client.Unmount(u.volName, mountPath)
+	driver := volumeclient.VolumeDriver(util.portworxClient)
+	err := driver.Unmount(u.volName, mountPath)
 	if err != nil {
 		glog.V(2).Infof("Error unmounting Portworx Volume (%v) on Path (%v): %v", u.volName, mountPath, err)
 		return err
@@ -147,67 +177,61 @@ func (util *PortworxVolumeUtil) UnmountVolume(u *portworxVolumeUnmounter, mountP
 	return nil
 }
 
-func (util *PortworxVolumeUtil) osdClient(volumeHost volume.VolumeHost) (osdvolume.VolumeDriver, error) {
-	if util.portworxClient == nil {
-		var e error
-
-		driverClient, err := getValidatedOsdClient(volumeHost.GetHostName())
-		if err == nil && driverClient != nil {
-			util.portworxClient = driverClient
-		} else {
-			e = err
-			kubeClient := volumeHost.GetKubeClient()
-			if kubeClient != nil {
-				nodes, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-				if err != nil {
-					glog.Errorf("Failed to list k8s nodes. Err: $v", err.Error())
-					return nil, err
-				}
-
-			OUTER:
-				for _, node := range nodes.Items {
-					if _, present := node.Labels[labelNodeRoleMaster]; present {
-						continue
-					}
-
-					for _, n := range node.Status.Addresses {
-						driverClient, err = getValidatedOsdClient(n.Address)
-						if err != nil {
-							e = err
-							continue
-						}
-
-						if driverClient != nil {
-							util.portworxClient = driverClient
-							break OUTER
-						}
-					}
-				}
-			}
-		}
-
-		if util.portworxClient == nil {
-			glog.Errorf("Failed to discover portworx api server.")
-			return nil, e
-		}
+func isValid(client *osdclient.Client) bool {
+	_, err := client.Versions(osdapi.OsdVolumePath)
+	if err != nil {
+		glog.Errorf("portworx client failed driver versions check. Err: %v", err)
+		return false
 	}
 
-	return volumeclient.VolumeDriver(util.portworxClient), nil
+	return true
 }
 
-func getValidatedOsdClient(hostname string) (*osdclient.Client, error) {
-	driverClient, err := volumeclient.NewDriverClient("http://"+hostname+":"+osdMgmtPort,
+func testDriverClient(hostname string) (*osdclient.Client, error) {
+	client, err := volumeclient.NewDriverClient("http://"+hostname+":"+osdMgmtPort,
 		pxdDriverName, osdDriverVersion)
 	if err != nil {
-		glog.Warningf("Failed to create driver client with node: %v. Err: %v", hostname, err)
 		return nil, err
 	}
 
-	_, err = driverClient.Versions(osdapi.OsdVolumePath)
-	if err != nil {
-		glog.Warningf("node: %v failed driver versions check. Err: %v", hostname, err)
-		return nil, err
+	if isValid(client) {
+		return client, nil
+	} else {
+		return nil, nil
+	}
+}
+
+func getPortworxClient(volumeHost volume.VolumeHost) (*osdclient.Client, error) {
+	pxClient, err := testDriverClient(volumeHost.GetHostName()) // for backward compatibility
+	if err != nil || pxClient == nil {
+		// Create client from portworx service
+		kubeClient := volumeHost.GetKubeClient()
+		if kubeClient == nil {
+			glog.Error("Failed to get kubeclient when creating portworx client")
+			return nil, nil
+		}
+
+		opts := metav1.GetOptions{}
+		svc, err := kubeClient.CoreV1().Services(api.NamespaceSystem).Get(pxServiceName, opts)
+		if err != nil {
+			glog.Errorf("Failed to get service. Err: %v", err)
+			return nil, err
+		}
+
+		if svc == nil {
+			glog.Errorf("Service: %v not found. Consult Portworx install docs to "+
+				"deploy it.", pxServiceName)
+			return nil, err
+		}
+
+		pxClient, err = testDriverClient(svc.Spec.ClusterIP)
+		if err != nil || pxClient == nil {
+			glog.Errorf("Failed to connect to portworx service. Err: %v", err)
+			return nil, err
+		}
+
+		glog.Infof("Using portworx service at: %v as api endpoint", svc.Spec.ClusterIP)
 	}
 
-	return driverClient, nil
+	return pxClient, nil
 }
