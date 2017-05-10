@@ -158,8 +158,6 @@ func (fk *fakeKubelet) StreamingConnectionIdleTimeout() time.Duration {
 	return fk.streamingConnectionIdleTimeoutFunc()
 }
 
-func (fk *fakeKubelet) PLEGHealthCheck() (bool, error) { return fk.plegHealth, nil }
-
 // Unused functions
 func (_ *fakeKubelet) GetContainerInfoV2(_ string, _ cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
 	return nil, nil
@@ -865,18 +863,6 @@ func TestSyncLoopCheck(t *testing.T) {
 	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
 
 	fw.fakeKubelet.loopEntryTime = time.Now().Add(time.Minute * -10)
-	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
-}
-
-func TestPLEGHealthCheck(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	fw.fakeKubelet.hostnameFunc = func() string {
-		return "127.0.0.1"
-	}
-
-	// Test with failed pleg health check.
-	fw.fakeKubelet.plegHealth = false
 	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
 }
 

@@ -688,6 +688,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
+	klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
 	klet.updatePodCIDR(kubeCfg.PodCIDR)
 
 	// setup containerGC
@@ -2032,11 +2033,6 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 		return time.Time{}
 	}
 	return val.(time.Time)
-}
-
-// PLEGHealthCheck returns whether the PLEG is healty.
-func (kl *Kubelet) PLEGHealthCheck() (bool, error) {
-	return kl.pleg.Healthy()
 }
 
 // updateRuntimeUp calls the container runtime status callback, initializing
