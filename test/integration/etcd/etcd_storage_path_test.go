@@ -714,7 +714,11 @@ func (c *allClient) verb(verb string, gvk schema.GroupVersionKind) (*restclient.
 	if gvk.Group == kapi.GroupName {
 		apiPath = "/api"
 	}
-	baseURL, versionedAPIPath, err := restclient.DefaultServerURL(c.config.Host, apiPath, gvk.GroupVersion(), true)
+	baseURLs, versionedAPIPath, err := restclient.DefaultServerURLsForHosts([]string{c.config.Host}, apiPath, gvk.GroupVersion(), true)
+	if len(baseURLs) != 1 {
+		return nil, fmt.Errorf("Expected to have one returned URL, but got %+v", baseURLs)
+	}
+	baseURL := baseURLs[0]
 	if err != nil {
 		return nil, err
 	}
