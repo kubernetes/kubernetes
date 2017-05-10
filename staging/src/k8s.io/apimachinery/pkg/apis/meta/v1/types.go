@@ -425,6 +425,11 @@ type StatusDetails struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	// +optional
 	Kind string `json:"kind,omitempty" protobuf:"bytes,3,opt,name=kind"`
+	// UID of the resource.
+	// (when there is a single resource which can be described).
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#uids
+	// +optional
+	UID types.UID `json:"uid,omitempty" protobuf:"bytes,6,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 	// The Causes array includes more details associated with the StatusReason
 	// failure. Not all StatusReasons may provide detailed causes.
 	// +optional
