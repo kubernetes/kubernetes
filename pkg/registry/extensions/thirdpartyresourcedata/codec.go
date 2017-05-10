@@ -384,8 +384,8 @@ func (t *thirdPartyResourceDataDecoder) Decode(data []byte, gvk *schema.GroupVer
 		if gvk == nil {
 			return nil, nil, runtime.NewMissingKindErr(string(data))
 		}
-		mapObj["kind"] = gvk.Kind
-		actual.Kind = gvk.Kind
+		mapObj["kind"] = t.kind
+		actual.Kind = t.kind
 	} else {
 		kindStr, ok := kindObj.(string)
 		if !ok {
@@ -417,7 +417,7 @@ func (t *thirdPartyResourceDataDecoder) Decode(data []byte, gvk *schema.GroupVer
 		actual.Group, actual.Version = gv.Group, gv.Version
 	}
 
-	mapObj, err := parseObject(data)
+	data, err := json.Marshal(mapObj)
 	if err != nil {
 		return nil, actual, err
 	}
