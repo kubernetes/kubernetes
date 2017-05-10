@@ -19005,6 +19005,10 @@
        "$ref": "v1.HostAlias"
       },
       "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods."
+     },
+     "priorityName": {
+      "type": "string",
+      "description": "If specified, indicates the pod's priority. `system` is a special keyword which indicates the highest priority. Any other name must be defined in Admission Controller config or pod will be rejected. If not specified, the pod priority will be zero."
      }
     }
    },
@@ -20274,6 +20278,11 @@
      "qosClass": {
       "type": "string",
       "description": "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md"
+     },
+     "priority": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The priority value which is resolved by the Admission Controller from PodSpec.PriorityName. The higher the value, the higher the priority."
      }
     }
    },

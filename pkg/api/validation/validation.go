@@ -2024,6 +2024,14 @@ func ValidateHostAliases(hostAliases []api.HostAlias, fldPath *field.Path) field
 	return allErrs
 }
 
+func ValidatePriorityName(priorityName string, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	if errs := validation.IsValidLabelValue(priorityName); len(errs) != 0 {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("priorityName"), priorityName, strings.Join(errs, ";")))
+	}
+	return allErrors
+}
+
 // ValidateTolerations tests if given tolerations have valid data.
 func ValidateTolerations(tolerations []api.Toleration, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
@@ -2127,6 +2135,10 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 
 	if len(spec.HostAliases) > 0 {
 		allErrs = append(allErrs, ValidateHostAliases(spec.HostAliases, fldPath.Child("hostAliases"))...)
+	}
+
+	if len(spec.PriorityName) > 0 {
+		allErrs = append(allErrs, ValidatePriorityName(spec.PriorityName, fldPath.Child("priorityName"))...)
 	}
 
 	return allErrs
