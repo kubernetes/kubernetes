@@ -375,8 +375,26 @@ func ValidateDeploymentUpdate(update, old *extensions.Deployment) field.ErrorLis
 
 func ValidateDeploymentStatusUpdate(update, old *extensions.Deployment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateDeploymentStatus(&update.Status, field.NewPath("status"))...)
+	fldPath := field.NewPath("status")
+	allErrs = append(allErrs, ValidateDeploymentStatus(&update.Status, fldPath)...)
+	if isDecremented(update.Status.Uniquifier, old.Status.Uniquifier) {
+		value := int64(0)
+		if update.Status.Uniquifier != nil {
+			value = *update.Status.Uniquifier
+		}
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("uniquifier"), value, "cannot be decremented"))
+	}
 	return allErrs
+}
+
+func isDecremented(update, old *int64) bool {
+	if update == nil && old != nil {
+		return true
+	}
+	if update == nil || old == nil {
+		return false
+	}
+	return *update < *old
 }
 
 func ValidateDeployment(obj *extensions.Deployment) field.ErrorList {

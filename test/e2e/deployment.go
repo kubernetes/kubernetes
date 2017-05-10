@@ -21,8 +21,10 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1431,7 +1433,7 @@ func testDeploymentHashCollisionAvoidance(f *framework.Framework) {
 			framework.Logf("cannot get deployment %q: %v", deploymentName, err)
 			return false, nil
 		}
-		framework.Logf("deployment status: %v", d.Status)
+		framework.Logf(spew.Sprintf("deployment status: %#v", d.Status))
 		return d.Status.Uniquifier != nil && *d.Status.Uniquifier == int64(1), nil
 	}); err != nil {
 		framework.Failf("Failed to increment uniquifier for deployment %q: %v", deploymentName, err)
