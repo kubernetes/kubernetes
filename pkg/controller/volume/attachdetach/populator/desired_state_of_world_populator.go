@@ -127,7 +127,8 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			glog.Errorf("podLister Get failed for pod %q (UID %q) with %v", dswPodKey, dswPodUID, err)
 			continue
 		default:
-			if !volumehelper.IsPodTerminated(informerPod, informerPod.Status) {
+			volumeActionFlag := dswp.desiredStateOfWorld.DetermineVolumeAction(informerPod, true /* default volume action */)
+			if volumeActionFlag {
 				informerPodUID := volumehelper.GetUniquePodName(informerPod)
 				// Check whether the unique identifier of the pod from dsw matches the one retrieved from pod informer
 				if informerPodUID == dswPodUID {

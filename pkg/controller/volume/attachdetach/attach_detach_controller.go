@@ -281,11 +281,7 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 				continue
 			}
 			adc.processVolumesInUse(nodeName, node.Status.VolumesInUse, true /* forceUnmount */)
-			if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
-				// Node specifies annotation indicating it should be managed by
-				// attach detach controller. Add it to desired state of world.
-				adc.desiredStateOfWorld.AddNode(types.NodeName(node.Name)) // Needed for DesiredStateOfWorld population
-			}
+			adc.addNodeToDswp(node, types.NodeName(node.Name))
 		}
 	}
 	return nil
@@ -385,13 +381,10 @@ func (adc *attachDetachController) podAdd(obj interface{}) {
 		return
 	}
 
-	if volumehelper.IsPodTerminated(pod, pod.Status) {
-		util.ProcessPodVolumes(pod, false, /* addVolumes */
-			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
-	} else {
-		util.ProcessPodVolumes(pod, true, /* addVolumes */
-			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
-	}
+	volumeActionFlag := adc.desiredStateOfWorld.DetermineVolumeAction(pod, true /* default volume action */)
+
+	util.ProcessPodVolumes(pod, volumeActionFlag, /* addVolumes */
+		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
 }
 
 // GetDesiredStateOfWorld returns desired state of world associated with controller
@@ -409,13 +402,9 @@ func (adc *attachDetachController) podUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	addPodFlag := true
+	volumeActionFlag := adc.desiredStateOfWorld.DetermineVolumeAction(pod, true /* default volume action */)
 
-	if volumehelper.IsPodTerminated(pod, pod.Status) {
-		addPodFlag = false
-	}
-
-	util.ProcessPodVolumes(pod, addPodFlag, /* addVolumes */
+	util.ProcessPodVolumes(pod, volumeActionFlag, /* addVolumes */
 		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
 }
 
@@ -453,11 +442,7 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 	}
 
 	nodeName := types.NodeName(node.Name)
-	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
-		// Node specifies annotation indicating it should be managed by attach
-		// detach controller. Add it to desired state of world.
-		adc.desiredStateOfWorld.AddNode(nodeName)
-	}
+	adc.addNodeToDswp(node, nodeName)
 	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse, false /* forceUnmount */)
 }
 
@@ -557,5 +542,19 @@ func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error)
 func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
 	return func(_, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in attachDetachController")
+	}
+}
+
+func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {
+	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
+		keepTerminatedPodVolumes := false
+
+		if t, ok := node.Annotations[volumehelper.KeepTerminatedPodVolumesAnnotation]; ok {
+			keepTerminatedPodVolumes = (t == "true")
+		}
+
+		// Node specifies annotation indicating it should be managed by attach
+		// detach controller. Add it to desired state of world.
+		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
 	}
 }

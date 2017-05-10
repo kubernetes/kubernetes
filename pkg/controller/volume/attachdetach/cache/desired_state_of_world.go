@@ -46,7 +46,7 @@ type DesiredStateOfWorld interface {
 	// AddNode adds the given node to the list of nodes managed by the attach/
 	// detach controller.
 	// If the node already exists this is a no-op.
-	AddNode(nodeName k8stypes.NodeName)
+	AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool)
 
 	// AddPod adds the given pod to the list of pods that reference the
 	// specified volume and is scheduled to the specified node.
@@ -95,6 +95,13 @@ type DesiredStateOfWorld interface {
 	// GetPodToAdd generates and returns a map of pods based on the current desired
 	// state of world
 	GetPodToAdd() map[types.UniquePodName]PodToAdd
+
+	// DetermineVolumeAction determines action to be taken for pod volume
+	// if the volume should be added or removed from desired state of world.
+	// return values:
+	//    true  -- if volume needs to be attached
+	//    false -- if volume needs to be detached
+	DetermineVolumeAction(pod *v1.Pod, defaultValue bool) bool
 }
 
 // VolumeToAttach represents a volume that should be attached to a node.
@@ -144,6 +151,9 @@ type nodeManaged struct {
 	// attached to this node. The key in the map is the name of the volume and
 	// the value is a pod object containing more information about the volume.
 	volumesToAttach map[v1.UniqueVolumeName]volumeToAttach
+
+	// keepTerminatedPodVolumes
+	keepTerminatedPodVolumes bool
 }
 
 // The volume object represents a volume that should be attached to a node.
@@ -173,14 +183,15 @@ type pod struct {
 	podObj *v1.Pod
 }
 
-func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName) {
+func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool) {
 	dsw.Lock()
 	defer dsw.Unlock()
 
 	if _, nodeExists := dsw.nodesManaged[nodeName]; !nodeExists {
 		dsw.nodesManaged[nodeName] = nodeManaged{
-			nodeName:        nodeName,
-			volumesToAttach: make(map[v1.UniqueVolumeName]volumeToAttach),
+			nodeName:                 nodeName,
+			volumesToAttach:          make(map[v1.UniqueVolumeName]volumeToAttach),
+			keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		}
 	}
 }
@@ -311,6 +322,30 @@ func (dsw *desiredStateOfWorld) VolumeExists(
 	}
 
 	return false
+}
+
+// DetermineVolumeAction determines action to be taken for pod volume
+// if the volume should be added or removed from desired state of world.
+// return values:
+//    true  -- if volume needs to be attached
+//    false -- if volume needs to be detached
+func (dsw *desiredStateOfWorld) DetermineVolumeAction(pod *v1.Pod, defaultValue bool) bool {
+	dsw.RLock()
+	defer dsw.RUnlock()
+	if pod == nil || len(pod.Spec.Volumes) <= 0 {
+		return defaultValue
+	}
+
+	nodeName := k8stypes.NodeName(pod.Spec.NodeName)
+	if nodeName == "" {
+		return defaultValue
+	}
+	if node, ok := dsw.nodesManaged[nodeName]; ok {
+		if volumehelper.IsPodTerminated(pod, pod.Status) {
+			return node.keepTerminatedPodVolumes
+		}
+	}
+	return defaultValue
 }
 
 func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
