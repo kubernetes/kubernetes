@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockertools
+package libdocker
 
 import (
 	"time"
@@ -23,15 +23,15 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
-// instrumentedDockerInterface wraps the DockerInterface and records the operations
+// instrumentedInterface wraps the Interface and records the operations
 // and errors metrics.
-type instrumentedDockerInterface struct {
-	client DockerInterface
+type instrumentedInterface struct {
+	client Interface
 }
 
-// Creates an instrumented DockerInterface from an existing DockerInterface.
-func NewInstrumentedDockerInterface(dockerClient DockerInterface) DockerInterface {
-	return instrumentedDockerInterface{
+// Creates an instrumented Interface from an existing Interface.
+func NewInstrumentedInterface(dockerClient Interface) Interface {
+	return instrumentedInterface{
 		client: dockerClient,
 	}
 }
@@ -53,7 +53,7 @@ func recordError(operation string, err error) {
 	}
 }
 
-func (in instrumentedDockerInterface) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
+func (in instrumentedInterface) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
 	const operation = "list_containers"
 	defer recordOperation(operation, time.Now())
 
@@ -62,7 +62,7 @@ func (in instrumentedDockerInterface) ListContainers(options dockertypes.Contain
 	return out, err
 }
 
-func (in instrumentedDockerInterface) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
+func (in instrumentedInterface) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
 	const operation = "inspect_container"
 	defer recordOperation(operation, time.Now())
 
@@ -71,7 +71,7 @@ func (in instrumentedDockerInterface) InspectContainer(id string) (*dockertypes.
 	return out, err
 }
 
-func (in instrumentedDockerInterface) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
+func (in instrumentedInterface) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
 	const operation = "create_container"
 	defer recordOperation(operation, time.Now())
 
@@ -80,7 +80,7 @@ func (in instrumentedDockerInterface) CreateContainer(opts dockertypes.Container
 	return out, err
 }
 
-func (in instrumentedDockerInterface) StartContainer(id string) error {
+func (in instrumentedInterface) StartContainer(id string) error {
 	const operation = "start_container"
 	defer recordOperation(operation, time.Now())
 
@@ -89,7 +89,7 @@ func (in instrumentedDockerInterface) StartContainer(id string) error {
 	return err
 }
 
-func (in instrumentedDockerInterface) StopContainer(id string, timeout int) error {
+func (in instrumentedInterface) StopContainer(id string, timeout int) error {
 	const operation = "stop_container"
 	defer recordOperation(operation, time.Now())
 
@@ -98,7 +98,7 @@ func (in instrumentedDockerInterface) StopContainer(id string, timeout int) erro
 	return err
 }
 
-func (in instrumentedDockerInterface) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
+func (in instrumentedInterface) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
 	const operation = "remove_container"
 	defer recordOperation(operation, time.Now())
 
@@ -107,7 +107,7 @@ func (in instrumentedDockerInterface) RemoveContainer(id string, opts dockertype
 	return err
 }
 
-func (in instrumentedDockerInterface) InspectImageByRef(image string) (*dockertypes.ImageInspect, error) {
+func (in instrumentedInterface) InspectImageByRef(image string) (*dockertypes.ImageInspect, error) {
 	const operation = "inspect_image"
 	defer recordOperation(operation, time.Now())
 
@@ -116,7 +116,7 @@ func (in instrumentedDockerInterface) InspectImageByRef(image string) (*dockerty
 	return out, err
 }
 
-func (in instrumentedDockerInterface) InspectImageByID(image string) (*dockertypes.ImageInspect, error) {
+func (in instrumentedInterface) InspectImageByID(image string) (*dockertypes.ImageInspect, error) {
 	const operation = "inspect_image"
 	defer recordOperation(operation, time.Now())
 
@@ -125,7 +125,7 @@ func (in instrumentedDockerInterface) InspectImageByID(image string) (*dockertyp
 	return out, err
 }
 
-func (in instrumentedDockerInterface) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
+func (in instrumentedInterface) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
 	const operation = "list_images"
 	defer recordOperation(operation, time.Now())
 
@@ -134,7 +134,7 @@ func (in instrumentedDockerInterface) ListImages(opts dockertypes.ImageListOptio
 	return out, err
 }
 
-func (in instrumentedDockerInterface) PullImage(imageID string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
+func (in instrumentedInterface) PullImage(imageID string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
 	const operation = "pull_image"
 	defer recordOperation(operation, time.Now())
 	err := in.client.PullImage(imageID, auth, opts)
@@ -142,7 +142,7 @@ func (in instrumentedDockerInterface) PullImage(imageID string, auth dockertypes
 	return err
 }
 
-func (in instrumentedDockerInterface) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
+func (in instrumentedInterface) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
 	const operation = "remove_image"
 	defer recordOperation(operation, time.Now())
 
@@ -151,7 +151,7 @@ func (in instrumentedDockerInterface) RemoveImage(image string, opts dockertypes
 	return imageDelete, err
 }
 
-func (in instrumentedDockerInterface) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
+func (in instrumentedInterface) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
 	const operation = "logs"
 	defer recordOperation(operation, time.Now())
 
@@ -160,7 +160,7 @@ func (in instrumentedDockerInterface) Logs(id string, opts dockertypes.Container
 	return err
 }
 
-func (in instrumentedDockerInterface) Version() (*dockertypes.Version, error) {
+func (in instrumentedInterface) Version() (*dockertypes.Version, error) {
 	const operation = "version"
 	defer recordOperation(operation, time.Now())
 
@@ -169,7 +169,7 @@ func (in instrumentedDockerInterface) Version() (*dockertypes.Version, error) {
 	return out, err
 }
 
-func (in instrumentedDockerInterface) Info() (*dockertypes.Info, error) {
+func (in instrumentedInterface) Info() (*dockertypes.Info, error) {
 	const operation = "info"
 	defer recordOperation(operation, time.Now())
 
@@ -178,7 +178,7 @@ func (in instrumentedDockerInterface) Info() (*dockertypes.Info, error) {
 	return out, err
 }
 
-func (in instrumentedDockerInterface) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error) {
+func (in instrumentedInterface) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error) {
 	const operation = "create_exec"
 	defer recordOperation(operation, time.Now())
 
@@ -187,7 +187,7 @@ func (in instrumentedDockerInterface) CreateExec(id string, opts dockertypes.Exe
 	return out, err
 }
 
-func (in instrumentedDockerInterface) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
+func (in instrumentedInterface) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
 	const operation = "start_exec"
 	defer recordOperation(operation, time.Now())
 
@@ -196,7 +196,7 @@ func (in instrumentedDockerInterface) StartExec(startExec string, opts dockertyp
 	return err
 }
 
-func (in instrumentedDockerInterface) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
+func (in instrumentedInterface) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
 	const operation = "inspect_exec"
 	defer recordOperation(operation, time.Now())
 
@@ -205,7 +205,7 @@ func (in instrumentedDockerInterface) InspectExec(id string) (*dockertypes.Conta
 	return out, err
 }
 
-func (in instrumentedDockerInterface) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
+func (in instrumentedInterface) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
 	const operation = "attach"
 	defer recordOperation(operation, time.Now())
 
@@ -214,7 +214,7 @@ func (in instrumentedDockerInterface) AttachToContainer(id string, opts dockerty
 	return err
 }
 
-func (in instrumentedDockerInterface) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
+func (in instrumentedInterface) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
 	const operation = "image_history"
 	defer recordOperation(operation, time.Now())
 
@@ -223,7 +223,7 @@ func (in instrumentedDockerInterface) ImageHistory(id string) ([]dockertypes.Ima
 	return out, err
 }
 
-func (in instrumentedDockerInterface) ResizeExecTTY(id string, height, width int) error {
+func (in instrumentedInterface) ResizeExecTTY(id string, height, width int) error {
 	const operation = "resize_exec"
 	defer recordOperation(operation, time.Now())
 
@@ -232,7 +232,7 @@ func (in instrumentedDockerInterface) ResizeExecTTY(id string, height, width int
 	return err
 }
 
-func (in instrumentedDockerInterface) ResizeContainerTTY(id string, height, width int) error {
+func (in instrumentedInterface) ResizeContainerTTY(id string, height, width int) error {
 	const operation = "resize_container"
 	defer recordOperation(operation, time.Now())
 
