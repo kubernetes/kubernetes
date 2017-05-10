@@ -24,11 +24,11 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	godbus "github.com/godbus/dbus"
 	"github.com/golang/glog"
+	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
@@ -388,7 +388,7 @@ func (runner *runner) grabIptablesLocks() (*locker, error) {
 	}
 
 	if err := wait.PollImmediate(200*time.Millisecond, 2*time.Second, func() (bool, error) {
-		if err := syscall.Flock(int(l.lock16.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		if err := unix.Flock(int(l.lock16.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
 			return false, nil
 		}
 		return true, nil

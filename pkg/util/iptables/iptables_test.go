@@ -20,10 +20,10 @@ import (
 	"net"
 	"os"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
+	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/dbus"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -1190,7 +1190,7 @@ func TestRestoreAllGrabNewLock(t *testing.T) {
 	}
 	defer runLock.Close()
 
-	if err := syscall.Flock(int(runLock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err := unix.Flock(int(runLock.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
 		t.Errorf("expected to lock %s, got %v", TestLockfilePath, err)
 	}
 
