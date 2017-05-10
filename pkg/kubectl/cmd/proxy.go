@@ -137,7 +137,7 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	server, err := kubectl.NewProxyServer(staticDir, apiProxyPrefix, staticPrefix, filter, clientConfig)
 
 	// Separate listening from serving so we can report the bound port
-	// when it is chosen by os (eg: port == 0)
+	// when it is chosen by os (e.g.: port == 0)
 	var l net.Listener
 	if path == "" {
 		l, err = server.Listen(address, port)
