@@ -62,7 +62,7 @@ go_library(
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/eviction:go_default_library",
         "//pkg/kubelet/gpu:go_default_library",
-        "//pkg/kubelet/gpu/nvidia:go_default_library",
+        "//pkg/kubelet/gpu/register:go_default_library",
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/kuberuntime:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",

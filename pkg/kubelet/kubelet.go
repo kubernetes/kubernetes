@@ -68,7 +68,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/gpu"
-	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
+	_ "k8s.io/kubernetes/pkg/kubelet/gpu/register"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -762,7 +762,16 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	if utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
 		if kubeCfg.ContainerRuntime == "docker" {
-			if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, klet.dockerClient); err != nil {
+			const (
+				// The unix socket for kubelet <-> GPU Manager communication.
+				gpuManagerEndpoint = "/var/run/gpu-manager.sock"
+			)
+			gpuManagerInitializer, err := gpu.GetGPUManagerInitializer(kubeCfg.GPUManagerRuntime)
+			if err != nil {
+				return nil, err
+			}
+
+			if klet.gpuManager, err = gpuManagerInitializer(klet, klet.dockerClient, gpuManagerEndpoint); err != nil {
 				return nil, err
 			}
 		} else {

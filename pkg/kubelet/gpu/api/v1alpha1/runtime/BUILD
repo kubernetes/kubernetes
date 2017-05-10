@@ -9,15 +9,14 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "factory.go",
-        "gpu_manager_stub.go",
-        "types.go",
-    ],
+    srcs = ["api.pb.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/kubelet/dockertools:go_default_library",
+        "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
+        "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
+        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
     ],
 )
 
@@ -30,11 +29,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/kubelet/gpu/api/v1alpha1/runtime:all-srcs",
-        "//pkg/kubelet/gpu/nvidia:all-srcs",
-        "//pkg/kubelet/gpu/register:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

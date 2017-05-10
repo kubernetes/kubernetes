@@ -14,32 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gpu
+package register
 
 import (
-	"fmt"
-
-	"k8s.io/kubernetes/pkg/api/v1"
+	_ "k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 )
-
-type gpuManagerStub struct{}
-
-func (gms *gpuManagerStub) Start() error {
-	return nil
-}
-
-func (gms *gpuManagerStub) Capacity() v1.ResourceList {
-	return nil
-}
-
-func (gms *gpuManagerStub) AllocateGPU(_ *v1.Pod, _ *v1.Container) ([]string, error) {
-	return nil, fmt.Errorf("GPUs are not supported")
-}
-
-func (gms *gpuManagerStub) FreeGPU(_ *v1.Pod) {
-	return
-}
-
-func NewGPUManagerStub() GPUManager {
-	return &gpuManagerStub{}
-}
