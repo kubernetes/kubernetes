@@ -380,6 +380,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		Algorithm:           algo,
 		Binder:              &binder{f.client},
 		PodConditionUpdater: &podConditionUpdater{f.client},
+		WaitForCacheSync: func() bool {
+			return cache.WaitForCacheSync(f.StopEverything, f.scheduledPodPopulator.HasSynced)
+		},
 		NextPod: func() *v1.Pod {
 			return f.getNextPod()
 		},
