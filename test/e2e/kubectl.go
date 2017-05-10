@@ -892,7 +892,7 @@ metadata:
 				{"Annotations:"},
 				{"CreationTimestamp:"},
 				{"Conditions:"},
-				{"Type", "Status", "LastHeartbeatTime", "LastTransitionTime", "Reason", "Message"},
+				{"Type", "Status", "Reason"},
 				{"Addresses:"},
 				{"Capacity:"},
 				{"Version:"},
