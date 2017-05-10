@@ -29,12 +29,10 @@ import (
 )
 
 const (
-	osdMgmtPort         = "9001"
-	osdDriverVersion    = "v1"
-	pxdDriverName       = "pxd"
-	pwxSockName         = "pwx"
-	pvcClaimLabel       = "pvc"
-	labelNodeRoleMaster = "node-role.kubernetes.io/master"
+	osdMgmtPort      = "9001"
+	osdDriverVersion = "v1"
+	pxdDriverName    = "pxd"
+	pvcClaimLabel    = "pvc"
 )
 
 type PortworxVolumeUtil struct {
@@ -164,13 +162,13 @@ func (util *PortworxVolumeUtil) osdClient(volumeHost volume.VolumeHost) (osdvolu
 					return nil, err
 				}
 
-			OUTER:
 				for _, node := range nodes.Items {
-					if _, present := node.Labels[labelNodeRoleMaster]; present {
-						continue
-					}
-
 					for _, n := range node.Status.Addresses {
+						if n.Address == volumeHost.GetHostName() {
+							continue // this address is already tested and known to fail
+						}
+
+						glog.Infof("Testing node: %v as px api server\n", n.Address)
 						driverClient, err = getValidatedOsdClient(n.Address)
 						if err != nil {
 							e = err
@@ -179,7 +177,7 @@ func (util *PortworxVolumeUtil) osdClient(volumeHost volume.VolumeHost) (osdvolu
 
 						if driverClient != nil {
 							util.portworxClient = driverClient
-							break OUTER
+							return volumeclient.VolumeDriver(util.portworxClient), nil
 						}
 					}
 				}
