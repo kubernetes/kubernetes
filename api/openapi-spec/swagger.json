@@ -39131,6 +39131,18 @@
      }
     }
    },
+   "io.k8s.kubernetes.pkg.api.v1.LocalVolumeSource": {
+    "description": "Local represents a directory with specific topology constraints",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "description": "The full path to the volume on the node For alpha, this path must be a file-based volume",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.NFSVolumeSource": {
     "description": "Represents an NFS mount that lasts the lifetime of a pod. NFS volumes do not support ownership management or SELinux relabeling.",
     "required": [
@@ -39907,6 +39919,10 @@
      "iscsi": {
       "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. Provisioned by an admin.",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ISCSIVolumeSource"
+     },
+     "local": {
+      "description": "Local represents a directory with specific topology constraints",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalVolumeSource"
      },
      "nfs": {
       "description": "NFS represents an NFS mount on the host. Provisioned by an admin. More info: http://kubernetes.io/docs/user-guide/volumes#nfs",

@@ -104,6 +104,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LoadBalancerIngress, InType: reflect.TypeOf(&LoadBalancerIngress{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LoadBalancerStatus, InType: reflect.TypeOf(&LoadBalancerStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalObjectReference, InType: reflect.TypeOf(&LocalObjectReference{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalVolumeSource, InType: reflect.TypeOf(&LocalVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NFSVolumeSource, InType: reflect.TypeOf(&NFSVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Namespace, InType: reflect.TypeOf(&Namespace{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NamespaceList, InType: reflect.TypeOf(&NamespaceList{})},
@@ -198,6 +199,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_TCPSocketAction, InType: reflect.TypeOf(&TCPSocketAction{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Taint, InType: reflect.TypeOf(&Taint{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Toleration, InType: reflect.TypeOf(&Toleration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_TopologyConstraint, InType: reflect.TypeOf(&TopologyConstraint{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Volume, InType: reflect.TypeOf(&Volume{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_VolumeMount, InType: reflect.TypeOf(&VolumeMount{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_VolumeProjection, InType: reflect.TypeOf(&VolumeProjection{})},
@@ -1422,6 +1424,15 @@ func DeepCopy_v1_LocalObjectReference(in interface{}, out interface{}, c *conver
 	}
 }
 
+func DeepCopy_v1_LocalVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LocalVolumeSource)
+		out := out.(*LocalVolumeSource)
+		*out = *in
+		return nil
+	}
+}
+
 func DeepCopy_v1_NFSVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NFSVolumeSource)
@@ -2053,6 +2064,11 @@ func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conv
 			if err := DeepCopy_v1_ScaleIOVolumeSource(*in, *out, c); err != nil {
 				return err
 			}
+		}
+		if in.Local != nil {
+			in, out := &in.Local, &out.Local
+			*out = new(LocalVolumeSource)
+			**out = **in
 		}
 		return nil
 	}
@@ -3285,6 +3301,20 @@ func DeepCopy_v1_Toleration(in interface{}, out interface{}, c *conversion.Clone
 			in, out := &in.TolerationSeconds, &out.TolerationSeconds
 			*out = new(int64)
 			**out = **in
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_TopologyConstraint(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*TopologyConstraint)
+		out := out.(*TopologyConstraint)
+		*out = *in
+		if in.Values != nil {
+			in, out := &in.Values, &out.Values
+			*out = make([]string, len(*in))
+			copy(*out, *in)
 		}
 		return nil
 	}

@@ -594,3 +594,27 @@ func PersistentVolumeClaimHasClass(claim *api.PersistentVolumeClaim) bool {
 
 	return false
 }
+
+// GetTopologyConstraintsFromAnnotations gets the json serialized topology constraints data from PersistentVolume.Annotations
+// and converts it to the []TopologyConstraint type in api.
+// TODO: remove when alpha support for topology constraints is removed
+func GetStorageTopologyConstraintsFromAnnotations(annotations map[string]string) ([]api.TopologyConstraint, error) {
+	if len(annotations) > 0 && annotations[api.AlphaStorageTopologyConstraintsAnnotation] != "" {
+		var constraints []api.TopologyConstraint
+		err := json.Unmarshal([]byte(annotations[api.AlphaStorageTopologyConstraintsAnnotation]), &constraints)
+		if err != nil {
+			return nil, err
+		}
+		return constraints, nil
+	}
+	return nil, nil
+}
+
+func StorageTopologyConstraintsToAlphaAnnotation(annotations map[string]string, constraints []api.TopologyConstraint) error {
+	json, err := json.Marshal(constraints)
+	if err != nil {
+		return err
+	}
+	annotations[api.AlphaStorageTopologyConstraintsAnnotation] = string(json)
+	return nil
+}

@@ -792,6 +792,15 @@ func (LocalObjectReference) SwaggerDoc() map[string]string {
 	return map_LocalObjectReference
 }
 
+var map_LocalVolumeSource = map[string]string{
+	"":     "Local represents a directory with specific topology constraints",
+	"path": "The full path to the volume on the node For alpha, this path must be a file-based volume",
+}
+
+func (LocalVolumeSource) SwaggerDoc() map[string]string {
+	return map_LocalVolumeSource
+}
+
 var map_NFSVolumeSource = map[string]string{
 	"":         "Represents an NFS mount that lasts the lifetime of a pod. NFS volumes do not support ownership management or SELinux relabeling.",
 	"server":   "Server is the hostname or IP address of the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs",
@@ -1147,6 +1156,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+	"local":                "Local represents a directory with specific topology constraints",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1902,6 +1912,16 @@ var map_Toleration = map[string]string{
 
 func (Toleration) SwaggerDoc() map[string]string {
 	return map_Toleration
+}
+
+var map_TopologyConstraint = map[string]string{
+	"":       "TopologyConstraint contains label information that the resource is constrained to A label key can have multiple values",
+	"key":    "Key of the label",
+	"values": "Values for the label key",
+}
+
+func (TopologyConstraint) SwaggerDoc() map[string]string {
+	return map_TopologyConstraint
 }
 
 var map_Volume = map[string]string{

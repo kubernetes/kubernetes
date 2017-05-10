@@ -428,6 +428,9 @@ type PersistentVolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,19,opt,name=scaleIO"`
+	// Local represents a directory with specific topology constraints
+	// +optional
+	Local *LocalVolumeSource `json:"local,omitempty" protobuf:"bytes,20,opt,name=local"`
 }
 
 const (
@@ -437,7 +440,20 @@ const (
 
 	// MountOptionAnnotation defines mount option annotation used in PVs
 	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
+
+	// StorageTopologyConstraint defines topology constraints of a PV
+	// Value is type []TopologyConstraint
+	AlphaStorageTopologyConstraintsAnnotation = "volume.alpha.kubernetes.io/topology-constraints"
 )
+
+// TopologyConstraint contains label information that the resource is constrained to
+// A label key can have multiple values
+type TopologyConstraint struct {
+	// Key of the label
+	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
+	// Values for the label key
+	Values []string `json:"values" protobuf:"bytes,2,opt,name=values"`
+}
 
 // +genclient=true
 // +nonNamespaced=true
@@ -1290,6 +1306,13 @@ type KeyToPath struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	Mode *int32 `json:"mode,omitempty" protobuf:"varint,3,opt,name=mode"`
+}
+
+// Local represents a directory with specific topology constraints
+type LocalVolumeSource struct {
+	// The full path to the volume on the node
+	// For alpha, this path must be a file-based volume
+	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 }
 
 // ContainerPort represents a network port in a single container.

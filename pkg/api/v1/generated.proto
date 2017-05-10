@@ -1434,6 +1434,13 @@ message LocalObjectReference {
   optional string name = 1;
 }
 
+// Local represents a directory with specific topology constraints
+message LocalVolumeSource {
+  // The full path to the volume on the node
+  // For alpha, this path must be a file-based volume
+  optional string path = 1;
+}
+
 // Represents an NFS mount that lasts the lifetime of a pod.
 // NFS volumes do not support ownership management or SELinux relabeling.
 message NFSVolumeSource {
@@ -2185,6 +2192,10 @@ message PersistentVolumeSource {
   // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
   // +optional
   optional ScaleIOVolumeSource scaleIO = 19;
+
+  // Local represents a directory with specific topology constraints
+  // +optional
+  optional LocalVolumeSource local = 20;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -3784,6 +3795,16 @@ message Toleration {
   // negative values will be treated as 0 (evict immediately) by the system.
   // +optional
   optional int64 tolerationSeconds = 5;
+}
+
+// TopologyConstraint contains label information that the resource is constrained to
+// A label key can have multiple values
+message TopologyConstraint {
+  // Key of the label
+  optional string key = 1;
+
+  // Values for the label key
+  repeated string values = 2;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.
