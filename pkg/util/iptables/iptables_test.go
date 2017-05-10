@@ -20,7 +20,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -1190,7 +1189,7 @@ func TestRestoreAllGrabNewLock(t *testing.T) {
 	}
 	defer runLock.Close()
 
-	if err := syscall.Flock(int(runLock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err := grabIptablesFileLock(runLock); err != nil {
 		t.Errorf("expected to lock %s, got %v", TestLockfilePath, err)
 	}
 
