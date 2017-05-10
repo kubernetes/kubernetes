@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -143,19 +144,23 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 
 			hostPath = filepath.Join(hostPath, mount.SubPath)
 
-			// Create the sub path now because if it's auto-created later when referenced, it may have an
-			// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
-			// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
-			// later auto-create it with the incorrect mode 0750
-			if err := os.MkdirAll(hostPath, perm); err != nil {
-				glog.Errorf("failed to mkdir:%s", hostPath)
-				return nil, err
-			}
+			if subPathExists, err := util.FileExists(hostPath); err != nil {
+				glog.Errorf("Could not determine if subPath %s exists; will not attempt to change its permissions", hostPath)
+			} else if !subPathExists {
+				// Create the sub path now because if it's auto-created later when referenced, it may have an
+				// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
+				// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
+				// later auto-create it with the incorrect mode 0750
+				if err := os.MkdirAll(hostPath, perm); err != nil {
+					glog.Errorf("failed to mkdir:%s", hostPath)
+					return nil, err
+				}
 
-			// chmod the sub path because umask may have prevented us from making the sub path with the same
-			// permissions as the mounter path
-			if err := os.Chmod(hostPath, perm); err != nil {
-				return nil, err
+				// chmod the sub path because umask may have prevented us from making the sub path with the same
+				// permissions as the mounter path
+				if err := os.Chmod(hostPath, perm); err != nil {
+					return nil, err
+				}
 			}
 		}
 
