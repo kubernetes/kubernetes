@@ -25,7 +25,7 @@ go_library(
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
-        "//pkg/kubelet/dockertools:go_default_library",
+        "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubemark:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",
         "//pkg/version/prometheus:go_default_library",
