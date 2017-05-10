@@ -12,7 +12,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "azure.go",
-        "azure_blob.go",
         "azure_file.go",
         "azure_instances.go",
         "azure_loadbalancer.go",
@@ -22,7 +21,6 @@ go_library(
         "azure_util.go",
         "azure_wrap.go",
         "azure_zones.go",
-        "vhd.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -40,7 +38,6 @@ go_library(
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/rubiojr/go-vhd/vhd:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],
