@@ -60,7 +60,8 @@ var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
 
 const (
-	defaultMachine = "n1-standard-1"
+	defaultMachine                = "n1-standard-1"
+	acceleratorTypeResourceFormat = "https://www.googleapis.com/compute/beta/projects/%s/zones/%s/acceleratorTypes/%s"
 )
 
 var (
@@ -535,7 +536,7 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 				AutomaticRestart:  true,
 			}
 		}
-		aType := fmt.Sprintf("https://www.googleapis.com/compute/beta/projects/%s/zones/%s/acceleratorTypes/%s", *project, *zone, accelerator.Type)
+		aType := fmt.Sprintf(acceleratorTypeResourceFormat, *project, *zone, accelerator.Type)
 		ac := &compute.AcceleratorConfig{
 			AcceleratorCount: accelerator.Count,
 			AcceleratorType:  aType,
@@ -553,8 +554,7 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 				ret = fmt.Sprintf("%s: %v", ret, op.Error)
 			}
 			return "", fmt.Errorf(ret)
-		}
-		if op.Error != nil {
+		} else if op.Error != nil {
 			return "", fmt.Errorf("could not create instance %s: %+v", name, op.Error)
 		}
 	}

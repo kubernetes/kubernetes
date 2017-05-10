@@ -8,7 +8,7 @@ images:
   ubuntu-docker12:
     image: e2e-node-ubuntu-trusty-docker12-v2-image # docker 1.12.6
     project: kubernetes-node-e2e-images
-    # GPU driver installation takes up significant amount of CPU.
+    # Using `n1-standard-2` because GPU driver installation takes up significant amount of CPU.
     machine: n1-standard-2
     metadata: 'startup-script<test/e2e_node/jenkins/ubuntu-14.04-nvidia-install.sh'
     resources:
