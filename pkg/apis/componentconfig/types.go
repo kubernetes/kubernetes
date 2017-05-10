@@ -839,12 +839,6 @@ type KubeControllerManagerConfiguration struct {
 	// clusterSigningDuration is the length of duration signed certificates
 	// will be given.
 	ClusterSigningDuration metav1.Duration
-	// approveAllKubeletCSRs tells the CSR controller to approve all CSRs originating
-	// from the kubelet bootstrapping group automatically.
-	// WARNING: this grants all users with access to the certificates API group
-	// the ability to create credentials for any user that has access to the boostrapping
-	// user's credentials.
-	ApproveAllKubeletCSRsForGroup string
 	// enableProfiling enables profiling via web interface host:port/debug/pprof/
 	EnableProfiling bool
 	// enableContentionProfiling enables lock contention profiling, if enableProfiling is true.
