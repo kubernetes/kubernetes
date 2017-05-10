@@ -566,7 +566,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 
 	message := fmt.Sprintf("Killing container with id %s", containerID.String())
 	if reason != "" {
-		message = fmt.Sprint(message, ":", reason)
+		message = fmt.Sprint(message, ": ", reason)
 	}
 	m.generateContainerEvent(containerID, v1.EventTypeNormal, events.KillingContainer, message)
 	m.containerRefManager.ClearRef(containerID)
