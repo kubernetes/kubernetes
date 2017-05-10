@@ -27,9 +27,10 @@ import (
 
 // PodDisruptionBudgetV1Generator supports stable generation of a pod disruption budget.
 type PodDisruptionBudgetV1Generator struct {
-	Name         string
-	MinAvailable string
-	Selector     string
+	Name           string
+	MinAvailable   string
+	MaxUnavailable string
+	Selector       string
 }
 
 // Ensure it supports the generator pattern that uses parameters specified during construction.
@@ -38,8 +39,9 @@ var _ StructuredGenerator = &PodDisruptionBudgetV1Generator{}
 func (PodDisruptionBudgetV1Generator) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
-		{"mim-available", true},
-		{"selector", true},
+		{"min-available", false},
+		{"max-unavailable", false},
+		{"selector", false},
 	}
 }
 
@@ -52,15 +54,19 @@ func (s PodDisruptionBudgetV1Generator) Generate(params map[string]interface{}) 
 	if !isString {
 		return nil, fmt.Errorf("expected string, saw %v for 'name'", name)
 	}
-	minAvailable, isString := params["mim-available"].(string)
+	minAvailable, isString := params["min-available"].(string)
 	if !isString {
 		return nil, fmt.Errorf("expected string, found %v", minAvailable)
 	}
-	selector, isString := params["selecor"].(string)
+	maxUnavailable, isString := params["max-available"].(string)
+	if !isString {
+		return nil, fmt.Errorf("expected string, found %v", maxUnavailable)
+	}
+	selector, isString := params["selector"].(string)
 	if !isString {
 		return nil, fmt.Errorf("expected string, found %v", selector)
 	}
-	delegate := &PodDisruptionBudgetV1Generator{Name: name, MinAvailable: minAvailable, Selector: selector}
+	delegate := &PodDisruptionBudgetV1Generator{Name: name, MinAvailable: minAvailable, MaxUnavailable: maxUnavailable, Selector: selector}
 	return delegate.StructuredGenerate()
 }
 
@@ -75,15 +81,34 @@ func (s *PodDisruptionBudgetV1Generator) StructuredGenerate() (runtime.Object, e
 		return nil, err
 	}
 
-	return &policy.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: s.Name,
-		},
-		Spec: policy.PodDisruptionBudgetSpec{
-			MinAvailable: intstr.Parse(s.MinAvailable),
-			Selector:     selector,
-		},
-	}, nil
+	if len(s.MaxUnavailable) > 0 {
+		maxUnavailable := intstr.Parse(s.MaxUnavailable)
+
+		return &policy.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: s.Name,
+			},
+			Spec: policy.PodDisruptionBudgetSpec{
+				MaxUnavailable: &maxUnavailable,
+				Selector:       selector,
+			},
+		}, nil
+	}
+
+	if len(s.MinAvailable) > 0 {
+		minAvailable := intstr.Parse(s.MinAvailable)
+		return &policy.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: s.Name,
+			},
+			Spec: policy.PodDisruptionBudgetSpec{
+				MinAvailable: &minAvailable,
+				Selector:     selector,
+			},
+		}, nil
+	}
+
+	return nil, err
 }
 
 // validate validates required fields are set to support structured generation.
@@ -94,8 +119,8 @@ func (s *PodDisruptionBudgetV1Generator) validate() error {
 	if len(s.Selector) == 0 {
 		return fmt.Errorf("a selector must be specified")
 	}
-	if len(s.MinAvailable) == 0 {
-		return fmt.Errorf("the minimim number of available pods required must be specified")
+	if len(s.MaxUnavailable) == 0 && len(s.MinAvailable) == 0 {
+		return fmt.Errorf("the MinAvailable or MaxUnavailable number of pods required must be specified")
 	}
 	return nil
 }

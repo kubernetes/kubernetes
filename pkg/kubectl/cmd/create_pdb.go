@@ -75,9 +75,10 @@ func CreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.PodDisruptionBudgetV1GeneratorName:
 		generator = &kubectl.PodDisruptionBudgetV1Generator{
-			Name:         name,
-			MinAvailable: cmdutil.GetFlagString(cmd, "min-available"),
-			Selector:     cmdutil.GetFlagString(cmd, "selector"),
+			Name:           name,
+			MinAvailable:   cmdutil.GetFlagString(cmd, "min-available"),
+			MaxUnavailable: cmdutil.GetFlagString(cmd, "max-unavailable"),
+			Selector:       cmdutil.GetFlagString(cmd, "selector"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
