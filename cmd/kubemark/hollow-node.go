@@ -35,7 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubemark"
+	fakeexec "k8s.io/kubernetes/pkg/util/exec"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
+	fakesysctl "k8s.io/kubernetes/pkg/util/sysctl/testing"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 
 	"github.com/golang/glog"
@@ -112,7 +114,6 @@ func main() {
 	if config.Morph == "kubelet" {
 		cadvisorInterface := new(cadvisortest.Fake)
 		containerManager := cm.NewStubContainerManager()
-
 		fakeDockerClient := libdocker.NewFakeDockerClient().WithTraceDisabled()
 		fakeDockerClient.EnableSleep = true
 
@@ -131,24 +132,29 @@ func main() {
 	}
 
 	if config.Morph == "proxy" {
-		eventBroadcaster := record.NewBroadcaster()
-		recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: config.NodeName})
-
-		iptInterface := fakeiptables.NewFake()
-
 		eventClient, err := clientgoclientset.NewForConfig(clientConfig)
 		if err != nil {
 			glog.Fatalf("Failed to create API Server client: %v", err)
 		}
+		iptInterface := fakeiptables.NewFake()
+		sysctl := fakesysctl.NewFake()
+		execer := &fakeexec.FakeExec{}
+		eventBroadcaster := record.NewBroadcaster()
+		recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: config.NodeName})
 
-		hollowProxy := kubemark.NewHollowProxyOrDie(
+		hollowProxy, err := kubemark.NewHollowProxyOrDie(
 			config.NodeName,
 			internalClientset,
 			eventClient,
 			iptInterface,
+			sysctl,
+			execer,
 			eventBroadcaster,
 			recorder,
 		)
+		if err != nil {
+			glog.Fatalf("Failed to create hollowProxy instance: %v", err)
+		}
 		hollowProxy.Run()
 	}
 }
