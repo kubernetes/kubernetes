@@ -59,7 +59,8 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 // TransportConfig converts a client config to an appropriate transport config.
 func (c *Config) TransportConfig() (*transport.Config, error) {
 	wt := c.WrapTransport
-	if c.AuthProvider != nil {
+	authProviderEnabled := c.AuthProvider != nil && (len(c.BearerToken) == 0 && len(c.Username) == 0)
+	if authProviderEnabled {
 		provider, err := GetAuthProvider(c.Host, c.AuthProvider, c.AuthConfigPersister)
 		if err != nil {
 			return nil, err
