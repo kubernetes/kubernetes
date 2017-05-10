@@ -2103,6 +2103,12 @@ type PodSpec struct {
 	// file if specified. This is only valid for non-hostNetwork pods.
 	// +optional
 	HostAliases []HostAlias
+	// If specified, indicates the pod's priority. "system" is a special keyword
+	// which indicates the highest priority. Any other name must be defined in
+	// Admission Controller config or pod will be rejected.
+	// If not specified, the pod priority will be zero.
+	// +optional
+	PriorityName string
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -2230,6 +2236,10 @@ type PodStatus struct {
 	// when we have done this.
 	// +optional
 	ContainerStatuses []ContainerStatus
+	// The priority value which is resolved by the Admission Controller from
+	// PodSpec.PriorityName. The higher the value, the higher the priority.
+	// +optional
+	Priority int32
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

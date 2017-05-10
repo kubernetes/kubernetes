@@ -3493,6 +3493,7 @@ func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 	out.SchedulerName = in.SchedulerName
 	out.Tolerations = *(*[]api.Toleration)(unsafe.Pointer(&in.Tolerations))
 	out.HostAliases = *(*[]api.HostAlias)(unsafe.Pointer(&in.HostAliases))
+	out.PriorityName = in.PriorityName
 	return nil
 }
 
@@ -3538,6 +3539,7 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	out.SchedulerName = in.SchedulerName
 	out.Tolerations = *(*[]Toleration)(unsafe.Pointer(&in.Tolerations))
 	out.HostAliases = *(*[]HostAlias)(unsafe.Pointer(&in.HostAliases))
+	out.PriorityName = in.PriorityName
 	return nil
 }
 
@@ -3552,6 +3554,7 @@ func autoConvert_v1_PodStatus_To_api_PodStatus(in *PodStatus, out *api.PodStatus
 	out.InitContainerStatuses = *(*[]api.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]api.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
 	out.QOSClass = api.PodQOSClass(in.QOSClass)
+	out.Priority = in.Priority
 	return nil
 }
 
@@ -3571,6 +3574,7 @@ func autoConvert_api_PodStatus_To_v1_PodStatus(in *api.PodStatus, out *PodStatus
 	out.QOSClass = PodQOSClass(in.QOSClass)
 	out.InitContainerStatuses = *(*[]ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
+	out.Priority = in.Priority
 	return nil
 }
 

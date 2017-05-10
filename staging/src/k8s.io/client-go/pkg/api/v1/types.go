@@ -2412,6 +2412,12 @@ type PodSpec struct {
 	// +patchMergeKey=IP
 	// +patchStrategy=merge
 	HostAliases []HostAlias `json:"hostMappings,omitempty" patchStrategy:"merge" patchMergeKey:"IP" protobuf:"bytes,23,rep,name=hostMappings"`
+	// If specified, indicates the pod's priority. "system" is a special keyword
+	// which indicates the highest priority. Any other name must be defined in
+	// Admission Controller config or pod will be rejected.
+	// If not specified, the pod priority will be zero.
+	// +optional
+	PriorityName string `json:"priorityName,omitempty" protobuf:"bytes,24,opt,name=priorityName"`
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -2529,6 +2535,10 @@ type PodStatus struct {
 	// More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md
 	// +optional
 	QOSClass PodQOSClass `json:"qosClass,omitempty" protobuf:"bytes,9,rep,name=qosClass"`
+	// The priority value which is resolved by the Admission Controller from
+	// PodSpec.PriorityName. The higher the value, the higher the priority.
+	// +optional
+	Priority int32 `json:"priority,omitempty" protobuf:"bytes,11,opt,name=priority"`
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

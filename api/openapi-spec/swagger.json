@@ -40253,6 +40253,10 @@
        "type": "string"
       }
      },
+     "priorityName": {
+      "description": "If specified, indicates the pod's priority. \"system\" is a special keyword which indicates the highest priority. Any other name must be defined in Admission Controller config or pod will be rejected. If not specified, the pod priority will be zero.",
+      "type": "string"
+     },
      "restartPolicy": {
       "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy",
       "type": "string"
@@ -40341,6 +40345,11 @@
      "podIP": {
       "description": "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
       "type": "string"
+     },
+     "priority": {
+      "description": "The priority value which is resolved by the Admission Controller from PodSpec.PriorityName. The higher the value, the higher the priority.",
+      "type": "integer",
+      "format": "int32"
      },
      "qosClass": {
       "description": "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md",

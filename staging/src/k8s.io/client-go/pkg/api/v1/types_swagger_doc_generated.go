@@ -1361,6 +1361,7 @@ var map_PodSpec = map[string]string{
 	"schedulerName":                 "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
 	"tolerations":                   "If specified, the pod's tolerations.",
 	"hostMappings":                  "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods.",
+	"priorityName":                  "If specified, indicates the pod's priority. \"system\" is a special keyword which indicates the highest priority. Any other name must be defined in Admission Controller config or pod will be rejected. If not specified, the pod priority will be zero.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -1379,6 +1380,7 @@ var map_PodStatus = map[string]string{
 	"initContainerStatuses": "The list has one entry per init container in the manifest. The most recent successful init container will have ready = true, the most recently started container will have startTime set. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses",
 	"containerStatuses":     "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses",
 	"qosClass":              "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md",
+	"priority":              "The priority value which is resolved by the Admission Controller from PodSpec.PriorityName. The higher the value, the higher the priority.",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {

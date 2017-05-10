@@ -10788,6 +10788,10 @@
        "type": "string"
       }
      },
+     "priorityName": {
+      "description": "If specified, indicates the pod's priority. \"system\" is a special keyword which indicates the highest priority. Any other name must be defined in Admission Controller config or pod will be rejected. If not specified, the pod priority will be zero.",
+      "type": "string"
+     },
      "restartPolicy": {
       "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy",
       "type": "string"
