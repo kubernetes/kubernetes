@@ -107,7 +107,8 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			"priorities" : [
 				{"name" : "PriorityOne", "weight" : 1},
 				{"name" : "PriorityTwo", "weight" : 5}
-			]
+			],
+			"hardPodAffinitySymmetricWeight" : 10
 			}`,
 		},
 	}
@@ -118,7 +119,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
 	ss := options.NewSchedulerServer()
-	ss.HardPodAffinitySymmetricWeight = v1.DefaultHardPodAffinitySymmetricWeight
 	ss.PolicyConfigMapName = configPolicyName
 	sched, err := app.CreateScheduler(ss, clientSet,
 		informerFactory.Core().V1().Nodes(),
@@ -148,7 +148,9 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	if schedPrioritizers[1].Function == nil || schedPrioritizers[1].Weight != 5 {
 		t.Errorf("Unexpected prioritizer: func: %v, weight: %v", schedPrioritizers[1].Function, schedPrioritizers[1].Weight)
 	}
-
+	if ss.HardPodAffinitySymmetricWeight != 10 {
+		t.Errorf("Unexpected hardPodAffinitySymmetricWeight, expected: %v, get: %v", 10, ss.HardPodAffinitySymmetricWeight)
+	}
 	defer close(sched.Config().StopEverything)
 }
 
