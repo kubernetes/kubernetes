@@ -254,9 +254,11 @@ func (s *ServiceController) ensureDnsRrsets(dnsZone dnsprovider.Zone, dnsName st
 				// Need to replace the existing one with a better one (or just remove it if we have no healthy endpoints).
 				glog.V(4).Infof("Existing recordset %v not equivalent to needed recordset %v removing existing and adding needed.", rrsetList, newRrset)
 				changeSet := rrsets.StartChangeset()
-				changeSet.Remove(found)
+				for i := range rrsetList {
+					changeSet = changeSet.Remove(rrsetList[i])
+				}
 				if uplevelCname != "" {
-					changeSet.Add(newRrset)
+					changeSet = changeSet.Add(newRrset)
 					if err := changeSet.Apply(); err != nil {
 						return err
 					}
@@ -288,7 +290,12 @@ func (s *ServiceController) ensureDnsRrsets(dnsZone dnsprovider.Zone, dnsName st
 			} else {
 				// Need to replace the existing one with a better one
 				glog.V(4).Infof("Existing recordset %v is not equivalent to needed recordset %v, removing existing and adding needed.", found, newRrset)
-				if err = rrsets.StartChangeset().Remove(found).Add(newRrset).Apply(); err != nil {
+				changeSet := rrsets.StartChangeset()
+				for i := range rrsetList {
+					changeSet = changeSet.Remove(rrsetList[i])
+				}
+				changeSet = changeSet.Add(newRrset)
+				if err = changeSet.Apply(); err != nil {
 					return err
 				}
 				glog.V(4).Infof("Successfully replaced recordset %v -> %v", found, newRrset)
