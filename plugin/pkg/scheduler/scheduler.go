@@ -110,6 +110,10 @@ type Config struct {
 	// stale while they sit in a channel.
 	NextPod func() *v1.Pod
 
+	// WaitForCacheSync waits for scheduler cache to populate.
+	// It returns true if it was successful, false if the controller should shutdown.
+	WaitForCacheSync func() bool
+
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
 	Error func(*v1.Pod, error)
@@ -140,8 +144,12 @@ func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Schedul
 	return s, nil
 }
 
-// Run begins watching and scheduling. It starts a goroutine and returns immediately.
+// Run begins watching and scheduling. It waits for cache to be synced, then starts a goroutine and returns immediately.
 func (sched *Scheduler) Run() {
+	if !sched.config.WaitForCacheSync() {
+		return
+	}
+
 	go wait.Until(sched.scheduleOne, 0, sched.config.StopEverything)
 }
 
