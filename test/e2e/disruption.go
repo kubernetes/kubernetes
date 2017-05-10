@@ -197,7 +197,7 @@ func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvai
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-			MinAvailable: minAvailable,
+			MinAvailable: &minAvailable,
 		},
 	}
 	_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
