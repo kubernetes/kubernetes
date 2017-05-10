@@ -81,13 +81,20 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	var configs []testutils.RunObjectConfig
 	var secretConfigs []*testutils.SecretConfig
 
+	testCaseBaseName := "load"
+
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
 	AfterEach(func() {
 		// Verify latency metrics
-		highLatencyRequests, err := framework.HighLatencyRequests(clientset)
-		framework.ExpectNoError(err, "Too many instances metrics above the threshold")
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
+		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset)
+		framework.ExpectNoError(err)
+		if err == nil {
+			summaries := make([]framework.TestDataSummary, 0, 1)
+			summaries = append(summaries, metrics)
+			framework.PrintSummaries(summaries, testCaseBaseName)
+			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+		}
 	})
 
 	// We assume a default throughput of 10 pods/second throughput.
@@ -106,7 +113,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		ClientQPS:   float32(math.Max(50.0, float64(2*throughput))),
 		ClientBurst: int(math.Max(100.0, float64(4*throughput))),
 	}
-	f := framework.NewFramework("load", options, nil)
+	f := framework.NewFramework(testCaseBaseName, options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {

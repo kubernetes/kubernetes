@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -91,6 +90,10 @@ type Framework struct {
 
 	// configuration for framework's client
 	Options FrameworkOptions
+
+	// Place where various additional data is stored during test run to be printed to ReportDir,
+	// or stdout if ReportDir is not set once test ends.
+	TestSummaries []TestDataSummary
 }
 
 type TestDataSummary interface {
@@ -307,19 +310,18 @@ func (f *Framework) AfterEach() {
 		LogContainersInPodsWithLabels(f.ClientSet, metav1.NamespaceSystem, ImagePullerLabels, "image-puller", logFunc)
 	}
 
-	summaries := make([]TestDataSummary, 0)
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
 		By("Collecting resource usage data")
 		summary, resourceViolationError := f.gatherer.stopAndSummarize([]int{90, 99, 100}, f.AddonResourceConstraints)
 		defer ExpectNoError(resourceViolationError)
-		summaries = append(summaries, summary)
+		f.TestSummaries = append(f.TestSummaries, summary)
 	}
 
 	if TestContext.GatherLogsSizes {
 		By("Gathering log sizes data")
 		close(f.logsSizeCloseChannel)
 		f.logsSizeWaitGroup.Wait()
-		summaries = append(summaries, f.logsSizeVerifier.GetSummary())
+		f.TestSummaries = append(f.TestSummaries, f.logsSizeVerifier.GetSummary())
 	}
 
 	if TestContext.GatherMetricsAfterTest {
@@ -334,44 +336,12 @@ func (f *Framework) AfterEach() {
 			if err != nil {
 				Logf("MetricsGrabber failed to grab metrics (skipping metrics gathering): %v", err)
 			} else {
-				summaries = append(summaries, (*MetricsForE2E)(&received))
+				f.TestSummaries = append(f.TestSummaries, (*MetricsForE2E)(&received))
 			}
 		}
 	}
 
-	outputTypes := strings.Split(TestContext.OutputPrintType, ",")
-	now := time.Now()
-	for _, printType := range outputTypes {
-		switch printType {
-		case "hr":
-			for i := range summaries {
-				if TestContext.ReportDir == "" {
-					Logf(summaries[i].PrintHumanReadable())
-				} else {
-					// TODO: learn to extract test name and append it to the kind instead of timestamp.
-					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+f.BaseName+"_"+now.Format(time.RFC3339)+".txt")
-					if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
-						Logf("Failed to write file %v with test performance data: %v", filePath, err)
-					}
-				}
-			}
-		case "json":
-			for i := range summaries {
-				if TestContext.ReportDir == "" {
-					Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
-					Logf("Finished")
-				} else {
-					// TODO: learn to extract test name and append it to the kind instead of timestamp.
-					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+f.BaseName+"_"+now.Format(time.RFC3339)+".json")
-					if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
-						Logf("Failed to write file %v with test performance data: %v", filePath, err)
-					}
-				}
-			}
-		default:
-			Logf("Unknown output type: %v. Skipping.", printType)
-		}
-	}
+	PrintSummaries(f.TestSummaries, f.BaseName)
 
 	// Check whether all nodes are ready after the test.
 	// This is explicitly done at the very end of the test, to avoid
