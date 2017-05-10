@@ -33,7 +33,7 @@ import (
 
 type RequestToRuleMapper interface {
 	// RulesFor returns all known PolicyRules and any errors that happened while locating those rules.
-	// Any rule returned is still valid, since rules are deny by default.  If you can pass with the rules
+	// Any rule returned is still valid, since rules are denied by default.  If you can pass with the rules
 	// supplied, you do not have to fail the request.  If you cannot, you should indicate the error along
 	// with your denial.
 	RulesFor(subject user.Info, namespace string) ([]rbac.PolicyRule, error)
