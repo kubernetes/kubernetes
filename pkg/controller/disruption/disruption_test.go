@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -141,7 +142,7 @@ func newSelFooBar() *metav1.LabelSelector {
 	return newSel(map[string]string{"foo": "bar"})
 }
 
-func newPodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrString) (*policy.PodDisruptionBudget, string) {
+func newMinAvailablePodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrString) (*policy.PodDisruptionBudget, string) {
 
 	pdb := &policy.PodDisruptionBudget{
 		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
@@ -152,8 +153,31 @@ func newPodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrString) (*pol
 			ResourceVersion: "18",
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
-			MinAvailable: minAvailable,
+			MinAvailable: &minAvailable,
 			Selector:     newSelFooBar(),
+		},
+	}
+
+	pdbName, err := controller.KeyFunc(pdb)
+	if err != nil {
+		t.Fatalf("Unexpected error naming pdb %q: %v", pdb.Name, err)
+	}
+
+	return pdb, pdbName
+}
+
+func newMaxUnavailablePodDisruptionBudget(t *testing.T, maxUnavailable intstr.IntOrString) (*policy.PodDisruptionBudget, string) {
+	pdb := &policy.PodDisruptionBudget{
+		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             uuid.NewUUID(),
+			Name:            "foobar",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "18",
+		},
+		Spec: policy.PodDisruptionBudgetSpec{
+			MaxUnavailable: &maxUnavailable,
+			Selector:       newSelFooBar(),
 		},
 	}
 
@@ -304,7 +328,7 @@ func add(t *testing.T, store cache.Store, obj interface{}) {
 func TestNoSelector(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromInt(3))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(3))
 	pdb.Spec.Selector = &metav1.LabelSelector{}
 	pod, _ := newPod(t, "yo-yo-yo")
 
@@ -322,7 +346,7 @@ func TestNoSelector(t *testing.T) {
 func TestUnavailable(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromInt(3))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(3))
 	add(t, dc.pdbStore, pdb)
 	dc.sync(pdbName)
 
@@ -346,12 +370,54 @@ func TestUnavailable(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 3, 3, 4, map[string]metav1.Time{})
 }
 
+// Verify that an integer MaxUnavailable won't
+// allow a disruption for pods with no controller.
+func TestIntegerMaxUnavailable(t *testing.T) {
+	dc, ps := newFakeDisruptionController()
+
+	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt(1))
+	add(t, dc.pdbStore, pdb)
+	dc.sync(pdbName)
+	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
+	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+
+	pod, _ := newPod(t, "naked")
+	add(t, dc.podStore, pod)
+	dc.sync(pdbName)
+
+	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+}
+
+// Verify that an integer MaxUnavailable will recompute allowed disruptions when the scale of
+// the selected pod's controller is modified.
+func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
+	dc, ps := newFakeDisruptionController()
+
+	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt(2))
+	add(t, dc.pdbStore, pdb)
+
+	rs, _ := newReplicaSet(t, 7)
+	add(t, dc.rsStore, rs)
+
+	pod, _ := newPod(t, "pod")
+	add(t, dc.podStore, pod)
+	dc.sync(pdbName)
+	ps.VerifyPdbStatus(t, pdbName, 0, 1, 5, 7, map[string]metav1.Time{})
+
+	// Update scale of ReplicaSet and check PDB
+	rs.Spec.Replicas = to.Int32Ptr(5)
+	update(t, dc.rsStore, rs)
+
+	dc.sync(pdbName)
+	ps.VerifyPdbStatus(t, pdbName, 0, 1, 3, 5, map[string]metav1.Time{})
+}
+
 // Create a pod  with no controller, and verify that a PDB with a percentage
 // specified won't allow a disruption.
 func TestNakedPod(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("28%"))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("28%"))
 	add(t, dc.pdbStore, pdb)
 	dc.sync(pdbName)
 	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
@@ -368,7 +434,7 @@ func TestNakedPod(t *testing.T) {
 func TestReplicaSet(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("20%"))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("20%"))
 	add(t, dc.pdbStore, pdb)
 
 	rs, _ := newReplicaSet(t, 10)
@@ -387,7 +453,7 @@ func TestMultipleControllers(t *testing.T) {
 
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("1%"))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("1%"))
 	add(t, dc.pdbStore, pdb)
 
 	for i := 0; i < podCount; i++ {
@@ -429,7 +495,7 @@ func TestReplicationController(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
 	// 34% should round up to 2
-	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("34%"))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("34%"))
 	add(t, dc.pdbStore, pdb)
 	rc, _ := newReplicationController(t, 3)
 	rc.Spec.Selector = labels
@@ -470,7 +536,7 @@ func TestStatefulSetController(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
 	// 34% should round up to 2
-	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("34%"))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("34%"))
 	add(t, dc.pdbStore, pdb)
 	ss, _ := newStatefulSet(t, 3)
 	add(t, dc.ssStore, ss)
@@ -518,7 +584,7 @@ func TestTwoControllers(t *testing.T) {
 	const minimumOne int32 = 4        // integer minimum with one controller
 	const minimumTwo int32 = 7        // integer minimum with two controllers
 
-	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("28%"))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("28%"))
 	add(t, dc.pdbStore, pdb)
 	rc, _ := newReplicationController(t, collectionSize)
 	rc.Spec.Selector = rcLabels
@@ -605,7 +671,7 @@ func TestTwoControllers(t *testing.T) {
 // Test pdb doesn't exist
 func TestPDBNotExist(t *testing.T) {
 	dc, _ := newFakeDisruptionController()
-	pdb, _ := newPodDisruptionBudget(t, intstr.FromString("67%"))
+	pdb, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromString("67%"))
 	add(t, dc.pdbStore, pdb)
 	if err := dc.sync("notExist"); err != nil {
 		t.Errorf("Unexpected error: %v, expect nil", err)
@@ -615,7 +681,7 @@ func TestPDBNotExist(t *testing.T) {
 func TestUpdateDisruptedPods(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 	dc.recheckQueue = workqueue.NewNamedDelayingQueue("pdb-queue")
-	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromInt(1))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
 	currentTime := time.Now()
 	pdb.Status.DisruptedPods = map[string]metav1.Time{
 		"p1":       {Time: currentTime},                       // Should be removed, pod deletion started.

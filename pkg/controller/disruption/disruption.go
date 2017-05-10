@@ -516,64 +516,86 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 	// permitted controller configurations (specifically, considering it an error
 	// if a pod covered by a PDB has 0 controllers or > 1 controller) should be
 	// handled the same way for integer and percentage minAvailable
-	if pdb.Spec.MinAvailable.Type == intstr.Int {
-		desiredHealthy = pdb.Spec.MinAvailable.IntVal
-		expectedCount = int32(len(pods))
-	} else if pdb.Spec.MinAvailable.Type == intstr.String {
-		// When the user specifies a fraction of pods that must be available, we
-		// use as the fraction's denominator
-		// SUM_{all c in C} scale(c)
-		// where C is the union of C_p1, C_p2, ..., C_pN
-		// and each C_pi is the set of controllers controlling the pod pi
 
-		// k8s only defines what will happens when 0 or 1 controllers control a
-		// given pod.  We explicitly exclude the 0 controllers case here, and we
-		// report an error if we find a pod with more than 1 controller.  Thus in
-		// practice each C_pi is a set of exactly 1 controller.
-
-		// A mapping from controllers to their scale.
-		controllerScale := map[types.UID]int32{}
-
-		// 1. Find the controller(s) for each pod.  If any pod has 0 controllers,
-		// that's an error.  If any pod has more than 1 controller, that's also an
-		// error.
-		for _, pod := range pods {
-			controllerCount := 0
-			for _, finder := range dc.finders() {
-				var controllers []controllerAndScale
-				controllers, err = finder(pod)
-				if err != nil {
-					return
-				}
-				for _, controller := range controllers {
-					controllerScale[controller.UID] = controller.scale
-					controllerCount++
-				}
-			}
-			if controllerCount == 0 {
-				err = fmt.Errorf("asked for percentage, but found no controllers for pod %q", pod.Name)
-				dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllers", err.Error())
-				return
-			} else if controllerCount > 1 {
-				err = fmt.Errorf("pod %q has %v>1 controllers", pod.Name, controllerCount)
-				dc.recorder.Event(pdb, v1.EventTypeWarning, "TooManyControllers", err.Error())
-				return
-			}
-		}
-
-		// 2. Add up all the controllers.
-		expectedCount = 0
-		for _, count := range controllerScale {
-			expectedCount += count
-		}
-
-		// 3. Do the math.
-		var dh int
-		dh, err = intstr.GetValueFromIntOrPercent(&pdb.Spec.MinAvailable, int(expectedCount), true)
+	if pdb.Spec.MaxUnavailable != nil {
+		expectedCount, err = dc.getExpectedScale(pdb, pods)
 		if err != nil {
 			return
 		}
-		desiredHealthy = int32(dh)
+		var mu int
+		mu, err = intstr.GetValueFromIntOrPercent(pdb.Spec.MaxUnavailable, int(expectedCount), true)
+		if err != nil {
+			return
+		}
+		desiredHealthy = expectedCount - int32(mu)
+	} else if pdb.Spec.MinAvailable != nil {
+		if pdb.Spec.MinAvailable.Type == intstr.Int {
+			desiredHealthy = pdb.Spec.MinAvailable.IntVal
+			expectedCount = int32(len(pods))
+		} else if pdb.Spec.MinAvailable.Type == intstr.String {
+			expectedCount, err = dc.getExpectedScale(pdb, pods)
+			if err != nil {
+				return
+			}
+
+			var dh int
+			dh, err = intstr.GetValueFromIntOrPercent(pdb.Spec.MinAvailable, int(expectedCount), true)
+			if err != nil {
+				return
+			}
+			desiredHealthy = int32(dh)
+		}
+	}
+	return
+}
+
+func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount int32, err error) {
+	err = nil
+	// When the user specifies a fraction of pods that must be available, we
+	// use as the fraction's denominator
+	// SUM_{all c in C} scale(c)
+	// where C is the union of C_p1, C_p2, ..., C_pN
+	// and each C_pi is the set of controllers controlling the pod pi
+
+	// k8s only defines what will happens when 0 or 1 controllers control a
+	// given pod.  We explicitly exclude the 0 controllers case here, and we
+	// report an error if we find a pod with more than 1 controller.  Thus in
+	// practice each C_pi is a set of exactly 1 controller.
+
+	// A mapping from controllers to their scale.
+	controllerScale := map[types.UID]int32{}
+
+	// 1. Find the controller(s) for each pod.  If any pod has 0 controllers,
+	// that's an error.  If any pod has more than 1 controller, that's also an
+	// error.
+	for _, pod := range pods {
+		controllerCount := 0
+		for _, finder := range dc.finders() {
+			var controllers []controllerAndScale
+			controllers, err = finder(pod)
+			if err != nil {
+				return
+			}
+			for _, controller := range controllers {
+				controllerScale[controller.UID] = controller.scale
+				controllerCount++
+			}
+		}
+		if controllerCount == 0 {
+			err = fmt.Errorf("found no controllers for pod %q", pod.Name)
+			dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllers", err.Error())
+			return
+		} else if controllerCount > 1 {
+			err = fmt.Errorf("pod %q has %v>1 controllers", pod.Name, controllerCount)
+			dc.recorder.Event(pdb, v1.EventTypeWarning, "TooManyControllers", err.Error())
+			return
+		}
+	}
+
+	// 2. Add up all the controllers.
+	expectedCount = 0
+	for _, count := range controllerScale {
+		expectedCount += count
 	}
 
 	return
