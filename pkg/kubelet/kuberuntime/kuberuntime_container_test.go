@@ -60,7 +60,7 @@ func TestRemoveContainer(t *testing.T) {
 	expectedContainerLogSymlink := legacyLogSymlink(containerId, "foo", "bar", "new")
 	assert.Equal(t, fakeOS.Removes, []string{expectedContainerLogPath, expectedContainerLogSymlink})
 	// Verify container is removed
-	fakeRuntime.AssertCalls([]string{"RemoveContainer"})
+	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
 	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerId})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)
