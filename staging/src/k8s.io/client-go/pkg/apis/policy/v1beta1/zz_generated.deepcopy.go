@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	reflect "reflect"
 )
 
@@ -108,6 +109,11 @@ func DeepCopy_v1beta1_PodDisruptionBudgetSpec(in interface{}, out interface{}, c
 		in := in.(*PodDisruptionBudgetSpec)
 		out := out.(*PodDisruptionBudgetSpec)
 		*out = *in
+		if in.MinAvailable != nil {
+			in, out := &in.MinAvailable, &out.MinAvailable
+			*out = new(intstr.IntOrString)
+			**out = **in
+		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
 			if newVal, err := c.DeepCopy(*in); err != nil {
@@ -115,6 +121,11 @@ func DeepCopy_v1beta1_PodDisruptionBudgetSpec(in interface{}, out interface{}, c
 			} else {
 				*out = newVal.(*v1.LabelSelector)
 			}
+		}
+		if in.MaxUnavailable != nil {
+			in, out := &in.MaxUnavailable, &out.MaxUnavailable
+			*out = new(intstr.IntOrString)
+			**out = **in
 		}
 		return nil
 	}
