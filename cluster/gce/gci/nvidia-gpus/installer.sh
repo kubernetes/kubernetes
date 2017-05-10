@@ -142,7 +142,6 @@ setup_overlay_mounts() {
 should_install() {
     if verify_nvidia; then
 	echo "nvidia drivers already installed. Skipping installation"
-	sleep infinity
 	exit 0
     fi
 }
@@ -170,7 +169,6 @@ main() {
     verify_nvidia
     copy_files_to_host
     restart_kubelet
-    sleep infinity
 }
 
 main "$@"
