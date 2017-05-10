@@ -58,7 +58,8 @@ func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 	statefulPodMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 	podMounts := []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
 	ns := f.Namespace.Name
-	t.set = framework.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
+	c :=f.ClientSet
+	t.set = framework.NewStatefulSet(c,ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
 	t.service = framework.CreateStatefulSetService(ssName, labels)
 	*(t.set.Spec.Replicas) = 3
 	framework.SetStatefulSetInitializedAnnotation(t.set, "false")

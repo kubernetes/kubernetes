@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 		BeforeEach(func() {
 			statefulPodMounts = []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts = []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
-			ss = framework.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
+			ss = framework.NewStatefulSet(c,ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
 
 			By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := createServiceSpec(headlessSvcName, "", true, labels)
@@ -288,7 +288,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			testProbe := &v1.Probe{Handler: v1.Handler{HTTPGet: &v1.HTTPGetAction{
 				Path: "/index.html",
 				Port: intstr.IntOrString{IntVal: 80}}}}
-			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
+			ss := framework.NewStatefulSet(c,ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
 			framework.SetStatefulSetInitializedAnnotation(ss, "false")
 			ss, err := c.Apps().StatefulSets(ns).Create(ss)
@@ -355,7 +355,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			testProbe := &v1.Probe{Handler: v1.Handler{HTTPGet: &v1.HTTPGetAction{
 				Path: "/index.html",
 				Port: intstr.IntOrString{IntVal: 80}}}}
-			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
+			ss := framework.NewStatefulSet(c,ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
 			ss, err = c.Apps().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
@@ -450,7 +450,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			By("Creating statefulset with conflicting port in namespace " + f.Namespace.Name)
-			ss := framework.NewStatefulSet(ssName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
+			ss := framework.NewStatefulSet(c,ssName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
 			statefulPodContainer := &ss.Spec.Template.Spec.Containers[0]
 			statefulPodContainer.Ports = append(statefulPodContainer.Ports, conflictingPort)
 			ss.Spec.Template.Spec.NodeName = node.Name
