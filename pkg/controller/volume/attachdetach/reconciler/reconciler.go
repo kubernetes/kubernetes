@@ -161,14 +161,14 @@ func (rc *reconciler) reconcile() {
 
 			// Trigger detach volume which requires verifing safe to detach step
 			// If timeout is true, skip verifySafeToDetach check
-			glog.V(5).Infof(attachedVolume.GenerateMsgDetailed("DetachVolume attempting", ""))
+			glog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting attacherDetacher.DetachVolume", ""))
 			verifySafeToDetach := !timeout
 			err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
 				if !timeout {
-					glog.Infof(attachedVolume.GenerateMsgDetailed("DetachVolume started", ""))
+					glog.Infof(attachedVolume.GenerateMsgDetailed("attacherDetacher.DetachVolume started", ""))
 				} else {
-					glog.Infof(attachedVolume.GenerateMsgDetailed("DetachVolume started", fmt.Sprintf("This volume is not safe to detach, but maxWaitForUnmountDuration %v expired, force detaching", rc.maxWaitForUnmountDuration)))
+					glog.Infof(attachedVolume.GenerateMsgDetailed("attacherDetacher.DetachVolume started", fmt.Sprintf("This volume is not safe to detach, but maxWaitForUnmountDuration %v expired, force detaching", rc.maxWaitForUnmountDuration)))
 				}
 			}
 			if err != nil &&
@@ -176,7 +176,7 @@ func (rc *reconciler) reconcile() {
 				!exponentialbackoff.IsExponentialBackoff(err) {
 				// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
-				glog.Errorf(attachedVolume.GenerateErrorDetailed("operationExecutor.DetachVolume failed", err).Error())
+				glog.Errorf(attachedVolume.GenerateErrorDetailed("attacherDetacher.DetachVolume failed to start", err).Error())
 			}
 		}
 	}
@@ -190,17 +190,17 @@ func (rc *reconciler) reconcile() {
 			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 		} else {
 			// Volume/Node doesn't exist, spawn a goroutine to attach it
-			glog.V(5).Infof("Attempting to start AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
+			glog.V(5).Infof(volumeToAttach.GenerateMsgDetailed("Starting attacherDetacher.AttachVolume", ""))
 			err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
 			if err == nil {
-				glog.Infof(volumeToAttach.GenerateMsgDetailed("AttachVolume attempting", ""))
+				glog.Infof(volumeToAttach.GenerateMsgDetailed("attacherDetacher.AttachVolume started", ""))
 			}
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
 				// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
-				glog.Errorf(volumeToAttach.GenerateErrorDetailed("operationExecutor.AttachVolume failed", err).Error())
+				glog.Errorf(volumeToAttach.GenerateErrorDetailed("attacherDetacher.AttachVolume failed to start", err).Error())
 			}
 		}
 	}
