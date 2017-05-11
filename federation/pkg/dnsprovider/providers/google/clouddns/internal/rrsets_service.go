@@ -33,6 +33,10 @@ func (service ResourceRecordSetsService) List(project string, managedZone string
 	return &ResourceRecordSetsListCall{service.impl.List(project, managedZone)}
 }
 
+func (service ResourceRecordSetsService) Get(project, managedZone, name string) interfaces.ResourceRecordSetsListCall {
+	return &ResourceRecordSetsListCall{service.impl.List(project, managedZone).Name(name)}
+}
+
 func (service ResourceRecordSetsService) NewResourceRecordSet(name string, rrdatas []string, ttl int64, type_ rrstype.RrsType) interfaces.ResourceRecordSet {
 	rrset := dns.ResourceRecordSet{Name: name, Rrdatas: rrdatas, Ttl: ttl, Type: string(type_)}
 	return &ResourceRecordSet{&rrset}

@@ -17,11 +17,36 @@ limitations under the License.
 package install
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/google/gofuzz"
+
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
 )
 
 func TestRoundTripTypes(t *testing.T) {
-	apitesting.RoundTripTestForAPIGroup(t, Install, nil)
+	apitesting.RoundTripTestForAPIGroup(t, Install, apitesting.MergeFuzzerFuncs(t,
+		fuzzerFuncs(),
+	))
+}
+
+func fuzzerFuncs() []interface{} {
+	return []interface{}{
+		func(obj *apiextensions.CustomResourceSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+
+			// match our defaulter
+			if len(obj.Scope) == 0 {
+				obj.Scope = apiextensions.NamespaceScoped
+			}
+			if len(obj.Names.Singular) == 0 {
+				obj.Names.Singular = strings.ToLower(obj.Names.Kind)
+			}
+			if len(obj.Names.ListKind) == 0 && len(obj.Names.Kind) > 0 {
+				obj.Names.ListKind = obj.Names.Kind + "List"
+			}
+		},
+	}
 }

@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
-	apiextensionsv1alpha1 "k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
 	"k8s.io/kube-apiextensions-server/test/integration/testserver"
 )
 
@@ -53,7 +52,7 @@ func TestSimpleCRUD(t *testing.T) {
 	ns := "not-the-default"
 	noxuNamespacedResourceClient := noxuVersionClient.Resource(&metav1.APIResource{
 		Name:       noxuDefinition.Spec.Names.Plural,
-		Namespaced: noxuDefinition.Spec.Scope == apiextensionsv1alpha1.NamespaceScoped,
+		Namespaced: true,
 	}, ns)
 	initialList, err := noxuNamespacedResourceClient.List(metav1.ListOptions{})
 	if err != nil {

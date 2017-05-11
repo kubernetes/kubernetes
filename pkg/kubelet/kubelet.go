@@ -530,12 +530,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	pluginSettings.LegacyRuntimeHost = nl
 
 	// rktnetes cannot be run with CRI.
-	// TODO(yujuhong): Remove the EnableCRI field.
 	if kubeCfg.ContainerRuntime != "rkt" {
-		kubeCfg.EnableCRI = true
-	}
-
-	if kubeCfg.EnableCRI {
 		// kubelet defers to the runtime shim to setup networking. Setting
 		// this to nil will prevent it from trying to invoke the plugin.
 		// It's easier to always probe and initialize plugins till cri
@@ -614,6 +609,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		klet.containerRuntime = runtime
 		klet.runner = runtime
 	} else {
+		// rkt uses the legacy, non-CRI, integration. Configure it the old way.
 		// TODO: Include hairpin mode settings in rkt?
 		conf := &rkt.Config{
 			Path:            kubeCfg.RktPath,
@@ -2018,9 +2014,9 @@ func (kl *Kubelet) updateRuntimeUp() {
 		glog.Errorf("Container runtime sanity check failed: %v", err)
 		return
 	}
-	// Only check specific conditions when runtime integration type is cri,
-	// because the old integration doesn't populate any runtime condition.
-	if kl.kubeletConfiguration.EnableCRI && kl.kubeletConfiguration.ContainerRuntime != "rkt" {
+	// rkt uses the legacy, non-CRI integration. Don't check the runtime
+	// conditions for it.
+	if kl.kubeletConfiguration.ContainerRuntime != "rkt" {
 		if s == nil {
 			glog.Errorf("Container runtime status is nil")
 			return
