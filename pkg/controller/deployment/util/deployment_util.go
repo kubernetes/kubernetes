@@ -259,7 +259,9 @@ func SetNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *exten
 	// The newRS's revision should be the greatest among all RSes. Usually, its revision number is newRevision (the max revision number
 	// of all old RSes + 1). However, it's possible that some of the old RSes are deleted after the newRS revision being updated, and
 	// newRevision becomes smaller than newRS's revision. We should only update newRS revision when it's smaller than newRevision.
-	if oldRevision < newRevision {
+	oldRevisionInt64, _ := strconv.ParseInt(oldRevision, 10, 64)
+	newRevisionInt64, _ := strconv.ParseInt(newRevision, 10, 64)
+	if oldRevisionInt64 < newRevisionInt64 {
 		newRS.Annotations[RevisionAnnotation] = newRevision
 		annotationChanged = true
 		glog.V(4).Infof("Updating replica set %q revision to %s", newRS.Name, newRevision)
