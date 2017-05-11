@@ -17,11 +17,11 @@ msgstr ""
 "X-Poedit-SourceCharset: UTF-8\n"
 "Language-Team: \n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
-"Language: jp\n"
+"Language: ja\n"
 
 # https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/apply.go#L98
 msgid "Apply a configuration to a resource by filename or stdin"
-msgstr "ファイル名または標準入力でリソースにコンフィグを適用する"
+msgstr "ファイル名を指定または標準入力経由でリソースにコンフィグを適用する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
 msgid "Delete the specified cluster from the kubeconfig"
@@ -33,7 +33,7 @@ msgstr "kubeconfigから指定したコンテキストを削除する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_contexts.go#L62
 msgid "Describe one or many contexts"
-msgstr "１つまたは複数のコンテキストを記述する"
+msgstr "1つまたは複数のコンテキストを記述する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
 msgid "Display clusters defined in the kubeconfig"
@@ -41,15 +41,15 @@ msgstr "kubeconfigで定義されたクラスターを表示する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/view.go#L64
 msgid "Display merged kubeconfig settings or a specified kubeconfig file"
-msgstr "kubeconfig設定または指示したkubeconfigファイルを表示する"
+msgstr "マージされたkubeconfigの設定または指定されたkubeconfigファイルを表示する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
 msgid "Displays the current-context"
-msgstr "現在のコンテキストを表示する"
+msgstr "カレントコンテキストを表示する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
 msgid "Modify kubeconfig files"
-msgstr "kubeconfigファイルを編集する"
+msgstr "kubeconfigファイルを変更する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
 msgid "Sets a cluster entry in kubeconfig"
@@ -65,18 +65,18 @@ msgstr "kubeconfigにユーザーエントリを設定する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
 msgid "Sets an individual value in a kubeconfig file"
-msgstr "kubeconfigファイルに単一値を設定する"
+msgstr "kubeconfigファイル内の変数を個別に設定する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
 msgid "Sets the current-context in a kubeconfig file"
-msgstr "kubeconfigに現在のコンテキストを設定する"
+msgstr "kubeconfigにカレントコンテキストを設定する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
 msgid "Unsets an individual value in a kubeconfig file"
-msgstr "kubeconfigに単一値の設定を削除する"
+msgstr "kubeconfigファイルから変数を個別に削除する"
 
 msgid "Update the annotations on a resource"
-msgstr "リソースでのあのテーショーンを更新する"
+msgstr "リソースのアノテーションを更新する"
 
 msgid ""
 "watch is only supported on individual resources and resource collections - "
@@ -85,8 +85,8 @@ msgid_plural ""
 "watch is only supported on individual resources and resource collections - "
 "%d resources were found"
 msgstr[0] ""
-"watchは単一リソース及びリソースコレクションでのみサポートされている - "
-"リソース　%d　が見つかった"
+"watchは単一リソース及びリソースコレクションのみサポートしています - "
+"%d個のリソースが見つかりました"
 msgstr[1] ""
-"watchは単一リソース及びリソースコレクションでのみサポートされている - "
-"リソース　%d　が見つかった"
+"watchは単一リソース及びリソースコレクションのみサポートしています - "
+"%d個のリソースが見つかりました"
