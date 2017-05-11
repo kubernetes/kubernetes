@@ -443,10 +443,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_list_or_watch_objects_of_kind_deployment">list or watch objects of kind Deployment</h3>
+<h3 id="_list_or_watch_objects_of_kind_controllerrevision">list or watch objects of kind ControllerRevision</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1beta1/deployments</pre>
+<pre>GET /apis/apps/v1beta1/controllerrevisions</pre>
 </div>
 </div>
 <div class="sect3">
@@ -550,7 +550,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deploymentlist">v1beta1.DeploymentList</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_controllerrevisionlist">v1beta1.ControllerRevisionList</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -600,10 +600,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_list_or_watch_objects_of_kind_deployment_2">list or watch objects of kind Deployment</h3>
+<h3 id="_list_or_watch_objects_of_kind_deployment">list or watch objects of kind Deployment</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1beta1/namespaces/{namespace}/deployments</pre>
+<pre>GET /apis/apps/v1beta1/deployments</pre>
 </div>
 </div>
 <div class="sect3">
@@ -684,14 +684,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
 </tbody>
 </table>
 
@@ -765,10 +757,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_delete_collection_of_deployment">delete collection of Deployment</h3>
+<h3 id="_list_or_watch_objects_of_kind_controllerrevision_2">list or watch objects of kind ControllerRevision</h3>
 <div class="listingblock">
 <div class="content">
-<pre>DELETE /apis/apps/v1beta1/namespaces/{namespace}/deployments</pre>
+<pre>GET /apis/apps/v1beta1/namespaces/{namespace}/controllerrevisions</pre>
 </div>
 </div>
 <div class="sect3">
@@ -880,7 +872,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_status">v1.Status</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_controllerrevisionlist">v1beta1.ControllerRevisionList</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -909,6 +901,12 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <li>
 <p>application/vnd.kubernetes.protobuf</p>
 </li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
 </ul>
 </div>
 </div>
@@ -924,10 +922,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_create_a_deployment">create a Deployment</h3>
+<h3 id="_delete_collection_of_controllerrevision">delete collection of ControllerRevision</h3>
 <div class="listingblock">
 <div class="content">
-<pre>POST /apis/apps/v1beta1/namespaces/{namespace}/deployments</pre>
+<pre>DELETE /apis/apps/v1beta1/namespaces/{namespace}/controllerrevisions</pre>
 </div>
 </div>
 <div class="sect3">
@@ -961,11 +959,51 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deployment">v1beta1.Deployment</a></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">includeUninitialized</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If true, partially initialized resources are included in the response.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -999,7 +1037,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deployment">v1beta1.Deployment</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_status">v1.Status</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -1043,14 +1081,133 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_read_the_specified_deployment">read the specified Deployment</h3>
+<h3 id="_create_a_controllerrevision">create a ControllerRevision</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}</pre>
+<pre>POST /apis/apps/v1beta1/namespaces/{namespace}/controllerrevisions</pre>
 </div>
 </div>
 <div class="sect3">
 <h4 id="_parameters_5">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_controllerrevision">v1beta1.ControllerRevision</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_6">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_controllerrevision">v1beta1.ControllerRevision</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_6">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_6">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_6">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_read_the_specified_controllerrevision">read the specified ControllerRevision</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/apps/v1beta1/namespaces/{namespace}/controllerrevisions/{name}</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_6">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -1106,134 +1263,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Deployment</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect3">
-<h4 id="_responses_6">Responses</h4>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:33%;">
-<col style="width:33%;">
-<col style="width:33%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">HTTP Code</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deployment">v1beta1.Deployment</a></p></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect3">
-<h4 id="_consumes_6">Consumes</h4>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>/</strong></p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_produces_6">Produces</h4>
-<div class="ulist">
-<ul>
-<li>
-<p>application/json</p>
-</li>
-<li>
-<p>application/yaml</p>
-</li>
-<li>
-<p>application/vnd.kubernetes.protobuf</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_tags_6">Tags</h4>
-<div class="ulist">
-<ul>
-<li>
-<p>apisappsv1beta1</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_replace_the_specified_deployment">replace the specified Deployment</h3>
-<div class="listingblock">
-<div class="content">
-<pre>PUT /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}</pre>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_parameters_6">Parameters</h4>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:16%;">
-<col style="width:16%;">
-<col style="width:16%;">
-<col style="width:16%;">
-<col style="width:16%;">
-<col style="width:16%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Type</th>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
-<td class="tableblock halign-left valign-top"></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deployment">v1beta1.Deployment</a></p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Deployment</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the ControllerRevision</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1261,7 +1291,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deployment">v1beta1.Deployment</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_controllerrevision">v1beta1.ControllerRevision</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -1305,14 +1335,141 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_delete_a_deployment">delete a Deployment</h3>
+<h3 id="_replace_the_specified_controllerrevision">replace the specified ControllerRevision</h3>
 <div class="listingblock">
 <div class="content">
-<pre>DELETE /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}</pre>
+<pre>PUT /apis/apps/v1beta1/namespaces/{namespace}/controllerrevisions/{name}</pre>
 </div>
 </div>
 <div class="sect3">
 <h4 id="_parameters_7">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_controllerrevision">v1beta1.ControllerRevision</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the ControllerRevision</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_8">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_controllerrevision">v1beta1.ControllerRevision</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_8">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_8">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_8">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_delete_a_controllerrevision">delete a ControllerRevision</h3>
+<div class="listingblock">
+<div class="content">
+<pre>DELETE /apis/apps/v1beta1/namespaces/{namespace}/controllerrevisions/{name}</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_8">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -1384,7 +1541,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Deployment</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the ControllerRevision</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1394,7 +1551,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_8">Responses</h4>
+<h4 id="_responses_9">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -1419,7 +1576,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_8">Consumes</h4>
+<h4 id="_consumes_9">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -1429,7 +1586,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_8">Produces</h4>
+<h4 id="_produces_9">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -1445,7 +1602,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_8">Tags</h4>
+<h4 id="_tags_9">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -1456,14 +1613,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_partially_update_the_specified_deployment">partially update the specified Deployment</h3>
+<h3 id="_partially_update_the_specified_controllerrevision">partially update the specified ControllerRevision</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PATCH /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}</pre>
+<pre>PATCH /apis/apps/v1beta1/namespaces/{namespace}/controllerrevisions/{name}</pre>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_8">Parameters</h4>
+<h4 id="_parameters_9">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -1511,140 +1668,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Deployment</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect3">
-<h4 id="_responses_9">Responses</h4>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:33%;">
-<col style="width:33%;">
-<col style="width:33%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">HTTP Code</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deployment">v1beta1.Deployment</a></p></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect3">
-<h4 id="_consumes_9">Consumes</h4>
-<div class="ulist">
-<ul>
-<li>
-<p>application/json-patch+json</p>
-</li>
-<li>
-<p>application/merge-patch+json</p>
-</li>
-<li>
-<p>application/strategic-merge-patch+json</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_produces_9">Produces</h4>
-<div class="ulist">
-<ul>
-<li>
-<p>application/json</p>
-</li>
-<li>
-<p>application/yaml</p>
-</li>
-<li>
-<p>application/vnd.kubernetes.protobuf</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_tags_9">Tags</h4>
-<div class="ulist">
-<ul>
-<li>
-<p>apisappsv1beta1</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_create_rollback_of_a_deploymentrollback">create rollback of a DeploymentRollback</h3>
-<div class="listingblock">
-<div class="content">
-<pre>POST /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/rollback</pre>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_parameters_9">Parameters</h4>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:16%;">
-<col style="width:16%;">
-<col style="width:16%;">
-<col style="width:16%;">
-<col style="width:16%;">
-<col style="width:16%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Type</th>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
-<td class="tableblock halign-left valign-top"></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deploymentrollback">v1beta1.DeploymentRollback</a></p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the DeploymentRollback</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the ControllerRevision</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1672,7 +1696,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deploymentrollback">v1beta1.DeploymentRollback</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_controllerrevision">v1beta1.ControllerRevision</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -1683,7 +1707,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="ulist">
 <ul>
 <li>
-<p><strong>/</strong></p>
+<p>application/json-patch+json</p>
+</li>
+<li>
+<p>application/merge-patch+json</p>
+</li>
+<li>
+<p>application/strategic-merge-patch+json</p>
 </li>
 </ul>
 </div>
@@ -1716,10 +1746,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_read_scale_of_the_specified_scale">read scale of the specified Scale</h3>
+<h3 id="_list_or_watch_objects_of_kind_deployment_2">list or watch objects of kind Deployment</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/scale</pre>
+<pre>GET /apis/apps/v1beta1/namespaces/{namespace}/deployments</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1753,17 +1783,57 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">includeUninitialized</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If true, partially initialized resources are included in the response.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Scale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1791,7 +1861,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_scale">v1beta1.Scale</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deploymentlist">v1beta1.DeploymentList</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -1820,6 +1890,12 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <li>
 <p>application/vnd.kubernetes.protobuf</p>
 </li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
 </ul>
 </div>
 </div>
@@ -1835,10 +1911,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_replace_scale_of_the_specified_scale">replace scale of the specified Scale</h3>
+<h3 id="_delete_collection_of_deployment">delete collection of Deployment</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PUT /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/scale</pre>
+<pre>DELETE /apis/apps/v1beta1/namespaces/{namespace}/deployments</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1872,25 +1948,57 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_scale">v1beta1.Scale</a></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">includeUninitialized</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If true, partially initialized resources are included in the response.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Scale</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1918,7 +2026,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_scale">v1beta1.Scale</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_status">v1.Status</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -1962,10 +2070,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_partially_update_scale_of_the_specified_scale">partially update scale of the specified Scale</h3>
+<h3 id="_create_a_deployment">create a Deployment</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PATCH /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/scale</pre>
+<pre>POST /apis/apps/v1beta1/namespaces/{namespace}/deployments</pre>
 </div>
 </div>
 <div class="sect3">
@@ -2003,21 +2111,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
 <td class="tableblock halign-left valign-top"></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_patch">v1.Patch</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deployment">v1beta1.Deployment</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Scale</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2045,7 +2145,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_scale">v1beta1.Scale</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deployment">v1beta1.Deployment</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -2056,13 +2156,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="ulist">
 <ul>
 <li>
-<p>application/json-patch+json</p>
-</li>
-<li>
-<p>application/merge-patch+json</p>
-</li>
-<li>
-<p>application/strategic-merge-patch+json</p>
+<p><strong>/</strong></p>
 </li>
 </ul>
 </div>
@@ -2095,10 +2189,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_read_status_of_the_specified_deployment">read status of the specified Deployment</h3>
+<h3 id="_read_the_specified_deployment">read the specified Deployment</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/status</pre>
+<pre>GET /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}</pre>
 </div>
 </div>
 <div class="sect3">
@@ -2129,6 +2223,22 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">export</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Should this value be exported.  Export strips fields that a user can not specify.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">exact</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Should the export be exact.  Exact export maintains cluster-specific fields like <em>Namespace</em>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -2214,10 +2324,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_replace_status_of_the_specified_deployment">replace status of the specified Deployment</h3>
+<h3 id="_replace_the_specified_deployment">replace the specified Deployment</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PUT /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/status</pre>
+<pre>PUT /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}</pre>
 </div>
 </div>
 <div class="sect3">
@@ -2341,14 +2451,165 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_partially_update_status_of_the_specified_deployment">partially update status of the specified Deployment</h3>
+<h3 id="_delete_a_deployment">delete a Deployment</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PATCH /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/status</pre>
+<pre>DELETE /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}</pre>
 </div>
 </div>
 <div class="sect3">
 <h4 id="_parameters_15">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_deleteoptions">v1.DeleteOptions</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">gracePeriodSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">orphanDependents</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the "orphan" finalizer will be added to/removed from the object&#8217;s finalizers list. Either this field or PropagationPolicy may be set, but not both.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">propagationPolicy</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Deployment</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_16">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_status">v1.Status</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_16">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_16">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_16">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_partially_update_the_specified_deployment">partially update the specified Deployment</h3>
+<div class="listingblock">
+<div class="content">
+<pre>PATCH /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_16">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -2406,7 +2667,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_16">Responses</h4>
+<h4 id="_responses_17">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -2431,7 +2692,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_16">Consumes</h4>
+<h4 id="_consumes_17">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -2442,165 +2703,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </li>
 <li>
 <p>application/strategic-merge-patch+json</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_produces_16">Produces</h4>
-<div class="ulist">
-<ul>
-<li>
-<p>application/json</p>
-</li>
-<li>
-<p>application/yaml</p>
-</li>
-<li>
-<p>application/vnd.kubernetes.protobuf</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_tags_16">Tags</h4>
-<div class="ulist">
-<ul>
-<li>
-<p>apisappsv1beta1</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_list_or_watch_objects_of_kind_statefulset">list or watch objects of kind StatefulSet</h3>
-<div class="listingblock">
-<div class="content">
-<pre>GET /apis/apps/v1beta1/namespaces/{namespace}/statefulsets</pre>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_parameters_16">Parameters</h4>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:16%;">
-<col style="width:16%;">
-<col style="width:16%;">
-<col style="width:16%;">
-<col style="width:16%;">
-<col style="width:16%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Type</th>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">includeUninitialized</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">If true, partially initialized resources are included in the response.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect3">
-<h4 id="_responses_17">Responses</h4>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:33%;">
-<col style="width:33%;">
-<col style="width:33%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">HTTP Code</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_statefulsetlist">v1beta1.StatefulSetList</a></p></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect3">
-<h4 id="_consumes_17">Consumes</h4>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>/</strong></p>
 </li>
 </ul>
 </div>
@@ -2618,12 +2720,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <li>
 <p>application/vnd.kubernetes.protobuf</p>
 </li>
-<li>
-<p>application/json;stream=watch</p>
-</li>
-<li>
-<p>application/vnd.kubernetes.protobuf;stream=watch</p>
-</li>
 </ul>
 </div>
 </div>
@@ -2639,10 +2735,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_delete_collection_of_statefulset">delete collection of StatefulSet</h3>
+<h3 id="_create_rollback_of_a_deploymentrollback">create rollback of a DeploymentRollback</h3>
 <div class="listingblock">
 <div class="content">
-<pre>DELETE /apis/apps/v1beta1/namespaces/{namespace}/statefulsets</pre>
+<pre>POST /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/rollback</pre>
 </div>
 </div>
 <div class="sect3">
@@ -2676,57 +2772,25 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
 <td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">includeUninitialized</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">If true, partially initialized resources are included in the response.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deploymentrollback">v1beta1.DeploymentRollback</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the DeploymentRollback</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2754,7 +2818,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_status">v1.Status</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deploymentrollback">v1beta1.DeploymentRollback</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -2798,6 +2862,1088 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
+<h3 id="_read_scale_of_the_specified_scale">read scale of the specified Scale</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/scale</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_18">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Scale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_19">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_scale">v1beta1.Scale</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_19">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_19">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_19">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_replace_scale_of_the_specified_scale">replace scale of the specified Scale</h3>
+<div class="listingblock">
+<div class="content">
+<pre>PUT /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/scale</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_19">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_scale">v1beta1.Scale</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Scale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_20">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_scale">v1beta1.Scale</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_20">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_20">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_20">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_partially_update_scale_of_the_specified_scale">partially update scale of the specified Scale</h3>
+<div class="listingblock">
+<div class="content">
+<pre>PATCH /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/scale</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_20">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_patch">v1.Patch</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Scale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_21">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_scale">v1beta1.Scale</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_21">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json-patch+json</p>
+</li>
+<li>
+<p>application/merge-patch+json</p>
+</li>
+<li>
+<p>application/strategic-merge-patch+json</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_21">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_21">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_read_status_of_the_specified_deployment">read status of the specified Deployment</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/status</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_21">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Deployment</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_22">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deployment">v1beta1.Deployment</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_22">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_22">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_22">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_replace_status_of_the_specified_deployment">replace status of the specified Deployment</h3>
+<div class="listingblock">
+<div class="content">
+<pre>PUT /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/status</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_22">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deployment">v1beta1.Deployment</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Deployment</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_23">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deployment">v1beta1.Deployment</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_23">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_23">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_23">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_partially_update_status_of_the_specified_deployment">partially update status of the specified Deployment</h3>
+<div class="listingblock">
+<div class="content">
+<pre>PATCH /apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/status</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_23">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_patch">v1.Patch</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the Deployment</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_24">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_deployment">v1beta1.Deployment</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_24">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json-patch+json</p>
+</li>
+<li>
+<p>application/merge-patch+json</p>
+</li>
+<li>
+<p>application/strategic-merge-patch+json</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_24">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_24">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_list_or_watch_objects_of_kind_statefulset">list or watch objects of kind StatefulSet</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/apps/v1beta1/namespaces/{namespace}/statefulsets</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_24">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">includeUninitialized</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If true, partially initialized resources are included in the response.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_25">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1beta1_statefulsetlist">v1beta1.StatefulSetList</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_25">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_25">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_25">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_delete_collection_of_statefulset">delete collection of StatefulSet</h3>
+<div class="listingblock">
+<div class="content">
+<pre>DELETE /apis/apps/v1beta1/namespaces/{namespace}/statefulsets</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_25">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">includeUninitialized</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If true, partially initialized resources are included in the response.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_26">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_status">v1.Status</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_26">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_26">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_26">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
 <h3 id="_create_a_statefulset">create a StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
@@ -2805,7 +3951,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_18">Parameters</h4>
+<h4 id="_parameters_26">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -2855,7 +4001,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_19">Responses</h4>
+<h4 id="_responses_27">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -2880,7 +4026,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_19">Consumes</h4>
+<h4 id="_consumes_27">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -2890,7 +4036,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_19">Produces</h4>
+<h4 id="_produces_27">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -2906,7 +4052,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_19">Tags</h4>
+<h4 id="_tags_27">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -2924,7 +4070,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_19">Parameters</h4>
+<h4 id="_parameters_27">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -2990,7 +4136,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_20">Responses</h4>
+<h4 id="_responses_28">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -3015,7 +4161,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_20">Consumes</h4>
+<h4 id="_consumes_28">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3025,7 +4171,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_20">Produces</h4>
+<h4 id="_produces_28">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3041,7 +4187,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_20">Tags</h4>
+<h4 id="_tags_28">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3059,7 +4205,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_20">Parameters</h4>
+<h4 id="_parameters_28">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -3117,7 +4263,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_21">Responses</h4>
+<h4 id="_responses_29">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -3142,7 +4288,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_21">Consumes</h4>
+<h4 id="_consumes_29">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3152,7 +4298,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_21">Produces</h4>
+<h4 id="_produces_29">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3168,7 +4314,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_21">Tags</h4>
+<h4 id="_tags_29">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3186,7 +4332,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_21">Parameters</h4>
+<h4 id="_parameters_29">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -3268,7 +4414,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_22">Responses</h4>
+<h4 id="_responses_30">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -3293,7 +4439,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_22">Consumes</h4>
+<h4 id="_consumes_30">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3303,7 +4449,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_22">Produces</h4>
+<h4 id="_produces_30">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3319,7 +4465,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_22">Tags</h4>
+<h4 id="_tags_30">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3337,7 +4483,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_22">Parameters</h4>
+<h4 id="_parameters_30">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -3395,7 +4541,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_23">Responses</h4>
+<h4 id="_responses_31">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -3420,7 +4566,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_23">Consumes</h4>
+<h4 id="_consumes_31">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3436,7 +4582,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_23">Produces</h4>
+<h4 id="_produces_31">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3452,7 +4598,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_23">Tags</h4>
+<h4 id="_tags_31">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3470,7 +4616,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_23">Parameters</h4>
+<h4 id="_parameters_31">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -3520,7 +4666,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_24">Responses</h4>
+<h4 id="_responses_32">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -3545,7 +4691,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_24">Consumes</h4>
+<h4 id="_consumes_32">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3555,7 +4701,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_24">Produces</h4>
+<h4 id="_produces_32">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3571,7 +4717,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_24">Tags</h4>
+<h4 id="_tags_32">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3589,7 +4735,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_24">Parameters</h4>
+<h4 id="_parameters_32">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -3647,7 +4793,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_25">Responses</h4>
+<h4 id="_responses_33">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -3672,7 +4818,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_25">Consumes</h4>
+<h4 id="_consumes_33">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3682,7 +4828,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_25">Produces</h4>
+<h4 id="_produces_33">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3698,7 +4844,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_25">Tags</h4>
+<h4 id="_tags_33">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3716,7 +4862,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_25">Parameters</h4>
+<h4 id="_parameters_33">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -3774,7 +4920,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_26">Responses</h4>
+<h4 id="_responses_34">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -3799,7 +4945,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_26">Consumes</h4>
+<h4 id="_consumes_34">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3815,7 +4961,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_26">Produces</h4>
+<h4 id="_produces_34">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3831,7 +4977,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_26">Tags</h4>
+<h4 id="_tags_34">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3849,7 +4995,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_26">Parameters</h4>
+<h4 id="_parameters_34">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -3931,7 +5077,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_27">Responses</h4>
+<h4 id="_responses_35">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -3956,7 +5102,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_27">Consumes</h4>
+<h4 id="_consumes_35">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3966,7 +5112,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_27">Produces</h4>
+<h4 id="_produces_35">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3988,7 +5134,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_27">Tags</h4>
+<h4 id="_tags_35">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -3999,14 +5145,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_watch_individual_changes_to_a_list_of_deployment">watch individual changes to a list of Deployment</h3>
+<h3 id="_watch_individual_changes_to_a_list_of_controllerrevision">watch individual changes to a list of ControllerRevision</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1beta1/watch/deployments</pre>
+<pre>GET /apis/apps/v1beta1/watch/controllerrevisions</pre>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_27">Parameters</h4>
+<h4 id="_parameters_35">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -4088,7 +5234,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_28">Responses</h4>
+<h4 id="_responses_36">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -4113,7 +5259,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_28">Consumes</h4>
+<h4 id="_consumes_36">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4123,7 +5269,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_28">Produces</h4>
+<h4 id="_produces_36">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4145,7 +5291,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_28">Tags</h4>
+<h4 id="_tags_36">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4156,14 +5302,171 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_watch_individual_changes_to_a_list_of_deployment_2">watch individual changes to a list of Deployment</h3>
+<h3 id="_watch_individual_changes_to_a_list_of_deployment">watch individual changes to a list of Deployment</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1beta1/watch/namespaces/{namespace}/deployments</pre>
+<pre>GET /apis/apps/v1beta1/watch/deployments</pre>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_28">Parameters</h4>
+<h4 id="_parameters_36">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">includeUninitialized</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If true, partially initialized resources are included in the response.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_37">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_watchevent">v1.WatchEvent</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_37">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_37">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_37">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_watch_individual_changes_to_a_list_of_controllerrevision_2">watch individual changes to a list of ControllerRevision</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/apps/v1beta1/watch/namespaces/{namespace}/controllerrevisions</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_37">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -4253,7 +5556,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_29">Responses</h4>
+<h4 id="_responses_38">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -4278,7 +5581,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_29">Consumes</h4>
+<h4 id="_consumes_38">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4288,7 +5591,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_29">Produces</h4>
+<h4 id="_produces_38">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4310,7 +5613,345 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_29">Tags</h4>
+<h4 id="_tags_38">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_watch_changes_to_an_object_of_kind_controllerrevision">watch changes to an object of kind ControllerRevision</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/apps/v1beta1/watch/namespaces/{namespace}/controllerrevisions/{name}</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_38">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">includeUninitialized</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If true, partially initialized resources are included in the response.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the ControllerRevision</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_39">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_watchevent">v1.WatchEvent</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_39">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_39">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_39">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisappsv1beta1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_watch_individual_changes_to_a_list_of_deployment_2">watch individual changes to a list of Deployment</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/apps/v1beta1/watch/namespaces/{namespace}/deployments</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_39">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">includeUninitialized</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If true, partially initialized resources are included in the response.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_40">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_watchevent">v1.WatchEvent</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_40">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_40">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_40">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4328,7 +5969,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_29">Parameters</h4>
+<h4 id="_parameters_40">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -4426,7 +6067,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_30">Responses</h4>
+<h4 id="_responses_41">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -4451,7 +6092,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_30">Consumes</h4>
+<h4 id="_consumes_41">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4461,7 +6102,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_30">Produces</h4>
+<h4 id="_produces_41">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4483,7 +6124,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_30">Tags</h4>
+<h4 id="_tags_41">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4501,7 +6142,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_30">Parameters</h4>
+<h4 id="_parameters_41">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -4591,7 +6232,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_31">Responses</h4>
+<h4 id="_responses_42">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -4616,7 +6257,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_31">Consumes</h4>
+<h4 id="_consumes_42">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4626,7 +6267,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_31">Produces</h4>
+<h4 id="_produces_42">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4648,7 +6289,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_31">Tags</h4>
+<h4 id="_tags_42">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4666,7 +6307,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_31">Parameters</h4>
+<h4 id="_parameters_42">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -4764,7 +6405,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_32">Responses</h4>
+<h4 id="_responses_43">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -4789,7 +6430,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_32">Consumes</h4>
+<h4 id="_consumes_43">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4799,7 +6440,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_32">Produces</h4>
+<h4 id="_produces_43">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4821,7 +6462,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_32">Tags</h4>
+<h4 id="_tags_43">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4839,7 +6480,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_32">Parameters</h4>
+<h4 id="_parameters_43">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -4921,7 +6562,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_33">Responses</h4>
+<h4 id="_responses_44">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -4946,7 +6587,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_33">Consumes</h4>
+<h4 id="_consumes_44">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4956,7 +6597,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_33">Produces</h4>
+<h4 id="_produces_44">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4978,7 +6619,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_33">Tags</h4>
+<h4 id="_tags_44">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -4993,7 +6634,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-05-17 22:24:34 UTC
+Last updated 2017-05-25 16:54:16 UTC
 </div>
 </div>
 </body>

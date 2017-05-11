@@ -18,6 +18,7 @@ package apps
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -126,4 +127,36 @@ type StatefulSetList struct {
 	// +optional
 	metav1.ListMeta
 	Items []StatefulSet
+}
+
+// +genclient=true
+
+// ControllerRevision implements an immutable snapshot of state data. Clients
+// are responsible for serializing and deserializing the objects that contain
+// their internal state.
+// Once a ControllerRevision has been successfully created, it can not be updated.
+// The API Server will fail validation of all requests that attempt to mutate
+// the Data field. ControllerRevisions may, however, be deleted.
+type ControllerRevision struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// Data is the Object representing the state.
+	Data runtime.Object
+
+	// Revision indicates the revision of the state represented by Data.
+	Revision int64
+}
+
+// ControllerRevisionList is a resource containing a list of ControllerRevision objects.
+type ControllerRevisionList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of ControllerRevision objects.
+	Items []ControllerRevision
 }
