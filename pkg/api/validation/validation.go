@@ -62,6 +62,7 @@ const isNotIntegerErrorMsg string = `must be an integer`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var volumeModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
+var azureDirFileModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = genericvalidation.BannedOwners
@@ -1001,6 +1002,12 @@ func validateAzureFile(azure *api.AzureFileVolumeSource, fldPath *field.Path) fi
 	}
 	if azure.ShareName == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("shareName"), ""))
+	}
+	if azure.DirMode != nil && (*azure.DirMode > 0777 || *azure.DirMode < 0) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("DirMode"), *azure.DirMode, azureDirFileModeErrorMsg))
+	}
+	if azure.FileMode != nil && (*azure.FileMode > 0777 || *azure.FileMode < 0) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("FileMode"), *azure.FileMode, azureDirFileModeErrorMsg))
 	}
 	return allErrs
 }

@@ -17039,8 +17039,8 @@ func (x *AzureFileVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
 			yyq2[2] = x.ReadOnly != false
-			yyq2[3] = x.DirMode != 0
-			yyq2[4] = x.FileMode != 0
+			yyq2[3] = x.DirMode != nil
+			yyq2[4] = x.FileMode != nil
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(5)
@@ -17120,50 +17120,70 @@ func (x *AzureFileVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[3] {
-					yym13 := z.EncBinary()
-					_ = yym13
-					if false {
+					if x.DirMode == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeInt(int64(x.DirMode))
+						yy13 := *x.DirMode
+						yym14 := z.EncBinary()
+						_ = yym14
+						if false {
+						} else {
+							r.EncodeInt(int64(yy13))
+						}
 					}
 				} else {
-					r.EncodeInt(0)
+					r.EncodeNil()
 				}
 			} else {
 				if yyq2[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("dirMode"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym14 := z.EncBinary()
-					_ = yym14
-					if false {
+					if x.DirMode == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeInt(int64(x.DirMode))
+						yy15 := *x.DirMode
+						yym16 := z.EncBinary()
+						_ = yym16
+						if false {
+						} else {
+							r.EncodeInt(int64(yy15))
+						}
 					}
 				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[4] {
-					yym16 := z.EncBinary()
-					_ = yym16
-					if false {
+					if x.FileMode == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeInt(int64(x.FileMode))
+						yy18 := *x.FileMode
+						yym19 := z.EncBinary()
+						_ = yym19
+						if false {
+						} else {
+							r.EncodeInt(int64(yy18))
+						}
 					}
 				} else {
-					r.EncodeInt(0)
+					r.EncodeNil()
 				}
 			} else {
 				if yyq2[4] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("fileMode"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym17 := z.EncBinary()
-					_ = yym17
-					if false {
+					if x.FileMode == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeInt(int64(x.FileMode))
+						yy20 := *x.FileMode
+						yym21 := z.EncBinary()
+						_ = yym21
+						if false {
+						} else {
+							r.EncodeInt(int64(yy20))
+						}
 					}
 				}
 			}
@@ -17266,26 +17286,34 @@ func (x *AzureFileVolumeSource) codecDecodeSelfFromMap(l int, d *codec1978.Decod
 			}
 		case "dirMode":
 			if r.TryDecodeAsNil() {
-				x.DirMode = 0
+				if x.DirMode != nil {
+					x.DirMode = nil
+				}
 			} else {
-				yyv10 := &x.DirMode
+				if x.DirMode == nil {
+					x.DirMode = new(int32)
+				}
 				yym11 := z.DecBinary()
 				_ = yym11
 				if false {
 				} else {
-					*((*int32)(yyv10)) = int32(r.DecodeInt(32))
+					*((*int32)(x.DirMode)) = int32(r.DecodeInt(32))
 				}
 			}
 		case "fileMode":
 			if r.TryDecodeAsNil() {
-				x.FileMode = 0
+				if x.FileMode != nil {
+					x.FileMode = nil
+				}
 			} else {
-				yyv12 := &x.FileMode
+				if x.FileMode == nil {
+					x.FileMode = new(int32)
+				}
 				yym13 := z.DecBinary()
 				_ = yym13
 				if false {
 				} else {
-					*((*int32)(yyv12)) = int32(r.DecodeInt(32))
+					*((*int32)(x.FileMode)) = int32(r.DecodeInt(32))
 				}
 			}
 		default:
@@ -17380,14 +17408,18 @@ func (x *AzureFileVolumeSource) codecDecodeSelfFromArray(l int, d *codec1978.Dec
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.DirMode = 0
+		if x.DirMode != nil {
+			x.DirMode = nil
+		}
 	} else {
-		yyv21 := &x.DirMode
+		if x.DirMode == nil {
+			x.DirMode = new(int32)
+		}
 		yym22 := z.DecBinary()
 		_ = yym22
 		if false {
 		} else {
-			*((*int32)(yyv21)) = int32(r.DecodeInt(32))
+			*((*int32)(x.DirMode)) = int32(r.DecodeInt(32))
 		}
 	}
 	yyj14++
@@ -17402,14 +17434,18 @@ func (x *AzureFileVolumeSource) codecDecodeSelfFromArray(l int, d *codec1978.Dec
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.FileMode = 0
+		if x.FileMode != nil {
+			x.FileMode = nil
+		}
 	} else {
-		yyv23 := &x.FileMode
+		if x.FileMode == nil {
+			x.FileMode = new(int32)
+		}
 		yym24 := z.DecBinary()
 		_ = yym24
 		if false {
 		} else {
-			*((*int32)(yyv23)) = int32(r.DecodeInt(32))
+			*((*int32)(x.FileMode)) = int32(r.DecodeInt(32))
 		}
 	}
 	for {

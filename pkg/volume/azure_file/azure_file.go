@@ -170,8 +170,8 @@ type azureFileMounter struct {
 	secretName   string
 	shareName    string
 	readOnly     bool
-	dirMode      int32
-	fileMode     int32
+	dirMode      *int32
+	fileMode     *int32
 	mountOptions []string
 }
 
@@ -213,15 +213,9 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error
 	os.MkdirAll(dir, 0750)
 	source := fmt.Sprintf("//%s.file.core.windows.net/%s", accountName, b.shareName)
 	// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
-	if b.dirMode <= 0 || b.dirMode > int32(0777) {
-		b.dirMode = int32(0777)
-	}
 
-	if b.fileMode <= 0 || b.fileMode > int32(0777) {
-		b.fileMode = int32(0777)
-	}
-
-	options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=%#o,file_mode=%#o", accountName, accountKey, b.dirMode, b.fileMode)}
+	glog.Errorf(fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=%#o,file_mode=%#o", accountName, accountKey, *b.dirMode, *b.fileMode))
+	options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=%#o,file_mode=%#o", accountName, accountKey, *b.dirMode, *b.fileMode)}
 	if b.readOnly {
 		options = append(options, "ro")
 	}

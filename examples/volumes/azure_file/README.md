@@ -15,8 +15,8 @@ In the pod, you need to provide the following information:
 - *secretName*:  the name of the secret that contains both Azure storage account name and key.
 - *shareName*: The share name to be used.
 - *readOnly*: Whether the filesystem is used as readOnly.
-- *dirMode*: Directory permission code that gives rwx permissions to all users. Must be a value between 0 and 511(0777). Defaults to 511(0777).
-- *fileMode*: File permission code that gives rwx permissions to all users. Must be a value between 0 and 511(0777). Defaults to 511(0777).
+- *dirMode*: Directory permission code that gives rwx permissions to all users. Must be a value between 0 and 0777. Defaults to 0777.
+- *fileMode*: File permission code that gives rwx permissions to all users. Must be a value between 0 and 0777. Defaults to 0777.
 
 Create the secret:
 

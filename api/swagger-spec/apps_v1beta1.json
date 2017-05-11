@@ -3287,12 +3287,12 @@
      "dirMode": {
       "type": "integer",
       "format": "int32",
-      "description": "Directory permission code that gives rwx permissions to all users. Must be a value between 0 and 511(0777). Defaults to 511(0777)."
+      "description": "Directory permission code that gives rwx permissions to all users. Must be a value between 0 and 0777. Defaults to 0777."
      },
      "fileMode": {
       "type": "integer",
       "format": "int32",
-      "description": "File permission code that gives rwx permissions to all users. Must be a value between 0 and 511(0777). Defaults to 511(0777)."
+      "description": "File permission code that gives rwx permissions to all users. Must be a value between 0 and 0777. Defaults to 0777."
      }
     }
    },
