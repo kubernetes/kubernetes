@@ -249,7 +249,7 @@ func newDockerContainerHandler(
 	handler.networkMode = ctnr.HostConfig.NetworkMode
 	handler.deviceID = ctnr.GraphDriver.Data["DeviceId"]
 
-	// Obtain the IP address for the contianer.
+	// Obtain the IP address for the container.
 	// If the NetworkMode starts with 'container:' then we need to use the IP address of the container specified.
 	// This happens in cases such as kubernetes where the containers doesn't have an IP address itself and we need to use the pod's address
 	ipAddress := ctnr.NetworkSettings.IPAddress
