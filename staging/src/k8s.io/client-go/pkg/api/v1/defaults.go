@@ -240,6 +240,16 @@ func SetDefaults_AzureDiskVolumeSource(obj *AzureDiskVolumeSource) {
 		*obj.ReadOnly = false
 	}
 }
+func SetDefaults_AzureFileVolumeSource(obj *AzureFileVolumeSource) {
+	if obj.DirMode == nil {
+		obj.DirMode = new(int32)
+		*obj.DirMode = 511
+	}
+	if obj.FileMode == nil {
+		obj.FileMode = new(int32)
+		*obj.FileMode = 511
+	}
+}
 func SetDefaults_Endpoints(obj *Endpoints) {
 	for i := range obj.Subsets {
 		ss := &obj.Subsets[i]

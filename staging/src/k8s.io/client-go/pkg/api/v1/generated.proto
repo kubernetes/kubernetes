@@ -136,11 +136,11 @@ message AzureFileVolumeSource {
   // +optional
   optional bool readOnly = 3;
 
-  // Directory permission code that gives rwx permissions to all users. Must be a value between 0 and 511(0777). Defaults to 511(0777).
+  // Directory permission code that gives rwx permissions to all users. Must be a value between 0 and 0777. Defaults to 0777.
   // +optional
   optional int32 dirMode = 4;
 
-  // File permission code that gives rwx permissions to all users. Must be a value between 0 and 511(0777). Defaults to 511(0777).
+  // File permission code that gives rwx permissions to all users. Must be a value between 0 and 0777. Defaults to 0777.
   // +optional
   optional int32 fileMode = 5;
 }
