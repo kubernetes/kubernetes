@@ -49,12 +49,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
       - name: cockroachdb
-        # Runs the master branch. Not recommended for production, but since
-        # CockroachDB is in Beta, you don't want to run it in production
-        # anyway. See
-        # https://hub.docker.com/r/cockroachdb/cockroach/tags/
-        # if you prefer to run a beta release.
-        image: cockroachdb/cockroach
+        image: cockroachdb/cockroach:v1.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 26257
