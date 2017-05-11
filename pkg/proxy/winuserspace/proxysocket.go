@@ -267,10 +267,9 @@ func isDNSService(portName string) bool {
 	return portName == dnsPortName
 }
 
-func appendDNSSuffix(msg *dns.Msg, buffer []byte, length int, dnsSuffix string) int {
+func appendDNSSuffix(msg *dns.Msg, buffer []byte, length int, dnsSuffix string) (int, error) {
 	if msg == nil || len(msg.Question) == 0 {
-		glog.Warning("DNS message parameter is invalid.")
-		return length
+		return length, fmt.Errorf("DNS message parameter is invalid")
 	}
 
 	// Save the original name since it will be reused for next iteration
@@ -283,25 +282,23 @@ func appendDNSSuffix(msg *dns.Msg, buffer []byte, length int, dnsSuffix string) 
 
 	if err != nil {
 		glog.Warning("Unable to pack DNS packet. Error is: %v", err)
-		return length
+		return length, err
 	}
 
 	if &buffer[0] != &mbuf[0] {
-		glog.Warning("Buffer is too small in packing DNS packet.")
-		return length
+		return length, fmt.Errorf("Buffer is too small in packing DNS packet")
 	}
 
-	return len(mbuf)
+	return len(mbuf), nil
 }
 
-func recoverDNSQuestion(origName string, msg *dns.Msg, buffer []byte, length int) int {
+func recoverDNSQuestion(origName string, msg *dns.Msg, buffer []byte, length int) (int, error) {
 	if msg == nil || len(msg.Question) == 0 {
-		glog.Warning("DNS message parameter is invalid.")
-		return length
+		return length, fmt.Errorf("DNS message parameter is invalid")
 	}
 
 	if origName == msg.Question[0].Name {
-		return length
+		return length, nil
 	}
 
 	msg.Question[0].Name = origName
@@ -312,15 +309,14 @@ func recoverDNSQuestion(origName string, msg *dns.Msg, buffer []byte, length int
 
 	if err != nil {
 		glog.Warning("Unable to pack DNS packet. Error is: %v", err)
-		return length
+		return length, err
 	}
 
 	if &buffer[0] != &mbuf[0] {
-		glog.Warning("Buffer is too small in packing DNS packet.")
-		return length
+		return length, fmt.Errorf("Buffer is too small in packing DNS packet")
 	}
 
-	return len(mbuf)
+	return len(mbuf), nil
 }
 
 func processUnpackedDNSQueryPacket(
@@ -354,7 +350,11 @@ func processUnpackedDNSQueryPacket(
 		return length
 	}
 
-	length = appendDNSSuffix(msg, buffer, length, dnsSearch[index])
+	length, err := appendDNSSuffix(msg, buffer, length, dnsSearch[index])
+	if err != nil {
+		glog.Errorf("Append DNS suffix failed: %v", err)
+	}
+
 	return length
 }
 
@@ -369,6 +369,7 @@ func processUnpackedDNSResponsePacket(
 	length int,
 	dnsSearch []string) (bool, int) {
 	var drop bool
+	var err error
 	if dnsSearch == nil || len(dnsSearch) == 0 {
 		glog.V(1).Infof("DNS search list is not initialized and is empty.")
 		return drop, length
@@ -384,16 +385,23 @@ func processUnpackedDNSResponsePacket(
 			// If the reponse has failure and iteration through the search list has not
 			// reached the end, retry on behalf of the client using the original query message
 			drop = true
-			length = appendDNSSuffix(state.msg, buffer, length, dnsSearch[index])
+			length, err = appendDNSSuffix(state.msg, buffer, length, dnsSearch[index])
+			if err != nil {
+				glog.Errorf("Append DNS suffix failed: %v", err)
+			}
 
-			_, err := svrConn.Write(buffer[0:length])
+			_, err = svrConn.Write(buffer[0:length])
 			if err != nil {
 				if !logTimeout(err) {
 					glog.Errorf("Write failed: %v", err)
 				}
 			}
 		} else {
-			length = recoverDNSQuestion(state.msg.Question[0].Name, msg, buffer, length)
+			length, err = recoverDNSQuestion(state.msg.Question[0].Name, msg, buffer, length)
+			if err != nil {
+				glog.Errorf("Recover DNS question failed: %v", err)
+			}
+
 			dnsClients.mu.Lock()
 			delete(dnsClients.clients, dnsClientQuery{host, dnsQType})
 			dnsClients.mu.Unlock()
@@ -403,30 +411,34 @@ func processUnpackedDNSResponsePacket(
 	return drop, length
 }
 
-func processDNSQueryPacket(dnsClients *dnsClientCache, cliAddr net.Addr, buffer []byte, length int, dnsSearch []string) int {
+func processDNSQueryPacket(
+	dnsClients *dnsClientCache,
+	cliAddr net.Addr,
+	buffer []byte,
+	length int,
+	dnsSearch []string) (int, error) {
 	msg := &dns.Msg{}
 	if err := msg.Unpack(buffer[:length]); err != nil {
 		glog.Warning("Unable to unpack DNS packet. Error is: %v", err)
-		return length
+		return length, err
 	}
 
 	// Query - Response bit that specifies whether this message is a query (0) or a response (1).
 	if msg.MsgHdr.Response == true {
-		glog.Warning("DNS packet should be a query message.")
-		return length
+		return length, fmt.Errorf("DNS packet should be a query message")
 	}
 
 	// QDCOUNT
 	if len(msg.Question) != 1 {
 		glog.V(1).Infof("Number of entries in the question section of the DNS packet is: %d", len(msg.Question))
 		glog.V(1).Infof("DNS suffix appending does not support more than one question.")
-		return length
+		return length, nil
 	}
 
 	// ANCOUNT, NSCOUNT, ARCOUNT
 	if len(msg.Answer) != 0 || len(msg.Ns) != 0 || len(msg.Extra) != 0 {
 		glog.V(1).Infof("DNS packet contains more than question section.")
-		return length
+		return length, nil
 	}
 
 	dnsQType := msg.Question[0].Qtype
@@ -441,27 +453,32 @@ func processDNSQueryPacket(dnsClients *dnsClientCache, cliAddr net.Addr, buffer 
 		length = processUnpackedDNSQueryPacket(dnsClients, msg, host, dnsQType, buffer, length, dnsSearch)
 	}
 
-	return length
+	return length, nil
 }
 
-func processDNSResponsePacket(svrConn net.Conn, dnsClients *dnsClientCache, cliAddr net.Addr, buffer []byte, length int, dnsSearch []string) (bool, int) {
+func processDNSResponsePacket(
+	svrConn net.Conn,
+	dnsClients *dnsClientCache,
+	cliAddr net.Addr,
+	buffer []byte,
+	length int,
+	dnsSearch []string) (bool, int, error) {
 	var drop bool
 	msg := &dns.Msg{}
 	if err := msg.Unpack(buffer[:length]); err != nil {
 		glog.Warning("Unable to unpack DNS packet. Error is: %v", err)
-		return drop, length
+		return drop, length, err
 	}
 
 	// Query - Response bit that specifies whether this message is a query (0) or a response (1).
 	if msg.MsgHdr.Response == false {
-		glog.Warning("DNS packet should be a response message.")
-		return drop, length
+		return drop, length, fmt.Errorf("DNS packet should be a response message")
 	}
 
 	// QDCOUNT
 	if len(msg.Question) != 1 {
 		glog.V(1).Infof("Number of entries in the reponse section of the DNS packet is: %d", len(msg.Answer))
-		return drop, length
+		return drop, length, nil
 	}
 
 	dnsQType := msg.Question[0].Qtype
@@ -476,7 +493,7 @@ func processDNSResponsePacket(svrConn net.Conn, dnsClients *dnsClientCache, cliA
 		drop, length = processUnpackedDNSResponsePacket(svrConn, dnsClients, msg, msg.MsgHdr.Rcode, host, dnsQType, buffer, length, dnsSearch)
 	}
 
-	return drop, length
+	return drop, length, nil
 }
 
 func (udp *udpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serviceInfo, proxier *Proxier) {
@@ -516,7 +533,10 @@ func (udp *udpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serv
 
 		// If this is DNS query packet
 		if isDNSService(service.Port) {
-			n = processDNSQueryPacket(myInfo.dnsClients, cliAddr, buffer[:], n, dnsSearch)
+			n, err = processDNSQueryPacket(myInfo.dnsClients, cliAddr, buffer[:], n, dnsSearch)
+			if err != nil {
+				glog.Errorf("Process DNS query packet failed: %v", err)
+			}
 		}
 
 		// If this is a client we know already, reuse the connection and goroutine.
@@ -585,7 +605,10 @@ func (udp *udpProxySocket) proxyClient(cliAddr net.Addr, svrConn net.Conn, activ
 
 		drop := false
 		if isDNSService(service.Port) {
-			drop, n = processDNSResponsePacket(svrConn, dnsClients, cliAddr, buffer[:], n, dnsSearch)
+			drop, n, err = processDNSResponsePacket(svrConn, dnsClients, cliAddr, buffer[:], n, dnsSearch)
+			if err != nil {
+				glog.Errorf("Process DNS response packet failed: %v", err)
+			}
 		}
 
 		if !drop {
