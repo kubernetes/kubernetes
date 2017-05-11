@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"fmt"
@@ -62,14 +62,14 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		err := framework.WaitForPodRunningInNamespace(f.ClientSet, podServer)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Create a pod with name 'client-a', which should be able to communicate with server.
+		// Create a pod with name 'client-can-connect', which should be able to communicate with server.
 		By("Creating client which will be able to contact the server since isolation is off.")
 		testCanConnect(f, ns, "client-can-connect", service, 80)
 
 		framework.Logf("Enabling network isolation.")
 		setNamespaceIsolation(f, ns, "DefaultDeny")
 
-		// Create a pod with name 'client-b', which will attempt to comunicate with the server,
+		// Create a pod with name 'client-cannot-connect', which will attempt to comunicate with the server,
 		// but should not be able to now that isolation is on.
 		testCannotConnect(f, ns, "client-cannot-connect", service, 80)
 	})
@@ -98,11 +98,11 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 
 		By("Creating a network policy for the server which allows traffic from the pod 'client-a'.")
 
-		policy := v1beta1.NetworkPolicy{
+		policy := networking.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "allow-client-a-via-pod-selector",
 			},
-			Spec: v1beta1.NetworkPolicySpec{
+			Spec: networking.NetworkPolicySpec{
 				// Apply this policy to the Server
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -110,8 +110,8 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 					},
 				},
 				// Allow traffic only from client-a
-				Ingress: []v1beta1.NetworkPolicyIngressRule{{
-					From: []v1beta1.NetworkPolicyPeer{{
+				Ingress: []networking.NetworkPolicyIngressRule{{
+					From: []networking.NetworkPolicyPeer{{
 						PodSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"pod-name": "client-a",
@@ -122,19 +122,12 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			},
 		}
 
-		result := v1beta1.NetworkPolicy{}
-		err = f.ClientSet.Extensions().RESTClient().Post().Namespace(ns.Name).
-			Resource("networkpolicies").Body(&policy).Do().Into(&result)
+		_, err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Create(&policy)
 
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("Cleaning up the policy.")
-			if err = f.ClientSet.Extensions().RESTClient().
-				Delete().
-				Namespace(ns.Name).
-				Resource("networkpolicies").
-				Name(policy.Name).
-				Do().Error(); err != nil {
+			if err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Delete(policy.Name, nil); err != nil {
 				framework.Failf("unable to cleanup policy %v: %v", policy.Name, err)
 			}
 		}()
@@ -177,11 +170,11 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		testCannotConnect(f, ns, "basecase-unreachable-81", service, 81)
 
 		By("Creating a network policy for the Service which allows traffic only to one port.")
-		policy := v1beta1.NetworkPolicy{
+		policy := networking.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "allow-ingress-on-port-81",
 			},
-			Spec: v1beta1.NetworkPolicySpec{
+			Spec: networking.NetworkPolicySpec{
 				// Apply to server
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -189,26 +182,19 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 					},
 				},
 				// Allow traffic only to one port.
-				Ingress: []v1beta1.NetworkPolicyIngressRule{{
-					Ports: []v1beta1.NetworkPolicyPort{{
+				Ingress: []networking.NetworkPolicyIngressRule{{
+					Ports: []networking.NetworkPolicyPort{{
 						Port: &intstr.IntOrString{IntVal: 81},
 					}},
 				}},
 			},
 		}
-		result := v1beta1.NetworkPolicy{}
-		err = f.ClientSet.Extensions().RESTClient().Post().Namespace(ns.Name).
-			Resource("networkpolicies").Body(&policy).Do().Into(&result)
+		_, err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Create(&policy)
 
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("Cleaning up the policy.")
-			if err = f.ClientSet.Extensions().RESTClient().
-				Delete().
-				Namespace(ns.Name).
-				Resource("networkpolicies").
-				Name(policy.Name).
-				Do().Error(); err != nil {
+			if err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Delete(policy.Name, nil); err != nil {
 				framework.Failf("unable to cleanup policy %v: %v", policy.Name, err)
 			}
 		}()
@@ -244,11 +230,11 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		testCanConnect(f, ns, "basecase-reachable-b", service, 81)
 
 		By("Creating a network policy for the Service which allows traffic only to one port.")
-		policy := v1beta1.NetworkPolicy{
+		policy := networking.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "allow-ingress-on-port-81",
 			},
-			Spec: v1beta1.NetworkPolicySpec{
+			Spec: networking.NetworkPolicySpec{
 				// Apply to server
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -256,26 +242,19 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 					},
 				},
 				// Allow traffic only to one port.
-				Ingress: []v1beta1.NetworkPolicyIngressRule{{
-					Ports: []v1beta1.NetworkPolicyPort{{
+				Ingress: []networking.NetworkPolicyIngressRule{{
+					Ports: []networking.NetworkPolicyPort{{
 						Port: &intstr.IntOrString{IntVal: 81},
 					}},
 				}},
 			},
 		}
-		result := v1beta1.NetworkPolicy{}
-		err = f.ClientSet.Extensions().RESTClient().Post().Namespace(ns.Name).
-			Resource("networkpolicies").Body(&policy).Do().Into(&result)
+		_, err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Create(&policy)
 
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("Cleaning up the policy.")
-			if err = f.ClientSet.Extensions().RESTClient().
-				Delete().
-				Namespace(ns.Name).
-				Resource("networkpolicies").
-				Name(policy.Name).
-				Do().Error(); err != nil {
+			if err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Delete(policy.Name, nil); err != nil {
 				framework.Failf("unable to cleanup policy %v: %v", policy.Name, err)
 			}
 		}()
@@ -317,11 +296,11 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		testCannotConnect(f, ns, "test-b-2", service, 81)
 
 		By("Creating a network policy for the Service which allows traffic only to one port.")
-		policy := v1beta1.NetworkPolicy{
+		policy := networking.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "allow-ingress-on-port-80",
 			},
-			Spec: v1beta1.NetworkPolicySpec{
+			Spec: networking.NetworkPolicySpec{
 				// Apply to server
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -329,36 +308,29 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 					},
 				},
 				// Allow traffic only to one port.
-				Ingress: []v1beta1.NetworkPolicyIngressRule{{
-					Ports: []v1beta1.NetworkPolicyPort{{
+				Ingress: []networking.NetworkPolicyIngressRule{{
+					Ports: []networking.NetworkPolicyPort{{
 						Port: &intstr.IntOrString{IntVal: 80},
 					}},
 				}},
 			},
 		}
-		result := v1beta1.NetworkPolicy{}
-		err = f.ClientSet.Extensions().RESTClient().Post().Namespace(ns.Name).
-			Resource("networkpolicies").Body(&policy).Do().Into(&result)
+		_, err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Create(&policy)
 
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("Cleaning up the policy.")
-			if err = f.ClientSet.Extensions().RESTClient().
-				Delete().
-				Namespace(ns.Name).
-				Resource("networkpolicies").
-				Name(policy.Name).
-				Do().Error(); err != nil {
+			if err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Delete(policy.Name, nil); err != nil {
 				framework.Failf("unable to cleanup policy %v: %v", policy.Name, err)
 			}
 		}()
 
 		By("Creating a network policy for the Service which allows traffic only to another port.")
-		policy2 := v1beta1.NetworkPolicy{
+		policy2 := networking.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "allow-ingress-on-port-81",
 			},
-			Spec: v1beta1.NetworkPolicySpec{
+			Spec: networking.NetworkPolicySpec{
 				// Apply to server
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -366,26 +338,19 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 					},
 				},
 				// Allow traffic only to one port.
-				Ingress: []v1beta1.NetworkPolicyIngressRule{{
-					Ports: []v1beta1.NetworkPolicyPort{{
+				Ingress: []networking.NetworkPolicyIngressRule{{
+					Ports: []networking.NetworkPolicyPort{{
 						Port: &intstr.IntOrString{IntVal: 81},
 					}},
 				}},
 			},
 		}
-		result = v1beta1.NetworkPolicy{}
-		err = f.ClientSet.Extensions().RESTClient().Post().Namespace(ns.Name).
-			Resource("networkpolicies").Body(&policy2).Do().Into(&result)
+		_, err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Create(&policy2)
 
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("Cleaning up the policy.")
-			if err = f.ClientSet.Extensions().RESTClient().
-				Delete().
-				Namespace(ns.Name).
-				Resource("networkpolicies").
-				Name(policy2.Name).
-				Do().Error(); err != nil {
+			if err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Delete(policy2.Name, nil); err != nil {
 				framework.Failf("unable to cleanup policy %v: %v", policy2.Name, err)
 			}
 		}()
@@ -427,31 +392,24 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		testCannotConnect(f, ns, "test-b", service, 81)
 
 		By("Creating a network policy which allows all traffic.")
-		policy := v1beta1.NetworkPolicy{
+		policy := networking.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "allow-all",
 			},
-			Spec: v1beta1.NetworkPolicySpec{
+			Spec: networking.NetworkPolicySpec{
 				// Allow all traffic
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{},
 				},
-				Ingress: []v1beta1.NetworkPolicyIngressRule{{}},
+				Ingress: []networking.NetworkPolicyIngressRule{{}},
 			},
 		}
-		result := v1beta1.NetworkPolicy{}
-		err = f.ClientSet.Extensions().RESTClient().Post().Namespace(ns.Name).
-			Resource("networkpolicies").Body(&policy).Do().Into(&result)
+		_, err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Create(&policy)
 
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("Cleaning up the policy.")
-			if err = f.ClientSet.Extensions().RESTClient().
-				Delete().
-				Namespace(ns.Name).
-				Resource("networkpolicies").
-				Name(policy.Name).
-				Do().Error(); err != nil {
+			if err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Delete(policy.Name, nil); err != nil {
 				framework.Failf("unable to cleanup policy %v: %v", policy.Name, err)
 			}
 		}()
@@ -493,11 +451,11 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 
 		// Create Policy for that service that allows traffic only via namespace B
 		By("Creating a network policy for the server which allows traffic from namespace-b.")
-		policy := v1beta1.NetworkPolicy{
+		policy := networking.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "allow-ns-b-via-namespace-selector",
 			},
-			Spec: v1beta1.NetworkPolicySpec{
+			Spec: networking.NetworkPolicySpec{
 				// Apply to server
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -505,8 +463,8 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 					},
 				},
 				// Allow traffic only from NS-B
-				Ingress: []v1beta1.NetworkPolicyIngressRule{{
-					From: []v1beta1.NetworkPolicyPeer{{
+				Ingress: []networking.NetworkPolicyIngressRule{{
+					From: []networking.NetworkPolicyPeer{{
 						NamespaceSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"ns-name": nsBName,
@@ -516,19 +474,12 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 				}},
 			},
 		}
-		result := v1beta1.NetworkPolicy{}
-		err = f.ClientSet.Extensions().RESTClient().Post().Namespace(nsA.Name).
-			Resource("networkpolicies").Body(&policy).Do().Into(&result)
+		_, err = f.InternalClientset.Networking().NetworkPolicies(nsA.Name).Create(&policy)
 
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("Cleaning up the policy.")
-			if err = f.ClientSet.Extensions().RESTClient().
-				Delete().
-				Namespace(nsA.Name).
-				Resource("networkpolicies").
-				Name(policy.Name).
-				Do().Error(); err != nil {
+			if err = f.InternalClientset.Networking().NetworkPolicies(nsA.Name).Delete(policy.Name, nil); err != nil {
 				framework.Failf("unable to cleanup policy %v: %v", policy.Name, err)
 			}
 		}()
