@@ -14,31 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	v1alpha1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
+	v1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
 )
 
-type ApiregistrationV1alpha1Interface interface {
+type ApiregistrationV1beta1Interface interface {
 	RESTClient() rest.Interface
 	APIServicesGetter
 }
 
-// ApiregistrationV1alpha1Client is used to interact with features provided by the apiregistration.k8s.io group.
-type ApiregistrationV1alpha1Client struct {
+// ApiregistrationV1beta1Client is used to interact with features provided by the apiregistration.k8s.io group.
+type ApiregistrationV1beta1Client struct {
 	restClient rest.Interface
 }
 
-func (c *ApiregistrationV1alpha1Client) APIServices() APIServiceInterface {
+func (c *ApiregistrationV1beta1Client) APIServices() APIServiceInterface {
 	return newAPIServices(c)
 }
 
-// NewForConfig creates a new ApiregistrationV1alpha1Client for the given config.
-func NewForConfig(c *rest.Config) (*ApiregistrationV1alpha1Client, error) {
+// NewForConfig creates a new ApiregistrationV1beta1Client for the given config.
+func NewForConfig(c *rest.Config) (*ApiregistrationV1beta1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -47,12 +47,12 @@ func NewForConfig(c *rest.Config) (*ApiregistrationV1alpha1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ApiregistrationV1alpha1Client{client}, nil
+	return &ApiregistrationV1beta1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new ApiregistrationV1alpha1Client for the given config and
+// NewForConfigOrDie creates a new ApiregistrationV1beta1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *ApiregistrationV1alpha1Client {
+func NewForConfigOrDie(c *rest.Config) *ApiregistrationV1beta1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -60,13 +60,13 @@ func NewForConfigOrDie(c *rest.Config) *ApiregistrationV1alpha1Client {
 	return client
 }
 
-// New creates a new ApiregistrationV1alpha1Client for the given RESTClient.
-func New(c rest.Interface) *ApiregistrationV1alpha1Client {
-	return &ApiregistrationV1alpha1Client{c}
+// New creates a new ApiregistrationV1beta1Client for the given RESTClient.
+func New(c rest.Interface) *ApiregistrationV1beta1Client {
+	return &ApiregistrationV1beta1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1alpha1.SchemeGroupVersion
+	gv := v1beta1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
@@ -80,7 +80,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *ApiregistrationV1alpha1Client) RESTClient() rest.Interface {
+func (c *ApiregistrationV1beta1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}
