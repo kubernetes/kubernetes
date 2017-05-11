@@ -157,7 +157,7 @@ func NewNamespaceController(client federationclientset.Interface, dynamicClientP
 	)
 
 	// Federated updater along with Create/Update/Delete operations.
-	nc.federatedUpdater = util.NewFederatedUpdater(nc.namespaceFederatedInformer, "namespace", nc.eventRecorder,
+	nc.federatedUpdater = util.NewFederatedUpdater(nc.namespaceFederatedInformer, "namespace", nc.updateTimeout, nc.eventRecorder,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			namespace := obj.(*apiv1.Namespace)
 			_, err := client.Core().Namespaces().Create(namespace)
@@ -186,7 +186,6 @@ func NewNamespaceController(client federationclientset.Interface, dynamicClientP
 			namespace := obj.(*apiv1.Namespace)
 			return fmt.Sprintf("%s/%s", namespace.Namespace, namespace.Name)
 		},
-		nc.updateTimeout,
 		nc.namespaceFederatedInformer,
 		nc.federatedUpdater,
 	)
@@ -397,7 +396,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 	}
 	glog.V(2).Infof("Updating namespace %s in underlying clusters. Operations: %d", baseNamespace.Name, len(operations))
 
-	err = nc.federatedUpdater.Update(operations, nc.updateTimeout)
+	err = nc.federatedUpdater.Update(operations)
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", namespace, err)
 		nc.deliverNamespace(namespace, 0, true)
