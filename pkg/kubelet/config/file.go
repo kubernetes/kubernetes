@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -42,6 +43,7 @@ type sourceFile struct {
 	store          cache.Store
 	fileKeyMapping map[string]string
 	updates        chan<- interface{}
+	locker         sync.Locker
 }
 
 func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
@@ -66,6 +68,7 @@ func new(path string, nodeName types.NodeName, period time.Duration, updates cha
 		store:          store,
 		fileKeyMapping: map[string]string{},
 		updates:        updates,
+		locker:         &sync.Mutex{},
 	}
 }
 
@@ -168,7 +171,9 @@ func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
 				err = keyErr
 				return
 			}
+			s.locker.Lock()
 			s.fileKeyMapping[filename] = objKey
+			s.locker.Unlock()
 		}
 	}()
 

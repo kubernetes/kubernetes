@@ -244,7 +244,7 @@ func watchFileAdded(watchDir bool, isSymbol bool, t *testing.T) {
 			if err != nil {
 				t.Fatalf("unable to create temp dir: %v", err)
 			}
-			//defer os.RemoveAll(dirName)
+			defer os.RemoveAll(dirName)
 
 			fileName := fmt.Sprintf("%s_%d", fileNamePre, index)
 			var linkedDirName string

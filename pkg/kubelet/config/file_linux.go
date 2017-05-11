@@ -119,6 +119,8 @@ func (s *sourceFile) processEvent(e *inotify.Event) error {
 			return s.store.Add(pod)
 		}
 	case podDelete:
+		s.locker.Lock()
+		defer s.locker.Unlock()
 		if objKey, keyExist := s.fileKeyMapping[e.Name]; keyExist {
 			pod, podExist, err := s.store.GetByKey(objKey)
 			if err != nil {
@@ -126,7 +128,11 @@ func (s *sourceFile) processEvent(e *inotify.Event) error {
 			} else if !podExist {
 				return fmt.Errorf("the pod with key %s doesn't exist in cache", objKey)
 			} else {
-				return s.store.Delete(pod)
+				err = s.store.Delete(pod)
+				if err != nil {
+					delete(s.fileKeyMapping, e.Name)
+				}
+				return err
 			}
 		}
 	}
