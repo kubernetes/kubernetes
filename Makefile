@@ -253,6 +253,21 @@ test-e2e-node: ginkgo generated_files
 	hack/make-rules/test-e2e-node.sh
 endif
 
+define TEST_E2E_CRI_HELP_INFO
+# Build and run CRI end-to-end tests.
+#
+# Example:
+#   make test-e2e-cri
+endef
+.PHONY: test-e2e-cri
+ifeq ($(PRINT_HELP),y)
+test-e2e-cri:
+	@echo "$$TEST_E2E_CRI_HELP_INFO"
+else
+test-e2e-cri: ginkgo
+	hack/make-rules/test-e2e-cri.sh
+endif
+
 define TEST_CMD_HELP_INFO
 # Build and run cmdline tests.
 #

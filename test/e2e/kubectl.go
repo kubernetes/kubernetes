@@ -272,7 +272,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	defer GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
 
-	// Reustable cluster state function.  This won't be adversly affected by lazy initialization of framework.
+	// Reusable cluster state function.  This won't be adversely affected by lazy initialization of framework.
 	clusterState := func() *framework.ClusterVerification {
 		return f.NewClusterVerification(
 			f.Namespace,
