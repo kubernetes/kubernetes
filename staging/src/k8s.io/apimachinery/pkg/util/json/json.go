@@ -50,6 +50,18 @@ func Unmarshal(data []byte, v interface{}) error {
 		// If the decode succeeds, post-process the map to convert json.Number objects to int64 or float64
 		return convertMapNumbers(*v)
 
+	case *[]interface{}:
+		// Build a decoder from the given data
+		decoder := json.NewDecoder(bytes.NewBuffer(data))
+		// Preserve numbers, rather than casting to float64 automatically
+		decoder.UseNumber()
+		// Run the decode
+		if err := decoder.Decode(v); err != nil {
+			return err
+		}
+		// If the decode succeeds, post-process the map to convert json.Number objects to int64 or float64
+		return convertSliceNumbers(*v)
+
 	default:
 		return json.Unmarshal(data, v)
 	}

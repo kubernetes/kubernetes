@@ -71,6 +71,18 @@ type F struct {
 	I []float32         `json:"fi"`
 }
 
+type G struct {
+	Custom Custom `json:"custom"`
+}
+
+type Custom struct {
+	data []byte
+}
+
+func (c Custom) MarshalJSON() ([]byte, error) {
+	return c.data, nil
+}
+
 func doRoundTrip(t *testing.T, item interface{}) {
 	data, err := json.Marshal(item)
 	if err != nil {
@@ -437,5 +449,38 @@ func TestFloatIntConversion(t *testing.T) {
 
 	if !reflect.DeepEqual(obj, unmarshalled) {
 		t.Errorf("Incorrect conversion, diff: %v", diff.ObjectReflectDiff(obj, unmarshalled))
+	}
+}
+
+func TestCustomToUnstructured(t *testing.T) {
+	testcases := []struct {
+		Data     string
+		Expected interface{}
+	}{
+		{Data: `null`, Expected: nil},
+		{Data: `true`, Expected: true},
+		{Data: `false`, Expected: false},
+		{Data: `[]`, Expected: []interface{}{}},
+		{Data: `[1]`, Expected: []interface{}{int64(1)}},
+		{Data: `{}`, Expected: map[string]interface{}{}},
+		{Data: `{"a":1}`, Expected: map[string]interface{}{"a": int64(1)}},
+		{Data: `0`, Expected: int64(0)},
+		{Data: `0.0`, Expected: float64(0)},
+	}
+
+	for _, tc := range testcases {
+		result, err := DefaultConverter.ToUnstructured(&G{Custom: Custom{data: []byte(tc.Data)}})
+		if err != nil {
+			t.Errorf("%s: %v", tc.Data, err)
+			continue
+		}
+
+		fieldResult := result["custom"]
+		if !reflect.DeepEqual(fieldResult, tc.Expected) {
+			t.Errorf("%s: expected %v, got %v", tc.Data, tc.Expected, fieldResult)
+			// t.Log("expected", spew.Sdump(tc.Expected))
+			// t.Log("actual", spew.Sdump(fieldResult))
+			continue
+		}
 	}
 }
