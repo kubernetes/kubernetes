@@ -239,8 +239,8 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	return preparedGenericAPIServer{s}
 }
 
-// Run spawns the http servers (secure and insecure). It only returns if stopCh is closed
-// or one of the ports cannot be listened on initially.
+// Run spawns the secure http server. It only returns if stopCh is closed
+// or the secure port cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	err := s.NonBlockingRun(stopCh)
 	if err != nil {
@@ -251,8 +251,8 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-// NonBlockingRun spawns the http servers (secure and insecure). An error is
-// returned if either of the ports cannot be listened on.
+// NonBlockingRun spawns the secure http server. An error is
+// returned if the secure port cannot be listened on.
 func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	// Use an internal stop channel to allow cleanup of the listeners on error.
 	internalStopCh := make(chan struct{})
@@ -264,7 +264,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 		}
 	}
 
-	// Now that both listeners have bound successfully, it is the
+	// Now that listener have bound successfully, it is the
 	// responsibility of the caller to close the provided channel to
 	// ensure cleanup.
 	go func() {
