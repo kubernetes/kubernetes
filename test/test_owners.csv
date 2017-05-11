@@ -123,7 +123,7 @@ Empty starts a pod,childsb,1,
 "EmptyDir volumes should support (non-root,0644,default)",timstclair,1,node
 "EmptyDir volumes should support (non-root,0644,tmpfs)",spxtr,1,node
 "EmptyDir volumes should support (non-root,0666,default)",dchen1107,1,node
-"EmptyDir volumes should support (non-root,0666,tmpfs)",apelisse,1,storage
+"EmptyDir volumes should support (non-root,0666,tmpfs)",apelisse,1,node
 "EmptyDir volumes should support (non-root,0777,default)",mwielgus,1,node
 "EmptyDir volumes should support (non-root,0777,tmpfs)",smarterclayton,1,node
 "EmptyDir volumes should support (root,0644,default)",mtaufen,1,node
