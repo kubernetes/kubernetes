@@ -113,11 +113,11 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 
 	// All flags below here are deprecated and will eventually be removed.
 
-	fs.Var(componentconfig.IPVar{Val: &options.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.StringVar(&options.master, "master", options.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
+	fs.Var(componentconfig.IPVar{Val: &options.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces).")
+	fs.StringVar(&options.master, "master", options.master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.Int32Var(&options.healthzPort, "healthz-port", options.healthzPort, "The port to bind the health check server. Use 0 to disable.")
-	fs.Var(componentconfig.IPVar{Val: &options.config.HealthzBindAddress}, "healthz-bind-address", "The IP address and port for the health check server to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.Int32Var(options.config.OOMScoreAdj, "oom-score-adj", util.Int32PtrDerefOr(options.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
+	fs.Var(componentconfig.IPVar{Val: &options.config.HealthzBindAddress}, "healthz-bind-address", "The IP address and port for the health check server to serve on (set to 0.0.0.0 for all interfaces).")
+	fs.Int32Var(options.config.OOMScoreAdj, "oom-score-adj", util.Int32PtrDerefOr(options.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000].")
 	fs.StringVar(&options.config.ResourceContainer, "resource-container", options.config.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
 	fs.StringVar(&options.config.ClientConnection.KubeConfigFile, "kubeconfig", options.config.ClientConnection.KubeConfigFile, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
@@ -128,12 +128,12 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 	fs.DurationVar(&options.config.IPTables.SyncPeriod.Duration, "iptables-sync-period", options.config.IPTables.SyncPeriod.Duration, "The maximum interval of how often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
 	fs.DurationVar(&options.config.IPTables.MinSyncPeriod.Duration, "iptables-min-sync-period", options.config.IPTables.MinSyncPeriod.Duration, "The minimum interval of how often the iptables rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
 	fs.DurationVar(&options.config.ConfigSyncPeriod.Duration, "config-sync-period", options.config.ConfigSyncPeriod.Duration, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
-	fs.BoolVar(&options.config.IPTables.MasqueradeAll, "masquerade-all", options.config.IPTables.MasqueradeAll, "If using the pure iptables proxy, SNAT everything")
+	fs.BoolVar(&options.config.IPTables.MasqueradeAll, "masquerade-all", options.config.IPTables.MasqueradeAll, "If using the pure iptables proxy, SNAT everything.")
 	fs.StringVar(&options.config.ClusterCIDR, "cluster-cidr", options.config.ClusterCIDR, "The CIDR range of pods in the cluster. It is used to bridge traffic coming from outside of the cluster. If not provided, no off-cluster bridging will be performed.")
 	fs.StringVar(&options.config.ClientConnection.ContentType, "kube-api-content-type", options.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
-	fs.Float32Var(&options.config.ClientConnection.QPS, "kube-api-qps", options.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
-	fs.IntVar(&options.config.ClientConnection.Burst, "kube-api-burst", options.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver")
-	fs.DurationVar(&options.config.UDPIdleTimeout.Duration, "udp-timeout", options.config.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
+	fs.Float32Var(&options.config.ClientConnection.QPS, "kube-api-qps", options.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver.")
+	fs.IntVar(&options.config.ClientConnection.Burst, "kube-api-burst", options.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver.")
+	fs.DurationVar(&options.config.UDPIdleTimeout.Duration, "udp-timeout", options.config.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace.")
 	fs.Int32Var(&options.config.Conntrack.Max, "conntrack-max", options.config.Conntrack.Max,
 		"Maximum number of NAT connections to track (0 to leave as-is). This overrides conntrack-max-per-core and conntrack-min.")
 	fs.MarkDeprecated("conntrack-max", "This feature will be removed in a later release.")
@@ -141,11 +141,11 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 		"Maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrack-min).")
 	fs.Int32Var(&options.config.Conntrack.Min, "conntrack-min", options.config.Conntrack.Min,
 		"Minimum number of conntrack entries to allocate, regardless of conntrack-max-per-core (set conntrack-max-per-core=0 to leave the limit as-is).")
-	fs.DurationVar(&options.config.Conntrack.TCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", options.config.Conntrack.TCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
+	fs.DurationVar(&options.config.Conntrack.TCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", options.config.Conntrack.TCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is).")
 	fs.DurationVar(
 		&options.config.Conntrack.TCPCloseWaitTimeout.Duration, "conntrack-tcp-timeout-close-wait",
 		options.config.Conntrack.TCPCloseWaitTimeout.Duration,
-		"NAT timeout for TCP connections in the CLOSE_WAIT state")
+		"NAT timeout for TCP connections in the CLOSE_WAIT state.")
 
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
@@ -181,8 +181,7 @@ func (o Options) Run() error {
 		}
 	}
 
-	proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.master)
-	if err != nil {
+	if proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.master); err != nil {
 		return err
 	}
 
@@ -212,8 +211,7 @@ func (o Options) applyDeprecatedHealthzPortToConfig() {
 // loadConfigFromFile loads the contents of file and decodes it as a
 // KubeProxyConfiguration object.
 func loadConfigFromFile(file string) (*componentconfig.KubeProxyConfiguration, error) {
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
+	if data, err := ioutil.ReadFile(file); err != nil {
 		return nil, err
 	}
 
@@ -229,15 +227,13 @@ func loadConfigFromFile(file string) (*componentconfig.KubeProxyConfiguration, e
 }
 
 func applyDefaults(in *componentconfig.KubeProxyConfiguration) (*componentconfig.KubeProxyConfiguration, error) {
-	external, err := api.Scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
-	if err != nil {
+	if external, err := api.Scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion); err != nil {
 		return nil, err
 	}
 
 	api.Scheme.Default(external)
 
-	internal, err := api.Scheme.ConvertToVersion(external, componentconfig.SchemeGroupVersion)
-	if err != nil {
+	if internal, err := api.Scheme.ConvertToVersion(external, componentconfig.SchemeGroupVersion); err != nil {
 		return nil, err
 	}
 
@@ -272,7 +268,7 @@ with the apiserver API to configure the proxy.`,
 	var err error
 	opts.config, err = applyDefaults(opts.config)
 	if err != nil {
-		glog.Fatalf("unable to create flag defaults: %v", err)
+		glog.Fatalf("Unable to create flag defaults: %v", err)
 	}
 
 	flags := cmd.Flags()
@@ -328,13 +324,11 @@ func createClients(config componentconfig.ClientConnectionConfiguration, masterO
 	//TODO make config struct use int instead of int32?
 	kubeConfig.Burst = int(config.Burst)
 
-	client, err := clientset.NewForConfig(kubeConfig)
-	if err != nil {
+	if client, err := clientset.NewForConfig(kubeConfig); err != nil {
 		return nil, nil, err
 	}
 
-	eventClient, err := clientgoclientset.NewForConfig(kubeConfig)
-	if err != nil {
+	if eventClient, err := clientgoclientset.NewForConfig(kubeConfig); err != nil {
 		return nil, nil, err
 	}
 
@@ -523,7 +517,7 @@ func (s *ProxyServer) Run() error {
 		encounteredError := userspace.CleanupLeftovers(s.IptInterface)
 		encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
 		if encounteredError {
-			return errors.New("encountered an error while tearing down rules.")
+			return errors.New("encountered an error while tearing down rules")
 		}
 		return nil
 	}
@@ -638,17 +632,17 @@ func getConntrackMax(config componentconfig.KubeProxyConntrackConfiguration) (in
 		if config.MaxPerCore > 0 {
 			return -1, fmt.Errorf("invalid config: Conntrack Max and Conntrack MaxPerCore are mutually exclusive")
 		}
-		glog.V(3).Infof("getConntrackMax: using absolute conntrack-max (deprecated)")
+		glog.V(3).Infof("getConntrackMax: using absolute conntrack-max (deprecated).")
 		return int(config.Max), nil
 	}
 	if config.MaxPerCore > 0 {
 		floor := int(config.Min)
 		scaled := int(config.MaxPerCore) * runtime.NumCPU()
 		if scaled > floor {
-			glog.V(3).Infof("getConntrackMax: using scaled conntrack-max-per-core")
+			glog.V(3).Infof("getConntrackMax: using scaled conntrack-max-per-core.")
 			return scaled, nil
 		}
-		glog.V(3).Infof("getConntrackMax: using conntrack-min")
+		glog.V(3).Infof("getConntrackMax: using conntrack-min.")
 		return floor, nil
 	}
 	return 0, nil
