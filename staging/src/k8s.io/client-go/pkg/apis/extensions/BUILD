@@ -17,6 +17,10 @@ go_library(
         "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
+    visibility = [
+        "//vendor/k8s.io/client-go/pkg/api/v1:__pkg__",
+        "//vendor/k8s.io/client-go/pkg/apis:__subpackages__",
+    ],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
