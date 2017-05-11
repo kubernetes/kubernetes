@@ -429,10 +429,22 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 	oldNode := old.(*v1.Node)
 	curNode := cur.(*v1.Node)
-	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) && reflect.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints) {
-		// If node labels and taints didn't change, we can ignore this update.
+
+	oldCond := v1helper.GetAvailableNodeCondition(oldNode.Status.Conditions)
+	curCond := v1helper.GetAvailableNodeCondition(curNode.Status.Conditions)
+
+	nodeConditionTypeEqual := (oldCond == nil && curCond == nil)
+	if oldCond != nil && curCond != nil {
+		nodeConditionTypeEqual = (oldCond.Type == curCond.Type)
+	}
+
+	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) &&
+		reflect.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints) &&
+		nodeConditionTypeEqual {
+		// If node labels, taints and condition type didn't change, we can ignore this update.
 		return
 	}
+
 	dsList, err := dsc.dsLister.List(labels.Everything())
 	if err != nil {
 		glog.V(4).Infof("Error enqueueing daemon sets: %v", err)

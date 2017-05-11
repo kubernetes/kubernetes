@@ -498,3 +498,14 @@ func PersistentVolumeClaimHasClass(claim *v1.PersistentVolumeClaim) bool {
 
 	return false
 }
+
+// GetAvailableNodeCondition returns the available NodeCondition of node.
+func GetAvailableNodeCondition(conds []v1.NodeCondition) *v1.NodeCondition {
+	for _, cond := range conds {
+		if cond.Status == v1.ConditionTrue {
+			return &cond
+		}
+	}
+
+	return nil
+}
