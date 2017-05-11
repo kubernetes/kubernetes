@@ -50,10 +50,7 @@ func TestSimpleCRUD(t *testing.T) {
 	}
 
 	ns := "not-the-default"
-	noxuNamespacedResourceClient := noxuVersionClient.Resource(&metav1.APIResource{
-		Name:       noxuDefinition.Spec.Names.Plural,
-		Namespaced: true,
-	}, ns)
+	noxuNamespacedResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
 	initialList, err := noxuNamespacedResourceClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -82,29 +79,9 @@ func TestSimpleCRUD(t *testing.T) {
 	}
 	defer noxuNamespacedWatch.Stop()
 
-	noxuInstanceToCreate := testserver.NewNoxuInstance(ns, "foo")
-	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate)
+	createdNoxuInstance, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns, "foo"), noxuNamespacedResourceClient, noxuDefinition)
 	if err != nil {
-		t.Logf("%#v", createdNoxuInstance)
-		t.Fatal(err)
-	}
-	createdObjectMeta, err := meta.Accessor(createdNoxuInstance)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// it should have a UUID
-	if len(createdObjectMeta.GetUID()) == 0 {
-		t.Errorf("missing uuid: %#v", createdNoxuInstance)
-	}
-	createdTypeMeta, err := meta.TypeAccessor(createdNoxuInstance)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if e, a := noxuDefinition.Spec.Group+"/"+noxuDefinition.Spec.Version, createdTypeMeta.GetAPIVersion(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := noxuDefinition.Spec.Names.Kind, createdTypeMeta.GetKind(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Fatalf("unable to create noxu Instance:%v", err)
 	}
 
 	select {
@@ -178,6 +155,10 @@ func TestSimpleCRUD(t *testing.T) {
 			t.Fatal(err)
 		}
 		// it should have a UUID
+		createdObjectMeta, err := meta.Accessor(createdNoxuInstance)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if e, a := createdObjectMeta.GetUID(), deletedObjectMeta.GetUID(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
