@@ -508,9 +508,6 @@ type KubeletConfiguration struct {
 	// featureGates is a string of comma-separated key=value pairs that describe feature
 	// gates for alpha/experimental features.
 	FeatureGates string
-	// Enable Container Runtime Interface (CRI) integration.
-	// +optional
-	EnableCRI bool
 	// Enable dockershim only mode.
 	// +optional
 	ExperimentalDockershim bool

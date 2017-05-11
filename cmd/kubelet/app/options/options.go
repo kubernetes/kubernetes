@@ -301,19 +301,10 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&c.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", c.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
 
 	// CRI flags.
-	// TODO: Remove experimental-cri in kubernetes 1.7.
-	fs.BoolVar(&c.EnableCRI, "experimental-cri", c.EnableCRI, "Same as --enable-cri.")
-	fs.MarkDeprecated("experimental-cri", "Please use --enable-cri instead.")
-	fs.MarkHidden("experimental-cri")
-	// TODO: Remove enable-cri once we stop supporting the non-cri
-	// implementation.
-	fs.BoolVar(&c.EnableCRI, "enable-cri", c.EnableCRI, "Enable the Container Runtime Interface (CRI) integration. If --container-runtime is set to \"remote\", Kubelet will communicate with the runtime/image CRI server listening on the endpoint specified by --remote-runtime-endpoint/--remote-image-endpoint. If --container-runtime is set to \"docker\", Kubelet will launch a in-process CRI server on behalf of docker, and communicate over a default endpoint. If --container-runtime is \"rkt\", the flag will be ignored because rkt integration doesn't support CRI yet.")
-	fs.MarkDeprecated("enable-cri", "The non-CRI implementation will be deprecated and removed in a future version.")
 	fs.BoolVar(&c.ExperimentalDockershim, "experimental-dockershim", c.ExperimentalDockershim, "Enable dockershim only mode. In this mode, kubelet will only start dockershim without any other functionalities. This flag only serves test purpose, please do not use it unless you are conscious of what you are doing. [default=false]")
 	fs.MarkHidden("experimental-dockershim")
-
-	fs.StringVar(&c.RemoteRuntimeEndpoint, "container-runtime-endpoint", c.RemoteRuntimeEndpoint, "[Experimental] The unix socket endpoint of remote runtime service. The endpoint is used only when CRI integration is enabled (--enable-cri)")
-	fs.StringVar(&c.RemoteImageEndpoint, "image-service-endpoint", c.RemoteImageEndpoint, "[Experimental] The unix socket endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. The endpoint is used only when CRI integration is enabled (--enable-cri)")
+	fs.StringVar(&c.RemoteRuntimeEndpoint, "container-runtime-endpoint", c.RemoteRuntimeEndpoint, "[Experimental] The unix socket endpoint of remote runtime service.")
+	fs.StringVar(&c.RemoteImageEndpoint, "image-service-endpoint", c.RemoteImageEndpoint, "[Experimental] The unix socket endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default.")
 	fs.BoolVar(&c.DockerDisableSharedPID, "docker-disable-shared-pid", c.DockerDisableSharedPID, "The Container Runtime Interface (CRI) defaults to using a shared PID namespace for containers in a pod when running with Docker 1.13.1 or higher. Setting this flag reverts to the previous behavior of isolated PID namespaces. This ability will be removed in a future Kubernetes release.")
 
 	fs.BoolVar(&c.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", c.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required componenets (binaries, etc.) before performing the mount")
