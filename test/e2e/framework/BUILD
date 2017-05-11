@@ -54,6 +54,7 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/rbac/v1beta1:go_default_library",
+        "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
