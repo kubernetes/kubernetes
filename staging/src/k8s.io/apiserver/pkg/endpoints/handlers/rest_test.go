@@ -39,9 +39,6 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-
-	// need to register pods
-	_ "k8s.io/client-go/pkg/api/install"
 )
 
 var (
