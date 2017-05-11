@@ -214,14 +214,15 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 				framework.Failf("Failed getting ScheduledJob %s: %v", sjName, err)
 			}
 			if sj.Spec.Schedule != schedule {
-				framework.Failf("Failed creating a ScheduledJob with correct schedule %s", schedule)
+				framework.Failf("Failed creating a ScheduledJob with correct schedule %s, but got %s", schedule, sj.Spec.Schedule)
 			}
 			containers := sj.Spec.JobTemplate.Spec.Template.Spec.Containers
 			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
 				framework.Failf("Failed creating ScheduledJob %s for 1 pod with expected image %s: %#v", sjName, busyboxImage, containers)
 			}
+			restartPolicy := sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy
 			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
-				framework.Failf("Failed creating a ScheduledJob with correct restart policy for --restart=OnFailure")
+				framework.Failf("Failed creating a ScheduledJob with correct restart policy %s, but got %s", v1.RestartPolicyOnFailure, restartPolicy)
 			}
 		})
 	})
