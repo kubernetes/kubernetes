@@ -27,8 +27,7 @@ import (
 const (
 	UnsupportedReason = "SysctlUnsupported"
 	// CRI uses semver-compatible API version, while docker does not
-	// (e.g., 1.24). Append the version with a ".0" so that it works
-	// with both the CRI and dockertools comparison logic.
+	// (e.g., 1.24). Append the version with a ".0".
 	dockerMinimumAPIVersion = "1.24.0"
 
 	dockerTypeName = "docker"
