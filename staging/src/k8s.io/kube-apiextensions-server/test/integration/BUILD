@@ -9,7 +9,10 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["basic_test.go"],
+    srcs = [
+        "basic_test.go",
+        "registration_test.go",
+    ],
     tags = [
         "automanaged",
         "integration",
@@ -19,6 +22,8 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/client-go/dynamic:go_default_library",
+        "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/test/integration/testserver:go_default_library",
     ],
 )

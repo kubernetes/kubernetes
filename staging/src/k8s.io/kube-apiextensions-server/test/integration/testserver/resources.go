@@ -61,6 +61,39 @@ func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
 	}
 }
 
+func NewCurletCustomResourceDefinition() *apiextensionsv1alpha1.CustomResource {
+	return &apiextensionsv1alpha1.CustomResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "curlets.mygroup.example.com"},
+		Spec: apiextensionsv1alpha1.CustomResourceSpec{
+			Group:   "mygroup.example.com",
+			Version: "v1alpha1",
+			Names: apiextensionsv1alpha1.CustomResourceNames{
+				Plural:   "curlets",
+				Singular: "curlet",
+				Kind:     "Curlet",
+				ListKind: "CurletList",
+			},
+			Scope: apiextensionsv1alpha1.NamespaceScoped,
+		},
+	}
+}
+
+func NewCurletInstance(namespace, name string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "mygroup.example.com/v1alpha1",
+			"kind":       "Curlet",
+			"metadata": map[string]interface{}{
+				"namespace": namespace,
+				"name":      name,
+			},
+			"content": map[string]interface{}{
+				"key": "value",
+			},
+		},
+	}
+}
+
 func CreateNewCustomResourceDefinition(customResource *apiextensionsv1alpha1.CustomResource, apiExtensionsClient clientset.Interface, clientPool dynamic.ClientPool) (*dynamic.Client, error) {
 	_, err := apiExtensionsClient.Apiextensions().CustomResources().Create(customResource)
 	if err != nil {
