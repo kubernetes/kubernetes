@@ -30,8 +30,8 @@ import (
 )
 
 func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pod-activedeadline-update", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -147,8 +147,8 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 }
 
 func TestPodReadOnlyFilesystem(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	isReadOnly := true
 	ns := framework.CreateTestingNamespace("pod-readonly-root", s, t)

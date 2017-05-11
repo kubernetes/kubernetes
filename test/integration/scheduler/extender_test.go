@@ -254,8 +254,8 @@ func machine_3_Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*schedulerapi.HostP
 }
 
 func TestSchedulerExtender(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("scheduler-extender", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
