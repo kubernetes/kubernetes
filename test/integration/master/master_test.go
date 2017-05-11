@@ -45,8 +45,8 @@ import (
 )
 
 func testPrefix(t *testing.T, prefix string) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	resp, err := http.Get(s.URL + prefix)
 	if err != nil {
@@ -74,8 +74,8 @@ func TestExtensionsPrefix(t *testing.T) {
 }
 
 func TestEmptyList(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	u := s.URL + "/api/v1/namespaces/default/pods"
 	resp, err := http.Get(u)
@@ -102,8 +102,8 @@ func TestEmptyList(t *testing.T) {
 }
 
 func TestWatchSucceedsWithoutArgs(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	resp, err := http.Get(s.URL + "/api/v1/namespaces?watch=1")
 	if err != nil {
@@ -207,8 +207,8 @@ func appsPath(resource, namespace, name string) string {
 }
 
 func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 	transport := http.DefaultTransport
 
 	requests := []struct {
@@ -252,8 +252,8 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 }
 
 func TestAppsGroupBackwardCompatibility(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 	transport := http.DefaultTransport
 
 	requests := []struct {
@@ -305,8 +305,8 @@ func TestAppsGroupBackwardCompatibility(t *testing.T) {
 }
 
 func TestAccept(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	resp, err := http.Get(s.URL + "/api/")
 	if err != nil {
@@ -383,8 +383,8 @@ func countEndpoints(eps *api.Endpoints) int {
 }
 
 func TestMasterService(t *testing.T) {
-	_, s := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
 
@@ -425,8 +425,8 @@ func TestServiceAlloc(t *testing.T) {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ServiceIPRange = *cidr
-	_, s := framework.RunAMaster(cfg)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(cfg)
+	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
 

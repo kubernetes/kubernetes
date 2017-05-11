@@ -117,7 +117,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			}
 			kubeClientConfigValue.Store(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
 
-			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, sharedInformers, wait.NeverStop)
+			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, sharedInformers)
 			if err != nil {
 				t.Fatal(err)
 			}

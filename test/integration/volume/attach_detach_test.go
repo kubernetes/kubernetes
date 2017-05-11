@@ -77,8 +77,8 @@ func fakePodWithVol(namespace string) *v1.Pod {
 // event is somehow missed by AttachDetach controller - it still
 // gets cleaned up by Desired State of World populator.
 func TestPodDeletionWithDswp(t *testing.T) {
-	_, server := framework.RunAMaster(nil)
-	defer server.Close()
+	_, server, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 	namespaceName := "test-pod-deletion"
 
 	node := &v1.Node{
@@ -225,8 +225,8 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 // event is somehow missed by AttachDetach controller - it still
 // gets added by Desired State of World populator.
 func TestPodAddedByDswp(t *testing.T) {
-	_, server := framework.RunAMaster(nil)
-	defer server.Close()
+	_, server, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 	namespaceName := "test-pod-deletion"
 
 	node := &v1.Node{
