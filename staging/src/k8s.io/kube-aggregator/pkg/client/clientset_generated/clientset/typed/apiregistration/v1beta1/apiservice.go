@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	v1alpha1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
+	v1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	scheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
 )
 
@@ -33,15 +33,15 @@ type APIServicesGetter interface {
 
 // APIServiceInterface has methods to work with APIService resources.
 type APIServiceInterface interface {
-	Create(*v1alpha1.APIService) (*v1alpha1.APIService, error)
-	Update(*v1alpha1.APIService) (*v1alpha1.APIService, error)
-	UpdateStatus(*v1alpha1.APIService) (*v1alpha1.APIService, error)
+	Create(*v1beta1.APIService) (*v1beta1.APIService, error)
+	Update(*v1beta1.APIService) (*v1beta1.APIService, error)
+	UpdateStatus(*v1beta1.APIService) (*v1beta1.APIService, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1alpha1.APIService, error)
-	List(opts v1.ListOptions) (*v1alpha1.APIServiceList, error)
+	Get(name string, options v1.GetOptions) (*v1beta1.APIService, error)
+	List(opts v1.ListOptions) (*v1beta1.APIServiceList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.APIService, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.APIService, err error)
 	APIServiceExpansion
 }
 
@@ -51,15 +51,15 @@ type aPIServices struct {
 }
 
 // newAPIServices returns a APIServices
-func newAPIServices(c *ApiregistrationV1alpha1Client) *aPIServices {
+func newAPIServices(c *ApiregistrationV1beta1Client) *aPIServices {
 	return &aPIServices{
 		client: c.RESTClient(),
 	}
 }
 
 // Create takes the representation of a aPIService and creates it.  Returns the server's representation of the aPIService, and an error, if there is any.
-func (c *aPIServices) Create(aPIService *v1alpha1.APIService) (result *v1alpha1.APIService, err error) {
-	result = &v1alpha1.APIService{}
+func (c *aPIServices) Create(aPIService *v1beta1.APIService) (result *v1beta1.APIService, err error) {
+	result = &v1beta1.APIService{}
 	err = c.client.Post().
 		Resource("apiservices").
 		Body(aPIService).
@@ -69,8 +69,8 @@ func (c *aPIServices) Create(aPIService *v1alpha1.APIService) (result *v1alpha1.
 }
 
 // Update takes the representation of a aPIService and updates it. Returns the server's representation of the aPIService, and an error, if there is any.
-func (c *aPIServices) Update(aPIService *v1alpha1.APIService) (result *v1alpha1.APIService, err error) {
-	result = &v1alpha1.APIService{}
+func (c *aPIServices) Update(aPIService *v1beta1.APIService) (result *v1beta1.APIService, err error) {
+	result = &v1beta1.APIService{}
 	err = c.client.Put().
 		Resource("apiservices").
 		Name(aPIService.Name).
@@ -83,8 +83,8 @@ func (c *aPIServices) Update(aPIService *v1alpha1.APIService) (result *v1alpha1.
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
 
-func (c *aPIServices) UpdateStatus(aPIService *v1alpha1.APIService) (result *v1alpha1.APIService, err error) {
-	result = &v1alpha1.APIService{}
+func (c *aPIServices) UpdateStatus(aPIService *v1beta1.APIService) (result *v1beta1.APIService, err error) {
+	result = &v1beta1.APIService{}
 	err = c.client.Put().
 		Resource("apiservices").
 		Name(aPIService.Name).
@@ -116,8 +116,8 @@ func (c *aPIServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 }
 
 // Get takes name of the aPIService, and returns the corresponding aPIService object, and an error if there is any.
-func (c *aPIServices) Get(name string, options v1.GetOptions) (result *v1alpha1.APIService, err error) {
-	result = &v1alpha1.APIService{}
+func (c *aPIServices) Get(name string, options v1.GetOptions) (result *v1beta1.APIService, err error) {
+	result = &v1beta1.APIService{}
 	err = c.client.Get().
 		Resource("apiservices").
 		Name(name).
@@ -128,8 +128,8 @@ func (c *aPIServices) Get(name string, options v1.GetOptions) (result *v1alpha1.
 }
 
 // List takes label and field selectors, and returns the list of APIServices that match those selectors.
-func (c *aPIServices) List(opts v1.ListOptions) (result *v1alpha1.APIServiceList, err error) {
-	result = &v1alpha1.APIServiceList{}
+func (c *aPIServices) List(opts v1.ListOptions) (result *v1beta1.APIServiceList, err error) {
+	result = &v1beta1.APIServiceList{}
 	err = c.client.Get().
 		Resource("apiservices").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -148,8 +148,8 @@ func (c *aPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched aPIService.
-func (c *aPIServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.APIService, err error) {
-	result = &v1alpha1.APIService{}
+func (c *aPIServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.APIService, err error) {
+	result = &v1beta1.APIService{}
 	err = c.client.Patch(pt).
 		Resource("apiservices").
 		SubResource(subresources...).
