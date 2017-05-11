@@ -146,7 +146,7 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 	}
 	constraints["l7-lb-controller"] = framework.ResourceConstraint{
 		CPUConstraint:    0.15,
-		MemoryConstraint: 60 * (1024 * 1024),
+		MemoryConstraint: 75 * (1024 * 1024),
 	}
 	constraints["influxdb"] = framework.ResourceConstraint{
 		CPUConstraint:    2,
