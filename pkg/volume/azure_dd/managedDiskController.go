@@ -236,9 +236,11 @@ func (c *managedDiskController) CreateDataDisk(diskName string, storageAccountTy
 	r.Header.Add("Authorization", "Bearer "+token)
 
 	resp, err := client.Do(r)
-
+	if err != nil {
+		return "", getRestError(fmt.Sprintf("Create Managed Disk: %s", diskName), err, 202, resp.StatusCode, resp.Body)
+	}
 	defer resp.Body.Close()
-	if err != nil || resp.StatusCode != 202 {
+	if resp.StatusCode != 202 {
 		return "", getRestError(fmt.Sprintf("Create Managed Disk: %s", diskName), err, 202, resp.StatusCode, resp.Body)
 	}
 
@@ -287,12 +289,14 @@ func (c *managedDiskController) DeleteDataDisk(diskUri string) error {
 	r.Header.Add("Authorization", "Bearer "+token)
 
 	resp, err := client.Do(r)
-
-	if err != nil || resp.StatusCode != 202 {
+	if err != nil {
+		return getRestError(fmt.Sprintf("Delete Managed Disk: %s", diskUri), err, 202, resp.StatusCode, resp.Body)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 202 {
 		return getRestError(fmt.Sprintf("Delete Managed Disk: %s", diskUri), err, 202, resp.StatusCode, resp.Body)
 	}
 
-	defer resp.Body.Close()
 	// We don't need poll here, k8s will immediatly stop referencing the disk
 	// the disk will be evantually deleted - cleanly - by ARM
 
@@ -318,9 +322,12 @@ func (c *managedDiskController) getDisk(diskName string) (bool, string, string, 
 	r.Header.Add("Authorization", "Bearer "+token)
 
 	resp, err := client.Do(r)
+	if err != nil {
+		return false, "", "", getRestError("Get Managed Disk", err, 200, resp.StatusCode, resp.Body)
+	}
 	defer resp.Body.Close()
 
-	if err != nil || resp.StatusCode != 200 {
+	if resp.StatusCode != 200 {
 		newError := getRestError("Get Managed Disk", err, 200, resp.StatusCode, resp.Body)
 		// log the new formatted error and return the original error
 		glog.Infof(newError.Error())

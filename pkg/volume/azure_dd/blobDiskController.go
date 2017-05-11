@@ -467,12 +467,15 @@ func (c *blobDiskController) getStorageAccountKey(SAName string) (string, error)
 	r.Header.Add("Authorization", "Bearer "+token)
 
 	resp, err := client.Do(r)
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil {
+		return "", getRestError("GetStorageAccountKeys", err, 200, resp.StatusCode, resp.Body)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
 		newError := getRestError("GetStorageAccountKeys", err, 200, resp.StatusCode, resp.Body)
 		return "", newError
 	}
-
-	defer resp.Body.Close()
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 
@@ -668,13 +671,15 @@ func (c *blobDiskController) getAllStorageAccounts() (map[string]*storageAccount
 
 	resp, err := client.Do(r)
 
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil {
+		return nil, getRestError("GetAllStorageAccounts", err, 200, resp.StatusCode, resp.Body)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
 		newError := getRestError("GetAllStorageAccounts", err, 200, resp.StatusCode, resp.Body)
 		glog.Infof(newError.Error())
 		return nil, newError
 	}
-
-	defer resp.Body.Close()
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 
@@ -766,8 +771,11 @@ func (c *blobDiskController) createStorageAccount(storageAccountName string, sto
 
 		resp, err := client.Do(r)
 
+		if err != nil {
+			return getRestError(fmt.Sprintf("Create Storage Account: %s", storageAccountName), err, 200, resp.StatusCode, resp.Body)
+		}
 		defer resp.Body.Close()
-		if err != nil || resp.StatusCode != 202 {
+		if resp.StatusCode != 202 {
 			return getRestError(fmt.Sprintf("Create Storage Account: %s", storageAccountName), err, 200, resp.StatusCode, resp.Body)
 		}
 
@@ -944,9 +952,11 @@ func (c *blobDiskController) getStorageAccount(storageAccountName string) (bool,
 
 	resp, err := client.Do(r)
 
+	if err != nil {
+		return false, "", getRestError(fmt.Sprintf("GetStorageAccount: %s", storageAccountName), err, 200, resp.StatusCode, resp.Body)
+	}
 	defer resp.Body.Close()
-
-	if err != nil || resp.StatusCode != 200 {
+	if resp.StatusCode != 200 {
 		if resp.StatusCode == 404 {
 			// we are ok the account does not exist
 			return false, "", nil
