@@ -17,10 +17,28 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
-	return scheme.AddConversionFuncs()
+	for _, k := range []string{"SubjectAccessReview", "SelfSubjectAccessReview", "LocalSubjectAccessReview"} {
+		kind := k // don't close over range variables
+		err := scheme.AddFieldLabelConversionFunc("authorization/v1", kind,
+			func(label, value string) (string, string, error) {
+				switch label {
+				case "metadata.name":
+					return label, value, nil
+				default:
+					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
+				}
+			},
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

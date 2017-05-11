@@ -17,7 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	api "k8s.io/kubernetes/pkg/apis/rbac"
 )
@@ -25,6 +27,46 @@ import (
 // allAuthenticated matches k8s.io/apiserver/pkg/authentication/user.AllAuthenticated,
 // but we don't want an client library (which must include types), depending on a server library
 const allAuthenticated = "system:authenticated"
+
+func addConversionFuncs(scheme *runtime.Scheme) error {
+	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
+	for _, k := range []string{"Role", "RoleBinding"} {
+		kind := k // don't close over range variables
+		err := scheme.AddFieldLabelConversionFunc("rbac/v1alpha1", kind,
+			func(label, value string) (string, string, error) {
+				switch label {
+				case "metadata.name", "metadata.namespace":
+					return label, value, nil
+				default:
+					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
+				}
+			},
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Add field label conversions for non-namespace scoped objects.
+	for _, k := range []string{"ClusterRole", "ClusterRoleBinding"} {
+		kind := k // don't close over range variables
+		err := scheme.AddFieldLabelConversionFunc("rbac/v1alpha1", kind,
+			func(label, value string) (string, string, error) {
+				switch label {
+				case "metadata.name":
+					return label, value, nil
+				default:
+					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
+				}
+			},
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 func Convert_v1alpha1_Subject_To_rbac_Subject(in *Subject, out *api.Subject, s conversion.Scope) error {
 	if err := autoConvert_v1alpha1_Subject_To_rbac_Subject(in, out, s); err != nil {

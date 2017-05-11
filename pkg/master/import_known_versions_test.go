@@ -67,6 +67,63 @@ func TestTypeTags(t *testing.T) {
 	}
 }
 
+func TestRegisteredObjectFieldSelector(t *testing.T) {
+	namespaceScopedObjects := map[string][]string{
+		"v1":                   {"Pod", "ReplicationController", "Service", "ConfigMap", "Secret", "PersistentVolumeClaim", "ResourceQuota", "ServiceAccount", "PodTemplate", "Endpoints", "Event", "LimitRange", "Binding"},
+		"apps/v1beta1":         {"Deployment", "StatefulSet"},
+		"autoscaling/v1":       {"HorizontalPodAutoscaler"},
+		"autoscaling/v2alpha1": {"HorizontalPodAutoscaler"},
+		"batch/v1":             {"Job"},
+		"batch/v2alpha1":       {"CronJob"},
+		"extensions/v1beta1":   {"Deployment", "DaemonSet", "ReplicaSet", "Ingress", "NetworkPolicy"},
+		"policy/v1beta1":       {"PodDisruptionBudget"},
+		"rbac/v1alpha1":        {"Role", "RoleBinding"},
+		"rbac/v1beta1":         {"Role", "RoleBinding"},
+		"settings/v1alpha1":    {"PodPreset"},
+	}
+
+	nonNamespaceScopedObjects := map[string][]string{
+		"v1":                          {"Namespace", "Node", "PersistentVolume", "ComponentStatus"},
+		"authentication/v1":           {"TokenReview"},
+		"authentication/v1beta1":      {"TokenReview"},
+		"authorization/v1":            {"LocalSubjectAccessReview", "SelfSubjectAccessReview", "SubjectAccessReview"},
+		"authorization/v1beta1":       {"LocalSubjectAccessReview", "SelfSubjectAccessReview", "SubjectAccessReview"},
+		"certificates.k8s.io/v1beta1": {"CertificateSigningRequest"},
+		"extensions/v1beta1":          {"ThirdPartyResource", "PodSecurityPolicy"},
+		"storage/v1":                  {"StorageClass"},
+		"storage/v1beta1":             {"StorageClass"},
+		"rbac/v1alpha1":               {"ClusterRole", "ClusterRoleBinding"},
+		"rbac/v1beta1":                {"ClusterRole", "ClusterRoleBinding"},
+	}
+
+	testMetadataName := func(version, kind string) {
+		_, _, err := api.Scheme.ConvertFieldLabel(version, kind, "metadata.name", "foo")
+		if err != nil {
+			t.Errorf("field 'metadata.name' is not supported by the field selector conversion function of %s-%s", version, kind)
+		}
+	}
+
+	for version, kinds := range namespaceScopedObjects {
+		for _, kind := range kinds {
+			testMetadataName(version, kind)
+			_, _, err := api.Scheme.ConvertFieldLabel(version, kind, "metadata.namespace", "default")
+			if err != nil {
+				t.Errorf("field 'metadata.namespace' is not supported by the field selector conversion function of %s-%s", version, kind)
+			}
+		}
+	}
+
+	for version, kinds := range nonNamespaceScopedObjects {
+		for _, kind := range kinds {
+			testMetadataName(version, kind)
+			_, _, err := api.Scheme.ConvertFieldLabel(version, kind, "metadata.namespace", "default")
+			if err == nil {
+				t.Errorf("field 'metadata.namespace' should not be supported by the field selector conversion function of non-namespace scoped object %s-%s", version, kind)
+			}
+		}
+	}
+}
+
 // These types are registered in external versions, and therefore include json tags,
 // but are also registered in internal versions (or referenced from internal types),
 // so we explicitly allow tags for them
