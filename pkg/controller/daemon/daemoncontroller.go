@@ -426,13 +426,47 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 	}
 }
 
+func isNodeConditionEquals(old, cur []v1.NodeCondition) bool {
+	var oldCon, curCon v1.NodeConditionType
+
+	for _, c := range old {
+		if c.Status == v1.ConditionTrue {
+			oldCon = c.Type
+		}
+	}
+
+	for _, c := range cur {
+		if c.Status == v1.ConditionTrue {
+			curCon = c.Type
+		}
+	}
+
+	return oldCon == curCon
+}
+
 func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 	oldNode := old.(*v1.Node)
 	curNode := cur.(*v1.Node)
-	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) && reflect.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints) {
+
+	oldCond, err := v1helper.GetAvailableNodeConditionType(oldNode.Status.Conditions)
+	if err != nil {
+		glog.Errorf("Failed to get old node's condition: %v", err)
+		return
+	}
+
+	curCond, err := v1helper.GetAvailableNodeConditionType(curNode.Status.Conditions)
+	if err != nil {
+		glog.Errorf("Failed to get current node's condition: %v", err)
+		return
+	}
+
+	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) &&
+		reflect.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints) &&
+		reflect.DeepEqual(oldCond, curCond) {
 		// If node labels and taints didn't change, we can ignore this update.
 		return
 	}
+
 	dsList, err := dsc.dsLister.List(labels.Everything())
 	if err != nil {
 		glog.V(4).Infof("Error enqueueing daemon sets: %v", err)
