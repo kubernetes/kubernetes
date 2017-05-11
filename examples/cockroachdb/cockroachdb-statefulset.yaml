@@ -93,24 +93,23 @@ spec:
         image: cockroachdb/cockroach-k8s-init:0.1
         imagePullPolicy: IfNotPresent
         args:
-          - "-on-start=/on-start.sh"
-          - "-service=cockroachdb"
+        - "-on-start=/on-start.sh"
+        - "-service=cockroachdb"
         env:
-          - name: POD_NAMESPACE
-            valueFrom:
-              fieldRef:
-                apiVersion: v1
-                fieldPath: metadata.namespace
-       volumeMounts:
-       - name: datadir
-         mountPath: "/cockroach/cockroach-data"
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: datadir
+          mountPath: "/cockroach/cockroach-data"
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 100
             podAffinityTerm:
               labelSelector:
-                matchExpress:
+                matchExpressions:
                 - key: app
                   operator: In
                   values:
