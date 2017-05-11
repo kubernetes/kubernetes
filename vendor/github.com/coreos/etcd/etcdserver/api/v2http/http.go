@@ -35,7 +35,7 @@ const (
 )
 
 var (
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd/etcdserver/api", "v2http")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "etcdserver/api/v2http")
 	mlog = logutil.NewMergeLogger(plog)
 )
 
@@ -60,7 +60,7 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		}
 	default:
 		switch err {
-		case etcdserver.ErrTimeoutDueToLeaderFail, etcdserver.ErrTimeoutDueToConnectionLost, etcdserver.ErrNotEnoughStartedMembers:
+		case etcdserver.ErrTimeoutDueToLeaderFail, etcdserver.ErrTimeoutDueToConnectionLost, etcdserver.ErrNotEnoughStartedMembers, etcdserver.ErrUnhealthy:
 			mlog.MergeError(err)
 		default:
 			mlog.MergeErrorf("got unexpected response error (%v)", err)

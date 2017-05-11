@@ -25,12 +25,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kadmission "k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	kapi "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
@@ -833,7 +835,8 @@ func TestAdmitRunAsUser(t *testing.T) {
 		// doesn't matter if we set it here or on the container, the
 		// admission controller uses DetermineEffectiveSC to get the defaulting
 		// behavior so it can validate what will be applied at runtime
-		pod.Spec.SecurityContext.RunAsUser = &user
+		userID := types.UnixUserID(user)
+		pod.Spec.SecurityContext.RunAsUser = &userID
 		return pod
 	}
 
@@ -852,7 +855,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 		pod               *kapi.Pod
 		psps              []*extensions.PodSecurityPolicy
 		shouldPass        bool
-		expectedRunAsUser *int
+		expectedRunAsUser *types.UnixUserID
 		expectedPSP       string
 	}{
 		"runAsAny no pod request": {
@@ -866,7 +869,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 			pod:               createPodWithRunAsUser(1),
 			psps:              []*extensions.PodSecurityPolicy{runAsAny},
 			shouldPass:        true,
-			expectedRunAsUser: intPtr(1),
+			expectedRunAsUser: userIDPtr(1),
 			expectedPSP:       runAsAny.Name,
 		},
 		"mustRunAs pod request out of range": {
@@ -878,14 +881,14 @@ func TestAdmitRunAsUser(t *testing.T) {
 			pod:               createPodWithRunAsUser(999),
 			psps:              []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPass:        true,
-			expectedRunAsUser: intPtr(int(mustRunAs.Spec.RunAsUser.Ranges[0].Min)),
+			expectedRunAsUser: &mustRunAs.Spec.RunAsUser.Ranges[0].Min,
 			expectedPSP:       mustRunAs.Name,
 		},
 		"mustRunAs no pod request": {
 			pod:               goodPod(),
 			psps:              []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPass:        true,
-			expectedRunAsUser: intPtr(int(mustRunAs.Spec.RunAsUser.Ranges[0].Min)),
+			expectedRunAsUser: &mustRunAs.Spec.RunAsUser.Ranges[0].Min,
 			expectedPSP:       mustRunAs.Name,
 		},
 		"runAsNonRoot no pod request": {
@@ -904,7 +907,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 			pod:               createPodWithRunAsUser(1),
 			psps:              []*extensions.PodSecurityPolicy{runAsNonRoot},
 			shouldPass:        true,
-			expectedRunAsUser: intPtr(1),
+			expectedRunAsUser: userIDPtr(1),
 			expectedPSP:       runAsNonRoot.Name,
 		},
 	}
@@ -925,7 +928,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 				t.Errorf("%s expected RunAsUser to be nil but found: %v", k, *v.pod.Spec.Containers[0].SecurityContext.RunAsUser)
 				continue
 			}
-			if int64(*v.expectedRunAsUser) != *v.pod.Spec.Containers[0].SecurityContext.RunAsUser {
+			if *v.expectedRunAsUser != *v.pod.Spec.Containers[0].SecurityContext.RunAsUser {
 				t.Errorf("%s expected RunAsUser to be: %v but found %v", k, *v.expectedRunAsUser, *v.pod.Spec.Containers[0].SecurityContext.RunAsUser)
 			}
 		}
@@ -938,7 +941,8 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 		// doesn't matter if we set it here or on the container, the
 		// admission controller uses DetermineEffectiveSC to get the defaulting
 		// behavior so it can validate what will be applied at runtime
-		pod.Spec.SecurityContext.SupplementalGroups = []int64{group}
+		groupID := types.UnixGroupID(group)
+		pod.Spec.SecurityContext.SupplementalGroups = []types.UnixGroupID{groupID}
 		return pod
 	}
 
@@ -953,28 +957,28 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 		pod               *kapi.Pod
 		psps              []*extensions.PodSecurityPolicy
 		shouldPass        bool
-		expectedSupGroups []int64
+		expectedSupGroups []types.UnixGroupID
 		expectedPSP       string
 	}{
 		"runAsAny no pod request": {
 			pod:               goodPod(),
 			psps:              []*extensions.PodSecurityPolicy{runAsAny},
 			shouldPass:        true,
-			expectedSupGroups: []int64{},
+			expectedSupGroups: []types.UnixGroupID{},
 			expectedPSP:       runAsAny.Name,
 		},
 		"runAsAny pod request": {
 			pod:               createPodWithSupGroup(1),
 			psps:              []*extensions.PodSecurityPolicy{runAsAny},
 			shouldPass:        true,
-			expectedSupGroups: []int64{1},
+			expectedSupGroups: []types.UnixGroupID{1},
 			expectedPSP:       runAsAny.Name,
 		},
 		"mustRunAs no pod request": {
 			pod:               goodPod(),
 			psps:              []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPass:        true,
-			expectedSupGroups: []int64{mustRunAs.Spec.SupplementalGroups.Ranges[0].Min},
+			expectedSupGroups: []types.UnixGroupID{mustRunAs.Spec.SupplementalGroups.Ranges[0].Min},
 			expectedPSP:       mustRunAs.Name,
 		},
 		"mustRunAs bad pod request": {
@@ -986,7 +990,7 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 			pod:               createPodWithSupGroup(999),
 			psps:              []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPass:        true,
-			expectedSupGroups: []int64{999},
+			expectedSupGroups: []types.UnixGroupID{999},
 			expectedPSP:       mustRunAs.Name,
 		},
 	}
@@ -1011,12 +1015,12 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 }
 
 func TestAdmitFSGroup(t *testing.T) {
-	createPodWithFSGroup := func(group int64) *kapi.Pod {
+	createPodWithFSGroup := func(group int) *kapi.Pod {
 		pod := goodPod()
 		// doesn't matter if we set it here or on the container, the
 		// admission controller uses DetermineEffectiveSC to get the defaulting
 		// behavior so it can validate what will be applied at runtime
-		pod.Spec.SecurityContext.FSGroup = &group
+		pod.Spec.SecurityContext.FSGroup = groupIDPtr(group)
 		return pod
 	}
 
@@ -1031,7 +1035,7 @@ func TestAdmitFSGroup(t *testing.T) {
 		pod             *kapi.Pod
 		psps            []*extensions.PodSecurityPolicy
 		shouldPass      bool
-		expectedFSGroup *int64
+		expectedFSGroup *types.UnixGroupID
 		expectedPSP     string
 	}{
 		"runAsAny no pod request": {
@@ -1045,7 +1049,7 @@ func TestAdmitFSGroup(t *testing.T) {
 			pod:             createPodWithFSGroup(1),
 			psps:            []*extensions.PodSecurityPolicy{runAsAny},
 			shouldPass:      true,
-			expectedFSGroup: int64Ptr(1),
+			expectedFSGroup: groupIDPtr(1),
 			expectedPSP:     runAsAny.Name,
 		},
 		"mustRunAs no pod request": {
@@ -1064,7 +1068,7 @@ func TestAdmitFSGroup(t *testing.T) {
 			pod:             createPodWithFSGroup(999),
 			psps:            []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPass:      true,
-			expectedFSGroup: int64Ptr(999),
+			expectedFSGroup: groupIDPtr(999),
 			expectedPSP:     mustRunAs.Name,
 		},
 	}
@@ -1172,8 +1176,8 @@ func TestAdmitSysctls(t *testing.T) {
 			}
 			return sysctls
 		}
-		pod.Annotations[kapi.SysctlsPodAnnotationKey] = kapi.PodAnnotationsFromSysctls(dummySysctls(safeSysctls))
-		pod.Annotations[kapi.UnsafeSysctlsPodAnnotationKey] = kapi.PodAnnotationsFromSysctls(dummySysctls(unsafeSysctls))
+		pod.Annotations[kapi.SysctlsPodAnnotationKey] = helper.PodAnnotationsFromSysctls(dummySysctls(safeSysctls))
+		pod.Annotations[kapi.UnsafeSysctlsPodAnnotationKey] = helper.PodAnnotationsFromSysctls(dummySysctls(unsafeSysctls))
 		return pod
 	}
 
@@ -1319,7 +1323,7 @@ func TestAdmitSysctls(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		origSafeSysctls, origUnsafeSysctls, err := kapi.SysctlsFromPodAnnotations(v.pod.Annotations)
+		origSafeSysctls, origUnsafeSysctls, err := helper.SysctlsFromPodAnnotations(v.pod.Annotations)
 		if err != nil {
 			t.Fatalf("invalid sysctl annotation: %v", err)
 		}
@@ -1327,7 +1331,7 @@ func TestAdmitSysctls(t *testing.T) {
 		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
 
 		if v.shouldPass {
-			safeSysctls, unsafeSysctls, _ := kapi.SysctlsFromPodAnnotations(v.pod.Annotations)
+			safeSysctls, unsafeSysctls, _ := helper.SysctlsFromPodAnnotations(v.pod.Annotations)
 			if !reflect.DeepEqual(safeSysctls, origSafeSysctls) {
 				t.Errorf("%s: wrong safe sysctls: expected=%v, got=%v", k, origSafeSysctls, safeSysctls)
 			}
@@ -1612,25 +1616,34 @@ func TestGetMatchingPolicies(t *testing.T) {
 			},
 			expectedPolicies: sets.NewString("policy1", "policy2", "policy4", "policy5"),
 		},
-		"policies are allowed for nil user info": {
-			user:    nil,
-			sa:      &user.DefaultInfo{Name: "sa"},
-			ns:      "test",
-			allowed: map[string]map[string]map[string]bool{}, // authorizer not consulted
+		"policies are not allowed for nil user info": {
+			user: nil,
+			sa:   &user.DefaultInfo{Name: "sa"},
+			ns:   "test",
+			allowed: map[string]map[string]map[string]bool{
+				"sa": {
+					"test": {"policy1": true},
+				},
+				"user": {
+					"test": {"policy2": true},
+				},
+			},
 			inPolicies: []*extensions.PodSecurityPolicy{
 				policyWithName("policy1"),
 				policyWithName("policy2"),
 				policyWithName("policy3"),
 			},
-			// all policies are allowed regardless of the permissions when user info is nil
-			// (ie. a request hitting the unsecure port)
-			expectedPolicies: sets.NewString("policy1", "policy2", "policy3"),
+			// only the policies for the sa are allowed when user info is nil
+			expectedPolicies: sets.NewString("policy1"),
 		},
 		"policies are not allowed for nil sa info": {
 			user: &user.DefaultInfo{Name: "user"},
 			sa:   nil,
 			ns:   "test",
 			allowed: map[string]map[string]map[string]bool{
+				"sa": {
+					"test": {"policy1": true},
+				},
 				"user": {
 					"test": {"policy2": true},
 				},
@@ -1642,6 +1655,26 @@ func TestGetMatchingPolicies(t *testing.T) {
 			},
 			// only the policies for the user are allowed when sa info is nil
 			expectedPolicies: sets.NewString("policy2"),
+		},
+		"policies are not allowed for nil sa and user info": {
+			user: nil,
+			sa:   nil,
+			ns:   "test",
+			allowed: map[string]map[string]map[string]bool{
+				"sa": {
+					"test": {"policy1": true},
+				},
+				"user": {
+					"test": {"policy2": true},
+				},
+			},
+			inPolicies: []*extensions.PodSecurityPolicy{
+				policyWithName("policy1"),
+				policyWithName("policy2"),
+				policyWithName("policy3"),
+			},
+			// no policies are allowed if sa and user are both nil
+			expectedPolicies: sets.NewString(),
 		},
 	}
 	for k, v := range tests {
@@ -1677,8 +1710,8 @@ func restrictivePSP() *extensions.PodSecurityPolicy {
 		Spec: extensions.PodSecurityPolicySpec{
 			RunAsUser: extensions.RunAsUserStrategyOptions{
 				Rule: extensions.RunAsUserStrategyMustRunAs,
-				Ranges: []extensions.IDRange{
-					{Min: 999, Max: 999},
+				Ranges: []extensions.UserIDRange{
+					{Min: types.UnixUserID(999), Max: types.UnixUserID(999)},
 				},
 			},
 			SELinux: extensions.SELinuxStrategyOptions{
@@ -1689,14 +1722,14 @@ func restrictivePSP() *extensions.PodSecurityPolicy {
 			},
 			FSGroup: extensions.FSGroupStrategyOptions{
 				Rule: extensions.FSGroupStrategyMustRunAs,
-				Ranges: []extensions.IDRange{
-					{Min: 999, Max: 999},
+				Ranges: []extensions.GroupIDRange{
+					{Min: types.UnixGroupID(999), Max: types.UnixGroupID(999)},
 				},
 			},
 			SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
 				Rule: extensions.SupplementalGroupsStrategyMustRunAs,
-				Ranges: []extensions.IDRange{
-					{Min: 999, Max: 999},
+				Ranges: []extensions.GroupIDRange{
+					{Min: types.UnixGroupID(999), Max: types.UnixGroupID(999)},
 				},
 			},
 		},
@@ -1741,11 +1774,12 @@ func goodPod() *kapi.Pod {
 	}
 }
 
-func intPtr(i int) *int {
-	return &i
+func userIDPtr(i int) *types.UnixUserID {
+	userID := types.UnixUserID(i)
+	return &userID
 }
 
-func int64Ptr(i int) *int64 {
-	i64 := int64(i)
-	return &i64
+func groupIDPtr(i int) *types.UnixGroupID {
+	groupID := types.UnixGroupID(i)
+	return &groupID
 }

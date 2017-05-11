@@ -17,18 +17,26 @@ limitations under the License.
 package gce
 
 import (
+	"time"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 
 	compute "google.golang.org/api/compute/v1"
 )
 
-// Firewall management: These methods are just passthrough to the existing
-// internal firewall creation methods used to manage TCPLoadBalancer.
+func newFirewallMetricContext(request string, region string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"firewall_" + request, region, unusedMetricLabel},
+	}
+}
 
 // GetFirewall returns the Firewall by name.
 func (gce *GCECloud) GetFirewall(name string) (*compute.Firewall, error) {
-	return gce.service.Firewalls.Get(gce.projectID, name).Do()
+	mc := newFirewallMetricContext("get", "")
+	v, err := gce.service.Firewalls.Get(gce.projectID, name).Do()
+	return v, mc.Observe(err)
 }
 
 // CreateFirewall creates the given firewall rule.
@@ -37,22 +45,28 @@ func (gce *GCECloud) CreateFirewall(name, desc string, sourceRanges netsets.IPNe
 	if err != nil {
 		return err
 	}
-	// TODO: This completely breaks modularity in the cloudprovider but the methods
-	// shared with the TCPLoadBalancer take v1.ServicePorts.
+
+	mc := newFirewallMetricContext("create", region)
+	// TODO: This completely breaks modularity in the cloudprovider but
+	// the methods shared with the TCPLoadBalancer take v1.ServicePorts.
 	svcPorts := []v1.ServicePort{}
 	// TODO: Currently the only consumer of this method is the GCE L7
-	// loadbalancer controller, which never needs a protocol other than TCP.
-	// We should pipe through a mapping of port:protocol and default to TCP
-	// if UDP ports are required. This means the method signature will change
-	// forcing downstream clients to refactor interfaces.
+	// loadbalancer controller, which never needs a protocol other than
+	// TCP.  We should pipe through a mapping of port:protocol and
+	// default to TCP if UDP ports are required. This means the method
+	// signature will change forcing downstream clients to refactor
+	// interfaces.
 	for _, p := range ports {
 		svcPorts = append(svcPorts, v1.ServicePort{Port: int32(p), Protocol: v1.ProtocolTCP})
 	}
+
 	hosts, err := gce.getInstancesByNames(hostNames)
 	if err != nil {
+		mc.Observe(err)
 		return err
 	}
-	return gce.createFirewall(name, region, desc, sourceRanges, svcPorts, hosts)
+
+	return mc.Observe(gce.createFirewall(name, region, desc, sourceRanges, svcPorts, hosts))
 }
 
 // DeleteFirewall deletes the given firewall rule.
@@ -61,30 +75,40 @@ func (gce *GCECloud) DeleteFirewall(name string) error {
 	if err != nil {
 		return err
 	}
-	return gce.deleteFirewall(name, region)
+
+	mc := newFirewallMetricContext("delete", region)
+
+	return mc.Observe(gce.deleteFirewall(name, region))
 }
 
-// UpdateFirewall applies the given firewall rule as an update to an existing
-// firewall rule with the same name.
+// UpdateFirewall applies the given firewall rule as an update to an
+// existing firewall rule with the same name.
 func (gce *GCECloud) UpdateFirewall(name, desc string, sourceRanges netsets.IPNet, ports []int64, hostNames []string) error {
+
 	region, err := GetGCERegion(gce.localZone)
 	if err != nil {
 		return err
 	}
-	// TODO: This completely breaks modularity in the cloudprovider but the methods
-	// shared with the TCPLoadBalancer take v1.ServicePorts.
+
+	mc := newFirewallMetricContext("update", region)
+	// TODO: This completely breaks modularity in the cloudprovider but
+	// the methods shared with the TCPLoadBalancer take v1.ServicePorts.
 	svcPorts := []v1.ServicePort{}
 	// TODO: Currently the only consumer of this method is the GCE L7
-	// loadbalancer controller, which never needs a protocol other than TCP.
-	// We should pipe through a mapping of port:protocol and default to TCP
-	// if UDP ports are required. This means the method signature will change,
-	// forcing downstream clients to refactor interfaces.
+	// loadbalancer controller, which never needs a protocol other than
+	// TCP.  We should pipe through a mapping of port:protocol and
+	// default to TCP if UDP ports are required. This means the method
+	// signature will change, forcing downstream clients to refactor
+	// interfaces.
 	for _, p := range ports {
 		svcPorts = append(svcPorts, v1.ServicePort{Port: int32(p), Protocol: v1.ProtocolTCP})
 	}
+
 	hosts, err := gce.getInstancesByNames(hostNames)
 	if err != nil {
+		mc.Observe(err)
 		return err
 	}
-	return gce.updateFirewall(name, region, desc, sourceRanges, svcPorts, hosts)
+
+	return mc.Observe(gce.updateFirewall(name, region, desc, sourceRanges, svcPorts, hosts))
 }

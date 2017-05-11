@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 )
 
@@ -62,7 +61,7 @@ func (s *clusterRoleLister) Get(name string) (*v1beta1.ClusterRole, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(rbac.Resource("clusterrole"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("clusterrole"), name)
 	}
 	return obj.(*v1beta1.ClusterRole), nil
 }

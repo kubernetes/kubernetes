@@ -31,6 +31,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/fatih/camelcase"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -47,6 +48,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/events"
+	"k8s.io/kubernetes/pkg/api/helper"
+	"k8s.io/kubernetes/pkg/api/ref"
+	resourcehelper "k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -62,10 +66,12 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 // Each level has 2 spaces for PrefixWriter
@@ -194,11 +200,74 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings pr
 		w.Write(LEVEL_0, "Name:\t%s\n", obj.GetName())
 		w.Write(LEVEL_0, "Namespace:\t%s\n", obj.GetNamespace())
 		printLabelsMultiline(w, "Labels", obj.GetLabels())
+		printAnnotationsMultiline(w, "Annotations", obj.GetAnnotations())
+		printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), "", ".metadata.name", ".metadata.namespace", ".metadata.labels", ".metadata.annotations")
 		if events != nil {
 			DescribeEvents(events, w)
 		}
 		return nil
 	})
+}
+
+func printUnstructuredContent(w PrefixWriter, level int, content map[string]interface{}, skipPrefix string, skip ...string) {
+	fields := []string{}
+	for field := range content {
+		fields = append(fields, field)
+	}
+	sort.Strings(fields)
+
+	for _, field := range fields {
+		value := content[field]
+		switch typedValue := value.(type) {
+		case map[string]interface{}:
+			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
+			if slice.ContainsString(skip, skipExpr, nil) {
+				continue
+			}
+			w.Write(level, fmt.Sprintf("%s:\n", smartLabelFor(field)))
+			printUnstructuredContent(w, level+1, typedValue, skipExpr, skip...)
+
+		case []interface{}:
+			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
+			if slice.ContainsString(skip, skipExpr, nil) {
+				continue
+			}
+			w.Write(level, fmt.Sprintf("%s:\n", smartLabelFor(field)))
+			for _, child := range typedValue {
+				switch typedChild := child.(type) {
+				case map[string]interface{}:
+					printUnstructuredContent(w, level+1, typedChild, skipExpr, skip...)
+				default:
+					w.Write(level+1, fmt.Sprintf("%v\n", typedChild))
+				}
+			}
+
+		default:
+			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
+			if slice.ContainsString(skip, skipExpr, nil) {
+				continue
+			}
+			w.Write(level, fmt.Sprintf("%s:\t%v\n", smartLabelFor(field), typedValue))
+		}
+	}
+}
+
+func smartLabelFor(field string) string {
+	commonAcronyms := []string{"API", "URL", "UID", "OSB", "GUID"}
+
+	splitted := camelcase.Split(field)
+	for i := 0; i < len(splitted); i++ {
+		part := splitted[i]
+
+		if slice.ContainsString(commonAcronyms, strings.ToUpper(part), nil) {
+			part = strings.ToUpper(part)
+		} else {
+			part = strings.Title(part)
+		}
+		splitted[i] = part
+	}
+
+	return strings.Join(splitted, " ")
 }
 
 // DefaultObjectDescriber can describe the default Kubernetes objects.
@@ -519,7 +588,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings printe
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		if ref, err := api.GetReference(api.Scheme, pod); err != nil {
+		if ref, err := ref.GetReference(api.Scheme, pod); err != nil {
 			glog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
 		} else {
 			ref.Kind = ""
@@ -554,7 +623,12 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			w.Write(LEVEL_0, "Message:\t%s\n", pod.Status.Message)
 		}
 		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
-		w.Write(LEVEL_0, "Controllers:\t%s\n", printControllers(pod.Annotations))
+		if createdBy := printCreator(pod.Annotations); len(createdBy) > 0 {
+			w.Write(LEVEL_0, "Created By:\t%s\n", createdBy)
+		}
+		if controlledBy := printController(pod); len(controlledBy) > 0 {
+			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
+		}
 
 		if len(pod.Spec.InitContainers) > 0 {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
@@ -583,7 +657,14 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 	})
 }
 
-func printControllers(annotation map[string]string) string {
+func printController(controllee metav1.Object) string {
+	if controllerRef := controller.GetControllerOf(controllee); controllerRef != nil {
+		return fmt.Sprintf("%s/%s", controllerRef.Kind, controllerRef.Name)
+	}
+	return ""
+}
+
+func printCreator(annotation map[string]string) string {
 	value, ok := annotation[api.CreatedByAnnotation]
 	if ok {
 		var r api.SerializedReference
@@ -592,7 +673,7 @@ func printControllers(annotation map[string]string) string {
 			return fmt.Sprintf("%s/%s", r.Reference.Kind, r.Reference.Name)
 		}
 	}
-	return "<none>"
+	return ""
 }
 
 func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
@@ -847,7 +928,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 		w.Write(LEVEL_0, "Name:\t%s\n", pv.Name)
 		printLabelsMultiline(w, "Labels", pv.Labels)
 		printAnnotationsMultiline(w, "Annotations", pv.Annotations)
-		w.Write(LEVEL_0, "StorageClass:\t%s\n", api.GetPersistentVolumeClass(pv))
+		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClass(pv))
 		w.Write(LEVEL_0, "Status:\t%s\n", pv.Status.Phase)
 		if pv.Spec.ClaimRef != nil {
 			w.Write(LEVEL_0, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
@@ -855,7 +936,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			w.Write(LEVEL_0, "Claim:\t%s\n", "")
 		}
 		w.Write(LEVEL_0, "Reclaim Policy:\t%v\n", pv.Spec.PersistentVolumeReclaimPolicy)
-		w.Write(LEVEL_0, "Access Modes:\t%s\n", api.GetAccessModesAsString(pv.Spec.AccessModes))
+		w.Write(LEVEL_0, "Access Modes:\t%s\n", helper.GetAccessModesAsString(pv.Spec.AccessModes))
 		w.Write(LEVEL_0, "Capacity:\t%s\n", storage.String())
 		w.Write(LEVEL_0, "Message:\t%s\n", pv.Status.Message)
 		w.Write(LEVEL_0, "Source:\n")
@@ -915,7 +996,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 	capacity := ""
 	accessModes := ""
 	if pvc.Spec.VolumeName != "" {
-		accessModes = api.GetAccessModesAsString(pvc.Status.AccessModes)
+		accessModes = helper.GetAccessModesAsString(pvc.Status.AccessModes)
 		storage = pvc.Status.Capacity[api.ResourceStorage]
 		capacity = storage.String()
 	}
@@ -926,7 +1007,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
-		w.Write(LEVEL_0, "StorageClass:\t%s\n", api.GetPersistentVolumeClaimClass(pvc))
+		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClaimClass(pvc))
 		w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
 		w.Write(LEVEL_0, "Volume:\t%s\n", pvc.Spec.VolumeName)
 		printLabelsMultiline(w, "Labels", pvc.Labels)
@@ -992,7 +1073,11 @@ func describeContainerBasicInfo(container api.Container, status api.ContainerSta
 	if strings.Contains(portString, ",") {
 		w.Write(LEVEL_2, "Ports:\t%s\n", portString)
 	} else {
-		w.Write(LEVEL_2, "Port:\t%s\n", portString)
+		if len(portString) == 0 {
+			w.Write(LEVEL_2, "Port:\t<none>\n")
+		} else {
+			w.Write(LEVEL_2, "Port:\t%s\n", portString)
+		}
 	}
 }
 
@@ -1100,7 +1185,7 @@ func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolver
 			}
 			w.Write(LEVEL_3, "%s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
 		case e.ValueFrom.ResourceFieldRef != nil:
-			valueFrom, err := api.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
+			valueFrom, err := resourcehelper.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
 			if err != nil {
 				valueFrom = ""
 			}
@@ -1225,7 +1310,7 @@ func describeVolumeClaimTemplates(templates []api.PersistentVolumeClaim, w Prefi
 	w.Write(LEVEL_0, "Volume Claims:\n")
 	for _, pvc := range templates {
 		w.Write(LEVEL_1, "Name:\t%s\n", pvc.Name)
-		w.Write(LEVEL_1, "StorageClass:\t%s\n", api.GetPersistentVolumeClaimClass(&pvc))
+		w.Write(LEVEL_1, "StorageClass:\t%s\n", helper.GetPersistentVolumeClaimClass(&pvc))
 		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.NewString())
 		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.NewString())
 		if capacity, ok := pvc.Spec.Resources.Requests[api.ResourceStorage]; ok {
@@ -1291,8 +1376,14 @@ func describeReplicationController(controller *api.ReplicationController, events
 		printAnnotationsMultiline(w, "Annotations", controller.Annotations)
 		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
-
 		DescribePodTemplate(controller.Spec.Template, w)
+		if len(controller.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
+			w.Write(LEVEL_1, "----\t------\t------\n")
+			for _, c := range controller.Status.Conditions {
+				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
+			}
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1357,6 +1448,9 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		w.Write(LEVEL_0, "Selector:\t%s\n", metav1.FormatLabelSelector(rs.Spec.Selector))
 		printLabelsMultiline(w, "Labels", rs.Labels)
 		printAnnotationsMultiline(w, "Annotations", rs.Annotations)
+		if controlledBy := printController(rs); len(controlledBy) > 0 {
+			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
+		}
 		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
 		w.Write(LEVEL_0, "Pods Status:\t")
 		if getPodErr != nil {
@@ -1365,6 +1459,13 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 			w.Write(LEVEL_0, "%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		}
 		DescribePodTemplate(&rs.Spec.Template, w)
+		if len(rs.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
+			w.Write(LEVEL_1, "----\t------\t------\n")
+			for _, c := range rs.Status.Conditions {
+				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
+			}
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1400,6 +1501,9 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		printLabelsMultiline(w, "Labels", job.Labels)
 		printAnnotationsMultiline(w, "Annotations", job.Annotations)
+		if createdBy := printCreator(job.Annotations); len(createdBy) > 0 {
+			w.Write(LEVEL_0, "Created By:\t%s\n", createdBy)
+		}
 		w.Write(LEVEL_0, "Parallelism:\t%d\n", *job.Spec.Parallelism)
 		if job.Spec.Completions != nil {
 			w.Write(LEVEL_0, "Completions:\t%d\n", *job.Spec.Completions)
@@ -1421,47 +1525,47 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 	})
 }
 
-// CronJobDescriber generates information about a scheduled job and the jobs it has created.
+// CronJobDescriber generates information about a cron job and the jobs it has created.
 type CronJobDescriber struct {
 	clientset.Interface
 }
 
 func (d *CronJobDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	scheduledJob, err := d.Batch().CronJobs(namespace).Get(name, metav1.GetOptions{})
+	cronJob, err := d.Batch().CronJobs(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		events, _ = d.Core().Events(namespace).Search(api.Scheme, scheduledJob)
+		events, _ = d.Core().Events(namespace).Search(api.Scheme, cronJob)
 	}
 
-	return describeCronJob(scheduledJob, events)
+	return describeCronJob(cronJob, events)
 }
 
-func describeCronJob(scheduledJob *batch.CronJob, events *api.EventList) (string, error) {
+func describeCronJob(cronJob *batch.CronJob, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", scheduledJob.Name)
-		w.Write(LEVEL_0, "Namespace:\t%s\n", scheduledJob.Namespace)
-		printLabelsMultiline(w, "Labels", scheduledJob.Labels)
-		printAnnotationsMultiline(w, "Annotations", scheduledJob.Annotations)
-		w.Write(LEVEL_0, "Schedule:\t%s\n", scheduledJob.Spec.Schedule)
-		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", scheduledJob.Spec.ConcurrencyPolicy)
-		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(scheduledJob.Spec.Suspend))
-		if scheduledJob.Spec.StartingDeadlineSeconds != nil {
-			w.Write(LEVEL_0, "Starting Deadline Seconds:\t%ds\n", *scheduledJob.Spec.StartingDeadlineSeconds)
+		w.Write(LEVEL_0, "Name:\t%s\n", cronJob.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", cronJob.Namespace)
+		printLabelsMultiline(w, "Labels", cronJob.Labels)
+		printAnnotationsMultiline(w, "Annotations", cronJob.Annotations)
+		w.Write(LEVEL_0, "Schedule:\t%s\n", cronJob.Spec.Schedule)
+		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", cronJob.Spec.ConcurrencyPolicy)
+		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(cronJob.Spec.Suspend))
+		if cronJob.Spec.StartingDeadlineSeconds != nil {
+			w.Write(LEVEL_0, "Starting Deadline Seconds:\t%ds\n", *cronJob.Spec.StartingDeadlineSeconds)
 		} else {
 			w.Write(LEVEL_0, "Starting Deadline Seconds:\t<unset>\n")
 		}
-		describeJobTemplate(scheduledJob.Spec.JobTemplate, w)
-		if scheduledJob.Status.LastScheduleTime != nil {
-			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", scheduledJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
+		describeJobTemplate(cronJob.Spec.JobTemplate, w)
+		if cronJob.Status.LastScheduleTime != nil {
+			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", cronJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
 		} else {
 			w.Write(LEVEL_0, "Last Schedule Time:\t<unset>\n")
 		}
-		printActiveJobs(w, "Active Jobs", scheduledJob.Status.Active)
+		printActiveJobs(w, "Active Jobs", cronJob.Status.Active)
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -2013,7 +2117,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings print
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		if ref, err := api.GetReference(api.Scheme, node); err != nil {
+		if ref, err := ref.GetReference(api.Scheme, node); err != nil {
 			glog.Errorf("Unable to construct reference to '%#v': %v", node, err)
 		} else {
 			// TODO: We haven't decided the namespace for Node object yet.
@@ -2034,7 +2138,6 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 		printAnnotationsMultiline(w, "Annotations", node.Annotations)
 		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
-		w.Write(LEVEL_0, "Phase:\t%v\n", node.Status.Phase)
 		if len(node.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
 			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
@@ -2048,9 +2151,10 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 					c.Message)
 			}
 		}
-		addresses := make([]string, 0, len(node.Status.Addresses))
+
+		w.Write(LEVEL_0, "Addresses:\n")
 		for _, address := range node.Status.Addresses {
-			addresses = append(addresses, address.Address)
+			w.Write(LEVEL_1, "%s:\t%s\n", address.Type, address.Address)
 		}
 
 		printResourceList := func(resourceList api.ResourceList) {
@@ -2065,7 +2169,6 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 			}
 		}
 
-		w.Write(LEVEL_0, "Addresses:\t%s\n", strings.Join(addresses, ","))
 		if len(node.Status.Capacity) > 0 {
 			w.Write(LEVEL_0, "Capacity:\n")
 			printResourceList(node.Status.Capacity)
@@ -2316,7 +2419,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 	}
 
 	for _, pod := range nodeNonTerminatedPodsList.Items {
-		req, limit, err := api.PodRequestsAndLimits(&pod)
+		req, limit, err := resourcehelper.PodRequestsAndLimits(&pod)
 		if err != nil {
 			return err
 		}
@@ -2364,7 +2467,7 @@ func filterTerminatedPods(pods []*api.Pod) []*api.Pod {
 func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
 	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
 	for _, pod := range podList.Items {
-		podReqs, podLimits, err := api.PodRequestsAndLimits(&pod)
+		podReqs, podLimits, err := resourcehelper.PodRequestsAndLimits(&pod)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -29,14 +29,14 @@ func ValidatePolicy(policy schedulerapi.Policy) error {
 	var validationErrors []error
 
 	for _, priority := range policy.Priorities {
-		if priority.Weight <= 0 {
-			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it", priority.Name))
+		if priority.Weight <= 0 || priority.Weight >= schedulerapi.MaxWeight {
+			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it or it has overflown", priority.Name))
 		}
 	}
 
 	for _, extender := range policy.ExtenderConfigs {
-		if extender.Weight < 0 {
-			validationErrors = append(validationErrors, fmt.Errorf("Priority for extender %s should have a non negative weight applied to it", extender.URLPrefix))
+		if extender.Weight <= 0 {
+			validationErrors = append(validationErrors, fmt.Errorf("Priority for extender %s should have a positive weight applied to it", extender.URLPrefix))
 		}
 	}
 	return utilerrors.NewAggregate(validationErrors)

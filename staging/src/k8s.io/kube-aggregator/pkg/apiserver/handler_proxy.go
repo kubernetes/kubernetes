@@ -25,7 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericrest "k8s.io/apiserver/pkg/registry/generic/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 
@@ -64,8 +66,17 @@ type proxyHandlingInfo struct {
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	handlingInfo := r.handlingInfo.Load().(proxyHandlingInfo)
+	value := r.handlingInfo.Load()
+	if value == nil {
+		r.localDelegate.ServeHTTP(w, req)
+		return
+	}
+	handlingInfo := value.(proxyHandlingInfo)
 	if handlingInfo.local {
+		if r.localDelegate == nil {
+			http.Error(w, "", http.StatusNotFound)
+			return
+		}
 		r.localDelegate.ServeHTTP(w, req)
 		return
 	}
@@ -142,7 +153,8 @@ func maybeWrapForConnectionUpgrades(restConfig *restclient.Config, rt http.Round
 	if err != nil {
 		return nil, true, err
 	}
-	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig)
+	followRedirects := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
+	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, followRedirects)
 	wrappedRT, err := restclient.HTTPWrappersForConfig(restConfig, upgradeRoundTripper)
 	if err != nil {
 		return nil, true, err
@@ -196,8 +208,4 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
 	r.handlingInfo.Store(newInfo)
-}
-
-func (r *proxyHandler) removeAPIService() {
-	r.handlingInfo.Store(proxyHandlingInfo{})
 }

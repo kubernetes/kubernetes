@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -201,6 +202,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			Unschedulable: !kl.registerSchedulable,
 		},
 	}
+	nodeTaints := make([]v1.Taint, 0)
 	if len(kl.kubeletConfiguration.RegisterWithTaints) > 0 {
 		taints := make([]v1.Taint, len(kl.kubeletConfiguration.RegisterWithTaints))
 		for i := range kl.kubeletConfiguration.RegisterWithTaints {
@@ -208,8 +210,19 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 				return nil, err
 			}
 		}
-		node.Spec.Taints = taints
+		nodeTaints = append(nodeTaints, taints...)
+	}
+	if kl.externalCloudProvider {
+		taint := v1.Taint{
+			Key:    metav1.TaintExternalCloudProvider,
+			Value:  "true",
+			Effect: v1.TaintEffectNoSchedule,
+		}
 
+		nodeTaints = append(nodeTaints, taint)
+	}
+	if len(nodeTaints) > 0 {
+		node.Spec.Taints = nodeTaints
 	}
 	// Initially, set NodeNetworkUnavailable to true.
 	if kl.providerRequiresNetworkingConfiguration() {
@@ -241,6 +254,10 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		node.ObjectMeta.Labels[k] = v
 	}
 
+	if kl.providerID != "" {
+		node.Spec.ProviderID = kl.providerID
+	}
+
 	if kl.cloud != nil {
 		instances, ok := kl.cloud.Instances()
 		if !ok {
@@ -259,9 +276,11 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		// TODO: We can't assume that the node has credentials to talk to the
 		// cloudprovider from arbitrary nodes. At most, we should talk to a
 		// local metadata server here.
-		node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(kl.cloud, kl.nodeName)
-		if err != nil {
-			return nil, err
+		if node.Spec.ProviderID == "" {
+			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(kl.cloud, kl.nodeName)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		instanceType, err := instances.InstanceType(kl.nodeName)
@@ -443,6 +462,7 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 		// 4) Try to get the IP from the network interface used as default gateway
 		if kl.nodeIP != nil {
 			ipAddr = kl.nodeIP
+			node.ObjectMeta.Annotations[metav1.AnnotationProvidedIPAddr] = kl.nodeIP.String()
 		} else if addr := net.ParseIP(kl.hostname); addr != nil {
 			ipAddr = addr
 		} else {
@@ -465,7 +485,6 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 			return fmt.Errorf("can't get ip address of node %s. error: %v", node.Name, err)
 		} else {
 			node.Status.Addresses = []v1.NodeAddress{
-				{Type: v1.NodeLegacyHostIP, Address: ipAddr.String()},
 				{Type: v1.NodeInternalIP, Address: ipAddr.String()},
 				{Type: v1.NodeHostName, Address: kl.GetHostname()},
 			}
@@ -532,7 +551,7 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 	// present in capacity.
 	for k := range node.Status.Allocatable {
 		_, found := node.Status.Capacity[k]
-		if !found && v1.IsOpaqueIntResourceName(k) {
+		if !found && v1helper.IsOpaqueIntResourceName(k) {
 			delete(node.Status.Allocatable, k)
 		}
 	}

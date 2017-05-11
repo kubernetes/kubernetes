@@ -147,13 +147,20 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 	)
 	// Enable kubenet by default.
-	cniDir, err := getCNIDirectory()
+	cniBinDir, err := getCNIBinDirectory()
 	if err != nil {
 		return nil, err
 	}
+
+	cniConfDir, err := getCNIConfDirectory()
+	if err != nil {
+		return nil, err
+	}
+
 	cmdArgs = append(cmdArgs,
 		"--network-plugin=kubenet",
-		"--network-plugin-dir", cniDir)
+		"--cni-bin-dir", cniBinDir,
+		"--cni-conf-dir", cniConfDir)
 
 	// Keep hostname override for convenience.
 	if framework.TestContext.NodeName != "" { // If node name is specified, set hostname override.
@@ -194,14 +201,22 @@ func createPodManifestDirectory() (string, error) {
 	return path, nil
 }
 
-// getCNIDirectory returns CNI directory.
-func getCNIDirectory() (string, error) {
+// getCNIBinDirectory returns CNI directory.
+func getCNIBinDirectory() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
-	// TODO(random-liu): Make sure the cni directory name is the same with that in remote/remote.go
 	return filepath.Join(cwd, "cni", "bin"), nil
+}
+
+// getCNIConfDirectory returns CNI Configuration directory.
+func getCNIConfDirectory() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cwd, "cni", "net.d"), nil
 }
 
 // adjustArgsForSystemd escape special characters in kubelet arguments for systemd. Systemd

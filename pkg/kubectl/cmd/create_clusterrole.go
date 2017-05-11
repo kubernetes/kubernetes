@@ -36,7 +36,13 @@ var (
 		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods
 
 		# Create a ClusterRole named "pod-reader" with ResourceName specified
-		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod`))
+		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod
+
+		# Create a ClusterRole named "foo" with API Group specified
+		kubectl create clusterrole foo --verb=get,list,watch --resource=rs.extensions
+
+		# Create a ClusterRole named "foo" with SubResource specified
+		kubectl create clusterrole foo --verb=get,list,watch --resource=pods,pods/status`))
 )
 
 type CreateClusterRoleOptions struct {

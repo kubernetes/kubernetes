@@ -90,9 +90,9 @@ func TestList(t *testing.T) {
 					"apiVersion": "vTest",
 					"kind":       "rTestList",
 				},
-				Items: []*unstructured.Unstructured{
-					getObject("vTest", "rTest", "item1"),
-					getObject("vTest", "rTest", "item2"),
+				Items: []unstructured.Unstructured{
+					*getObject("vTest", "rTest", "item1"),
+					*getObject("vTest", "rTest", "item2"),
 				},
 			},
 		},
@@ -108,9 +108,9 @@ func TestList(t *testing.T) {
 					"apiVersion": "vTest",
 					"kind":       "rTestList",
 				},
-				Items: []*unstructured.Unstructured{
-					getObject("vTest", "rTest", "item1"),
-					getObject("vTest", "rTest", "item2"),
+				Items: []unstructured.Unstructured{
+					*getObject("vTest", "rTest", "item1"),
+					*getObject("vTest", "rTest", "item2"),
 				},
 			},
 		},
@@ -554,5 +554,13 @@ func TestPatch(t *testing.T) {
 		if !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("Patch(%q) want: %v\ngot: %v", tc.name, tc.want, got)
 		}
+	}
+}
+
+func TestVersionedParameterEncoderWithV1Fallback(t *testing.T) {
+	enc := VersionedParameterEncoderWithV1Fallback
+	_, err := enc.EncodeParameters(&metav1.ListOptions{}, schema.GroupVersion{Group: "foo.bar.com", Version: "v4"})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }

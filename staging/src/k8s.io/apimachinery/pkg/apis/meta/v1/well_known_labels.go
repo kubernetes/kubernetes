@@ -17,8 +17,6 @@ limitations under the License.
 package v1
 
 const (
-	// If you add a new topology domain here, also consider adding it to the set of default values
-	// for the scheduler's --failure-domain command-line argument.
 	LabelHostname          = "kubernetes.io/hostname"
 	LabelZoneFailureDomain = "failure-domain.beta.kubernetes.io/zone"
 	LabelZoneRegion        = "failure-domain.beta.kubernetes.io/region"
@@ -38,6 +36,12 @@ const (
 	// when node becomes unreachable (corresponding to NodeReady status ConditionUnknown)
 	// and removed when node becomes reachable (NodeReady status ConditionTrue).
 	TaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
+
+	// When kubelet is started with the "external" cloud provider, then
+	// it sets this taint on a node to mark it as unusable, until a controller
+	// from the cloud-controller-manager intitializes this node, and then removes
+	// the taint
+	TaintExternalCloudProvider = "node.cloudprovider.kubernetes.io/uninitialized"
 )
 
 // Role labels are applied to Nodes to mark their purpose.  In particular, we

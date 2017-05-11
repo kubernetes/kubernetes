@@ -25,8 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -668,7 +666,7 @@ func TestResolveFenceposts(t *testing.T) {
 		desired           int32
 		expectSurge       int32
 		expectUnavailable int32
-		expectError       string
+		expectError       bool
 	}{
 		{
 			maxSurge:          "0%",
@@ -676,7 +674,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           0,
 			expectSurge:       0,
 			expectUnavailable: 1,
-			expectError:       "",
+			expectError:       false,
 		},
 		{
 			maxSurge:          "39%",
@@ -684,7 +682,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           10,
 			expectSurge:       4,
 			expectUnavailable: 3,
-			expectError:       "",
+			expectError:       false,
 		},
 		{
 			maxSurge:          "oops",
@@ -692,7 +690,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 0,
-			expectError:       "invalid value for IntOrString: invalid value \"oops\": strconv.ParseInt: parsing \"oops\": invalid syntax",
+			expectError:       true,
 		},
 		{
 			maxSurge:          "55%",
@@ -700,7 +698,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 0,
-			expectError:       "invalid value for IntOrString: invalid value \"urg\": strconv.ParseInt: parsing \"urg\": invalid syntax",
+			expectError:       true,
 		},
 	}
 
@@ -708,16 +706,11 @@ func TestResolveFenceposts(t *testing.T) {
 		maxSurge := intstr.FromString(test.maxSurge)
 		maxUnavail := intstr.FromString(test.maxUnavailable)
 		surge, unavail, err := ResolveFenceposts(&maxSurge, &maxUnavail, test.desired)
-		if err != nil {
-			if test.expectError == "" {
-				t.Errorf("unexpected error %v", err)
-			} else {
-				assert := assert.New(t)
-				assert.EqualError(err, test.expectError)
-			}
+		if err != nil && !test.expectError {
+			t.Errorf("unexpected error %v", err)
 		}
-		if err == nil && test.expectError != "" {
-			t.Errorf("missing error %v", test.expectError)
+		if err == nil && test.expectError {
+			t.Error("expected error")
 		}
 		if surge != test.expectSurge || unavail != test.expectUnavailable {
 			t.Errorf("#%v got %v:%v, want %v:%v", num, surge, unavail, test.expectSurge, test.expectUnavailable)
@@ -960,35 +953,41 @@ func TestDeploymentComplete(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "complete",
+			name: "not complete: min but not all pods become available",
 
 			d:        deployment(5, 5, 5, 4, 1, 0),
-			expected: true,
+			expected: false,
 		},
 		{
-			name: "not complete",
+			name: "not complete: min availability is not honored",
 
 			d:        deployment(5, 5, 5, 3, 1, 0),
 			expected: false,
 		},
 		{
-			name: "complete #2",
+			name: "complete",
 
 			d:        deployment(5, 5, 5, 5, 0, 0),
 			expected: true,
 		},
 		{
-			name: "not complete #2",
+			name: "not complete: all pods are available but not updated",
 
 			d:        deployment(5, 5, 4, 5, 0, 0),
 			expected: false,
 		},
 		{
-			name: "not complete #3",
+			name: "not complete: still running old pods",
 
 			// old replica set: spec.replicas=1, status.replicas=1, status.availableReplicas=1
 			// new replica set: spec.replicas=1, status.replicas=1, status.availableReplicas=0
 			d:        deployment(1, 2, 1, 1, 0, 1),
+			expected: false,
+		},
+		{
+			name: "not complete: one replica deployment never comes up",
+
+			d:        deployment(1, 1, 1, 0, 1, 1),
 			expected: false,
 		},
 	}
@@ -1148,6 +1147,83 @@ func TestDeploymentTimedOut(t *testing.T) {
 		nowFn = test.nowFn
 		if got, exp := DeploymentTimedOut(&test.d, &test.d.Status), test.expected; got != exp {
 			t.Errorf("expected timeout: %t, got: %t", exp, got)
+		}
+	}
+}
+
+func TestMaxUnavailable(t *testing.T) {
+	deployment := func(replicas int32, maxUnavailable intstr.IntOrString) extensions.Deployment {
+		return extensions.Deployment{
+			Spec: extensions.DeploymentSpec{
+				Replicas: func(i int32) *int32 { return &i }(replicas),
+				Strategy: extensions.DeploymentStrategy{
+					RollingUpdate: &extensions.RollingUpdateDeployment{
+						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1)),
+						MaxUnavailable: &maxUnavailable,
+					},
+					Type: extensions.RollingUpdateDeploymentStrategyType,
+				},
+			},
+		}
+	}
+	tests := []struct {
+		name       string
+		deployment extensions.Deployment
+		expected   int32
+	}{
+		{
+			name:       "maxUnavailable less than replicas",
+			deployment: deployment(10, intstr.FromInt(5)),
+			expected:   int32(5),
+		},
+		{
+			name:       "maxUnavailable equal replicas",
+			deployment: deployment(10, intstr.FromInt(10)),
+			expected:   int32(10),
+		},
+		{
+			name:       "maxUnavailable greater than replicas",
+			deployment: deployment(5, intstr.FromInt(10)),
+			expected:   int32(5),
+		},
+		{
+			name:       "maxUnavailable with replicas is 0",
+			deployment: deployment(0, intstr.FromInt(10)),
+			expected:   int32(0),
+		},
+		{
+			name: "maxUnavailable with Recreate deployment strategy",
+			deployment: extensions.Deployment{
+				Spec: extensions.DeploymentSpec{
+					Strategy: extensions.DeploymentStrategy{
+						Type: extensions.RecreateDeploymentStrategyType,
+					},
+				},
+			},
+			expected: int32(0),
+		},
+		{
+			name:       "maxUnavailable less than replicas with percents",
+			deployment: deployment(10, intstr.FromString("50%")),
+			expected:   int32(5),
+		},
+		{
+			name:       "maxUnavailable equal replicas with percents",
+			deployment: deployment(10, intstr.FromString("100%")),
+			expected:   int32(10),
+		},
+		{
+			name:       "maxUnavailable greater than replicas with percents",
+			deployment: deployment(5, intstr.FromString("100%")),
+			expected:   int32(5),
+		},
+	}
+
+	for _, test := range tests {
+		t.Log(test.name)
+		maxUnavailable := MaxUnavailable(test.deployment)
+		if test.expected != maxUnavailable {
+			t.Fatalf("expected:%v, got:%v", test.expected, maxUnavailable)
 		}
 	}
 }

@@ -34,6 +34,8 @@ type FakeLimitRanges struct {
 
 var limitrangesResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "limitranges"}
 
+var limitrangesKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "LimitRange"}
+
 func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(limitrangesResource, c.ns, limitRange), &api.LimitRange{})
@@ -80,7 +82,7 @@ func (c *FakeLimitRanges) Get(name string, options v1.GetOptions) (result *api.L
 
 func (c *FakeLimitRanges) List(opts v1.ListOptions) (result *api.LimitRangeList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(limitrangesResource, c.ns, opts), &api.LimitRangeList{})
+		Invokes(testing.NewListAction(limitrangesResource, limitrangesKind, c.ns, opts), &api.LimitRangeList{})
 
 	if obj == nil {
 		return nil, err

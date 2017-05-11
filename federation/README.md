@@ -1,8 +1,8 @@
 # Cluster Federation
 
 Kubernetes Cluster Federation enables users to federate multiple
-Kubernetes clusters. Please see the [user guide](http://kubernetes.io/docs/user-guide/federation/federated-services/)
-and the [admin guide](http://kubernetes.io/docs/admin/federation/)
+Kubernetes clusters. Please see the [user guide](https://kubernetes.io/docs/concepts/cluster-administration/federation-service-discovery/)
+and the [admin guide](https://kubernetes.io/docs/tutorials/federation/set-up-cluster-federation-kubefed/)
 for more details about setting up and using the Cluster Federation.
 
 # Building Kubernetes Cluster Federation

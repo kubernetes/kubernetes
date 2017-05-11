@@ -35,6 +35,7 @@ import (
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
+	"k8s.io/kube-aggregator/pkg/controllers"
 )
 
 type APIHandlerManager interface {
@@ -95,6 +96,13 @@ func (c *APIServiceRegistrationController) sync(key string) error {
 		return err
 	}
 
+	// remove registration handling for APIServices which are not available
+	if !apiregistration.IsAPIServiceConditionTrue(apiService, apiregistration.Available) {
+		c.apiHandlerManager.RemoveAPIService(key)
+		return nil
+	}
+
+	// TODO move the destination host to status so that you can see where its going
 	c.apiHandlerManager.AddAPIService(apiService, c.getDestinationHost(apiService))
 	return nil
 }
@@ -124,12 +132,11 @@ func (c *APIServiceRegistrationController) getDestinationHost(apiService *apireg
 func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
-	defer glog.Infof("Shutting down APIServiceRegistrationController")
 
 	glog.Infof("Starting APIServiceRegistrationController")
+	defer glog.Infof("Shutting down APIServiceRegistrationController")
 
-	if !cache.WaitForCacheSync(stopCh, c.apiServiceSynced, c.servicesSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controllers.WaitForCacheSync("APIServiceRegistrationController", stopCh, c.apiServiceSynced, c.servicesSynced) {
 		return
 	}
 

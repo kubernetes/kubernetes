@@ -23,10 +23,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -43,14 +46,6 @@ const (
 	nameErrMsg              = "a qualified name must consist of"
 	idErrMsg                = "a valid C identifier must"
 )
-
-func expectPrefix(t *testing.T, prefix string, errs field.ErrorList) {
-	for i := range errs {
-		if f, p := errs[i].Field, prefix; !strings.HasPrefix(f, p) {
-			t.Errorf("expected prefix '%s' for field '%s' (%v)", p, f, errs[i])
-		}
-	}
-}
 
 func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
 	objMeta := metav1.ObjectMeta{Name: name}
@@ -3127,8 +3122,12 @@ func TestValidateDNSPolicy(t *testing.T) {
 
 func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSeconds := int64(30)
-	minID := int64(0)
-	maxID := int64(2147483647)
+
+	minUserID := types.UnixUserID(0)
+	maxUserID := types.UnixUserID(2147483647)
+	minGroupID := types.UnixGroupID(0)
+	maxGroupID := types.UnixGroupID(2147483647)
+
 	successCases := []api.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
@@ -3167,9 +3166,9 @@ func TestValidatePodSpec(t *testing.T) {
 		{ // Populate RunAsUser SupplementalGroups FSGroup with minID 0
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
-				SupplementalGroups: []int64{minID},
-				RunAsUser:          &minID,
-				FSGroup:            &minID,
+				SupplementalGroups: []types.UnixGroupID{minGroupID},
+				RunAsUser:          &minUserID,
+				FSGroup:            &minGroupID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3177,9 +3176,9 @@ func TestValidatePodSpec(t *testing.T) {
 		{ // Populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
-				SupplementalGroups: []int64{maxID},
-				RunAsUser:          &maxID,
-				FSGroup:            &maxID,
+				SupplementalGroups: []types.UnixGroupID{maxGroupID},
+				RunAsUser:          &maxUserID,
+				FSGroup:            &maxGroupID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3208,6 +3207,13 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		{ // Populate HostAliases.
+			HostAliases:   []api.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1", "host2"}}},
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	for i := range successCases {
 		if errs := ValidatePodSpec(&successCases[i], field.NewPath("field")); len(errs) != 0 {
@@ -3216,8 +3222,12 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 
 	activeDeadlineSeconds = int64(0)
-	minID = int64(-1)
-	maxID = int64(2147483648)
+
+	minUserID = types.UnixUserID(-1)
+	maxUserID = types.UnixUserID(2147483648)
+	minGroupID = types.UnixGroupID(-1)
+	maxGroupID = types.UnixGroupID(2147483648)
+
 	failureCases := map[string]api.PodSpec{
 		"bad volume": {
 			Volumes:       []api.Volume{{}},
@@ -3268,11 +3278,29 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		"with hostNetwork and hostAliases": {
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
+			HostAliases: []api.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1", "host2"}}},
+		},
+		"with hostAliases with invalid IP": {
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: false,
+			},
+			HostAliases: []api.HostAlias{{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}},
+		},
+		"with hostAliases with invalid hostname": {
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: false,
+			},
+			HostAliases: []api.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"@#$^#@#$"}}},
+		},
 		"bad supplementalGroups large than math.MaxInt32": {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork:        false,
-				SupplementalGroups: []int64{maxID, 1234},
+				SupplementalGroups: []types.UnixGroupID{maxGroupID, 1234},
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3281,7 +3309,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork:        false,
-				SupplementalGroups: []int64{minID, 1234},
+				SupplementalGroups: []types.UnixGroupID{minGroupID, 1234},
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3290,7 +3318,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
-				RunAsUser:   &maxID,
+				RunAsUser:   &maxUserID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3299,7 +3327,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
-				RunAsUser:   &minID,
+				RunAsUser:   &minUserID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3308,7 +3336,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
-				FSGroup:     &maxID,
+				FSGroup:     &maxGroupID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3317,7 +3345,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
-				FSGroup:     &minID,
+				FSGroup:     &minGroupID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3712,10 +3740,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("10"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("10"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("20"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("20"),
 							},
 						},
 						TerminationMessagePolicy: "File",
@@ -3737,10 +3765,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("10"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("10"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("20"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("20"),
 							},
 						},
 						TerminationMessagePolicy: "File",
@@ -4211,10 +4239,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("2"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("2"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("1"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("1"),
 							},
 						},
 					},
@@ -4233,7 +4261,7 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
 							},
 						},
 					},
@@ -4252,7 +4280,7 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
 							},
 						},
 					},
@@ -4272,10 +4300,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("5"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
 							},
 						},
 					},
@@ -4294,10 +4322,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("5"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
 							},
 							Limits: api.ResourceList{
-								api.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+								helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
 							},
 						},
 					},
@@ -4311,6 +4339,124 @@ func TestValidatePod(t *testing.T) {
 	for k, v := range errorCases {
 		if errs := ValidatePod(&v); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
+		}
+	}
+}
+
+func TestValidatePodWithDisabledAffinityInAnnotations(t *testing.T) {
+	validPodSpec := func(affinity *api.Affinity) api.PodSpec {
+		spec := api.PodSpec{
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		}
+		if affinity != nil {
+			spec.Affinity = affinity
+		}
+		return spec
+	}
+
+	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=False")
+	errorCases := []api.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: validPodSpec(&api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
+							TopologyKey: "",
+							Namespaces:  []string{"ns"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: validPodSpec(&api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpNotIn,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+								Namespaces:  []string{"ns"},
+								TopologyKey: "",
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: validPodSpec(&api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
+							TopologyKey: "",
+							Namespaces:  []string{"ns"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: validPodSpec(&api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpNotIn,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+								Namespaces:  []string{"ns"},
+								TopologyKey: "",
+							},
+						},
+					},
+				},
+			}),
+		},
+	}
+
+	for _, v := range errorCases {
+		if errs := ValidatePod(&v); len(errs) == 0 {
+			t.Errorf("expected failure for %v", errs)
 		}
 	}
 }
@@ -5510,9 +5656,35 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "LoadBalancer disallows onlyLocal alpha annotations",
+			name: "LoadBalancer allows onlyLocal alpha annotations",
 			tweakSvc: func(s *api.Service) {
 				s.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid externalTraffic beta annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Annotations[service.BetaAnnotationExternalTraffic] = "invalid"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "nagative healthCheckNodePort beta annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				s.Annotations[service.BetaAnnotationHealthCheckNodePort] = "-1"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid healthCheckNodePort beta annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+				s.Annotations[service.BetaAnnotationHealthCheckNodePort] = "whatisthis"
 			},
 			numErrs: 1,
 		},
@@ -6132,7 +6304,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6150,7 +6322,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6167,7 +6339,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6206,7 +6378,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6294,7 +6466,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6313,7 +6485,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6332,7 +6504,7 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "something"},
+					{Type: api.NodeExternalIP, Address: "something"},
 				},
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
@@ -6575,7 +6747,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
+					{Type: api.NodeExternalIP, Address: "1.2.3.4"},
 				},
 			},
 		}, api.Node{
@@ -6739,8 +6911,8 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.OpaqueIntResourceName("A"):       resource.MustParse("5"),
-					api.OpaqueIntResourceName("B"):       resource.MustParse("10"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("5"),
+					helper.OpaqueIntResourceName("B"):    resource.MustParse("10"),
 				},
 			},
 		}, true},
@@ -6756,7 +6928,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.OpaqueIntResourceName("A"):       resource.MustParse("500m"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("500m"),
 				},
 			},
 		}, false},
@@ -6772,12 +6944,12 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.OpaqueIntResourceName("A"):       resource.MustParse("5"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("5"),
 				},
 				Allocatable: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.OpaqueIntResourceName("A"):       resource.MustParse("4.5"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("4.5"),
 				},
 			},
 		}, false},
@@ -6916,22 +7088,22 @@ func TestValidateServiceUpdate(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "Service disallows removing one onlyLocal alpha annotation",
+			name: "Service allows removing onlyLocal alpha annotations",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
 				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
 				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
 			},
-			numErrs: 2,
+			numErrs: 0,
 		},
 		{
-			name: "Service disallows modifying onlyLocal alpha annotations",
+			name: "Service allows modifying onlyLocal alpha annotations",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
 				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
 				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
 				newSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficGlobal
 				newSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort]
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "Service disallows promoting one of the onlyLocal pair to beta",
@@ -8558,7 +8730,7 @@ func TestValidateTLSSecret(t *testing.T) {
 
 func TestValidateSecurityContext(t *testing.T) {
 	priv := false
-	var runAsUser int64 = 1
+	runAsUser := types.UnixUserID(1)
 	fullValidSC := func() *api.SecurityContext {
 		return &api.SecurityContext{
 			Privileged: &priv,
@@ -8610,7 +8782,7 @@ func TestValidateSecurityContext(t *testing.T) {
 	privRequestWithGlobalDeny.Privileged = &requestPrivileged
 
 	negativeRunAsUser := fullValidSC()
-	var negativeUser int64 = -1
+	negativeUser := types.UnixUserID(-1)
 	negativeRunAsUser.RunAsUser = &negativeUser
 
 	errorCases := map[string]struct {

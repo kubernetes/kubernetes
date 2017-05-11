@@ -56,7 +56,20 @@ func NodesHaveSameTopologyKey(nodeA, nodeB *v1.Node, topologyKey string) bool {
 	if len(topologyKey) == 0 {
 		return false
 	}
-	return nodeA.Labels != nil && nodeB.Labels != nil && len(nodeA.Labels[topologyKey]) > 0 && nodeA.Labels[topologyKey] == nodeB.Labels[topologyKey]
+
+	if nodeA.Labels == nil || nodeB.Labels == nil {
+		return false
+	}
+
+	nodeALabel, okA := nodeA.Labels[topologyKey]
+	nodeBLabel, okB := nodeB.Labels[topologyKey]
+
+	// If found label in both nodes, check the label
+	if okB && okA {
+		return nodeALabel == nodeBLabel
+	}
+
+	return false
 }
 
 type Topologies struct {

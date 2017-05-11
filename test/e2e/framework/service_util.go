@@ -258,9 +258,6 @@ func GetNodePublicIps(c clientset.Interface) ([]string, error) {
 	nodes := GetReadySchedulableNodesOrDie(c)
 
 	ips := CollectAddresses(nodes, v1.NodeExternalIP)
-	if len(ips) == 0 {
-		ips = CollectAddresses(nodes, v1.NodeLegacyHostIP)
-	}
 	return ips, nil
 }
 
@@ -1057,7 +1054,7 @@ func StartServeHostnameService(c clientset.Interface, internalClient internalcli
 	config := testutils.RCConfig{
 		Client:               c,
 		InternalClient:       internalClient,
-		Image:                "gcr.io/google_containers/serve_hostname:v1.4",
+		Image:                ServeHostnameImage,
 		Name:                 name,
 		Namespace:            ns,
 		PollInterval:         3 * time.Second,

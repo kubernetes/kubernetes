@@ -194,7 +194,7 @@ function run-heat-script() {
     else
       rgx="publicURL: (.+)$"
     fi
-    SWIFT_SERVER_URL=$(openstack catalog show object-store --format value | egrep -o "$rgx" | cut -d" " -f2)
+    SWIFT_SERVER_URL=$(openstack catalog show object-store --format value | egrep -o "$rgx" | cut -d" " -f2 | head -n 1)
   fi
   local swift_repo_url="${SWIFT_SERVER_URL}/kubernetes"
 

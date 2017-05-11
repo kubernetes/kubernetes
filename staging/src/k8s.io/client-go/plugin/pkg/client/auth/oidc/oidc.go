@@ -216,6 +216,9 @@ type roundTripper struct {
 }
 
 func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if len(req.Header.Get("Authorization")) != 0 {
+		return r.wrapped.RoundTrip(req)
+	}
 	token, err := r.provider.idToken()
 	if err != nil {
 		return nil, err

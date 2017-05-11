@@ -90,7 +90,7 @@ parameters:
 *  `aggregation_level`: specifies the number of chunks the volume would be distributed into, 0 indicates a non-aggregated volume (default: `0`)
 *  `ephemeral`: ephemeral storage [true/false] (default `false`)
 
-For a complete example refer ([Portworx Volume docs](../../volumes/portworx/README.md))
+For a complete example refer ([Portworx Volume docs](../volumes/portworx/README.md))
 
 #### GLUSTERFS
 
@@ -111,22 +111,30 @@ parameters:
   volumetype: "replicate:3"
 ```
 
+Example storageclass can be found in [glusterfs-storageclass.yaml](glusterfs/glusterfs-storageclass.yaml).
+
 * `resturl` : Gluster REST service/Heketi service url which provision gluster volumes on demand. The general format should be `IPaddress:Port` and this is a mandatory parameter for GlusterFS dynamic provisioner. If Heketi service is exposed as a routable service in openshift/kubernetes setup, this can have a format similar to
 `http://heketi-storage-project.cloudapps.mystorage.com` where the fqdn is a resolvable heketi service url.
+
 * `restauthenabled` : Gluster REST service authentication boolean that enables authentication to the REST server. If this value is 'true', `restuser` and `restuserkey` or `secretNamespace` + `secretName` have to be filled. This option is deprecated, authentication is enabled when any of `restuser`, `restuserkey`, `secretName` or `secretNamespace` is specified.
+
 * `restuser` : Gluster REST service/Heketi user who has access to create volumes in the Gluster Trusted Pool.
+
 * `restuserkey` : Gluster REST service/Heketi user's password which will be used for authentication to the REST server. This parameter is deprecated in favor of `secretNamespace` + `secretName`.
+
 * `secretNamespace` + `secretName` : Identification of Secret instance that contains user password to use when talking to Gluster REST service. These parameters are optional, empty password will be used when both `secretNamespace` and `secretName` are omitted. The provided secret must have type "kubernetes.io/glusterfs".
 When both `restuserkey` and `secretNamespace` + `secretName` is specified, the secret will be used.
+
 * `clusterid`: `630372ccdc720a92c681fb928f27b53f` is the ID of the cluster which will be used by Heketi when provisioning the volume. It can also be a list of clusterids, for ex:
 "8452344e2becec931ece4e33c4674e4e,42982310de6c63381718ccfa6d8cf397". This is an optional parameter.
 
-Example of a secret can be found in [glusterfs-provisioning-secret.yaml](glusterfs-provisioning-secret.yaml).
+Example of a secret can be found in [glusterfs-secret.yaml](glusterfs/glusterfs-secret.yaml).
 
 * `gidMin` + `gidMax` : The minimum and maximum value of GID range for the storage class. A unique value (GID) in this range ( gidMin-gidMax ) will be used for dynamically provisioned volumes. These are optional values. If not specified, the volume will be provisioned with a value between 2000-2147483647 which are defaults for gidMin and gidMax respectively.
 
-* `volumetype` : The volume type and it's parameters can be configured with this optional value. If the volume type is not mentioned, it's up to the provisioner to decide the volume type.
+* `volumetype` : The volume type and its parameters can be configured with this optional value. If the volume type is not mentioned, it's up to the provisioner to decide the volume type.
 For example:
+
   'Replica volume':
     `volumetype: replicate:3` where '3' is replica count.
   'Disperse/EC volume':
@@ -134,7 +142,9 @@ For example:
   'Distribute volume':
     `volumetype: none`
 
-For available volume types and it's administration options refer: ([Administration Guide](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/3.1/html/Administration_Guide/part-Overview.html))
+For available volume types and its administration options refer: ([Administration Guide](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/3.1/html/Administration_Guide/part-Overview.html))
+
+Reference : ([How to configure Gluster on Kubernetes](https://github.com/gluster/gluster-kubernetes/blob/master/docs/setup-guide.md))
 
 Reference : ([How to configure Heketi](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
 
@@ -214,7 +224,7 @@ parameters:
 * **user** maps all access to this user. Default is `root`.
 * **group** maps all access to this group. Default is `nfsnobody`.
 * **quobyteConfig** use the specified configuration to create the volume. You can create a new configuration or modify an existing one with the Web console or the quobyte CLI. Default is `BASE`
-* **quobyteTenant** use the specified tenant ID to create/delete the volume. This Quobyte tenant has to be already present in Quobyte. Default is `DEFAULT`
+* **quobyteTenant** use the specified tenant ID to create/delete the volume. This Quobyte tenant has to be already present in Quobyte. For Quobyte < 1.4 use an empty string `""` as `DEFAULT` tenant. Default is `DEFAULT`
 
 First create Quobyte admin's Secret in the system namespace. Here the Secret is created in `kube-system`:
 

@@ -13,18 +13,22 @@ go_test(
         "api_test.go",
         "crud_test.go",
     ],
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "integration",
+    ],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
+        "//federation/pkg/federatedtypes:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//test/integration/federation/framework:go_default_library",
-        "//vendor:github.com/pborman/uuid",
-        "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor/github.com/pborman/uuid:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 

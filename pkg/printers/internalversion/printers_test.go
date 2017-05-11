@@ -236,7 +236,7 @@ func TestFormatResourceName(t *testing.T) {
 		{"kind", "name", "kind/name"},
 	}
 	for _, tt := range tests {
-		if got := formatResourceName(tt.kind, tt.name, true); got != tt.want {
+		if got := printers.FormatResourceName(tt.kind, tt.name, true); got != tt.want {
 			t.Errorf("formatResourceName(%q, %q) = %q, want %q", tt.kind, tt.name, got, tt.want)
 		}
 	}
@@ -852,7 +852,6 @@ func TestPrintNodeExternalIP(t *testing.T) {
 			node: api.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
 				Status: api.NodeStatus{Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "1.1.1.1"},
 					{Type: api.NodeExternalIP, Address: "2.2.2.2"},
 					{Type: api.NodeInternalIP, Address: "3.3.3.3"},
 					{Type: api.NodeExternalIP, Address: "4.4.4.4"},
@@ -2143,7 +2142,7 @@ func TestPrintService(t *testing.T) {
 		printService(&test.service, buf, printers.PrintOptions{})
 		// We ignore time
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s %d", test.expect, buf.String(), strings.Compare(test.expect, buf.String()))
+			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}

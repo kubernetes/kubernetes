@@ -45,7 +45,7 @@ readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
 #   VERSION_COMMITS        (e.g. '56')
 function kube::release::parse_and_validate_ci_version() {
   # Accept things like "v1.2.3-alpha.4.56+abcdef12345678" or "v1.2.3-beta.4"
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha|rc)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[0-9a-f]{7,40})?$"
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[0-9a-f]{7,40})?$"
   local -r version="${1-}"
   [[ "${version}" =~ ${version_regex} ]] || {
     kube::log::error "Invalid ci version: '${version}', must match regex ${version_regex}"
@@ -278,12 +278,16 @@ function kube::release::create_docker_images_for_server() {
       kube::log::status "Starting Docker build for image: ${binary_name}"
 
       (
-        local md5_sum
-        md5_sum=$(kube::release::md5 "${binary_dir}/${binary_name}")
-
+        # Docker tags cannot contain '+'
+        local docker_tag="${KUBE_GIT_VERSION/+/_}"
+        if [[ -z "${docker_tag}" ]]; then
+          kube::log::error "git version information missing; cannot create Docker tag"
+          return 1
+        fi
         local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
         local docker_file_path="${docker_build_path}/Dockerfile"
         local binary_file_path="${binary_dir}/${binary_name}"
+        local docker_image_tag="${KUBE_DOCKER_REGISTRY:-gcr.io/google_containers}"
 
         rm -rf ${docker_build_path}
         mkdir -p ${docker_build_path}
@@ -291,26 +295,31 @@ function kube::release::create_docker_images_for_server() {
         printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
         if [[ ${arch} == "amd64" ]]; then
-          # If we are building a amd64 docker image, preserve the original image name
-          local docker_image_tag=gcr.io/google_containers/${binary_name}:${md5_sum}
+          # If we are building a amd64 docker image, preserve the original
+          # image name
+          docker_image_tag+="/${binary_name}:${docker_tag}"
         else
-          # If we are building a docker image for another architecture, append the arch in the image tag
-          local docker_image_tag=gcr.io/google_containers/${binary_name}-${arch}:${md5_sum}
+          # If we are building a docker image for another architecture,
+          # append the arch in the image tag
+          docker_image_tag+="/${binary_name}-${arch}:${docker_tag}"
         fi
 
         "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
         "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
-        echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
+        echo "${docker_tag}" > ${binary_dir}/${binary_name}.docker_tag
 
         rm -rf ${docker_build_path}
 
-        # If we are building an official/alpha/beta release we want to keep docker images
-        # and tag them appropriately.
+        # If we are building an official/alpha/beta release we want to keep
+        # docker images and tag them appropriately.
         if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
           local release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
-          kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
-          "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
-          "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
+          # Only rmi and tag if name is different
+          if [[ $docker_image_tag != $release_docker_image_tag ]]; then
+            kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
+            "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
+            "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
+          fi
         fi
 
         kube::log::status "Deleting docker image ${docker_image_tag}"
@@ -362,7 +371,6 @@ function kube::release::package_kube_manifests_tarball() {
   rm -rf "${release_stage}"
 
   mkdir -p "${release_stage}"
-  cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
 
@@ -475,6 +483,10 @@ EOF
   cp -R "${KUBE_ROOT}/federation/cluster" "${release_stage}/federation/"
   cp -R "${KUBE_ROOT}/federation/manifests" "${release_stage}/federation/"
   cp -R "${KUBE_ROOT}/federation/deploy" "${release_stage}/federation/"
+
+  # Include hack/lib as a dependency for the cluster/ scripts
+  mkdir -p "${release_stage}/hack"
+  cp -R "${KUBE_ROOT}/hack/lib" "${release_stage}/hack/"
 
   cp -R "${KUBE_ROOT}/examples" "${release_stage}/"
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"

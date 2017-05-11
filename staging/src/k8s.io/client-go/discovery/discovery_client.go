@@ -23,15 +23,17 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/emicklei/go-restful/swagger"
+	"github.com/emicklei/go-restful-swagger12"
 
+	"github.com/go-openapi/loads"
+	"github.com/go-openapi/spec"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 )
@@ -47,6 +49,7 @@ type DiscoveryInterface interface {
 	ServerResourcesInterface
 	ServerVersionInterface
 	SwaggerSchemaInterface
+	OpenAPISchemaInterface
 }
 
 // CachedDiscoveryInterface is a DiscoveryInterface with cache invalidation and freshness.
@@ -89,6 +92,12 @@ type ServerVersionInterface interface {
 type SwaggerSchemaInterface interface {
 	// SwaggerSchema retrieves and parses the swagger API schema the server supports.
 	SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error)
+}
+
+// OpenAPISchemaInterface has a method to retrieve the open API schema.
+type OpenAPISchemaInterface interface {
+	// OpenAPISchema retrieves and parses the swagger API schema the server supports.
+	OpenAPISchema() (*spec.Swagger, error)
 }
 
 // DiscoveryClient implements the functions that discover server-supported API groups,
@@ -332,6 +341,7 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 }
 
 // SwaggerSchema retrieves and parses the swagger API schema the server supports.
+// TODO: Replace usages with Open API.  Tracked in https://github.com/kubernetes/kubernetes/issues/44589
 func (d *DiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
 	if version.Empty() {
 		return nil, fmt.Errorf("groupVersion cannot be empty")
@@ -365,6 +375,21 @@ func (d *DiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.A
 	return &schema, nil
 }
 
+// OpenAPISchema fetches the open api schema using a rest client and parses the json.
+// Warning: this is very expensive (~1.2s)
+func (d *DiscoveryClient) OpenAPISchema() (*spec.Swagger, error) {
+	data, err := d.restClient.Get().AbsPath("/swagger.json").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	msg := json.RawMessage(data)
+	doc, err := loads.Analyzed(msg, "")
+	if err != nil {
+		return nil, err
+	}
+	return doc.Spec(), err
+}
+
 // withRetries retries the given recovery function in case the groups supported by the server change after ServerGroup() returns.
 func withRetries(maxRetries int, f func(failEarly bool) ([]*metav1.APIResourceList, error)) ([]*metav1.APIResourceList, error) {
 	var result []*metav1.APIResourceList
@@ -385,7 +410,7 @@ func withRetries(maxRetries int, f func(failEarly bool) ([]*metav1.APIResourceLi
 func setDiscoveryDefaults(config *restclient.Config) error {
 	config.APIPath = ""
 	config.GroupVersion = nil
-	codec := runtime.NoopEncoder{Decoder: api.Codecs.UniversalDecoder()}
+	codec := runtime.NoopEncoder{Decoder: scheme.Codecs.UniversalDecoder()}
 	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = restclient.DefaultKubernetesUserAgent()

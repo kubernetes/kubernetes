@@ -33,15 +33,19 @@ func InitLabels(options []string) (string, string, error) {
 		pcon := selinux.NewContext(processLabel)
 		mcon := selinux.NewContext(mountLabel)
 		for _, opt := range options {
-			if opt == "disable" {
+			val := strings.SplitN(opt, "=", 2)
+			if val[0] != "label" {
+				continue
+			}
+			if len(val) < 2 {
+				return "", "", fmt.Errorf("bad label option %q, valid options 'disable' or \n'user, role, level, type' followed by ':' and a value", opt)
+			}
+			if val[1] == "disable" {
 				return "", "", nil
 			}
-			if i := strings.Index(opt, ":"); i == -1 {
-				return "", "", fmt.Errorf("Bad label option %q, valid options 'disable' or \n'user, role, level, type' followed by ':' and a value", opt)
-			}
-			con := strings.SplitN(opt, ":", 2)
-			if !validOptions[con[0]] {
-				return "", "", fmt.Errorf("Bad label option %q, valid options 'disable, user, role, level, type'", con[0])
+			con := strings.SplitN(val[1], ":", 2)
+			if len(con) < 2 || !validOptions[con[0]] {
+				return "", "", fmt.Errorf("bad label option %q, valid options 'disable, user, role, level, type'", con[0])
 
 			}
 			pcon[con[0]] = con[1]
@@ -53,6 +57,10 @@ func InitLabels(options []string) (string, string, error) {
 		mountLabel = mcon.Get()
 	}
 	return processLabel, mountLabel, nil
+}
+
+func GetROMountLabel() string {
+	return selinux.GetROFileLabel()
 }
 
 // DEPRECATED: The GenLabels function is only to be used during the transition to the official API.

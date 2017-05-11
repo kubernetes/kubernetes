@@ -145,7 +145,7 @@ type CreateOpts struct {
 	SecurityGroups []string `json:"-"`
 
 	// UserData contains configuration information or scripts to use upon launch.
-	// Create will base64-encode it for you.
+	// Create will base64-encode it for you, if it isn't already.
 	UserData []byte `json:"-"`
 
 	// AvailabilityZone in which to launch the server.
@@ -160,7 +160,7 @@ type CreateOpts struct {
 
 	// Personality includes files to inject into the server at launch.
 	// Create will base64-encode file contents for you.
-	Personality Personality `json:"-"`
+	Personality Personality `json:"personality,omitempty"`
 
 	// ConfigDrive enables metadata injection through a configuration drive.
 	ConfigDrive *bool `json:"config_drive,omitempty"`
@@ -190,8 +190,13 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 	}
 
 	if opts.UserData != nil {
-		encoded := base64.StdEncoding.EncodeToString(opts.UserData)
-		b["user_data"] = &encoded
+		var userData string
+		if _, err := base64.StdEncoding.DecodeString(string(opts.UserData)); err != nil {
+			userData = base64.StdEncoding.EncodeToString(opts.UserData)
+		} else {
+			userData = string(opts.UserData)
+		}
+		b["user_data"] = &userData
 	}
 
 	if len(opts.SecurityGroups) > 0 {

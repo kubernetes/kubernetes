@@ -19,11 +19,9 @@ package options
 import (
 	"fmt"
 	"net"
-	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
@@ -35,9 +33,7 @@ import (
 
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
-	AdmissionControl           string
-	AdmissionControlConfigFile string
-	AdvertiseAddress           net.IP
+	AdvertiseAddress net.IP
 
 	CorsAllowedOriginList       []string
 	ExternalHost                string
@@ -50,9 +46,7 @@ type ServerRunOptions struct {
 
 func NewServerRunOptions() *ServerRunOptions {
 	defaults := server.NewConfig(serializer.CodecFactory{})
-
 	return &ServerRunOptions{
-		AdmissionControl:            "AlwaysAdmit",
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
 		MinRequestTimeout:           defaults.MinRequestTimeout,
@@ -93,13 +87,6 @@ func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions)
 func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
-
-	fs.StringVar(&s.AdmissionControl, "admission-control", s.AdmissionControl, ""+
-		"Ordered list of plug-ins to do admission control of resources into cluster. "+
-		"Comma-delimited list of: "+strings.Join(admission.GetPlugins(), ", ")+".")
-
-	fs.StringVar(&s.AdmissionControlConfigFile, "admission-control-config-file", s.AdmissionControlConfigFile,
-		"File with admission control configuration.")
 
 	fs.IPVar(&s.AdvertiseAddress, "advertise-address", s.AdvertiseAddress, ""+
 		"The IP address on which to advertise the apiserver to members of the cluster. This "+

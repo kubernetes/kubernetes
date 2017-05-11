@@ -48,15 +48,12 @@ import (
 )
 
 const (
-	smallGroupSize       = 5
-	mediumGroupSize      = 30
-	bigGroupSize         = 250
-	smallGroupName       = "load-small"
-	mediumGroupName      = "load-medium"
-	bigGroupName         = "load-big"
-	smallGroupBatchSize  = 30
-	mediumGroupBatchSize = 5
-	bigGroupBatchSize    = 1
+	smallGroupSize  = 5
+	mediumGroupSize = 30
+	bigGroupSize    = 250
+	smallGroupName  = "load-small"
+	mediumGroupName = "load-medium"
+	bigGroupName    = "load-big"
 	// We start RCs/Services/pods/... in different namespace in this test.
 	// nodeCountPerNamespace determines how many namespaces we will be using
 	// depending on the number of nodes in the underlying cluster.
@@ -84,13 +81,20 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	var configs []testutils.RunObjectConfig
 	var secretConfigs []*testutils.SecretConfig
 
+	testCaseBaseName := "load"
+
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
 	AfterEach(func() {
 		// Verify latency metrics
-		highLatencyRequests, err := framework.HighLatencyRequests(clientset)
-		framework.ExpectNoError(err, "Too many instances metrics above the threshold")
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
+		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset)
+		framework.ExpectNoError(err)
+		if err == nil {
+			summaries := make([]framework.TestDataSummary, 0, 1)
+			summaries = append(summaries, metrics)
+			framework.PrintSummaries(summaries, testCaseBaseName)
+			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+		}
 	})
 
 	// We assume a default throughput of 10 pods/second throughput.
@@ -109,7 +113,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		ClientQPS:   float32(math.Max(50.0, float64(2*throughput))),
 		ClientBurst: int(math.Max(100.0, float64(4*throughput))),
 	}
-	f := framework.NewFramework("load", options, nil)
+	f := framework.NewFramework(testCaseBaseName, options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
@@ -143,16 +147,16 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	loadTests := []Load{
 		// The container will consume 1 cpu and 512mb of memory.
 		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}, kind: api.Kind("ReplicationController")},
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController")},
 		// Tests for other resource types
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment")},
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: batch.Kind("Job")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: batch.Kind("Job")},
 		// Test scheduling when daemons are preset
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
 		// Test with secrets
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment"), secretsPerPod: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
 		// Special test case which randomizes created resources
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: randomKind},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind},
 	}
 
 	for _, testArg := range loadTests {

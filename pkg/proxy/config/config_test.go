@@ -19,10 +19,12 @@ package config
 import (
 	"reflect"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	ktesting "k8s.io/client-go/testing"
@@ -44,17 +46,66 @@ func (s sortedServices) Less(i, j int) bool {
 }
 
 type ServiceHandlerMock struct {
+	lock sync.Mutex
+
+	state   map[types.NamespacedName]*api.Service
+	synced  bool
 	updated chan []*api.Service
-	waits   int
+	process func([]*api.Service)
 }
 
 func NewServiceHandlerMock() *ServiceHandlerMock {
-	return &ServiceHandlerMock{updated: make(chan []*api.Service, 5)}
+	shm := &ServiceHandlerMock{
+		state:   make(map[types.NamespacedName]*api.Service),
+		updated: make(chan []*api.Service, 5),
+	}
+	shm.process = func(services []*api.Service) {
+		shm.updated <- services
+	}
+	return shm
 }
 
-func (h *ServiceHandlerMock) OnServiceUpdate(services []*api.Service) {
+func (h *ServiceHandlerMock) OnServiceAdd(service *api.Service) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+	h.state[namespacedName] = service
+	h.sendServices()
+}
+
+func (h *ServiceHandlerMock) OnServiceUpdate(oldService, service *api.Service) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+	h.state[namespacedName] = service
+	h.sendServices()
+}
+
+func (h *ServiceHandlerMock) OnServiceDelete(service *api.Service) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+	delete(h.state, namespacedName)
+	h.sendServices()
+}
+
+func (h *ServiceHandlerMock) OnServiceSynced() {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	h.synced = true
+	h.sendServices()
+}
+
+func (h *ServiceHandlerMock) sendServices() {
+	if !h.synced {
+		return
+	}
+	services := make([]*api.Service, 0, len(h.state))
+	for _, svc := range h.state {
+		services = append(services, svc)
+	}
 	sort.Sort(sortedServices(services))
-	h.updated <- services
+	h.process(services)
 }
 
 func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []*api.Service) {
@@ -90,17 +141,66 @@ func (s sortedEndpoints) Less(i, j int) bool {
 }
 
 type EndpointsHandlerMock struct {
+	lock sync.Mutex
+
+	state   map[types.NamespacedName]*api.Endpoints
+	synced  bool
 	updated chan []*api.Endpoints
-	waits   int
+	process func([]*api.Endpoints)
 }
 
 func NewEndpointsHandlerMock() *EndpointsHandlerMock {
-	return &EndpointsHandlerMock{updated: make(chan []*api.Endpoints, 5)}
+	ehm := &EndpointsHandlerMock{
+		state:   make(map[types.NamespacedName]*api.Endpoints),
+		updated: make(chan []*api.Endpoints, 5),
+	}
+	ehm.process = func(endpoints []*api.Endpoints) {
+		ehm.updated <- endpoints
+	}
+	return ehm
 }
 
-func (h *EndpointsHandlerMock) OnEndpointsUpdate(endpoints []*api.Endpoints) {
+func (h *EndpointsHandlerMock) OnEndpointsAdd(endpoints *api.Endpoints) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+	h.state[namespacedName] = endpoints
+	h.sendEndpoints()
+}
+
+func (h *EndpointsHandlerMock) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+	h.state[namespacedName] = endpoints
+	h.sendEndpoints()
+}
+
+func (h *EndpointsHandlerMock) OnEndpointsDelete(endpoints *api.Endpoints) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
+	delete(h.state, namespacedName)
+	h.sendEndpoints()
+}
+
+func (h *EndpointsHandlerMock) OnEndpointsSynced() {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	h.synced = true
+	h.sendEndpoints()
+}
+
+func (h *EndpointsHandlerMock) sendEndpoints() {
+	if !h.synced {
+		return
+	}
+	endpoints := make([]*api.Endpoints, 0, len(h.state))
+	for _, eps := range h.state {
+		endpoints = append(endpoints, eps)
+	}
 	sort.Sort(sortedEndpoints(endpoints))
-	h.updated <- endpoints
+	h.process(endpoints)
 }
 
 func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints []*api.Endpoints) {
@@ -135,7 +235,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 
 	config := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
-	config.RegisterHandler(handler)
+	config.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
@@ -159,7 +259,7 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 
 	config := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
-	config.RegisterHandler(handler)
+	config.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
@@ -196,8 +296,8 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 	config := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	handler2 := NewServiceHandlerMock()
-	config.RegisterHandler(handler)
-	config.RegisterHandler(handler2)
+	config.RegisterEventHandler(handler)
+	config.RegisterEventHandler(handler2)
 	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
@@ -230,8 +330,8 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 	config := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), time.Minute)
 	handler := NewEndpointsHandlerMock()
 	handler2 := NewEndpointsHandlerMock()
-	config.RegisterHandler(handler)
-	config.RegisterHandler(handler2)
+	config.RegisterEventHandler(handler)
+	config.RegisterEventHandler(handler2)
 	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
@@ -270,8 +370,8 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 	config := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), time.Minute)
 	handler := NewEndpointsHandlerMock()
 	handler2 := NewEndpointsHandlerMock()
-	config.RegisterHandler(handler)
-	config.RegisterHandler(handler2)
+	config.RegisterEventHandler(handler)
+	config.RegisterEventHandler(handler2)
 	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 

@@ -36,7 +36,8 @@ service RuntimeService {
     // This call is idempotent, and must not return an error if the sandbox has
     // already been removed.
     rpc RemovePodSandbox(RemovePodSandboxRequest) returns (RemovePodSandboxResponse) {}
-    // PodSandboxStatus returns the status of the PodSandbox.
+    // PodSandboxStatus returns the status of the PodSandbox. If the PodSandbox is not
+    // present, returns an error.
     rpc PodSandboxStatus(PodSandboxStatusRequest) returns (PodSandboxStatusResponse) {}
     // ListPodSandbox returns a list of PodSandboxes.
     rpc ListPodSandbox(ListPodSandboxRequest) returns (ListPodSandboxResponse) {}
@@ -57,7 +58,8 @@ service RuntimeService {
     rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse) {}
     // ListContainers lists all containers by filters.
     rpc ListContainers(ListContainersRequest) returns (ListContainersResponse) {}
-    // ContainerStatus returns status of the container.
+    // ContainerStatus returns status of the container. If the container is not
+    // present, returns an error.
     rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
 
     // ExecSync runs a command in a container synchronously.
@@ -90,6 +92,8 @@ service ImageService {
     // This call is idempotent, and must not return an error if the image has
     // already been removed.
     rpc RemoveImage(RemoveImageRequest) returns (RemoveImageResponse) {}
+    // ImageFSInfo returns information of the filesystem that is used to store images.
+    rpc ImageFsInfo(ImageFsInfoRequest) returns (ImageFsInfoResponse) {}
 }
 
 message VersionRequest {
@@ -269,17 +273,7 @@ message PodSandboxConfig {
     // and the CRI). Whenever possible, however, runtime authors SHOULD
     // consider proposing new typed fields for any new features instead.
     //
-    // 1. AppArmor
-    //
-    //    key: container.apparmor.security.beta.kubernetes.io/<container_name>
-    //    description: apparmor profile for a container in this pod.
-    //    value:
-    //      * runtime/default: equivalent to not specifying a profile.
-    //      * localhost/<profile_name>: profile loaded on the node
-    //        (localhost) by name. The possible profile names are detailed at
-    //        http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
-    //
-    // 2. Seccomp
+    // 1. Seccomp
     //
     //      key: security.alpha.kubernetes.io/seccomp/pod
     //      description: the seccomp profile for the containers of an entire pod.
@@ -296,7 +290,7 @@ message PodSandboxConfig {
     //        local seccomp profile root. Note that profile root is set in
     //        kubelet, and it is not passed in CRI yet, see https://issues.k8s.io/36997.
     //
-    // 3. Sysctls
+    // 2. Sysctls
     //
     //      key: security.alpha.kubernetes.io/sysctls
     //      description: list of safe sysctls which are set for the sandbox.
@@ -348,8 +342,6 @@ message PodSandboxNetworkStatus {
 
 // Namespace contains paths to the namespaces.
 message Namespace {
-    // Path to the network namespace.
-    string network = 1;
     // Namespace options for Linux namespaces.
     NamespaceOption options = 2;
 }
@@ -526,6 +518,12 @@ message LinuxContainerSecurityContext {
     // List of groups applied to the first process run in the container, in
     // addition to the container's primary GID.
     repeated int64 supplemental_groups = 8;
+    // AppArmor profile for the container, candidate values are:
+    // * runtime/default: equivalent to not specifying a profile.
+    // * localhost/<profile_name>: profile loaded on the node
+    //    (localhost) by name. The possible profile names are detailed at
+    //    http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
+    string apparmor_profile = 9;
 }
 
 // LinuxContainerConfig contains platform-specific configuration for
@@ -969,4 +967,43 @@ message StatusRequest {}
 message StatusResponse {
     // Status of the Runtime.
     RuntimeStatus status = 1;
+}
+
+message ImageFsInfoRequest {}
+
+// UInt64Value is the wrapper of uint64.
+message UInt64Value {
+    // The value.
+    uint64 value = 1;
+}
+
+// FsInfo contains data about filesystem usage.
+message FsInfo {
+    // The block device name associated with the filesystem.
+    string device = 1;
+    // The root directory for the images.
+    string path = 2;
+    // CapacityBytes represents the total capacity (bytes) of the filesystems
+    // underlying storage.
+    UInt64Value capacity_bytes = 3;
+    // AvailableBytes represents the storage space available (bytes) for the
+    // filesystem.
+    UInt64Value available_bytes = 4;
+    // UsedBytes represents the bytes used for images on the filesystem.
+    // This may differ from the total bytes used on the filesystem and may not 
+    // equal CapacityBytes - AvailableBytes.
+    UInt64Value used_bytes = 5;
+    // InodesCapacity represents the total inodes in the filesystem.
+    UInt64Value inodes_capacity = 6;
+    // InodesAvailable represents the free inodes in the filesystem.
+    UInt64Value inodes_available = 7;
+    // InodesUsed represents the inodes used by the images.
+    // This may not equal InodesCapacity - InodesAvailable because the underlying
+    // filesystem may also be used for purposes other than storing images.
+    UInt64Value inodes_used = 8;
+}
+
+message ImageFsInfoResponse {
+    // filesystem information of images.
+    FsInfo fs_info = 1;
 }

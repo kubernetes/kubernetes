@@ -36,6 +36,7 @@ func KubeadmFuzzerFuncs(t apitesting.TestingCommon) []interface{} {
 			obj.CertificatesDir = "foo"
 			obj.APIServerCertSANs = []string{}
 			obj.Token = "foo"
+			obj.Etcd.DataDir = "foo"
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)

@@ -226,7 +226,7 @@ func (f *fixture) run_(deploymentName string, startInformers bool, expectError b
 		}
 
 		expectedAction := f.actions[i]
-		if !expectedAction.Matches(action.GetVerb(), action.GetResource().Resource) {
+		if !(expectedAction.Matches(action.GetVerb(), action.GetResource().Resource) && action.GetSubresource() == expectedAction.GetSubresource()) {
 			f.t.Errorf("Expected\n\t%#v\ngot\n\t%#v", expectedAction, action)
 			continue
 		}

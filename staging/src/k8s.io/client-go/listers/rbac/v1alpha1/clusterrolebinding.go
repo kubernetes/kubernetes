@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	rbac "k8s.io/client-go/pkg/apis/rbac"
 	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -62,7 +61,7 @@ func (s *clusterRoleBindingLister) Get(name string) (*v1alpha1.ClusterRoleBindin
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(rbac.Resource("clusterrolebinding"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("clusterrolebinding"), name)
 	}
 	return obj.(*v1alpha1.ClusterRoleBinding), nil
 }

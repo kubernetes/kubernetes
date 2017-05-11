@@ -35,6 +35,7 @@ import (
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
+	"k8s.io/kube-aggregator/pkg/controllers"
 )
 
 const (
@@ -120,7 +121,7 @@ func (c *autoRegisterController) Run(threadiness int, stopCh <-chan struct{}) {
 	defer glog.Infof("Shutting down autoregister controller")
 
 	// wait for your secondary caches to fill before starting your work
-	if !cache.WaitForCacheSync(stopCh, c.apiServiceSynced) {
+	if !controllers.WaitForCacheSync("autoregister", stopCh, c.apiServiceSynced) {
 		return
 	}
 

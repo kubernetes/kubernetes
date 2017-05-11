@@ -150,7 +150,13 @@ func (rc *reconciler) reconcile() {
 
 			// Before triggering volume detach, mark volume as detached and update the node status
 			// If it fails to update node status, skip detach volume
-			rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
+			err = rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
+			if err != nil {
+				glog.V(5).Infof("RemoveVolumeFromReportAsAttached failed while removing volume %q from node %q with: %v",
+					attachedVolume.VolumeName,
+					attachedVolume.NodeName,
+					err)
+			}
 
 			// Update Node Status to indicate volume is no longer safe to mount.
 			err = rc.nodeStatusUpdater.UpdateNodeStatuses()
@@ -184,9 +190,8 @@ func (rc *reconciler) reconcile() {
 				// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
 				glog.Errorf(
-					"operationExecutor.DetachVolume failed to start for volume %q (spec.Name: %q) from node %q with err: %v",
+					"operationExecutor.DetachVolume failed to start for volume %q from node %q with err: %v",
 					attachedVolume.VolumeName,
-					attachedVolume.VolumeSpec.Name(),
 					attachedVolume.NodeName,
 					err)
 			}

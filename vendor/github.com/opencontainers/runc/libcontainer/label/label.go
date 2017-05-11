@@ -9,6 +9,10 @@ func InitLabels(options []string) (string, string, error) {
 	return "", "", nil
 }
 
+func GetROMountLabel() string {
+	return ""
+}
+
 func GenLabels(options string) (string, string, error) {
 	return "", "", nil
 }

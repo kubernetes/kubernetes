@@ -101,7 +101,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"don't serve HTTPS at all.")
 
 	fs.StringVar(&s.ServerCert.CertDirectory, "cert-dir", s.ServerCert.CertDirectory, ""+
-		"The directory where the TLS certs are located (by default /var/run/kubernetes). "+
+		"The directory where the TLS certs are located. "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 
 	fs.StringVar(&s.ServerCert.CertKey.CertFile, "tls-cert-file", s.ServerCert.CertKey.CertFile, ""+
@@ -125,7 +125,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns "+
 		"trump over extracted names. For multiple key/certificate pairs, use the "+
 		"--tls-sni-cert-key multiple times. "+
-		"Examples: \"example.key,example.crt\" or \"*.foo.com,foo.com:foo.key,foo.crt\".")
+		"Examples: \"example.crt,example.key\" or \"foo.crt,foo.key:*.foo.com,foo.com\".")
 }
 
 func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {

@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -99,7 +97,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	policyConfigMap := v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
 		Data: map[string]string{
-			"scheduler-policy-config.json": `{
+			options.SchedulerPolicyConfigMapKey: `{
 			"kind" : "Policy",
 			"apiVersion" : "v1",
 			"predicates" : [
@@ -263,8 +261,8 @@ func TestUnschedulableNodes(t *testing.T) {
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
 	informerFactory.Start(schedulerConfig.StopEverything)
-	scheduler.New(schedulerConfig).Run()
-
+	sched, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
+	sched.Run()
 	defer close(schedulerConfig.StopEverything)
 
 	DoTestUnschedulableNodes(t, clientSet, ns, schedulerConfigFactory.GetNodeLister())
@@ -325,13 +323,13 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 		Type:              v1.NodeReady,
 		Status:            v1.ConditionTrue,
 		Reason:            fmt.Sprintf("schedulable condition"),
-		LastHeartbeatTime: metav1.Time{time.Now()},
+		LastHeartbeatTime: metav1.Time{Time: time.Now()},
 	}
 	badCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
 		Status:            v1.ConditionUnknown,
 		Reason:            fmt.Sprintf("unschedulable condition"),
-		LastHeartbeatTime: metav1.Time{time.Now()},
+		LastHeartbeatTime: metav1.Time{Time: time.Now()},
 	}
 	// Create a new schedulable node, since we're first going to apply
 	// the unschedulable condition and verify that pods aren't scheduled.
@@ -545,7 +543,8 @@ func TestMultiScheduler(t *testing.T) {
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
 	informerFactory.Start(schedulerConfig.StopEverything)
-	scheduler.New(schedulerConfig).Run()
+	sched, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
+	sched.Run()
 	// default-scheduler will be stopped later
 
 	// 2. create a node
@@ -629,8 +628,9 @@ func TestMultiScheduler(t *testing.T) {
 	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(api.Scheme, clientv1.EventSource{Component: "foo-scheduler"})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet2.Core().RESTClient()).Events("")})
 	informerFactory2.Start(schedulerConfig2.StopEverything)
-	scheduler.New(schedulerConfig2).Run()
 
+	sched2, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig2}, nil...)
+	sched2.Run()
 	defer close(schedulerConfig2.StopEverything)
 
 	//	6. **check point-2**:
@@ -737,7 +737,8 @@ func TestAllocatable(t *testing.T) {
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
 	informerFactory.Start(schedulerConfig.StopEverything)
-	scheduler.New(schedulerConfig).Run()
+	sched, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
+	sched.Run()
 	// default-scheduler will be stopped later
 	defer close(schedulerConfig.StopEverything)
 

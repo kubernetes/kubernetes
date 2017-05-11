@@ -20,10 +20,12 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -33,8 +35,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/cache"
 )
 
 // Binder knows how to write a binding.
@@ -110,6 +110,10 @@ type Config struct {
 	// stale while they sit in a channel.
 	NextPod func() *v1.Pod
 
+	// WaitForCacheSync waits for scheduler cache to populate.
+	// It returns true if it was successful, false if the controller should shutdown.
+	WaitForCacheSync func() bool
+
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
 	Error func(*v1.Pod, error)
@@ -119,16 +123,6 @@ type Config struct {
 
 	// Close this to shut down the scheduler.
 	StopEverything chan struct{}
-}
-
-// New returns a new scheduler.
-// TODO replace this with NewFromConfigurator.
-func New(c *Config) *Scheduler {
-	s := &Scheduler{
-		config: c,
-	}
-	metrics.Register()
-	return s
 }
 
 // NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
@@ -150,8 +144,12 @@ func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Schedul
 	return s, nil
 }
 
-// Run begins watching and scheduling. It starts a goroutine and returns immediately.
+// Run begins watching and scheduling. It waits for cache to be synced, then starts a goroutine and returns immediately.
 func (sched *Scheduler) Run() {
+	if !sched.config.WaitForCacheSync() {
+		return
+	}
+
 	go wait.Until(sched.scheduleOne, 0, sched.config.StopEverything)
 }
 
@@ -235,7 +233,7 @@ func (sched *Scheduler) scheduleOne() {
 				glog.Errorf("scheduler cache ForgetPod failed: %v", err)
 			}
 			sched.config.Error(pod, err)
-			sched.config.Recorder.Eventf(pod, v1.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
+			sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "Binding rejected: %v", err)
 			sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
 				Type:   v1.PodScheduled,
 				Status: v1.ConditionFalse,

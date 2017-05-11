@@ -20,8 +20,8 @@ go_library(
     deps = [
         "//pkg/apis/authentication/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/scheme:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
-        "//vendor:k8s.io/client-go/rest",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
 

@@ -12,9 +12,9 @@ go_library(
     srcs = ["mock_cni.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/containernetworking/cni/libcni",
-        "//vendor:github.com/containernetworking/cni/pkg/types",
-        "//vendor:github.com/stretchr/testify/mock",
+        "//vendor/github.com/containernetworking/cni/libcni:go_default_library",
+        "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
+        "//vendor/github.com/stretchr/testify/mock:go_default_library",
     ],
 )
 

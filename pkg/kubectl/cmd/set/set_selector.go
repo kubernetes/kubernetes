@@ -83,7 +83,7 @@ func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    fmt.Sprintf(selectorLong, validation.LabelValueMaxLength),
 		Example: selectorExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args, out))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.Validate())
 			cmdutil.CheckErr(options.RunSelector())
 		},
@@ -101,7 +101,7 @@ func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 // Complete assigns the SelectorOptions from args.
-func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.local = cmdutil.GetFlagBool(cmd, "local")
 	o.all = cmdutil.GetFlagBool(cmd, "all")
 	o.record = cmdutil.GetRecordFlag(cmd)

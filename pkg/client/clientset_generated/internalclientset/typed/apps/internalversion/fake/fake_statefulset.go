@@ -34,6 +34,8 @@ type FakeStatefulSets struct {
 
 var statefulsetsResource = schema.GroupVersionResource{Group: "apps", Version: "", Resource: "statefulsets"}
 
+var statefulsetsKind = schema.GroupVersionKind{Group: "apps", Version: "", Kind: "StatefulSet"}
+
 func (c *FakeStatefulSets) Create(statefulSet *apps.StatefulSet) (result *apps.StatefulSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(statefulsetsResource, c.ns, statefulSet), &apps.StatefulSet{})
@@ -90,7 +92,7 @@ func (c *FakeStatefulSets) Get(name string, options v1.GetOptions) (result *apps
 
 func (c *FakeStatefulSets) List(opts v1.ListOptions) (result *apps.StatefulSetList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(statefulsetsResource, c.ns, opts), &apps.StatefulSetList{})
+		Invokes(testing.NewListAction(statefulsetsResource, statefulsetsKind, c.ns, opts), &apps.StatefulSetList{})
 
 	if obj == nil {
 		return nil, err

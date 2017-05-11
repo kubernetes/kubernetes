@@ -40,15 +40,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	}
 
 	// We explicitly do NOT do any decoration here yet. // TODO determine why we do not want to cache here
-	opts.Decorator = generic.UndecoratedStorage // TODO use watchCacheSize=-1 to signal UndecoratedStorage
+	opts.Decorator = generic.UndecoratedStorage
 
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
-		NewFunc:     func() runtime.Object { return &extensions.ThirdPartyResource{} },
-		NewListFunc: func() runtime.Object { return &extensions.ThirdPartyResourceList{} },
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*extensions.ThirdPartyResource).Name, nil
-		},
+		Copier:            api.Scheme,
+		NewFunc:           func() runtime.Object { return &extensions.ThirdPartyResource{} },
+		NewListFunc:       func() runtime.Object { return &extensions.ThirdPartyResourceList{} },
 		PredicateFunc:     thirdpartyresource.Matcher,
 		QualifiedResource: resource,
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource(resource.Resource),

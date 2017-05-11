@@ -23,7 +23,6 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -62,7 +61,7 @@ func (s *componentStatusLister) Get(name string) (*v1.ComponentStatus, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("componentstatus"), name)
+		return nil, errors.NewNotFound(v1.Resource("componentstatus"), name)
 	}
 	return obj.(*v1.ComponentStatus), nil
 }

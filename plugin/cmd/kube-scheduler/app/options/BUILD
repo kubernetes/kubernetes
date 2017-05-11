@@ -19,8 +19,8 @@ go_library(
         "//pkg/client/leaderelection:go_default_library",
         "//pkg/features:go_default_library",
         "//plugin/pkg/scheduler/factory:go_default_library",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apiserver/pkg/util/feature",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 

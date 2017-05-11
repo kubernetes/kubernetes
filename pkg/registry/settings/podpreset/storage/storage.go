@@ -34,12 +34,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against replication controllers.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
-		NewFunc:     func() runtime.Object { return &settingsapi.PodPreset{} },
-		NewListFunc: func() runtime.Object { return &settingsapi.PodPresetList{} },
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*settingsapi.PodPreset).GetName(), nil
-		},
+		Copier:            api.Scheme,
+		NewFunc:           func() runtime.Object { return &settingsapi.PodPreset{} },
+		NewListFunc:       func() runtime.Object { return &settingsapi.PodPresetList{} },
 		PredicateFunc:     podpreset.Matcher,
 		QualifiedResource: settingsapi.Resource("podpresets"),
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("podpresets"),

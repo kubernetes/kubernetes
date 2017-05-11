@@ -39,6 +39,7 @@ import (
 	neutronports "github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -46,8 +47,26 @@ import (
 
 // Note: when creating a new Loadbalancer (VM), it can take some time before it is ready for use,
 // this timeout is used for waiting until the Loadbalancer provisioning status goes to ACTIVE state.
-const loadbalancerActiveTimeoutSeconds = 120
-const loadbalancerDeleteTimeoutSeconds = 30
+const (
+	// loadbalancerActive* is configuration of exponential backoff for
+	// going into ACTIVE loadbalancer provisioning status. Starting with 1
+	// seconds, multiplying by 1.2 with each step and taking 19 steps at maximum
+	// it will time out after 128s, which roughly corresponds to 120s
+	loadbalancerActiveInitDealy = 1 * time.Second
+	loadbalancerActiveFactor    = 1.2
+	loadbalancerActiveSteps     = 19
+
+	// loadbalancerDelete* is configuration of exponential backoff for
+	// waiting for delete operation to complete. Starting with 1
+	// seconds, multiplying by 1.2 with each step and taking 13 steps at maximum
+	// it will time out after 32s, which roughly corresponds to 30s
+	loadbalancerDeleteInitDealy = 1 * time.Second
+	loadbalancerDeleteFactor    = 1.2
+	loadbalancerDeleteSteps     = 13
+
+	activeStatus = "ACTIVE"
+	errorStatus  = "ERROR"
+)
 
 // LoadBalancer implementation for LBaaS v1
 type LbaasV1 struct {
@@ -337,44 +356,6 @@ func getMembersByPoolID(client *gophercloud.ServiceClient, id string) ([]v2pools
 	return members, nil
 }
 
-// Each pool has exactly one or zero monitors. ListOpts does not seem to filter anything.
-func getMonitorByPoolID(client *gophercloud.ServiceClient, id string) (*v2monitors.Monitor, error) {
-	var monitorList []v2monitors.Monitor
-	err := v2monitors.List(client, v2monitors.ListOpts{PoolID: id}).EachPage(func(page pagination.Page) (bool, error) {
-		monitorsList, err := v2monitors.ExtractMonitors(page)
-		if err != nil {
-			return false, err
-		}
-
-		for _, monitor := range monitorsList {
-			// bugfix, filter by poolid
-			for _, pool := range monitor.Pools {
-				if pool.ID == id {
-					monitorList = append(monitorList, monitor)
-				}
-			}
-		}
-		if len(monitorList) > 1 {
-			return false, ErrMultipleResults
-		}
-		return true, nil
-	})
-	if err != nil {
-		if isNotFound(err) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-
-	if len(monitorList) == 0 {
-		return nil, ErrNotFound
-	} else if len(monitorList) > 1 {
-		return nil, ErrMultipleResults
-	}
-
-	return &monitorList[0], nil
-}
-
 // Check if a member exists for node
 func memberExists(members []v2pools.Member, addr string, port int) bool {
 	for _, member := range members {
@@ -436,45 +417,59 @@ func getSecurityGroupRules(client *gophercloud.ServiceClient, opts rules.ListOpt
 }
 
 func waitLoadbalancerActiveProvisioningStatus(client *gophercloud.ServiceClient, loadbalancerID string) (string, error) {
-	start := time.Now().Second()
-	for {
+	backoff := wait.Backoff{
+		Duration: loadbalancerActiveInitDealy,
+		Factor:   loadbalancerActiveFactor,
+		Steps:    loadbalancerActiveSteps,
+	}
+
+	var provisioningStatus string
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		loadbalancer, err := loadbalancers.Get(client, loadbalancerID).Extract()
 		if err != nil {
-			return "", err
+			return false, err
 		}
-		if loadbalancer.ProvisioningStatus == "ACTIVE" {
-			return "ACTIVE", nil
-		} else if loadbalancer.ProvisioningStatus == "ERROR" {
-			return "ERROR", fmt.Errorf("Loadbalancer has gone into ERROR state")
+		provisioningStatus = loadbalancer.ProvisioningStatus
+		if loadbalancer.ProvisioningStatus == activeStatus {
+			return true, nil
+		} else if loadbalancer.ProvisioningStatus == errorStatus {
+			return true, fmt.Errorf("Loadbalancer has gone into ERROR state")
+		} else {
+			return false, nil
 		}
 
-		time.Sleep(1 * time.Second)
+	})
 
-		if time.Now().Second()-start >= loadbalancerActiveTimeoutSeconds {
-			return loadbalancer.ProvisioningStatus, fmt.Errorf("Loadbalancer failed to go into ACTIVE provisioning status within alloted time")
-		}
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("Loadbalancer failed to go into ACTIVE provisioning status within alloted time")
 	}
+	return provisioningStatus, err
 }
 
 func waitLoadbalancerDeleted(client *gophercloud.ServiceClient, loadbalancerID string) error {
-	start := time.Now().Second()
-	for {
+	backoff := wait.Backoff{
+		Duration: loadbalancerDeleteInitDealy,
+		Factor:   loadbalancerDeleteFactor,
+		Steps:    loadbalancerDeleteSteps,
+	}
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		_, err := loadbalancers.Get(client, loadbalancerID).Extract()
 		if err != nil {
 			if err == ErrNotFound {
-				return nil
+				return true, nil
 			} else {
-				return err
+				return false, err
 			}
+		} else {
+			return false, nil
 		}
+	})
 
-		time.Sleep(1 * time.Second)
-
-		if time.Now().Second()-start >= loadbalancerDeleteTimeoutSeconds {
-			return fmt.Errorf("Loadbalancer failed to delete within the alloted time")
-		}
-
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("Loadbalancer failed to delete within the alloted time")
 	}
+
+	return err
 }
 
 func toRuleProtocol(protocol v1.Protocol) rules.RuleProtocol {
@@ -828,19 +823,16 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 
 	status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
 
-	port, err := getPortByIP(lbaas.network, loadbalancer.VipAddress)
-	if err != nil {
-		return nil, fmt.Errorf("Error getting port for LB vip %s: %v", loadbalancer.VipAddress, err)
-	}
-	floatIP, err := getFloatingIPByPortID(lbaas.network, port.ID)
+	portID := loadbalancer.VipPortID
+	floatIP, err := getFloatingIPByPortID(lbaas.network, portID)
 	if err != nil && err != ErrNotFound {
-		return nil, fmt.Errorf("Error getting floating ip for port %s: %v", port.ID, err)
+		return nil, fmt.Errorf("Error getting floating ip for port %s: %v", portID, err)
 	}
 	if floatIP == nil && lbaas.opts.FloatingNetworkId != "" {
-		glog.V(4).Infof("Creating floating ip for loadbalancer %s port %s", loadbalancer.ID, port.ID)
+		glog.V(4).Infof("Creating floating ip for loadbalancer %s port %s", loadbalancer.ID, portID)
 		floatIPOpts := floatingips.CreateOpts{
 			FloatingNetworkID: lbaas.opts.FloatingNetworkId,
-			PortID:            port.ID,
+			PortID:            portID,
 		}
 		floatIP, err = floatingips.Create(lbaas.network, floatIPOpts).Extract()
 		if err != nil {
@@ -945,25 +937,15 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			return nil, err
 		}
 
-		// Get the port ID
-		port, err := getPortByIP(lbaas.network, loadbalancer.VipAddress)
-		if err != nil {
-			// cleanup what was created so far
-			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-			return nil, err
-		}
-
+		portID := loadbalancer.VipPortID
 		update_opts := neutronports.UpdateOpts{SecurityGroups: []string{lbSecGroup.ID}}
-
-		res := neutronports.Update(lbaas.network, port.ID, update_opts)
-
+		res := neutronports.Update(lbaas.network, portID, update_opts)
 		if res.Err != nil {
-			glog.Errorf("Error occured updating port: %s", port.ID)
+			glog.Errorf("Error occured updating port: %s", portID)
 			// cleanup what was created so far
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, res.Err
 		}
-
 	}
 
 	return status, nil
@@ -1129,12 +1111,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	}
 
 	if lbaas.opts.FloatingNetworkId != "" && loadbalancer != nil {
-		port, err := getPortByIP(lbaas.network, loadbalancer.VipAddress)
-		if err != nil {
-			return err
-		}
-
-		floatingIP, err := getFloatingIPByPortID(lbaas.network, port.ID)
+		portID := loadbalancer.VipPortID
+		floatingIP, err := getFloatingIPByPortID(lbaas.network, portID)
 		if err != nil && err != ErrNotFound {
 			return err
 		}

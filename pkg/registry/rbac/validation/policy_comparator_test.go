@@ -407,7 +407,12 @@ func TestNonResourceURLCovers(t *testing.T) {
 		requested string
 		want      bool
 	}{
+		{"*", "", true},
+		{"*", "/", true},
 		{"*", "/api", true},
+		{"/*", "", false},
+		{"/*", "/", true},
+		{"/*", "/foo", true},
 		{"/api", "/api", true},
 		{"/apis", "/api", false},
 		{"/api/v1", "/api", false},

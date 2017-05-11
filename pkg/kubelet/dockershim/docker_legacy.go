@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 )
 
@@ -70,7 +70,7 @@ func convertLegacyNameAndLabels(names []string, labels map[string]string) ([]str
 	}
 
 	// Generate new dockershim name.
-	m, _, err := dockertools.ParseDockerName(names[0])
+	m, _, err := libdocker.ParseDockerName(names[0])
 	if err != nil {
 		return nil, nil, err
 	}

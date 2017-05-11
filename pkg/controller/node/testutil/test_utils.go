@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 
 	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/v1/ref"
 	"k8s.io/client-go/util/clock"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -87,6 +88,11 @@ func (c *FakeNodeHandler) GetUpdatedNodesCopy() []*v1.Node {
 // Core returns fake CoreInterface.
 func (c *FakeNodeHandler) Core() v1core.CoreV1Interface {
 	return &FakeLegacyHandler{c.Clientset.Core(), c}
+}
+
+// CoreV1 returns fake CoreV1Interface
+func (c *FakeNodeHandler) CoreV1() v1core.CoreV1Interface {
+	return &FakeLegacyHandler{c.Clientset.CoreV1(), c}
 }
 
 // Nodes return fake NodeInterfaces.
@@ -356,7 +362,7 @@ func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp metav1.Time, eve
 func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, eventtype, reason, message string) {
 	f.Lock()
 	defer f.Unlock()
-	ref, err := clientv1.GetReference(api.Scheme, obj)
+	ref, err := ref.GetReference(api.Scheme, obj)
 	if err != nil {
 		glog.Errorf("Encoutered error while getting reference: %v", err)
 		return

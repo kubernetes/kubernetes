@@ -83,7 +83,9 @@ var _ http.Hijacker = &fancyResponseWriterDelegator{}
 //    - source ip of the request
 //    - HTTP method being invoked
 //    - original user invoking the operation
+//    - original user's groups info
 //    - impersonated user for the operation
+//    - impersonated groups info
 //    - namespace of the request or <none>
 //    - uri is the full URI as requested
 // 2. the response line containing:
@@ -139,10 +141,6 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 }
 
 func auditStringSlice(inList []string) string {
-	if len(inList) == 0 {
-		return ""
-	}
-
 	quotedElements := make([]string, len(inList))
 	for i, in := range inList {
 		quotedElements[i] = fmt.Sprintf("%q", in)

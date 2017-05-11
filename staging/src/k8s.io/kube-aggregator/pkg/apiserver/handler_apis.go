@@ -18,46 +18,24 @@ package apiserver
 
 import (
 	"net/http"
-	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	v1listers "k8s.io/client-go/listers/core/v1"
 
 	apiregistrationapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	apiregistrationv1alpha1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
-	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 )
-
-// WithAPIs adds the handling for /apis and /apis/<group: -apiregistration.k8s.io>.
-func WithAPIs(handler http.Handler, codecs serializer.CodecFactory, informer informers.APIServiceInformer, serviceLister v1listers.ServiceLister, endpointsLister v1listers.EndpointsLister) http.Handler {
-	apisHandler := &apisHandler{
-		codecs:          codecs,
-		lister:          informer.Lister(),
-		delegate:        handler,
-		serviceLister:   serviceLister,
-		endpointsLister: endpointsLister,
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		apisHandler.ServeHTTP(w, req)
-	})
-}
 
 // apisHandler serves the `/apis` endpoint.
 // This is registered as a filter so that it never collides with any explictly registered endpoints
 type apisHandler struct {
 	codecs serializer.CodecFactory
 	lister listers.APIServiceLister
-
-	serviceLister   v1listers.ServiceLister
-	endpointsLister v1listers.EndpointsLister
-
-	delegate http.Handler
 }
 
 var discoveryGroup = metav1.APIGroup{
@@ -75,17 +53,6 @@ var discoveryGroup = metav1.APIGroup{
 }
 
 func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// if the URL is for OUR api group, serve it normally
-	if strings.HasPrefix(req.URL.Path+"/", "/apis/"+apiregistrationapi.GroupName+"/") {
-		r.delegate.ServeHTTP(w, req)
-		return
-	}
-	// don't handle URLs that aren't /apis
-	if req.URL.Path != "/apis" && req.URL.Path != "/apis/" {
-		r.delegate.ServeHTTP(w, req)
-		return
-	}
-
 	discoveryGroupList := &metav1.APIGroupList{
 		// always add OUR api group to the list first.  Since we'll never have a registered APIService for it
 		// and since this is the crux of the API, having this first will give our names priority.  It's good to be king.
@@ -103,51 +70,25 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if len(apiGroupServers[0].Spec.Group) == 0 {
 			continue
 		}
-		discoveryGroup := convertToDiscoveryAPIGroup(apiGroupServers, r.serviceLister, r.endpointsLister)
+		discoveryGroup := convertToDiscoveryAPIGroup(apiGroupServers)
 		if discoveryGroup != nil {
 			discoveryGroupList.Groups = append(discoveryGroupList.Groups, *discoveryGroup)
 		}
 	}
 
-	json, err := runtime.Encode(r.codecs.LegacyCodec(), discoveryGroupList)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if _, err := w.Write(json); err != nil {
-		panic(err)
-	}
+	responsewriters.WriteObjectNegotiated(r.codecs, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroupList)
 }
 
 // convertToDiscoveryAPIGroup takes apiservices in a single group and returns a discovery compatible object.
 // if none of the services are available, it will return nil.
-func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService, serviceLister v1listers.ServiceLister, endpointsLister v1listers.EndpointsLister) *metav1.APIGroup {
+func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService) *metav1.APIGroup {
 	apiServicesByGroup := apiregistrationapi.SortedByGroup(apiServices)[0]
 
 	var discoveryGroup *metav1.APIGroup
 
 	for _, apiService := range apiServicesByGroup {
-		if apiService.Spec.Service != nil {
-			// skip any API services without actual services
-			if _, err := serviceLister.Services(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name); err != nil {
-				continue
-			}
-
-			hasActiveEndpoints := false
-			endpoints, err := endpointsLister.Endpoints(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
-			// skip any API services without endpoints
-			if err != nil {
-				continue
-			}
-			for _, subset := range endpoints.Subsets {
-				if len(subset.Addresses) > 0 {
-					hasActiveEndpoints = true
-					break
-				}
-			}
-			if !hasActiveEndpoints {
-				continue
-			}
+		if !apiregistrationapi.IsAPIServiceConditionTrue(apiService, apiregistrationapi.Available) {
+			continue
 		}
 
 		// the first APIService which is valid becomes the default
@@ -179,19 +120,10 @@ type apiGroupHandler struct {
 
 	lister listers.APIServiceLister
 
-	serviceLister   v1listers.ServiceLister
-	endpointsLister v1listers.EndpointsLister
-
 	delegate http.Handler
 }
 
 func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// don't handle URLs that aren't /apis/<groupName>
-	if req.URL.Path != "/apis/"+r.groupName && req.URL.Path != "/apis/"+r.groupName+"/" {
-		r.delegate.ServeHTTP(w, req)
-		return
-	}
-
 	apiServices, err := r.lister.List(labels.Everything())
 	if statusErr, ok := err.(*apierrors.StatusError); ok && err != nil {
 		responsewriters.WriteRawJSON(int(statusErr.Status().Code), statusErr.Status(), w)
@@ -210,21 +142,14 @@ func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if len(apiServicesForGroup) == 0 {
-		http.Error(w, "", http.StatusNotFound)
+		r.delegate.ServeHTTP(w, req)
 		return
 	}
 
-	discoveryGroup := convertToDiscoveryAPIGroup(apiServicesForGroup, r.serviceLister, r.endpointsLister)
+	discoveryGroup := convertToDiscoveryAPIGroup(apiServicesForGroup)
 	if discoveryGroup == nil {
 		http.Error(w, "", http.StatusNotFound)
 		return
 	}
-	json, err := runtime.Encode(r.codecs.LegacyCodec(), discoveryGroup)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if _, err := w.Write(json); err != nil {
-		panic(err)
-	}
+	responsewriters.WriteObjectNegotiated(r.codecs, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroup)
 }

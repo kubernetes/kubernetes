@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "etcdserver")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "compactor")
 )
 
 const (

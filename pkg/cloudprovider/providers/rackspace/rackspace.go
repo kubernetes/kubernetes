@@ -381,7 +381,6 @@ func (i *Instances) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, er
 	// net.ParseIP().String() is to maintain compatibility with the old code
 	parsedIP := net.ParseIP(ip).String()
 	return []v1.NodeAddress{
-		{Type: v1.NodeLegacyHostIP, Address: parsedIP},
 		{Type: v1.NodeInternalIP, Address: parsedIP},
 		{Type: v1.NodeExternalIP, Address: parsedIP},
 	}, nil
@@ -480,8 +479,8 @@ func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
 }
 
 // Create a volume of given size (in GiB)
-func (rs *Rackspace) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, err error) {
-	return "", errors.New("unimplemented")
+func (rs *Rackspace) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, volumeAZ string, err error) {
+	return "", "", errors.New("unimplemented")
 }
 
 func (rs *Rackspace) DeleteVolume(volumeName string) error {

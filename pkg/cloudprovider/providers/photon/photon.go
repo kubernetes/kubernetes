@@ -39,6 +39,7 @@ import (
 	"gopkg.in/gcfg.v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -324,14 +325,14 @@ func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 							// Filter external IP by MAC address OUIs from vCenter and from ESX
 							if strings.HasPrefix(i.HardwareAddr.String(), MAC_OUI_VC) ||
 								strings.HasPrefix(i.HardwareAddr.String(), MAC_OUI_ESX) {
-								v1.AddToNodeAddresses(&nodeAddrs,
+								v1helper.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
 										Type:    v1.NodeExternalIP,
 										Address: ipnet.IP.String(),
 									},
 								)
 							} else {
-								v1.AddToNodeAddresses(&nodeAddrs,
+								v1helper.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
 										Type:    v1.NodeInternalIP,
 										Address: ipnet.IP.String(),
@@ -394,14 +395,14 @@ func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 						if ipAddr != "-" {
 							if strings.HasPrefix(macAddr, MAC_OUI_VC) ||
 								strings.HasPrefix(macAddr, MAC_OUI_ESX) {
-								v1.AddToNodeAddresses(&nodeAddrs,
+								v1helper.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
 										Type:    v1.NodeExternalIP,
 										Address: ipAddr,
 									},
 								)
 							} else {
-								v1.AddToNodeAddresses(&nodeAddrs,
+								v1helper.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
 										Type:    v1.NodeInternalIP,
 										Address: ipAddr,
@@ -621,7 +622,7 @@ func (pc *PCCloud) DiskIsAttached(pdID string, nodeName k8stypes.NodeName) (bool
 	}
 
 	for _, vm := range disk.VMs {
-		if strings.Compare(vm, vmID) == 0 {
+		if vm == vmID {
 			return true, nil
 		}
 	}

@@ -73,6 +73,7 @@ docs/man/man1/kubectl-label.1
 docs/man/man1/kubectl-logs.1
 docs/man/man1/kubectl-options.1
 docs/man/man1/kubectl-patch.1
+docs/man/man1/kubectl-plugin.1
 docs/man/man1/kubectl-port-forward.1
 docs/man/man1/kubectl-proxy.1
 docs/man/man1/kubectl-replace.1
@@ -88,6 +89,7 @@ docs/man/man1/kubectl-scale.1
 docs/man/man1/kubectl-set-image.1
 docs/man/man1/kubectl-set-resources.1
 docs/man/man1/kubectl-set-selector.1
+docs/man/man1/kubectl-set-subject.1
 docs/man/man1/kubectl-set.1
 docs/man/man1/kubectl-stop.1
 docs/man/man1/kubectl-taint.1
@@ -162,6 +164,7 @@ docs/user-guide/kubectl/kubectl_label.md
 docs/user-guide/kubectl/kubectl_logs.md
 docs/user-guide/kubectl/kubectl_options.md
 docs/user-guide/kubectl/kubectl_patch.md
+docs/user-guide/kubectl/kubectl_plugin.md
 docs/user-guide/kubectl/kubectl_port-forward.md
 docs/user-guide/kubectl/kubectl_proxy.md
 docs/user-guide/kubectl/kubectl_replace.md
@@ -178,6 +181,7 @@ docs/user-guide/kubectl/kubectl_set.md
 docs/user-guide/kubectl/kubectl_set_image.md
 docs/user-guide/kubectl/kubectl_set_resources.md
 docs/user-guide/kubectl/kubectl_set_selector.md
+docs/user-guide/kubectl/kubectl_set_subject.md
 docs/user-guide/kubectl/kubectl_taint.md
 docs/user-guide/kubectl/kubectl_top.md
 docs/user-guide/kubectl/kubectl_top_node.md
@@ -211,6 +215,7 @@ docs/yaml/kubectl/kubectl_label.yaml
 docs/yaml/kubectl/kubectl_logs.yaml
 docs/yaml/kubectl/kubectl_options.yaml
 docs/yaml/kubectl/kubectl_patch.yaml
+docs/yaml/kubectl/kubectl_plugin.yaml
 docs/yaml/kubectl/kubectl_port-forward.yaml
 docs/yaml/kubectl/kubectl_proxy.yaml
 docs/yaml/kubectl/kubectl_replace.yaml

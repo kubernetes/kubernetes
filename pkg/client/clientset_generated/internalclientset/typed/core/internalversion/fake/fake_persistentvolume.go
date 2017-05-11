@@ -33,6 +33,8 @@ type FakePersistentVolumes struct {
 
 var persistentvolumesResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "persistentvolumes"}
 
+var persistentvolumesKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "PersistentVolume"}
+
 func (c *FakePersistentVolumes) Create(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(persistentvolumesResource, persistentVolume), &api.PersistentVolume{})
@@ -84,7 +86,7 @@ func (c *FakePersistentVolumes) Get(name string, options v1.GetOptions) (result 
 
 func (c *FakePersistentVolumes) List(opts v1.ListOptions) (result *api.PersistentVolumeList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(persistentvolumesResource, opts), &api.PersistentVolumeList{})
+		Invokes(testing.NewRootListAction(persistentvolumesResource, persistentvolumesKind, opts), &api.PersistentVolumeList{})
 	if obj == nil {
 		return nil, err
 	}

@@ -481,10 +481,16 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out 
 		in.Spec.InitContainers = values
 
 		// Call defaulters explicitly until annotations are removed
-		for i := range in.Spec.InitContainers {
-			c := &in.Spec.InitContainers[i]
-			SetDefaults_Container(c)
+		tmpPodTemp := &PodTemplate{
+			Template: PodTemplateSpec{
+				Spec: PodSpec{
+					HostNetwork:    in.Spec.HostNetwork,
+					InitContainers: values,
+				},
+			},
 		}
+		SetObjectDefaults_PodTemplate(tmpPodTemp)
+		in.Spec.InitContainers = tmpPodTemp.Template.Spec.InitContainers
 	}
 
 	if err := autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s); err != nil {
@@ -604,10 +610,14 @@ func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 		// back to the caller.
 		in.Spec.InitContainers = values
 		// Call defaulters explicitly until annotations are removed
-		for i := range in.Spec.InitContainers {
-			c := &in.Spec.InitContainers[i]
-			SetDefaults_Container(c)
+		tmpPod := &Pod{
+			Spec: PodSpec{
+				HostNetwork:    in.Spec.HostNetwork,
+				InitContainers: values,
+			},
 		}
+		SetObjectDefaults_Pod(tmpPod)
+		in.Spec.InitContainers = tmpPod.Spec.InitContainers
 	}
 	// If there is a beta annotation, copy to alpha key.
 	// See commit log for PR #31026 for why we do this.
@@ -645,15 +655,6 @@ func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 	return nil
 }
 
-func Convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
-	if err := autoConvert_api_ServiceSpec_To_v1_ServiceSpec(in, out, s); err != nil {
-		return err
-	}
-	// Publish both externalIPs and deprecatedPublicIPs fields in v1.
-	out.DeprecatedPublicIPs = in.ExternalIPs
-	return nil
-}
-
 func Convert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.Scope) error {
 	if err := autoConvert_v1_Secret_To_api_Secret(in, out, s); err != nil {
 		return err
@@ -669,17 +670,6 @@ func Convert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.S
 		}
 	}
 
-	return nil
-}
-
-func Convert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
-	if err := autoConvert_v1_ServiceSpec_To_api_ServiceSpec(in, out, s); err != nil {
-		return err
-	}
-	// Prefer the legacy deprecatedPublicIPs field, if provided.
-	if len(in.DeprecatedPublicIPs) > 0 {
-		out.ExternalIPs = in.DeprecatedPublicIPs
-	}
 	return nil
 }
 

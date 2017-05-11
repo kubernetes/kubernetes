@@ -22,11 +22,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/davecgh/go-spew/spew"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/clock"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 type fakeListener struct {
@@ -108,6 +110,11 @@ type hcPayload struct {
 	LocalEndpoints int
 }
 
+type healthzPayload struct {
+	LastUpdated string
+	CurrentTime string
+}
+
 func TestServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
@@ -174,6 +181,14 @@ func TestServer(t *testing.T) {
 	// test the handler
 	testHandler(hcs, nsn, http.StatusServiceUnavailable, 0, t)
 
+	// put the endpoint back
+	hcs.SyncEndpoints(map[types.NamespacedName]int{nsn: 11})
+	if len(hcs.services) != 1 {
+		t.Errorf("expected 1 service, got %d", len(hcs.services))
+	}
+	if hcs.services[nsn].endpoints != 11 {
+		t.Errorf("expected 18 endpoints, got %d", hcs.services[nsn].endpoints)
+	}
 	// sync nil endpoints
 	hcs.SyncEndpoints(nil)
 	if len(hcs.services) != 1 {
@@ -227,6 +242,7 @@ func TestServer(t *testing.T) {
 	// test the handlers
 	testHandler(hcs, nsn1, http.StatusServiceUnavailable, 0, t)
 	testHandler(hcs, nsn2, http.StatusServiceUnavailable, 0, t)
+	testHandler(hcs, nsn3, http.StatusServiceUnavailable, 0, t)
 
 	// sync endpoints
 	hcs.SyncEndpoints(map[types.NamespacedName]int{
@@ -298,6 +314,28 @@ func TestServer(t *testing.T) {
 	testHandler(hcs, nsn2, http.StatusOK, 3, t)
 	testHandler(hcs, nsn3, http.StatusOK, 7, t)
 	testHandler(hcs, nsn4, http.StatusOK, 6, t)
+
+	// sync endpoints, missing nsn2
+	hcs.SyncEndpoints(map[types.NamespacedName]int{
+		nsn3: 7,
+		nsn4: 6,
+	})
+	if len(hcs.services) != 3 {
+		t.Errorf("expected 3 services, got %d", len(hcs.services))
+	}
+	if hcs.services[nsn2].endpoints != 0 {
+		t.Errorf("expected 0 endpoints, got %d", hcs.services[nsn2].endpoints)
+	}
+	if hcs.services[nsn3].endpoints != 7 {
+		t.Errorf("expected 7 endpoints, got %d", hcs.services[nsn3].endpoints)
+	}
+	if hcs.services[nsn4].endpoints != 6 {
+		t.Errorf("expected 6 endpoints, got %d", hcs.services[nsn4].endpoints)
+	}
+	// test the handlers
+	testHandler(hcs, nsn2, http.StatusServiceUnavailable, 0, t)
+	testHandler(hcs, nsn3, http.StatusOK, 7, t)
+	testHandler(hcs, nsn4, http.StatusOK, 6, t)
 }
 
 func testHandler(hcs *server, nsn types.NamespacedName, status int, endpoints int, t *testing.T) {
@@ -322,5 +360,46 @@ func testHandler(hcs *server, nsn types.NamespacedName, status int, endpoints in
 	}
 	if payload.LocalEndpoints != endpoints {
 		t.Errorf("expected %d endpoints, got %d", endpoints, payload.LocalEndpoints)
+	}
+}
+
+func TestHealthzServer(t *testing.T) {
+	listener := newFakeListener()
+	httpFactory := newFakeHTTPServerFactory()
+	fakeClock := clock.NewFakeClock(time.Now())
+
+	hs := newHealthzServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
+	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
+
+	// Should return 200 "OK" by default.
+	testHealthzHandler(server, http.StatusOK, t)
+
+	// Should return 503 "ServiceUnavailable" if exceed max no respond duration.
+	hs.UpdateTimestamp()
+	fakeClock.Step(25 * time.Second)
+	testHealthzHandler(server, http.StatusServiceUnavailable, t)
+
+	// Should return 200 "OK" if timestamp is valid.
+	hs.UpdateTimestamp()
+	fakeClock.Step(5 * time.Second)
+	testHealthzHandler(server, http.StatusOK, t)
+}
+
+func testHealthzHandler(server HTTPServer, status int, t *testing.T) {
+	handler := server.(*fakeHTTPServer).handler
+	req, err := http.NewRequest("GET", "/healthz", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp := httptest.NewRecorder()
+
+	handler.ServeHTTP(resp, req)
+
+	if resp.Code != status {
+		t.Errorf("expected status code %v, got %v", status, resp.Code)
+	}
+	var payload healthzPayload
+	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
 	}
 }

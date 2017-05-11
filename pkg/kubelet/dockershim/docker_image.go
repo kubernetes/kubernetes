@@ -17,9 +17,12 @@ limitations under the License.
 package dockershim
 
 import (
+	"fmt"
+
 	dockertypes "github.com/docker/engine-api/types"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 // This file implements methods in ImageManagerService.
@@ -54,7 +57,7 @@ func (ds *dockerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimea
 func (ds *dockerService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
 	imageInspect, err := ds.client.InspectImageByRef(image.Image)
 	if err != nil {
-		if dockertools.IsImageNotFoundError(err) {
+		if libdocker.IsImageNotFoundError(err) {
 			return nil, nil
 		}
 		return nil, err
@@ -80,7 +83,7 @@ func (ds *dockerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi
 		return "", err
 	}
 
-	return dockertools.GetImageRef(ds.client, image.Image)
+	return getImageRef(ds.client, image.Image)
 }
 
 // RemoveImage removes the image.
@@ -100,4 +103,27 @@ func (ds *dockerService) RemoveImage(image *runtimeapi.ImageSpec) error {
 
 	_, err = ds.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{PruneChildren: true})
 	return err
+}
+
+// getImageRef returns the image digest if exists, or else returns the image ID.
+func getImageRef(client libdocker.Interface, image string) (string, error) {
+	img, err := client.InspectImageByRef(image)
+	if err != nil {
+		return "", err
+	}
+	if img == nil {
+		return "", fmt.Errorf("unable to inspect image %s", image)
+	}
+
+	// Returns the digest if it exist.
+	if len(img.RepoDigests) > 0 {
+		return img.RepoDigests[0], nil
+	}
+
+	return img.ID, nil
+}
+
+// ImageFsInfo returns information of the filesystem that is used to store images.
+func (ds *dockerService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
+	return nil, fmt.Errorf("not implemented")
 }

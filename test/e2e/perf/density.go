@@ -92,10 +92,10 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		} else if numNodes <= 100 {
 			apiserverCPU = 1.5
 			apiserverMem = 1500 * (1024 * 1024)
-			controllerCPU = 0.75
-			controllerMem = 750 * (1024 * 1024)
-			schedulerCPU = 0.75
-			schedulerMem = 500 * (1024 * 1024)
+			controllerCPU = 0.5
+			controllerMem = 500 * (1024 * 1024)
+			schedulerCPU = 0.4
+			schedulerMem = 180 * (1024 * 1024)
 		} else if numNodes <= 500 {
 			apiserverCPU = 3.5
 			apiserverMem = 3400 * (1024 * 1024)
@@ -113,14 +113,12 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		}
 	} else {
 		if numNodes <= 100 {
-			// TODO: Investigate higher apiserver consumption and
-			// potentially revert to 1.5cpu and 1.3GB - see #30871
 			apiserverCPU = 1.8
-			apiserverMem = 2200 * (1024 * 1024)
+			apiserverMem = 1500 * (1024 * 1024)
 			controllerCPU = 0.5
-			controllerMem = 300 * (1024 * 1024)
+			controllerMem = 500 * (1024 * 1024)
 			schedulerCPU = 0.4
-			schedulerMem = 150 * (1024 * 1024)
+			schedulerMem = 180 * (1024 * 1024)
 		}
 	}
 
@@ -143,13 +141,8 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		MemoryConstraint: 100 * (1024 * 1024),
 	}
 	constraints["kube-proxy"] = framework.ResourceConstraint{
-		CPUConstraint: 0.15,
-		// When we are running purely density test, 30MB seems to be enough.
-		// However, we are usually running Density together with Load test.
-		// Thus, if Density is running after Load (which is creating and
-		// propagating a bunch of services), kubeproxy is using much more
-		// memory and not releasing it afterwards.
-		MemoryConstraint: 60 * (1024 * 1024),
+		CPUConstraint:    0.15,
+		MemoryConstraint: 100 * (1024 * 1024),
 	}
 	constraints["l7-lb-controller"] = framework.ResourceConstraint{
 		CPUConstraint:    0.15,
@@ -311,6 +304,8 @@ var _ = framework.KubeDescribe("Density", func() {
 	var nodes *v1.NodeList
 	var masters sets.String
 
+	testCaseBaseName := "density"
+
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
 		saturationThreshold := time.Duration((totalPods / MinPodsPerSecondThroughput)) * time.Second
@@ -326,17 +321,25 @@ var _ = framework.KubeDescribe("Density", func() {
 		}
 		framework.Logf("Cluster saturation time: %s", framework.PrettyPrintJSON(saturationData))
 
+		summaries := make([]framework.TestDataSummary, 0, 2)
 		// Verify latency metrics.
-		highLatencyRequests, err := framework.HighLatencyRequests(c)
+		highLatencyRequests, metrics, err := framework.HighLatencyRequests(c)
 		framework.ExpectNoError(err)
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+		if err == nil {
+			summaries = append(summaries, metrics)
+			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+		}
 
 		// Verify scheduler metrics.
 		// TODO: Reset metrics at the beginning of the test.
 		// We should do something similar to how we do it for APIserver.
-		if err = framework.VerifySchedulerLatency(c); err != nil {
-			framework.Logf("Warning: Scheduler latency not calculated, %v", err)
+		latency, err := framework.VerifySchedulerLatency(c)
+		framework.ExpectNoError(err)
+		if err == nil {
+			summaries = append(summaries, latency)
 		}
+
+		framework.PrintSummaries(summaries, testCaseBaseName)
 	})
 
 	options := framework.FrameworkOptions{
@@ -345,7 +348,7 @@ var _ = framework.KubeDescribe("Density", func() {
 	}
 	// Explicitly put here, to delete namespace at the end of the test
 	// (after measuring latency metrics, etc.).
-	f := framework.NewFramework("density", options, nil)
+	f := framework.NewFramework(testCaseBaseName, options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
@@ -725,7 +728,8 @@ var _ = framework.KubeDescribe("Density", func() {
 				framework.PrintLatencies(e2eLag, "worst e2e total latencies")
 
 				// Test whether e2e pod startup time is acceptable.
-				podStartupLatency := framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLag)}
+				podStartupLatency := &framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLag)}
+				f.TestSummaries = append(f.TestSummaries, podStartupLatency)
 				framework.ExpectNoError(framework.VerifyPodStartupLatency(podStartupLatency))
 
 				framework.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)

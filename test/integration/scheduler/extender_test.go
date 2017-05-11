@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -232,7 +230,10 @@ func machine_2_Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*schedulerapi.HostP
 		if node.Name == "machine2" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{node.Name, score})
+		result = append(result, schedulerapi.HostPriority{
+			Host:  node.Name,
+			Score: score,
+		})
 	}
 	return &result, nil
 }
@@ -244,7 +245,10 @@ func machine_3_Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*schedulerapi.HostP
 		if node.Name == "machine3" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{node.Name, score})
+		result = append(result, schedulerapi.HostPriority{
+			Host:  node.Name,
+			Score: score,
+		})
 	}
 	return &result, nil
 }
@@ -337,7 +341,7 @@ func TestSchedulerExtender(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientSet.Core().RESTClient()).Events("")})
-	scheduler := scheduler.New(schedulerConfig)
+	scheduler, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
 	informerFactory.Start(schedulerConfig.StopEverything)
 	scheduler.Run()
 
@@ -355,7 +359,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		Type:              v1.NodeReady,
 		Status:            v1.ConditionTrue,
 		Reason:            fmt.Sprintf("schedulable condition"),
-		LastHeartbeatTime: metav1.Time{time.Now()},
+		LastHeartbeatTime: metav1.Time{Time: time.Now()},
 	}
 	node := &v1.Node{
 		Spec: v1.NodeSpec{Unschedulable: false},
