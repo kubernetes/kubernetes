@@ -252,7 +252,7 @@ func GetVersionedClientForRBACOrFail(hostFactory cmdutil.Factory) (client.Interf
 				if err != nil {
 					return nil, err
 				}
-				return hostFactory.ClientSetForVersion(&gv)
+				return hostFactory.ClientSetForVersion(gv)
 			}
 			for _, version := range g.Versions {
 				if version.GroupVersion != "" {
@@ -260,7 +260,7 @@ func GetVersionedClientForRBACOrFail(hostFactory cmdutil.Factory) (client.Interf
 					if err != nil {
 						return nil, err
 					}
-					return hostFactory.ClientSetForVersion(&gv)
+					return hostFactory.ClientSetForVersion(gv)
 				}
 			}
 		}

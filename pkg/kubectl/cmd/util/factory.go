@@ -100,13 +100,13 @@ type ClientAccessFactory interface {
 
 	// TODO this should probably be removed and collapsed into whatever we want to use long term
 	// probably returning a restclient for a version and leaving contruction up to someone else
-	FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error)
+	FederationClientSetForVersion(version schema.GroupVersion) (fedclientset.Interface, error)
 	// TODO remove this should be rolled into restclient with the right version
-	FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error)
+	FederationClientForVersion(version schema.GroupVersion) (*restclient.RESTClient, error)
 	// TODO remove.  This should be rolled into `ClientSet`
-	ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error)
+	ClientSetForVersion(requiredVersion schema.GroupVersion) (internalclientset.Interface, error)
 	// TODO remove.  This should be rolled into `ClientConfig`
-	ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error)
+	ClientConfigForVersion(requiredVersion schema.GroupVersion) (*restclient.Config, error)
 
 	// Returns interfaces for decoding objects - if toInternal is set, decoded objects will be converted
 	// into their internal form (if possible). Eventually the internal form will be removed as an option,

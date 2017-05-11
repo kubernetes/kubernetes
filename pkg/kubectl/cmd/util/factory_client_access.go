@@ -43,6 +43,7 @@ import (
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -169,37 +170,37 @@ func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, er
 }
 
 func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
-	return f.clientCache.ClientSetForVersion(nil)
+	return f.clientCache.ClientSetForVersion(v1.SchemeGroupVersion)
 }
 
-func (f *ring0Factory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
+func (f *ring0Factory) ClientSetForVersion(requiredVersion schema.GroupVersion) (internalclientset.Interface, error) {
 	return f.clientCache.ClientSetForVersion(requiredVersion)
 }
 
 func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
-	return f.clientCache.ClientConfigForVersion(nil)
+	return f.clientCache.ClientConfigForVersion(v1.SchemeGroupVersion)
 }
 func (f *ring0Factory) BareClientConfig() (*restclient.Config, error) {
 	return f.clientConfig.ClientConfig()
 }
 
-func (f *ring0Factory) ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
-	return f.clientCache.ClientConfigForVersion(nil)
+func (f *ring0Factory) ClientConfigForVersion(requiredVersion schema.GroupVersion) (*restclient.Config, error) {
+	return f.clientCache.ClientConfigForVersion(v1.SchemeGroupVersion)
 }
 
 func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
-	clientConfig, err := f.clientCache.ClientConfigForVersion(nil)
+	clientConfig, err := f.clientCache.ClientConfigForVersion(v1.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 	return restclient.RESTClientFor(clientConfig)
 }
 
-func (f *ring0Factory) FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error) {
+func (f *ring0Factory) FederationClientSetForVersion(version schema.GroupVersion) (fedclientset.Interface, error) {
 	return f.clientCache.FederationClientSetForVersion(version)
 }
 
-func (f *ring0Factory) FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error) {
+func (f *ring0Factory) FederationClientForVersion(version schema.GroupVersion) (*restclient.RESTClient, error) {
 	return f.clientCache.FederationClientForVersion(version)
 }
 
