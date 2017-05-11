@@ -326,11 +326,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
-		if in.EnableCRI != nil {
-			in, out := &in.EnableCRI, &out.EnableCRI
-			*out = new(bool)
-			**out = **in
-		}
 		if in.ExperimentalDockershim != nil {
 			in, out := &in.ExperimentalDockershim, &out.ExperimentalDockershim
 			*out = new(bool)

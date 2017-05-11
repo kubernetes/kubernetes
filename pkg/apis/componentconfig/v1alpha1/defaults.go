@@ -431,9 +431,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = defaultNodeAllocatableEnforcement
 	}
-	if obj.EnableCRI == nil {
-		obj.EnableCRI = boolVar(true)
-	}
 	if obj.ExperimentalDockershim == nil {
 		obj.ExperimentalDockershim = boolVar(false)
 	}

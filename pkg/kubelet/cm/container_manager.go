@@ -74,7 +74,6 @@ type NodeConfig struct {
 	CgroupRoot            string
 	CgroupDriver          string
 	ProtectKernelDefaults bool
-	EnableCRI             bool
 	NodeAllocatableConfig
 	ExperimentalQOSReserved map[v1.ResourceName]int64
 }
