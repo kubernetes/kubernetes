@@ -4051,12 +4051,12 @@ func CheckPodsCondition(c clientset.Interface, ns string, podNames []string, tim
 	np := len(podNames)
 	Logf("Waiting up to %v for %d pods to be %s: %s", timeout, np, desc, podNames)
 	result := make(chan bool, len(podNames))
-	for ix := range podNames {
+	for _, podName := range podNames {
 		// Launch off pod readiness checkers.
 		go func(name string) {
 			err := WaitForPodCondition(c, ns, name, desc, timeout, condition)
 			result <- err == nil
-		}(podNames[ix])
+		}(podName)
 	}
 	// Wait for them all to finish.
 	success := true
@@ -4801,8 +4801,7 @@ func ensureGCELoadBalancerResourcesDeleted(ip, portRange string) error {
 		if err != nil {
 			return false, err
 		}
-		for ix := range list.Items {
-			item := list.Items[ix]
+		for _, item := range list.Items {
 			if item.PortRange == portRange && item.IPAddress == ip {
 				Logf("found a load balancer: %v", item)
 				return false, nil
