@@ -33,6 +33,9 @@ const (
 	DefaultCACertPath         = "/etc/kubernetes/pki/ca.crt"
 	DefaultCertificatesDir    = "/etc/kubernetes/pki"
 	DefaultEtcdDataDir        = "/var/lib/etcd"
+	DefaultEtcdClusterSize    = 3
+	DefaultEtcdOperatorCount  = 1
+	DefaultEtcdVersion        = "v3.1.4"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -70,6 +73,18 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	if obj.Etcd.DataDir == "" {
 		obj.Etcd.DataDir = DefaultEtcdDataDir
+	}
+
+	if obj.Etcd.SelfHosted.ClusterSize == 0 {
+		obj.Etcd.SelfHosted.ClusterSize = DefaultEtcdClusterSize
+	}
+
+	if obj.Etcd.SelfHosted.Version == "" {
+		obj.Etcd.SelfHosted.Version = DefaultEtcdVersion
+	}
+
+	if obj.Etcd.SelfHosted.OperatorCount == 0 {
+		obj.Etcd.SelfHosted.OperatorCount = DefaultEtcdOperatorCount
 	}
 }
 

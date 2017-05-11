@@ -71,5 +71,36 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		}
 	}
 
+	// If user does not provide a custom service IP for etcd, calculate one
+	// using the service CIDR and the default offset
+	if cfg.Etcd.SelfHosted.ServiceIP == "" {
+		ipv4, err := appendToIPv4(cfg.Networking.ServiceSubnet, kubeadmconstants.DefaultEtcdIPSuffix)
+		if err != nil {
+			return err
+		}
+		cfg.Etcd.SelfHosted.ServiceIP = ipv4
+	}
+
+	if cfg.Etcd.BootstrapServiceIP == "" {
+		ipv4, err := appendToIPv4(cfg.Networking.ServiceSubnet, kubeadmconstants.DefaultBootstrapIPSuffix)
+		if err != nil {
+			return err
+		}
+		cfg.Etcd.BootstrapServiceIP = ipv4
+	}
+
 	return nil
+}
+
+func appendToIPv4(subnet string, offset int) (string, error) {
+	ip, ipnet, err := net.ParseCIDR(subnet)
+	if err != nil {
+		return "", fmt.Errorf("Could not parse service IP CIDR: %v", err)
+	}
+	ipv4 := ip.To4()
+	ipv4[3] = byte(offset)
+	if !ipnet.Contains(ipv4) {
+		return "", fmt.Errorf("etcd service IP could not be constructed successfully")
+	}
+	return ipv4.String(), nil
 }

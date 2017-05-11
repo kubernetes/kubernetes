@@ -18,7 +18,6 @@ package master
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -57,15 +56,35 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *c
 	volumes = append(volumes, flockVolume())
 	volumeMounts = append(volumeMounts, flockVolumeMount())
 
+	// create etcd service which fans out to eventual etcd cluster
+	if err := createEtcdService(cfg, client); err != nil {
+		return err
+	}
+
 	if err := launchSelfHostedAPIServer(cfg, client, volumes, volumeMounts); err != nil {
 		return err
 	}
+	WaitForPodsWithLabel(client, "self-hosted-"+kubeAPIServer, false)
 
 	if err := launchSelfHostedScheduler(cfg, client, volumes, volumeMounts); err != nil {
 		return err
 	}
+	WaitForPodsWithLabel(client, "self-hosted-"+kubeScheduler, false)
 
 	if err := launchSelfHostedControllerManager(cfg, client, volumes, volumeMounts); err != nil {
+		return err
+	}
+	WaitForPodsWithLabel(client, "self-hosted-"+kubeControllerManager, false)
+
+	if err := launchSelfHostedProxy(cfg, client); err != nil {
+		return err
+	}
+
+	if err := launchCheckpointers(cfg, client); err != nil {
+		return err
+	}
+
+	if err := launchEtcdOperator(cfg, client); err != nil {
 		return err
 	}
 
@@ -106,17 +125,6 @@ func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 		return true, nil
 	})
 
-	// Wait for self-hosted API server to take ownership
-	waitForPodsWithLabel(client, "self-hosted-"+kubeAPIServer, true)
-
-	// Remove temporary API server
-	apiServerStaticManifestPath := buildStaticManifestFilepath(kubeAPIServer)
-	if err := os.RemoveAll(apiServerStaticManifestPath); err != nil {
-		return fmt.Errorf("unable to delete temporary API server manifest [%v]", err)
-	}
-
-	WaitForAPI(client)
-
 	fmt.Printf("[self-hosted] self-hosted kube-apiserver ready after %f seconds\n", time.Since(start).Seconds())
 	return nil
 }
@@ -134,30 +142,16 @@ func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, clie
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeControllerManager, err)
 	}
 
-	waitForPodsWithLabel(client, "self-hosted-"+kubeControllerManager, true)
-
-	ctrlMgrStaticManifestPath := buildStaticManifestFilepath(kubeControllerManager)
-	if err := os.RemoveAll(ctrlMgrStaticManifestPath); err != nil {
-		return fmt.Errorf("unable to delete temporary controller manager manifest [%v]", err)
-	}
-
 	fmt.Printf("[self-hosted] self-hosted kube-controller-manager ready after %f seconds\n", time.Since(start).Seconds())
 	return nil
-
 }
 
 func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
 	start := time.Now()
+
 	scheduler := getSchedulerDeployment(cfg, volumes, volumeMounts)
 	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(&scheduler); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeScheduler, err)
-	}
-
-	waitForPodsWithLabel(client, "self-hosted-"+kubeScheduler, true)
-
-	schedulerStaticManifestPath := buildStaticManifestFilepath(kubeScheduler)
-	if err := os.RemoveAll(schedulerStaticManifestPath); err != nil {
-		return fmt.Errorf("unable to delete temporary scheduler manifest [%v]", err)
 	}
 
 	fmt.Printf("[self-hosted] self-hosted kube-scheduler ready after %f seconds\n", time.Since(start).Seconds())
@@ -166,7 +160,7 @@ func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clie
 
 // waitForPodsWithLabel will lookup pods with the given label and wait until they are all
 // reporting status as running.
-func waitForPodsWithLabel(client *clientset.Clientset, appLabel string, mustBeRunning bool) {
+func WaitForPodsWithLabel(client *clientset.Clientset, appLabel string, mustBeRunning bool) {
 	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
 		// TODO: Do we need a stronger label link than this?
 		listOpts := metav1.ListOptions{LabelSelector: fmt.Sprintf("k8s-app=%s", appLabel)}
@@ -175,17 +169,23 @@ func waitForPodsWithLabel(client *clientset.Clientset, appLabel string, mustBeRu
 			fmt.Printf("[self-hosted] error getting %s pods [%v]\n", appLabel, err)
 			return false, nil
 		}
-		fmt.Printf("[self-hosted] Found %d %s pods\n", len(apiPods.Items), appLabel)
 
-		// TODO: HA
-		if int32(len(apiPods.Items)) != 1 {
+		if len(apiPods.Items) == 0 {
+			time.Sleep(1)
 			return false, nil
 		}
+
+		fmt.Printf("[self-hosted] Found %d %s pods\n", len(apiPods.Items), appLabel)
+
+		hasFailure := false
 		for _, pod := range apiPods.Items {
 			fmt.Printf("[self-hosted] Pod %s status: %s\n", pod.Name, pod.Status.Phase)
 			if mustBeRunning && pod.Status.Phase != "Running" {
-				return false, nil
+				hasFailure = true
 			}
+		}
+		if hasFailure {
+			return false, nil
 		}
 
 		return true, nil
@@ -201,8 +201,11 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "self-hosted-" + kubeAPIServer,
-			Namespace: "kube-system",
+			Namespace: metav1.NamespaceSystem,
 			Labels:    map[string]string{"k8s-app": "self-hosted-" + kubeAPIServer},
+			Annotations: map[string]string{
+				"checkpointer.alpha.coreos.com/checkpoint": "true",
+			},
 		},
 		Spec: ext.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
@@ -219,17 +222,16 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 					Volumes:      volumes,
 					Containers: []v1.Container{
 						{
-							Name:          "self-hosted-" + kubeAPIServer,
-							Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-							Command:       getAPIServerCommand(cfg, true, kubeVersion),
-							Env:           getSelfHostedAPIServerEnv(),
-							VolumeMounts:  volumeMounts,
-							LivenessProbe: componentProbe(6443, "/healthz", v1.URISchemeHTTPS),
-							Resources:     componentResources("250m"),
+							Name:  "self-hosted-" + kubeAPIServer,
+							Image: images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+							// Need to append etcd service IP
+							Command:      getAPIServerCommand(cfg, true, kubeVersion),
+							Env:          getSelfHostedAPIServerEnv(),
+							VolumeMounts: volumeMounts,
+							Resources:    componentResources("250m"),
 						},
 					},
 					Tolerations: []v1.Toleration{kubeadmconstants.MasterToleration},
-					DNSPolicy:   v1.DNSClusterFirstWithHostNet,
 				},
 			},
 		},
@@ -238,6 +240,7 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 }
 
 func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount, kubeVersion *version.Version) ext.Deployment {
+	r := int32(2)
 	d := ext.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
@@ -245,11 +248,11 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "self-hosted-" + kubeControllerManager,
-			Namespace: "kube-system",
+			Namespace: metav1.NamespaceSystem,
 			Labels:    map[string]string{"k8s-app": "self-hosted-" + kubeControllerManager},
 		},
 		Spec: ext.DeploymentSpec{
-			// TODO bootkube uses 2 replicas
+			Replicas: &r,
 			Strategy: ext.DeploymentStrategy{
 				Type: ext.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &ext.RollingUpdateDeployment{
@@ -266,8 +269,33 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 					},
 				},
 				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+								{
+									Weight: 100,
+									PodAffinityTerm: v1.PodAffinityTerm{
+										TopologyKey: "kubernetes.io/hostname",
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "tier",
+													Operator: "In",
+													Values:   []string{"control-plane"},
+												},
+												{
+													Key:      "k8s-app",
+													Operator: "In",
+													Values:   []string{"kube-contoller-manager"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 					NodeSelector: map[string]string{kubeadmconstants.LabelNodeRoleMaster: ""},
-					HostNetwork:  true,
 					Volumes:      volumes,
 					Containers: []v1.Container{
 						{
@@ -281,7 +309,7 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 						},
 					},
 					Tolerations: []v1.Toleration{kubeadmconstants.MasterToleration},
-					DNSPolicy:   v1.DNSClusterFirstWithHostNet,
+					DNSPolicy:   v1.DNSDefault,
 				},
 			},
 		},
@@ -297,7 +325,7 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Vo
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "self-hosted-" + kubeScheduler,
-			Namespace: "kube-system",
+			Namespace: metav1.NamespaceSystem,
 			Labels:    map[string]string{"k8s-app": "self-hosted-" + kubeScheduler},
 		},
 		Spec: ext.DeploymentSpec{
@@ -319,7 +347,6 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Vo
 				},
 				Spec: v1.PodSpec{
 					NodeSelector: map[string]string{kubeadmconstants.LabelNodeRoleMaster: ""},
-					HostNetwork:  true,
 					Volumes:      volumes,
 					Containers: []v1.Container{
 						{

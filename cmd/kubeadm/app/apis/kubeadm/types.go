@@ -77,12 +77,21 @@ type Networking struct {
 }
 
 type Etcd struct {
-	Endpoints []string
-	CAFile    string
-	CertFile  string
-	KeyFile   string
-	DataDir   string
-	ExtraArgs map[string]string
+	Endpoints          []string
+	CAFile             string
+	CertFile           string
+	KeyFile            string
+	DataDir            string
+	ExtraArgs          map[string]string
+	SelfHosted         SelfHostedEtcd
+	BootstrapServiceIP string
+}
+
+type SelfHostedEtcd struct {
+	OperatorCount int
+	ServiceIP     string
+	ClusterSize   int
+	Version       string
 }
 
 type NodeConfiguration struct {

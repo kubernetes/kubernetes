@@ -29,8 +29,13 @@ const (
 	KubeControllerManagerImage = "controller-manager"
 	KubeSchedulerImage         = "scheduler"
 	KubeProxyImage             = "proxy"
+	EtcdOperatorImage          = "etcd-operator"
+	PodCheckpointerImage       = "pod-checkpointer"
+	NetworkCheckpointerImage   = "network-checkpointer"
 
-	etcdVersion = "3.0.17"
+	etcdOperatorVersion    = "v0.3.3"
+	podCheckpointerVersion = "4e7a7dab10bc4d895b66c21656291c6e0b017248"
+	kencVersion            = "8f6e2e885f790030fbbb0496ea2a2d8830e58b8f"
 )
 
 func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideImage string) string {
@@ -39,10 +44,13 @@ func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideIma
 	}
 	repoPrefix := kubeadmapi.GlobalEnvParams.RepositoryPrefix
 	return map[string]string{
-		KubeEtcdImage:              fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "etcd", runtime.GOARCH, etcdVersion),
 		KubeAPIServerImage:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-apiserver", runtime.GOARCH, cfg.KubernetesVersion),
 		KubeControllerManagerImage: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-controller-manager", runtime.GOARCH, cfg.KubernetesVersion),
 		KubeSchedulerImage:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-scheduler", runtime.GOARCH, cfg.KubernetesVersion),
 		KubeProxyImage:             fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-proxy", runtime.GOARCH, cfg.KubernetesVersion),
+		KubeEtcdImage:              fmt.Sprintf("quay.io/coreos/etcd:%s", cfg.Etcd.SelfHosted.Version),
+		EtcdOperatorImage:          fmt.Sprintf("quay.io/coreos/etcd-operator:%s", etcdOperatorVersion),
+		PodCheckpointerImage:       fmt.Sprintf("quay.io/coreos/pod-checkpointer:%s", podCheckpointerVersion),
+		NetworkCheckpointerImage:   fmt.Sprintf("quay.io/coreos/kenc:%s", kencVersion),
 	}[image]
 }

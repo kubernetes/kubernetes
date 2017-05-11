@@ -22,45 +22,12 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
-func TestGetClusterCIDR(t *testing.T) {
-	emptyClusterCIDR := getClusterCIDR("")
-	if emptyClusterCIDR != "" {
-		t.Errorf("Invalid format: %s", emptyClusterCIDR)
-	}
-
-	clusterCIDR := getClusterCIDR("10.244.0.0/16")
-	if clusterCIDR != "- --cluster-cidr=10.244.0.0/16" {
-		t.Errorf("Invalid format: %s", clusterCIDR)
-	}
-
-	clusterIPv6CIDR := getClusterCIDR("2001:db8::/64")
-	if clusterIPv6CIDR != "- --cluster-cidr=2001:db8::/64" {
-		t.Errorf("Invalid format: %s", clusterIPv6CIDR)
-	}
-}
-
 func TestCompileManifests(t *testing.T) {
 	var tests = []struct {
 		manifest string
 		data     interface{}
 		expected bool
 	}{
-		{
-			manifest: KubeProxyConfigMap,
-			data: struct{ MasterEndpoint string }{
-				MasterEndpoint: "foo",
-			},
-			expected: true,
-		},
-		{
-			manifest: KubeProxyDaemonSet,
-			data: struct{ Image, ClusterCIDR, MasterTaintKey string }{
-				Image:          "foo",
-				ClusterCIDR:    "foo",
-				MasterTaintKey: "foo",
-			},
-			expected: true,
-		},
 		{
 			manifest: KubeDNSDeployment,
 			data: struct{ ImageRepository, Arch, Version, DNSDomain, MasterTaintKey string }{
