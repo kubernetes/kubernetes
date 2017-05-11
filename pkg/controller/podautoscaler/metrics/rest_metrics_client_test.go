@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	autoscalingapi "k8s.io/api/autoscaling/v2alpha1"
+	kv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,8 +31,6 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
-	kv1 "k8s.io/api/core/v1"
-	autoscalingapi "k8s.io/api/autoscaling/v2alpha1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 
@@ -38,10 +38,6 @@ import (
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
-
-	// we need the API types for rest mapping lookup
-	_ "k8s.io/client-go/pkg/api/install"
-	_ "k8s.io/client-go/pkg/apis/extensions/install"
 )
 
 type restClientTestCase struct {
