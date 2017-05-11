@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -242,5 +243,98 @@ func TestMultipleRegistration(t *testing.T) {
 	if e, a := createdNoxuInstance, gottenNoxuInstance2; !reflect.DeepEqual(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+}
 
+func TestDeRegistrationAndReRegistration(t *testing.T) {
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition()
+	ns := "not-the-default"
+	sameInstanceName := "foo"
+	func() {
+		noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+		if err != nil {
+			t.Fatal(err)
+		}
+		noxuNamespacedResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
+		if _, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns, sameInstanceName), noxuNamespacedResourceClient, noxuDefinition); err != nil {
+			t.Fatal(err)
+		}
+		// Remove sameInstanceName since at the moment there's no finalizers.
+		// TODO: as soon finalizers will be implemented Delete can be removed.
+		if err := noxuNamespacedResourceClient.Delete(sameInstanceName, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := testserver.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := testserver.GetCustomResourceDefinition(noxuDefinition, apiExtensionClient); err == nil || !errors.IsNotFound(err) {
+			t.Fatalf("expected a NotFound error, got:%v", err)
+		}
+		if _, err = noxuNamespacedResourceClient.List(metav1.ListOptions{}); err == nil || !errors.IsNotFound(err) {
+			t.Fatalf("expected a NotFound error, got:%v", err)
+		}
+		if _, err = noxuNamespacedResourceClient.Get("foo"); err == nil || !errors.IsNotFound(err) {
+			t.Fatalf("expected a NotFound error, got:%v", err)
+		}
+	}()
+
+	func() {
+		if _, err := testserver.GetCustomResourceDefinition(noxuDefinition, apiExtensionClient); err == nil || !errors.IsNotFound(err) {
+			t.Fatalf("expected a NotFound error, got:%v", err)
+		}
+		noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+		if err != nil {
+			t.Fatal(err)
+		}
+		noxuNamespacedResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
+		initialList, err := noxuNamespacedResourceClient.List(metav1.ListOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = noxuNamespacedResourceClient.Get(sameInstanceName); err == nil || !errors.IsNotFound(err) {
+			t.Fatalf("expected a NotFound error, got:%v", err)
+		}
+		if e, a := 0, len(initialList.(*unstructured.UnstructuredList).Items); e != a {
+			t.Fatalf("expected %v, got %v", e, a)
+		}
+		createdNoxuInstance, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns, sameInstanceName), noxuNamespacedResourceClient, noxuDefinition)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gottenNoxuInstance, err := noxuNamespacedResourceClient.Get(sameInstanceName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e, a := createdNoxuInstance, gottenNoxuInstance; !reflect.DeepEqual(e, a) {
+			t.Fatalf("expected %v, got %v", e, a)
+		}
+		listWithItem, err := noxuNamespacedResourceClient.List(metav1.ListOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e, a := 1, len(listWithItem.(*unstructured.UnstructuredList).Items); e != a {
+			t.Fatalf("expected %v, got %v", e, a)
+		}
+		if e, a := *createdNoxuInstance, listWithItem.(*unstructured.UnstructuredList).Items[0]; !reflect.DeepEqual(e, a) {
+			t.Fatalf("expected %v, got %v", e, a)
+		}
+
+		if err := noxuNamespacedResourceClient.Delete(sameInstanceName, nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = noxuNamespacedResourceClient.Get(sameInstanceName); err == nil || !errors.IsNotFound(err) {
+			t.Fatalf("expected a NotFound error, got:%v", err)
+		}
+		listWithoutItem, err := noxuNamespacedResourceClient.List(metav1.ListOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e, a := 0, len(listWithoutItem.(*unstructured.UnstructuredList).Items); e != a {
+			t.Fatalf("expected %v, got %v", e, a)
+		}
+	}()
 }
