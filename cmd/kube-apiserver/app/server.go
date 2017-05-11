@@ -137,7 +137,7 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	return aggregatorServer.GenericAPIServer.PrepareRun().Run(stopCh)
 }
 
-// CreateKubeAPIServer creates and wires a workable kube-apiserver
+// CreateKubeAPIServer creates and writes a workable kube-apiserver
 func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, sharedInformers informers.SharedInformerFactory, stopCh <-chan struct{}) (*master.Master, error) {
 	kubeAPIServer, err := kubeAPIServerConfig.Complete().New(genericapiserver.EmptyDelegate)
 	if err != nil {
