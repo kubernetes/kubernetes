@@ -59,6 +59,7 @@ type EditOptions struct {
 	Mapper         meta.RESTMapper
 	ResourceMapper *resource.Mapper
 	OriginalResult *resource.Result
+	Encoder        runtime.Encoder
 
 	EditMode EditMode
 
@@ -129,7 +130,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 
 	o.Mapper = mapper
 	o.CmdNamespace = cmdNamespace
-
+	o.Encoder = f.JSONEncoder()
 	o.f = f
 
 	// Set up writer
@@ -145,7 +146,6 @@ func (o *EditOptions) Validate() error {
 }
 
 func (o *EditOptions) Run() error {
-	encoder := o.f.JSONEncoder()
 	edit := NewDefaultEditor(o.f.EditorEnvs())
 	// editFn is invoked for each edit session (once with a list for normal edit, once for each individual resource in a edit-on-create invocation)
 	editFn := func(infos []*resource.Info) error {
@@ -273,15 +273,15 @@ func (o *EditOptions) Run() error {
 			}
 
 			// iterate through all items to apply annotations
-			if err := visitAnnotation(o.ApplyAnnotation, o.Record, o.ChangeCause, updatedVisitor, encoder); err != nil {
+			if err := o.visitAnnotation(updatedVisitor); err != nil {
 				return preservedFile(err, file, o.ErrOut)
 			}
 
 			switch o.EditMode {
 			case NormalEditMode:
-				err = visitToPatch(infos, updatedVisitor, o.Mapper, encoder, o.Out, o.ErrOut, &results)
+				err = o.visitToPatch(infos, updatedVisitor, &results)
 			case EditBeforeCreateMode:
-				err = visitToCreate(updatedVisitor, o.Mapper, o.Out)
+				err = o.visitToCreate(updatedVisitor)
 			default:
 				err = fmt.Errorf("unsupported edit mode %q", o.EditMode)
 			}
@@ -360,12 +360,9 @@ func getPrinter(format string) *editPrinterOptions {
 	}
 }
 
-func visitToPatch(
+func (o *EditOptions) visitToPatch(
 	originalInfos []*resource.Info,
 	patchVisitor resource.Visitor,
-	mapper meta.RESTMapper,
-	encoder runtime.Encoder,
-	out, errOut io.Writer,
 	results *editResults,
 ) error {
 	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
@@ -389,11 +386,11 @@ func visitToPatch(
 			return fmt.Errorf("no original object found for %#v", info.Object)
 		}
 
-		originalSerialization, err := runtime.Encode(encoder, originalInfo.Object)
+		originalSerialization, err := runtime.Encode(o.Encoder, originalInfo.Object)
 		if err != nil {
 			return err
 		}
-		editedSerialization, err := runtime.Encode(encoder, info.Object)
+		editedSerialization, err := runtime.Encode(o.Encoder, info.Object)
 		if err != nil {
 			return err
 		}
@@ -411,7 +408,7 @@ func visitToPatch(
 
 		if reflect.DeepEqual(originalJS, editedJS) {
 			// no edit, so just skip it.
-			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "skipped")
+			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
 			return nil
 		}
 
@@ -457,38 +454,38 @@ func visitToPatch(
 
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch)
 		if err != nil {
-			fmt.Fprintln(errOut, results.addError(err, info))
+			fmt.Fprintln(o.ErrOut, results.addError(err, info))
 			return nil
 		}
 		info.Refresh(patched, true)
-		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "edited")
+		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
 		return nil
 	})
 	return err
 }
 
-func visitToCreate(createVisitor resource.Visitor, mapper meta.RESTMapper, out io.Writer) error {
+func (o *EditOptions) visitToCreate(createVisitor resource.Visitor) error {
 	err := createVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		if err := resource.CreateAndRefresh(info); err != nil {
 			return err
 		}
-		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "created")
+		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "created")
 		return nil
 	})
 	return err
 }
 
-func visitAnnotation(applyAnnotation, record bool, changeCause string, annotationVisitor resource.Visitor, encoder runtime.Encoder) error {
+func (o *EditOptions) visitAnnotation(annotationVisitor resource.Visitor) error {
 	// iterate through all items to apply annotations
 	err := annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		// put configuration annotation in "updates"
-		if applyAnnotation {
-			if err := kubectl.CreateOrUpdateAnnotation(true, info, encoder); err != nil {
+		if o.ApplyAnnotation {
+			if err := kubectl.CreateOrUpdateAnnotation(true, info, o.Encoder); err != nil {
 				return err
 			}
 		}
-		if record || cmdutil.ContainsChangeCause(info) {
-			if err := cmdutil.RecordChangeCause(info.Object, changeCause); err != nil {
+		if o.Record || cmdutil.ContainsChangeCause(info) {
+			if err := cmdutil.RecordChangeCause(info.Object, o.ChangeCause); err != nil {
 				return err
 			}
 		}
