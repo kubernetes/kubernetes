@@ -26,7 +26,6 @@ import (
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	oldclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -124,9 +123,6 @@ func (c *ClientCache) clientConfigForVersion(requiredVersion *schema.GroupVersio
 		return nil, err
 	}
 	config.GroupVersion = negotiatedVersion
-
-	// TODO this isn't what we want.  Each clientset should be setting defaults as it sees fit.
-	oldclient.SetKubernetesDefaults(&config)
 
 	if requiredVersion != nil {
 		c.configs[*requiredVersion] = copyConfig(&config)
