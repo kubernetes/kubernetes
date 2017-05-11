@@ -214,7 +214,6 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error
 	source := fmt.Sprintf("//%s.file.core.windows.net/%s", accountName, b.shareName)
 	// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
 
-	glog.Errorf(fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=%#o,file_mode=%#o", accountName, accountKey, *b.dirMode, *b.fileMode))
 	options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=%#o,file_mode=%#o", accountName, accountKey, *b.dirMode, *b.fileMode)}
 	if b.readOnly {
 		options = append(options, "ro")
