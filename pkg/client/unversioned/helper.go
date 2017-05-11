@@ -48,22 +48,3 @@ func SetKubernetesDefaults(config *restclient.Config) error {
 	}
 	return restclient.SetKubernetesDefaults(config)
 }
-
-func setGroupDefaults(groupName string, config *restclient.Config) error {
-	config.APIPath = defaultAPIPath
-	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
-	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != groupName {
-		g, err := api.Registry.Group(groupName)
-		if err != nil {
-			return err
-		}
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
-	}
-	if config.NegotiatedSerializer == nil {
-		config.NegotiatedSerializer = api.Codecs
-	}
-	return nil
-}
