@@ -188,7 +188,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		),
 	)
 
-	fdc.fedUpdater = fedutil.NewFederatedUpdater(fdc.fedDeploymentInformer, "deployment", fdc.eventRecorder,
+	fdc.fedUpdater = fedutil.NewFederatedUpdater(fdc.fedDeploymentInformer, "deployment", updateTimeout, fdc.eventRecorder,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.Deployment)
 			_, err := client.Extensions().Deployments(rs.Namespace).Create(rs)
@@ -213,7 +213,6 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 			deployment := obj.(*extensionsv1.Deployment)
 			return fmt.Sprintf("%s/%s", deployment.Namespace, deployment.Name)
 		},
-		updateTimeout,
 		fdc.fedDeploymentInformer,
 		fdc.fedUpdater,
 	)
@@ -567,7 +566,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		// Everything is in order
 		return statusAllOk, nil
 	}
-	err = fdc.fedUpdater.Update(operations, updateTimeout)
+	err = fdc.fedUpdater.Update(operations)
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", key, err)
 		return statusError, err

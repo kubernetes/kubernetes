@@ -214,7 +214,11 @@ func (az *Cloud) ProviderName() string {
 	return CloudProviderName
 }
 
+// configureUserAgent configures the autorest client with a user agent that
+// includes "kubernetes" and the full kubernetes git version string
+// example:
+// Azure-SDK-for-Go/7.0.1-beta arm-network/2016-09-01; kubernetes-cloudprovider/v1.7.0-alpha.2.711+a2fadef8170bb0-dirty;
 func configureUserAgent(client *autorest.Client) {
 	k8sVersion := version.Get().GitVersion
-	client.UserAgent = fmt.Sprintf("%s; %s", client.UserAgent, k8sVersion)
+	client.UserAgent = fmt.Sprintf("%s; kubernetes-cloudprovider/%s", client.UserAgent, k8sVersion)
 }

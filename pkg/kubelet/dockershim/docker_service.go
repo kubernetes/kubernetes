@@ -36,22 +36,19 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 const (
 	dockerRuntimeName = "docker"
 	kubeAPIVersion    = "0.1.0"
-
-	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	// docker version should be at least 1.10.x
-	minimumDockerAPIVersion = "1.22.0"
 
 	// String used to detect docker host mode for various namespaces (e.g.
 	// networking). Must match the value returned by docker inspect -f
@@ -148,9 +145,9 @@ type dockerNetworkHost struct {
 var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
+func NewDockerService(client libdocker.Interface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
 	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandlerName, dockershimRootDir string, disableSharedPID bool) (DockerService, error) {
-	c := dockertools.NewInstrumentedDockerInterface(client)
+	c := libdocker.NewInstrumentedInterface(client)
 	checkpointHandler, err := NewPersistentCheckpointHandler(dockershimRootDir)
 	if err != nil {
 		return nil, err
@@ -246,7 +243,7 @@ type DockerService interface {
 
 type dockerService struct {
 	seccompProfileRoot string
-	client             dockertools.DockerInterface
+	client             libdocker.Interface
 	os                 kubecontainer.OSInterface
 	podSandboxImage    string
 	streamingRuntime   *streamingRuntime
@@ -413,7 +410,7 @@ func (ds *dockerService) checkVersionCompatibility() error {
 		return err
 	}
 
-	minAPIVersion, err := semver.Parse(minimumDockerAPIVersion)
+	minAPIVersion, err := semver.Parse(libdocker.MinimumDockerAPIVersion)
 	if err != nil {
 		return err
 	}
@@ -421,7 +418,7 @@ func (ds *dockerService) checkVersionCompatibility() error {
 	// Verify the docker version.
 	result := apiVersion.Compare(minAPIVersion)
 	if result < 0 {
-		return fmt.Errorf("docker API version is older than %s", minimumDockerAPIVersion)
+		return fmt.Errorf("docker API version is older than %s", libdocker.MinimumDockerAPIVersion)
 	}
 
 	return nil
@@ -478,10 +475,10 @@ type DockerLegacyService interface {
 // dockerLegacyService implements the DockerLegacyService. We add this for non json-log driver
 // support. (See #41996)
 type dockerLegacyService struct {
-	client dockertools.DockerInterface
+	client libdocker.Interface
 }
 
-func NewDockerLegacyService(client dockertools.DockerInterface) DockerLegacyService {
+func NewDockerLegacyService(client libdocker.Interface) DockerLegacyService {
 	return &dockerLegacyService{client: client}
 }
 
@@ -511,7 +508,7 @@ func (d *dockerLegacyService) GetContainerLogs(pod *v1.Pod, containerID kubecont
 		opts.Tail = strconv.FormatInt(*logOptions.TailLines, 10)
 	}
 
-	sopts := dockertools.StreamOptions{
+	sopts := libdocker.StreamOptions{
 		OutputStream: stdout,
 		ErrorStream:  stderr,
 		RawTerminal:  container.Config.Tty,
@@ -524,7 +521,7 @@ var criSupportedLogDrivers = []string{"json-file"}
 
 // IsCRISupportedLogDriver checks whether the logging driver used by docker is
 // suppoted by native CRI integration.
-func IsCRISupportedLogDriver(client dockertools.DockerInterface) (bool, error) {
+func IsCRISupportedLogDriver(client libdocker.Interface) (bool, error) {
 	info, err := client.Info()
 	if err != nil {
 		return false, fmt.Errorf("failed to get docker info: %v", err)

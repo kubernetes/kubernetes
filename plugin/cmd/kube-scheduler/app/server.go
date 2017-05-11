@@ -94,6 +94,8 @@ func Run(s *options.SchedulerServer) error {
 	stop := make(chan struct{})
 	defer close(stop)
 	informerFactory.Start(stop)
+	// Waiting for all cache to sync before scheduling.
+	informerFactory.WaitForCacheSync(stop)
 
 	run := func(_ <-chan struct{}) {
 		sched.Run()

@@ -24,7 +24,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/client-go/pkg/api"
 	reflect "reflect"
 )
 
@@ -51,7 +50,7 @@ func DeepCopy_metrics_ContainerMetrics(in interface{}, out interface{}, c *conve
 		*out = *in
 		if in.Usage != nil {
 			in, out := &in.Usage, &out.Usage
-			*out = make(api.ResourceList)
+			*out = make(ResourceList)
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
@@ -73,7 +72,7 @@ func DeepCopy_metrics_NodeMetrics(in interface{}, out interface{}, c *conversion
 		out.Timestamp = in.Timestamp.DeepCopy()
 		if in.Usage != nil {
 			in, out := &in.Usage, &out.Usage
-			*out = make(api.ResourceList)
+			*out = make(ResourceList)
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}

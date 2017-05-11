@@ -21,7 +21,8 @@ import (
 
 	dockertypes "github.com/docker/engine-api/types"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 // This file implements methods in ImageManagerService.
@@ -56,7 +57,7 @@ func (ds *dockerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimea
 func (ds *dockerService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
 	imageInspect, err := ds.client.InspectImageByRef(image.Image)
 	if err != nil {
-		if dockertools.IsImageNotFoundError(err) {
+		if libdocker.IsImageNotFoundError(err) {
 			return nil, nil
 		}
 		return nil, err
@@ -105,7 +106,7 @@ func (ds *dockerService) RemoveImage(image *runtimeapi.ImageSpec) error {
 }
 
 // getImageRef returns the image digest if exists, or else returns the image ID.
-func getImageRef(client dockertools.DockerInterface, image string) (string, error) {
+func getImageRef(client libdocker.Interface, image string) (string, error) {
 	img, err := client.InspectImageByRef(image)
 	if err != nil {
 		return "", err

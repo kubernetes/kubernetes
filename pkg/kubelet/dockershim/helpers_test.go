@@ -29,8 +29,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 func TestLabelsAndAnnotationsRoundTrip(t *testing.T) {
@@ -302,7 +303,7 @@ func TestEnsureSandboxImageExists(t *testing.T) {
 		},
 		"should pull image when it doesn't exist": {
 			injectImage: false,
-			injectErr:   dockertools.ImageNotFoundError{ID: "image_id"},
+			injectErr:   libdocker.ImageNotFoundError{ID: "image_id"},
 			calls:       []string{"inspect_image", "pull"},
 		},
 		"should return error when inspect image fails": {

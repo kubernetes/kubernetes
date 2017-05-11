@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockertools
+package libdocker
 
 import (
 	"bytes"
@@ -38,16 +38,16 @@ import (
 
 // kubeDockerClient is a wrapped layer of docker client for kubelet internal use. This layer is added to:
 //	1) Redirect stream for exec and attach operations.
-//	2) Wrap the context in this layer to make the DockerInterface cleaner.
-//	3) Stabilize the DockerInterface. The engine-api is still under active development, the interface
-//	is not stabilized yet. However, the DockerInterface is used in many files in Kubernetes, we may
+//	2) Wrap the context in this layer to make the Interface cleaner.
+//	3) Stabilize the Interface. The engine-api is still under active development, the interface
+//	is not stabilized yet. However, the Interface is used in many files in Kubernetes, we may
 //	not want to change the interface frequently. With this layer, we can port the engine api to the
-//	DockerInterface to avoid changing DockerInterface as much as possible.
+//	Interface to avoid changing Interface as much as possible.
 //	(See
 //	  * https://github.com/docker/engine-api/issues/89
 //	  * https://github.com/docker/engine-api/issues/137
 //	  * https://github.com/docker/engine-api/pull/140)
-// TODO(random-liu): Swith to new docker interface by refactoring the functions in the old DockerInterface
+// TODO(random-liu): Swith to new docker interface by refactoring the functions in the old Interface
 // one by one.
 type kubeDockerClient struct {
 	// timeout is the timeout of short running docker operations.
@@ -59,8 +59,8 @@ type kubeDockerClient struct {
 	client                    *dockerapi.Client
 }
 
-// Make sure that kubeDockerClient implemented the DockerInterface.
-var _ DockerInterface = &kubeDockerClient{}
+// Make sure that kubeDockerClient implemented the Interface.
+var _ Interface = &kubeDockerClient{}
 
 // There are 2 kinds of docker operations categorized by running time:
 // * Long running operation: The long running operation could run for arbitrary long time, and the running time
@@ -83,7 +83,7 @@ const (
 
 // newKubeDockerClient creates an kubeDockerClient from an existing docker client. If requestTimeout is 0,
 // defaultTimeout will be applied.
-func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePullProgressDeadline time.Duration) DockerInterface {
+func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePullProgressDeadline time.Duration) Interface {
 	if requestTimeout == 0 {
 		requestTimeout = defaultTimeout
 	}
@@ -574,12 +574,6 @@ func (d *kubeDockerClient) getCustomTimeoutContext(timeout time.Duration) (conte
 		timeout = d.timeout
 	}
 	return context.WithTimeout(context.Background(), timeout)
-}
-
-// ParseDockerTimestamp parses the timestamp returned by DockerInterface from string to time.Time
-func ParseDockerTimestamp(s string) (time.Time, error) {
-	// Timestamp returned by Docker is in time.RFC3339Nano format.
-	return time.Parse(time.RFC3339Nano, s)
 }
 
 // contextError checks the context, and returns error if the context is timeout.

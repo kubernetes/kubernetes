@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockertools
+package libdocker
 
 import (
 	"encoding/json"
@@ -77,16 +77,16 @@ type FakeDockerClient struct {
 }
 
 const (
-	// We don't check docker version now, just set the docker version of fake docker client to 1.8.1.
 	// Notice that if someday we also have minimum docker version requirement, this should also be updated.
-	fakeDockerVersion = "1.8.1"
+	fakeDockerVersion = "1.11.2"
 
 	fakeImageSize = 1024
 )
 
 func NewFakeDockerClient() *FakeDockerClient {
 	return &FakeDockerClient{
-		VersionInfo:  dockertypes.Version{Version: fakeDockerVersion, APIVersion: minimumDockerAPIVersion},
+		// Docker's API version does not include the patch number.
+		VersionInfo:  dockertypes.Version{Version: fakeDockerVersion, APIVersion: strings.TrimSuffix(MinimumDockerAPIVersion, ".0")},
 		Errors:       make(map[string]error),
 		ContainerMap: make(map[string]*dockertypes.ContainerJSON),
 		Clock:        clock.RealClock{},
@@ -345,6 +345,14 @@ func (f *FakeDockerClient) AssertImagesPulled(pulled []string) error {
 	return sortedStringSlicesEqual(pulled, actualPulled)
 }
 
+func (f *FakeDockerClient) AssertImagesPulledMsgs(expected []string) error {
+	f.Lock()
+	defer f.Unlock()
+	// Copy pulled to avoid modifying it.
+	actual := append([]string{}, f.pulled...)
+	return sortedStringSlicesEqual(expected, actual)
+}
+
 func sortedStringSlicesEqual(expected, actual []string) error {
 	sort.StringSlice(expected).Sort()
 	sort.StringSlice(actual).Sort()
@@ -367,7 +375,7 @@ func (f *FakeDockerClient) popError(op string) error {
 	}
 }
 
-// ListContainers is a test-spy implementation of DockerInterface.ListContainers.
+// ListContainers is a test-spy implementation of Interface.ListContainers.
 // It adds an entry "list" to the internal method call record.
 func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
 	f.Lock()
@@ -434,7 +442,7 @@ func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 	return containerList, err
 }
 
-// InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
+// InspectContainer is a test-spy implementation of Interface.InspectContainer.
 // It adds an entry "inspect" to the internal method call record.
 func (f *FakeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
 	f.Lock()
@@ -451,7 +459,7 @@ func (f *FakeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJS
 	return nil, fmt.Errorf("container %q not found", id)
 }
 
-// InspectImageByRef is a test-spy implementation of DockerInterface.InspectImageByRef.
+// InspectImageByRef is a test-spy implementation of Interface.InspectImageByRef.
 // It adds an entry "inspect" to the internal method call record.
 func (f *FakeDockerClient) InspectImageByRef(name string) (*dockertypes.ImageInspect, error) {
 	f.Lock()
@@ -466,7 +474,7 @@ func (f *FakeDockerClient) InspectImageByRef(name string) (*dockertypes.ImageIns
 	return nil, ImageNotFoundError{name}
 }
 
-// InspectImageByID is a test-spy implementation of DockerInterface.InspectImageByID.
+// InspectImageByID is a test-spy implementation of Interface.InspectImageByID.
 // It adds an entry "inspect" to the internal method call record.
 func (f *FakeDockerClient) InspectImageByID(name string) (*dockertypes.ImageInspect, error) {
 	f.Lock()
@@ -502,7 +510,7 @@ func GetFakeContainerID(name string) string {
 	return strconv.FormatUint(hash.Sum64(), 16)
 }
 
-// CreateContainer is a test-spy implementation of DockerInterface.CreateContainer.
+// CreateContainer is a test-spy implementation of Interface.CreateContainer.
 // It adds an entry "create" to the internal method call record.
 func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
 	f.Lock()
@@ -519,7 +527,7 @@ func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) 
 	timestamp := f.Clock.Now()
 	// The newest container should be in front, because we assume so in GetPodStatus()
 	f.RunningContainerList = append([]dockertypes.Container{
-		{ID: id, Names: []string{name}, Image: c.Config.Image, Created: timestamp.Unix(), State: statusCreatedPrefix, Labels: c.Config.Labels},
+		{ID: id, Names: []string{name}, Image: c.Config.Image, Created: timestamp.Unix(), State: StatusCreatedPrefix, Labels: c.Config.Labels},
 	}, f.RunningContainerList...)
 	f.ContainerMap[id] = convertFakeContainer(&FakeContainer{
 		ID: id, Name: name, Config: c.Config, HostConfig: c.HostConfig, CreatedAt: timestamp})
@@ -529,7 +537,7 @@ func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) 
 	return &dockertypes.ContainerCreateResponse{ID: id}, nil
 }
 
-// StartContainer is a test-spy implementation of DockerInterface.StartContainer.
+// StartContainer is a test-spy implementation of Interface.StartContainer.
 // It adds an entry "start" to the internal method call record.
 func (f *FakeDockerClient) StartContainer(id string) error {
 	f.Lock()
@@ -549,12 +557,12 @@ func (f *FakeDockerClient) StartContainer(id string) error {
 	container.State.StartedAt = dockerTimestampToString(timestamp)
 	container.NetworkSettings.IPAddress = "2.3.4.5"
 	f.ContainerMap[id] = container
-	f.updateContainerStatus(id, statusRunningPrefix)
+	f.updateContainerStatus(id, StatusRunningPrefix)
 	f.normalSleep(200, 50, 50)
 	return nil
 }
 
-// StopContainer is a test-spy implementation of DockerInterface.StopContainer.
+// StopContainer is a test-spy implementation of Interface.StopContainer.
 // It adds an entry "stop" to the internal method call record.
 func (f *FakeDockerClient) StopContainer(id string, timeout int) error {
 	f.Lock()
@@ -565,7 +573,7 @@ func (f *FakeDockerClient) StopContainer(id string, timeout int) error {
 	}
 	f.appendContainerTrace("Stopped", id)
 	// Container status should be Updated before container moved to ExitedContainerList
-	f.updateContainerStatus(id, statusExitedPrefix)
+	f.updateContainerStatus(id, StatusExitedPrefix)
 	var newList []dockertypes.Container
 	for _, container := range f.RunningContainerList {
 		if container.ID == id {
@@ -615,7 +623,7 @@ func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 	return fmt.Errorf("container not stopped")
 }
 
-// Logs is a test-spy implementation of DockerInterface.Logs.
+// Logs is a test-spy implementation of Interface.Logs.
 // It adds an entry "logs" to the internal method call record.
 func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
 	f.Lock()
@@ -624,7 +632,7 @@ func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 	return f.popError("logs")
 }
 
-// PullImage is a test-spy implementation of DockerInterface.PullImage.
+// PullImage is a test-spy implementation of Interface.PullImage.
 // It adds an entry "pull" to the internal method call record.
 func (f *FakeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
 	f.Lock()
@@ -804,7 +812,7 @@ func (f *FakeDockerClient) InjectImageHistory(data map[string][]dockertypes.Imag
 // FakeDockerPuller is meant to be a simple wrapper around FakeDockerClient.
 // Please do not add more functionalities to it.
 type FakeDockerPuller struct {
-	client DockerInterface
+	client Interface
 }
 
 func (f *FakeDockerPuller) Pull(image string, _ []v1.Secret) error {

@@ -36,6 +36,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_custom_metrics_MetricValue, InType: reflect.TypeOf(&MetricValue{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_custom_metrics_MetricValueList, InType: reflect.TypeOf(&MetricValueList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_custom_metrics_ObjectReference, InType: reflect.TypeOf(&ObjectReference{})},
 	)
 }
 
@@ -71,6 +72,15 @@ func DeepCopy_custom_metrics_MetricValueList(in interface{}, out interface{}, c 
 				}
 			}
 		}
+		return nil
+	}
+}
+
+func DeepCopy_custom_metrics_ObjectReference(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ObjectReference)
+		out := out.(*ObjectReference)
+		*out = *in
 		return nil
 	}
 }

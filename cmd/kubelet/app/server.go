@@ -72,8 +72,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/server"
@@ -143,9 +143,9 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 		writer = &kubeio.NsenterWriter{}
 	}
 
-	var dockerClient dockertools.DockerInterface
+	var dockerClient libdocker.Interface
 	if s.ContainerRuntime == "docker" {
-		dockerClient = dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration,
+		dockerClient = libdocker.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration,
 			s.ImagePullProgressDeadline.Duration)
 	} else {
 		dockerClient = nil
@@ -937,7 +937,7 @@ func parseResourceList(m componentconfig.ConfigurationMap) (v1.ResourceList, err
 // TODO(random-liu): Move this to a separate binary.
 func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir string) error {
 	// Create docker client.
-	dockerClient := dockertools.ConnectToDockerOrDie(c.DockerEndpoint, c.RuntimeRequestTimeout.Duration,
+	dockerClient := libdocker.ConnectToDockerOrDie(c.DockerEndpoint, c.RuntimeRequestTimeout.Duration,
 		c.ImagePullProgressDeadline.Duration)
 
 	// Initialize network plugin settings.
@@ -968,7 +968,7 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 
 	ds, err := dockershim.NewDockerService(dockerClient, c.SeccompProfileRoot, c.PodInfraContainerImage,
 		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, c.DockerExecHandlerName, dockershimRootDir,
-		!c.DockerEnableSharedPID)
+		c.DockerDisableSharedPID)
 	if err != nil {
 		return err
 	}

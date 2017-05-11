@@ -22,7 +22,6 @@ package deletionhelper
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,18 +49,16 @@ type ObjNameFunc func(runtime.Object) string
 type DeletionHelper struct {
 	updateObjFunc UpdateObjFunc
 	objNameFunc   ObjNameFunc
-	updateTimeout time.Duration
 	informer      util.FederatedInformer
 	updater       util.FederatedUpdater
 }
 
 func NewDeletionHelper(
-	updateObjFunc UpdateObjFunc, objNameFunc ObjNameFunc, updateTimeout time.Duration,
+	updateObjFunc UpdateObjFunc, objNameFunc ObjNameFunc,
 	informer util.FederatedInformer, updater util.FederatedUpdater) *DeletionHelper {
 	return &DeletionHelper{
 		updateObjFunc: updateObjFunc,
 		objNameFunc:   objNameFunc,
-		updateTimeout: updateTimeout,
 		informer:      informer,
 		updater:       updater,
 	}
@@ -155,7 +152,7 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 			Key:         objName,
 		})
 	}
-	err = dh.updater.Update(operations, dh.updateTimeout)
+	err = dh.updater.Update(operations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute updates for obj %s: %v", objName, err)
 	}
