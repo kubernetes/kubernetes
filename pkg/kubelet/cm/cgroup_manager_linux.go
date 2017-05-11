@@ -227,8 +227,20 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	// Get map of all cgroup paths on the system for the particular cgroup
 	cgroupPaths := m.buildCgroupPaths(name)
 
+	// the presence of alternative control groups not known to runc confuses
+	// the kubelet existence checks.
+	// ideally, we would have a mechaninsm in runc to support Exists() logic
+	// scoped to the set control groups it understands.  this is being discussed
+	// in https://github.com/opencontainers/runc/issues/1440
+	// once resolved, we can remove this code.
+	whitelistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "hugetlb", "systemd")
+
 	// If even one cgroup path doesn't exist, then the cgroup doesn't exist.
-	for _, path := range cgroupPaths {
+	for controller, path := range cgroupPaths {
+		// ignore mounts we dont care about
+		if !whitelistControllers.Has(controller) {
+			continue
+		}
 		if !libcontainercgroups.PathExists(path) {
 			return false
 		}
