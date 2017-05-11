@@ -126,8 +126,7 @@ func (hk *HyperKube) Run(args []string) error {
 
 		baseFlags := hk.Flags()
 		baseFlags.SetInterspersed(false) // Only parse flags up to the next real command
-		err := baseFlags.Parse(args)
-		if err != nil || hk.helpFlagVal {
+		if err := baseFlags.Parse(args); err != nil || hk.helpFlagVal {
 			if err != nil {
 				hk.Println("Error:", err)
 			}
@@ -162,8 +161,7 @@ func (hk *HyperKube) Run(args []string) error {
 	}
 
 	s.Flags().AddFlagSet(hk.Flags())
-	err = s.Flags().Parse(args)
-	if err != nil || hk.helpFlagVal {
+	if err = s.Flags().Parse(args); err != nil || hk.helpFlagVal {
 		if err != nil {
 			hk.Printf("Error: %v\n\n", err)
 		}
@@ -176,8 +174,8 @@ func (hk *HyperKube) Run(args []string) error {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	err = s.Run(s, s.Flags().Args())
-	if err != nil {
+
+	if err = s.Run(s, s.Flags().Args()); err != nil {
 		hk.Println("Error:", err)
 	}
 
@@ -186,8 +184,7 @@ func (hk *HyperKube) Run(args []string) error {
 
 // RunToExit will run the hyperkube and then call os.Exit with an appropriate exit code.
 func (hk *HyperKube) RunToExit(args []string) {
-	err := hk.Run(args)
-	if err != nil {
+	if err := hk.Run(args); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err.Error())
 		os.Exit(1)
 	}
@@ -222,8 +219,7 @@ func (hk *HyperKube) MakeSymlinks(command string) error {
 	for _, s := range hk.servers {
 		link := path.Join(wd, s.Name())
 
-		err := os.Symlink(command, link)
-		if err != nil {
+		if err := os.Symlink(command, link); err != nil {
 			errs = true
 			hk.Println(err)
 		}
