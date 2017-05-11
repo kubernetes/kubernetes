@@ -139,8 +139,6 @@ func TestLoadSeccompLocalhostProfiles(t *testing.T) {
 }
 
 // TestGetApparmorSecurityOpts tests the logic of generating container apparmor options from sandbox annotations.
-// The actual profile loading logic is tested in dockertools.
-// TODO: Migrate the corresponding test to dockershim.
 func TestGetApparmorSecurityOpts(t *testing.T) {
 	makeConfig := func(profile string) *runtimeapi.LinuxContainerSecurityContext {
 		return &runtimeapi.LinuxContainerSecurityContext{

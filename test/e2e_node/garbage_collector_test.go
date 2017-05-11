@@ -263,7 +263,7 @@ func dockerContainerGCTest(f *framework.Framework, test testRun) {
 		runtime = libdocker.ConnectToDockerOrDie(defaultDockerEndpoint, defaultRuntimeRequestTimeoutDuration, defaultImagePullProgressDeadline)
 	})
 	for _, pod := range test.testPods {
-		// Initialize the getContainerNames function to use the dockertools api
+		// Initialize the getContainerNames function to use the libdocker api
 		thisPrefix := pod.containerPrefix
 		pod.getContainerNames = func() ([]string, error) {
 			relevantContainers := []string{}
