@@ -17,10 +17,12 @@ limitations under the License.
 package config
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -29,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/util/prompt"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/i18n"
@@ -79,6 +82,12 @@ var (
 
 		# Set basic auth for the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
+
+		# Prompt username and password input for the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --username - --password -
+
+		# Prompt token input for the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --token -
 
 		# Embed client certificate data in the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true
@@ -131,7 +140,14 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 }
 
 func (o createAuthInfoOptions) run() error {
-	err := o.validate()
+	var err error
+
+	err = o.checkPrompts()
+	if err != nil {
+		return err
+	}
+
+	err = o.validate()
 	if err != nil {
 		return err
 	}
@@ -292,6 +308,38 @@ func (o createAuthInfoOptions) validate() error {
 				return fmt.Errorf("error reading %s data from %s: %v", clientcmd.FlagKeyFile, keyPath, err)
 			}
 		}
+	}
+
+	return nil
+}
+
+func (o *createAuthInfoOptions) checkPrompts() (err error) {
+	var result string
+
+	prompter := prompt.NewPrompter(bufio.NewReader(os.Stdin))
+
+	if o.username.Value() == "-" {
+		result, err = prompter.Prompt("Username", prompt.ShowEcho, prompt.DontMask)
+		if err != nil {
+			return err
+		}
+		o.username.Set(result)
+	}
+
+	if o.password.Value() == "-" {
+		result, err = prompter.Prompt("Password", prompt.DontShowEcho, prompt.Mask)
+		if err != nil {
+			return err
+		}
+		o.password.Set(result)
+	}
+
+	if o.token.Value() == "-" {
+		result, err = prompter.Prompt("Token", prompt.DontShowEcho, prompt.DontMask)
+		if err != nil {
+			return err
+		}
+		o.token.Set(result)
 	}
 
 	return nil
