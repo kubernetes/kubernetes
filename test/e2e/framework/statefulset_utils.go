@@ -36,8 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/generated"
 )
@@ -482,7 +482,7 @@ func IsStatefulSetPodInitialized(pod v1.Pod) bool {
 }
 
 // NewStatefulSetPVC returns a PersistentVolumeClaim named name, for testing StatefulSets.
-func NewStatefulSetPVC(c clientset.Interface,name string) v1.PersistentVolumeClaim {
+func NewStatefulSetPVC(c clientset.Interface, name string) v1.PersistentVolumeClaim {
 	classDefault := getDefaultStorageClassName(c)
 	return v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -526,11 +526,11 @@ func getDefaultStorageClassName(c clientset.Interface) string {
 // NewStatefulSet creates a new NGINX StatefulSet for testing. The StatefulSet is named name, is in namespace ns,
 // statefulPodsMounts are the mounts that will be backed by PVs. podsMounts are the mounts that are mounted directly
 // to the Pod. labels are the labels that will be usd for the StatefulSet selector.
-func NewStatefulSet(c clientset.Interface,name, ns, governingSvcName string, replicas int32, statefulPodMounts []v1.VolumeMount, podMounts []v1.VolumeMount, labels map[string]string) *apps.StatefulSet {
+func NewStatefulSet(c clientset.Interface, name, ns, governingSvcName string, replicas int32, statefulPodMounts []v1.VolumeMount, podMounts []v1.VolumeMount, labels map[string]string) *apps.StatefulSet {
 	mounts := append(statefulPodMounts, podMounts...)
 	claims := []v1.PersistentVolumeClaim{}
 	for _, m := range statefulPodMounts {
-		claims = append(claims, NewStatefulSetPVC(c,m.Name))
+		claims = append(claims, NewStatefulSetPVC(c, m.Name))
 	}
 
 	vols := []v1.Volume{}
