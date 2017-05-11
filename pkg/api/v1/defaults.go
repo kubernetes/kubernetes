@@ -243,11 +243,11 @@ func SetDefaults_AzureDiskVolumeSource(obj *AzureDiskVolumeSource) {
 func SetDefaults_AzureFileVolumeSource(obj *AzureFileVolumeSource) {
 	if obj.DirMode == nil {
 		obj.DirMode = new(int32)
-		*obj.DirMode = 511
+		*obj.DirMode = 0777
 	}
 	if obj.FileMode == nil {
 		obj.FileMode = new(int32)
-		*obj.FileMode = 511
+		*obj.FileMode = 0777
 	}
 }
 func SetDefaults_Endpoints(obj *Endpoints) {
