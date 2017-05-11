@@ -17,10 +17,10 @@ limitations under the License.
 package wardle
 
 import (
+	"k8s.io/apimachinery/pkg/apis/discovery"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/apimachinery/pkg/apis/discovery"
 )
 
 // rest implements a RESTStorage for API services against etcd

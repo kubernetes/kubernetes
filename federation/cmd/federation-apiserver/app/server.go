@@ -232,6 +232,10 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	routes.UIRedirect{}.Install(m.Handler.PostGoRestfulMux)
 	routes.Logs{}.Install(m.Handler.GoRestfulContainer)
 
+	if err := m.InstallDiscoveryAPIGroup(api.Registry, api.Scheme, api.Codecs); err != nil {
+		return err
+	}
+
 	apiResourceConfigSource := storageFactory.APIResourceConfigSource
 	installFederationAPIs(m, genericConfig.RESTOptionsGetter, apiResourceConfigSource)
 	installCoreAPIs(s, m, genericConfig.RESTOptionsGetter, apiResourceConfigSource)

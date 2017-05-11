@@ -380,6 +380,7 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 		admissionControl:       c.AdmissionControl,
 		requestContextMapper:   c.RequestContextMapper,
 		Serializer:             c.Serializer,
+		RESTOptionsGetter:      c.RESTOptionsGetter,
 
 		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
 
@@ -422,7 +423,7 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 
 	s.listedPathProvider = routes.ListedPathProviders{s.listedPathProvider, delegationTarget}
 
-	installAPI(s, c.Config)
+	installRoutes(s, c.Config)
 
 	// use the UnprotectedHandler from the delegation target to ensure that we don't attempt to double authenticator, authorize,
 	// or some other part of the filter chain in delegation cases.
@@ -450,7 +451,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	return handler
 }
 
-func installAPI(s *GenericAPIServer, c *Config) {
+func installRoutes(s *GenericAPIServer, c *Config) {
 	if c.EnableIndex {
 		routes.Index{}.Install(s.listedPathProvider, s.Handler.PostGoRestfulMux)
 	}
