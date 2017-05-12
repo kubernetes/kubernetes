@@ -145,10 +145,10 @@ func XDGDataPluginLoader() PluginLoader {
 	}
 	return TolerantMultiPluginLoader{
 		&DirectoryPluginLoader{
-			Directory: "/usr/local/share",
+			Directory: "/usr/local/share/kubectl/plugins",
 		},
 		&DirectoryPluginLoader{
-			Directory: "/usr/share",
+			Directory: "/usr/share/kubectl/plugins",
 		},
 	}
 }
