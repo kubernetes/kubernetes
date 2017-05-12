@@ -39,7 +39,6 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authorization/v1beta1:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/apis/authorization/install:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/authorization/v1beta1:go_default_library",
     ],
 )

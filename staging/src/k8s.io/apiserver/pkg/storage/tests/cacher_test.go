@@ -46,7 +46,6 @@ import (
 	"golang.org/x/net/context"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	_ "k8s.io/client-go/pkg/api/install"
 )
 
 var (
