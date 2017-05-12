@@ -335,6 +335,9 @@ func printPodBase(pod *api.Pod, w io.Writer, options printers.PrintOptions) erro
 		if podIP == "" {
 			podIP = "<none>"
 		}
+		if nodeName == "" {
+			nodeName = "<none>"
+		}
 		if _, err := fmt.Fprintf(w, "\t%s\t%s",
 			podIP,
 			nodeName,
