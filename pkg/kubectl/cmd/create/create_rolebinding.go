@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"fmt"
@@ -29,49 +29,50 @@ import (
 )
 
 var (
-	clusterRoleBindingLong = templates.LongDesc(i18n.T(`
-		Create a ClusterRoleBinding for a particular ClusterRole.`))
+	roleBindingLong = templates.LongDesc(i18n.T(`
+		Create a RoleBinding for a particular Role or ClusterRole.`))
 
-	clusterRoleBindingExample = templates.Examples(i18n.T(`
-		  # Create a ClusterRoleBinding for user1, user2, and group1 using the cluster-admin ClusterRole
-		  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1`))
+	roleBindingExample = templates.Examples(i18n.T(`
+		  # Create a RoleBinding for user1, user2, and group1 using the admin ClusterRole
+		  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1`))
 )
 
-// ClusterRoleBinding is a command to ease creating ClusterRoleBindings.
-func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+// RoleBinding is a command to ease creating RoleBindings.
+func NewCmdCreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "clusterrolebinding NAME --clusterrole=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
-		Short:   i18n.T("Create a ClusterRoleBinding for a particular ClusterRole"),
-		Long:    clusterRoleBindingLong,
-		Example: clusterRoleBindingExample,
+		Use:     "rolebinding NAME --clusterrole=NAME|--role=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
+		Short:   i18n.T("Create a RoleBinding for a particular Role or ClusterRole"),
+		Long:    roleBindingLong,
+		Example: roleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := CreateClusterRoleBinding(f, cmdOut, cmd, args)
+			err := CreateRoleBinding(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, cmdutil.ClusterRoleBindingV1GeneratorName)
-	cmd.Flags().String("clusterrole", "", i18n.T("ClusterRole this ClusterRoleBinding should reference"))
+	cmdutil.AddGeneratorFlags(cmd, cmdutil.RoleBindingV1GeneratorName)
+	cmd.Flags().String("clusterrole", "", i18n.T("ClusterRole this RoleBinding should reference"))
+	cmd.Flags().String("role", "", i18n.T("Role this RoleBinding should reference"))
 	cmd.Flags().StringArray("user", []string{}, "usernames to bind to the role")
 	cmd.Flags().StringArray("group", []string{}, "groups to bind to the role")
 	cmd.Flags().StringArray("serviceaccount", []string{}, "service accounts to bind to the role, in the format <namespace>:<name>")
 	return cmd
 }
 
-// CreateClusterRoleBinding is the implementation of the create configmap command.
-func CreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func CreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case cmdutil.ClusterRoleBindingV1GeneratorName:
-		generator = &kubectl.ClusterRoleBindingGeneratorV1{
+	case cmdutil.RoleBindingV1GeneratorName:
+		generator = &kubectl.RoleBindingGeneratorV1{
 			Name:            name,
 			ClusterRole:     cmdutil.GetFlagString(cmd, "clusterrole"),
+			Role:            cmdutil.GetFlagString(cmd, "role"),
 			Users:           cmdutil.GetFlagStringArray(cmd, "user"),
 			Groups:          cmdutil.GetFlagStringArray(cmd, "group"),
 			ServiceAccounts: cmdutil.GetFlagStringArray(cmd, "serviceaccount"),
