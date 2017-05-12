@@ -129,3 +129,9 @@ func matchImageIDOnly(inspected dockertypes.ImageInspect, image string) bool {
 	glog.V(4).Infof("The reference %s does not directly refer to the given image's ID (%q)", image, inspected.ID)
 	return false
 }
+
+// isImageNotFoundError returns whether the err is caused by image not found in docker
+// TODO: Use native error tester once ImageNotFoundError is supported in docker-engine client(eg. ImageRemove())
+func isImageNotFoundError(err error) bool {
+	return strings.Contains(err.Error(), "No such image:")
+}
