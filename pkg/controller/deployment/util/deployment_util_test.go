@@ -1090,8 +1090,8 @@ func TestDeploymentTimedOut(t *testing.T) {
 		ten  = int32(10)
 	)
 
-	timeFn := func(min, sec int) time.Time {
-		return time.Date(2016, 1, 1, 0, min, sec, 0, time.UTC)
+	timeFn := func(min, sec, ns int) time.Time {
+		return time.Date(2016, 1, 1, 0, min, sec, ns, time.UTC)
 	}
 	deployment := func(condType extensions.DeploymentConditionType, status v1.ConditionStatus, pds *int32, from time.Time) extensions.Deployment {
 		return extensions.Deployment{
@@ -1121,32 +1121,44 @@ func TestDeploymentTimedOut(t *testing.T) {
 		{
 			name: "no progressDeadlineSeconds specified - no timeout",
 
-			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, null, timeFn(1, 9)),
-			nowFn:    func() time.Time { return timeFn(1, 20) },
+			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, null, timeFn(1, 9, 0)),
+			nowFn:    func() time.Time { return timeFn(1, 20, 0) },
 			expected: false,
 		},
 		{
 			name: "progressDeadlineSeconds: 10s, now - started => 00:01:20 - 00:01:09 => 11s",
 
-			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, &ten, timeFn(1, 9)),
-			nowFn:    func() time.Time { return timeFn(1, 20) },
+			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, &ten, timeFn(1, 9, 0)),
+			nowFn:    func() time.Time { return timeFn(1, 20, 0) },
 			expected: true,
 		},
 		{
 			name: "progressDeadlineSeconds: 10s, now - started => 00:01:20 - 00:01:11 => 9s",
 
-			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, &ten, timeFn(1, 11)),
-			nowFn:    func() time.Time { return timeFn(1, 20) },
+			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, &ten, timeFn(1, 11, 0)),
+			nowFn:    func() time.Time { return timeFn(1, 20, 0) },
 			expected: false,
+		},
+		{
+			name: "handle nanoseconds properly #1",
+
+			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, &ten, timeFn(1, 0, 0)),
+			nowFn:    func() time.Time { return timeFn(1, 9, 500000000) },
+			expected: true,
+		},
+		{
+			name: "handle nanoseconds properly #2",
+			// https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133
+			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, &ten, timeFn(33, 20, 506962913)),
+			nowFn:    func() time.Time { return timeFn(33, 30, 497349178) },
+			expected: true,
 		},
 	}
 
 	for _, test := range tests {
-		t.Log(test.name)
-
 		nowFn = test.nowFn
 		if got, exp := DeploymentTimedOut(&test.d, &test.d.Status), test.expected; got != exp {
-			t.Errorf("expected timeout: %t, got: %t", exp, got)
+			t.Errorf("%s: expected timeout: %t, got: %t", test.name, exp, got)
 		}
 	}
 }
