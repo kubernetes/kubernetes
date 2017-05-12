@@ -5,6 +5,7 @@ Building Kubernetes is easy if you take advantage of the containerized build env
 ## Requirements
 
 1. Docker, using one of the following configurations:
+  1. **Minikube on Mac/Windows/Linux** you can use [minikube](https://github.com/kubernetes/minikube) to get a Docker build endpoint. Ensure you have at least 3GB of memory. See instructions for [setting up minikube for a build](#minikube).
   1. **Mac OS X** You can either use Docker for Mac or docker-machine. See installation instructions [here](https://docs.docker.com/docker-for-mac/).
      **Note**: You will want to set the Docker VM to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)).
   2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.
@@ -42,6 +43,17 @@ There are 3 different containers instances that are run from this image.  The fi
 `rsync` is used transparently behind the scenes to efficiently move data in and out of the container.  This will use an ephemeral port picked by Docker.  You can modify this by setting the `KUBE_RSYNC_PORT` env variable.
 
 All Docker names are suffixed with a hash derived from the file path (to allow concurrent usage on things like CI machines) and a version number.  When the version number changes all state is cleared and clean build is started.  This allows the build infrastructure to be changed and signal to CI systems that old artifacts need to be deleted.
+
+## Minikube
+
+To use minikube you need to create an SSH tunnel for rsync, do something like this:
+
+```
+export KUBE_RSYNC_PORT=8730
+eval $(minikube docker-env)
+ssh -i ~/.minikube/machines/minikube/id_rsa  $(minikube ip) -L ${KUBE_RSYNC_PORT}:localhost:${KUBE_RSYNC_PORT} -N -l docker &
+build/run.sh make
+```
 
 ## Proxy Settings
 
