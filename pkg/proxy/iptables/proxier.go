@@ -160,7 +160,7 @@ func (e *endpointsInfo) String() string {
 }
 
 // returns a new serviceInfo struct
-func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, service *api.Service) *serviceInfo {
+func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, service *api.Service) *serviceInfo {
 	onlyNodeLocalEndpoints := false
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) &&
 		apiservice.RequestsOnlyLocalTraffic(service) {
@@ -185,7 +185,7 @@ func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, se
 	if apiservice.NeedsHealthCheck(service) {
 		p := apiservice.GetServiceHealthCheckNodePort(service)
 		if p == 0 {
-			glog.Errorf("Service %q has no healthcheck nodeport", serviceName)
+			glog.Errorf("Service %q has no healthcheck nodeport", svcPortName.NamespacedName.String())
 		} else {
 			info.healthCheckNodePort = int(p)
 		}
@@ -267,46 +267,46 @@ func (scm *serviceChangeMap) update(namespacedName *types.NamespacedName, previo
 
 func (sm *proxyServiceMap) merge(other proxyServiceMap) sets.String {
 	existingPorts := sets.NewString()
-	for serviceName, info := range other {
-		existingPorts.Insert(serviceName.Port)
-		_, exists := (*sm)[serviceName]
+	for svcPortName, info := range other {
+		existingPorts.Insert(svcPortName.Port)
+		_, exists := (*sm)[svcPortName]
 		if !exists {
-			glog.V(1).Infof("Adding new service %q at %s:%d/%s", serviceName, info.clusterIP, info.port, info.protocol)
+			glog.V(1).Infof("Adding new service port %q at %s:%d/%s", svcPortName, info.clusterIP, info.port, info.protocol)
 		} else {
-			glog.V(1).Infof("Updating existing service %q at %s:%d/%s", serviceName, info.clusterIP, info.port, info.protocol)
+			glog.V(1).Infof("Updating existing service port %q at %s:%d/%s", svcPortName, info.clusterIP, info.port, info.protocol)
 		}
-		(*sm)[serviceName] = info
+		(*sm)[svcPortName] = info
 	}
 	return existingPorts
 }
 
 func (sm *proxyServiceMap) unmerge(other proxyServiceMap, existingPorts, staleServices sets.String) {
-	for serviceName := range other {
-		if existingPorts.Has(serviceName.Port) {
+	for svcPortName := range other {
+		if existingPorts.Has(svcPortName.Port) {
 			continue
 		}
-		info, exists := (*sm)[serviceName]
+		info, exists := (*sm)[svcPortName]
 		if exists {
-			glog.V(1).Infof("Removing service %q", serviceName)
+			glog.V(1).Infof("Removing service port %q", svcPortName)
 			if info.protocol == api.ProtocolUDP {
 				staleServices.Insert(info.clusterIP.String())
 			}
-			delete(*sm, serviceName)
+			delete(*sm, svcPortName)
 		} else {
-			glog.Errorf("Service %q removed, but doesn't exists", serviceName)
+			glog.Errorf("Service port %q removed, but doesn't exists", svcPortName)
 		}
 	}
 }
 
 func (em proxyEndpointsMap) merge(other proxyEndpointsMap) {
-	for svcPort := range other {
-		em[svcPort] = other[svcPort]
+	for svcPortName := range other {
+		em[svcPortName] = other[svcPortName]
 	}
 }
 
 func (em proxyEndpointsMap) unmerge(other proxyEndpointsMap) {
-	for svcPort := range other {
-		delete(em, svcPort)
+	for svcPortName := range other {
+		delete(em, svcPortName)
 	}
 }
 
@@ -662,9 +662,9 @@ func updateServiceMap(
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to serviceMap.
 	hcServices = make(map[types.NamespacedName]uint16)
-	for svcPort, info := range serviceMap {
+	for svcPortName, info := range serviceMap {
 		if info.healthCheckNodePort != 0 {
-			hcServices[svcPort.NamespacedName] = uint16(info.healthCheckNodePort)
+			hcServices[svcPortName.NamespacedName] = uint16(info.healthCheckNodePort)
 		}
 	}
 
@@ -738,18 +738,18 @@ func updateEndpointsMap(
 // <staleEndpoints> are modified by this function with detected stale
 // connections.
 func detectStaleConnections(oldEndpointsMap, newEndpointsMap proxyEndpointsMap, staleEndpoints map[endpointServicePair]bool) {
-	for svcPort, epList := range oldEndpointsMap {
+	for svcPortName, epList := range oldEndpointsMap {
 		for _, ep := range epList {
 			stale := true
-			for i := range newEndpointsMap[svcPort] {
-				if *newEndpointsMap[svcPort][i] == *ep {
+			for i := range newEndpointsMap[svcPortName] {
+				if *newEndpointsMap[svcPortName][i] == *ep {
 					stale = false
 					break
 				}
 			}
 			if stale {
-				glog.V(4).Infof("Stale endpoint %v -> %v", svcPort, ep.endpoint)
-				staleEndpoints[endpointServicePair{endpoint: ep.endpoint, servicePortName: svcPort}] = true
+				glog.V(4).Infof("Stale endpoint %v -> %v", svcPortName, ep.endpoint)
+				staleEndpoints[endpointServicePair{endpoint: ep.endpoint, servicePortName: svcPortName}] = true
 			}
 		}
 	}
@@ -757,10 +757,10 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap proxyEndpointsMap, 
 
 func getLocalIPs(endpointsMap proxyEndpointsMap) map[types.NamespacedName]sets.String {
 	localIPs := make(map[types.NamespacedName]sets.String)
-	for svcPort := range endpointsMap {
-		for _, ep := range endpointsMap[svcPort] {
+	for svcPortName := range endpointsMap {
+		for _, ep := range endpointsMap[svcPortName] {
 			if ep.isLocal {
-				nsn := svcPort.NamespacedName
+				nsn := svcPortName.NamespacedName
 				if localIPs[nsn] == nil {
 					localIPs[nsn] = sets.NewString()
 				}
@@ -792,7 +792,7 @@ func endpointsToEndpointsMap(endpoints *api.Endpoints, hostname string) proxyEnd
 				glog.Warningf("ignoring invalid endpoint port %s", port.Name)
 				continue
 			}
-			svcPort := proxy.ServicePortName{
+			svcPortName := proxy.ServicePortName{
 				NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name},
 				Port:           port.Name,
 			}
@@ -806,14 +806,14 @@ func endpointsToEndpointsMap(endpoints *api.Endpoints, hostname string) proxyEnd
 					endpoint: net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port))),
 					isLocal:  addr.NodeName != nil && *addr.NodeName == hostname,
 				}
-				endpointsMap[svcPort] = append(endpointsMap[svcPort], epInfo)
+				endpointsMap[svcPortName] = append(endpointsMap[svcPortName], epInfo)
 			}
 			if glog.V(3) {
 				newEPList := []string{}
-				for _, ep := range endpointsMap[svcPort] {
+				for _, ep := range endpointsMap[svcPortName] {
 					newEPList = append(newEPList, ep.endpoint)
 				}
-				glog.Infof("Setting endpoints for %q to %+v", svcPort, newEPList)
+				glog.Infof("Setting endpoints for %q to %+v", svcPortName, newEPList)
 			}
 		}
 	}
@@ -835,8 +835,8 @@ func serviceToServiceMap(service *api.Service) proxyServiceMap {
 	serviceMap := make(proxyServiceMap)
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
-		serviceName := proxy.ServicePortName{NamespacedName: svcName, Port: servicePort.Name}
-		serviceMap[serviceName] = newServiceInfo(serviceName, servicePort, service)
+		svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: servicePort.Name}
+		serviceMap[svcPortName] = newServiceInfo(svcPortName, servicePort, service)
 	}
 	return serviceMap
 }
