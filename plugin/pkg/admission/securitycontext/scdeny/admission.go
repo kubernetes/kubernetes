@@ -17,7 +17,7 @@ limitations under the License.
 package scdeny
 
 import (
-	"fmt"
+	"errors"
 	"io"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,8 +43,8 @@ func NewSecurityContextDeny() admission.Interface {
 	}
 }
 
-// Admit will deny any pod that defines SELinuxOptions or RunAsUser.
-func (p *plugin) Admit(a admission.Attributes) (err error) {
+// Admit will deny any pod that defines SELinuxOptions, RunAsUser, SupplementalGroups, or FSGroup.
+func (p *plugin) Admit(a admission.Attributes) error {
 	if a.GetSubresource() != "" || a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
@@ -54,42 +54,52 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
-	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SupplementalGroups != nil {
-		return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.SupplementalGroups is forbidden"))
+	if err := checkPodSecurityContext(pod.Spec.SecurityContext); err != nil {
+		return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, err)
 	}
-	if pod.Spec.SecurityContext != nil {
-		if pod.Spec.SecurityContext.SELinuxOptions != nil {
-			return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("pod.Spec.SecurityContext.SELinuxOptions is forbidden"))
-		}
-		if pod.Spec.SecurityContext.RunAsUser != nil {
-			return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("pod.Spec.SecurityContext.RunAsUser is forbidden"))
+
+	for _, initContainer := range pod.Spec.InitContainers {
+		if err := checkSecurityContext(initContainer.SecurityContext); err != nil {
+			return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, err)
 		}
 	}
 
-	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
-		return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.FSGroup is forbidden"))
-	}
-
-	for _, v := range pod.Spec.InitContainers {
-		if v.SecurityContext != nil {
-			if v.SecurityContext.SELinuxOptions != nil {
-				return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.SELinuxOptions is forbidden"))
-			}
-			if v.SecurityContext.RunAsUser != nil {
-				return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.RunAsUser is forbidden"))
-			}
+	for _, container := range pod.Spec.Containers {
+		if err := checkSecurityContext(container.SecurityContext); err != nil {
+			return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, err)
 		}
 	}
+	return nil
+}
 
-	for _, v := range pod.Spec.Containers {
-		if v.SecurityContext != nil {
-			if v.SecurityContext.SELinuxOptions != nil {
-				return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.SELinuxOptions is forbidden"))
-			}
-			if v.SecurityContext.RunAsUser != nil {
-				return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.RunAsUser is forbidden"))
-			}
-		}
+func checkPodSecurityContext(psc *api.PodSecurityContext) error {
+	if psc == nil {
+		return nil
+	}
+	if psc.SELinuxOptions != nil {
+		return errors.New("pod.Spec.SecurityContext.SELinuxOptions is forbidden")
+	}
+	if psc.RunAsUser != nil {
+		return errors.New("pod.Spec.SecurityContext.RunAsUser is forbidden")
+	}
+	if psc.SupplementalGroups != nil {
+		return errors.New("pod.Spec.SecurityContext.SupplementalGroups is forbidden")
+	}
+	if psc.FSGroup != nil {
+		return errors.New("pod.Spec.SecurityContext.FSGroup is forbidden")
+	}
+	return nil
+}
+
+func checkSecurityContext(sc *api.SecurityContext) error {
+	if sc == nil {
+		return nil
+	}
+	if sc.SELinuxOptions != nil {
+		return errors.New("SecurityContext.SELinuxOptions is forbidden")
+	}
+	if sc.RunAsUser != nil {
+		return errors.New("SecurityContext.RunAsUser is forbidden")
 	}
 	return nil
 }
