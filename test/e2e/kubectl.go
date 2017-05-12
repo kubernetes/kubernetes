@@ -255,14 +255,15 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 				framework.Failf("Failed getting CronJob %s: %v", cjName, err)
 			}
 			if sj.Spec.Schedule != schedule {
-				framework.Failf("Failed creating a CronJob with correct schedule %s", schedule)
+				framework.Failf("Failed creating a CronJob with correct schedule %s, but got %s", schedule, sj.Spec.Schedule)
 			}
 			containers := sj.Spec.JobTemplate.Spec.Template.Spec.Containers
 			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
 				framework.Failf("Failed creating CronJob %s for 1 pod with expected image %s: %#v", cjName, busyboxImage, containers)
 			}
+			restartPolicy := sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy
 			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
-				framework.Failf("Failed creating a CronJob with correct restart policy for --restart=OnFailure")
+				framework.Failf("Failed creating a CronJob with correct restart policy %s, but got %s", v1.RestartPolicyOnFailure, restartPolicy)
 			}
 		})
 	})
@@ -612,8 +613,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			// Build a kubeconfig file that will make use of the injected ca and token,
 			// but point at the DNS host and the default namespace
 			tmpDir, err := ioutil.TempDir("", "icc-override")
-			overrideKubeconfigName := "icc-override.kubeconfig"
 			framework.ExpectNoError(err)
+			overrideKubeconfigName := "icc-override.kubeconfig"
 			defer func() { os.Remove(tmpDir) }()
 			framework.ExpectNoError(ioutil.WriteFile(filepath.Join(tmpDir, overrideKubeconfigName), []byte(`
 kind: Config
@@ -1205,7 +1206,7 @@ metadata:
 			}
 			containers := rc.Spec.Template.Spec.Containers
 			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
-				framework.Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, nginxImage)
+				framework.Failf("Failed creating rc %s for 1 pod with expected image %s: %#v", rcName, nginxImage, containers)
 			}
 
 			By("verifying the pod controlled by rc " + rcName + " was created")
@@ -1266,7 +1267,6 @@ metadata:
 			framework.WaitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
 
 			By("rolling-update to same image controller")
-
 			runKubectlRetryOrDie("rolling-update", rcName, "--update-period=1s", "--image="+nginxImage, "--image-pull-policy="+string(v1.PullIfNotPresent), nsFlag)
 			framework.ValidateController(c, nginxImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
 		})
@@ -1351,8 +1351,9 @@ metadata:
 			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
 				framework.Failf("Failed creating job %s for 1 pod with expected image %s: %#v", jobName, nginxImage, containers)
 			}
+			restartPolicy := job.Spec.Template.Spec.RestartPolicy
 			if job.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
-				framework.Failf("Failed creating a job with correct restart policy for --restart=OnFailure")
+				framework.Failf("Failed creating a job with correct restart policy %s, but got %s", v1.RestartPolicyOnFailure, restartPolicy)
 			}
 		})
 	})
