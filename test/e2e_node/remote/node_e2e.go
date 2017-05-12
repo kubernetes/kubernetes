@@ -145,7 +145,8 @@ func updateCOSKubeletFlags(args, host, workspace string) (string, error) {
 		return args, fmt.Errorf("unabled to chmod 544 GCI/COS mounter script. Err: %v, Output:\n%s", err, output)
 	}
 	// Insert args at beginning of test args, so any values from command line take precedence
-	args = fmt.Sprintf("--kubelet-flags='--experimental-kernel-memcg-notification=true --experimental-mounter-path=%s'", mounterPath) + args
+	args = "--kubelet-flags=--experimental-kernel-memcg-notification=true " + args
+	args = fmt.Sprintf("--kubelet-flags=--experimental-mounter-path=%s ", mounterPath) + args
 	return args, nil
 }
 
