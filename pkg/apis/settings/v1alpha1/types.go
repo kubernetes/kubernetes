@@ -34,7 +34,7 @@ type PodPreset struct {
 	Spec PodPresetSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
-// PodPresetSpec is a description of a pod injection policy.
+// PodPresetSpec is a description of a pod preset.
 type PodPresetSpec struct {
 	// Selector is a label query over a set of resources, in this case pods.
 	// Required.
