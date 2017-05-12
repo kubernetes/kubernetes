@@ -99,8 +99,11 @@ func TestPlugin(t *testing.T) {
 	}
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	dirMode := r.Int31n(511) + 1
-	fileMode := r.Int31n(511) + 1
+	dirMode := new(int32)
+	*dirMode = r.Int31n(0777) + 1
+
+	fileMode := new(int32)
+	*fileMode = r.Int31n(0777) + 1
 
 	spec := &v1.Volume{
 		Name: "vol1",
@@ -232,8 +235,11 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	}
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	dirMode := r.Int31n(511) + 1
-	fileMode := r.Int31n(511) + 1
+	dirMode := new(int32)
+	*dirMode = r.Int31n(0777) + 1
+
+	fileMode := new(int32)
+	*fileMode = r.Int31n(0777) + 1
 
 	spec := &v1.Volume{
 		Name: "vol1",
