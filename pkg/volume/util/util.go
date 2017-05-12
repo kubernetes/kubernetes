@@ -28,6 +28,7 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"syscall"
 )
 
 const readyFileName = "ready"
@@ -71,29 +72,34 @@ func SetReady(dir string) {
 // UnmountPath is a common unmount routine that unmounts the given path and
 // deletes the remaining directory if successful.
 func UnmountPath(mountPath string, mounter mount.Interface) error {
+	isTransportEndpointNotConnected := false
 	if pathExists, pathErr := PathExists(mountPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		isTransportEndpointNotConnected = IsTransportEndpointNotConnected(pathErr)
+		if !isTransportEndpointNotConnected {
+			return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		}
 	} else if !pathExists {
 		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
 		return nil
 	}
 
-	notMnt, err := mounter.IsLikelyNotMountPoint(mountPath)
-	if err != nil {
-		return err
+	if !isTransportEndpointNotConnected {
+		notMnt, err := mounter.IsLikelyNotMountPoint(mountPath)
+		if err != nil {
+			return err
+		}
+		if notMnt {
+			glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
+			return os.Remove(mountPath)
+		}
 	}
-	if notMnt {
-		glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
-		return os.Remove(mountPath)
-	}
-
 	// Unmount the mount path
 	if err := mounter.Unmount(mountPath); err != nil {
 		return err
 	}
 	notMnt, mntErr := mounter.IsLikelyNotMountPoint(mountPath)
 	if mntErr != nil {
-		return err
+		return mntErr
 	}
 	if notMnt {
 		glog.V(4).Infof("%q is unmounted, deleting the directory", mountPath)
@@ -109,9 +115,25 @@ func PathExists(path string) (bool, error) {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil
+	} else if IsTransportEndpointNotConnected(err) {
+		return true, err
 	} else {
 		return false, err
 	}
+}
+
+func IsTransportEndpointNotConnected(err error) bool {
+	switch pe := err.(type) {
+	case nil:
+		return false
+	case *os.PathError:
+		err = pe.Err
+	case *os.LinkError:
+		err = pe.Err
+	case *os.SyscallError:
+		err = pe.Err
+	}
+	return err == syscall.ENOTCONN
 }
 
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map
