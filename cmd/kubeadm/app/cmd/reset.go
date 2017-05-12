@@ -155,8 +155,7 @@ func cleanDir(filePath string) error {
 		return err
 	}
 	for _, name := range names {
-		err = os.RemoveAll(filepath.Join(filePath, name))
-		if err != nil {
+		if err = os.RemoveAll(filepath.Join(filePath, name)); err != nil {
 			return err
 		}
 	}
@@ -171,8 +170,7 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	}
 	fmt.Printf("[reset] Deleting contents of config directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
-		err := cleanDir(dir)
-		if err != nil {
+		if err := cleanDir(dir); err != nil {
 			fmt.Printf("[reset] Failed to remove directory: %q [%v]\n", dir, err)
 		}
 	}
@@ -185,8 +183,7 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	}
 	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
 	for _, path := range filesToClean {
-		err := os.RemoveAll(path)
-		if err != nil {
+		if err := os.RemoveAll(path); err != nil {
 			fmt.Printf("[reset] Failed to remove file: %q [%v]\n", path, err)
 		}
 	}
