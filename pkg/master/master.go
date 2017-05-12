@@ -241,6 +241,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		m.InstallLegacyAPI(c.Config, c.Config.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}
 
+	// install discovery.k8s.io api
+	if err := s.InstallDiscoveryAPIGroup(api.Registry, api.Scheme, api.Codecs); err != nil {
+		glog.Fatalf("Error setting up discovery: %v", err)
+	}
+
 	// The order here is preserved in discovery.
 	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
 	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.

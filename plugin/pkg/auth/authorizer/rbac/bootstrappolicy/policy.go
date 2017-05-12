@@ -44,6 +44,7 @@ const (
 	policyGroup         = "policy"
 	rbacGroup           = "rbac.authorization.k8s.io"
 	storageGroup        = "storage.k8s.io"
+	discoveryGroup      = "discovery.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -102,6 +103,7 @@ func ClusterRoles() []rbac.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:discovery"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule("get").URLs("/healthz", "/version", "/swaggerapi", "/swaggerapi/*", "/api", "/api/*", "/apis", "/apis/*").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(discoveryGroup).Resources("groups").RuleOrDie(),
 			},
 		},
 		{

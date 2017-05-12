@@ -99,6 +99,10 @@ func (c completedConfig) New() (*WardleServer, error) {
 		GenericAPIServer: genericServer,
 	}
 
+	if err := s.GenericAPIServer.InstallDiscoveryAPIGroup(registry, Scheme, Codecs); err != nil {
+		return nil, err
+	}
+
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(wardle.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
 	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
 	v1alpha1storage := map[string]rest.Storage{}

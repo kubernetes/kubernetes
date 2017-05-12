@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apimachinery"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	discoveryv1alpha1 "k8s.io/apimachinery/pkg/apis/discovery/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +41,8 @@ import (
 	genericapi "k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	discoverystorage "k8s.io/apiserver/pkg/registry/discovery"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
@@ -108,8 +111,8 @@ type GenericAPIServer struct {
 	// external (public internet) URLs for this GenericAPIServer.
 	ExternalAddress string
 
-	// storage contains the RESTful endpoints exposed by this GenericAPIServer
-	storage map[string]rest.Storage
+	// RESTOptionsGetter is used to construct RESTStorage types via the generic registry.
+	RESTOptionsGetter genericregistry.RESTOptionsGetter
 
 	// Serializer controls how common API objects not in a group/version prefix are serialized for this server.
 	// Individual APIGroups may define their own serializers.
@@ -284,6 +287,22 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 // EffectiveSecurePort returns the secure port we bound to.
 func (s *GenericAPIServer) EffectiveSecurePort() int {
 	return s.effectiveSecurePort
+}
+
+// InstallDiscoveryAPIGroup installs the discovery.k8s.io/v1alpha1 api.
+func (s *GenericAPIServer) InstallDiscoveryAPIGroup(registry *registered.APIRegistrationManager, scheme *runtime.Scheme, codecs serializer.CodecFactory) error {
+	apiGroupInfo := NewDefaultAPIGroupInfo(discoveryv1alpha1.GroupName, registry, scheme, metav1.ParameterCodec, codecs)
+	apiGroupInfo.GroupMeta.GroupVersion = discoveryv1alpha1.SchemeGroupVersion
+	v1alpha1storage := map[string]rest.Storage{}
+	apiServiceREST := discoverystorage.NewREST(scheme, s.RESTOptionsGetter)
+	v1alpha1storage["apiservices"] = apiServiceREST
+	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
+
+	if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
+		return fmt.Errorf("failed to install %v api group: %v", discoveryv1alpha1.SchemeGroupVersion, err)
+	}
+
+	return nil
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
