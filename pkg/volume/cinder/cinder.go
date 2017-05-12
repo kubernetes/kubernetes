@@ -51,6 +51,7 @@ type CinderProvider interface {
 	GetDevicePath(diskId string) string
 	InstanceID() (string, error)
 	GetAttachmentDiskPath(instanceID string, diskName string) (string, error)
+	OperationPending(diskName string) (bool, string, error)
 	DiskIsAttached(diskName, instanceID string) (bool, error)
 	DisksAreAttached(diskNames []string, instanceID string) (map[string]bool, error)
 	ShouldTrustDevicePath() bool
