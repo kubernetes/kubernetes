@@ -13,3 +13,5 @@ network.host: 0.0.0.0
 
 discovery.zen.minimum_master_nodes: ${MINIMUM_MASTER_NODES}
 discovery.zen.ping.multicast.enabled: false
+
+indices.fielddata.cache.size: 20%
