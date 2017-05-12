@@ -74,7 +74,7 @@ function dirty_sha() {
   mkdir -p "${tmp_objects_dir}"
   cp "${index}" "${tmp_index}"
 
-  local -r files=$(git ls-files -m -o -d --exclude-standard)
+  local -r files="$(git ls-files $(git rev-parse --show-toplevel) -m -o -d --exclude-standard)"
   GIT_INDEX_FILE="${tmp_index}" git add ${files}
   GIT_ALTERNATE_OBJECT_DIRECTORIES="${objects_dir}" GIT_OBJECT_DIRECTORY="${tmp_objects_dir}" GIT_INDEX_FILE="${tmp_index}" git write-tree
 }
