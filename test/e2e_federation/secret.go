@@ -225,7 +225,8 @@ func waitForSecretOrFail(clientset *kubeclientset.Clientset, nsName string, secr
 	By(fmt.Sprintf("Fetching a federated secret shard of secret %q in namespace %q from cluster", secret.Name, nsName))
 	var clusterSecret *v1.Secret
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterSecret, err := clientset.Core().Secrets(nsName).Get(secret.Name, metav1.GetOptions{})
+		var err error
+		clusterSecret, err = clientset.Core().Secrets(nsName).Get(secret.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
 			By(fmt.Sprintf("Success: shard of federated secret %q in namespace %q in cluster is absent", secret.Name, nsName))
 			return true, nil // Success
