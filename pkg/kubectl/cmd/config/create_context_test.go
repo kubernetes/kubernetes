@@ -46,7 +46,7 @@ func TestCreateContext(t *testing.T) {
 			"--user=user_nickname",
 			"--namespace=namespace",
 		},
-		expected: `Context "shaker-context" set.` + "\n",
+		expected: `Context "shaker-context" created.` + "\n",
 		expectedConfig: clientcmdapi.Config{
 			Contexts: map[string]*clientcmdapi.Context{
 				"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"}},
@@ -68,7 +68,7 @@ func TestModifyContext(t *testing.T) {
 			"--user=user_nickname",
 			"--namespace=namespace",
 		},
-		expected: `Context "shaker-context" set.` + "\n",
+		expected: `Context "shaker-context" modified.` + "\n",
 		expectedConfig: clientcmdapi.Config{
 			Contexts: map[string]*clientcmdapi.Context{
 				"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"},
