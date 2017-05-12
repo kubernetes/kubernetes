@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -339,6 +340,84 @@ func TestGenerateRunContainerOptions_DNSConfigurationParams(t *testing.T) {
 		t.Errorf("expected prepend of cluster domain, got %+v", options[2].DNSSearch)
 	} else if options[2].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
 		t.Errorf("expected domain %s, got %s", ".svc."+kubelet.clusterDomain, options[0].DNSSearch)
+	}
+}
+
+func TestGeneratePodHostNameAndDomain(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	testCases := []struct {
+		name               string
+		clusterDomain      string
+		podName            string
+		specHostname       string
+		specSubdomain      string
+		expectedHostname   string
+		expectedHostDomain string
+		expectedErr        string
+	}{
+		{
+			name:             "test empty cluster domain",
+			clusterDomain:    "",
+			podName:          "my-pod",
+			expectedHostname: "my-pod",
+		},
+		{
+			name:               "test cluster domain",
+			clusterDomain:      "cluster.local",
+			podName:            "my-pod",
+			specHostname:       "hostname",
+			specSubdomain:      "sub-domain",
+			expectedHostname:   "hostname",
+			expectedHostDomain: "sub-domain.ns.svc.cluster.local",
+		},
+		{
+			name:             "test empty cluster domain",
+			podName:          "my-pod",
+			specHostname:     "hostname",
+			specSubdomain:    "sub-domain",
+			expectedHostname: "hostname",
+		},
+		{
+			name:         "test invalid hostname",
+			podName:      "my-pod",
+			specHostname: "A invalid name",
+			expectedErr:  "is not a valid DNS label",
+		},
+		{
+			name:          "test invalid subdomain",
+			podName:       "my-pod",
+			specSubdomain: "A invalid subdomain",
+			expectedErr:   "is not a valid DNS label",
+		},
+	}
+
+	for _, tc := range testCases {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      tc.podName,
+				Namespace: "ns",
+			},
+			Spec: v1.PodSpec{
+				Hostname:  tc.specHostname,
+				Subdomain: tc.specSubdomain,
+			},
+		}
+		kubelet.clusterDomain = tc.clusterDomain
+		hostname, hostDomain, err := kubelet.GeneratePodHostNameAndDomain(pod)
+		if err != nil {
+			if len(tc.expectedErr) == 0 {
+				t.Errorf("%s: unexpected err %v\n", tc.name, err)
+			}
+			if !strings.Contains(err.Error(), tc.expectedErr) {
+				t.Errorf("%s: expected to find:\n\t%s\nfound:\n\t%v\n", tc.name, tc.expectedErr, err)
+			}
+			continue
+		}
+		assert.Equal(t, tc.expectedHostname, hostname)
+		assert.Equal(t, tc.expectedHostDomain, hostDomain)
 	}
 }
 

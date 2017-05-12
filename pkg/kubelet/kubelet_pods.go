@@ -280,7 +280,13 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Subdomain); len(msgs) != 0 {
 			return "", "", fmt.Errorf("Pod Subdomain %q is not a valid DNS label: %s", pod.Spec.Subdomain, strings.Join(msgs, ";"))
 		}
-		hostDomain = fmt.Sprintf("%s.%s.svc.%s", pod.Spec.Subdomain, pod.Namespace, clusterDomain)
+		if len(clusterDomain) == 0 {
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, "MissingClusterDomain", "kubelet does not have Cluster Domain configured, cannot set FQDN for the pod.")
+			log := fmt.Sprintf("kubelet does not have Cluster Domain configured and cannot set FQDN for pod: %q.", format.Pod(pod))
+			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, "MissingClusterDomain", log)
+		} else {
+			hostDomain = fmt.Sprintf("%s.%s.svc.%s", pod.Spec.Subdomain, pod.Namespace, clusterDomain)
+		}
 	}
 
 	return hostname, hostDomain, nil
