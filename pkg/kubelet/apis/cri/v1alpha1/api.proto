@@ -205,6 +205,8 @@ message LinuxPodSandboxConfig {
     string cgroup_parent = 1;
     // LinuxSandboxSecurityContext holds sandbox security attributes.
     LinuxSandboxSecurityContext security_context = 2;
+    // Sysctls holds linux sysctls config for the sandbox.
+    map<string, string> sysctls = 3;
 }
 
 // PodSandboxMetadata holds all necessary information for building the sandbox name.
@@ -289,16 +291,6 @@ message PodSandboxConfig {
     //      * localhost/<profile-name>: the profile installed to the node's
     //        local seccomp profile root. Note that profile root is set in
     //        kubelet, and it is not passed in CRI yet, see https://issues.k8s.io/36997.
-    //
-    // 2. Sysctls
-    //
-    //      key: security.alpha.kubernetes.io/sysctls
-    //      description: list of safe sysctls which are set for the sandbox.
-    //      value: comma separated list of sysctl_name=value key-value pairs.
-    //
-    //      key: security.alpha.kubernetes.io/unsafe-sysctls
-    //      description: list of unsafe sysctls which are set for the sandbox.
-    //      value: comma separated list of sysctl_name=value key-value pairs.
     //
     map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
