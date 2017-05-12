@@ -42061,6 +42061,13 @@
      "medium": {
       "description": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
       "type": "string"
+     },
+     "options": {
+      "description": "Optional: Extra driver options if any.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
      }
     }
    },

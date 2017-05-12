@@ -104,13 +104,16 @@ func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vo
 
 func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Mounter, error) {
 	medium := v1.StorageMediumDefault
+	var options map[string]string
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
+		options = spec.Volume.EmptyDir.Options
 	}
 	return &emptyDir{
 		pod:             pod,
 		volName:         spec.Name(),
 		medium:          medium,
+		options:         options,
 		mounter:         mounter,
 		mountDetector:   mountDetector,
 		plugin:          plugin,
@@ -169,6 +172,7 @@ type emptyDir struct {
 	pod           *v1.Pod
 	volName       string
 	medium        v1.StorageMedium
+	options	      map[string]string
 	mounter       mount.Interface
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
@@ -254,8 +258,16 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return nil
 	}
 
-	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
-	return ed.mounter.Mount("tmpfs", dir, "tmpfs", nil /* options */)
+	var options []string
+	if ed.options != nil {
+		for key, value := range ed.options {
+			op := key + "=" + value
+			options = append(options, op)
+		}
+	}
+
+	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v, options", ed.pod.UID, ed.volName, options)
+	return ed.mounter.Mount("tmpfs", dir, "tmpfs", options /* options */)
 }
 
 // setupDir creates the directory with the specified SELinux context and

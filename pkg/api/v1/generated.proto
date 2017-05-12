@@ -760,6 +760,10 @@ message EmptyDirVolumeSource {
   // More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
   // +optional
   optional string medium = 1;
+
+  // Optional: Extra driver options if any.
+  // +optional
+  map<string, string> options = 2;
 }
 
 // EndpointAddress is a tuple that describes single IP address.
