@@ -18,6 +18,9 @@ package testing
 
 import (
 	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -29,6 +32,8 @@ type FakeImageService struct {
 	FakeImageSize uint64
 	Called        []string
 	Images        map[string]*runtimeapi.Image
+
+	pulledImages []*pulledImage
 }
 
 func (r *FakeImageService) SetFakeImages(images []string) {
@@ -97,6 +102,7 @@ func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimea
 
 	r.Called = append(r.Called, "PullImage")
 
+	r.pulledImages = append(r.pulledImages, &pulledImage{imageSpec: image, authConfig: auth})
 	// ImageID should be randomized for real container runtime, but here just use
 	// image's name for easily making fake images.
 	imageID := image.Image
@@ -127,4 +133,16 @@ func (r *FakeImageService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
 	r.Called = append(r.Called, "ImageFsInfo")
 
 	return nil, nil
+}
+
+func (r *FakeImageService) AssertImagePulledWithAuth(t *testing.T, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, failMsg string) {
+	r.Lock()
+	defer r.Unlock()
+	expected := &pulledImage{imageSpec: image, authConfig: auth}
+	assert.Contains(t, r.pulledImages, expected, failMsg)
+}
+
+type pulledImage struct {
+	imageSpec  *runtimeapi.ImageSpec
+	authConfig *runtimeapi.AuthConfig
 }

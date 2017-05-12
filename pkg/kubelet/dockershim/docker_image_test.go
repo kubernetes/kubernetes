@@ -17,12 +17,14 @@ limitations under the License.
 package dockershim
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/docker/docker/pkg/jsonmessage"
 	dockertypes "github.com/docker/engine-api/types"
+	"github.com/stretchr/testify/assert"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -43,4 +45,30 @@ func TestRemoveImageWithMultipleTags(t *testing.T) {
 	fakeDocker.AssertCallDetails(libdocker.NewCalledDetail("inspect_image", nil),
 		libdocker.NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 		libdocker.NewCalledDetail("remove_image", []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}))
+}
+
+func TestPullWithJSONError(t *testing.T) {
+	ds, fakeDocker, _ := newTestDockerService()
+	tests := map[string]struct {
+		image         *runtimeapi.ImageSpec
+		err           error
+		expectedError string
+	}{
+		"Json error": {
+			&runtimeapi.ImageSpec{Image: "ubuntu"},
+			&jsonmessage.JSONError{Code: 50, Message: "Json error"},
+			"Json error",
+		},
+		"Bad gateway": {
+			&runtimeapi.ImageSpec{Image: "ubuntu"},
+			&jsonmessage.JSONError{Code: 502, Message: "<!doctype html>\n<html class=\"no-js\" lang=\"\">\n    <head>\n  </head>\n    <body>\n   <h1>Oops, there was an error!</h1>\n        <p>We have been contacted of this error, feel free to check out <a href=\"http://status.docker.com/\">status.docker.com</a>\n           to see if there is a bigger issue.</p>\n\n    </body>\n</html>"},
+			"RegistryUnavailable",
+		},
+	}
+	for key, test := range tests {
+		fakeDocker.InjectError("pull", test.err)
+		_, err := ds.PullImage(test.image, &runtimeapi.AuthConfig{})
+		assert.Error(t, err, fmt.Sprintf("TestCase [%s]", key))
+		assert.Contains(t, err.Error(), test.expectedError)
+	}
 }
