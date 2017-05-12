@@ -1055,7 +1055,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		svcXlbChain := serviceLBChainName(svcNameString, protocol)
 		if svcInfo.onlyNodeLocalEndpoints {
-			// Only for services with the externalTraffic annotation set to OnlyLocal
+			// Only for services request OnlyLocal traffic
 			// create the per-service LB chain, retaining counters if possible.
 			if lbChain, ok := existingNATChains[svcXlbChain]; ok {
 				writeLine(natChains, lbChain)
@@ -1371,7 +1371,7 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 
-		// Now write ingress loadbalancing & DNAT rules only for services that have a localOnly annotation
+		// Now write ingress loadbalancing & DNAT rules only for services that request OnlyLocal traffic.
 		// TODO - This logic may be combinable with the block above that creates the svc balancer chain
 		localEndpoints := make([]*endpointsInfo, 0)
 		localEndpointChains := make([]utiliptables.Chain, 0)

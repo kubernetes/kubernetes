@@ -2742,7 +2742,8 @@ func ValidateService(service *api.Service) field.ErrorList {
 		}
 	}
 
-	allErrs = append(allErrs, validateServiceExternalTrafficFields(service)...)
+	allErrs = append(allErrs, validateServiceExternalTrafficFieldsValue(service)...)
+	allErrs = append(allErrs, validateServiceExternalTrafficAPIVersion(service)...)
 
 	return allErrs
 }
@@ -2785,61 +2786,68 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 	return allErrs
 }
 
-// validateServiceExternalTrafficFields validates ExternalTraffic related annotations
+// validateServiceExternalTrafficFieldsValue validates ExternalTraffic related annotations
 // have legal value.
-func validateServiceExternalTrafficFields(service *api.Service) field.ErrorList {
+func validateServiceExternalTrafficFieldsValue(service *api.Service) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	for _, annotation := range []string{apiservice.AlphaAnnotationExternalTraffic, apiservice.BetaAnnotationExternalTraffic} {
-		if l, ok := service.Annotations[annotation]; ok {
-			if l != apiservice.AnnotationValueExternalTrafficLocal &&
-				l != apiservice.AnnotationValueExternalTrafficGlobal {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(annotation), l,
-					fmt.Sprintf("ExternalTraffic must be %v or %v", apiservice.AnnotationValueExternalTrafficLocal, apiservice.AnnotationValueExternalTrafficGlobal)))
-			}
+	// Check beta annotations.
+	if l, ok := service.Annotations[apiservice.BetaAnnotationExternalTraffic]; ok {
+		if l != apiservice.AnnotationValueExternalTrafficLocal &&
+			l != apiservice.AnnotationValueExternalTrafficGlobal {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(apiservice.BetaAnnotationExternalTraffic), l,
+				fmt.Sprintf("ExternalTraffic must be %v or %v", apiservice.AnnotationValueExternalTrafficLocal, apiservice.AnnotationValueExternalTrafficGlobal)))
 		}
 	}
-	for _, annotation := range []string{apiservice.AlphaAnnotationHealthCheckNodePort, apiservice.BetaAnnotationHealthCheckNodePort} {
-		if l, ok := service.Annotations[annotation]; ok {
-			p, err := strconv.Atoi(l)
-			if err != nil {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(annotation), l,
-					"HealthCheckNodePort must be a valid port number"))
-			} else if p <= 0 {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(annotation), l,
-					"HealthCheckNodePort must be greater than 0"))
-			}
+	if l, ok := service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]; ok {
+		p, err := strconv.Atoi(l)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(apiservice.BetaAnnotationHealthCheckNodePort), l,
+				"HealthCheckNodePort must be a valid port number"))
+		} else if p <= 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(apiservice.BetaAnnotationHealthCheckNodePort), l,
+				"HealthCheckNodePort must be greater than 0"))
 		}
 	}
 
-	allErrs = append(allErrs, validateServiceExternalTrafficAPIVersion(service)...)
+	// Check first class fields.
+	if service.Spec.ExternalTrafficPolicy != "" &&
+		service.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeGlobal &&
+		service.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeLocal {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("externalTrafficPolicy"), service.Spec.ExternalTrafficPolicy,
+			fmt.Sprintf("ExternalTrafficPolicy must be empty, %v or %v", api.ServiceExternalTrafficPolicyTypeGlobal, api.ServiceExternalTrafficPolicyTypeLocal)))
+	}
+	if service.Spec.HealthCheckNodePort < 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("healthCheckNodePort"), service.Spec.HealthCheckNodePort,
+			"HealthCheckNodePort must be not less than 0"))
+	}
 
 	return allErrs
 }
 
 // serviceExternalTrafficStatus stores flags indicating whether ExternalTraffic
-// related beta annotations and alpha annotations are set on service.
+// related beta annotations and GA fields are set on service.
 type serviceExternalTrafficStatus struct {
-	alphaExternalTrafficIsSet bool
-	alphaHealthCheckIsSet     bool
-	betaExternalTrafficIsSet  bool
-	betaHealthCheckIsSet      bool
+	betaExternalTrafficIsSet bool
+	betaHealthCheckIsSet     bool
+	gaExternalTrafficIsSet   bool
+	gaHealthCheckIsSet       bool
 }
 
-func (s *serviceExternalTrafficStatus) useAlphaExternalTrafficWithBeta() bool {
-	return s.alphaExternalTrafficIsSet && (s.betaExternalTrafficIsSet || s.betaHealthCheckIsSet)
+func (s *serviceExternalTrafficStatus) useBetaExternalTrafficWithGA() bool {
+	return s.betaExternalTrafficIsSet && (s.gaExternalTrafficIsSet || s.gaHealthCheckIsSet)
 }
 
-func (s *serviceExternalTrafficStatus) useAlphaHealthCheckWithBeta() bool {
-	return s.alphaHealthCheckIsSet && (s.betaExternalTrafficIsSet || s.betaHealthCheckIsSet)
+func (s *serviceExternalTrafficStatus) useBetaHealthCheckWithGA() bool {
+	return s.betaHealthCheckIsSet && (s.gaExternalTrafficIsSet || s.gaHealthCheckIsSet)
 }
 
 func getServiceExternalTrafficStatus(service *api.Service) *serviceExternalTrafficStatus {
 	s := serviceExternalTrafficStatus{}
-	_, s.alphaExternalTrafficIsSet = service.Annotations[apiservice.AlphaAnnotationExternalTraffic]
-	_, s.alphaHealthCheckIsSet = service.Annotations[apiservice.AlphaAnnotationHealthCheckNodePort]
 	_, s.betaExternalTrafficIsSet = service.Annotations[apiservice.BetaAnnotationExternalTraffic]
 	_, s.betaHealthCheckIsSet = service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]
+	s.gaExternalTrafficIsSet = service.Spec.ExternalTrafficPolicy != ""
+	s.gaHealthCheckIsSet = service.Spec.HealthCheckNodePort != 0
 	return &s
 }
 
@@ -2850,16 +2858,39 @@ func validateServiceExternalTrafficAPIVersion(service *api.Service) field.ErrorL
 
 	status := getServiceExternalTrafficStatus(service)
 
-	if status.useAlphaExternalTrafficWithBeta() {
-		fieldPath := field.NewPath("metadata", "annotations").Key(apiservice.AlphaAnnotationExternalTraffic)
-		msg := fmt.Sprintf("please replace the alpha annotation with beta annotation")
-		allErrs = append(allErrs, field.Invalid(fieldPath, apiservice.AlphaAnnotationExternalTraffic, msg))
+	if status.useBetaExternalTrafficWithGA() {
+		fieldPath := field.NewPath("metadata", "annotations").Key(apiservice.BetaAnnotationExternalTraffic)
+		msg := fmt.Sprintf("please replace the beta annotation with 'ExternalTrafficPolicy' field")
+		allErrs = append(allErrs, field.Invalid(fieldPath, apiservice.BetaAnnotationExternalTraffic, msg))
 	}
 
-	if status.useAlphaHealthCheckWithBeta() {
-		fieldPath := field.NewPath("metadata", "annotations").Key(apiservice.AlphaAnnotationHealthCheckNodePort)
-		msg := fmt.Sprintf("please replace the alpha annotation with beta annotation")
-		allErrs = append(allErrs, field.Invalid(fieldPath, apiservice.AlphaAnnotationHealthCheckNodePort, msg))
+	if status.useBetaHealthCheckWithGA() {
+		fieldPath := field.NewPath("metadata", "annotations").Key(apiservice.BetaAnnotationHealthCheckNodePort)
+		msg := fmt.Sprintf("please replace the beta annotation with 'HealthCheckNodePort' field")
+		allErrs = append(allErrs, field.Invalid(fieldPath, apiservice.BetaAnnotationHealthCheckNodePort, msg))
+	}
+
+	return allErrs
+}
+
+// ValidateServiceExternalTrafficFieldsCombination validates if ExternalTrafficPolicy,
+// HealthCheckNodePort and Type combination are legal. For update, it should be called
+// after clearing externalTraffic related fields for the ease of transitioning between
+// different service types.
+func ValidateServiceExternalTrafficFieldsCombination(service *api.Service) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if service.Spec.Type != api.ServiceTypeLoadBalancer &&
+		service.Spec.Type != api.ServiceTypeNodePort &&
+		service.Spec.ExternalTrafficPolicy != "" {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "externalTrafficPolicy"), service.Spec.ExternalTrafficPolicy,
+			"ExternalTrafficPolicy can only be set on NodePort and LoadBalancer service"))
+	}
+
+	if !apiservice.NeedsHealthCheck(service) &&
+		service.Spec.HealthCheckNodePort != 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "healthCheckNodePort"), service.Spec.HealthCheckNodePort,
+			"HealthCheckNodePort can only be set on LoadBalancer service with ExternalTrafficPolicy=Local"))
 	}
 
 	return allErrs
