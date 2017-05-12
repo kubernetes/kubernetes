@@ -24,6 +24,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/master/ports:go_default_library",
