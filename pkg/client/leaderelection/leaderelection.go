@@ -53,12 +53,11 @@ import (
 	"reflect"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	cs "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 
 	"github.com/golang/glog"
@@ -70,9 +69,6 @@ const (
 	DefaultLeaseDuration = 15 * time.Second
 	DefaultRenewDeadline = 10 * time.Second
 	DefaultRetryPeriod   = 2 * time.Second
-
-	LockTypeEndpoints  = "endpoints"
-	LockTypeConfigMaps = "configmaps"
 )
 
 // NewLeadereElector creates a LeaderElector from a LeaderElecitionConfig
@@ -229,7 +225,7 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	// 1. obtain or create the ElectionRecord
 	oldLeaderElectionRecord, err := le.config.Lock.Get()
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
+		if !errors.IsNotFound(err) {
 			glog.Errorf("error retrieving resource lock %v: %v", le.config.Lock.Describe(), err)
 			return false
 		}
@@ -288,7 +284,7 @@ func DefaultLeaderElectionConfiguration() componentconfig.LeaderElectionConfigur
 		LeaseDuration: metav1.Duration{Duration: DefaultLeaseDuration},
 		RenewDeadline: metav1.Duration{Duration: DefaultRenewDeadline},
 		RetryPeriod:   metav1.Duration{Duration: DefaultRetryPeriod},
-		LockType:      LockTypeEndpoints,
+		ResourceLock:  rl.EndpointsResourceLock,
 	}
 }
 
@@ -311,33 +307,7 @@ func BindFlags(l *componentconfig.LeaderElectionConfiguration, fs *pflag.FlagSet
 	fs.DurationVar(&l.RetryPeriod.Duration, "leader-elect-retry-period", l.RetryPeriod.Duration, ""+
 		"The duration the clients should wait between attempting acquisition and renewal "+
 		"of a leadership. This is only applicable if leader election is enabled.")
-	fs.StringVar(&l.LockType, "leader-elect-lock-type", l.LockType, fmt.Sprintf(""+
-		"Indicates the type of locking to use for leadership election. Supported options "+
-		"are `%s` (default) and `%s`.", LockTypeConfigMaps, LockTypeEndpoints))
-}
-
-func GetLock(l componentconfig.LeaderElectionConfiguration, client cs.Clientset, rlc rl.ResourceLockConfig) (rl.Interface, error) {
-	name := "kube-controller-manager"
-	switch l.LockType {
-	case LockTypeEndpoints:
-		return &rl.EndpointsLock{
-			EndpointsMeta: metav1.ObjectMeta{
-				Namespace: metav1.NamespaceSystem,
-				Name:      name,
-			},
-			Client:     client,
-			LockConfig: rlc,
-		}, nil
-	case LockTypeConfigMaps:
-		return &rl.ConfigMapLock{
-			ConfigMapMeta: metav1.ObjectMeta{
-				Namespace: metav1.NamespaceSystem,
-				Name:      name,
-			},
-			Client:     client,
-			LockConfig: rlc,
-		}, nil
-	default:
-		return nil, fmt.Errorf("Invalid lock-type provided: %s. Supported types are `%s` and `%s`", l.LockType, LockTypeConfigMaps, LockTypeEndpoints)
-	}
+	fs.StringVar(&l.ResourceLock, "leader-elect-resource-lock", l.ResourceLock, ""+
+		"The type of resource resource object that is used for locking during"+
+		"leader election. Supported options are `endpoints` (default) and `configmap`.")
 }

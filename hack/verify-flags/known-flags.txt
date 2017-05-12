@@ -426,6 +426,7 @@ last-release-pr
 leader-elect
 leader-elect-lease-duration
 leader-elect-renew-deadline
+leader-elect-resource-lock
 leader-elect-retry-period
 lease-duration
 leave-stdin-open

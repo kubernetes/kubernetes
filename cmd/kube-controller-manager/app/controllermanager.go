@@ -191,13 +191,16 @@ func Run(s *options.CMServer) error {
 		return err
 	}
 
-	rlc := resourcelock.ResourceLockConfig{
-		Identity:      id,
-		EventRecorder: recorder,
-	}
-	rl, err := leaderelection.GetLock(s.LeaderElection, *leaderElectionClient, rlc)
+	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
+		"kube-system",
+		"kube-controller-manager",
+		leaderElectionClient,
+		resourcelock.ResourceLockConfig{
+			Identity:      id,
+			EventRecorder: recorder,
+		})
 	if err != nil {
-		return err
+		glog.Fatalf("error creating lock: %v", err)
 	}
 
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
