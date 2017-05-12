@@ -14,7 +14,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

@@ -233,9 +233,9 @@ type LeaderElectionConfiguration struct {
 	// acquisition and renewal of a leadership. This is only applicable if
 	// leader election is enabled.
 	RetryPeriod metav1.Duration `json:"retryPeriod"`
-	// LockType indicates the type of locking to use for leadership election.
-	// Supported options are `endpoints` (default) and `configmap`.
-	LockType string
+	// resourceLock indicates the resource object type that will be used to lock
+	// during leader election cycles.
+	ResourceLock string `json:"resourceLock"`
 }
 
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
