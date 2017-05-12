@@ -51,6 +51,25 @@ func ApiCallToPerfData(apicalls *APIResponsiveness) *perftype.PerfData {
 	return perfData
 }
 
+// PodStartupLatencyToPerfData transforms PodStartupLatency to PerfData.
+func PodStartupLatencyToPerfData(latency *PodStartupLatency) *perftype.PerfData {
+	perfData := &perftype.PerfData{Version: currentApiCallMetricsVersion}
+	item := perftype.DataItem{
+		Data: map[string]float64{
+			"Perc50":  float64(latency.Latency.Perc50) / 1000000, // us -> ms
+			"Perc90":  float64(latency.Latency.Perc90) / 1000000,
+			"Perc99":  float64(latency.Latency.Perc99) / 1000000,
+			"Perc100": float64(latency.Latency.Perc100) / 1000000,
+		},
+		Unit: "ms",
+		Labels: map[string]string{
+			"Metric": "pod_startup",
+		},
+	}
+	perfData.DataItems = append(perfData.DataItems, item)
+	return perfData
+}
+
 // currentKubeletPerfMetricsVersion is the current kubelet performance metrics version. We should
 // bump up the version each time we make incompatible change to the metrics.
 const currentKubeletPerfMetricsVersion = "v2"
