@@ -45,8 +45,7 @@ func RetrieveValidatedClusterInfo(filepath string) (*clientcmdapi.Cluster, error
 // securely to the API Server using the provided CA cert and
 // optionally refreshes the cluster-info information from the cluster-info ConfigMap
 func ValidateClusterInfo(clusterinfo *clientcmdapi.Config) (*clientcmdapi.Cluster, error) {
-	err := validateClusterInfoKubeConfig(clusterinfo)
-	if err != nil {
+	if err := validateClusterInfoKubeConfig(clusterinfo); err != nil {
 		return nil, err
 	}
 
@@ -99,7 +98,7 @@ func ValidateClusterInfo(clusterinfo *clientcmdapi.Config) (*clientcmdapi.Cluste
 		return defaultCluster, nil
 	}
 
-	fmt.Println("[discovery] Synced cluster-info information from the API Server so we have got the latest information")
+	fmt.Println("[discovery] Synced cluster-info information from the API Server so we have got the latest information.")
 	// In an HA world in the future, this will make more sense, because now we've got new information, possibly about new API Servers to talk to
 	return kubeconfigutil.GetClusterFromKubeConfig(refreshedBaseKubeConfig), nil
 }
@@ -112,7 +111,7 @@ func tryParseClusterInfoFromConfigMap(cm *v1.ConfigMap) (*clientcmdapi.Config, e
 	}
 	parsedKubeConfig, err := clientcmd.Load([]byte(kubeConfigString))
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse the kubeconfig file in the %s ConfigMap: %v", bootstrapapi.ConfigMapClusterInfo, err)
+		return nil, fmt.Errorf("Couldn't parse the kubeconfig file in the %s ConfigMap: %v", bootstrapapi.ConfigMapClusterInfo, err)
 	}
 	return parsedKubeConfig, nil
 }
