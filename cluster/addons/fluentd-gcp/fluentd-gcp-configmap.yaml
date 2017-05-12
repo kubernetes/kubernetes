@@ -301,7 +301,42 @@ data:
     <source>
       @type prometheus_monitor
     </source>
+
+    # This source is used to acquire approximate process start timestamp,
+    # which purpose is explained before the corresponding output plugin.
+    <source>
+      @type exec
+      command /bin/sh -c 'date +%s'
+      tag process_start
+      time_format %Y-%m-%d %H:%M:%S
+      keys process_start_timestamp
+    </source>
+
+    # This filter is used to convert process start timestamp to integer
+    # value for correct ingestion in the prometheus output plugin.
+    <filter>
+      @type record_transformer
+      enable_ruby true
+      auto_typecast true
+      <record>
+        process_start_timestamp ${record["process_start_timestamp"].to_i}
+      </record>
+    </filter>
   output.conf: |-
+    # This match is placed before the all-matching output to provide metric
+    # exporter with a process start timestamp for correct exporting of
+    # cumulative metrics to Stackdriver.
+    <match process_start>
+      @type prometheus
+
+      <metric>
+        type gauge
+        name process_start_time_seconds
+        desc Timestamp of the process start in seconds
+        key process_start_timestamp
+      </metric>
+    </match>
+
     # We use 2 output stanzas - one to handle the container logs and one to handle
     # the node daemon logs, the latter of which explicitly sends its logs to the
     # compute.googleapis.com service rather than container.googleapis.com to keep
