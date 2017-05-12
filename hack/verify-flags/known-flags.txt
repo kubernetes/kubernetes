@@ -425,6 +425,7 @@ large-cluster-size-threshold
 last-release-pr
 leader-elect
 leader-elect-lease-duration
+leader-elect-lock-type
 leader-elect-renew-deadline
 leader-elect-resource-lock
 leader-elect-retry-period
