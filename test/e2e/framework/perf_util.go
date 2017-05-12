@@ -30,7 +30,7 @@ import (
 const currentApiCallMetricsVersion = "v1"
 
 // ApiCallToPerfData transforms APIResponsiveness to PerfData.
-func ApiCallToPerfData(apicalls APIResponsiveness) *perftype.PerfData {
+func ApiCallToPerfData(apicalls *APIResponsiveness) *perftype.PerfData {
 	perfData := &perftype.PerfData{Version: currentApiCallMetricsVersion}
 	for _, apicall := range apicalls.APICalls {
 		item := perftype.DataItem{
@@ -43,6 +43,7 @@ func ApiCallToPerfData(apicalls APIResponsiveness) *perftype.PerfData {
 			Labels: map[string]string{
 				"Verb":     apicall.Verb,
 				"Resource": apicall.Resource,
+				"Count":    fmt.Sprintf("%v", apicall.Count),
 			},
 		}
 		perfData.DataItems = append(perfData.DataItems, item)
