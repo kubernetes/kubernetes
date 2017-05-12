@@ -378,9 +378,6 @@ func createKubeConfig(clientCfg *rest.Config) *clientcmdapi.Config {
 		cluster.CertificateAuthorityData = clientCfg.CAData
 	}
 	cluster.InsecureSkipTLSVerify = clientCfg.Insecure
-	if clientCfg.GroupVersion != nil {
-		cluster.APIVersion = clientCfg.GroupVersion.String()
-	}
 	config.Clusters[clusterNick] = cluster
 
 	context := clientcmdapi.NewContext()
