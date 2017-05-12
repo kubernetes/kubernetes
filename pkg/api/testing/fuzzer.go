@@ -434,6 +434,16 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 				*obj.ReadOnly = false
 			}
 		},
+		func(obj *api.AzureFileVolumeSource, c fuzz.Continue) {
+			if obj.DirMode == nil {
+				obj.DirMode = new(int32)
+				*obj.DirMode = 0777
+			}
+			if obj.FileMode == nil {
+				obj.FileMode = new(int32)
+				*obj.FileMode = 0777
+			}
+		},
 		func(sio *api.ScaleIOVolumeSource, c fuzz.Continue) {
 			sio.ProtectionDomain = c.RandString()
 			if sio.ProtectionDomain == "" {
