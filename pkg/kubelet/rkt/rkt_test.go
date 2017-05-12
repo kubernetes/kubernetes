@@ -46,6 +46,7 @@ import (
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"strings"
 )
 
 func mustMarshalPodManifest(man *appcschema.PodManifest) []byte {
@@ -583,7 +584,7 @@ func TestGetPodStatus(t *testing.T) {
 	defer ctrl.Finish()
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
-	fnet := newFakeNetNs()
+	fug := newfakeUnitGetter()
 	fnp := nettest.NewMockNetworkPlugin(ctrl)
 	fos := &containertesting.FakeOS{}
 	frh := &containertesting.FakeRuntimeHelper{}
@@ -593,7 +594,7 @@ func TestGetPodStatus(t *testing.T) {
 		runtimeHelper: frh,
 		os:            fos,
 		network:       network.NewPluginManager(fnp),
-		netns:         fnet,
+		unitGetter:    fug,
 	}
 
 	ns := func(seconds int64) int64 {
@@ -846,7 +847,7 @@ func TestGetPodStatus(t *testing.T) {
 
 		assert.Equal(t, tt.result, status, testCaseHint)
 		assert.Equal(t, []string{"ListPods"}, fr.called, testCaseHint)
-		fnet.networkNamespace = kubecontainer.ContainerID{}
+		fug.networkNamespace = kubecontainer.ContainerID{}
 		fr.CleanCalls()
 		ctrl.Finish()
 	}
@@ -1633,6 +1634,8 @@ func TestGarbageCollect(t *testing.T) {
 	cli := newFakeRktCli()
 	fakeOS := kubetesting.NewFakeOS()
 	getter := newFakePodGetter()
+	fug := newfakeUnitGetter()
+	frh := &containertesting.FakeRuntimeHelper{}
 
 	rkt := &Runtime{
 		os:                  fakeOS,
@@ -1641,6 +1644,8 @@ func TestGarbageCollect(t *testing.T) {
 		podGetter:           getter,
 		systemd:             fs,
 		containerRefManager: kubecontainer.NewRefManager(),
+		unitGetter:          fug,
+		runtimeHelper:       frh,
 	}
 
 	fakeApp := &rktapi.App{Name: "app-foo"}
@@ -1651,7 +1656,7 @@ func TestGarbageCollect(t *testing.T) {
 		pods                 []*rktapi.Pod
 		serviceFilesOnDisk   []string
 		expectedCommands     []string
-		expectedServiceFiles []string
+		expectedDeletedFiles []string
 	}{
 		// All running pods, should not be gc'd.
 		// Dead, new pods should not be gc'd.
@@ -1738,7 +1743,7 @@ func TestGarbageCollect(t *testing.T) {
 			},
 			[]string{"k8s_dead-old.service", "k8s_deleted-foo.service", "k8s_non-existing-bar.service"},
 			[]string{"rkt rm dead-old", "rkt rm deleted-foo"},
-			[]string{"/run/systemd/system/k8s_dead-old.service", "/run/systemd/system/k8s_deleted-foo.service", "/run/systemd/system/k8s_non-existing-bar.service"},
+			[]string{"/poddir/fake/finished-dead-old", "/poddir/fake/finished-deleted-foo", "/poddir/fake/finished-non-existing-bar", "/run/systemd/system/k8s_dead-old.service", "/run/systemd/system/k8s_deleted-foo.service", "/run/systemd/system/k8s_non-existing-bar.service"},
 		},
 		// gcPolicy.MaxContainers should be enforced.
 		// Oldest ones are removed first.
@@ -1795,7 +1800,7 @@ func TestGarbageCollect(t *testing.T) {
 			},
 			[]string{"k8s_dead-0.service", "k8s_dead-1.service", "k8s_dead-2.service"},
 			[]string{"rkt rm dead-0", "rkt rm dead-1"},
-			[]string{"/run/systemd/system/k8s_dead-0.service", "/run/systemd/system/k8s_dead-1.service"},
+			[]string{"/poddir/fake/finished-dead-0", "/poddir/fake/finished-dead-1", "/run/systemd/system/k8s_dead-0.service", "/run/systemd/system/k8s_dead-1.service"},
 		},
 	}
 
@@ -1834,14 +1839,17 @@ func TestGarbageCollect(t *testing.T) {
 
 		assert.Equal(t, tt.expectedCommands, cli.cmds, testCaseHint)
 
-		sort.Sort(sortedStringList(tt.expectedServiceFiles))
+		sort.Sort(sortedStringList(tt.expectedDeletedFiles))
 		sort.Sort(sortedStringList(fakeOS.Removes))
 		sort.Sort(sortedStringList(fs.resetFailedUnits))
 
-		assert.Equal(t, tt.expectedServiceFiles, fakeOS.Removes, testCaseHint)
+		assert.Equal(t, tt.expectedDeletedFiles, fakeOS.Removes, testCaseHint)
 		var expectedService []string
-		for _, f := range tt.expectedServiceFiles {
-			expectedService = append(expectedService, filepath.Base(f))
+		for _, f := range tt.expectedDeletedFiles {
+			unit := filepath.Base(f)
+			if strings.HasSuffix(unit, ".service") && strings.HasPrefix(unit, kubernetesUnitPrefix) {
+				expectedService = append(expectedService, unit)
+			}
 		}
 		assert.Equal(t, expectedService, fs.resetFailedUnits, testCaseHint)
 

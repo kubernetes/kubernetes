@@ -30,7 +30,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -405,52 +404,6 @@ func (f *Framework) TestContainerOutput(scenarioName string, pod *v1.Pod, contai
 // the specified container log against the given expected output using a regexp matcher.
 func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
 	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, MatchRegexp)
-}
-
-// WaitForAnEndpoint waits for at least one endpoint to become available in the
-// service's corresponding endpoints object.
-func (f *Framework) WaitForAnEndpoint(serviceName string) error {
-	for {
-		// TODO: Endpoints client should take a field selector so we
-		// don't have to list everything.
-		list, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).List(metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-		rv := list.ResourceVersion
-
-		isOK := func(e *v1.Endpoints) bool {
-			return e.Name == serviceName && len(e.Subsets) > 0 && len(e.Subsets[0].Addresses) > 0
-		}
-		for i := range list.Items {
-			if isOK(&list.Items[i]) {
-				return nil
-			}
-		}
-
-		options := metav1.ListOptions{
-			FieldSelector:   fields.Set{"metadata.name": serviceName}.AsSelector().String(),
-			ResourceVersion: rv,
-		}
-		w, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).Watch(options)
-		if err != nil {
-			return err
-		}
-		defer w.Stop()
-
-		for {
-			val, ok := <-w.ResultChan()
-			if !ok {
-				// reget and re-watch
-				break
-			}
-			if e, ok := val.Object.(*v1.Endpoints); ok {
-				if isOK(e) {
-					return nil
-				}
-			}
-		}
-	}
 }
 
 // Write a file using kubectl exec echo <contents> > <path> via specified container

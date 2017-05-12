@@ -51,7 +51,7 @@ message PodPresetList {
   repeated PodPreset items = 2;
 }
 
-// PodPresetSpec is a description of a pod injection policy.
+// PodPresetSpec is a description of a pod preset.
 message PodPresetSpec {
   // Selector is a label query over a set of resources, in this case pods.
   // Required.

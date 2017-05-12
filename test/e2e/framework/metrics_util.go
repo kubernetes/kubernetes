@@ -103,7 +103,7 @@ func (m *MetricsForE2E) PrintHumanReadable() string {
 
 func (m *MetricsForE2E) PrintJSON() string {
 	m.filterMetrics()
-	return PrettyPrintJSON(*m)
+	return PrettyPrintJSON(m)
 }
 
 func (m *MetricsForE2E) SummaryKind() string {
@@ -155,11 +155,11 @@ func (l *PodStartupLatency) SummaryKind() string {
 }
 
 func (l *PodStartupLatency) PrintHumanReadable() string {
-	return PrettyPrintJSON(*l)
+	return PrettyPrintJSON(l)
 }
 
 func (l *PodStartupLatency) PrintJSON() string {
-	return PrettyPrintJSON(*l)
+	return PrettyPrintJSON(PodStartupLatencyToPerfData(l))
 }
 
 type SchedulingLatency struct {
@@ -173,11 +173,11 @@ func (l *SchedulingLatency) SummaryKind() string {
 }
 
 func (l *SchedulingLatency) PrintHumanReadable() string {
-	return PrettyPrintJSON(*l)
+	return PrettyPrintJSON(l)
 }
 
 func (l *SchedulingLatency) PrintJSON() string {
-	return PrettyPrintJSON(*l)
+	return PrettyPrintJSON(l)
 }
 
 type SaturationTime struct {
@@ -203,11 +203,11 @@ func (a *APIResponsiveness) SummaryKind() string {
 }
 
 func (a *APIResponsiveness) PrintHumanReadable() string {
-	return PrettyPrintJSON(*a)
+	return PrettyPrintJSON(a)
 }
 
 func (a *APIResponsiveness) PrintJSON() string {
-	return PrettyPrintJSON(*a)
+	return PrettyPrintJSON(ApiCallToPerfData(a))
 }
 
 func (a *APIResponsiveness) Len() int { return len(a.APICalls) }

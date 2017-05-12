@@ -101,6 +101,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -178,6 +184,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "parameters": [
@@ -292,6 +304,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "post": {
@@ -331,6 +349,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "POST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "delete": {
@@ -397,6 +421,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "parameters": [
@@ -476,6 +506,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "post": {
@@ -515,6 +551,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "POST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "delete": {
@@ -581,6 +623,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -645,6 +693,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "put": {
@@ -684,6 +738,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "delete": {
@@ -744,6 +804,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "patch": {
@@ -785,6 +851,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -880,6 +952,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "post": {
@@ -919,6 +997,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "POST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "delete": {
@@ -985,6 +1069,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "parameters": [
@@ -1049,6 +1139,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "put": {
@@ -1088,6 +1184,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "delete": {
@@ -1148,6 +1250,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "patch": {
@@ -1189,6 +1297,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "parameters": [
@@ -1284,6 +1398,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "post": {
@@ -1323,6 +1443,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "POST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "delete": {
@@ -1389,6 +1515,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "parameters": [
@@ -1453,6 +1585,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "put": {
@@ -1492,6 +1630,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "delete": {
@@ -1552,6 +1696,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "patch": {
@@ -1593,6 +1743,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "parameters": [
@@ -1688,6 +1844,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "post": {
@@ -1727,6 +1889,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "POST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "delete": {
@@ -1793,6 +1961,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -1857,6 +2031,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "put": {
@@ -1896,6 +2076,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "delete": {
@@ -1956,6 +2142,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "patch": {
@@ -1997,6 +2189,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -2053,6 +2251,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "put": {
@@ -2092,6 +2296,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "patch": {
@@ -2133,6 +2343,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -2205,6 +2421,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "put": {
@@ -2244,6 +2466,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "delete": {
@@ -2304,6 +2532,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "patch": {
@@ -2345,6 +2579,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "parameters": [
@@ -2403,6 +2643,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "parameters": [
@@ -2451,6 +2697,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "put": {
@@ -2490,6 +2742,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "patch": {
@@ -2531,6 +2789,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "parameters": [
@@ -2581,6 +2845,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "parameters": [
@@ -2658,6 +2928,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -2735,6 +3011,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -2812,6 +3094,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "parameters": [
@@ -2889,6 +3177,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "parameters": [
@@ -2966,6 +3260,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -3051,6 +3351,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -3144,6 +3450,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "parameters": [
@@ -3229,6 +3541,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     },
     "parameters": [
@@ -3322,6 +3640,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "parameters": [
@@ -3407,6 +3731,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "parameters": [
@@ -3500,6 +3830,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -3585,6 +3921,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -3678,6 +4020,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     },
     "parameters": [
@@ -3763,6 +4111,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     },
     "parameters": [
@@ -3840,6 +4194,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     },
     "parameters": [
@@ -4016,6 +4376,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -4093,6 +4459,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -4170,6 +4542,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -4284,6 +4662,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "post": {
@@ -4323,6 +4707,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "POST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "delete": {
@@ -4389,6 +4779,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -4453,6 +4849,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "put": {
@@ -4492,6 +4894,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "delete": {
@@ -4552,6 +4960,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "patch": {
@@ -4593,6 +5007,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -4649,6 +5069,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "put": {
@@ -4688,6 +5114,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "patch": {
@@ -4729,6 +5161,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -4824,6 +5262,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "post": {
@@ -4863,6 +5307,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "POST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "delete": {
@@ -4929,6 +5379,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -4993,6 +5449,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "put": {
@@ -5032,6 +5494,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "delete": {
@@ -5092,6 +5560,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "patch": {
@@ -5133,6 +5607,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -5199,6 +5679,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "POST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DeploymentRollback"
      }
     },
     "parameters": [
@@ -5255,6 +5741,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "put": {
@@ -5294,6 +5786,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "patch": {
@@ -5335,6 +5833,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "parameters": [
@@ -5391,6 +5895,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "put": {
@@ -5430,6 +5940,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "patch": {
@@ -5471,6 +5987,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -5566,6 +6088,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "post": {
@@ -5605,6 +6133,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "POST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "delete": {
@@ -5671,6 +6205,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -5735,6 +6275,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "put": {
@@ -5774,6 +6320,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "delete": {
@@ -5834,6 +6386,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "patch": {
@@ -5875,6 +6433,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -5931,6 +6495,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "put": {
@@ -5970,6 +6540,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "patch": {
@@ -6011,6 +6587,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -6106,6 +6688,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "post": {
@@ -6145,6 +6733,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "POST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "delete": {
@@ -6211,6 +6805,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -6275,6 +6875,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "put": {
@@ -6314,6 +6920,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "delete": {
@@ -6374,6 +6986,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "patch": {
@@ -6415,6 +7033,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -6471,6 +7095,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "put": {
@@ -6510,6 +7140,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "patch": {
@@ -6551,6 +7187,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     },
     "parameters": [
@@ -6607,6 +7249,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "put": {
@@ -6646,6 +7294,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "patch": {
@@ -6687,6 +7341,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -6745,6 +7405,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -6822,6 +7488,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -6899,6 +7571,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -6976,6 +7654,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -7053,6 +7737,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -7138,6 +7828,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -7231,6 +7927,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -7316,6 +8018,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     },
     "parameters": [
@@ -7409,6 +8117,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -7494,6 +8208,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     },
     "parameters": [
@@ -7587,6 +8307,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -7672,6 +8398,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -7765,6 +8497,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -7945,6 +8683,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "LIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "federation",
+      "Version": "v1beta1",
+      "Kind": "Cluster"
      }
     },
     "post": {
@@ -7984,6 +8728,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "POST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "federation",
+      "Version": "v1beta1",
+      "Kind": "Cluster"
      }
     },
     "delete": {
@@ -8050,6 +8800,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-group-version-kind": {
+      "Group": "federation",
+      "Version": "v1beta1",
+      "Kind": "Cluster"
      }
     },
     "parameters": [
@@ -8106,6 +8862,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "GET",
+     "x-kubernetes-group-version-kind": {
+      "Group": "federation",
+      "Version": "v1beta1",
+      "Kind": "Cluster"
      }
     },
     "put": {
@@ -8145,6 +8907,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "federation",
+      "Version": "v1beta1",
+      "Kind": "Cluster"
      }
     },
     "delete": {
@@ -8205,6 +8973,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-group-version-kind": {
+      "Group": "federation",
+      "Version": "v1beta1",
+      "Kind": "Cluster"
      }
     },
     "patch": {
@@ -8246,6 +9020,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "federation",
+      "Version": "v1beta1",
+      "Kind": "Cluster"
      }
     },
     "parameters": [
@@ -8304,6 +9084,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "PUT",
+     "x-kubernetes-group-version-kind": {
+      "Group": "federation",
+      "Version": "v1beta1",
+      "Kind": "Cluster"
      }
     },
     "parameters": [
@@ -8354,6 +9140,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-group-version-kind": {
+      "Group": "federation",
+      "Version": "v1beta1",
+      "Kind": "Cluster"
      }
     },
     "parameters": [
@@ -8431,6 +9223,12 @@
       "401": {
        "description": "Unauthorized"
       }
+     },
+     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-group-version-kind": {
+      "Group": "federation",
+      "Version": "v1beta1",
+      "Kind": "Cluster"
      }
     },
     "parameters": [
@@ -11429,6 +12227,15 @@
      "externalName": {
       "description": "externalName is the external reference that kubedns or equivalent will return as a CNAME record for this service. No proxying will be involved. Must be a valid DNS name and requires Type to be ExternalName.",
       "type": "string"
+     },
+     "externalTrafficPolicy": {
+      "description": "externalTrafficPolicy denotes if this Service desires to route external traffic to local endpoints only. This preserves Source IP and avoids a second hop for LoadBalancer and Nodeport type services.",
+      "type": "string"
+     },
+     "healthCheckNodePort": {
+      "description": "healthCheckNodePort specifies the healthcheck nodePort for the service. If not specified, HealthCheckNodePort is created by the service api backend with the allocated nodePort. Will use user-specified nodePort value if specified by the client. Only effects when Type is set to LoadBalancer and ExternalTrafficPolicy is set to Local.",
+      "type": "integer",
+      "format": "int32"
      },
      "loadBalancerIP": {
       "description": "Only applies to Service Type: LoadBalancer LoadBalancer will get created with the IP specified in this field. This feature depends on whether the underlying cloud-provider supports specifying the loadBalancerIP when a load balancer is created. This field will be ignored if the cloud-provider does not support the feature.",

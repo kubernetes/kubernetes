@@ -18,10 +18,12 @@ package dockershim
 
 import (
 	"fmt"
+	"net/http"
 
+	"github.com/docker/docker/pkg/jsonmessage"
 	dockertypes "github.com/docker/engine-api/types"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -80,7 +82,7 @@ func (ds *dockerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi
 		dockertypes.ImagePullOptions{},
 	)
 	if err != nil {
-		return "", err
+		return "", filterHTTPError(err, image.Image)
 	}
 
 	return getImageRef(ds.client, image.Image)
@@ -94,15 +96,20 @@ func (ds *dockerService) RemoveImage(image *runtimeapi.ImageSpec) error {
 	imageInspect, err := ds.client.InspectImageByID(image.Image)
 	if err == nil && imageInspect != nil && len(imageInspect.RepoTags) > 1 {
 		for _, tag := range imageInspect.RepoTags {
-			if _, err := ds.client.RemoveImage(tag, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil {
+			if _, err := ds.client.RemoveImage(tag, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil && !libdocker.IsImageNotFoundError(err) {
 				return err
 			}
 		}
 		return nil
+	} else if err != nil && libdocker.IsImageNotFoundError(err) {
+		return nil
 	}
 
 	_, err = ds.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{PruneChildren: true})
-	return err
+	if err != nil && !libdocker.IsImageNotFoundError(err) {
+		return err
+	}
+	return nil
 }
 
 // getImageRef returns the image digest if exists, or else returns the image ID.
@@ -126,4 +133,19 @@ func getImageRef(client libdocker.Interface, image string) (string, error) {
 // ImageFsInfo returns information of the filesystem that is used to store images.
 func (ds *dockerService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+func filterHTTPError(err error, image string) error {
+	// docker/docker/pull/11314 prints detailed error info for docker pull.
+	// When it hits 502, it returns a verbose html output including an inline svg,
+	// which makes the output of kubectl get pods much harder to parse.
+	// Here converts such verbose output to a concise one.
+	jerr, ok := err.(*jsonmessage.JSONError)
+	if ok && (jerr.Code == http.StatusBadGateway ||
+		jerr.Code == http.StatusServiceUnavailable ||
+		jerr.Code == http.StatusGatewayTimeout) {
+		return fmt.Errorf("RegistryUnavailable: %v", err)
+	}
+	return err
+
 }

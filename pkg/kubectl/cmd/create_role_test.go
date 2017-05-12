@@ -229,6 +229,45 @@ func TestValidate(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		"test-special-verb": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"use"},
+				Resources: []ResourceOptions{
+					{
+						Resource: "pods",
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"test-mix-verbs": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"impersonate", "use"},
+				Resources: []ResourceOptions{
+					{
+						Resource:    "userextras",
+						SubResource: "scopes",
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"test-special-verb-with-wrong-apigroup": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"impersonate"},
+				Resources: []ResourceOptions{
+					{
+						Resource:    "userextras",
+						SubResource: "scopes",
+						Group:       "extensions",
+					},
+				},
+			},
+			expectErr: true,
+		},
 		"test-invalid-resource": {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
@@ -283,6 +322,20 @@ func TestValidate(t *testing.T) {
 					},
 				},
 				ResourceNames: []string{"bar"},
+			},
+			expectErr: false,
+		},
+		"test-valid-case-with-additional-resource": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"impersonate"},
+				Resources: []ResourceOptions{
+					{
+						Resource:    "userextras",
+						SubResource: "scopes",
+						Group:       "authentication.k8s.io",
+					},
+				},
 			},
 			expectErr: false,
 		},

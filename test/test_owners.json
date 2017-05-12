@@ -1,0 +1,124 @@
+{
+ "api-machinery": [
+  "Etcd", 
+  "Generated", 
+  "HA-master", 
+  "Multi-AZ", 
+  "Namespaces", 
+  "ResourceQuota", 
+  "Staging", 
+  "Summary", 
+  "ThirdParty"
+ ], 
+ "apps": [
+  "Cassandra", 
+  "ConfigMap", 
+  "CronJob", 
+  "Daemon", 
+  "Deployment", 
+  "Job", 
+  "Mesos", 
+  "Pet", 
+  "Redis", 
+  "ReplicaSet", 
+  "ReplicationController", 
+  "Rescheduler", 
+  "RethinkDB", 
+  "Secret", 
+  "Security", 
+  "Spark", 
+  "StatefulSet", 
+  "Storm"
+ ], 
+ "autoscaling": [
+  "Cluster size", 
+  "Horizontal"
+ ], 
+ "big-data": [
+  "Hazelcast"
+ ], 
+ "cli": [
+  "Kubectl"
+ ], 
+ "cluster-lifecycle": [
+  "GKE node", 
+  "Garbage", 
+  "Nodes", 
+  "Upgrade"
+ ], 
+ "federation": [
+  "Federated", 
+  "Federation"
+ ], 
+ "instrumentation": [
+  "Cluster level", 
+  "Kibana", 
+  "MetricsGrabber", 
+  "Monitoring"
+ ], 
+ "network": [
+  "ClusterDns", 
+  "DNS", 
+  "ESIPP", 
+  "Firewall", 
+  "Load", 
+  "Network", 
+  "Service"
+ ], 
+ "node": [
+  "AppArmor", 
+  "Cadvisor", 
+  "Container", 
+  "Docker", 
+  "Downward", 
+  "EmptyDir", 
+  "Events", 
+  "HostPath", 
+  "ImageID", 
+  "InitContainer", 
+  "Initial", 
+  "Kubelet", 
+  "LimitRange", 
+  "Liveness", 
+  "Logging", 
+  "MemoryEviction", 
+  "MirrorPod", 
+  "NodeOutOfDisk", 
+  "NodeProblemDetector", 
+  "Opaque", 
+  "Pod garbage", 
+  "Pods", 
+  "Port", 
+  "PreStop", 
+  "PrivilegedPod", 
+  "Probing", 
+  "Proxy", 
+  "Reboot", 
+  "Restart", 
+  "SimpleMount", 
+  "Sysctls", 
+  "Variable", 
+  "kubelet", 
+  "when"
+ ], 
+ "scalability": [
+  "Density"
+ ], 
+ "scheduling": [
+  "DisruptionController", 
+  "NoExecuteTaintManager", 
+  "SchedulerPredicates"
+ ], 
+ "storage": [
+  "Dynamic", 
+  "GCP", 
+  "GKE local", 
+  "PersistentVolumes", 
+  "Pod Disks", 
+  "Projected", 
+  "Volume"
+ ], 
+ "ui": [
+  "Kubernetes"
+ ]
+}

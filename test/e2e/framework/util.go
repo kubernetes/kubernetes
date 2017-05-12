@@ -180,6 +180,8 @@ const (
 
 	// Serve hostname image name
 	ServeHostnameImage = "gcr.io/google_containers/serve_hostname:v1.4"
+	// ssh port
+	sshPort = "22"
 )
 
 var (
@@ -1567,6 +1569,10 @@ func WaitForReplicationControllerwithSelector(c clientset.Interface, namespace s
 func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 	for t := time.Now(); time.Since(t) < EndpointRegisterTimeout; time.Sleep(Poll) {
 		endpoint, err := c.Core().Endpoints(ns).Get(name, metav1.GetOptions{})
+		if apierrs.IsNotFound(err) {
+			Logf("Endpoint %s/%s is not ready yet", ns, name)
+			continue
+		}
 		Expect(err).NotTo(HaveOccurred())
 		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
@@ -3781,7 +3787,7 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 
 	sshHosts := make([]string, 0, len(hosts))
 	for _, h := range hosts {
-		sshHosts = append(sshHosts, net.JoinHostPort(h, "22"))
+		sshHosts = append(sshHosts, net.JoinHostPort(h, sshPort))
 	}
 	return sshHosts, nil
 }
@@ -3793,6 +3799,13 @@ type SSHResult struct {
 	Stdout string
 	Stderr string
 	Code   int
+}
+
+// NodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
+// eg: the name returned by framework.GetMasterHost(). This is also not guaranteed to work across
+// cloud providers since it involves ssh.
+func NodeExec(nodeName, cmd string) (SSHResult, error) {
+	return SSH(cmd, net.JoinHostPort(nodeName, sshPort), TestContext.Provider)
 }
 
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
@@ -3835,7 +3848,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult,
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP {
-			host = a.Address + ":22"
+			host = net.JoinHostPort(a.Address, sshPort)
 			break
 		}
 	}
@@ -4413,7 +4426,7 @@ func sshRestartMaster() error {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
 	Logf("Restarting master via ssh, running: %v", command)
-	result, err := SSH(command, GetMasterHost()+":22", TestContext.Provider)
+	result, err := SSH(command, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		LogSSHResult(result)
 		return fmt.Errorf("couldn't restart apiserver: %v", err)
@@ -5381,7 +5394,7 @@ func GetNodeExternalIP(node *v1.Node) string {
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP {
-			host = a.Address + ":22"
+			host = net.JoinHostPort(a.Address, sshPort)
 			break
 		}
 	}

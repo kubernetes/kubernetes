@@ -73,23 +73,21 @@ func TestRunOnce(t *testing.T) {
 	}
 	defer os.RemoveAll(basePath)
 	kb := &Kubelet{
-		rootDirectory:       basePath,
-		recorder:            &record.FakeRecorder{},
-		cadvisor:            cadvisor,
-		nodeLister:          testNodeLister{},
-		nodeInfo:            testNodeInfo{},
-		statusManager:       status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}),
-		containerRefManager: kubecontainer.NewRefManager(),
-		podManager:          podManager,
-		os:                  &containertest.FakeOS{},
-		diskSpaceManager:    diskSpaceManager,
-		containerRuntime:    fakeRuntime,
-		reasonCache:         NewReasonCache(),
-		clock:               clock.RealClock{},
-		kubeClient:          &fake.Clientset{},
-		hostname:            testKubeletHostname,
-		nodeName:            testKubeletHostname,
-		runtimeState:        newRuntimeState(time.Second),
+		rootDirectory:    basePath,
+		recorder:         &record.FakeRecorder{},
+		cadvisor:         cadvisor,
+		nodeInfo:         testNodeInfo{},
+		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}),
+		podManager:       podManager,
+		os:               &containertest.FakeOS{},
+		diskSpaceManager: diskSpaceManager,
+		containerRuntime: fakeRuntime,
+		reasonCache:      NewReasonCache(),
+		clock:            clock.RealClock{},
+		kubeClient:       &fake.Clientset{},
+		hostname:         testKubeletHostname,
+		nodeName:         testKubeletHostname,
+		runtimeState:     newRuntimeState(time.Second),
 	}
 	kb.containerManager = cm.NewStubContainerManager()
 
@@ -113,7 +111,7 @@ func TestRunOnce(t *testing.T) {
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount */
 		false /* keepTerminatedPodVolumes */)
 
-	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, kb.nonMasqueradeCIDR, network.UseDefaultMTU)
+	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, "", network.UseDefaultMTU)
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
 	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod, kb.containerRuntime)

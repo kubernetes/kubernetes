@@ -103,6 +103,8 @@ spec:
       tolerations:
       - key: "node.alpha.kubernetes.io/ismaster"
         effect: "NoSchedule"
+      - operator: "Exists"
+        effect: "NoExecute"
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog

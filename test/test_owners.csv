@@ -123,7 +123,7 @@ Empty starts a pod,childsb,1,
 "EmptyDir volumes should support (non-root,0644,default)",timstclair,1,node
 "EmptyDir volumes should support (non-root,0644,tmpfs)",spxtr,1,node
 "EmptyDir volumes should support (non-root,0666,default)",dchen1107,1,node
-"EmptyDir volumes should support (non-root,0666,tmpfs)",apelisse,1,storage
+"EmptyDir volumes should support (non-root,0666,tmpfs)",apelisse,1,node
 "EmptyDir volumes should support (non-root,0777,default)",mwielgus,1,node
 "EmptyDir volumes should support (non-root,0777,tmpfs)",smarterclayton,1,node
 "EmptyDir volumes should support (root,0644,default)",mtaufen,1,node
@@ -721,8 +721,6 @@ k8s.io/kubernetes/pkg/kubelet/config,mikedanese,1,
 k8s.io/kubernetes/pkg/kubelet/container,yujuhong,0,
 k8s.io/kubernetes/pkg/kubelet/custommetrics,kevin-wangzefeng,0,
 k8s.io/kubernetes/pkg/kubelet/dockershim,zmerlynn,1,
-k8s.io/kubernetes/pkg/kubelet/dockertools,deads2k,1,
-k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext,yifan-gu,1,
 k8s.io/kubernetes/pkg/kubelet/envvars,rrati,0,
 k8s.io/kubernetes/pkg/kubelet/eviction,childsb,1,
 k8s.io/kubernetes/pkg/kubelet/images,caesarxuchao,1,

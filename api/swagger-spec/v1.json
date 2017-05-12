@@ -21041,6 +21041,15 @@
      "externalName": {
       "type": "string",
       "description": "externalName is the external reference that kubedns or equivalent will return as a CNAME record for this service. No proxying will be involved. Must be a valid DNS name and requires Type to be ExternalName."
+     },
+     "externalTrafficPolicy": {
+      "type": "string",
+      "description": "externalTrafficPolicy denotes if this Service desires to route external traffic to local endpoints only. This preserves Source IP and avoids a second hop for LoadBalancer and Nodeport type services."
+     },
+     "healthCheckNodePort": {
+      "type": "integer",
+      "format": "int32",
+      "description": "healthCheckNodePort specifies the healthcheck nodePort for the service. If not specified, HealthCheckNodePort is created by the service api backend with the allocated nodePort. Will use user-specified nodePort value if specified by the client. Only effects when Type is set to LoadBalancer and ExternalTrafficPolicy is set to Local."
      }
     }
    },

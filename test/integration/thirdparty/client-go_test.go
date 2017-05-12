@@ -34,8 +34,8 @@ import (
 )
 
 func TestClientGoThirdPartyResourceExample(t *testing.T) {
-	_, s := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	defer closeFn()
 
 	scheme := runtime.NewScheme()
 	if err := exampletprv1.AddToScheme(scheme); err != nil {

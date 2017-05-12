@@ -247,7 +247,6 @@ filegroup(
         "//pkg/kubelet/container:all-srcs",
         "//pkg/kubelet/custommetrics:all-srcs",
         "//pkg/kubelet/dockershim:all-srcs",
-        "//pkg/kubelet/dockertools:all-srcs",
         "//pkg/kubelet/envvars:all-srcs",
         "//pkg/kubelet/events:all-srcs",
         "//pkg/kubelet/eviction:all-srcs",

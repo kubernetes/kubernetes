@@ -129,7 +129,7 @@ func (c *Config) SkipComplete() completedConfig {
 }
 
 // New returns a new instance of APIAggregator from the given config.
-func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget, stopCh <-chan struct{}) (*APIAggregator, error) {
+func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
 	genericServer, err := c.Config.GenericConfig.SkipComplete().New(delegationTarget) // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
@@ -185,16 +185,16 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	)
 
 	s.GenericAPIServer.AddPostStartHook("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
-		informerFactory.Start(stopCh)
-		kubeInformers.Start(stopCh)
+		informerFactory.Start(context.StopCh)
+		kubeInformers.Start(context.StopCh)
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHook("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
-		go apiserviceRegistrationController.Run(stopCh)
+		go apiserviceRegistrationController.Run(context.StopCh)
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHook("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
-		go availableController.Run(stopCh)
+		go availableController.Run(context.StopCh)
 		return nil
 	})
 
