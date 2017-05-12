@@ -37,7 +37,7 @@ func For(cfg *kubeadmapi.NodeConfiguration) (*clientcmdapi.Config, error) {
 	// we also need an ability for the user to configure the client to validate received CA cert against a checksum
 	clusterinfo, err := GetValidatedClusterInfoObject(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't validate the identity of the API Server: %v", err)
+		return nil, fmt.Errorf("Couldn't validate the identity of the API Server: %v", err)
 	}
 
 	return kubeconfigutil.CreateWithToken(
@@ -60,7 +60,7 @@ func GetValidatedClusterInfoObject(cfg *kubeadmapi.NodeConfiguration) (*clientcm
 	case len(cfg.DiscoveryToken) != 0:
 		return token.RetrieveValidatedClusterInfo(cfg.DiscoveryToken, cfg.DiscoveryTokenAPIServers)
 	default:
-		return nil, fmt.Errorf("couldn't find a valid discovery configuration.")
+		return nil, fmt.Errorf("Couldn't find a valid discovery configuration.")
 	}
 }
 

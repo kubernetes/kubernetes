@@ -29,8 +29,7 @@ const (
 func TestRunGenerateToken(t *testing.T) {
 	var buf bytes.Buffer
 
-	err := RunGenerateToken(&buf)
-	if err != nil {
+	if err := RunGenerateToken(&buf); err != nil {
 		t.Errorf("RunGenerateToken returned an error: %v", err)
 	}
 
@@ -38,7 +37,7 @@ func TestRunGenerateToken(t *testing.T) {
 
 	matched, err := regexp.MatchString(TokenExpectedRegex, output)
 	if err != nil {
-		t.Fatalf("encountered an error while trying to match RunGenerateToken's output: %v", err)
+		t.Fatalf("Encountered an error while trying to match RunGenerateToken's output: %v", err)
 	}
 	if !matched {
 		t.Errorf("RunGenerateToken's output did not match expected regex; wanted: [%s], got: [%s]", TokenExpectedRegex, output)
