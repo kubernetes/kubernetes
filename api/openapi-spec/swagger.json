@@ -49674,7 +49674,7 @@
     ]
    },
    "io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPresetSpec": {
-    "description": "PodPresetSpec is a description of a pod injection policy.",
+    "description": "PodPresetSpec is a description of a pod preset.",
     "properties": {
      "env": {
       "description": "Env defines the collection of EnvVar to inject into containers.",
