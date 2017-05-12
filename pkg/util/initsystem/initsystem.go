@@ -17,7 +17,7 @@ limitations under the License.
 package initsystem
 
 import (
-	"fmt"
+	"errors"
 	"os/exec"
 	"strings"
 )
@@ -42,34 +42,26 @@ type InitSystem interface {
 type SystemdInitSystem struct{}
 
 func (sysd SystemdInitSystem) ServiceStart(service string) error {
-	args := []string{"start", service}
-	_, err := exec.Command("systemctl", args...).Output()
-	return err
+	args := []string{"-q", "start", service}
+	return exec.Command("systemctl", args...).Run()
 }
 
 func (sysd SystemdInitSystem) ServiceStop(service string) error {
-	args := []string{"stop", service}
-	_, err := exec.Command("systemctl", args...).Output()
-	return err
+	args := []string{"-q", "stop", service}
+	return exec.Command("systemctl", args...).Run()
 }
 
 func (sysd SystemdInitSystem) ServiceExists(service string) bool {
 	args := []string{"status", service}
 	outBytes, _ := exec.Command("systemctl", args...).Output()
 	output := string(outBytes)
-	if strings.Contains(output, "Loaded: not-found") {
-		return false
-	}
-	return true
+	return !strings.Contains(output, "Loaded: not-found")
 }
 
 func (sysd SystemdInitSystem) ServiceIsEnabled(service string) bool {
-	args := []string{"is-enabled", service}
-	_, err := exec.Command("systemctl", args...).Output()
-	if err != nil {
-		return false
-	}
-	return true
+	args := []string{"-q", "is-enabled", service}
+	err := exec.Command("systemctl", args...).Run()
+	return err == nil
 }
 
 // ServiceIsActive will check is the service is "active". In the case of
@@ -95,5 +87,5 @@ func GetInitSystem() (InitSystem, error) {
 	if err == nil {
 		return &SystemdInitSystem{}, nil
 	}
-	return nil, fmt.Errorf("no supported init system detected, skipping checking for services")
+	return nil, errors.New("no supported init system detected, skipping checking for services")
 }
