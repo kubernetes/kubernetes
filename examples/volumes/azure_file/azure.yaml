@@ -15,3 +15,5 @@ spec:
           secretName: azure-secret
           shareName: k8stest
           readOnly: false
+          dirMode: 0777
+          fileMode: 0777

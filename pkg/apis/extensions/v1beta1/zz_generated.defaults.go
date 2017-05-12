@@ -64,6 +64,9 @@ func SetObjectDefaults_DaemonSet(in *DaemonSet) {
 				}
 			}
 		}
+		if a.VolumeSource.AzureFile != nil {
+			v1.SetDefaults_AzureFileVolumeSource(a.VolumeSource.AzureFile)
+		}
 		if a.VolumeSource.ConfigMap != nil {
 			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
@@ -204,6 +207,9 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
 				}
 			}
+		}
+		if a.VolumeSource.AzureFile != nil {
+			v1.SetDefaults_AzureFileVolumeSource(a.VolumeSource.AzureFile)
 		}
 		if a.VolumeSource.ConfigMap != nil {
 			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
@@ -356,6 +362,9 @@ func SetObjectDefaults_ReplicaSet(in *ReplicaSet) {
 					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
 				}
 			}
+		}
+		if a.VolumeSource.AzureFile != nil {
+			v1.SetDefaults_AzureFileVolumeSource(a.VolumeSource.AzureFile)
 		}
 		if a.VolumeSource.ConfigMap != nil {
 			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)

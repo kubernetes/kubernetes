@@ -58,6 +58,9 @@ func SetObjectDefaults_Job(in *Job) {
 				}
 			}
 		}
+		if a.VolumeSource.AzureFile != nil {
+			api_v1.SetDefaults_AzureFileVolumeSource(a.VolumeSource.AzureFile)
+		}
 		if a.VolumeSource.ConfigMap != nil {
 			api_v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}

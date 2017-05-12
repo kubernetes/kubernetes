@@ -59,6 +59,9 @@ func SetObjectDefaults_CronJob(in *CronJob) {
 				}
 			}
 		}
+		if a.VolumeSource.AzureFile != nil {
+			v1.SetDefaults_AzureFileVolumeSource(a.VolumeSource.AzureFile)
+		}
 		if a.VolumeSource.ConfigMap != nil {
 			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
@@ -198,6 +201,9 @@ func SetObjectDefaults_JobTemplate(in *JobTemplate) {
 					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
 				}
 			}
+		}
+		if a.VolumeSource.AzureFile != nil {
+			v1.SetDefaults_AzureFileVolumeSource(a.VolumeSource.AzureFile)
 		}
 		if a.VolumeSource.ConfigMap != nil {
 			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)

@@ -1844,6 +1844,40 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "azureFile.shareName",
 		},
+		{
+			name: "AzureFile invalid DirMode",
+			vol: api.Volume{
+				Name: "azure-file",
+				VolumeSource: api.VolumeSource{
+					AzureFile: &api.AzureFileVolumeSource{
+						SecretName: "name",
+						ShareName:  "share",
+						ReadOnly:   false,
+						DirMode:    newInt32(-100),
+						FileMode:   newInt32(0200),
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "azureFile.DirMode",
+		},
+		{
+			name: "AzureFile invalid FileMode",
+			vol: api.Volume{
+				Name: "azure-file",
+				VolumeSource: api.VolumeSource{
+					AzureFile: &api.AzureFileVolumeSource{
+						SecretName: "name",
+						ShareName:  "share",
+						ReadOnly:   false,
+						DirMode:    newInt32(0257),
+						FileMode:   newInt32(999),
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "azureFile.FileMode",
+		},
 		// Quobyte
 		{
 			name: "valid Quobyte",

@@ -134,6 +134,9 @@ func SetObjectDefaults_PersistentVolume(in *PersistentVolume) {
 	if in.Spec.PersistentVolumeSource.ISCSI != nil {
 		SetDefaults_ISCSIVolumeSource(in.Spec.PersistentVolumeSource.ISCSI)
 	}
+	if in.Spec.PersistentVolumeSource.AzureFile != nil {
+		SetDefaults_AzureFileVolumeSource(in.Spec.PersistentVolumeSource.AzureFile)
+	}
 	if in.Spec.PersistentVolumeSource.AzureDisk != nil {
 		SetDefaults_AzureDiskVolumeSource(in.Spec.PersistentVolumeSource.AzureDisk)
 	}
@@ -186,6 +189,9 @@ func SetObjectDefaults_Pod(in *Pod) {
 					SetDefaults_ObjectFieldSelector(b.FieldRef)
 				}
 			}
+		}
+		if a.VolumeSource.AzureFile != nil {
+			SetDefaults_AzureFileVolumeSource(a.VolumeSource.AzureFile)
 		}
 		if a.VolumeSource.ConfigMap != nil {
 			SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
@@ -335,6 +341,9 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 				}
 			}
 		}
+		if a.VolumeSource.AzureFile != nil {
+			SetDefaults_AzureFileVolumeSource(a.VolumeSource.AzureFile)
+		}
 		if a.VolumeSource.ConfigMap != nil {
 			SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
@@ -476,6 +485,9 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 						SetDefaults_ObjectFieldSelector(b.FieldRef)
 					}
 				}
+			}
+			if a.VolumeSource.AzureFile != nil {
+				SetDefaults_AzureFileVolumeSource(a.VolumeSource.AzureFile)
 			}
 			if a.VolumeSource.ConfigMap != nil {
 				SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)

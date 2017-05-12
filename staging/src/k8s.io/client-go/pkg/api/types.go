@@ -1009,6 +1009,12 @@ type AzureFileVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Directory permission code that gives rwx permissions to all users. Must be a value between 0 and 0777. Defaults to 0777.
+	// +optional
+	DirMode *int32
+	// File permission code that gives rwx permissions to all users. Must be a value between 0 and 0777. Defaults to 0777.
+	// +optional
+	FileMode *int32
 }
 
 // Represents a vSphere volume resource.

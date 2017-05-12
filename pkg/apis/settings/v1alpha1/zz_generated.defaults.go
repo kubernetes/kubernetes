@@ -64,6 +64,9 @@ func SetObjectDefaults_PodPreset(in *PodPreset) {
 				}
 			}
 		}
+		if a.VolumeSource.AzureFile != nil {
+			v1.SetDefaults_AzureFileVolumeSource(a.VolumeSource.AzureFile)
+		}
 		if a.VolumeSource.ConfigMap != nil {
 			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}

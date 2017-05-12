@@ -117,6 +117,8 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 		secretName:   source.SecretName,
 		shareName:    source.ShareName,
 		readOnly:     readOnly,
+		dirMode:      source.DirMode,
+		fileMode:     source.FileMode,
 		mountOptions: volume.MountOptionFromSpec(spec),
 	}, nil
 }
@@ -168,6 +170,8 @@ type azureFileMounter struct {
 	secretName   string
 	shareName    string
 	readOnly     bool
+	dirMode      *int32
+	fileMode     *int32
 	mountOptions []string
 }
 
@@ -209,7 +213,8 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error
 	os.MkdirAll(dir, 0750)
 	source := fmt.Sprintf("//%s.file.core.windows.net/%s", accountName, b.shareName)
 	// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
-	options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=0777,file_mode=0777", accountName, accountKey)}
+
+	options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=%#o,file_mode=%#o", accountName, accountKey, *b.dirMode, *b.fileMode)}
 	if b.readOnly {
 		options = append(options, "ro")
 	}

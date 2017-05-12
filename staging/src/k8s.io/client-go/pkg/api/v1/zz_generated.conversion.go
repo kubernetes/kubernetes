@@ -500,6 +500,8 @@ func autoConvert_v1_AzureFileVolumeSource_To_api_AzureFileVolumeSource(in *Azure
 	out.SecretName = in.SecretName
 	out.ShareName = in.ShareName
 	out.ReadOnly = in.ReadOnly
+	out.DirMode = (*int32)(unsafe.Pointer(in.DirMode))
+	out.FileMode = (*int32)(unsafe.Pointer(in.FileMode))
 	return nil
 }
 
@@ -512,6 +514,8 @@ func autoConvert_api_AzureFileVolumeSource_To_v1_AzureFileVolumeSource(in *api.A
 	out.SecretName = in.SecretName
 	out.ShareName = in.ShareName
 	out.ReadOnly = in.ReadOnly
+	out.DirMode = (*int32)(unsafe.Pointer(in.DirMode))
+	out.FileMode = (*int32)(unsafe.Pointer(in.FileMode))
 	return nil
 }
 
