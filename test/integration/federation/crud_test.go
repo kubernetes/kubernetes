@@ -48,15 +48,16 @@ func TestFederationCRUD(t *testing.T) {
 		})
 	}
 
-	// Validate deletion handling where orphanDependents is true or nil for a single resource type since the
-	// underlying logic is common across all types.
-	orphanedDependents := true
-	testCases := map[string]*bool{
-		"Resources should not be deleted from underlying clusters when OrphanDependents is true": &orphanedDependents,
-		"Resources should not be deleted from underlying clusters when OrphanDependents is nil":  nil,
-	}
+	// The following tests target a single type since the underlying logic is common across all types.
 	kind := federatedtypes.SecretKind
 	adapterFactory := federatedtypes.NewSecretAdapter
+
+	// Validate deletion handling where orphanDependents is true or nil
+	orphanedDependents := true
+	testCases := map[string]*bool{
+		"Resource should not be deleted from underlying clusters when OrphanDependents is true": &orphanedDependents,
+		"Resource should not be deleted from underlying clusters when OrphanDependents is nil":  nil,
+	}
 	for testName, orphanDependents := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			config := fedFixture.APIFixture.NewConfig()
@@ -72,4 +73,22 @@ func TestFederationCRUD(t *testing.T) {
 			crudtester.CheckDelete(updatedObj, orphanDependents)
 		})
 	}
+
+	t.Run("Resource should be propagated to a newly added cluster", func(t *testing.T) {
+		config := fedFixture.APIFixture.NewConfig()
+		fixture := framework.NewControllerFixture(t, kind, adapterFactory, config)
+		defer fixture.TearDown(t)
+
+		client := fedFixture.APIFixture.NewClient(fmt.Sprintf("cluster-addition-test-%s", kind))
+		adapter := adapterFactory(client)
+
+		crudtester := framework.NewFederatedTypeCRUDTester(t, adapter, fedFixture.ClusterClients)
+		obj := adapter.NewTestObject(uuid.New())
+		updatedObj := crudtester.CheckCreate(obj)
+
+		// Start a new cluster and validate that the resource is propagated to it.
+		fedFixture.StartCluster(t)
+		// Check propagation to the new cluster by providing the updated set of clients
+		crudtester.CheckPropagationForClients(updatedObj, fedFixture.ClusterClients)
+	})
 }
