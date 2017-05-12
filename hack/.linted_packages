@@ -438,6 +438,7 @@ test/integration/apiserver
 test/integration/client
 test/integration/configmap
 test/integration/defaulttolerationseconds
+test/integration/deployment
 test/integration/etcd
 test/integration/examples
 test/integration/federation
