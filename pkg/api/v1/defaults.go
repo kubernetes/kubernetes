@@ -25,6 +25,39 @@ import (
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
+	/*
+		RegisterDefaults(scheme)
+		return scheme.AddDefaultingFuncs(
+			SetDefaults_PodExecOptions,
+			SetDefaults_PodAttachOptions,
+			SetDefaults_ReplicationController,
+			SetDefaults_Volume,
+			SetDefaults_ContainerPort,
+			SetDefaults_Container,
+			SetDefaults_ServiceSpec,
+			SetDefaults_Pod,
+			SetDefaults_PodSpec,
+			SetDefaults_Probe,
+			SetDefaults_SecretVolumeSource,
+			SetDefaults_ConfigMapVolumeSource,
+			SetDefaults_DownwardAPIVolumeSource,
+			SetDefaults_Secret,
+			SetDefaults_PersistentVolume,
+			SetDefaults_PersistentVolumeClaim,
+			SetDefaults_ISCSIVolumeSource,
+			SetDefaults_Endpoints,
+			SetDefaults_HTTPGetAction,
+			SetDefaults_NamespaceStatus,
+			SetDefaults_Node,
+			SetDefaults_NodeStatus,
+			SetDefaults_ObjectFieldSelector,
+			SetDefaults_LimitRangeItem,
+			SetDefaults_ConfigMap,
+			SetDefaults_RBDVolumeSource,
+			SetDefaults_ResourceList,
+			SetDefaults_AzureDiskVolumeSource,
+		)
+	*/
 }
 
 func SetDefaults_ResourceList(obj *ResourceList) {
@@ -229,7 +262,11 @@ func SetDefaults_ISCSIVolumeSource(obj *ISCSIVolumeSource) {
 func SetDefaults_AzureDiskVolumeSource(obj *AzureDiskVolumeSource) {
 	if obj.CachingMode == nil {
 		obj.CachingMode = new(AzureDataDiskCachingMode)
-		*obj.CachingMode = AzureDataDiskCachingNone
+		*obj.CachingMode = AzureDataDiskCachingReadWrite
+	}
+	if obj.Kind == nil {
+		obj.Kind = new(AzureDataDiskKind)
+		*obj.Kind = AzureSharedBlobDisk
 	}
 	if obj.FSType == nil {
 		obj.FSType = new(string)
