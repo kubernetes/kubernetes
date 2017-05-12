@@ -825,6 +825,43 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 	}
 }
 
+func TestPrintNodeName(t *testing.T) {
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+		Wide: true,
+	})
+	AddHandlers(printer)
+	table := []struct {
+		node api.Node
+		Name string
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
+				Status:     api.NodeStatus{},
+			},
+			Name: "127.0.0.1",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: ""},
+				Status:     api.NodeStatus{},
+			},
+			Name: "<unknown>",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.node, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Node: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.Name) {
+			t.Fatalf("Expect printing node %s with node name %#v, got: %#v", test.node.Name, test.Name, buffer.String())
+		}
+	}
+}
+
 func TestPrintNodeExternalIP(t *testing.T) {
 	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 		Wide: true,
