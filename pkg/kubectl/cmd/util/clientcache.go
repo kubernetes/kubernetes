@@ -103,14 +103,8 @@ func (c *ClientCache) clientConfigForVersion(requiredVersion *schema.GroupVersio
 	if err != nil {
 		return nil, err
 	}
-	if requiredVersion == nil && config.GroupVersion != nil {
-		// if someone has set the values via flags, our config will have the groupVersion set
-		// that means it is required.
-		requiredVersion = config.GroupVersion
-	}
 
-	// required version may still be nil, since config.GroupVersion may have been nil.  Do the check
-	// before looking up from the cache
+	// only lookup in the cache if the requiredVersion is set
 	if requiredVersion != nil {
 		if config, ok := c.configs[*requiredVersion]; ok {
 			return copyConfig(config), nil
