@@ -159,7 +159,7 @@ func (l *PodStartupLatency) PrintHumanReadable() string {
 }
 
 func (l *PodStartupLatency) PrintJSON() string {
-	return PrettyPrintJSON(l)
+	return PrettyPrintJSON(PodStartupLatencyToPerfData(l))
 }
 
 type SchedulingLatency struct {
