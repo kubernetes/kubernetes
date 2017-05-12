@@ -63,6 +63,31 @@ func TestInterPodAffinityPriority(t *testing.T) {
 	podLabelSecurityS2 := map[string]string{
 		"security": "S2",
 	}
+	ns1 := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ns1",
+			Labels: map[string]string{
+				"key1": "value1",
+			},
+		},
+	}
+	ns2 := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ns2",
+			Labels: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+		},
+	}
+	ns3 := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ns3",
+			Labels: map[string]string{
+				"key3": "value3",
+			},
+		},
+	}
 	// considered only preferredDuringSchedulingIgnoredDuringExecution in pod affinity
 	stayWithS1InRegion := &v1.Affinity{
 		PodAffinity: &v1.PodAffinity{
@@ -262,7 +287,62 @@ func TestInterPodAffinityPriority(t *testing.T) {
 			},
 		},
 	}
-
+	// Affinity with namespaceSelector
+	statyWithS1InRegionWithNamespaceSelectorK1V1 := &v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+				{
+					Weight: 8,
+					PodAffinityTerm: v1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "security",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"S1"},
+								},
+							},
+						},
+						TopologyKey: "region",
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "key1",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"value1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	// Affinity with empty namespaceSelector
+	statyWithS1InRegionWithEmptyNamespaceSelector := &v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+				{
+					Weight: 8,
+					PodAffinityTerm: v1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "security",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"S1"},
+								},
+							},
+						},
+						TopologyKey: "region",
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{},
+						},
+					},
+				},
+			},
+		},
+	}
 	tests := []struct {
 		pod          *v1.Pod
 		pods         []*v1.Pod
@@ -508,6 +588,36 @@ func TestInterPodAffinityPriority(t *testing.T) {
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 10}, {Host: "machine4", Score: 0}},
 			test:         "Affinity and Anti Affinity and symmetry: considered only preferredDuringSchedulingIgnoredDuringExecution in both pod affinity & anti affinity & symmetry",
 		},
+		{
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: statyWithS1InRegionWithNamespaceSelectorK1V1}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1, Namespace: "ns1"}},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1, Namespace: ns1.Name}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2, Namespace: ns3.Name}},
+				{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1, Namespace: ns2.Name}}},
+
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
+			},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
+			test:         "Affinity: podAffinityItem with namespace slector",
+		},
+		{
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: statyWithS1InRegionWithEmptyNamespaceSelector}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1, Namespace: ns1.Name}},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1, Namespace: ns1.Name}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1, Namespace: ns3.Name}},
+				{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1, Namespace: ns2.Name}}},
+
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
+			},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 0}},
+			test:         "Affinity: podAffinityItem with empty namespace slector",
+		},
 	}
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
@@ -515,6 +625,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 			info:                  FakeNodeListInfo(test.nodes),
 			nodeLister:            schedulertesting.FakeNodeLister(test.nodes),
 			podLister:             schedulertesting.FakePodLister(test.pods),
+			namespaceLister:       schedulertesting.FakeNamespaceLister{ns1, ns2, ns3},
 			hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		}
 		list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
@@ -603,6 +714,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 			info:                  FakeNodeListInfo(test.nodes),
 			nodeLister:            schedulertesting.FakeNodeLister(test.nodes),
 			podLister:             schedulertesting.FakePodLister(test.pods),
+			namespaceLister:       schedulertesting.FakeNamespaceLister{},
 			hardPodAffinityWeight: test.hardPodAffinityWeight,
 		}
 		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
@@ -1077,6 +1189,7 @@ func TestInterPodAffinityAnnotationsPriority(t *testing.T) {
 			info:                  FakeNodeListInfo(test.nodes),
 			nodeLister:            schedulertesting.FakeNodeLister(test.nodes),
 			podLister:             schedulertesting.FakePodLister(test.pods),
+			namespaceLister:       schedulertesting.FakeNamespaceLister{},
 			hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		}
 		list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
@@ -1167,6 +1280,7 @@ func TestHardPodAffinityAnnotationsSymmetricWeight(t *testing.T) {
 			info:                  FakeNodeListInfo(test.nodes),
 			nodeLister:            schedulertesting.FakeNodeLister(test.nodes),
 			podLister:             schedulertesting.FakePodLister(test.pods),
+			namespaceLister:       schedulertesting.FakeNamespaceLister{},
 			hardPodAffinityWeight: test.hardPodAffinityWeight,
 		}
 		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)

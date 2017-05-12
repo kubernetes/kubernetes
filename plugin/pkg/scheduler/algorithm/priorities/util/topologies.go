@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -24,27 +25,49 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// NamespaceLister helps list Namespaces.
+type namespaceLister interface {
+	// List lists all Namespaces in the indexer.
+	List(selector labels.Selector) (ret []*v1.Namespace, err error)
+}
+
 // GetNamespacesFromPodAffinityTerm returns a set of names
-// according to the namespaces indicated in podAffinityTerm.
-// If namespaces is empty it considers the given pod's namespace.
-func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.String {
-	names := sets.String{}
-	if len(podAffinityTerm.Namespaces) == 0 {
-		names.Insert(pod.Namespace)
-	} else {
-		names.Insert(podAffinityTerm.Namespaces...)
+// according to the NamespaceSelector indicated in podAffinityTerm.
+// If NamespaceSelector is not provided, podAffinityTerm.Namespaces will be used and if it is empty,
+// pod's namespace will be returned.
+// TODO We will remove the filed term.Namespaces in 1.8, then we need to remove using the term.Namespaces here
+func GetNamespacesFromPodAffinityTerm(nsLister namespaceLister, pod *v1.Pod, term *v1.PodAffinityTerm) sets.String {
+	namespaces := sets.String{}
+	namespaceSelector, err := metav1.LabelSelectorAsSelector(term.NamespaceSelector)
+	if err != nil {
+		return namespaces
 	}
-	return names
+	namespaceList, err := nsLister.List(namespaceSelector)
+	if err != nil {
+		return namespaces
+	}
+
+	for _, ns := range namespaceList {
+		namespaces.Insert(ns.Name)
+	}
+	if len(namespaces) == 0 {
+		if len(term.Namespaces) == 0 {
+			namespaces.Insert(pod.Namespace)
+		} else {
+			namespaces.Insert(term.Namespaces...)
+		}
+	}
+	return namespaces
 }
 
 // PodMatchesTermsNamespaceAndSelector returns true if the given <pod>
 // matches the namespace and selector defined by <affinityPod>`s <term>.
-func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, namespaces sets.String, selector labels.Selector) bool {
+func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, namespaces sets.String, podSelector labels.Selector) bool {
 	if !namespaces.Has(pod.Namespace) {
 		return false
 	}
 
-	if !selector.Matches(labels.Set(pod.Labels)) {
+	if !podSelector.Matches(labels.Set(pod.Labels)) {
 		return false
 	}
 	return true

@@ -11437,8 +11437,12 @@
       "description": "A label query over a set of resources, in this case pods.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
+     "namespaceSelector": {
+      "description": "Selects Namespaces using cluster scoped-labels.  This matches namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+     },
      "namespaces": {
-      "description": "namespaces specifies which namespaces the labelSelector applies to (matches against); null or empty list means \"this pod's namespace\"",
+      "description": "Deprecated: please use the NamespaceSelector, this field will be removed in 1.8. namespaces specifies which namespaces the labelSelector applies to (matches against); null or empty list means \"this pod's namespace\"",
       "type": "array",
       "items": {
        "type": "string"

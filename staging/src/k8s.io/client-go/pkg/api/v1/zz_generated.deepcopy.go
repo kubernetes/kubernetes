@@ -2170,6 +2170,14 @@ func DeepCopy_v1_PodAffinityTerm(in interface{}, out interface{}, c *conversion.
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
+		if in.NamespaceSelector != nil {
+			in, out := &in.NamespaceSelector, &out.NamespaceSelector
+			if newVal, err := c.DeepCopy(*in); err != nil {
+				return err
+			} else {
+				*out = newVal.(*meta_v1.LabelSelector)
+			}
+		}
 		return nil
 	}
 }

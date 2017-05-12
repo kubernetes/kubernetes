@@ -17,19 +17,28 @@ limitations under the License.
 package predicates
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/golang/glog"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 type PredicateMetadataFactory struct {
-	podLister algorithm.PodLister
+	podLister       algorithm.PodLister
+	namespaceLister algorithm.NamespaceLister
 }
 
-func NewPredicateMetadataFactory(podLister algorithm.PodLister) algorithm.MetadataProducer {
+func NewPredicateMetadataFactory(podLister algorithm.PodLister, namespaceLister algorithm.NamespaceLister) algorithm.MetadataProducer {
 	factory := &PredicateMetadataFactory{
-		podLister,
+		podLister:       podLister,
+		namespaceLister: namespaceLister,
 	}
 	return factory.GetMetadata
 }
@@ -40,7 +49,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 	if pod == nil {
 		return nil
 	}
-	matchingTerms, err := getMatchingAntiAffinityTerms(pod, nodeNameToInfoMap)
+	matchingTerms, err := pfactory.getMatchingAntiAffinityTerms(pod, nodeNameToInfoMap)
 	if err != nil {
 		return nil
 	}
@@ -56,4 +65,60 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		precomputeFunc(predicateMetadata)
 	}
 	return predicateMetadata
+}
+
+func (pfactory *PredicateMetadataFactory) getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*schedulercache.NodeInfo) ([]matchingPodAntiAffinityTerm, error) {
+	allNodeNames := make([]string, 0, len(nodeInfoMap))
+	for name := range nodeInfoMap {
+		allNodeNames = append(allNodeNames, name)
+	}
+
+	var lock sync.Mutex
+	var result []matchingPodAntiAffinityTerm
+	var firstError error
+	appendResult := func(toAppend []matchingPodAntiAffinityTerm) {
+		lock.Lock()
+		defer lock.Unlock()
+		result = append(result, toAppend...)
+	}
+	catchError := func(err error) {
+		lock.Lock()
+		defer lock.Unlock()
+		if firstError == nil {
+			firstError = err
+		}
+	}
+
+	processNode := func(i int) {
+		nodeInfo := nodeInfoMap[allNodeNames[i]]
+		node := nodeInfo.Node()
+		if node == nil {
+			catchError(fmt.Errorf("node not found"))
+			return
+		}
+		var nodeResult []matchingPodAntiAffinityTerm
+		for _, existingPod := range nodeInfo.PodsWithAffinity() {
+			affinity := schedulercache.ReconcileAffinity(existingPod)
+			if affinity == nil {
+				continue
+			}
+			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
+				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pfactory.namespaceLister, existingPod, &term)
+				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+				if err != nil {
+					catchError(err)
+					return
+				}
+				match := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector)
+				if match {
+					nodeResult = append(nodeResult, matchingPodAntiAffinityTerm{term: &term, node: node})
+				}
+			}
+		}
+		if len(nodeResult) > 0 {
+			appendResult(nodeResult)
+		}
+	}
+	workqueue.Parallelize(16, len(allNodeNames), processNode)
+	return result, firstError
 }

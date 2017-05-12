@@ -35,6 +35,7 @@ type InterPodAffinity struct {
 	info                  predicates.NodeInfo
 	nodeLister            algorithm.NodeLister
 	podLister             algorithm.PodLister
+	namespaceLister       algorithm.NamespaceLister
 	hardPodAffinityWeight int
 }
 
@@ -42,11 +43,13 @@ func NewInterPodAffinityPriority(
 	info predicates.NodeInfo,
 	nodeLister algorithm.NodeLister,
 	podLister algorithm.PodLister,
+	namespaceLister algorithm.NamespaceLister,
 	hardPodAffinityWeight int) algorithm.PriorityFunction {
 	interPodAffinity := &InterPodAffinity{
 		info:                  info,
 		nodeLister:            nodeLister,
 		podLister:             podLister,
+		namespaceLister:       namespaceLister,
 		hardPodAffinityWeight: hardPodAffinityWeight,
 	}
 	return interPodAffinity.CalculateInterPodAffinityPriority
@@ -64,13 +67,16 @@ type podAffinityPriorityMap struct {
 	failureDomains priorityutil.Topologies
 	// The first error that we faced.
 	firstError error
+	// The namespace lister
+	namespaceLister algorithm.NamespaceLister
 }
 
-func newPodAffinityPriorityMap(nodes []*v1.Node) *podAffinityPriorityMap {
+func newPodAffinityPriorityMap(nodes []*v1.Node, namespaceLister algorithm.NamespaceLister) *podAffinityPriorityMap {
 	return &podAffinityPriorityMap{
-		nodes:          nodes,
-		counts:         make(map[string]float64, len(nodes)),
-		failureDomains: priorityutil.Topologies{DefaultKeys: strings.Split(v1.DefaultFailureDomains, ",")},
+		nodes:           nodes,
+		counts:          make(map[string]float64, len(nodes)),
+		failureDomains:  priorityutil.Topologies{DefaultKeys: strings.Split(v1.DefaultFailureDomains, ",")},
+		namespaceLister: namespaceLister,
 	}
 }
 
@@ -83,13 +89,13 @@ func (p *podAffinityPriorityMap) setError(err error) {
 }
 
 func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, weight float64) {
-	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(podDefiningAffinityTerm, term)
-	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(p.namespaceLister, podDefiningAffinityTerm, term)
+	podSelector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil {
 		p.setError(err)
 		return
 	}
-	match := priorityutil.PodMatchesTermsNamespaceAndSelector(podToCheck, namespaces, selector)
+	match := priorityutil.PodMatchesTermsNamespaceAndSelector(podToCheck, namespaces, podSelector)
 	if match {
 		func() {
 			p.Lock()
@@ -130,7 +136,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	var minCount float64
 	// priorityMap stores the mapping from node name to so-far computed score of
 	// the node.
-	pm := newPodAffinityPriorityMap(nodes)
+	pm := newPodAffinityPriorityMap(nodes, ipa.namespaceLister)
 
 	processPod := func(existingPod *v1.Pod) error {
 		existingPodNode, err := ipa.info.GetNodeInfo(existingPod.Spec.NodeName)

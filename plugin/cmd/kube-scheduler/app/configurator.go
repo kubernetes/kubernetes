@@ -83,6 +83,7 @@ func CreateScheduler(
 	replicaSetInformer extensionsinformers.ReplicaSetInformer,
 	statefulSetInformer appsinformers.StatefulSetInformer,
 	serviceInformer coreinformers.ServiceInformer,
+	namespaceInformer coreinformers.NamespaceInformer,
 	recorder record.EventRecorder,
 ) (*scheduler.Scheduler, error) {
 	configurator := factory.NewConfigFactory(
@@ -95,6 +96,7 @@ func CreateScheduler(
 		replicaSetInformer,
 		statefulSetInformer,
 		serviceInformer,
+		namespaceInformer,
 		s.HardPodAffinitySymmetricWeight,
 	)
 

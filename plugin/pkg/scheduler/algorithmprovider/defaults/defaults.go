@@ -53,7 +53,7 @@ func init() {
 	// Register functions that extract metadata used by predicates and priorities computations.
 	factory.RegisterPredicateMetadataProducerFactory(
 		func(args factory.PluginFactoryArgs) algorithm.MetadataProducer {
-			return predicates.NewPredicateMetadataFactory(args.PodLister)
+			return predicates.NewPredicateMetadataFactory(args.PodLister, args.NamespaceLister)
 		})
 	factory.RegisterPriorityMetadataProducerFactory(
 		func(args factory.PluginFactoryArgs) algorithm.MetadataProducer {
@@ -157,7 +157,7 @@ func defaultPredicates() sets.String {
 		factory.RegisterFitPredicateFactory(
 			"MatchInterPodAffinity",
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister)
+				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister, args.NamespaceLister)
 			},
 		),
 
@@ -197,7 +197,7 @@ func defaultPriorities() sets.String {
 			"InterPodAffinityPriority",
 			factory.PriorityConfigFactory{
 				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
-					return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.NodeLister, args.PodLister, args.HardPodAffinitySymmetricWeight)
+					return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.NodeLister, args.PodLister, args.NamespaceLister, args.HardPodAffinitySymmetricWeight)
 				},
 				Weight: 1,
 			},

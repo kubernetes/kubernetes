@@ -2246,10 +2246,16 @@ func validatePodAffinityTerm(podAffinityTerm api.PodAffinityTerm, allowEmptyTopo
 		allErrs = append(allErrs, field.Required(fldPath.Child("topologyKey"), "can not be empty"))
 	}
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, fldPath.Child("matchExpressions"))...)
+	if len(podAffinityTerm.Namespaces) != 0 && podAffinityTerm.NamespaceSelector != nil {
+		allErrs = append(allErrs, field.Duplicate(fldPath.Child("podAffinityTerm"), "namespace and namespaceSelector cannt be used at the same time"))
+	}
 	for _, name := range podAffinityTerm.Namespaces {
 		for _, msg := range ValidateNamespaceName(name, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg))
 		}
+	}
+	if podAffinityTerm.NamespaceSelector != nil {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
 	}
 	if !allowEmptyTopologyKey && len(podAffinityTerm.TopologyKey) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("topologyKey"), "can only be empty for PreferredDuringScheduling pod anti affinity"))
