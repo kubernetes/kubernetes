@@ -31,60 +31,83 @@ import (
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
+type pullerExpects struct {
+	calls []string
+	err   error
+}
+
 type pullerTestCase struct {
-	containerImage  string
-	policy          v1.PullPolicy
-	calledFunctions []string
-	inspectErr      error
-	pullerErr       error
-	expectedErr     []error
+	containerImage string
+	policy         v1.PullPolicy
+	inspectErr     error
+	pullerErr      error
+	expected       []pullerExpects
 }
 
 func pullerTestCases() []pullerTestCase {
 	return []pullerTestCase{
 		{ // pull missing image
-			containerImage:  "missing_image",
-			policy:          v1.PullIfNotPresent,
-			calledFunctions: []string{"GetImageRef", "PullImage"},
-			inspectErr:      nil,
-			pullerErr:       nil,
-			expectedErr:     []error{nil}},
+			containerImage: "missing_image",
+			policy:         v1.PullIfNotPresent,
+			inspectErr:     nil,
+			pullerErr:      nil,
+			expected: []pullerExpects{
+				{[]string{"GetImageRef", "PullImage"}, nil},
+			}},
 
 		{ // image present, don't pull
-			containerImage:  "present_image",
-			policy:          v1.PullIfNotPresent,
-			calledFunctions: []string{"GetImageRef"},
-			inspectErr:      nil,
-			pullerErr:       nil,
-			expectedErr:     []error{nil, nil, nil}},
+			containerImage: "present_image",
+			policy:         v1.PullIfNotPresent,
+			inspectErr:     nil,
+			pullerErr:      nil,
+			expected: []pullerExpects{
+				{[]string{"GetImageRef"}, nil},
+				{[]string{"GetImageRef"}, nil},
+				{[]string{"GetImageRef"}, nil},
+			}},
 		// image present, pull it
 		{containerImage: "present_image",
-			policy:          v1.PullAlways,
-			calledFunctions: []string{"GetImageRef", "PullImage"},
-			inspectErr:      nil,
-			pullerErr:       nil,
-			expectedErr:     []error{nil, nil, nil}},
+			policy:     v1.PullAlways,
+			inspectErr: nil,
+			pullerErr:  nil,
+			expected: []pullerExpects{
+				{[]string{"GetImageRef", "PullImage"}, nil},
+				{[]string{"GetImageRef", "PullImage"}, nil},
+				{[]string{"GetImageRef", "PullImage"}, nil},
+			}},
 		// missing image, error PullNever
 		{containerImage: "missing_image",
-			policy:          v1.PullNever,
-			calledFunctions: []string{"GetImageRef"},
-			inspectErr:      nil,
-			pullerErr:       nil,
-			expectedErr:     []error{ErrImageNeverPull, ErrImageNeverPull, ErrImageNeverPull}},
+			policy:     v1.PullNever,
+			inspectErr: nil,
+			pullerErr:  nil,
+			expected: []pullerExpects{
+				{[]string{"GetImageRef"}, ErrImageNeverPull},
+				{[]string{"GetImageRef"}, ErrImageNeverPull},
+				{[]string{"GetImageRef"}, ErrImageNeverPull},
+			}},
 		// missing image, unable to inspect
 		{containerImage: "missing_image",
-			policy:          v1.PullIfNotPresent,
-			calledFunctions: []string{"GetImageRef"},
-			inspectErr:      errors.New("unknown inspectError"),
-			pullerErr:       nil,
-			expectedErr:     []error{ErrImageInspect, ErrImageInspect, ErrImageInspect}},
+			policy:     v1.PullIfNotPresent,
+			inspectErr: errors.New("unknown inspectError"),
+			pullerErr:  nil,
+			expected: []pullerExpects{
+				{[]string{"GetImageRef"}, ErrImageInspect},
+				{[]string{"GetImageRef"}, ErrImageInspect},
+				{[]string{"GetImageRef"}, ErrImageInspect},
+			}},
 		// missing image, unable to fetch
 		{containerImage: "typo_image",
-			policy:          v1.PullIfNotPresent,
-			calledFunctions: []string{"GetImageRef", "PullImage"},
-			inspectErr:      nil,
-			pullerErr:       errors.New("404"),
-			expectedErr:     []error{ErrImagePull, ErrImagePull, ErrImagePullBackOff, ErrImagePull, ErrImagePullBackOff, ErrImagePullBackOff}},
+			policy:     v1.PullIfNotPresent,
+			inspectErr: nil,
+			pullerErr:  errors.New("404"),
+			expected: []pullerExpects{
+				{[]string{"GetImageRef", "PullImage"}, ErrImagePull},
+				{[]string{"GetImageRef", "PullImage"}, ErrImagePull},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff},
+				{[]string{"GetImageRef", "PullImage"}, ErrImagePull},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff},
+			}},
 	}
 }
 
@@ -102,7 +125,7 @@ func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fake
 	fakeRuntime = &ctest.FakeRuntime{}
 	fakeRecorder := &record.FakeRecorder{}
 
-	fakeRuntime.ImageList = []Image{{ID: "present_image"}}
+	fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
 	fakeRuntime.Err = c.pullerErr
 	fakeRuntime.InspectErr = c.inspectErr
 
@@ -125,11 +148,12 @@ func TestParallelPuller(t *testing.T) {
 	for i, c := range cases {
 		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, false)
 
-		for tick, expected := range c.expectedErr {
+		for tick, expected := range c.expected {
+			fakeRuntime.CalledFunctions = nil
 			fakeClock.Step(time.Second)
 			_, _, err := puller.EnsureImageExists(pod, container, nil)
-			fakeRuntime.AssertCalls(c.calledFunctions)
-			assert.Equal(t, expected, err, "in test %d tick=%d", i, tick)
+			assert.NoError(t, fakeRuntime.AssertCalls(expected.calls), "in test %d tick=%d", i, tick)
+			assert.Equal(t, expected.err, err, "in test %d tick=%d", i, tick)
 		}
 	}
 }
@@ -149,11 +173,12 @@ func TestSerializedPuller(t *testing.T) {
 	for i, c := range cases {
 		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, true)
 
-		for tick, expected := range c.expectedErr {
+		for tick, expected := range c.expected {
+			fakeRuntime.CalledFunctions = nil
 			fakeClock.Step(time.Second)
 			_, _, err := puller.EnsureImageExists(pod, container, nil)
-			fakeRuntime.AssertCalls(c.calledFunctions)
-			assert.Equal(t, expected, err, "in test %d tick=%d", i, tick)
+			assert.NoError(t, fakeRuntime.AssertCalls(expected.calls), "in test %d tick=%d", i, tick)
+			assert.Equal(t, expected.err, err, "in test %d tick=%d", i, tick)
 		}
 	}
 }
