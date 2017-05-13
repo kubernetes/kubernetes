@@ -41,6 +41,9 @@ const (
 	LevelResponseObject Level = "ResponseObject"
 )
 
+// +genclient=true
+// +nonNamespaced=true
+
 // Event captures all the information that can be included in an API audit log.
 type Event struct {
 	metav1.TypeMeta `json:",inline"`
@@ -99,6 +102,9 @@ type EventList struct {
 
 	Items []Event `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// +genclient=true
+// +nonNamespaced=true
 
 // Policy defines the configuration of audit logging, and the rules for how different request
 // categories are logged.
