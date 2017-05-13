@@ -770,6 +770,8 @@ message ContainerStatus {
     map<string,string> annotations = 13;
     // Mounts for the container.
     repeated Mount mounts = 14;
+    // Log path of container.
+    string log_path = 15;
 }
 
 message ContainerStatusResponse {
