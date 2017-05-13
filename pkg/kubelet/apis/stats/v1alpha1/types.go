@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package stats
+package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,7 +58,7 @@ type NodeStats struct {
 	Runtime *RuntimeStats `json:"runtime,omitempty"`
 }
 
-// Stats pertaining to the underlying container runtime.
+// RuntimeStats are stats pertaining to the underlying container runtime.
 type RuntimeStats struct {
 	// Stats about the underlying filesystem where container images are stored.
 	// This filesystem could be the same as the primary (root) filesystem.
@@ -68,11 +68,11 @@ type RuntimeStats struct {
 }
 
 const (
-	// Container name for the system container tracking Kubelet usage.
+	// SystemContainerKubelet is the container name for the system container tracking Kubelet usage.
 	SystemContainerKubelet = "kubelet"
-	// Container name for the system container tracking the runtime (e.g. docker or rkt) usage.
+	// SystemContainerRuntime is the container name for the system container tracking the runtime (e.g. docker or rkt) usage.
 	SystemContainerRuntime = "runtime"
-	// Container name for the system container tracking non-kubernetes processes.
+	// SystemContainerMisc is the container name for the system container tracking non-kubernetes processes.
 	SystemContainerMisc = "misc"
 )
 
@@ -228,13 +228,13 @@ type FsStats struct {
 type UserDefinedMetricType string
 
 const (
-	// Instantaneous value. May increase or decrease.
+	// MetricGauge is an instantaneous value. May increase or decrease.
 	MetricGauge UserDefinedMetricType = "gauge"
 
-	// A counter-like value that is only expected to increase.
+	// MetricCumulative is a counter-like value that is only expected to increase.
 	MetricCumulative UserDefinedMetricType = "cumulative"
 
-	// Rate over a time period.
+	// MetricDelta is a rate over a time period.
 	MetricDelta UserDefinedMetricType = "delta"
 )
 
