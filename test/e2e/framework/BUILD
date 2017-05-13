@@ -69,7 +69,7 @@ go_library(
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/node:go_default_library",
         "//pkg/kubectl:go_default_library",
-        "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
+        "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",

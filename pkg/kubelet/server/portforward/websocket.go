@@ -46,7 +46,7 @@ const (
 // options contains details about which streams are required for
 // port forwarding.
 // All fields incldued in V4Options need to be expressed explicilty in the
-// CRI (pkg/kubelet/api/{version}/runtime/api.proto) PortForwardRequest.
+// CRI (pkg/kubelet/apis/cri/{version}/api.proto) PortForwardRequest.
 type V4Options struct {
 	Ports []int32
 }
