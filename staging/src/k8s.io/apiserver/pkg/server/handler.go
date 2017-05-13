@@ -109,11 +109,12 @@ func logStackOnRecover(s runtime.NegotiatedSerializer, panicReason interface{}, 
 	if ct := w.Header().Get("Content-Type"); len(ct) > 0 {
 		headers.Set("Accept", ct)
 	}
-	responsewriters.ErrorNegotiated(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", schema.GroupResource{}, "", "", 0, false), s, schema.GroupVersion{}, w, &http.Request{Header: headers})
+	responsewriters.ErrorNegotiated(nil, apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", schema.GroupResource{}, "", "", 0, false), s, schema.GroupVersion{}, w, &http.Request{Header: headers})
 }
 
 func serviceErrorHandler(s runtime.NegotiatedSerializer, serviceErr restful.ServiceError, request *restful.Request, resp *restful.Response) {
 	responsewriters.ErrorNegotiated(
+		nil,
 		apierrors.NewGenericServerResponse(serviceErr.Code, "", schema.GroupResource{}, "", serviceErr.Message, 0, false),
 		s,
 		schema.GroupVersion{},

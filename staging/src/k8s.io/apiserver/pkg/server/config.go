@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	goruntime "runtime"
@@ -39,6 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
@@ -100,8 +101,11 @@ type Config struct {
 
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
-	// AuditWriter is the destination for audit logs.  If nil, they will not be written.
-	AuditWriter io.Writer
+	// AuditBackend is where audit events are sent to.
+	AuditBackend audit.Backend
+	// AuditPolicy defines rules which determine the audit level for different requests.
+	AuditPolicy *auditinternal.Policy
+
 	// SupportsBasicAuth indicates that's at least one Authenticator supports basic auth
 	// If this is true, a basic auth challenge is returned on authentication failure
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
@@ -374,7 +378,7 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 	handlerChainBuilder := func(handler http.Handler) http.Handler {
 		return c.BuildHandlerChainFunc(handler, c.Config)
 	}
-	apiServerHandler := NewAPIServerHandler(c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
+	apiServerHandler := NewAPIServerHandler(c.RequestContextMapper, c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
 
 	s := &GenericAPIServer{
 		discoveryAddresses:     c.DiscoveryAddresses,
@@ -383,6 +387,7 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 		admissionControl:       c.AdmissionControl,
 		requestContextMapper:   c.RequestContextMapper,
 		Serializer:             c.Serializer,
+		AuditBackend:           c.AuditBackend,
 
 		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
 
@@ -452,7 +457,8 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler := genericapifilters.WithAuthorization(apiHandler, c.RequestContextMapper, c.Authorizer)
 	handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
-	handler = genericapifilters.WithAudit(handler, c.RequestContextMapper, c.AuditWriter)
+	// TODO(audit): use WithLegacyAudit if feature flag is false
+	handler = genericapifilters.WithAudit(handler, c.RequestContextMapper, c.AuditBackend, c.AuditPolicy, c.LongRunningFunc)
 	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, genericapifilters.Unauthorized(c.SupportsBasicAuth))
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithPanicRecovery(handler)

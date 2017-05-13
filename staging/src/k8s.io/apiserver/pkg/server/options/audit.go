@@ -17,12 +17,14 @@ limitations under the License.
 package options
 
 import (
+	"io"
 	"os"
 
 	"github.com/spf13/pflag"
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"k8s.io/apiserver/pkg/server"
+	pluginlog "k8s.io/apiserver/plugin/pkg/audit/log"
 )
 
 type AuditLogOptions struct {
@@ -52,16 +54,15 @@ func (o *AuditLogOptions) ApplyTo(c *server.Config) error {
 		return nil
 	}
 
-	if o.Path == "-" {
-		c.AuditWriter = os.Stdout
-		return nil
+	var w io.Writer = os.Stdout
+	if o.Path != "-" {
+		w = &lumberjack.Logger{
+			Filename:   o.Path,
+			MaxAge:     o.MaxAge,
+			MaxBackups: o.MaxBackups,
+			MaxSize:    o.MaxSize,
+		}
 	}
-
-	c.AuditWriter = &lumberjack.Logger{
-		Filename:   o.Path,
-		MaxAge:     o.MaxAge,
-		MaxBackups: o.MaxBackups,
-		MaxSize:    o.MaxSize,
-	}
+	c.AuditBackend = pluginlog.NewBackend(w)
 	return nil
 }
