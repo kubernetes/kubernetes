@@ -74,5 +74,5 @@ func (s *legacyRootAPIHandler) handle(req *restful.Request, resp *restful.Respon
 		Versions:                   s.apiVersions,
 	}
 
-	responsewriters.WriteObjectNegotiated(s.serializer, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, apiVersions)
+	responsewriters.WriteObjectNegotiated(nil, s.serializer, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, apiVersions)
 }
