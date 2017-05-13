@@ -43,7 +43,7 @@ const (
 type Event struct {
 	metav1.TypeMeta
 	// +optional
-	metav1.ListMeta
+	metav1.ObjectMeta
 
 	// AuditLevel at which event was generated
 	Level Level
@@ -95,7 +95,7 @@ type EventList struct {
 	// +optional
 	metav1.ListMeta
 
-	Events []Event
+	Items []Event
 }
 
 // Policy defines the configuration of audit logging, and the rules for how different request
@@ -103,7 +103,7 @@ type EventList struct {
 type Policy struct {
 	metav1.TypeMeta
 	// +optional
-	metav1.ListMeta
+	metav1.ObjectMeta
 
 	// Rules specify the audit Level a request should be recorded at.
 	// A request may match multiple rules, in which case the FIRST matching rule is used.
@@ -152,6 +152,15 @@ type PolicyRule struct {
 	//  "/healthz*" - Log all health checks
 	// +optional
 	NonResourceURLs []string
+}
+
+// PolicyList is a list of audit Policies.
+type PolicyList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	Items []Policy
 }
 
 // GroupKinds represents resource kinds in an API group.

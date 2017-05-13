@@ -45,7 +45,7 @@ const (
 type Event struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// AuditLevel at which event was generated
 	Level Level `json:"level" protobuf:"bytes,2,opt,name=level,casttype=Level"`
@@ -97,7 +97,7 @@ type EventList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	Events []Event `json:"events" protobuf:"bytes,2,rep,name=events"`
+	Items []Event `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // Policy defines the configuration of audit logging, and the rules for how different request
@@ -105,7 +105,7 @@ type EventList struct {
 type Policy struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Rules specify the audit Level a request should be recorded at.
 	// A request may match multiple rules, in which case the FIRST matching rule is used.
@@ -166,4 +166,13 @@ type GroupKinds struct {
 	// Any empty list implies every resource kind in the API group.
 	// +optional
 	Kinds []string `json:"kinds,omitempty" protobuf:"bytes,2,rep,name=kinds"`
+}
+
+// PolicyList is a list of audit Policies.
+type PolicyList struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	Items []Policy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
