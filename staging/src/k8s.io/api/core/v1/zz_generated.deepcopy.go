@@ -3834,6 +3834,15 @@ func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
 			**out = **in
 		}
 	}
+	if in.RunAsGroup != nil {
+		in, out := &in.RunAsGroup, &out.RunAsGroup
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int64)
+			**out = **in
+		}
+	}
 	if in.RunAsNonRoot != nil {
 		in, out := &in.RunAsNonRoot, &out.RunAsNonRoot
 		if *in == nil {
@@ -5060,6 +5069,15 @@ func (in *SecurityContext) DeepCopyInto(out *SecurityContext) {
 	}
 	if in.RunAsUser != nil {
 		in, out := &in.RunAsUser, &out.RunAsUser
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int64)
+			**out = **in
+		}
+	}
+	if in.RunAsGroup != nil {
+		in, out := &in.RunAsGroup, &out.RunAsGroup
 		if *in == nil {
 			*out = nil
 		} else {

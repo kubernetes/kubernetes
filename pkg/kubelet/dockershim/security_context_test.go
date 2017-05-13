@@ -31,11 +31,13 @@ import (
 func TestModifyContainerConfig(t *testing.T) {
 	var uid int64 = 123
 	var username = "testuser"
+	var gid int64 = 423
 
 	cases := []struct {
 		name     string
 		sc       *runtimeapi.LinuxContainerSecurityContext
 		expected *dockercontainer.Config
+		isErr    bool
 	}{
 		{
 			name: "container.SecurityContext.RunAsUser set",
@@ -45,6 +47,7 @@ func TestModifyContainerConfig(t *testing.T) {
 			expected: &dockercontainer.Config{
 				User: strconv.FormatInt(uid, 10),
 			},
+			isErr: false,
 		},
 		{
 			name: "container.SecurityContext.RunAsUsername set",
@@ -54,18 +57,54 @@ func TestModifyContainerConfig(t *testing.T) {
 			expected: &dockercontainer.Config{
 				User: username,
 			},
+			isErr: false,
 		},
 		{
 			name:     "no RunAsUser value set",
 			sc:       &runtimeapi.LinuxContainerSecurityContext{},
 			expected: &dockercontainer.Config{},
+			isErr:    false,
+		},
+		{
+			name: "RunAsUser value set, RunAsGroup set",
+			sc: &runtimeapi.LinuxContainerSecurityContext{
+				RunAsUser:  &runtimeapi.Int64Value{Value: uid},
+				RunAsGroup: &runtimeapi.Int64Value{Value: gid},
+			},
+			expected: &dockercontainer.Config{
+				User: "123:423",
+			},
+			isErr: false,
+		},
+		{
+			name: "RunAsUsername value set, RunAsGroup set",
+			sc: &runtimeapi.LinuxContainerSecurityContext{
+				RunAsUsername: username,
+				RunAsGroup:    &runtimeapi.Int64Value{Value: gid},
+			},
+			expected: &dockercontainer.Config{
+				User: "testuser:423",
+			},
+			isErr: false,
+		},
+		{
+			name: "RunAsUser/RunAsUsername not set, RunAsGroup set",
+			sc: &runtimeapi.LinuxContainerSecurityContext{
+				RunAsGroup: &runtimeapi.Int64Value{Value: gid},
+			},
+			isErr: true,
 		},
 	}
 
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.Config{}
-		modifyContainerConfig(tc.sc, dockerCfg)
-		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
+		err := modifyContainerConfig(tc.sc, dockerCfg)
+		if tc.isErr {
+			assert.NotNil(t, err)
+		} else {
+			assert.Nil(t, err)
+			assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
+		}
 	}
 }
 

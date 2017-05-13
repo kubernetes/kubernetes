@@ -256,6 +256,28 @@ func DropDisabledAlphaFields(podSpec *api.PodSpec) {
 	}
 
 	DropDisabledVolumeDevicesAlphaFields(podSpec)
+
+	DropDisabledRunAsGroupField(podSpec)
+}
+
+// DropDisabledRunAsGroupField removes disabled fields from PodSpec related
+// to RunAsGroup
+func DropDisabledRunAsGroupField(podSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
+		if podSpec.SecurityContext != nil {
+			podSpec.SecurityContext.RunAsGroup = nil
+		}
+		for i := range podSpec.Containers {
+			if podSpec.Containers[i].SecurityContext != nil {
+				podSpec.Containers[i].SecurityContext.RunAsGroup = nil
+			}
+		}
+		for i := range podSpec.InitContainers {
+			if podSpec.InitContainers[i].SecurityContext != nil {
+				podSpec.InitContainers[i].SecurityContext.RunAsGroup = nil
+			}
+		}
+	}
 }
 
 // DropDisabledVolumeMountsAlphaFields removes disabled fields from []VolumeMount.
