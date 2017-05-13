@@ -25,12 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/apis/audit/v1alpha1"
-	"k8s.io/kubernetes/pkg/api"
 )
-
-func init() {
-	Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
-}
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
