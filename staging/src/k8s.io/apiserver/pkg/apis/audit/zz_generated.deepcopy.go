@@ -40,6 +40,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_audit_GroupKinds, InType: reflect.TypeOf(&GroupKinds{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_audit_ObjectReference, InType: reflect.TypeOf(&ObjectReference{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_audit_Policy, InType: reflect.TypeOf(&Policy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_audit_PolicyList, InType: reflect.TypeOf(&PolicyList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_audit_PolicyRule, InType: reflect.TypeOf(&PolicyRule{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_audit_UserInfo, InType: reflect.TypeOf(&UserInfo{})},
 	)
@@ -50,6 +51,11 @@ func DeepCopy_audit_Event(in interface{}, out interface{}, c *conversion.Cloner)
 		in := in.(*Event)
 		out := out.(*Event)
 		*out = *in
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
+			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		}
 		out.Timestamp = in.Timestamp.DeepCopy()
 		if newVal, err := c.DeepCopy(&in.User); err != nil {
 			return err
@@ -102,8 +108,8 @@ func DeepCopy_audit_EventList(in interface{}, out interface{}, c *conversion.Clo
 		in := in.(*EventList)
 		out := out.(*EventList)
 		*out = *in
-		if in.Events != nil {
-			in, out := &in.Events, &out.Events
+		if in.Items != nil {
+			in, out := &in.Items, &out.Items
 			*out = make([]Event, len(*in))
 			for i := range *in {
 				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
@@ -145,6 +151,11 @@ func DeepCopy_audit_Policy(in interface{}, out interface{}, c *conversion.Cloner
 		in := in.(*Policy)
 		out := out.(*Policy)
 		*out = *in
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
+			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		}
 		if in.Rules != nil {
 			in, out := &in.Rules, &out.Rules
 			*out = make([]PolicyRule, len(*in))
@@ -153,6 +164,26 @@ func DeepCopy_audit_Policy(in interface{}, out interface{}, c *conversion.Cloner
 					return err
 				} else {
 					(*out)[i] = *newVal.(*PolicyRule)
+				}
+			}
+		}
+		return nil
+	}
+}
+
+func DeepCopy_audit_PolicyList(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PolicyList)
+		out := out.(*PolicyList)
+		*out = *in
+		if in.Items != nil {
+			in, out := &in.Items, &out.Items
+			*out = make([]Policy, len(*in))
+			for i := range *in {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
+					return err
+				} else {
+					(*out)[i] = *newVal.(*Policy)
 				}
 			}
 		}

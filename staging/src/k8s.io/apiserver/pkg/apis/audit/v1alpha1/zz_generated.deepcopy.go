@@ -21,11 +21,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
-	v1 "k8s.io/client-go/pkg/apis/authentication/v1"
+	authentication_v1 "k8s.io/client-go/pkg/apis/authentication/v1"
 	reflect "reflect"
 )
 
@@ -41,6 +41,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_EventList, InType: reflect.TypeOf(&EventList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_GroupKinds, InType: reflect.TypeOf(&GroupKinds{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_Policy, InType: reflect.TypeOf(&Policy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PolicyList, InType: reflect.TypeOf(&PolicyList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PolicyRule, InType: reflect.TypeOf(&PolicyRule{})},
 	)
 }
@@ -50,18 +51,23 @@ func DeepCopy_v1alpha1_Event(in interface{}, out interface{}, c *conversion.Clon
 		in := in.(*Event)
 		out := out.(*Event)
 		*out = *in
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
+			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		}
 		out.Timestamp = in.Timestamp.DeepCopy()
 		if newVal, err := c.DeepCopy(&in.User); err != nil {
 			return err
 		} else {
-			out.User = *newVal.(*v1.UserInfo)
+			out.User = *newVal.(*authentication_v1.UserInfo)
 		}
 		if in.Impersonate != nil {
 			in, out := &in.Impersonate, &out.Impersonate
 			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
 			} else {
-				*out = newVal.(*v1.UserInfo)
+				*out = newVal.(*authentication_v1.UserInfo)
 			}
 		}
 		if in.ObjectRef != nil {
@@ -74,7 +80,7 @@ func DeepCopy_v1alpha1_Event(in interface{}, out interface{}, c *conversion.Clon
 			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
 			} else {
-				*out = newVal.(*meta_v1.Status)
+				*out = newVal.(*v1.Status)
 			}
 		}
 		if newVal, err := c.DeepCopy(&in.RequestObject); err != nil {
@@ -96,8 +102,8 @@ func DeepCopy_v1alpha1_EventList(in interface{}, out interface{}, c *conversion.
 		in := in.(*EventList)
 		out := out.(*EventList)
 		*out = *in
-		if in.Events != nil {
-			in, out := &in.Events, &out.Events
+		if in.Items != nil {
+			in, out := &in.Items, &out.Items
 			*out = make([]Event, len(*in))
 			for i := range *in {
 				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
@@ -130,6 +136,11 @@ func DeepCopy_v1alpha1_Policy(in interface{}, out interface{}, c *conversion.Clo
 		in := in.(*Policy)
 		out := out.(*Policy)
 		*out = *in
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
+			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		}
 		if in.Rules != nil {
 			in, out := &in.Rules, &out.Rules
 			*out = make([]PolicyRule, len(*in))
@@ -138,6 +149,26 @@ func DeepCopy_v1alpha1_Policy(in interface{}, out interface{}, c *conversion.Clo
 					return err
 				} else {
 					(*out)[i] = *newVal.(*PolicyRule)
+				}
+			}
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_PolicyList(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PolicyList)
+		out := out.(*PolicyList)
+		*out = *in
+		if in.Items != nil {
+			in, out := &in.Items, &out.Items
+			*out = make([]Policy, len(*in))
+			for i := range *in {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
+					return err
+				} else {
+					(*out)[i] = *newVal.(*Policy)
 				}
 			}
 		}
