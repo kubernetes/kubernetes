@@ -430,5 +430,6 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 		Message:     message,
 		Labels:      labels,
 		Annotations: annotations,
+		LogPath:     r.Config.Labels[containerLogPathLabelKey],
 	}, nil
 }
