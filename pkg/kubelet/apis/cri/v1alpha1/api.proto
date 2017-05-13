@@ -1,7 +1,7 @@
 // To regenerate api.pb.go run hack/update-generated-runtime.sh
 syntax = 'proto3';
 
-package runtime;
+package v1alpha1;
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
@@ -770,6 +770,8 @@ message ContainerStatus {
     map<string,string> annotations = 13;
     // Mounts for the container.
     repeated Mount mounts = 14;
+    // Log path of container.
+    string log_path = 15;
 }
 
 message ContainerStatusResponse {

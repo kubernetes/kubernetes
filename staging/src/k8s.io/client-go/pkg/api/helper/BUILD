@@ -12,9 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["helpers.go"],
     tags = ["automanaged"],
-    visibility = [
-        "//pkg/controller/bootstrap:__subpackages__",
-    ],
+    visibility = ["//visibility:private"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
