@@ -17,6 +17,9 @@ limitations under the License.
 package api
 
 const (
+	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
+	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
+
 	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
 	// in the Annotations of a Pod.
 	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
