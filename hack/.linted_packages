@@ -321,6 +321,14 @@ staging/src/k8s.io/apiserver/pkg/authentication/authenticator
 staging/src/k8s.io/apiserver/pkg/authentication/request/union
 staging/src/k8s.io/apiserver/pkg/authentication/request/x509
 staging/src/k8s.io/apiserver/pkg/authorization/union
+staging/src/k8s.io/apiserver/pkg/client/informers/externalversions
+staging/src/k8s.io/apiserver/pkg/client/informers/externalversions/audit
+staging/src/k8s.io/apiserver/pkg/client/informers/externalversions/audit/v1alpha1
+staging/src/k8s.io/apiserver/pkg/client/informers/internalversion
+staging/src/k8s.io/apiserver/pkg/client/informers/internalversion/audit
+staging/src/k8s.io/apiserver/pkg/client/informers/internalversion/audit/internalversion
+staging/src/k8s.io/apiserver/pkg/client/listers/audit/internalversion
+staging/src/k8s.io/apiserver/pkg/client/listers/audit/v1alpha1
 staging/src/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters
 staging/src/k8s.io/apiserver/pkg/endpoints/openapi
 staging/src/k8s.io/apiserver/pkg/endpoints/request
