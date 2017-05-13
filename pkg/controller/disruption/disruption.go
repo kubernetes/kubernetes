@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	policyclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
@@ -173,89 +174,89 @@ func (dc *DisruptionController) finders() []podControllerFinder {
 		dc.getPodStatefulSets}
 }
 
+var (
+	controllerKindRS  = v1beta1.SchemeGroupVersion.WithKind("ReplicaSet")
+	controllerKindSS  = v1beta1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindRC  = v1beta1.SchemeGroupVersion.WithKind("ReplicationController")
+	controllerKindDep = v1beta1.SchemeGroupVersion.WithKind("Deployment")
+)
+
 // getPodReplicaSets finds replicasets which have no matching deployments.
 func (dc *DisruptionController) getPodReplicaSets(pod *v1.Pod) ([]controllerAndScale, error) {
-	cas := []controllerAndScale{}
+	casSlice := []controllerAndScale{}
 	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
-		rs, err := dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
-		if err != nil {
-			return cas, nil
-		}
-		controllerScale := map[types.UID]int32{}
-		// deployments are found.
-		if controllerRef := controller.GetControllerOf(rs); controllerRef != nil {
-			_, err := dc.dLister.Deployments(pod.Namespace).Get(controllerRef.Name)
-			if err != nil { // A deployment was not found, so this finder will count this RS.
-				controllerScale[rs.UID] = *(rs.Spec.Replicas)
+		if controllerRef.Kind == controllerKindRS.Kind {
+			rs, err := dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
+			if err != nil {
+				return nil, nil
 			}
-		}
-		for uid, scale := range controllerScale {
-			cas = append(cas, controllerAndScale{UID: uid, scale: scale})
-		}
-
-	}
-	return cas, nil
-}
-
-// getPodStatefulSet returns the statefulset managing the given pod.
-func (dc *DisruptionController) getPodStatefulSets(pod *v1.Pod) ([]controllerAndScale, error) {
-	cas := []controllerAndScale{}
-	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
-		ss, err := dc.ssLister.StatefulSets(pod.Namespace).Get(controllerRef.Name)
-
-		// GetPodStatefulSets returns an error only if no StatefulSets are found. We
-		// don't return that as an error to the caller.
-		if err != nil {
-			return cas, nil
-		}
-
-		controllerScale := map[types.UID]int32{}
-		controllerScale[ss.UID] = *(ss.Spec.Replicas)
-
-		for uid, scale := range controllerScale {
-			cas = append(cas, controllerAndScale{UID: uid, scale: scale})
-		}
-	}
-	return cas, nil
-}
-
-// getPodDeployments finds deployments for any replicasets which are being managed by deployments.
-func (dc *DisruptionController) getPodDeployments(pod *v1.Pod) ([]controllerAndScale, error) {
-	cas := []controllerAndScale{}
-	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
-		rs, err := dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
-		// GetPodReplicaSets returns an error only if no ReplicaSets are found.  We
-		// don't return that as an error to the caller.
-		if err != nil {
-			return cas, nil
-		}
-		controllerScale := map[types.UID]int32{}
-		if controllerRef := controller.GetControllerOf(rs); controllerRef != nil {
-			deployment, err := dc.dLister.Deployments(rs.Namespace).Get(controllerRef.Name)
-			// GetDeploymentsForReplicaSet returns an error only if no matching
-			// deployments are found.  In that case we skip this ReplicaSet.
-			if err == nil {
-				controllerScale[deployment.UID] = *(deployment.Spec.Replicas)
-
-				for uid, scale := range controllerScale {
-					cas = append(cas, controllerAndScale{UID: uid, scale: scale})
+			controllerRef := controller.GetControllerOf(rs)
+			if controllerRef == nil {
+				casSlice = append(casSlice, controllerAndScale{rs.UID, *(rs.Spec.Replicas)})
+			} else if controllerRef != nil {
+				if controllerRef.Kind != controllerKindDep.Kind {
+					// deployments are not found.
+					casSlice = append(casSlice, controllerAndScale{rs.UID, *(rs.Spec.Replicas)})
 				}
 			}
 		}
 	}
-	return cas, nil
+	return casSlice, nil
+}
+
+// getPodStatefulSet returns the statefulset managing the given pod.
+func (dc *DisruptionController) getPodStatefulSets(pod *v1.Pod) ([]controllerAndScale, error) {
+	casSlice := []controllerAndScale{}
+	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
+		if controllerRef.Kind == controllerKindSS.Kind {
+			ss, err := dc.ssLister.StatefulSets(pod.Namespace).Get(controllerRef.Name)
+			if err != nil {
+				return nil, nil
+			}
+
+			casSlice = append(casSlice, controllerAndScale{ss.UID, *(ss.Spec.Replicas)})
+		}
+	}
+	return casSlice, nil
+}
+
+// getPodDeployments finds deployments for any replicasets which are being managed by deployments.
+func (dc *DisruptionController) getPodDeployments(pod *v1.Pod) ([]controllerAndScale, error) {
+	casSlice := []controllerAndScale{}
+	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
+		if controllerRef.Kind == controllerKindRS.Kind {
+			rs, err := dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
+			if err != nil {
+				return nil, nil
+			}
+			controllerRef := controller.GetControllerOf(rs)
+			if controllerRef != nil {
+				if controllerRef.Kind == controllerKindDep.Kind {
+					deployment, err := dc.dLister.Deployments(rs.Namespace).Get(controllerRef.Name)
+					if err != nil {
+						return nil, nil
+					}
+					casSlice = append(casSlice, controllerAndScale{deployment.UID, *(deployment.Spec.Replicas)})
+				}
+			}
+		}
+	}
+	return casSlice, nil
 }
 
 func (dc *DisruptionController) getPodReplicationControllers(pod *v1.Pod) ([]controllerAndScale, error) {
-	cas := []controllerAndScale{}
+	casSlice := []controllerAndScale{}
 	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
-		rc, err := dc.rcLister.ReplicationControllers(pod.Namespace).Get(controllerRef.Name)
-		if err != nil {
-			return nil, err
+		if controllerRef.Kind == controllerKindRC.Kind {
+			rc, err := dc.rcLister.ReplicationControllers(pod.Namespace).Get(controllerRef.Name)
+			if err != nil {
+				return nil, nil
+			}
+
+			casSlice = append(casSlice, controllerAndScale{rc.UID, *(rc.Spec.Replicas)})
 		}
-		cas = append(cas, controllerAndScale{UID: rc.UID, scale: *(rc.Spec.Replicas)})
 	}
-	return cas, nil
+	return casSlice, nil
 }
 
 func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
