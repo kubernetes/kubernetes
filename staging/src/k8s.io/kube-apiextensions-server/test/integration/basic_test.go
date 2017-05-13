@@ -186,3 +186,34 @@ func TestSimpleCRUD(t *testing.T) {
 		t.Errorf("missing watch event")
 	}
 }
+
+func TestSelfLink(t *testing.T) {
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition()
+	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := "not-the-default"
+	noxuNamespacedResourceClient := noxuVersionClient.Resource(&metav1.APIResource{
+		Name:       noxuDefinition.Spec.Names.Plural,
+		Namespaced: true,
+	}, ns)
+
+	noxuInstanceToCreate := testserver.NewNoxuInstance(ns, "foo")
+	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if e, a := "/apis/mygroup.example.com/v1alpha1/namespaces/not-the-default/noxus/foo", createdNoxuInstance.GetSelfLink(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+}
