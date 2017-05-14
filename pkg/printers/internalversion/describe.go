@@ -604,7 +604,11 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pod.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pod.Namespace)
-		w.Write(LEVEL_0, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
+		if pod.Spec.NodeName == "" {
+			w.Write(LEVEL_0, "Node:\t<none>\n")
+		} else {
+			w.Write(LEVEL_0, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
+		}
 		if pod.Status.StartTime != nil {
 			w.Write(LEVEL_0, "Start Time:\t%s\n", pod.Status.StartTime.Time.Format(time.RFC1123Z))
 		}
