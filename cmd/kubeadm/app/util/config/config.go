@@ -14,23 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package util
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
 func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
-	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0, the default interface's IP address is used
+	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0 or empty, the default interface's IP address is used
 	// This is the same logic as the API Server uses
 	ip, err := netutil.ChooseBindAddress(net.ParseIP(cfg.API.AdvertiseAddress))
 	if err != nil {
@@ -38,7 +41,7 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 	cfg.API.AdvertiseAddress = ip.String()
 
-	// Validate version argument
+	// Choose the kubernetes version. If empty fetch version information from release servers.
 	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
 	if err != nil {
 		return err
@@ -68,6 +71,22 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		cfg.Token, err = tokenutil.GenerateToken()
 		if err != nil {
 			return fmt.Errorf("couldn't generate random token: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// TryLoadCfg tries to loads a Master configuration from the given file (if defined)
+func TryLoadCfg(cfgPath string, cfg *kubeadmapi.MasterConfiguration) error {
+
+	if cfgPath != "" {
+		b, err := ioutil.ReadFile(cfgPath)
+		if err != nil {
+			return fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
+		}
+		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), b, cfg); err != nil {
+			return fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}
 
