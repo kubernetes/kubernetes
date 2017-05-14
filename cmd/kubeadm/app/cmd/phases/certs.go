@@ -17,25 +17,25 @@ limitations under the License.
 package phases
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
-	"io/ioutil"
-	"net"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/pkg/api"
 )
 
 // NewCmdCerts returns main command for kubeadm certs phase.
-// This command is not meant to be run on its own, but acts as container for related sum commands
+// This command is not meant to be create on its own, but acts as container for related sum commands
 func NewCmdCerts() *cobra.Command {
 
 	certCmd := &cobra.Command{
@@ -61,44 +61,44 @@ func newSubCmdCerts() []*cobra.Command {
 	var subCmds []*cobra.Command
 
 	subCmdProperties := []struct {
-		use            string
-		short          string
-		createCertFunc certphase.BulkCreateCertFunc
+		use     string
+		short   string
+		cmdFunc func(cfg *kubeadmapi.MasterConfiguration) error
 	}{
 		{
-			use:            "all",
-			short:          "Generate all PKI assets necessary to establish the control plane",
-			createCertFunc: certphase.CreatePKIAssets,
+			use:     "all",
+			short:   "Generate all PKI assets necessary to establish the control plane",
+			cmdFunc: CreatePKIAssets,
 		},
 		{
-			use:            "ca",
-			short:          "Generate CA certificate and key for a Kubernetes cluster.",
-			createCertFunc: wrapCreateCertFunc(certphase.CreateCACertAndKey),
+			use:     "ca",
+			short:   "Generate CA certificate and key for a Kubernetes cluster.",
+			cmdFunc: createOrUseCACertAndKey,
 		},
 		{
-			use:            "apiserver",
-			short:          "Generate api server certificate and key.",
-			createCertFunc: wrapCreateCertFunc(certphase.CreateAPIServerCertAndKey),
+			use:     "apiserver",
+			short:   "Generate api server certificate and key.",
+			cmdFunc: createOrUseAPIServerCertAndKey,
 		},
 		{
-			use:            "apiserver-kubelet-client",
-			short:          "Generate a client certificate for the apiservers to connect to the kubelets securely.",
-			createCertFunc: wrapCreateCertFunc(certphase.CreateAPIServerKubeletClientCertAndKey),
+			use:     "apiserver-kubelet-client",
+			short:   "Generate a client certificate for the apiservers to connect to the kubelets securely.",
+			cmdFunc: createOrUseAPIServerKubeletClientCertAndKey,
 		},
 		{
-			use:            "sa",
-			short:          "Generate a private key for signing service account tokens along with its public key.",
-			createCertFunc: wrapCreateCertFunc(certphase.CreateServiceAccountKeyAndPublicKey),
+			use:     "sa",
+			short:   "Generate a private key for signing service account tokens along with its public key.",
+			cmdFunc: createOrUseServiceAccountKeyAndPublicKey,
 		},
 		{
-			use:            "front-proxy-ca",
-			short:          "Generate front proxy CA certificate and key for a Kubernetes cluster.",
-			createCertFunc: wrapCreateCertFunc(certphase.CreateFrontProxyCACertAndKey),
+			use:     "front-proxy-ca",
+			short:   "Generate front proxy CA certificate and key for a Kubernetes cluster.",
+			cmdFunc: createOrUseFrontProxyCACertAndKey,
 		},
 		{
-			use:            "front-proxy-client",
-			short:          "Generate front proxy CA client certificate and key for a Kubernetes cluster.",
-			createCertFunc: wrapCreateCertFunc(certphase.CreateFrontProxyClientCertAndKey),
+			use:     "front-proxy-client",
+			short:   "Generate front proxy CA client certificate and key for a Kubernetes cluster.",
+			cmdFunc: createOrUseFrontProxyClientCertAndKey,
 		},
 	}
 
@@ -107,7 +107,7 @@ func newSubCmdCerts() []*cobra.Command {
 		cmd := &cobra.Command{
 			Use:   properties.use,
 			Short: properties.short,
-			Run:   runCreateCerts(&cfgPath, cfg, properties.createCertFunc),
+			Run:   runCmdFunc(properties.cmdFunc, &cfgPath, cfg),
 		}
 
 		// Add flags to the command
@@ -126,101 +126,269 @@ func newSubCmdCerts() []*cobra.Command {
 	return subCmds
 }
 
-// CreateCertFunc is a utility method that wraps "atomic" CreateCertFunction into a BulkCreateCertFunc with one single step,
-// thus allowing to treat both "atomic" and bulk functions in the same way
-func wrapCreateCertFunc(simpleFunc certphase.CreateCertFunc) certphase.BulkCreateCertFunc {
+// runCmdFunc creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of inpunt parameters)
+func runCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration) error, cfgPath *string, cfg *kubeadmapiext.MasterConfiguration) func(cmd *cobra.Command, args []string) {
 
-	return func(cfg *kubeadmapi.MasterConfiguration) (certphase.BulkCreateCertResult, error) {
-		result, err := simpleFunc(cfg)
-		if err != nil {
-			return nil, err
-		}
-		return []*certphase.CreateCertResult{result}, nil
-	}
-}
-
-// runCreateCerts executes the given createCertFunc, including preparation of inpuut parameter and handling of results
-func runCreateCerts(cfgPath *string, cfg *kubeadmapiext.MasterConfiguration, createCertFunc certphase.BulkCreateCertFunc) func(cmd *cobra.Command, args []string) {
-
-	// the following statement builds a clousure that wraps a call to a CreateCertFunc, binding
-	// the called function with the specific parameters of each sub command.
-	// Please note that specific parameter should be passed as values, while other parameters - passed as reference -
+	// the following statement build a clousure that wraps a call to a CreateCertFunc, binding
+	// the function itself with the specific parameters of each sub command.
+	// Please note that specific parameter should be passed as value, while other parameters - passed as reference -
 	// are shared between sub commnands and gets access to current value e.g. flags value.
 
 	return func(cmd *cobra.Command, args []string) {
 		internalcfg := &kubeadmapi.MasterConfiguration{}
 
-		// Takes passed flags into account; the defaulting is run once again enforcing assignement of
+		// Takes passed flags into account; the defaulting is executed once again enforcing assignement of
 		// static default values to cfg only for values not provided with flags
 		api.Scheme.Default(cfg)
 		api.Scheme.Convert(cfg, internalcfg, nil)
 
 		// Loads configuration from config file, if provided
 		// TODO: with current implementation --config overrides command line flag, and this is counter inutitive
-		// (e.g. defining api.Scheme.Merge instead of api.Scheme.Convert)
 		// see https://github.com/kubernetes/kubeadm/issues/267
-		err := tryLoadCfg(*cfgPath, internalcfg)
+		err := configutil.TryLoadCfg(*cfgPath, internalcfg)
 		kubeadmutil.CheckErr(err)
 
-		// Applies dynamic defaults to cfg settings not provided with flags
-		err = setInitDynamicDefaults(internalcfg)
+		// Applies dynamic defaults to settings not provided with flags
+		err = configutil.SetInitDynamicDefaults(internalcfg)
 		kubeadmutil.CheckErr(err)
 
 		// Validates cfg (flags/configs + defaults + dynamics defaults)
 		err = validation.ValidateMasterConfiguration(internalcfg).ToAggregate()
 		kubeadmutil.CheckErr(err)
 
-		// Execute the create createCertFunc
-		results, err := createCertFunc(internalcfg)
+		// Execute the cmdFunc
+		err = cmdFunc(internalcfg)
 		kubeadmutil.CheckErr(err)
-
-		// Prints results to UX
-		fmt.Printf("%v", results)
 	}
 }
 
-// SetInitDynamicDefaults set defaults dynamically by fetching information from the internet, looking up network interfaces, etc. (the API group defaulting can't co this
-// TODO: this function should be centralized across all phases & init. see https://github.com/kubernetes/kubeadm/issues/267
-func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
+// CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.
+// Please note that this action is a bulk action calling all the atomic certphase actions
+func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 
-	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0, the default interface's IP address is used
-	// This is the same logic as the API Server uses
-	ip, err := netutil.ChooseBindAddress(net.ParseIP(cfg.API.AdvertiseAddress))
+	// create a new self signed CA, or use the existing one
+	err := createOrUseCACertAndKey(cfg)
 	if err != nil {
 		return err
 	}
-	cfg.API.AdvertiseAddress = ip.String()
 
-	if cfg.Token == "" {
-		var err error
-		cfg.Token, err = tokenutil.GenerateToken()
+	// create a new CA certificate for apiserver, or use the existing one
+	err = createOrUseAPIServerCertAndKey(cfg)
+	if err != nil {
+		return err
+	}
+
+	// create a new CA certificate for kubelets calling apiserver, or use the existing one
+	err = createOrUseAPIServerKubeletClientCertAndKey(cfg)
+	if err != nil {
+		return err
+	}
+
+	// create a new public/private key pairs for signing service account user, or use the existing one
+	err = createOrUseServiceAccountKeyAndPublicKey(cfg)
+	if err != nil {
+		return err
+	}
+
+	// create a new self signed front proxy CA, or use the existing one
+	err = createOrUseFrontProxyCACertAndKey(cfg)
+	if err != nil {
+		return err
+	}
+
+	// create a new certificate for proxy server client, or use the existing one
+	err = createOrUseFrontProxyClientCertAndKey(cfg)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("[certificates] Valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
+
+	return nil
+}
+
+// createOrUseCACertAndKey create a new self signed CA, or use the existing one.
+func createOrUseCACertAndKey(cfg *kubeadmapi.MasterConfiguration) error {
+
+	return createOrUseCertificateAuthorithy(
+		cfg.CertificatesDir,
+		kubeadmconstants.CACertAndKeyBaseName,
+		"CA",
+		certphase.NewCACertAndKey,
+	)
+}
+
+// createOrUseAPIServerCertAndKey create a new CA certificate for apiserver, or use the existing one.
+// It assumes the CA certificates should exists into the CertificatesDir
+func createOrUseAPIServerCertAndKey(cfg *kubeadmapi.MasterConfiguration) error {
+
+	return createOrUseSignedCertificate(
+		cfg.CertificatesDir,
+		kubeadmconstants.CACertAndKeyBaseName,
+		kubeadmconstants.APIServerCertAndKeyBaseName,
+		"API server",
+		func(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+			return certphase.NewAPIServerCertAndKey(cfg, caCert, caKey)
+		},
+	)
+}
+
+// create a new CA certificate for kubelets calling apiserver, or use the existing one
+// It assumes the CA certificates should exists into the CertificatesDir
+func createOrUseAPIServerKubeletClientCertAndKey(cfg *kubeadmapi.MasterConfiguration) error {
+
+	return createOrUseSignedCertificate(
+		cfg.CertificatesDir,
+		kubeadmconstants.CACertAndKeyBaseName,
+		kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
+		"API server kubelet client",
+		certphase.NewAPIServerKubeletClientCertAndKey,
+	)
+}
+
+// createOrUseServiceAccountKeyAndPublicKey create a new public/private key pairs for signing service account user, or use the existing one.
+func createOrUseServiceAccountKeyAndPublicKey(cfg *kubeadmapi.MasterConfiguration) error {
+
+	// Checks if the key exists in the PKI directory
+	if pkiutil.CertOrKeyExist(cfg.CertificatesDir, kubeadmconstants.ServiceAccountKeyBaseName) {
+
+		// Try to load .key from the PKI directory
+		_, err := pkiutil.TryLoadKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.ServiceAccountKeyBaseName)
 		if err != nil {
-			return fmt.Errorf("couldn't generate random token: %v", err)
+			return fmt.Errorf("service account token signing key existed but they could not be loaded properly: %v", err)
 		}
+
+		fmt.Println("[certificates] Using the existing service account token signing key.")
+	} else {
+		// The key does NOT exist, let's generate it now
+		saTokenSigningKey, err := certphase.NewServiceAccountSigningKey()
+		if err != nil {
+			return fmt.Errorf("failure while generating service account token signing key: %v", err)
+		}
+
+		// Write .key and .pub files to disk
+		if err = pkiutil.WriteKey(cfg.CertificatesDir, kubeadmconstants.ServiceAccountKeyBaseName, saTokenSigningKey); err != nil {
+			return fmt.Errorf("failure while saving service account token signing key: %v", err)
+		}
+
+		if err = pkiutil.WritePublicKey(cfg.CertificatesDir, kubeadmconstants.ServiceAccountKeyBaseName, &saTokenSigningKey.PublicKey); err != nil {
+			return fmt.Errorf("failure while saving service account token signing public key: %v", err)
+		}
+		fmt.Println("[certificates] Generated service account token signing key and public key.")
 	}
 
 	return nil
 }
 
-// TryLoadCfg tries to loads a Master configuration from the given file (if defined)
-// TODO: this function should be centralized across all phases & init. see https://github.com/kubernetes/kubeadm/issues/267
-func tryLoadCfg(cfgPath string, cfg *kubeadmapi.MasterConfiguration) error {
+// createOrUseFrontProxyCACertAndKey create a new self signed front proxy CA, or use the existing one.
+func createOrUseFrontProxyCACertAndKey(cfg *kubeadmapi.MasterConfiguration) error {
 
-	if cfgPath != "" {
-		b, err := ioutil.ReadFile(cfgPath)
+	return createOrUseCertificateAuthorithy(
+		cfg.CertificatesDir,
+		kubeadmconstants.FrontProxyCACertAndKeyBaseName,
+		"front-proxy CA",
+		certphase.NewFrontProxyCACertAndKey,
+	)
+}
+
+// createOrUseFrontProxyClientCertAndKey create a new certificate for proxy server client, or use the existing one.
+// It assumes the front proxy CA certificates should exists into the CertificatesDir
+func createOrUseFrontProxyClientCertAndKey(cfg *kubeadmapi.MasterConfiguration) error {
+
+	return createOrUseSignedCertificate(
+		cfg.CertificatesDir,
+		kubeadmconstants.FrontProxyCACertAndKeyBaseName,
+		kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
+		"front-proxy client",
+		certphase.NewFrontProxyClientCertAndKey,
+	)
+}
+
+// createOrUseCertificateAuthorithy is a generic function that will create a new certificate Authorithy using the given newFunc,
+// assign file names accoding to the given baseName, or use the existing one already presente in pkiDir.
+func createOrUseCertificateAuthorithy(pkiDir string, baseName string, UXName string, newFunc func() (*x509.Certificate, *rsa.PrivateKey, error)) error {
+
+	// If cert or key exists, we should try to load them
+	if pkiutil.CertOrKeyExist(pkiDir, baseName) {
+
+		// Try to load .crt and .key from the PKI directory
+		caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, baseName)
 		if err != nil {
-			return fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
+			return fmt.Errorf("failure loading %s certificate: %v", UXName, err)
 		}
-		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), b, cfg); err != nil {
-			return fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
+
+		// Check if the existing cert is a CA
+		if !caCert.IsCA {
+			return fmt.Errorf("certificate %s is not a CA", UXName)
 		}
+
+		fmt.Printf("[certificates] Using the existing %s certificate and key.\n", UXName)
+	} else {
+		// The certificate and the key did NOT exist, let's generate them now
+		caCert, caKey, err := newFunc()
+		if err != nil {
+			return fmt.Errorf("failure while generating %s certificate and key: %v", UXName, err)
+		}
+
+		// Write .crt and .key files to disk
+		if err = pkiutil.WriteCertAndKey(pkiDir, baseName, caCert, caKey); err != nil {
+			return fmt.Errorf("failure while saving %s certificate and key: %v", UXName, err)
+		}
+
+		fmt.Printf("[certificates] Generated %s certificate and key.\n", UXName)
+	}
+	return nil
+}
+
+// createOrUseSignedCertificate is a generic function that will create a new signed certificate using the given newFunc,
+// assign file names accoding to the given baseName, or use the existing one already presente in pkiDir.
+func createOrUseSignedCertificate(pkiDir string, CABaseName string, baseName string, UXName string, newFunc func(*x509.Certificate, *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error)) error {
+
+	// Checks if certificate authorithy exists in the PKI directory
+	if !pkiutil.CertOrKeyExist(pkiDir, CABaseName) {
+		return fmt.Errorf("couldn't load certificate authorithy for %s from certificate dir", UXName)
 	}
 
-	if cfg.Token == "" {
-		var err error
-		cfg.Token, err = tokenutil.GenerateToken()
+	// Try to load certificate authorithy .crt and .key from the PKI directory
+	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, CABaseName)
+	if err != nil {
+		return fmt.Errorf("failure loading certificate authorithy for %s: %v", UXName, err)
+	}
+
+	// The certificate and key could be loaded, but the certificate is not a CA
+	if !caCert.IsCA {
+		return fmt.Errorf("certificate authorithy for %s is not a CA", UXName)
+	}
+
+	// Checks if the signed certificate exists in the PKI directory
+	if pkiutil.CertOrKeyExist(pkiDir, baseName) {
+		// Try to load signed certificate .crt and .key from the PKI directory
+		signedCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, baseName)
 		if err != nil {
-			return fmt.Errorf("couldn't generate random token: %v", err)
+			return fmt.Errorf("failure loading %s certificate: %v", UXName, err)
+		}
+
+		// Check if the existing cert is signed by the given CA
+		if err := signedCert.CheckSignatureFrom(caCert); err != nil {
+			return fmt.Errorf("certificate %s is not signed by corresponding CA", UXName)
+		}
+
+		fmt.Printf("[certificates] Using the existing %s certificate and key.\n", UXName)
+	} else {
+		// The certificate and the key did NOT exist, let's generate them now
+		signedCert, signedKey, err := newFunc(caCert, caKey)
+		if err != nil {
+			return fmt.Errorf("failure while generating %s key and certificate: %v", UXName, err)
+		}
+
+		// Write .crt and .key files to disk
+		if err = pkiutil.WriteCertAndKey(pkiDir, baseName, signedCert, signedKey); err != nil {
+			return fmt.Errorf("failure while saving %s certificate and key: %v", UXName, err)
+		}
+
+		fmt.Printf("[certificates] Generated %s certificate and key.\n", UXName)
+		if pkiutil.IsServerAuth(signedCert) {
+			fmt.Printf("[certificates] %s serving cert is signed for DNS names %v and IPs %v\n", UXName, signedCert.DNSNames, signedCert.IPAddresses)
 		}
 	}
 

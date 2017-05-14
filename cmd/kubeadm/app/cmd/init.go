@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"path"
 	"strconv"
 	"text/template"
@@ -27,19 +26,19 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	certphase "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	addonsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons"
 	apiconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
-	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/token"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -147,20 +146,24 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 
 	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
 
-	if cfgPath != "" {
-		b, err := ioutil.ReadFile(cfgPath)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
-		}
-		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), b, cfg); err != nil {
-			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
-		}
+	err := configutil.TryLoadCfg(cfgPath, cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	// Set defaults dynamically that the API group defaulting can't (by fetching information from the internet, looking up network interfaces, etc.)
-	err := setInitDynamicDefaults(cfg)
+	err = configutil.SetInitDynamicDefaults(cfg)
 	if err != nil {
 		return nil, err
+	}
+
+	fmt.Printf("[init] Using Kubernetes version: %s\n", cfg.KubernetesVersion)
+	fmt.Printf("[init] Using Authorization mode: %v\n", cfg.AuthorizationModes)
+
+	// Warn about the limitations with the current cloudprovider solution.
+	if cfg.CloudProvider != "" {
+		fmt.Println("[init] WARNING: For cloudprovider integrations to work --cloud-provider must be set for all kubelets in the cluster.")
+		fmt.Println("\t(/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)")
 	}
 
 	if !skipPreFlight {
@@ -199,14 +202,12 @@ func (i *Init) Validate() error {
 func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 1: Generate certificates
-	results, err := certphase.CreatePKIAssets(i.cfg)
+	err := certphase.CreatePKIAssets(i.cfg)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%v", results)
 
 	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
-
 	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddress, i.cfg.API.BindPort)
 	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, i.cfg.CertificatesDir, kubeadmapi.GlobalEnvParams.KubernetesDir)
 	if err != nil {

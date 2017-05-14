@@ -28,12 +28,10 @@ import (
 	"github.com/spf13/cobra"
 
 	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
+
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
-	_ "k8s.io/kubernetes/pkg/api"
 )
-
-//TODO: test parameters API server
 
 func TestSubCmdCertsCreateFiles(t *testing.T) {
 
