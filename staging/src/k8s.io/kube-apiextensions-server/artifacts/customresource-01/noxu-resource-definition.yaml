@@ -7,7 +7,7 @@ spec:
   version: v1alpha1
   scope: Namespaced
   names:
-    name: noxus
+    plural: noxus
     singular: noxu
     kind: Noxu
     listKind: NoxuList
