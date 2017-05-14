@@ -67,6 +67,7 @@ func New() *Generator {
 			`+k8s.io/apimachinery/pkg/runtime/schema`,
 			`+k8s.io/apimachinery/pkg/runtime`,
 			`k8s.io/apimachinery/pkg/apis/meta/v1`,
+			`k8s.io/apimachinery/pkg/apis/meta/v1alpha1`,
 			`k8s.io/apiserver/pkg/apis/example/v1`,
 			`k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1`,
 			`k8s.io/kubernetes/pkg/api/v1`,
