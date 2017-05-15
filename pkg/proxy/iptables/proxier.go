@@ -652,12 +652,16 @@ func updateServiceMap(
 	syncRequired = false
 	staleServices = sets.NewString()
 
-	for _, change := range changes.items {
-		mergeSyncRequired, existingPorts := serviceMap.mergeService(change.current)
-		unmergeSyncRequired := serviceMap.unmergeService(change.previous, existingPorts, staleServices)
-		syncRequired = syncRequired || mergeSyncRequired || unmergeSyncRequired
-	}
-	changes.items = make(map[types.NamespacedName]*serviceChange)
+	func() {
+		changes.Lock()
+		defer changes.Unlock()
+		for _, change := range changes.items {
+			mergeSyncRequired, existingPorts := serviceMap.mergeService(change.current)
+			unmergeSyncRequired := serviceMap.unmergeService(change.previous, existingPorts, staleServices)
+			syncRequired = syncRequired || mergeSyncRequired || unmergeSyncRequired
+		}
+		changes.items = make(map[types.NamespacedName]*serviceChange)
+	}()
 
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to serviceMap.
@@ -708,17 +712,22 @@ func updateEndpointsMap(
 	hostname string) (syncRequired bool, hcEndpoints map[types.NamespacedName]int, staleSet map[endpointServicePair]bool) {
 	syncRequired = false
 	staleSet = make(map[endpointServicePair]bool)
-	for _, change := range changes.items {
-		oldEndpointsMap := endpointsToEndpointsMap(change.previous, hostname)
-		newEndpointsMap := endpointsToEndpointsMap(change.current, hostname)
-		if !reflect.DeepEqual(oldEndpointsMap, newEndpointsMap) {
-			endpointsMap.unmerge(oldEndpointsMap)
-			endpointsMap.merge(newEndpointsMap)
-			detectStaleConnections(oldEndpointsMap, newEndpointsMap, staleSet)
-			syncRequired = true
+
+	func() {
+		changes.Lock()
+		defer changes.Unlock()
+		for _, change := range changes.items {
+			oldEndpointsMap := endpointsToEndpointsMap(change.previous, hostname)
+			newEndpointsMap := endpointsToEndpointsMap(change.current, hostname)
+			if !reflect.DeepEqual(oldEndpointsMap, newEndpointsMap) {
+				endpointsMap.unmerge(oldEndpointsMap)
+				endpointsMap.merge(newEndpointsMap)
+				detectStaleConnections(oldEndpointsMap, newEndpointsMap, staleSet)
+				syncRequired = true
+			}
 		}
-	}
-	changes.items = make(map[types.NamespacedName]*endpointsChange)
+		changes.items = make(map[types.NamespacedName]*endpointsChange)
+	}()
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
 		return
@@ -914,10 +923,8 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	}
 
 	// Figure out the new services we need to activate.
-	proxier.serviceChanges.Lock()
 	serviceSyncRequired, hcServices, staleServices := updateServiceMap(
 		proxier.serviceMap, &proxier.serviceChanges)
-	proxier.serviceChanges.Unlock()
 
 	// If this was called because of a services update, but nothing actionable has changed, skip it.
 	if reason == syncReasonServices && !serviceSyncRequired {
@@ -925,10 +932,8 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 		return
 	}
 
-	proxier.endpointsChanges.Lock()
 	endpointsSyncRequired, hcEndpoints, staleEndpoints := updateEndpointsMap(
 		proxier.endpointsMap, &proxier.endpointsChanges, proxier.hostname)
-	proxier.endpointsChanges.Unlock()
 
 	// If this was called because of an endpoints update, but nothing actionable has changed, skip it.
 	if reason == syncReasonEndpoints && !endpointsSyncRequired {
