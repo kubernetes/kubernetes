@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
@@ -346,14 +347,14 @@ func getResolvedEndpoints(endpoints []string) ([]string, error) {
 			resolvedEndpoints = append(resolvedEndpoints, endpoint)
 		}
 	}
-	deduped := []string{}
+	deduped := sets.String{}
 
-	for _, value := range resolvedEndpoints {
-		if !dedupeEndpoints(value, deduped) {
-			deduped = append(deduped, value)
+	for _, endpoint := range resolvedEndpoints {
+		if !deduped.Has(endpoint) {
+			deduped.Insert(endpoint)
 		}
 	}
-	return deduped, nil
+	return deduped.List(), nil
 }
 
 /* ensureDNSRrsets ensures (idempotently, and with minimum mutations) that all of the DNS resource record sets for dnsName are consistent with endpoints.
