@@ -664,6 +664,8 @@ func (s *ServiceController) getOperationsToPerformOnCluster(cluster *v1beta1.Clu
 				}
 			}
 		}
+		// If ExternalTrafficPolicy is not set, the federated cluster will assign a default ExternalTrafficPolicy, so retain what is chosen.
+		desiredService.Spec.ExternalTrafficPolicy = clusterService.Spec.ExternalTrafficPolicy
 
 		// Update existing service, if needed.
 		if !Equivalent(desiredService, clusterService) {
