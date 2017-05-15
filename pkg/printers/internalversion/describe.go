@@ -634,16 +634,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
 		}
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), w, "")
-		if len(pod.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
-			w.Write(LEVEL_1, "----\t------\t------\n")
-			for _, c := range pod.Status.Conditions {
-				if len(c.Reason) == 0 {
-					c.Reason = "<none>"
-				}
-				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
-			}
-		}
+		printConditions(w, pod.Status)
 		describeVolumes(pod.Spec.Volumes, w, "")
 		if pod.Status.QOSClass != "" {
 			w.Write(LEVEL_0, "QoS Class:\t%s\n", pod.Status.QOSClass)
@@ -1375,16 +1366,7 @@ func describeReplicationController(controller *api.ReplicationController, events
 		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		DescribePodTemplate(controller.Spec.Template, w)
-		if len(controller.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
-			w.Write(LEVEL_1, "----\t------\t------\n")
-			for _, c := range controller.Status.Conditions {
-				if len(c.Reason) == 0 {
-					c.Reason = "<none>"
-				}
-				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
-			}
-		}
+		printConditions(w, controller.Status)
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1460,16 +1442,7 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 			w.Write(LEVEL_0, "%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		}
 		DescribePodTemplate(&rs.Spec.Template, w)
-		if len(rs.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
-			w.Write(LEVEL_1, "----\t------\t------\n")
-			for _, c := range rs.Status.Conditions {
-				if len(c.Reason) == 0 {
-					c.Reason = "<none>"
-				}
-				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
-			}
-		}
+		printConditions(w, rs.Status)
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1522,16 +1495,7 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		}
 		w.Write(LEVEL_0, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
 		DescribePodTemplate(&job.Spec.Template, w)
-		if len(job.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
-			w.Write(LEVEL_1, "----\t------\t------\n")
-			for _, c := range job.Status.Conditions {
-				if len(c.Reason) == 0 {
-					c.Reason = "<none>"
-				}
-				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
-			}
-		}
+		printConditions(w, job.Status)
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -2153,15 +2117,19 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
 		if len(node.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
-			w.Write(LEVEL_1, "----\t------\t------\n")
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
 			for _, c := range node.Status.Conditions {
-				if len(c.Reason) == 0 {
-					c.Reason = "<none>"
-				}
-				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
+				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
+					c.Type,
+					c.Status,
+					c.LastHeartbeatTime.Time.Format(time.RFC1123Z),
+					c.LastTransitionTime.Time.Format(time.RFC1123Z),
+					c.Reason,
+					c.Message)
 			}
 		}
+
 		w.Write(LEVEL_0, "Addresses:\n")
 		for _, address := range node.Status.Addresses {
 			w.Write(LEVEL_1, "%s:\t%s\n", address.Type, address.Address)
@@ -2557,16 +2525,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 			w.Write(LEVEL_0, "RollingUpdateStrategy:\t%s max unavailable, %s max surge\n", ru.MaxUnavailable.String(), ru.MaxSurge.String())
 		}
 		DescribePodTemplate(&internalDeployment.Spec.Template, w)
-		if len(d.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
-			w.Write(LEVEL_1, "----\t------\t------\n")
-			for _, c := range d.Status.Conditions {
-				if len(c.Reason) == 0 {
-					c.Reason = "<none>"
-				}
-				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
-			}
-		}
+		printConditions(w, d.Status)
 		oldRSs, _, newRS, err := deploymentutil.GetAllReplicaSets(d, dd.versionedClient)
 		if err == nil {
 			w.Write(LEVEL_0, "OldReplicaSets:\t%s\n", printReplicaSetsByLabels(oldRSs))
@@ -2730,13 +2689,16 @@ func describeCluster(cluster *federation.Cluster) (string, error) {
 		}
 
 		if len(cluster.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
-			w.Write(LEVEL_1, "----\t------\t------\n")
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastUpdateTime\tLastTransitionTime\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
 			for _, c := range cluster.Status.Conditions {
-				if len(c.Reason) == 0 {
-					c.Reason = "<none>"
-				}
-				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
+				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
+					c.Type,
+					c.Status,
+					c.LastProbeTime.Time.Format(time.RFC1123Z),
+					c.LastTransitionTime.Time.Format(time.RFC1123Z),
+					c.Reason,
+					c.Message)
 			}
 		}
 		return nil
@@ -3237,5 +3199,27 @@ func printAnnotationsMultilineWithIndent(w PrefixWriter, initialIndent, title, i
 			w.Write(LEVEL_0, "%s\n", line)
 		}
 		i++
+	}
+}
+
+func printConditions(w PrefixWriter, obj interface{}) {
+	switch status := obj.(type) {
+	case api.PodStatus:
+	case api.ReplicationControllerStatus:
+	case extensions.ReplicaSetStatus:
+	case batch.JobStatus:
+	case versionedextension.DeploymentStatus:
+		conditions := status.Conditions
+		if len(conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
+			w.Write(LEVEL_1, "----\t------\t------\n")
+			for _, c := range conditions {
+				if len(c.Reason) == 0 {
+					c.Reason = "<none>"
+				}
+				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
+			}
+		}
+	default:
 	}
 }
