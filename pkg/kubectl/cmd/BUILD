@@ -70,6 +70,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/annotations:go_default_library",
         "//pkg/api/helper:go_default_library",
+        "//pkg/api/ref:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/validation:go_default_library",
@@ -142,6 +143,7 @@ go_library(
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/tools/portforward:go_default_library",
+        "//vendor/k8s.io/client-go/util/clock:go_default_library",
     ],
 )
 
