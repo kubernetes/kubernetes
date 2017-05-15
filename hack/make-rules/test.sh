@@ -84,7 +84,7 @@ kube::test::find_dirs() {
 
     find ./staging/src/k8s.io/kube-apiextensions-server -not \( \
         \( \
-          -o -path './test/integration/*' \
+          -path '*/test/integration/*' \
         \) -prune \
       \) -name '*_test.go' \
       -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
