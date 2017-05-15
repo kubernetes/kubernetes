@@ -142,7 +142,7 @@ spec:
     spec:
       containers:
       - name: master
-        image: gcr.io/google_containers/redis:e2e  # or just image: redis
+        image: gcr.io/google_containers/redis:e2e
         resources:
           requests:
             cpu: 100m
