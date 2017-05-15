@@ -495,7 +495,7 @@ func (o *openAPI) buildParameter(restParam restful.ParameterData, bodySample int
 	case restful.HeaderParameterKind:
 		ret.In = "header"
 	case restful.FormParameterKind:
-		ret.In = "form"
+		ret.In = "formData"
 	default:
 		return ret, fmt.Errorf("unknown restful operation kind : %v", restParam.Kind)
 	}
