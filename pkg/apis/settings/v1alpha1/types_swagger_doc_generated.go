@@ -37,7 +37,7 @@ func (PodPreset) SwaggerDoc() map[string]string {
 
 var map_PodPresetList = map[string]string{
 	"":         "PodPresetList is a list of PodPreset objects.",
-	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"metadata": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
 	"items":    "Items is a list of schema objects.",
 }
 
