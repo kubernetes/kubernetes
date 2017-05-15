@@ -145,7 +145,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		groupDiscoveryHandler,
 		s.GenericAPIServer.RequestContextMapper(),
 		customResourceInformers.Apiextensions().InternalVersion().CustomResources().Lister(),
-		delegationTarget.UnprotectedHandler(),
+		delegateHandler,
 		c.CustomResourceRESTOptionsGetter,
 		c.GenericConfig.AdmissionControl,
 	)
