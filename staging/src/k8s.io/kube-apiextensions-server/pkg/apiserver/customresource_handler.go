@@ -48,58 +48,58 @@ import (
 	"k8s.io/kube-apiextensions-server/pkg/registry/customresource"
 )
 
-// customResourceDefinitionHandler serves the `/apis` endpoint.
+// crdHandler serves the `/apis` endpoint.
 // This is registered as a filter so that it never collides with any explictly registered endpoints
-type customResourceDefinitionHandler struct {
+type crdHandler struct {
 	versionDiscoveryHandler *versionDiscoveryHandler
 	groupDiscoveryHandler   *groupDiscoveryHandler
 
 	customStorageLock sync.Mutex
-	// customStorage contains a customResourceDefinitionStorageMap
+	// customStorage contains a crdStorageMap
 	customStorage atomic.Value
 
 	requestContextMapper apirequest.RequestContextMapper
 
-	customResourceDefinitionLister listers.CustomResourceDefinitionLister
+	crdLister listers.CustomResourceDefinitionLister
 
 	delegate          http.Handler
 	restOptionsGetter generic.RESTOptionsGetter
 	admission         admission.Interface
 }
 
-// customResourceDefinitionInfo stores enough information to serve the storage for the custom resource
-type customResourceDefinitionInfo struct {
+// crdInfo stores enough information to serve the storage for the custom resource
+type crdInfo struct {
 	storage      *customresource.REST
 	requestScope handlers.RequestScope
 }
 
-// customResourceDefinitionStorageMap goes from customresourcedefinition to its storage
-type customResourceDefinitionStorageMap map[types.UID]*customResourceDefinitionInfo
+// crdStorageMap goes from customresourcedefinition to its storage
+type crdStorageMap map[types.UID]*crdInfo
 
 func NewCustomResourceDefinitionHandler(
 	versionDiscoveryHandler *versionDiscoveryHandler,
 	groupDiscoveryHandler *groupDiscoveryHandler,
 	requestContextMapper apirequest.RequestContextMapper,
-	customResourceDefinitionLister listers.CustomResourceDefinitionLister,
+	crdLister listers.CustomResourceDefinitionLister,
 	delegate http.Handler,
 	restOptionsGetter generic.RESTOptionsGetter,
-	admission admission.Interface) *customResourceDefinitionHandler {
-	ret := &customResourceDefinitionHandler{
-		versionDiscoveryHandler:        versionDiscoveryHandler,
-		groupDiscoveryHandler:          groupDiscoveryHandler,
-		customStorage:                  atomic.Value{},
-		requestContextMapper:           requestContextMapper,
-		customResourceDefinitionLister: customResourceDefinitionLister,
-		delegate:                       delegate,
-		restOptionsGetter:              restOptionsGetter,
-		admission:                      admission,
+	admission admission.Interface) *crdHandler {
+	ret := &crdHandler{
+		versionDiscoveryHandler: versionDiscoveryHandler,
+		groupDiscoveryHandler:   groupDiscoveryHandler,
+		customStorage:           atomic.Value{},
+		requestContextMapper:    requestContextMapper,
+		crdLister:               crdLister,
+		delegate:                delegate,
+		restOptionsGetter:       restOptionsGetter,
+		admission:               admission,
 	}
 
-	ret.customStorage.Store(customResourceDefinitionStorageMap{})
+	ret.customStorage.Store(crdStorageMap{})
 	return ret
 }
 
-func (r *customResourceDefinitionHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx, ok := r.requestContextMapper.Get(req)
 	if !ok {
 		// programmer error
@@ -134,8 +134,8 @@ func (r *customResourceDefinitionHandler) ServeHTTP(w http.ResponseWriter, req *
 		return
 	}
 
-	customResourceDefinitionName := requestInfo.Resource + "." + requestInfo.APIGroup
-	customResourceDefinition, err := r.customResourceDefinitionLister.Get(customResourceDefinitionName)
+	crdName := requestInfo.Resource + "." + requestInfo.APIGroup
+	crd, err := r.crdLister.Get(crdName)
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -144,15 +144,18 @@ func (r *customResourceDefinitionHandler) ServeHTTP(w http.ResponseWriter, req *
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if customResourceDefinition.Spec.Version != requestInfo.APIVersion {
+	if crd.Spec.Version != requestInfo.APIVersion {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
-	// TODO this is the point to do the condition checks
+	// if we can't definitively determine that our names are good, delegate
+	if !apiextensions.IsCRDConditionFalse(crd, apiextensions.NameConflict) {
+		r.delegate.ServeHTTP(w, req)
+	}
 
-	customResourceDefinitionInfo := r.getServingInfoFor(customResourceDefinition)
-	storage := customResourceDefinitionInfo.storage
-	requestScope := customResourceDefinitionInfo.requestScope
+	crdInfo := r.getServingInfoFor(crd)
+	storage := crdInfo.storage
+	requestScope := crdInfo.requestScope
 	minRequestTimeout := 1 * time.Minute
 
 	switch requestInfo.Verb {
@@ -195,12 +198,12 @@ func (r *customResourceDefinitionHandler) ServeHTTP(w http.ResponseWriter, req *
 }
 
 // removeDeadStorage removes REST storage that isn't being used
-func (r *customResourceDefinitionHandler) removeDeadStorage() {
+func (r *crdHandler) removeDeadStorage() {
 	// these don't have to be live.  A snapshot is fine
 	// if we wrongly delete, that's ok.  The rest storage will be recreated on the next request
 	// if we wrongly miss one, that's ok.  We'll get it next time
-	storageMap := r.customStorage.Load().(customResourceDefinitionStorageMap)
-	allCustomResourceDefinitions, err := r.customResourceDefinitionLister.List(labels.Everything())
+	storageMap := r.customStorage.Load().(crdStorageMap)
+	allCustomResourceDefinitions, err := r.crdLister.List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(err)
 		return
@@ -208,8 +211,8 @@ func (r *customResourceDefinitionHandler) removeDeadStorage() {
 
 	for uid := range storageMap {
 		found := false
-		for _, customResourceDefinition := range allCustomResourceDefinitions {
-			if customResourceDefinition.UID == uid {
+		for _, crd := range allCustomResourceDefinitions {
+			if crd.UID == uid {
 				found = true
 				break
 			}
@@ -225,9 +228,9 @@ func (r *customResourceDefinitionHandler) removeDeadStorage() {
 	r.customStorage.Store(storageMap)
 }
 
-func (r *customResourceDefinitionHandler) getServingInfoFor(customResourceDefinition *apiextensions.CustomResourceDefinition) *customResourceDefinitionInfo {
-	storageMap := r.customStorage.Load().(customResourceDefinitionStorageMap)
-	ret, ok := storageMap[customResourceDefinition.UID]
+func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefinition) *crdInfo {
+	storageMap := r.customStorage.Load().(crdStorageMap)
+	ret, ok := storageMap[crd.UID]
 	if ok {
 		return ret
 	}
@@ -235,21 +238,21 @@ func (r *customResourceDefinitionHandler) getServingInfoFor(customResourceDefini
 	r.customStorageLock.Lock()
 	defer r.customStorageLock.Unlock()
 
-	ret, ok = storageMap[customResourceDefinition.UID]
+	ret, ok = storageMap[crd.UID]
 	if ok {
 		return ret
 	}
 
 	storage := customresource.NewREST(
-		schema.GroupResource{Group: customResourceDefinition.Spec.Group, Resource: customResourceDefinition.Spec.Names.Plural},
-		schema.GroupVersionKind{Group: customResourceDefinition.Spec.Group, Version: customResourceDefinition.Spec.Version, Kind: customResourceDefinition.Spec.Names.ListKind},
+		schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural},
+		schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.ListKind},
 		UnstructuredCopier{},
-		customresource.NewStrategy(discovery.NewUnstructuredObjectTyper(nil), customResourceDefinition.Spec.Scope == apiextensions.NamespaceScoped),
+		customresource.NewStrategy(discovery.NewUnstructuredObjectTyper(nil), crd.Spec.Scope == apiextensions.NamespaceScoped),
 		r.restOptionsGetter,
 	)
 
 	parameterScheme := runtime.NewScheme()
-	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: customResourceDefinition.Spec.Group, Version: customResourceDefinition.Spec.Version},
+	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version},
 		&metav1.ListOptions{},
 		&metav1.ExportOptions{},
 		&metav1.GetOptions{},
@@ -259,11 +262,11 @@ func (r *customResourceDefinitionHandler) getServingInfoFor(customResourceDefini
 	parameterCodec := runtime.NewParameterCodec(parameterScheme)
 
 	selfLinkPrefix := ""
-	switch customResourceDefinition.Spec.Scope {
+	switch crd.Spec.Scope {
 	case apiextensions.ClusterScoped:
-		selfLinkPrefix = "/" + path.Join("apis", customResourceDefinition.Spec.Group, customResourceDefinition.Spec.Version) + "/"
+		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, crd.Spec.Version) + "/"
 	case apiextensions.NamespaceScoped:
-		selfLinkPrefix = "/" + path.Join("apis", customResourceDefinition.Spec.Group, customResourceDefinition.Spec.Version, "namespaces") + "/"
+		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, crd.Spec.Version, "namespaces") + "/"
 	}
 
 	requestScope := handlers.RequestScope{
@@ -273,7 +276,7 @@ func (r *customResourceDefinitionHandler) getServingInfoFor(customResourceDefini
 				return ret
 			},
 			SelfLinker:         meta.NewAccessor(),
-			ClusterScoped:      customResourceDefinition.Spec.Scope == apiextensions.ClusterScoped,
+			ClusterScoped:      crd.Spec.Scope == apiextensions.ClusterScoped,
 			SelfLinkPathPrefix: selfLinkPrefix,
 		},
 		ContextFunc: func(req *http.Request) apirequest.Context {
@@ -291,18 +294,18 @@ func (r *customResourceDefinitionHandler) getServingInfoFor(customResourceDefini
 		Typer:           discovery.NewUnstructuredObjectTyper(nil),
 		UnsafeConvertor: unstructured.UnstructuredObjectConverter{},
 
-		Resource:    schema.GroupVersionResource{Group: customResourceDefinition.Spec.Group, Version: customResourceDefinition.Spec.Version, Resource: customResourceDefinition.Spec.Names.Plural},
-		Kind:        schema.GroupVersionKind{Group: customResourceDefinition.Spec.Group, Version: customResourceDefinition.Spec.Version, Kind: customResourceDefinition.Spec.Names.Kind},
+		Resource:    schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural},
+		Kind:        schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.Kind},
 		Subresource: "",
 
 		MetaGroupVersion: metav1.SchemeGroupVersion,
 	}
 
-	ret = &customResourceDefinitionInfo{
+	ret = &crdInfo{
 		storage:      storage,
 		requestScope: requestScope,
 	}
-	storageMap[customResourceDefinition.UID] = ret
+	storageMap[crd.UID] = ret
 	r.customStorage.Store(storageMap)
 	return ret
 }
