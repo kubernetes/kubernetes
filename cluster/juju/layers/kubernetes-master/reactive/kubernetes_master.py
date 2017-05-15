@@ -441,7 +441,6 @@ def addons_ready():
         return False
 
 
-
 @when('loadbalancer.available', 'certificates.ca.available',
       'certificates.client.cert.available')
 def loadbalancer_kubeconfig(loadbalancer, ca, client):
