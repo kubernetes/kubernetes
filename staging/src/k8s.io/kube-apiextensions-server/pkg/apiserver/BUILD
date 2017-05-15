@@ -55,6 +55,6 @@ go_library(
         "//vendor/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion/apiextensions/internalversion:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/internalversion:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/registry/customresource:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/registry/customresourcestorage:go_default_library",
+        "//vendor/k8s.io/kube-apiextensions-server/pkg/registry/customresourcedefinition:go_default_library",
     ],
 )

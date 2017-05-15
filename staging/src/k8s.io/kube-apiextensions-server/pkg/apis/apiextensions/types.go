@@ -18,22 +18,22 @@ package apiextensions
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-// CustomResourceSpec describes how a user wants their resource to appear
-type CustomResourceSpec struct {
+// CustomResourceDefinitionSpec describes how a user wants their resource to appear
+type CustomResourceDefinitionSpec struct {
 	// Group is the group this resource belongs in
 	Group string
 	// Version is the version this resource belongs in
 	Version string
 	// Names are the names used to describe this custom resource
-	Names CustomResourceNames
+	Names CustomResourceDefinitionNames
 
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
 	Scope ResourceScope
 }
 
-// CustomResourceNames indicates the names to serve this CustomResource
-type CustomResourceNames struct {
-	// Plural is the plural name of the resource to serve.  It must match the name of the CustomResource-registration
+// CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition
+type CustomResourceDefinitionNames struct {
+	// Plural is the plural name of the resource to serve.  It must match the name of the CustomResourceDefinition-registration
 	// too: plural.group and it must be all lowercase.
 	Plural string
 	// Singular is the singular name of the resource.  It must be all lowercase  Defaults to lowercased <kind>
@@ -66,20 +66,20 @@ const (
 	ConditionUnknown ConditionStatus = "Unknown"
 )
 
-// CustomResourceConditionType is a valid value for CustomResourceCondition.Type
-type CustomResourceConditionType string
+// CustomResourceDefinitionConditionType is a valid value for CustomResourceDefinitionCondition.Type
+type CustomResourceDefinitionConditionType string
 
 const (
-	// NameConflict means the names chosen for this CustomResource conflict with others in the group.
-	NameConflict CustomResourceConditionType = "NameConflict"
-	// Terminating means that the CustomResource has been deleted and is cleaning up.
-	Terminating CustomResourceConditionType = "Terminating"
+	// NameConflict means the names chosen for this CustomResourceDefinition conflict with others in the group.
+	NameConflict CustomResourceDefinitionConditionType = "NameConflict"
+	// Terminating means that the CustomResourceDefinition has been deleted and is cleaning up.
+	Terminating CustomResourceDefinitionConditionType = "Terminating"
 )
 
-// CustomResourceCondition contains details for the current condition of this pod.
-type CustomResourceCondition struct {
+// CustomResourceDefinitionCondition contains details for the current condition of this pod.
+type CustomResourceDefinitionCondition struct {
 	// Type is the type of the condition.
-	Type CustomResourceConditionType
+	Type CustomResourceDefinitionConditionType
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
 	Status ConditionStatus
@@ -94,36 +94,36 @@ type CustomResourceCondition struct {
 	Message string
 }
 
-// CustomResourceStatus indicates the state of the CustomResource
-type CustomResourceStatus struct {
-	// Conditions indicate state for particular aspects of a CustomResource
-	Conditions []CustomResourceCondition
+// CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
+type CustomResourceDefinitionStatus struct {
+	// Conditions indicate state for particular aspects of a CustomResourceDefinition
+	Conditions []CustomResourceDefinitionCondition
 
 	// AcceptedNames are the names that are actually being used to serve discovery
 	// They may be different than the names in spec.
-	AcceptedNames CustomResourceNames
+	AcceptedNames CustomResourceDefinitionNames
 }
 
 // +genclient=true
 // +nonNamespaced=true
 
-// CustomResource represents a resource that should be exposed on the API server.  Its name MUST be in the format
+// CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
 // <.spec.name>.<.spec.group>.
-type CustomResource struct {
+type CustomResourceDefinition struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
 
 	// Spec describes how the user wants the resources to appear
-	Spec CustomResourceSpec
-	// Status indicates the actual state of the CustomResource
-	Status CustomResourceStatus
+	Spec CustomResourceDefinitionSpec
+	// Status indicates the actual state of the CustomResourceDefinition
+	Status CustomResourceDefinitionStatus
 }
 
-// CustomResourceList is a list of CustomResource objects.
-type CustomResourceList struct {
+// CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
+type CustomResourceDefinitionList struct {
 	metav1.TypeMeta
 	metav1.ListMeta
 
-	// Items individual CustomResources
-	Items []CustomResource
+	// Items individual CustomResourceDefinitions
+	Items []CustomResourceDefinition
 }
