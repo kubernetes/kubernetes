@@ -53,7 +53,7 @@ type ScaleStatus struct {
 	// label query over pods that should match the replicas count. This is same
 	// as the label selector but in the string format to avoid introspection
 	// by clients. The string will be in the same format as the query-param syntax.
-	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
 	Selector string
 }
@@ -279,12 +279,12 @@ type ResourceMetricStatus struct {
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta
 	// Metadata is the standard object metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Spec is the specification for the behaviour of the autoscaler.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status.
 	// +optional
 	Spec HorizontalPodAutoscalerSpec
 
