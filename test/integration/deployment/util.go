@@ -17,12 +17,10 @@ limitations under the License.
 package deployment
 
 import (
-	"fmt"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
@@ -32,10 +30,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller/deployment"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
-	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutil "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -132,103 +129,8 @@ func addPodConditionReady(pod *v1.Pod, time metav1.Time) {
 	}
 }
 
-func (d *deploymentTester) logReplicaSetsOfDeployment(allOldRSs []*v1beta1.ReplicaSet, newRS *v1beta1.ReplicaSet) {
-	if newRS != nil {
-		d.t.Logf("New ReplicaSet of Deployment %s:\n%+v", d.deployment.Name, *newRS)
-	} else {
-		d.t.Logf("New ReplicaSet of Deployment %s is nil.", d.deployment.Name)
-	}
-	if len(allOldRSs) > 0 {
-		d.t.Logf("All old ReplicaSets of Deployment %s:", d.deployment.Name)
-	}
-	for i := range allOldRSs {
-		d.t.Logf(spew.Sprintf("%#v", *allOldRSs[i]))
-	}
-}
-
-func (d *deploymentTester) logPodsOfDeployment(rsList []*v1beta1.ReplicaSet) {
-	minReadySeconds := d.deployment.Spec.MinReadySeconds
-	podListFunc := func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
-		return d.c.Core().Pods(namespace).List(options)
-	}
-
-	podList, err := deploymentutil.ListPods(d.deployment, rsList, podListFunc)
-
-	if err != nil {
-		d.t.Logf("Failed to list Pods of Deployment %s: %v", d.deployment.Name, err)
-		return
-	}
-	for _, pod := range podList.Items {
-		availability := "not available"
-		if podutil.IsPodAvailable(&pod, minReadySeconds, metav1.Now()) {
-			availability = "available"
-		}
-		d.t.Logf("Pod %s is %s:\n%s", pod.Name, availability, spew.Sprintf("%#v", pod))
-	}
-}
-
-// WaitForDeploymentRevisionAndImage waits for the deployment's and its new RS's revision and container image to match the given revision and image.
-// Note that deployment revision and its new RS revision should be updated shortly, so we only wait for 1 minute here to fail early.
 func (d *deploymentTester) waitForDeploymentRevisionAndImage(revision, image string) error {
-	var deployment *v1beta1.Deployment
-	var newRS *v1beta1.ReplicaSet
-	var reason string
-	deploymentName, ns := d.deployment.Name, d.deployment.Namespace
-	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
-		var err error
-		deployment, err = d.c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		// The new ReplicaSet needs to be non-nil and contain the pod-template-hash label
-		newRS, err = deploymentutil.GetNewReplicaSet(deployment, d.c)
-		if err != nil {
-			return false, err
-		}
-		if newRS == nil {
-			reason = fmt.Sprintf("New replica set for deployment %q is yet to be created", deployment.Name)
-			d.t.Logf(reason)
-			return false, nil
-		}
-		if !labelsutil.SelectorHasLabel(newRS.Spec.Selector, v1beta1.DefaultDeploymentUniqueLabelKey) {
-			reason = fmt.Sprintf("New replica set %q doesn't have DefaultDeploymentUniqueLabelKey", newRS.Name)
-			d.t.Logf(reason)
-			return false, nil
-		}
-		// Check revision of this deployment, and of the new replica set of this deployment
-		if deployment.Annotations == nil || deployment.Annotations[deploymentutil.RevisionAnnotation] != revision {
-			reason = fmt.Sprintf("Deployment %q doesn't have the required revision set", deployment.Name)
-			d.t.Logf(reason)
-			return false, nil
-		}
-		if deployment.Spec.Template.Spec.Containers[0].Image != image {
-			reason = fmt.Sprintf("Deployment %q doesn't have the required image set", deployment.Name)
-			d.t.Logf(reason)
-			return false, nil
-		}
-		if newRS.Annotations == nil || newRS.Annotations[deploymentutil.RevisionAnnotation] != revision {
-			reason = fmt.Sprintf("New replica set %q doesn't have the required revision set", newRS.Name)
-			d.t.Logf(reason)
-			return false, nil
-		}
-		if newRS.Spec.Template.Spec.Containers[0].Image != image {
-			reason = fmt.Sprintf("New replica set %q doesn't have the required image set", newRS.Name)
-			d.t.Logf(reason)
-			return false, nil
-		}
-		return true, nil
-	})
-	if err == wait.ErrWaitTimeout {
-		d.logReplicaSetsOfDeployment(nil, newRS)
-		err = fmt.Errorf(reason)
-	}
-	if newRS == nil {
-		return fmt.Errorf("deployment %q failed to create new replica set", deploymentName)
-	}
-	if err != nil {
-		return fmt.Errorf("error waiting for deployment %q (got %s / %s) and new replica set %q (got %s / %s) revision and image to match expectation (expected %s / %s): %v", deploymentName, deployment.Annotations[deploymentutil.RevisionAnnotation], deployment.Spec.Template.Spec.Containers[0].Image, newRS.Name, newRS.Annotations[deploymentutil.RevisionAnnotation], newRS.Spec.Template.Spec.Containers[0].Image, revision, image, err)
-	}
-	return nil
+	return testutil.WaitForDeploymentRevisionAndImage(d.c, d.deployment.Namespace, d.deployment.Name, revision, image, d.t.Logf, pollInterval, pollTimeout)
 }
 
 // markAllPodsReady manually updates all Deployment pods status to ready
@@ -270,73 +172,7 @@ func (d *deploymentTester) markAllPodsReady() {
 }
 
 func (d *deploymentTester) waitForDeploymentStatusValid() error {
-	var (
-		oldRSs, allOldRSs, allRSs []*v1beta1.ReplicaSet
-		newRS                     *v1beta1.ReplicaSet
-		deployment                *v1beta1.Deployment
-		reason                    string
-	)
-
-	name := d.deployment.Name
-	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
-		var err error
-		deployment, err = d.c.Extensions().Deployments(d.deployment.Namespace).Get(name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		oldRSs, allOldRSs, newRS, err = deploymentutil.GetAllReplicaSets(deployment, d.c)
-		if err != nil {
-			return false, err
-		}
-		if newRS == nil {
-			// New RC hasn't been created yet.
-			reason = "new replica set hasn't been created yet"
-			d.t.Logf(reason)
-			return false, nil
-		}
-		allRSs = append(oldRSs, newRS)
-		// The old/new ReplicaSets need to contain the pod-template-hash label
-		for i := range allRSs {
-			if !labelsutil.SelectorHasLabel(allRSs[i].Spec.Selector, v1beta1.DefaultDeploymentUniqueLabelKey) {
-				reason = "all replica sets need to contain the pod-template-hash label"
-				d.t.Logf(reason)
-				return false, nil
-			}
-		}
-		totalCreated := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
-		maxCreated := *(deployment.Spec.Replicas) + deploymentutil.MaxSurge(*deployment)
-		if totalCreated > maxCreated {
-			reason = fmt.Sprintf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
-			d.t.Logf(reason)
-			return false, nil
-		}
-		minAvailable := deploymentutil.MinAvailable(deployment)
-		if deployment.Status.AvailableReplicas < minAvailable {
-			reason = fmt.Sprintf("total pods available: %d, less than the min required: %d", deployment.Status.AvailableReplicas, minAvailable)
-			d.t.Logf(reason)
-			return false, nil
-		}
-
-		// When the deployment status and its underlying resources reach the desired state, we're done
-		if deploymentutil.DeploymentComplete(deployment, &deployment.Status) {
-			return true, nil
-		}
-
-		reason = fmt.Sprintf("deployment status: %#v", deployment.Status)
-		d.t.Logf(reason)
-
-		return false, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		d.logReplicaSetsOfDeployment(allOldRSs, newRS)
-		d.logPodsOfDeployment(allRSs)
-		err = fmt.Errorf("%s", reason)
-	}
-	if err != nil {
-		return fmt.Errorf("error waiting for deployment %q status to match expectation: %v", d.deployment.Name, err)
-	}
-	return nil
+	return testutil.WaitForDeploymentStatusValid(d.c, d.deployment, d.t.Logf, pollInterval, pollTimeout)
 }
 
 // waitForDeploymentStatusValidAndMarkPodsReady waits for the Deployment status to become valid
