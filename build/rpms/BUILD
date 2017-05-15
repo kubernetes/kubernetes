@@ -9,7 +9,7 @@ pkg_rpm(
         "//cmd/kubectl",
     ],
     spec_file = "kubectl.spec",
-    version = "1.6.0",
+    version_file = "//build:os_package_version",
 )
 
 pkg_rpm(
@@ -20,7 +20,7 @@ pkg_rpm(
         "//cmd/kubelet",
     ],
     spec_file = "kubelet.spec",
-    version = "1.6.0",
+    version_file = "//build:os_package_version",
 )
 
 pkg_rpm(
@@ -31,7 +31,7 @@ pkg_rpm(
         "//cmd/kubeadm",
     ],
     spec_file = "kubeadm.spec",
-    version = "1.6.0",
+    version_file = "//build:os_package_version",
 )
 
 pkg_rpm(
@@ -41,5 +41,18 @@ pkg_rpm(
         "@kubernetes_cni//file",
     ],
     spec_file = "kubernetes-cni.spec",
-    version = "1.6.0",
+    version_file = "//build:os_package_version",
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )
