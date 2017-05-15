@@ -902,3 +902,90 @@ func (m *kubeGenericRuntimeManager) UpdatePodCIDR(podCIDR string) error {
 			},
 		})
 }
+
+func (m *kubeGenericRuntimeManager) NewSyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backoff *flowcontrol.Backoff) (podSyncResult kubecontainer.PodSyncResult) {
+	var sandboxStatus *runtimeapi.PodSandboxStatus
+	var result []*kubecontainer.SyncResult
+	var err error
+
+	// Split the pod status.
+	statuses := newStatusGroup(pod, podStatus)
+
+	// Try to prune the init containers before every sync iteration to reduce GC pressure.
+	result, err = m.pruneInitContainers(statuses.initContainerStatuses, false)
+	podSyncResult.AddSyncResult(result...)
+	if err != nil {
+		glog.Errorf("Error during pruning init containers: %v", err)
+		return
+	}
+
+	// Compute action.
+	action := computeSyncAction(pod, statuses, m.livenessManager)
+
+	// Take action.
+	if action.needsToKillContainers() {
+		result, err = m.killContainers(action)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during killing containers: %v", err)
+			return
+		}
+	}
+
+	if action.needsToKillSandboxes() {
+		result, err = m.killSandboxes(action)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during killing sandboxes: %v", err)
+			return
+		}
+	}
+
+	if action.needsToStartSandbox() {
+		// Prune all old init containers if we are starting
+		// a new pod.
+		// Otherwise they will be treated as finished init
+		// containers in the next SyncPod() call.
+		result, err = m.pruneInitContainers(statuses.initContainerStatuses, true)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during pruning init containers: %v", err)
+			return
+		}
+
+		sandboxStatus, result, err = m.startSandbox(action, pullSecrets)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during starting sandbox: %v", err)
+			return
+		}
+	}
+
+	if action.needsToStartContainers() {
+		result, err = m.startContainers(action, sandboxStatus, pullSecrets, backoff)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during starting containers: %v", err)
+			return
+		}
+	}
+
+	return
+}
+
+// Placeholders.
+func (m *kubeGenericRuntimeManager) killContainers(a *syncAction) ([]*kubecontainer.SyncResult, error) {
+	return nil, fmt.Errorf("Not implemented")
+}
+
+func (m *kubeGenericRuntimeManager) killSandboxes(a *syncAction) ([]*kubecontainer.SyncResult, error) {
+	return nil, fmt.Errorf("Not implemented")
+}
+
+func (m *kubeGenericRuntimeManager) startSandbox(a *syncAction, pullSecrets []v1.Secret) (*runtimeapi.PodSandboxStatus, []*kubecontainer.SyncResult, error) {
+	return nil, nil, fmt.Errorf("Not imeplemented")
+}
+
+func (m *kubeGenericRuntimeManager) startContainers(a *syncAction, sandboxStatus *runtimeapi.PodSandboxStatus, pullSecrets []v1.Secret, backoff *flowcontrol.Backoff) ([]*kubecontainer.SyncResult, error) {
+	return nil, fmt.Errorf("Not implemented")
+}

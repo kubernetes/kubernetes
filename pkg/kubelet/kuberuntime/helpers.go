@@ -236,3 +236,8 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 	}
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
 }
+
+// isContainerActive returns true if the container is created or running.
+func isContainerActive(status *kubecontainer.ContainerStatus) bool {
+	return status.State == kubecontainer.ContainerStateRunning || status.State == kubecontainer.ContainerStateCreated
+}

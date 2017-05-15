@@ -24,6 +24,7 @@ go_library(
         "labels.go",
         "legacy.go",
         "security_context.go",
+        "sync_action.go",
     ],
     tags = ["automanaged"],
     deps = [

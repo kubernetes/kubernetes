@@ -553,7 +553,7 @@ func TestSyncPod(t *testing.T) {
 	}
 }
 
-func TestPruneInitContainers(t *testing.T) {
+func TestPruneInitContainersBeforeStart(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
@@ -671,6 +671,47 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	assert.Equal(t, 3, len(fakeRuntime.Containers))
 	expectedContainers = []string{initContainerID, buildContainerID(pod, containers[0]),
 		buildContainerID(pod, containers[1])}
+	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
+		t.Errorf("expected %q, got %q", expectedContainers, actual)
+	}
+}
+
+func TestPruneInitContainers(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	statuses := []*kubecontainer.ContainerStatus{
+		{Name: "init2", ID: kubecontainer.ContainerID{ID: "init2_1"}, State: kubecontainer.ContainerStateExited},
+		{Name: "init2", ID: kubecontainer.ContainerID{ID: "init2_0"}, State: kubecontainer.ContainerStateExited},
+		{Name: "init1", ID: kubecontainer.ContainerID{ID: "init1_2"}, State: kubecontainer.ContainerStateExited},
+		{Name: "init1", ID: kubecontainer.ContainerID{ID: "init1_1"}, State: kubecontainer.ContainerStateExited},
+		{Name: "init1", ID: kubecontainer.ContainerID{ID: "init1_0"}, State: kubecontainer.ContainerStateExited},
+		{Name: "init3", ID: kubecontainer.ContainerID{ID: "init3_0"}, State: kubecontainer.ContainerStateRunning},
+	}
+
+	var fakeContainers []*apitest.FakeContainer
+	for _, s := range statuses {
+		fakeContainers = append(fakeContainers, &apitest.FakeContainer{
+			runtimeapi.ContainerStatus{
+				Id:       s.ID.ID,
+				Metadata: &runtimeapi.ContainerMetadata{Name: s.Name},
+			},
+			"sandbox-foo",
+		})
+	}
+
+	// 1. Prune extra exited init containers.
+	fakeRuntime.SetFakeContainers(fakeContainers)
+	m.pruneInitContainers(statuses, false)
+	expectedContainers := []string{"init2_1", "init1_2", "init3_0"}
+	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
+		t.Errorf("expected %q, got %q", expectedContainers, actual)
+	}
+
+	// 2. Prune all init containers.
+	fakeRuntime.SetFakeContainers(fakeContainers)
+	m.pruneInitContainers(statuses, true)
+	expectedContainers = []string{}
 	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
 		t.Errorf("expected %q, got %q", expectedContainers, actual)
 	}

@@ -32,6 +32,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -775,4 +776,59 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 // DeleteContainer removes a container.
 func (m *kubeGenericRuntimeManager) DeleteContainer(containerID kubecontainer.ContainerID) error {
 	return m.removeContainer(containerID.ID)
+}
+
+// pruneInitContainers will reduce the number of
+// outstanding init containers still present.
+// This reduces load on the container garbage collector
+// by only preserving the most recent terminated init container.
+//
+// If 'all' is set to true, then all init containers will
+// be removed.
+//
+// The 'statues' must only contain init container statuses.
+func (m *kubeGenericRuntimeManager) pruneInitContainers(statuses []*kubecontainer.ContainerStatus, all bool) ([]*kubecontainer.SyncResult, error) {
+	var syncResult []*kubecontainer.SyncResult
+	var errlist []error
+	var indexesToPrune []int
+
+	names := sets.NewString()
+
+	// Assume statuses are sorted so that the latest status comes first.
+	for i, s := range statuses {
+		if all || names.Has(s.Name) && !isContainerActive(s) {
+			indexesToPrune = append(indexesToPrune, i)
+			continue
+		}
+		names.Insert(s.Name)
+	}
+
+	// Remove containers.
+	for _, idx := range indexesToPrune {
+		status := statuses[idx]
+
+		result := kubecontainer.NewSyncResult(kubecontainer.RemoveContainer, status.Name)
+		syncResult = append(syncResult, result)
+
+		if err := m.runtimeService.RemoveContainer(status.ID.ID); err != nil {
+			result.Fail(kubecontainer.ErrRemoveContainer, err.Error())
+			glog.Errorf("Failed to remove container %q: %v", status.ID.ID, err)
+			continue
+		}
+
+		// Remove any references to this container.
+		if _, ok := m.containerRefManager.GetRef(status.ID); ok {
+			m.containerRefManager.ClearRef(status.ID)
+		} else {
+			glog.Warningf("No ref for container %q", status.ID)
+		}
+	}
+
+	// Aggregate the errors.
+	for _, result := range syncResult {
+		if result.Error != nil {
+			errlist = append(errlist, result.Error)
+		}
+	}
+	return syncResult, errors.NewAggregate(errlist)
 }
