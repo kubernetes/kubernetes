@@ -35,12 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
@@ -162,16 +160,14 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runti
 		}
 	}
 
-	// Handle ExternalTraiffc related fields during service creation.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
-		if apiservice.NeedsHealthCheck(service) {
-			if err := rs.allocateHealthCheckNodePort(service); err != nil {
-				return nil, errors.NewInternalError(err)
-			}
+	// Handle ExternalTraffic related fields during service creation.
+	if apiservice.NeedsHealthCheck(service) {
+		if err := rs.allocateHealthCheckNodePort(service); err != nil {
+			return nil, errors.NewInternalError(err)
 		}
-		if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
-			return nil, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
-		}
+	}
+	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
+		return nil, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
 	out, err := rs.registry.CreateService(ctx, service)
@@ -222,8 +218,7 @@ func (rs *REST) Delete(ctx genericapirequest.Context, id string) (runtime.Object
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) &&
-		apiservice.NeedsHealthCheck(service) {
+	if apiservice.NeedsHealthCheck(service) {
 		nodePort := apiservice.GetServiceHealthCheckNodePort(service)
 		if nodePort > 0 {
 			err := rs.serviceNodePorts.Release(int(nodePort))
@@ -411,16 +406,14 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		service.Status.LoadBalancer = api.LoadBalancerStatus{}
 	}
 
-	// Handle ExternalTraiffc related updates.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
-		success, err := rs.healthCheckNodePortUpdate(oldService, service)
-		if !success || err != nil {
-			return nil, false, err
-		}
-		externalTrafficPolicyUpdate(oldService, service)
-		if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
-			return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
-		}
+	// Handle ExternalTraffic related updates.
+	success, err := rs.healthCheckNodePortUpdate(oldService, service)
+	if !success || err != nil {
+		return nil, false, err
+	}
+	externalTrafficPolicyUpdate(oldService, service)
+	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
+		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
 	out, err := rs.registry.UpdateService(ctx, service)

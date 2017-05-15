@@ -32,10 +32,6 @@ const (
 	// beta: v1.4
 	AppArmor utilfeature.Feature = "AppArmor"
 
-	// owner: @girishkalele
-	// alpha: v1.4
-	ExternalTrafficLocalOnly utilfeature.Feature = "AllowExtTrafficLocalEndpoints"
-
 	// owner: @saad-ali
 	// alpha: v1.3
 	DynamicVolumeProvisioning utilfeature.Feature = "DynamicVolumeProvisioning"
@@ -98,7 +94,6 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	ExternalTrafficLocalOnly:                    {Default: true, PreRelease: utilfeature.GA},
 	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
 	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
 	DynamicVolumeProvisioning:                   {Default: true, PreRelease: utilfeature.Alpha},
