@@ -19,13 +19,12 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.pkg.apis.apps.v1beta1;
+package k8s.io.client_go.pkg.apis.apps.v1beta1;
 
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
-import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/apis/policy/v1beta1/generated.proto";
 
@@ -136,7 +135,7 @@ message DeploymentSpec {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.
-  optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 3;
+  optional k8s.io.client_go.pkg.api.v1.PodTemplateSpec template = 3;
 
   // The deployment strategy to use to replace existing pods with new ones.
   // +optional
@@ -350,7 +349,7 @@ message StatefulSetSpec {
   // insufficient replicas are detected. Each pod stamped out by the StatefulSet
   // will fulfill this Template, but have a unique identity from the rest
   // of the StatefulSet.
-  optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 3;
+  optional k8s.io.client_go.pkg.api.v1.PodTemplateSpec template = 3;
 
   // volumeClaimTemplates is a list of claims that pods are allowed to reference.
   // The StatefulSet controller is responsible for mapping network identities to
@@ -360,7 +359,7 @@ message StatefulSetSpec {
   // any volumes in the template, with the same name.
   // TODO: Define the behavior if a claim already exists with the same name.
   // +optional
-  repeated k8s.io.kubernetes.pkg.api.v1.PersistentVolumeClaim volumeClaimTemplates = 4;
+  repeated k8s.io.client_go.pkg.api.v1.PersistentVolumeClaim volumeClaimTemplates = 4;
 
   // serviceName is the name of the service that governs this StatefulSet.
   // This service must exist before the StatefulSet, and is responsible for

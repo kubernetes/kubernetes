@@ -19,14 +19,13 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.pkg.apis.extensions.v1beta1;
+package k8s.io.client_go.pkg.apis.extensions.v1beta1;
 
 import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
-import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/apis/policy/v1beta1/generated.proto";
 
@@ -111,7 +110,7 @@ message DaemonSetSpec {
   // that matches the template's node selector (or on every node if no node
   // selector is specified).
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
-  optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 2;
+  optional k8s.io.client_go.pkg.api.v1.PodTemplateSpec template = 2;
 
   // An update strategy to replace existing DaemonSet pods with new pods.
   // +optional
@@ -259,7 +258,7 @@ message DeploymentSpec {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.
-  optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 3;
+  optional k8s.io.client_go.pkg.api.v1.PodTemplateSpec template = 3;
 
   // The deployment strategy to use to replace existing pods with new ones.
   // +optional
@@ -512,7 +511,7 @@ message IngressSpec {
 message IngressStatus {
   // LoadBalancer contains the current status of the load-balancer.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.LoadBalancerStatus loadBalancer = 1;
+  optional k8s.io.client_go.pkg.api.v1.LoadBalancerStatus loadBalancer = 1;
 }
 
 // IngressTLS describes the transport layer security associated with an Ingress.
@@ -794,7 +793,7 @@ message ReplicaSetSpec {
   // insufficient replicas are detected.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 3;
+  optional k8s.io.client_go.pkg.api.v1.PodTemplateSpec template = 3;
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
@@ -904,7 +903,7 @@ message SELinuxStrategyOptions {
   // seLinuxOptions required to run as; required for MustRunAs
   // More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/security_context.md
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.SELinuxOptions seLinuxOptions = 2;
+  optional k8s.io.client_go.pkg.api.v1.SELinuxOptions seLinuxOptions = 2;
 }
 
 // represents a scaling request for a resource.
