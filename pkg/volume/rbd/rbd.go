@@ -51,8 +51,10 @@ var _ volume.DeletableVolumePlugin = &rbdPlugin{}
 var _ volume.ProvisionableVolumePlugin = &rbdPlugin{}
 
 const (
-	rbdPluginName = "kubernetes.io/rbd"
-	secretKeyName = "key" // key name used in secret
+	rbdPluginName   = "kubernetes.io/rbd"
+	secretKeyName   = "key" // key name used in secret
+	rbdImageFormat1 = "1"
+	rbdImageFormat2 = "2"
 )
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
@@ -267,6 +269,7 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	adminSecretNamespace := "default"
 	secretName := ""
 	secret := ""
+	imageFormat := ""
 
 	for k, v := range r.options.Parameters {
 		switch dstrings.ToLower(k) {
@@ -287,11 +290,18 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			r.Pool = v
 		case "usersecretname":
 			secretName = v
+		case "imageformat":
+			imageFormat = v
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, r.plugin.GetPluginName())
 		}
 	}
 	// sanity check
+	if imageFormat != rbdImageFormat1 && imageFormat != rbdImageFormat2 {
+		return nil, fmt.Errorf("invalid ceph imageformat %s, expecting %s or %s",
+			imageFormat, rbdImageFormat1, rbdImageFormat2)
+	}
+	r.imageFormat = imageFormat
 	if adminSecretName == "" {
 		return nil, fmt.Errorf("missing Ceph admin secret name")
 	}
@@ -384,6 +394,7 @@ type rbdMounter struct {
 	adminSecret  string
 	adminId      string
 	mountOptions []string
+	imageFormat  string
 }
 
 var _ volume.Mounter = &rbdMounter{}
