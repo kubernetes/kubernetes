@@ -195,13 +195,14 @@ func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, se
 }
 
 type endpointsChange struct {
-	previous *api.Endpoints
-	current  *api.Endpoints
+	previous proxyEndpointsMap
+	current  proxyEndpointsMap
 }
 
 type endpointsChangeMap struct {
-	lock  sync.Mutex
-	items map[types.NamespacedName]*endpointsChange
+	lock     sync.Mutex
+	hostname string
+	items    map[types.NamespacedName]*endpointsChange
 }
 
 type serviceChange struct {
@@ -217,23 +218,31 @@ type serviceChangeMap struct {
 type proxyServiceMap map[proxy.ServicePortName]*serviceInfo
 type proxyEndpointsMap map[proxy.ServicePortName][]*endpointsInfo
 
-func newEndpointsChangeMap() endpointsChangeMap {
+func newEndpointsChangeMap(hostname string) endpointsChangeMap {
 	return endpointsChangeMap{
-		items: make(map[types.NamespacedName]*endpointsChange),
+		hostname: hostname,
+		items:    make(map[types.NamespacedName]*endpointsChange),
 	}
 }
 
-func (ecm *endpointsChangeMap) update(namespacedName *types.NamespacedName, previous, current *api.Endpoints) {
+func (ecm *endpointsChangeMap) update(namespacedName *types.NamespacedName, previous, current *api.Endpoints) bool {
 	ecm.lock.Lock()
 	defer ecm.lock.Unlock()
 
 	change, exists := ecm.items[*namespacedName]
 	if !exists {
 		change = &endpointsChange{}
-		change.previous = previous
+		change.previous = endpointsToEndpointsMap(previous, ecm.hostname)
 		ecm.items[*namespacedName] = change
 	}
-	change.current = current
+	change.current = endpointsToEndpointsMap(current, ecm.hostname)
+	if reflect.DeepEqual(change.previous, change.current) {
+		delete(ecm.items, *namespacedName)
+		return false
+	}
+	// TODO: Instead of returning true/false, shouldn't we just always return whether the map
+	// contains some element or not?
+	return true
 }
 
 func newServiceChangeMap() serviceChangeMap {
@@ -393,7 +402,7 @@ func NewProxier(ipt utiliptables.Interface,
 		serviceMap:       make(proxyServiceMap),
 		serviceChanges:   newServiceChangeMap(),
 		endpointsMap:     make(proxyEndpointsMap),
-		endpointsChanges: newEndpointsChangeMap(),
+		endpointsChanges: newEndpointsChangeMap(hostname),
 		iptables:         ipt,
 		masqueradeAll:    masqueradeAll,
 		masqueradeMark:   masqueradeMark,
@@ -655,34 +664,33 @@ func updateServiceMap(
 
 func (proxier *Proxier) OnEndpointsAdd(endpoints *api.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
-	proxier.endpointsChanges.update(&namespacedName, nil, endpoints)
-
-	// FIXME: we need to pass a reason syncReasonEndpoints.
-	proxier.syncRunner.CallFunction()
+	if proxier.endpointsChanges.update(&namespacedName, nil, endpoints) {
+		// TODO: Check if endpoints and services are synced.
+		proxier.syncRunner.CallFunction()
+	}
 }
 
 func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
-	proxier.endpointsChanges.update(&namespacedName, oldEndpoints, endpoints)
-
-	// FIXME: we need to pass a reason syncReasonEndpoints.
-	proxier.syncRunner.CallFunction()
+	if proxier.endpointsChanges.update(&namespacedName, oldEndpoints, endpoints) {
+		// TODO: Check if endpoints and services are synced.
+		proxier.syncRunner.CallFunction()
+	}
 }
 
 func (proxier *Proxier) OnEndpointsDelete(endpoints *api.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
-	proxier.endpointsChanges.update(&namespacedName, endpoints, nil)
-
-	// FIXME: we need to pass a reason syncReasonEndpoints.
-	proxier.syncRunner.CallFunction()
+	if proxier.endpointsChanges.update(&namespacedName, endpoints, nil) {
+		// TODO: Check if endpoints and services are synced.
+		proxier.syncRunner.CallFunction()
+	}
 }
 
 func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.mu.Lock()
 	proxier.endpointsSynced = true
 	proxier.mu.Unlock()
-
-	// FIXME: we need to pass a reason syncReasonEndpoints.
+	// Call it unconditionally - this is called once per lifetime.
 	proxier.syncRunner.CallFunction()
 }
 
@@ -699,14 +707,10 @@ func updateEndpointsMap(
 		changes.lock.Lock()
 		defer changes.lock.Unlock()
 		for _, change := range changes.items {
-			oldEndpointsMap := endpointsToEndpointsMap(change.previous, hostname)
-			newEndpointsMap := endpointsToEndpointsMap(change.current, hostname)
-			if !reflect.DeepEqual(oldEndpointsMap, newEndpointsMap) {
-				endpointsMap.unmerge(oldEndpointsMap)
-				endpointsMap.merge(newEndpointsMap)
-				detectStaleConnections(oldEndpointsMap, newEndpointsMap, staleSet)
-				syncRequired = true
-			}
+			endpointsMap.unmerge(change.previous)
+			endpointsMap.merge(change.current)
+			detectStaleConnections(change.previous, change.current, staleSet)
+			syncRequired = true
 		}
 		changes.items = make(map[types.NamespacedName]*endpointsChange)
 	}()
