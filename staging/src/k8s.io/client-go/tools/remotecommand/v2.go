@@ -24,7 +24,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 // streamProtocolV2 implements version 2 of the streaming protocol for attach
@@ -53,7 +53,7 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 	headers := http.Header{}
 
 	// set up error stream
-	headers.Set(api.StreamType, api.StreamTypeError)
+	headers.Set(v1.StreamType, v1.StreamTypeError)
 	p.errorStream, err = conn.CreateStream(headers)
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 
 	// set up stdin stream
 	if p.Stdin != nil {
-		headers.Set(api.StreamType, api.StreamTypeStdin)
+		headers.Set(v1.StreamType, v1.StreamTypeStdin)
 		p.remoteStdin, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
@@ -70,7 +70,7 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 
 	// set up stdout stream
 	if p.Stdout != nil {
-		headers.Set(api.StreamType, api.StreamTypeStdout)
+		headers.Set(v1.StreamType, v1.StreamTypeStdout)
 		p.remoteStdout, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
@@ -79,7 +79,7 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 
 	// set up stderr stream
 	if p.Stderr != nil && !p.Tty {
-		headers.Set(api.StreamType, api.StreamTypeStderr)
+		headers.Set(v1.StreamType, v1.StreamTypeStderr)
 		p.remoteStderr, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
