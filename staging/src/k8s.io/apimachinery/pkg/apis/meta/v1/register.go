@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -78,5 +79,6 @@ func init() {
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
 	scheme.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...)
+	scheme.AddGeneratedDeepCopyFuncs(unstructured.GetGeneratedDeepCopyFuncs()...)
 	RegisterDefaults(scheme)
 }

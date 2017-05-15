@@ -24,10 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// IsListType returns true if the provided Object has a slice called Items
+// IsListType returns true if the provided Accessor has a slice called Items
 func IsListType(obj runtime.Object) bool {
 	// if we're a runtime.Unstructured, check whether this is a list.
-	// TODO: refactor GetItemsPtr to use an interface that returns []runtime.Object
+	// TODO: refactor GetItemsPtr to use an interface that returns []runtime.Accessor
 	if unstructured, ok := obj.(runtime.Unstructured); ok {
 		return unstructured.IsList()
 	}
@@ -64,7 +64,7 @@ func GetItemsPtr(list runtime.Object) (interface{}, error) {
 	}
 }
 
-// EachListItem invokes fn on each runtime.Object in the list. Any error immediately terminates
+// EachListItem invokes fn on each runtime.Accessor in the list. Any error immediately terminates
 // the loop.
 func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
 	// TODO: Change to an interface call?
@@ -176,7 +176,7 @@ func SetList(list runtime.Object, objects []runtime.Object) error {
 	for i := range objects {
 		dest := slice.Index(i)
 		if dest.Type() == reflect.TypeOf(runtime.RawExtension{}) {
-			dest = dest.FieldByName("Object")
+			dest = dest.FieldByName("Accessor")
 		}
 
 		// check to see if you're directly assignable

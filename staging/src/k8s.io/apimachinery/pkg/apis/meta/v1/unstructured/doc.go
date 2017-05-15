@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package meta
-
-import (
-	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-)
-
-// InterfacesForUnstructured returns VersionInterfaces suitable for
-// dealing with unstructured.Unstructured objects.
-func InterfacesForUnstructured(schema.GroupVersion) (*VersionInterfaces, error) {
-	return &VersionInterfaces{
-		ObjectConvertor:  &unstructuredhelpers.ObjectConverter{},
-		MetadataAccessor: NewAccessor(),
-	}, nil
-}
+// unstructured provides JSON-like unstructure data types.
+package unstructured

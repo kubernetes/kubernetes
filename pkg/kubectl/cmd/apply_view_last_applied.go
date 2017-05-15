@@ -24,7 +24,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -93,7 +93,7 @@ func (o *ViewLastAppliedOptions) Complete(f cmdutil.Factory, args []string) erro
 		return err
 	}
 
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructuredhelpers.Codec).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(enforceNamespace, args...).

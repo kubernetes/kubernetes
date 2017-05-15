@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
@@ -145,7 +146,7 @@ func TestDynamicClient(t *testing.T) {
 }
 
 func unstructuredToPod(obj *unstructured.Unstructured) (*v1.Pod, error) {
-	json, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
+	json, err := runtime.Encode(unstructuredhelpers.Codec, obj)
 	if err != nil {
 		return nil, err
 	}

@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -197,10 +198,10 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings pr
 
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", obj.GetName())
-		w.Write(LEVEL_0, "Namespace:\t%s\n", obj.GetNamespace())
-		printLabelsMultiline(w, "Labels", obj.GetLabels())
-		printAnnotationsMultiline(w, "Annotations", obj.GetAnnotations())
+		w.Write(LEVEL_0, "Name:\t%s\n", (*unstructuredhelpers.Accessor)(obj).GetName())
+		w.Write(LEVEL_0, "Namespace:\t%s\n", (*unstructuredhelpers.Accessor)(obj).GetNamespace())
+		printLabelsMultiline(w, "Labels", (*unstructuredhelpers.Accessor)(obj).GetLabels())
+		printAnnotationsMultiline(w, "Annotations", (*unstructuredhelpers.Accessor)(obj).GetAnnotations())
 		printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), "", ".metadata.name", ".metadata.namespace", ".metadata.labels", ".metadata.annotations")
 		if events != nil {
 			DescribeEvents(events, w)

@@ -128,7 +128,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 	setObjectTypeMeta := func(obj interface{}) {
 		runtimeObject, ok := obj.(runtime.Object)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("expected runtime.Object, got %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("expected runtime.Accessor, got %#v", obj))
 		}
 		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
 	}

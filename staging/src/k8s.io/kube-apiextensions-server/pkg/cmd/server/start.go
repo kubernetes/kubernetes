@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
@@ -103,7 +103,7 @@ func (o CustomResourcesServerOptions) Config() (*apiserver.Config, error) {
 		EnableGarbageCollection: o.RecommendedOptions.Etcd.EnableGarbageCollection,
 		DeleteCollectionWorkers: o.RecommendedOptions.Etcd.DeleteCollectionWorkers,
 	}
-	customResourceRESTOptionsGetter.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	customResourceRESTOptionsGetter.StorageConfig.Codec = unstructuredhelpers.Codec
 	customResourceRESTOptionsGetter.StorageConfig.Copier = apiserver.UnstructuredCopier{}
 
 	config := &apiserver.Config{

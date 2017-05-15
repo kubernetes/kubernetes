@@ -27,6 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
@@ -236,7 +237,7 @@ func TestDelete(t *testing.T) {
 			}
 
 			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
-			unstructured.UnstructuredJSONScheme.Encode(statusOK, w)
+			unstructuredhelpers.Codec.Encode(statusOK, w)
 		})
 		if err != nil {
 			t.Errorf("unexpected error when creating client: %v", err)
@@ -285,7 +286,7 @@ func TestDeleteCollection(t *testing.T) {
 			}
 
 			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
-			unstructured.UnstructuredJSONScheme.Encode(statusOK, w)
+			unstructuredhelpers.Codec.Encode(statusOK, w)
 		})
 		if err != nil {
 			t.Errorf("unexpected error when creating client: %v", err)

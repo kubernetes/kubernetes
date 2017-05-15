@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -119,7 +119,7 @@ func RunDescribe(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, a
 	if err != nil {
 		return err
 	}
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructuredhelpers.Codec).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 		FilenameParam(enforceNamespace, options).
@@ -179,7 +179,7 @@ func DescribeMatchingResources(f cmdutil.Factory, namespace, rsrc, prefix string
 	if err != nil {
 		return err
 	}
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructuredhelpers.Codec).
 		NamespaceParam(namespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(true, rsrc).
 		SingleResourceType().

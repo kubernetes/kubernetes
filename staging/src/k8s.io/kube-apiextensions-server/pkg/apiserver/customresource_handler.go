@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"sync"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -178,7 +178,7 @@ func (r *customResourceHandler) ServeHTTP(w http.ResponseWriter, req *http.Reque
 		handler(w, req)
 		return
 	case "patch":
-		handler := handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{})
+		handler := handlers.PatchResource(storage, requestScope, r.admission, unstructuredhelpers.ObjectConverter{})
 		handler(w, req)
 		return
 	case "delete":
@@ -275,11 +275,11 @@ func (r *customResourceHandler) getServingInfoFor(customResource *apiextensions.
 		ParameterCodec: parameterCodec,
 
 		Creater:         UnstructuredCreator{},
-		Convertor:       unstructured.UnstructuredObjectConverter{},
+		Convertor:       unstructuredhelpers.ObjectConverter{},
 		Defaulter:       UnstructuredDefaulter{},
 		Copier:          UnstructuredCopier{},
 		Typer:           discovery.NewUnstructuredObjectTyper(nil),
-		UnsafeConvertor: unstructured.UnstructuredObjectConverter{},
+		UnsafeConvertor: unstructuredhelpers.ObjectConverter{},
 
 		Resource:    schema.GroupVersionResource{Group: customResource.Spec.Group, Version: customResource.Spec.Version, Resource: customResource.Spec.Names.Plural},
 		Kind:        schema.GroupVersionKind{Group: customResource.Spec.Group, Version: customResource.Spec.Version, Kind: customResource.Spec.Names.Kind},
@@ -316,11 +316,11 @@ func (s UnstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 }
 
 func (s UnstructuredNegotiatedSerializer) EncoderForVersion(serializer runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
-	return unstructured.UnstructuredJSONScheme
+	return unstructuredhelpers.Codec
 }
 
 func (s UnstructuredNegotiatedSerializer) DecoderToVersion(serializer runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	return unstructured.UnstructuredJSONScheme
+	return unstructuredhelpers.Codec
 }
 
 type UnstructuredCreator struct{}
@@ -334,15 +334,16 @@ func (UnstructuredCreator) New(kind schema.GroupVersionKind) (runtime.Object, er
 type UnstructuredCopier struct{}
 
 func (UnstructuredCopier) Copy(obj runtime.Object) (runtime.Object, error) {
-	// serialize and deserialize to ensure a clean copy
-	buf := &bytes.Buffer{}
-	err := unstructured.UnstructuredJSONScheme.Encode(obj, buf)
-	if err != nil {
-		return nil, err
+	switch u := obj.(type) {
+	case *unstructured.Unstructured:
+		clone := u.DeepCopy()
+		return &clone, nil
+	case *unstructured.UnstructuredList:
+		clone := u.DeepCopy()
+		return &clone, nil
+	default:
+		return nil, fmt.Errorf("UnstructuredCopier cannot copy %T", obj)
 	}
-	out := &unstructured.Unstructured{}
-	result, _, err := unstructured.UnstructuredJSONScheme.Decode(buf.Bytes(), nil, out)
-	return result, err
 }
 
 type UnstructuredDefaulter struct{}

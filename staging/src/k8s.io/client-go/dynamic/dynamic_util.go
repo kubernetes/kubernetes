@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -30,7 +31,7 @@ import (
 // accessor appropriate for use with unstructured objects.
 func VersionInterfaces(schema.GroupVersion) (*meta.VersionInterfaces, error) {
 	return &meta.VersionInterfaces{
-		ObjectConvertor:  &unstructured.UnstructuredObjectConverter{},
+		ObjectConvertor:  &unstructuredhelpers.ObjectConverter{},
 		MetadataAccessor: meta.NewAccessor(),
 	}, nil
 }

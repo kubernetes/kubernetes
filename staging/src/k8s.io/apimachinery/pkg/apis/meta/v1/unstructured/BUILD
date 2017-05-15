@@ -10,21 +10,22 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["unstructured_test.go"],
+    srcs = ["types_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
-    srcs = ["unstructured.go"],
+    srcs = [
+        "doc.go",
+        "types.go",
+        "zz_generated.deepcopy.go",
+    ],
     tags = ["automanaged"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
     ],
 )

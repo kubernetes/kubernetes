@@ -18,6 +18,7 @@ go_library(
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",

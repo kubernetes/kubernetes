@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/client/retry"
@@ -124,7 +125,7 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 			return nil
 		}
 		// remove the owner from dependent's OwnerReferences
-		ownerObject.SetFinalizers(newFinalizers)
+		(*unstructuredhelpers.Accessor)(ownerObject).SetFinalizers(newFinalizers)
 		_, err = gc.updateObject(owner.identity, ownerObject)
 		return err
 	})

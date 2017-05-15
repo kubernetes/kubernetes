@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -103,7 +104,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 	if err != nil {
 		return err
 	}
-	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme)
+	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructuredhelpers.Codec)
 	if o.EditMode == NormalEditMode {
 		// when do normal edit we need to always retrieve the latest resource from server
 		b = b.ResourceTypeOrNameArgs(true, args...).Latest()
@@ -121,7 +122,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 
 	o.updatedResultGetter = func(data []byte) *resource.Result {
 		// resource builder to read objects from edited data
-		return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+		return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructuredhelpers.Codec).
 			Stream(bytes.NewReader(data), "edited-file").
 			ContinueOnError().
 			Flatten().

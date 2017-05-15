@@ -25,7 +25,7 @@ import (
 
 	"github.com/pborman/uuid"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -84,7 +84,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 		EnableGarbageCollection: options.RecommendedOptions.Etcd.EnableGarbageCollection,
 		DeleteCollectionWorkers: options.RecommendedOptions.Etcd.DeleteCollectionWorkers,
 	}
-	customResourceRESTOptionsGetter.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	customResourceRESTOptionsGetter.StorageConfig.Codec = unstructuredhelpers.Codec
 	customResourceRESTOptionsGetter.StorageConfig.Copier = extensionsapiserver.UnstructuredCopier{}
 
 	config := &extensionsapiserver.Config{

@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructuredhelpers "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/helpers"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -205,7 +205,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		}
 	}
 
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructuredhelpers.Codec).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -230,7 +230,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
-		// In this method, info.Object contains the object retrieved from the server
+		// In this method, info.Accessor contains the object retrieved from the server
 		// and info.VersionedObject contains the object decoded from the input source.
 		if err != nil {
 			return err
