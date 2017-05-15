@@ -99,12 +99,12 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 		foundVersion = true
 
 		apiResourcesForDiscovery = append(apiResourcesForDiscovery, metav1.APIResource{
-			Name:         customResourceDefinition.Spec.Names.Plural,
-			SingularName: customResourceDefinition.Spec.Names.Singular,
+			Name:         customResourceDefinition.Status.AcceptedNames.Plural,
+			SingularName: customResourceDefinition.Status.AcceptedNames.Singular,
 			Namespaced:   customResourceDefinition.Spec.Scope == apiextensions.NamespaceScoped,
-			Kind:         customResourceDefinition.Spec.Names.Kind,
+			Kind:         customResourceDefinition.Status.AcceptedNames.Kind,
 			Verbs:        metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"}),
-			ShortNames:   customResourceDefinition.Spec.Names.ShortNames,
+			ShortNames:   customResourceDefinition.Status.AcceptedNames.ShortNames,
 		})
 	}
 

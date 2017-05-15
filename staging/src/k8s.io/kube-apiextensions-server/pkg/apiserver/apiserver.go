@@ -37,6 +37,7 @@ import (
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
 	"k8s.io/kube-apiextensions-server/pkg/client/clientset/internalclientset"
 	internalinformers "k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion"
+	"k8s.io/kube-apiextensions-server/pkg/controller/status"
 	"k8s.io/kube-apiextensions-server/pkg/registry/customresourcedefinition"
 
 	// make sure the generated client works
@@ -113,8 +114,10 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiextensions.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
 	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
+	customResourceDefintionStorage := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
 	v1alpha1storage := map[string]rest.Storage{}
-	v1alpha1storage["customresourcedefinitions"] = customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
+	v1alpha1storage["customresourcedefinitions"] = customResourceDefintionStorage
+	v1alpha1storage["customresourcedefinitions/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefintionStorage)
 	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
 
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
@@ -153,6 +156,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	s.GenericAPIServer.Handler.PostGoRestfulMux.HandlePrefix("/apis/", customResourceDefinitionHandler)
 
 	customResourceDefinitionController := NewDiscoveryController(customResourceDefinitionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
+	namingController := status.NewNamingConditionController(customResourceDefinitionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(), customResourceDefinitionClient)
 
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
 		customResourceDefinitionInformers.Start(context.StopCh)
@@ -160,6 +164,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	})
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
 		go customResourceDefinitionController.Run(context.StopCh)
+		go namingController.Run(context.StopCh)
 		return nil
 	})
 
