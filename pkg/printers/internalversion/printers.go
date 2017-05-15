@@ -55,7 +55,7 @@ var (
 	podColumns                       = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 	podWideColumns                   = []string{"IP", "NODE"}
 	podTemplateColumns               = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
-	podDisruptionBudgetColumns       = []string{"NAME", "MIN-AVAILABLE", "ALLOWED-DISRUPTIONS", "AGE"}
+	podDisruptionBudgetColumns       = []string{"NAME", "MIN-AVAILABLE", "MAX-UNAVAILABLE", "ALLOWED-DISRUPTIONS", "AGE"}
 	replicationControllerColumns     = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
 	replicationControllerWideColumns = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 	replicaSetColumns                = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
@@ -397,7 +397,7 @@ func printPodTemplateList(podList *api.PodTemplateList, w io.Writer, options pri
 }
 
 func printPodDisruptionBudget(pdb *policy.PodDisruptionBudget, w io.Writer, options printers.PrintOptions) error {
-	// name, minavailable, selector
+	// name, minavailable, maxUnavailable, selector
 	name := printers.FormatResourceName(options.Kind, pdb.Name, options.WithKind)
 	namespace := pdb.Namespace
 
@@ -406,9 +406,25 @@ func printPodDisruptionBudget(pdb *policy.PodDisruptionBudget, w io.Writer, opti
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\n",
+
+	var minAvailable string
+	var maxUnavailable string
+	if pdb.Spec.MinAvailable != nil {
+		minAvailable = pdb.Spec.MinAvailable.String()
+	} else {
+		minAvailable = "N/A"
+	}
+
+	if pdb.Spec.MaxUnavailable != nil {
+		maxUnavailable = pdb.Spec.MaxUnavailable.String()
+	} else {
+		maxUnavailable = "N/A"
+	}
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n",
 		name,
-		pdb.Spec.MinAvailable.String(),
+		minAvailable,
+		maxUnavailable,
 		pdb.Status.PodDisruptionsAllowed,
 		translateTimestamp(pdb.CreationTimestamp),
 	); err != nil {
