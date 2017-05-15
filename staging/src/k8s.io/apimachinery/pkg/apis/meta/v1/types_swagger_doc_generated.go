@@ -270,6 +270,7 @@ var map_StatusDetails = map[string]string{
 	"name":              "The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described).",
 	"group":             "The group attribute of the resource associated with the status StatusReason.",
 	"kind":              "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+	"uid":               "UID of the resource. (when there is a single resource which can be described). More info: http://kubernetes.io/docs/user-guide/identifiers#uids",
 	"causes":            "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
 	"retryAfterSeconds": "If specified, the time in seconds before the operation should be retried.",
 }
