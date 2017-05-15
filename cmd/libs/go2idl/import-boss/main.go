@@ -51,7 +51,7 @@ limitations under the License.
 //   ]
 // }
 //
-// Note the secound block explicitly matches the unsafe package, and forbids it
+// Note the second block explicitly matches the unsafe package, and forbids it
 // ("" is a prefix of everything).
 package main
 
