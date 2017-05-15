@@ -165,6 +165,9 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 			authInfoName, _ := config.getAuthInfoName()
 			persister = PersisterForUser(config.configAccess, authInfoName)
 		}
+		if err != nil {
+			return nil, err
+		}
 		userAuthPartialConfig, err := config.getUserIdentificationPartialConfig(configAuthInfo, config.fallbackReader, persister)
 		if err != nil {
 			return nil, err
