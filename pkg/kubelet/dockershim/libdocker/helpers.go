@@ -133,5 +133,8 @@ func matchImageIDOnly(inspected dockertypes.ImageInspect, image string) bool {
 // isImageNotFoundError returns whether the err is caused by image not found in docker
 // TODO: Use native error tester once ImageNotFoundError is supported in docker-engine client(eg. ImageRemove())
 func isImageNotFoundError(err error) bool {
-	return strings.Contains(err.Error(), "No such image:")
+	if err != nil {
+		return strings.Contains(err.Error(), "No such image:")
+	}
+	return false
 }
