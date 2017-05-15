@@ -1,5 +1,6 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 - [v1.6.3](#v163)
+  - [Known Issues for v1.6.3](#known-issues-for-v163)
   - [Downloads for v1.6.3](#downloads-for-v163)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
@@ -570,6 +571,13 @@
 # v1.6.3
 
 [Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.6/examples)
+
+## Known Issues for v1.6.3
+
+* This release introduced a regression when using [subPath](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath).
+  If the `subPath` is a file rather than a directory, Pods may fail to start ([#45613](https://github.com/kubernetes/kubernetes/issues/45613)).
+
+  **Do not upgrade to v1.6.3** if your cluster may run Pods with such subPaths.
 
 ## Downloads for v1.6.3
 
