@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
@@ -298,7 +299,7 @@ func (s *FederationSyncController) isSynced() bool {
 	}
 	clusters, err := s.informer.GetReadyClusters()
 	if err != nil {
-		glog.Errorf("Failed to get ready clusters: %v", err)
+		runtime.HandleError(fmt.Errorf("Failed to get ready clusters: %v", err))
 		return false
 	}
 	if !s.informer.GetTargetStore().ClustersSynced(clusters) {
@@ -328,7 +329,6 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 
 	obj, err := s.objFromCache(kind, key)
 	if err != nil {
-		glog.Error(err)
 		return statusError
 	}
 	if obj == nil {
@@ -341,7 +341,7 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		if err != nil {
 			msg := "Failed to delete %s %q: %v"
 			args := []interface{}{kind, namespacedName, err}
-			glog.Errorf(msg, args...)
+			runtime.HandleError(fmt.Errorf(msg, args...))
 			s.eventRecorder.Eventf(obj, api.EventTypeWarning, "DeleteFailed", msg, args...)
 			return statusError
 		}
@@ -351,7 +351,7 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 	glog.V(3).Infof("Ensuring finalizers exist on %s %q", kind, key)
 	obj, err = s.deletionHelper.EnsureFinalizers(obj)
 	if err != nil {
-		glog.Errorf("Failed to ensure finalizers for %s %q: %v", kind, key, err)
+		runtime.HandleError(fmt.Errorf("Failed to ensure finalizers for %s %q: %v", kind, key, err))
 		return statusError
 	}
 
@@ -372,7 +372,9 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 func (s *FederationSyncController) objFromCache(kind, key string) (pkgruntime.Object, error) {
 	cachedObj, exist, err := s.store.GetByKey(key)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to query %s store for %q: %v", kind, key, err)
+		wrappedErr := fmt.Errorf("Failed to query %s store for %q: %v", kind, key, err)
+		runtime.HandleError(wrappedErr)
+		return nil, err
 	}
 	if !exist {
 		return nil, nil
@@ -381,10 +383,14 @@ func (s *FederationSyncController) objFromCache(kind, key string) (pkgruntime.Ob
 	// Create a copy before modifying the resource to prevent racing with other readers.
 	copiedObj, err := api.Scheme.DeepCopy(cachedObj)
 	if err != nil {
-		return nil, fmt.Errorf("Error in retrieving %s %q from store: %v", kind, key, err)
+		wrappedErr := fmt.Errorf("Error in retrieving %s %q from store: %v", kind, key, err)
+		runtime.HandleError(wrappedErr)
+		return nil, err
 	}
 	if !s.adapter.IsExpectedType(copiedObj) {
-		return nil, fmt.Errorf("Object is not the expected type: %v", copiedObj)
+		err = fmt.Errorf("Object is not the expected type: %v", copiedObj)
+		runtime.HandleError(err)
+		return nil, err
 	}
 	return copiedObj.(pkgruntime.Object), nil
 }
@@ -422,13 +428,12 @@ func syncToClusters(clustersAccessor clustersAccessorFunc, operationsAccessor op
 
 	clusters, err := clustersAccessor()
 	if err != nil {
-		glog.Errorf("Failed to get cluster list: %v", err)
+		runtime.HandleError(fmt.Errorf("Failed to get cluster list: %v", err))
 		return statusNotSynced
 	}
 
 	operations, err := operationsAccessor(adapter, clusters, obj)
 	if err != nil {
-		glog.Error(err)
 		return statusError
 	}
 	if len(operations) == 0 {
@@ -437,7 +442,7 @@ func syncToClusters(clustersAccessor clustersAccessorFunc, operationsAccessor op
 
 	err = execute(operations)
 	if err != nil {
-		glog.Errorf("Failed to execute updates for %s %q: %v", kind, key, err)
+		runtime.HandleError(fmt.Errorf("Failed to execute updates for %s %q: %v", kind, key, err))
 		return statusError
 	}
 
@@ -454,7 +459,9 @@ func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, clusters []*
 	for _, cluster := range clusters {
 		clusterObj, found, err := accessor(cluster.Name)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get %s %q from cluster %q: %v", adapter.Kind(), key, cluster.Name, err)
+			wrappedErr := fmt.Errorf("Failed to get %s %q from cluster %q: %v", adapter.Kind(), key, cluster.Name, err)
+			runtime.HandleError(wrappedErr)
+			return nil, wrappedErr
 		}
 		// The data should not be modified.
 		desiredObj := adapter.Copy(obj)
