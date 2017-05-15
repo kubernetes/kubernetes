@@ -197,4 +197,6 @@ func TestSelfLink(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
+	// TODO add test for cluster scoped self-link when its available
+
 }
