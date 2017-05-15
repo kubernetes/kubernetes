@@ -18,12 +18,14 @@ package common
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -40,7 +42,6 @@ var _ = framework.KubeDescribe("HostPath", func() {
 	})
 
 	It("should give a volume the correct mode [Conformance] [Volume]", func() {
-		volumePath := "/test-volume"
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
@@ -57,7 +58,6 @@ var _ = framework.KubeDescribe("HostPath", func() {
 
 	// This test requires mounting a folder into a container with write privileges.
 	It("should support r/w [Volume]", func() {
-		volumePath := "/test-volume"
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180
 		source := &v1.HostPathVolumeSource{
@@ -82,7 +82,6 @@ var _ = framework.KubeDescribe("HostPath", func() {
 	})
 
 	It("should support subPath [Volume]", func() {
-		volumePath := "/test-volume"
 		subPath := "sub-path"
 		fileName := "test-file"
 		retryDuration := 180
@@ -101,6 +100,74 @@ var _ = framework.KubeDescribe("HostPath", func() {
 			fmt.Sprintf("--new_file_0644=%v", filePathInWriter),
 			fmt.Sprintf("--file_mode=%v", filePathInWriter),
 		}
+		// Read it from outside the subPath from container 1
+		pod.Spec.Containers[1].Args = []string{
+			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
+			fmt.Sprintf("--retry_time=%d", retryDuration),
+		}
+
+		f.TestContainerOutput("hostPath subPath", pod, 1, []string{
+			"content of file \"" + filePathInReader + "\": mount-tester new file",
+		})
+	})
+
+	It("should support existing directory subPath [Volume]", func() {
+		subPath := "sub-path"
+		fileName := "test-file"
+		retryDuration := 180
+
+		filePathInWriter := path.Join(volumePath, fileName)
+		filePathInReader := path.Join(volumePath, subPath, fileName)
+
+		source := &v1.HostPathVolumeSource{
+			Path: "/tmp",
+		}
+		pod := testPodWithHostVol(volumePath, source)
+		// Create the subPath directory on the host (if it already exists like wanted, just proceed)
+		existing := path.Join(source.Path, subPath)
+		exists, err := util.FileExists(existing)
+		if err != nil {
+			framework.ExpectNoError(err, fmt.Sprintf("error checking if directory %s already exists", existing))
+		}
+		if !exists {
+			err := os.Mkdir(path.Join(source.Path, subPath), 0755)
+			framework.ExpectNoError(err, fmt.Sprintf("could not create directory %s", existing))
+		}
+		// Write the file in the subPath from container 0
+		container := &pod.Spec.Containers[0]
+		container.VolumeMounts[0].SubPath = subPath
+		container.Args = []string{
+			fmt.Sprintf("--new_file_0644=%v", filePathInWriter),
+			fmt.Sprintf("--file_mode=%v", filePathInWriter),
+		}
+		// Read it from outside the subPath from container 1
+		pod.Spec.Containers[1].Args = []string{
+			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
+			fmt.Sprintf("--retry_time=%d", retryDuration),
+		}
+
+		f.TestContainerOutput("hostPath subPath", pod, 1, []string{
+			"content of file \"" + filePathInReader + "\": mount-tester new file",
+		})
+	})
+
+	It("should support existing single file subPath [Volume]", func() {
+		subPath := "test-file"
+		retryDuration := 180
+
+		filePathInReader := path.Join(volumePath, subPath)
+
+		source := &v1.HostPathVolumeSource{
+			Path: "/tmp",
+		}
+		pod := testPodWithHostVol(volumePath, source)
+		// Create the subPath file on the host
+		existing := path.Join(source.Path, subPath)
+		err := ioutil.WriteFile(existing, []byte("mount-tester new file\n"), 0644)
+		framework.ExpectNoError(err, fmt.Sprintf("could not write file %s", existing))
+		// Mount the file to the subPath in container 0
+		container := &pod.Spec.Containers[0]
+		container.VolumeMounts[0].SubPath = subPath
 		// Read it from outside the subPath from container 1
 		pod.Spec.Containers[1].Args = []string{
 			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
