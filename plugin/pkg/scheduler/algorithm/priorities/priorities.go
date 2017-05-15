@@ -47,8 +47,12 @@ func calculateScore(requested int64, capacity int64, node string) int {
 func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) schedulerapi.HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
+	totalDiskIops := int64(0)
+	totalDiskSize := int64(0)
 	capacityMilliCPU := node.Status.Allocatable.Cpu().MilliValue()
 	capacityMemory := node.Status.Allocatable.Memory().Value()
+	capacityDiskIops := int64(node.ObjectMeta.Labels["iops"])
+	capacityDiskSize := int64(node.ObjectMeta.Labels["disk_size"])
 
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
@@ -56,17 +60,41 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) sc
 			totalMilliCPU += cpu
 			totalMemory += memory
 		}
+		if pod.Labels["iops"] && pod.Labels["disk_size"] {
+			diskIops, _ := strconv.ParseInt(existingPod.ObjectMeta.Labels["iops"], 10, 64)
+			diskSize, _ := strconv.ParseInt(existingPod.ObjectMeta.Labels["disk_size"], 10, 64)
+			totalDiskIops += diskIops
+			totalDiskSize += diskSize
+		}
 	}
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, nodes.
+
+	// TODO: 是否纳入计算?
 	for _, container := range pod.Spec.Containers {
 		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)
 		totalMilliCPU += cpu
 		totalMemory += memory
 	}
-
+	//-----------------------------------------------------------------------------
 	cpuScore := calculateScore(totalMilliCPU, capacityMilliCPU, node.Name)
 	memoryScore := calculateScore(totalMemory, capacityMemory, node.Name)
+	if pod.Labels["iops"] && pod.Labels["disk_size"] {
+		ioScore := int((totalDiskIops/capacityDiskIops + totalDiskSize/capacityDiskSize) / 2)
+		glog.V(10).Infof(
+			"%v -> %v: Least Requested Priority, Absolute/Requested: (%d, %d) / (%d, %d) Score: (%d, %d)",
+			pod.Name, node.Name,
+			totalMilliCPU, totalMemory,
+			capacityMilliCPU, capacityMemory,
+			cpuScore, memoryScore,
+		)
+
+		return schedulerapi.HostPriority{
+			Host:  node.Name,
+			Score: int((cpuScore + memoryScore + ioScore) / 3),
+		}
+
+	}
 	glog.V(10).Infof(
 		"%v -> %v: Least Requested Priority, Absolute/Requested: (%d, %d) / (%d, %d) Score: (%d, %d)",
 		pod.Name, node.Name,

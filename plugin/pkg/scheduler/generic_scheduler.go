@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -101,7 +103,24 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 		return "", err
 	}
 
-	return g.selectHost(priorityList)
+	result, err := g.selectHost(priorityList)
+
+	// TODO:这里调用storage_agent
+	if pod.Labels["iops"] && pod.Labels["disk_size"] {
+		data := make(url.Values)
+		data["iops"] = []string{pod.Labels["iops"]}
+		data["size"] = []string{pod.Labels["disk_size"]}
+		data["lv_name"] = []string{pod.Name}
+		node_url := fmt.Sprintf("http://%v:8080/v1/lv/", result)
+		res, err := http.PostForm(node_url, data)
+		if err != nil {
+			return "", err
+		}
+		defer res.Body.Close()
+
+	}
+	return result, err
+
 }
 
 // selectHost takes a prioritized list of nodes and then picks one
