@@ -41,7 +41,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 		return nil, err
 	}
 
-	options := server.NewCustomResourcesServerOptions(os.Stdout, os.Stderr)
+	options := server.NewCustomResourceDefinitionsServerOptions(os.Stdout, os.Stderr)
 	options.RecommendedOptions.Audit.Path = "-"
 	options.RecommendedOptions.SecureServing.BindPort = port
 	options.RecommendedOptions.Authentication.SkipInClusterLookup = true
@@ -76,7 +76,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 		return nil, err
 	}
 
-	customResourceRESTOptionsGetter := extensionsapiserver.CustomResourceRESTOptionsGetter{
+	customResourceDefinitionRESTOptionsGetter := extensionsapiserver.CustomResourceDefinitionRESTOptionsGetter{
 		StorageConfig:           options.RecommendedOptions.Etcd.StorageConfig,
 		StoragePrefix:           options.RecommendedOptions.Etcd.StorageConfig.Prefix,
 		EnableWatchCache:        options.RecommendedOptions.Etcd.EnableWatchCache,
@@ -84,12 +84,12 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 		EnableGarbageCollection: options.RecommendedOptions.Etcd.EnableGarbageCollection,
 		DeleteCollectionWorkers: options.RecommendedOptions.Etcd.DeleteCollectionWorkers,
 	}
-	customResourceRESTOptionsGetter.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
-	customResourceRESTOptionsGetter.StorageConfig.Copier = extensionsapiserver.UnstructuredCopier{}
+	customResourceDefinitionRESTOptionsGetter.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	customResourceDefinitionRESTOptionsGetter.StorageConfig.Copier = extensionsapiserver.UnstructuredCopier{}
 
 	config := &extensionsapiserver.Config{
-		GenericConfig:                   genericConfig,
-		CustomResourceRESTOptionsGetter: customResourceRESTOptionsGetter,
+		GenericConfig:                             genericConfig,
+		CustomResourceDefinitionRESTOptionsGetter: customResourceDefinitionRESTOptionsGetter,
 	}
 
 	return config, nil

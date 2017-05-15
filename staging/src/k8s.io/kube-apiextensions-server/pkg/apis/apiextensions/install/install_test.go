@@ -34,7 +34,7 @@ func TestRoundTripTypes(t *testing.T) {
 
 func fuzzerFuncs() []interface{} {
 	return []interface{}{
-		func(obj *apiextensions.CustomResourceSpec, c fuzz.Continue) {
+		func(obj *apiextensions.CustomResourceDefinitionSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 
 			// match our defaulter

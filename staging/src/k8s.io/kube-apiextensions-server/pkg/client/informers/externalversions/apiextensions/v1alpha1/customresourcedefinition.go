@@ -30,28 +30,28 @@ import (
 	time "time"
 )
 
-// CustomResourceInformer provides access to a shared informer and lister for
-// CustomResources.
-type CustomResourceInformer interface {
+// CustomResourceDefinitionInformer provides access to a shared informer and lister for
+// CustomResourceDefinitions.
+type CustomResourceDefinitionInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.CustomResourceLister
+	Lister() v1alpha1.CustomResourceDefinitionLister
 }
 
-type customResourceInformer struct {
+type customResourceDefinitionInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newCustomResourceInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newCustomResourceDefinitionInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.ApiextensionsV1alpha1().CustomResources().List(options)
+				return client.ApiextensionsV1alpha1().CustomResourceDefinitions().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.ApiextensionsV1alpha1().CustomResources().Watch(options)
+				return client.ApiextensionsV1alpha1().CustomResourceDefinitions().Watch(options)
 			},
 		},
-		&apiextensions_v1alpha1.CustomResource{},
+		&apiextensions_v1alpha1.CustomResourceDefinition{},
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -59,10 +59,10 @@ func newCustomResourceInformer(client clientset.Interface, resyncPeriod time.Dur
 	return sharedIndexInformer
 }
 
-func (f *customResourceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiextensions_v1alpha1.CustomResource{}, newCustomResourceInformer)
+func (f *customResourceDefinitionInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&apiextensions_v1alpha1.CustomResourceDefinition{}, newCustomResourceDefinitionInformer)
 }
 
-func (f *customResourceInformer) Lister() v1alpha1.CustomResourceLister {
-	return v1alpha1.NewCustomResourceLister(f.Informer().GetIndexer())
+func (f *customResourceDefinitionInformer) Lister() v1alpha1.CustomResourceDefinitionLister {
+	return v1alpha1.NewCustomResourceDefinitionLister(f.Informer().GetIndexer())
 }
