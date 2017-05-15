@@ -16,6 +16,11 @@ release_filegroup(
         ":kubeadm.deb",
         ":kubectl.deb",
         ":kubelet.deb",
+        ":kube-apiserver.deb",
+        ":kube-scheduler.deb",
+        ":kube-controller-manager.deb",
+        ":kube-proxy.deb",
+        ":kube-aggregator.deb",
         ":kubernetes-cni.deb",
     ],
 )
