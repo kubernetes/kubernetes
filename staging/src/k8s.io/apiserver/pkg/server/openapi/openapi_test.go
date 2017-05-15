@@ -187,6 +187,7 @@ func getConfig(fullMethods bool) (*openapi.Config, *restful.Container) {
 			InfoProps: spec.InfoProps{
 				Title:       "TestAPI",
 				Description: "Test API",
+				Version:     "unversioned",
 			},
 		},
 		GetDefinitions: func(_ openapi.ReferenceCallback) map[string]openapi.OpenAPIDefinition {
@@ -330,7 +331,7 @@ func getAdditionalTestParameters() []spec.Parameter {
 		ParamProps: spec.ParamProps{
 			Name:        "fparam",
 			Description: "a test form parameter",
-			In:          "form",
+			In:          "formData",
 		},
 		SimpleSchema: spec.SimpleSchema{
 			Type: "number",
@@ -432,6 +433,7 @@ func TestBuildSwaggerSpec(t *testing.T) {
 				InfoProps: spec.InfoProps{
 					Title:       "TestAPI",
 					Description: "Test API",
+					Version:     "unversioned",
 				},
 			},
 			Swagger: "2.0",
