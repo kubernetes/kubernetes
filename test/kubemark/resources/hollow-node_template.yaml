@@ -90,6 +90,8 @@ spec:
           requests:
             cpu: {{HOLLOW_PROXY_CPU}}m
             memory: {{HOLLOW_PROXY_MEM}}Ki
+        securityContext:
+          privileged: true
       - name: hollow-node-problem-detector
         image: gcr.io/google_containers/node-problem-detector:v0.3.0
         env:
