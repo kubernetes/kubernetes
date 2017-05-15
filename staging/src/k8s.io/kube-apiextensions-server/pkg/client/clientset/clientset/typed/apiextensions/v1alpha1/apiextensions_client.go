@@ -25,7 +25,7 @@ import (
 
 type ApiextensionsV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	CustomResourcesGetter
+	CustomResourceDefinitionsGetter
 }
 
 // ApiextensionsV1alpha1Client is used to interact with features provided by the apiextensions.k8s.io group.
@@ -33,8 +33,8 @@ type ApiextensionsV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *ApiextensionsV1alpha1Client) CustomResources() CustomResourceInterface {
-	return newCustomResources(c)
+func (c *ApiextensionsV1alpha1Client) CustomResourceDefinitions() CustomResourceDefinitionInterface {
+	return newCustomResourceDefinitions(c)
 }
 
 // NewForConfig creates a new ApiextensionsV1alpha1Client for the given config.

@@ -26,8 +26,8 @@ type FakeApiextensions struct {
 	*testing.Fake
 }
 
-func (c *FakeApiextensions) CustomResources() internalversion.CustomResourceInterface {
-	return &FakeCustomResources{c}
+func (c *FakeApiextensions) CustomResourceDefinitions() internalversion.CustomResourceDefinitionInterface {
+	return &FakeCustomResourceDefinitions{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

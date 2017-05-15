@@ -30,7 +30,7 @@ import (
 	"k8s.io/kube-apiextensions-server/test/integration/testserver"
 )
 
-func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client *dynamic.ResourceClient, definition *apiextensionsv1alpha1.CustomResource) (*unstructured.Unstructured, error) {
+func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client *dynamic.ResourceClient, definition *apiextensionsv1alpha1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
 	createdInstance, err := client.Create(instanceToCreate)
 	if err != nil {
 		t.Logf("%#v", createdInstance)
@@ -57,7 +57,7 @@ func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unst
 	return createdInstance, nil
 }
 
-func NewNamespacedCustomResourceClient(ns string, client *dynamic.Client, definition *apiextensionsv1alpha1.CustomResource) *dynamic.ResourceClient {
+func NewNamespacedCustomResourceClient(ns string, client *dynamic.Client, definition *apiextensionsv1alpha1.CustomResourceDefinition) *dynamic.ResourceClient {
 	return client.Resource(&metav1.APIResource{
 		Name:       definition.Spec.Names.Plural,
 		Namespaced: definition.Spec.Scope == apiextensionsv1alpha1.NamespaceScoped,

@@ -40,19 +40,19 @@ func (v validationMatch) matches(err *field.Error) bool {
 	return err.Type == v.errorType && err.Field == v.path.String()
 }
 
-func TestValidateCustomResource(t *testing.T) {
+func TestValidateCustomResourceDefinition(t *testing.T) {
 	tests := []struct {
 		name     string
-		resource *apiextensions.CustomResource
+		resource *apiextensions.CustomResourceDefinition
 		errors   []validationMatch
 	}{
 		{
 			name: "mismatched name",
-			resource: &apiextensions.CustomResource{
+			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.not.group.com"},
-				Spec: apiextensions.CustomResourceSpec{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group: "group.com",
-					Names: apiextensions.CustomResourceNames{
+					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural: "plural",
 					},
 				},
@@ -63,7 +63,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{
 			name: "missing values",
-			resource: &apiextensions.CustomResource{
+			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
 			},
 			errors: []validationMatch{
@@ -78,21 +78,21 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{
 			name: "bad names 01",
-			resource: &apiextensions.CustomResource{
+			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group"},
-				Spec: apiextensions.CustomResourceSpec{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group:   "group",
 					Version: "ve()*rsion",
 					Scope:   apiextensions.ResourceScope("foo"),
-					Names: apiextensions.CustomResourceNames{
+					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "pl()*ural",
 						Singular: "value()*a",
 						Kind:     "value()*a",
 						ListKind: "value()*a",
 					},
 				},
-				Status: apiextensions.CustomResourceStatus{
-					AcceptedNames: apiextensions.CustomResourceNames{
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "pl()*ural",
 						Singular: "value()*a",
 						Kind:     "value()*a",
@@ -116,20 +116,20 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{
 			name: "bad names 02",
-			resource: &apiextensions.CustomResource{
+			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group"},
-				Spec: apiextensions.CustomResourceSpec{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group:   "group.c(*&om",
 					Version: "version",
-					Names: apiextensions.CustomResourceNames{
+					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
 						Kind:     "matching",
 						ListKind: "matching",
 					},
 				},
-				Status: apiextensions.CustomResourceStatus{
-					AcceptedNames: apiextensions.CustomResourceNames{
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
 						Kind:     "matching",
@@ -146,7 +146,7 @@ func TestValidateCustomResource(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		errs := ValidateCustomResource(tc.resource)
+		errs := ValidateCustomResourceDefinition(tc.resource)
 
 		for _, expectedError := range tc.errors {
 			found := false

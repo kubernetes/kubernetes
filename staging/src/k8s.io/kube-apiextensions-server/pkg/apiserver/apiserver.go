@@ -37,7 +37,7 @@ import (
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
 	"k8s.io/kube-apiextensions-server/pkg/client/clientset/internalclientset"
 	internalinformers "k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion"
-	"k8s.io/kube-apiextensions-server/pkg/registry/customresource"
+	"k8s.io/kube-apiextensions-server/pkg/registry/customresourcedefinition"
 
 	// make sure the generated client works
 	_ "k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset"
@@ -71,10 +71,10 @@ func init() {
 type Config struct {
 	GenericConfig *genericapiserver.Config
 
-	CustomResourceRESTOptionsGetter genericregistry.RESTOptionsGetter
+	CustomResourceDefinitionRESTOptionsGetter genericregistry.RESTOptionsGetter
 }
 
-type CustomResources struct {
+type CustomResourceDefinitions struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 }
 
@@ -100,32 +100,32 @@ func (c *Config) SkipComplete() completedConfig {
 	return completedConfig{c}
 }
 
-// New returns a new instance of CustomResources from the given config.
-func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*CustomResources, error) {
+// New returns a new instance of CustomResourceDefinitions from the given config.
+func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*CustomResourceDefinitions, error) {
 	genericServer, err := c.Config.GenericConfig.SkipComplete().New(genericapiserver.EmptyDelegate) // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
 	}
 
-	s := &CustomResources{
+	s := &CustomResourceDefinitions{
 		GenericAPIServer: genericServer,
 	}
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiextensions.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
 	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
 	v1alpha1storage := map[string]rest.Storage{}
-	v1alpha1storage["customresources"] = customresource.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
+	v1alpha1storage["customresourcedefinitions"] = customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
 	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
 
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
 	}
 
-	customResourceClient, err := internalclientset.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
+	customResourceDefinitionClient, err := internalclientset.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		return nil, err
 	}
-	customResourceInformers := internalinformers.NewSharedInformerFactory(customResourceClient, 5*time.Minute)
+	customResourceDefinitionInformers := internalinformers.NewSharedInformerFactory(customResourceDefinitionClient, 5*time.Minute)
 
 	delegateHandler := delegationTarget.UnprotectedHandler()
 	if delegateHandler == nil {
@@ -140,26 +140,26 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		discovery: map[string]*discovery.APIGroupHandler{},
 		delegate:  delegateHandler,
 	}
-	customResourceHandler := NewCustomResourceHandler(
+	customResourceDefinitionHandler := NewCustomResourceDefinitionHandler(
 		versionDiscoveryHandler,
 		groupDiscoveryHandler,
 		s.GenericAPIServer.RequestContextMapper(),
-		customResourceInformers.Apiextensions().InternalVersion().CustomResources().Lister(),
+		customResourceDefinitionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions().Lister(),
 		delegateHandler,
-		c.CustomResourceRESTOptionsGetter,
+		c.CustomResourceDefinitionRESTOptionsGetter,
 		c.GenericConfig.AdmissionControl,
 	)
-	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle("/apis", customResourceHandler)
-	s.GenericAPIServer.Handler.PostGoRestfulMux.HandlePrefix("/apis/", customResourceHandler)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle("/apis", customResourceDefinitionHandler)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.HandlePrefix("/apis/", customResourceDefinitionHandler)
 
-	customResourceController := NewDiscoveryController(customResourceInformers.Apiextensions().InternalVersion().CustomResources(), versionDiscoveryHandler, groupDiscoveryHandler)
+	customResourceDefinitionController := NewDiscoveryController(customResourceDefinitionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
 
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
-		customResourceInformers.Start(context.StopCh)
+		customResourceDefinitionInformers.Start(context.StopCh)
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
-		go customResourceController.Run(context.StopCh)
+		go customResourceDefinitionController.Run(context.StopCh)
 		return nil
 	})
 
