@@ -153,6 +153,10 @@ func (podStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 	oldPod := old.(*api.Pod)
 	newPod.Spec = oldPod.Spec
 	newPod.DeletionTimestamp = nil
+
+	// don't allow the pods/status endpoint to touch owner references since old kubelets corrupt them in a way
+	// that breaks garbage collection
+	newPod.OwnerReferences = oldPod.OwnerReferences
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
