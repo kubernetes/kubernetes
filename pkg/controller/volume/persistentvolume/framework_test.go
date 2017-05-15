@@ -166,7 +166,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		return true, nil, err
 	}
 
-	// Test did not requst to inject an error, continue simulating API server.
+	// Test did not request to inject an error, continue simulating API server.
 	switch {
 	case action.Matches("create", "persistentvolumes"):
 		obj := action.(core.UpdateAction).GetObject()
