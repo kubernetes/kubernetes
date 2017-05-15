@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -1458,6 +1459,63 @@ URL:	http://localhost
 			if strings.Contains(output, test.unexpected) {
 				t.Errorf("Didn't expect to find %q in: %q", test.unexpected, output)
 			}
+		}
+	}
+}
+
+func TestDescribePodSecurityPolicy(t *testing.T) {
+	expected := []string{
+		"Name:\t*mypsp",
+		"Allow Privileged:\t*false",
+		"Default Add Capabilities:\t*<none>",
+		"Required Drop Capabilities:\t*<none>",
+		"Allowed Capabilities:\t*<none>",
+		"Allowed Volume Types:\t*<none>",
+		"Allow Host Network:\t*false",
+		"Allow Host Ports:\t*<none>",
+		"Allow Host PID:\t*false",
+		"Allow Host IPC:\t*false",
+		"Read Only Root Filesystem:\t*false",
+		"SELinux Context Strategy: RunAsAny",
+		"User:\t*<none>",
+		"Role:\t*<none>",
+		"Type:\t*<none>",
+		"Level:\t*<none>",
+		"Run As User Strategy: RunAsAny",
+		"FSGroup Strategy: RunAsAny",
+		"Supplemental Groups Strategy: RunAsAny",
+	}
+
+	fake := fake.NewSimpleClientset(&extensions.PodSecurityPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mypsp",
+		},
+		Spec: extensions.PodSecurityPolicySpec{
+			SELinux: extensions.SELinuxStrategyOptions{
+				Rule: extensions.SELinuxStrategyRunAsAny,
+			},
+			RunAsUser: extensions.RunAsUserStrategyOptions{
+				Rule: extensions.RunAsUserStrategyRunAsAny,
+			},
+			FSGroup: extensions.FSGroupStrategyOptions{
+				Rule: extensions.FSGroupStrategyRunAsAny,
+			},
+			SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
+				Rule: extensions.SupplementalGroupsStrategyRunAsAny,
+			},
+		},
+	})
+
+	c := &describeClient{T: t, Namespace: "", Interface: fake}
+	d := PodSecurityPolicyDescriber{c}
+	out, err := d.Describe("", "mypsp", printers.DescriberSettings{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, item := range expected {
+		if matched, _ := regexp.MatchString(item, out); !matched {
+			t.Errorf("Expected to find %q in: %q", item, out)
 		}
 	}
 }
