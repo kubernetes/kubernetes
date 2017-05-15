@@ -115,6 +115,8 @@ func TestPodDeletionWithDswp(t *testing.T) {
 
 	// start controller loop
 	stopCh := make(chan struct{})
+	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
+	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
 	go ctrl.Run(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
