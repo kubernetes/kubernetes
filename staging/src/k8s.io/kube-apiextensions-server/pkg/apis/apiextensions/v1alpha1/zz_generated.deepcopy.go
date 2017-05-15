@@ -35,19 +35,19 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CustomResource, InType: reflect.TypeOf(&CustomResource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CustomResourceCondition, InType: reflect.TypeOf(&CustomResourceCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CustomResourceList, InType: reflect.TypeOf(&CustomResourceList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CustomResourceNames, InType: reflect.TypeOf(&CustomResourceNames{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CustomResourceSpec, InType: reflect.TypeOf(&CustomResourceSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CustomResourceStatus, InType: reflect.TypeOf(&CustomResourceStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CustomResourceDefinition, InType: reflect.TypeOf(&CustomResourceDefinition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CustomResourceDefinitionCondition, InType: reflect.TypeOf(&CustomResourceDefinitionCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CustomResourceDefinitionList, InType: reflect.TypeOf(&CustomResourceDefinitionList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CustomResourceDefinitionNames, InType: reflect.TypeOf(&CustomResourceDefinitionNames{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CustomResourceDefinitionSpec, InType: reflect.TypeOf(&CustomResourceDefinitionSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CustomResourceDefinitionStatus, InType: reflect.TypeOf(&CustomResourceDefinitionStatus{})},
 	)
 }
 
-func DeepCopy_v1alpha1_CustomResource(in interface{}, out interface{}, c *conversion.Cloner) error {
+func DeepCopy_v1alpha1_CustomResourceDefinition(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
-		in := in.(*CustomResource)
-		out := out.(*CustomResource)
+		in := in.(*CustomResourceDefinition)
+		out := out.(*CustomResourceDefinition)
 		*out = *in
 		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
@@ -57,40 +57,40 @@ func DeepCopy_v1alpha1_CustomResource(in interface{}, out interface{}, c *conver
 		if newVal, err := c.DeepCopy(&in.Spec); err != nil {
 			return err
 		} else {
-			out.Spec = *newVal.(*CustomResourceSpec)
+			out.Spec = *newVal.(*CustomResourceDefinitionSpec)
 		}
 		if newVal, err := c.DeepCopy(&in.Status); err != nil {
 			return err
 		} else {
-			out.Status = *newVal.(*CustomResourceStatus)
+			out.Status = *newVal.(*CustomResourceDefinitionStatus)
 		}
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_CustomResourceCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
+func DeepCopy_v1alpha1_CustomResourceDefinitionCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
-		in := in.(*CustomResourceCondition)
-		out := out.(*CustomResourceCondition)
+		in := in.(*CustomResourceDefinitionCondition)
+		out := out.(*CustomResourceDefinitionCondition)
 		*out = *in
 		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_CustomResourceList(in interface{}, out interface{}, c *conversion.Cloner) error {
+func DeepCopy_v1alpha1_CustomResourceDefinitionList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
-		in := in.(*CustomResourceList)
-		out := out.(*CustomResourceList)
+		in := in.(*CustomResourceDefinitionList)
+		out := out.(*CustomResourceDefinitionList)
 		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
-			*out = make([]CustomResource, len(*in))
+			*out = make([]CustomResourceDefinition, len(*in))
 			for i := range *in {
 				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
 				} else {
-					(*out)[i] = *newVal.(*CustomResource)
+					(*out)[i] = *newVal.(*CustomResourceDefinition)
 				}
 			}
 		}
@@ -98,10 +98,10 @@ func DeepCopy_v1alpha1_CustomResourceList(in interface{}, out interface{}, c *co
 	}
 }
 
-func DeepCopy_v1alpha1_CustomResourceNames(in interface{}, out interface{}, c *conversion.Cloner) error {
+func DeepCopy_v1alpha1_CustomResourceDefinitionNames(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
-		in := in.(*CustomResourceNames)
-		out := out.(*CustomResourceNames)
+		in := in.(*CustomResourceDefinitionNames)
+		out := out.(*CustomResourceDefinitionNames)
 		*out = *in
 		if in.ShortNames != nil {
 			in, out := &in.ShortNames, &out.ShortNames
@@ -112,40 +112,40 @@ func DeepCopy_v1alpha1_CustomResourceNames(in interface{}, out interface{}, c *c
 	}
 }
 
-func DeepCopy_v1alpha1_CustomResourceSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+func DeepCopy_v1alpha1_CustomResourceDefinitionSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
-		in := in.(*CustomResourceSpec)
-		out := out.(*CustomResourceSpec)
+		in := in.(*CustomResourceDefinitionSpec)
+		out := out.(*CustomResourceDefinitionSpec)
 		*out = *in
 		if newVal, err := c.DeepCopy(&in.Names); err != nil {
 			return err
 		} else {
-			out.Names = *newVal.(*CustomResourceNames)
+			out.Names = *newVal.(*CustomResourceDefinitionNames)
 		}
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_CustomResourceStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+func DeepCopy_v1alpha1_CustomResourceDefinitionStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
-		in := in.(*CustomResourceStatus)
-		out := out.(*CustomResourceStatus)
+		in := in.(*CustomResourceDefinitionStatus)
+		out := out.(*CustomResourceDefinitionStatus)
 		*out = *in
 		if in.Conditions != nil {
 			in, out := &in.Conditions, &out.Conditions
-			*out = make([]CustomResourceCondition, len(*in))
+			*out = make([]CustomResourceDefinitionCondition, len(*in))
 			for i := range *in {
 				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
 				} else {
-					(*out)[i] = *newVal.(*CustomResourceCondition)
+					(*out)[i] = *newVal.(*CustomResourceDefinitionCondition)
 				}
 			}
 		}
 		if newVal, err := c.DeepCopy(&in.AcceptedNames); err != nil {
 			return err
 		} else {
-			out.AcceptedNames = *newVal.(*CustomResourceNames)
+			out.AcceptedNames = *newVal.(*CustomResourceDefinitionNames)
 		}
 		return nil
 	}

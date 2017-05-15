@@ -40,8 +40,8 @@ type DiscoveryController struct {
 	versionHandler *versionDiscoveryHandler
 	groupHandler   *groupDiscoveryHandler
 
-	customResourceLister  listers.CustomResourceLister
-	customResourcesSynced cache.InformerSynced
+	customResourceDefinitionLister  listers.CustomResourceDefinitionLister
+	customResourceDefinitionsSynced cache.InformerSynced
 
 	// To allow injection for testing.
 	syncFn func(version schema.GroupVersion) error
@@ -49,20 +49,20 @@ type DiscoveryController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-func NewDiscoveryController(customResourceInformer informers.CustomResourceInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler) *DiscoveryController {
+func NewDiscoveryController(customResourceDefinitionInformer informers.CustomResourceDefinitionInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler) *DiscoveryController {
 	c := &DiscoveryController{
-		versionHandler:        versionHandler,
-		groupHandler:          groupHandler,
-		customResourceLister:  customResourceInformer.Lister(),
-		customResourcesSynced: customResourceInformer.Informer().HasSynced,
+		versionHandler:                  versionHandler,
+		groupHandler:                    groupHandler,
+		customResourceDefinitionLister:  customResourceDefinitionInformer.Lister(),
+		customResourceDefinitionsSynced: customResourceDefinitionInformer.Informer().HasSynced,
 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DiscoveryController"),
 	}
 
-	customResourceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.addCustomResource,
-		UpdateFunc: c.updateCustomResource,
-		DeleteFunc: c.deleteCustomResource,
+	customResourceDefinitionInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.addCustomResourceDefinition,
+		UpdateFunc: c.updateCustomResourceDefinition,
+		DeleteFunc: c.deleteCustomResourceDefinition,
 	})
 
 	c.syncFn = c.sync
@@ -75,36 +75,36 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	apiVersionsForDiscovery := []metav1.GroupVersionForDiscovery{}
 	apiResourcesForDiscovery := []metav1.APIResource{}
 
-	customResources, err := c.customResourceLister.List(labels.Everything())
+	customResourceDefinitions, err := c.customResourceDefinitionLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
 	foundVersion := false
 	foundGroup := false
-	for _, customResource := range customResources {
+	for _, customResourceDefinition := range customResourceDefinitions {
 		// TODO add status checking
 
-		if customResource.Spec.Group != version.Group {
+		if customResourceDefinition.Spec.Group != version.Group {
 			continue
 		}
 		foundGroup = true
 		apiVersionsForDiscovery = append(apiVersionsForDiscovery, metav1.GroupVersionForDiscovery{
-			GroupVersion: customResource.Spec.Group + "/" + customResource.Spec.Version,
-			Version:      customResource.Spec.Version,
+			GroupVersion: customResourceDefinition.Spec.Group + "/" + customResourceDefinition.Spec.Version,
+			Version:      customResourceDefinition.Spec.Version,
 		})
 
-		if customResource.Spec.Version != version.Version {
+		if customResourceDefinition.Spec.Version != version.Version {
 			continue
 		}
 		foundVersion = true
 
 		apiResourcesForDiscovery = append(apiResourcesForDiscovery, metav1.APIResource{
-			Name:         customResource.Spec.Names.Plural,
-			SingularName: customResource.Spec.Names.Singular,
-			Namespaced:   customResource.Spec.Scope == apiextensions.NamespaceScoped,
-			Kind:         customResource.Spec.Names.Kind,
+			Name:         customResourceDefinition.Spec.Names.Plural,
+			SingularName: customResourceDefinition.Spec.Names.Singular,
+			Namespaced:   customResourceDefinition.Spec.Scope == apiextensions.NamespaceScoped,
+			Kind:         customResourceDefinition.Spec.Names.Kind,
 			Verbs:        metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"}),
-			ShortNames:   customResource.Spec.Names.ShortNames,
+			ShortNames:   customResourceDefinition.Spec.Names.ShortNames,
 		})
 	}
 
@@ -140,7 +140,7 @@ func (c *DiscoveryController) Run(stopCh <-chan struct{}) {
 
 	glog.Infof("Starting DiscoveryController")
 
-	if !cache.WaitForCacheSync(stopCh, c.customResourcesSynced) {
+	if !cache.WaitForCacheSync(stopCh, c.customResourceDefinitionsSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
@@ -176,36 +176,36 @@ func (c *DiscoveryController) processNextWorkItem() bool {
 	return true
 }
 
-func (c *DiscoveryController) enqueue(obj *apiextensions.CustomResource) {
+func (c *DiscoveryController) enqueue(obj *apiextensions.CustomResourceDefinition) {
 	c.queue.Add(schema.GroupVersion{Group: obj.Spec.Group, Version: obj.Spec.Version})
 }
 
-func (c *DiscoveryController) addCustomResource(obj interface{}) {
-	castObj := obj.(*apiextensions.CustomResource)
-	glog.V(4).Infof("Adding customresource %s", castObj.Name)
+func (c *DiscoveryController) addCustomResourceDefinition(obj interface{}) {
+	castObj := obj.(*apiextensions.CustomResourceDefinition)
+	glog.V(4).Infof("Adding customresourcedefinition %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
-func (c *DiscoveryController) updateCustomResource(obj, _ interface{}) {
-	castObj := obj.(*apiextensions.CustomResource)
-	glog.V(4).Infof("Updating customresource %s", castObj.Name)
+func (c *DiscoveryController) updateCustomResourceDefinition(obj, _ interface{}) {
+	castObj := obj.(*apiextensions.CustomResourceDefinition)
+	glog.V(4).Infof("Updating customresourcedefinition %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
-func (c *DiscoveryController) deleteCustomResource(obj interface{}) {
-	castObj, ok := obj.(*apiextensions.CustomResource)
+func (c *DiscoveryController) deleteCustomResourceDefinition(obj interface{}) {
+	castObj, ok := obj.(*apiextensions.CustomResourceDefinition)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			glog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
-		castObj, ok = tombstone.Obj.(*apiextensions.CustomResource)
+		castObj, ok = tombstone.Obj.(*apiextensions.CustomResourceDefinition)
 		if !ok {
 			glog.Errorf("Tombstone contained object that is not expected %#v", obj)
 			return
 		}
 	}
-	glog.V(4).Infof("Deleting customresource %q", castObj.Name)
+	glog.V(4).Infof("Deleting customresourcedefinition %q", castObj.Name)
 	c.enqueue(castObj)
 }
