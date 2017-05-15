@@ -101,8 +101,11 @@ func (ds *dockerService) RemoveImage(image *runtimeapi.ImageSpec) error {
 			}
 		}
 		return nil
-	} else if err != nil && libdocker.IsImageNotFoundError(err) {
-		return nil
+	}
+	// dockerclient.InspectImageByID doesn't work with digest and repoTags,
+	// it is safe to continue removing it since there is another check below.
+	if err != nil && !libdocker.IsImageNotFoundError(err) {
+		return err
 	}
 
 	_, err = ds.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{PruneChildren: true})
