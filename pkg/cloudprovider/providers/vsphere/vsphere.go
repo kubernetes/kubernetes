@@ -528,7 +528,7 @@ func (i *Instances) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress,
 		}
 		for _, ip := range v.IpAddress {
 			if net.ParseIP(ip).To4() != nil {
-				v1helper.AddToNodeAddresses(&addrs,
+				v1.AddToNodeAddresses(&addrs,
 					v1.NodeAddress{
 						Type:    addressType,
 						Address: ip,
