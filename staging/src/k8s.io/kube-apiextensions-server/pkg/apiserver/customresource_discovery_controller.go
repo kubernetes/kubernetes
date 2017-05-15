@@ -40,8 +40,8 @@ type DiscoveryController struct {
 	versionHandler *versionDiscoveryHandler
 	groupHandler   *groupDiscoveryHandler
 
-	customResourceDefinitionLister  listers.CustomResourceDefinitionLister
-	customResourceDefinitionsSynced cache.InformerSynced
+	crdLister  listers.CustomResourceDefinitionLister
+	crdsSynced cache.InformerSynced
 
 	// To allow injection for testing.
 	syncFn func(version schema.GroupVersion) error
@@ -49,17 +49,17 @@ type DiscoveryController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-func NewDiscoveryController(customResourceDefinitionInformer informers.CustomResourceDefinitionInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler) *DiscoveryController {
+func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler) *DiscoveryController {
 	c := &DiscoveryController{
-		versionHandler:                  versionHandler,
-		groupHandler:                    groupHandler,
-		customResourceDefinitionLister:  customResourceDefinitionInformer.Lister(),
-		customResourceDefinitionsSynced: customResourceDefinitionInformer.Informer().HasSynced,
+		versionHandler: versionHandler,
+		groupHandler:   groupHandler,
+		crdLister:      crdInformer.Lister(),
+		crdsSynced:     crdInformer.Informer().HasSynced,
 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DiscoveryController"),
 	}
 
-	customResourceDefinitionInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addCustomResourceDefinition,
 		UpdateFunc: c.updateCustomResourceDefinition,
 		DeleteFunc: c.deleteCustomResourceDefinition,
@@ -75,36 +75,39 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	apiVersionsForDiscovery := []metav1.GroupVersionForDiscovery{}
 	apiResourcesForDiscovery := []metav1.APIResource{}
 
-	customResourceDefinitions, err := c.customResourceDefinitionLister.List(labels.Everything())
+	crds, err := c.crdLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
 	foundVersion := false
 	foundGroup := false
-	for _, customResourceDefinition := range customResourceDefinitions {
-		// TODO add status checking
+	for _, crd := range crds {
+		// if we can't definitively determine that our names are good, don't serve it
+		if !apiextensions.IsCRDConditionFalse(crd, apiextensions.NameConflict) {
+			continue
+		}
 
-		if customResourceDefinition.Spec.Group != version.Group {
+		if crd.Spec.Group != version.Group {
 			continue
 		}
 		foundGroup = true
 		apiVersionsForDiscovery = append(apiVersionsForDiscovery, metav1.GroupVersionForDiscovery{
-			GroupVersion: customResourceDefinition.Spec.Group + "/" + customResourceDefinition.Spec.Version,
-			Version:      customResourceDefinition.Spec.Version,
+			GroupVersion: crd.Spec.Group + "/" + crd.Spec.Version,
+			Version:      crd.Spec.Version,
 		})
 
-		if customResourceDefinition.Spec.Version != version.Version {
+		if crd.Spec.Version != version.Version {
 			continue
 		}
 		foundVersion = true
 
 		apiResourcesForDiscovery = append(apiResourcesForDiscovery, metav1.APIResource{
-			Name:         customResourceDefinition.Spec.Names.Plural,
-			SingularName: customResourceDefinition.Spec.Names.Singular,
-			Namespaced:   customResourceDefinition.Spec.Scope == apiextensions.NamespaceScoped,
-			Kind:         customResourceDefinition.Spec.Names.Kind,
+			Name:         crd.Status.AcceptedNames.Plural,
+			SingularName: crd.Status.AcceptedNames.Singular,
+			Namespaced:   crd.Spec.Scope == apiextensions.NamespaceScoped,
+			Kind:         crd.Status.AcceptedNames.Kind,
 			Verbs:        metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"}),
-			ShortNames:   customResourceDefinition.Spec.Names.ShortNames,
+			ShortNames:   crd.Status.AcceptedNames.ShortNames,
 		})
 	}
 
@@ -140,7 +143,7 @@ func (c *DiscoveryController) Run(stopCh <-chan struct{}) {
 
 	glog.Infof("Starting DiscoveryController")
 
-	if !cache.WaitForCacheSync(stopCh, c.customResourceDefinitionsSynced) {
+	if !cache.WaitForCacheSync(stopCh, c.crdsSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
