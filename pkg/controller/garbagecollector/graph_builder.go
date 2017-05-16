@@ -94,6 +94,7 @@ type GraphBuilder struct {
 	absentOwnerCache *UIDCache
 	sharedInformers  informers.SharedInformerFactory
 	stopCh           <-chan struct{}
+	ignoredResources map[schema.GroupResource]struct{}
 }
 
 func listWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *cache.ListWatch {
@@ -193,7 +194,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 
 func (gb *GraphBuilder) monitorsForResources(resources map[schema.GroupVersionResource]struct{}) error {
 	for resource := range resources {
-		if _, ok := ignoredResources[resource]; ok {
+		if _, ok := gb.ignoredResources[resource.GroupResource()]; ok {
 			glog.V(5).Infof("ignore resource %#v", resource)
 			continue
 		}
@@ -231,16 +232,24 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 	gb.stopCh = stopCh
 }
 
-var ignoredResources = map[schema.GroupVersionResource]struct{}{
-	{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}:              {},
-	{Group: "", Version: "v1", Resource: "bindings"}:                                           {},
-	{Group: "", Version: "v1", Resource: "componentstatuses"}:                                  {},
-	{Group: "", Version: "v1", Resource: "events"}:                                             {},
-	{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}:             {},
-	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {},
-	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {},
-	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
-	{Group: "apiregistration.k8s.io", Version: "v1beta1", Resource: "apiservices"}:             {},
+var ignoredResources = map[schema.GroupResource]struct{}{
+	{Group: "extensions", Resource: "replicationcontrollers"}:              {},
+	{Group: "", Resource: "bindings"}:                                      {},
+	{Group: "", Resource: "componentstatuses"}:                             {},
+	{Group: "", Resource: "events"}:                                        {},
+	{Group: "authentication.k8s.io", Resource: "tokenreviews"}:             {},
+	{Group: "authorization.k8s.io", Resource: "subjectaccessreviews"}:      {},
+	{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"}:  {},
+	{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"}: {},
+	{Group: "apiregistration.k8s.io", Resource: "apiservices"}:             {},
+	{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"}: {},
+}
+
+// DefaultIgnoredResources returns the default set of resources that the garbage collector controller
+// should ignore. This is exposed so downstream integrators can have access to the defaults, and add
+// to them as necessary when constructing the controller.
+func DefaultIgnoredResources() map[schema.GroupResource]struct{} {
+	return ignoredResources
 }
 
 func (gb *GraphBuilder) enqueueChanges(e *event) {
