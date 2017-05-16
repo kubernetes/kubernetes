@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	// "github.com/go-openapi/spec"
+	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -48,6 +48,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/client-go/pkg/api"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -76,10 +77,6 @@ func init() {
 	examplev1.AddToScheme(scheme)
 }
 
-func testGetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.OpenAPIDefinition {
-	return map[string]openapi.OpenAPIDefinition{}
-}
-
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, scheme)
@@ -90,14 +87,17 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
 
-	// TODO restore this test, but right now, eliminate our cycle
-	// config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, runtime.NewScheme())
-	// config.OpenAPIConfig.Info = &spec.Info{
-	// 	InfoProps: spec.InfoProps{
-	// 		Title:   "Kubernetes",
-	// 		Version: "unversioned",
-	// 	},
-	// }
+	config.OpenAPIConfig = DefaultOpenAPIConfig(
+		func(ref openapi.ReferenceCallback) map[string]openapi.OpenAPIDefinition {
+			return map[string]openapi.OpenAPIDefinition{}
+		},
+		api.Scheme)
+	config.OpenAPIConfig.Info = &spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:   "Kubernetes",
+			Version: "unversioned",
+		},
+	}
 	config.SwaggerConfig = DefaultSwaggerConfig()
 
 	return etcdServer, *config, assert.New(t)
@@ -300,7 +300,7 @@ func TestPrepareRun(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	assert.NotNil(config.SwaggerConfig)
-	// assert.NotNil(config.OpenAPIConfig)
+	assert.NotNil(config.OpenAPIConfig)
 
 	server := httptest.NewServer(s.Handler.GoRestfulContainer.ServeMux)
 	defer server.Close()
@@ -308,12 +308,12 @@ func TestPrepareRun(t *testing.T) {
 	s.PrepareRun()
 
 	// openapi is installed in PrepareRun
-	// resp, err := http.Get(server.URL + "/swagger.json")
-	// assert.NoError(err)
-	// assert.Equal(http.StatusOK, resp.StatusCode)
+	resp, err := http.Get(server.URL + "/swagger.json")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
 
 	// swagger is installed in PrepareRun
-	resp, err := http.Get(server.URL + "/swaggerapi/")
+	resp, err = http.Get(server.URL + "/swaggerapi/")
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
 
