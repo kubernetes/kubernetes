@@ -132,7 +132,7 @@ type internalImageConfig struct {
 type internalGCEImage struct {
 	image     string
 	project   string
-	resources *Resources
+	resources Resources
 	metadata  *compute.Metadata
 	machine   string
 	tests     []string
@@ -209,7 +209,7 @@ func main() {
 					metadata:  getImageMetadata(imageConfig.Metadata),
 					machine:   imageConfig.Machine,
 					tests:     imageConfig.Tests,
-					resources: &imageConfig.Resources,
+					resources: imageConfig.Resources,
 				}
 				if isRegex && len(images) > 1 {
 					// Use image name when shortName is not unique.
