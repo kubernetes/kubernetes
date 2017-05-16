@@ -109,6 +109,12 @@ type AuthInfo struct {
 	// Impersonate is the username to act-as.
 	// +optional
 	Impersonate string `json:"act-as,omitempty"`
+	// ImpersonateGroups is the groups to imperonate.
+	// +optional
+	ImpersonateGroups []string `json:"act-as-groups,omitempty"`
+	// ImpersonateUserExtra contains additional information for impersonated user.
+	// +optional
+	ImpersonateUserExtra map[string][]string `json:"act-as-user-extra,omitempty"`
 	// Username is the username for basic authentication to the kubernetes cluster.
 	// +optional
 	Username string `json:"username,omitempty"`
@@ -172,7 +178,10 @@ func NewCluster() *Cluster {
 // NewAuthInfo is a convenience function that returns a new AuthInfo
 // object with non-nil maps
 func NewAuthInfo() *AuthInfo {
-	return &AuthInfo{Extensions: make(map[string]runtime.Object)}
+	return &AuthInfo{
+		Extensions:           make(map[string]runtime.Object),
+		ImpersonateUserExtra: make(map[string][]string),
+	}
 }
 
 // NewPreferences is a convenience function that returns a new
