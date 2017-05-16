@@ -16,12 +16,10 @@ limitations under the License.
 
 package apiextensions
 
-import ()
-
-// SetCustomResourceDefinitionCondition sets the status condition.  It either overwrites the existing one or
+// SetCRDCondition sets the status condition.  It either overwrites the existing one or
 // creates a new one
-func SetCustomResourceDefinitionCondition(customResourceDefinition *CustomResourceDefinition, newCondition CustomResourceDefinitionCondition) {
-	existingCondition := GetCustomResourceDefinitionCondition(customResourceDefinition, newCondition.Type)
+func SetCRDCondition(customResourceDefinition *CustomResourceDefinition, newCondition CustomResourceDefinitionCondition) {
+	existingCondition := FindCRDCondition(customResourceDefinition, newCondition.Type)
 	if existingCondition == nil {
 		customResourceDefinition.Status.Conditions = append(customResourceDefinition.Status.Conditions, newCondition)
 		return
@@ -36,8 +34,8 @@ func SetCustomResourceDefinitionCondition(customResourceDefinition *CustomResour
 	existingCondition.Message = newCondition.Message
 }
 
-// GetCustomResourceDefinitionCondition returns the condition you're looking for or nil
-func GetCustomResourceDefinitionCondition(customResourceDefinition *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType) *CustomResourceDefinitionCondition {
+// FindCRDCondition returns the condition you're looking for or nil
+func FindCRDCondition(customResourceDefinition *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType) *CustomResourceDefinitionCondition {
 	for i := range customResourceDefinition.Status.Conditions {
 		if customResourceDefinition.Status.Conditions[i].Type == conditionType {
 			return &customResourceDefinition.Status.Conditions[i]
@@ -47,23 +45,28 @@ func GetCustomResourceDefinitionCondition(customResourceDefinition *CustomResour
 	return nil
 }
 
-// IsCustomResourceDefinitionConditionTrue indicates if the condition is present and strictly true
-func IsCustomResourceDefinitionConditionTrue(customResourceDefinition *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType) bool {
-	return IsCustomResourceDefinitionCondition(customResourceDefinition, conditionType, ConditionTrue)
+// IsCRDConditionTrue indicates if the condition is present and strictly true
+func IsCRDConditionTrue(customResourceDefinition *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType) bool {
+	return IsCRDConditionPresentAndEqual(customResourceDefinition, conditionType, ConditionTrue)
 }
 
-// IsCustomResourceDefinitionCondition indicates if the condition is present and equal to the arg
-func IsCustomResourceDefinitionCondition(customResourceDefinition *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType, status ConditionStatus) bool {
+// IsCRDConditionFalse indicates if the condition is present and false true
+func IsCRDConditionFalse(customResourceDefinition *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType) bool {
+	return IsCRDConditionPresentAndEqual(customResourceDefinition, conditionType, ConditionFalse)
+}
+
+// IsCRDConditionPresentAndEqual indicates if the condition is present and equal to the arg
+func IsCRDConditionPresentAndEqual(customResourceDefinition *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType, status ConditionStatus) bool {
 	for _, condition := range customResourceDefinition.Status.Conditions {
-		if condition.Type == conditionType && condition.Status == status {
-			return true
+		if condition.Type == conditionType {
+			return condition.Status == status
 		}
 	}
 	return false
 }
 
-// IsCustomResourceDefinitionEquivalent returns true if the lhs and rhs are equivalent except for times
-func IsCustomResourceDefinitionEquivalent(lhs, rhs *CustomResourceDefinitionCondition) bool {
+// IsCRDConditionEquivalent returns true if the lhs and rhs are equivalent except for times
+func IsCRDConditionEquivalent(lhs, rhs *CustomResourceDefinitionCondition) bool {
 	if lhs == nil && rhs == nil {
 		return true
 	}

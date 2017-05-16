@@ -44,10 +44,13 @@ var cloner = conversion.NewCloner()
 // This controller is reserving names. To avoid conflicts, be sure to run only one instance of the worker at a time.
 // This could eventually be lifted, but starting simple.
 type NamingConditionController struct {
-	customResourceDefinitionClient client.CustomResourceDefinitionsGetter
+	crdClient client.CustomResourceDefinitionsGetter
 
-	customResourceDefinitionLister listers.CustomResourceDefinitionLister
-	customResourceDefinitionSynced cache.InformerSynced
+	crdLister listers.CustomResourceDefinitionLister
+	crdSynced cache.InformerSynced
+	// crdMutationCache backs our lister and keeps track of committed updates to avoid racy
+	// write/lookup cycles.  It's got 100 slots by default, so it unlikely to overrun
+	crdMutationCache cache.MutationCache
 
 	// To allow injection for testing.
 	syncFn func(key string) error
@@ -56,17 +59,20 @@ type NamingConditionController struct {
 }
 
 func NewNamingConditionController(
-	customResourceDefinitionInformer informers.CustomResourceDefinitionInformer,
-	customResourceDefinitionClient client.CustomResourceDefinitionsGetter,
+	crdInformer informers.CustomResourceDefinitionInformer,
+	crdClient client.CustomResourceDefinitionsGetter,
 ) *NamingConditionController {
 	c := &NamingConditionController{
-		customResourceDefinitionClient: customResourceDefinitionClient,
-		customResourceDefinitionLister: customResourceDefinitionInformer.Lister(),
-		customResourceDefinitionSynced: customResourceDefinitionInformer.Informer().HasSynced,
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "CustomResourceDefinition-NamingConditionController"),
+		crdClient: crdClient,
+		crdLister: crdInformer.Lister(),
+		crdSynced: crdInformer.Informer().HasSynced,
+		queue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "CustomResourceDefinition-NamingConditionController"),
 	}
 
-	customResourceDefinitionInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	informerIndexer := crdInformer.Informer().GetIndexer()
+	c.crdMutationCache = cache.NewIntegerResourceVersionMutationCache(informerIndexer, informerIndexer)
+
+	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addCustomResourceDefinition,
 		UpdateFunc: c.updateCustomResourceDefinition,
 		DeleteFunc: c.deleteCustomResourceDefinition,
@@ -77,11 +83,11 @@ func NewNamingConditionController(
 	return c
 }
 
-func (c *NamingConditionController) getNamesForGroup(group string) (allResources sets.String, allKinds sets.String) {
+func (c *NamingConditionController) getAcceptedNamesForGroup(group string) (allResources sets.String, allKinds sets.String) {
 	allResources = sets.String{}
 	allKinds = sets.String{}
 
-	list, err := c.customResourceDefinitionLister.List(labels.Everything())
+	list, err := c.crdLister.List(labels.Everything())
 	if err != nil {
 		panic(err)
 	}
@@ -91,12 +97,21 @@ func (c *NamingConditionController) getNamesForGroup(group string) (allResources
 			continue
 		}
 
-		allResources.Insert(curr.Status.AcceptedNames.Plural)
-		allResources.Insert(curr.Status.AcceptedNames.Singular)
-		allResources.Insert(curr.Status.AcceptedNames.ShortNames...)
+		// for each item here, see if we have a mutation cache entry that is more recent
+		// this makes sure that if we tight loop on update and run, our mutation cache will show
+		// us the version of the objects we just updated to.
+		item := curr
+		obj, exists, err := c.crdMutationCache.GetByKey(curr.Name)
+		if exists && err == nil {
+			item = obj.(*apiextensions.CustomResourceDefinition)
+		}
 
-		allKinds.Insert(curr.Status.AcceptedNames.Kind)
-		allKinds.Insert(curr.Status.AcceptedNames.ListKind)
+		allResources.Insert(item.Status.AcceptedNames.Plural)
+		allResources.Insert(item.Status.AcceptedNames.Singular)
+		allResources.Insert(item.Status.AcceptedNames.ShortNames...)
+
+		allKinds.Insert(item.Status.AcceptedNames.Kind)
+		allKinds.Insert(item.Status.AcceptedNames.ListKind)
 	}
 
 	return allResources, allKinds
@@ -104,7 +119,7 @@ func (c *NamingConditionController) getNamesForGroup(group string) (allResources
 
 func (c *NamingConditionController) calculateNames(in *apiextensions.CustomResourceDefinition) (apiextensions.CustomResourceDefinitionNames, apiextensions.CustomResourceDefinitionCondition) {
 	// Get the names that have already been claimed
-	allResources, allKinds := c.getNamesForGroup(in.Spec.Group)
+	allResources, allKinds := c.getAcceptedNamesForGroup(in.Spec.Group)
 
 	condition := apiextensions.CustomResourceDefinitionCondition{
 		Type:   apiextensions.NameConflict,
@@ -117,14 +132,14 @@ func (c *NamingConditionController) calculateNames(in *apiextensions.CustomResou
 
 	// Check each name for mismatches.  If there's a mismatch between spec and status, then try to deconflict.
 	// Continue on errors so that the status is the best match possible
-	if err := checkName(requestedNames.Plural, acceptedNames.Plural, allResources); err != nil {
+	if err := equalToAcceptedOrFresh(requestedNames.Plural, acceptedNames.Plural, allResources); err != nil {
 		condition.Status = apiextensions.ConditionTrue
 		condition.Reason = "Plural"
 		condition.Message = err.Error()
 	} else {
 		newNames.Plural = requestedNames.Plural
 	}
-	if err := checkName(requestedNames.Singular, acceptedNames.Singular, allResources); err != nil {
+	if err := equalToAcceptedOrFresh(requestedNames.Singular, acceptedNames.Singular, allResources); err != nil {
 		condition.Status = apiextensions.ConditionTrue
 		condition.Reason = "Singular"
 		condition.Message = err.Error()
@@ -139,7 +154,7 @@ func (c *NamingConditionController) calculateNames(in *apiextensions.CustomResou
 			if existingShortNames.Has(shortName) {
 				continue
 			}
-			if err := checkName(shortName, "", allResources); err != nil {
+			if err := equalToAcceptedOrFresh(shortName, "", allResources); err != nil {
 				errs = append(errs, err)
 			}
 
@@ -153,14 +168,14 @@ func (c *NamingConditionController) calculateNames(in *apiextensions.CustomResou
 		}
 	}
 
-	if err := checkName(requestedNames.Kind, acceptedNames.Kind, allKinds); err != nil {
+	if err := equalToAcceptedOrFresh(requestedNames.Kind, acceptedNames.Kind, allKinds); err != nil {
 		condition.Status = apiextensions.ConditionTrue
 		condition.Reason = "Kind"
 		condition.Message = err.Error()
 	} else {
 		newNames.Kind = requestedNames.Kind
 	}
-	if err := checkName(requestedNames.ListKind, acceptedNames.ListKind, allKinds); err != nil {
+	if err := equalToAcceptedOrFresh(requestedNames.ListKind, acceptedNames.ListKind, allKinds); err != nil {
 		condition.Status = apiextensions.ConditionTrue
 		condition.Reason = "ListKind"
 		condition.Message = err.Error()
@@ -171,14 +186,14 @@ func (c *NamingConditionController) calculateNames(in *apiextensions.CustomResou
 	// if we haven't changed the condition, then our names must be good.
 	if condition.Status == apiextensions.ConditionUnknown {
 		condition.Status = apiextensions.ConditionFalse
-		condition.Reason = "Passed"
+		condition.Reason = "NoConflicts"
 		condition.Message = "no conflicts found"
 	}
 
 	return newNames, condition
 }
 
-func checkName(requestedName, acceptedName string, usedNames sets.String) error {
+func equalToAcceptedOrFresh(requestedName, acceptedName string, usedNames sets.String) error {
 	if requestedName == acceptedName {
 		return nil
 	}
@@ -190,7 +205,7 @@ func checkName(requestedName, acceptedName string, usedNames sets.String) error 
 }
 
 func (c *NamingConditionController) sync(key string) error {
-	inCustomResourceDefinition, err := c.customResourceDefinitionLister.Get(key)
+	inCustomResourceDefinition, err := c.crdLister.Get(key)
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
@@ -199,34 +214,43 @@ func (c *NamingConditionController) sync(key string) error {
 	}
 
 	acceptedNames, namingCondition := c.calculateNames(inCustomResourceDefinition)
+	// nothing to do if accepted names and NameConflict condition didn't change
 	if reflect.DeepEqual(inCustomResourceDefinition.Status.AcceptedNames, acceptedNames) &&
-		apiextensions.IsCustomResourceDefinitionEquivalent(
+		apiextensions.IsCRDConditionEquivalent(
 			&namingCondition,
-			apiextensions.GetCustomResourceDefinitionCondition(inCustomResourceDefinition, apiextensions.NameConflict)) {
+			apiextensions.FindCRDCondition(inCustomResourceDefinition, apiextensions.NameConflict)) {
 		return nil
 	}
 
-	customResourceDefinition := &apiextensions.CustomResourceDefinition{}
-	if err := apiextensions.DeepCopy_apiextensions_CustomResourceDefinition(inCustomResourceDefinition, customResourceDefinition, cloner); err != nil {
+	crd := &apiextensions.CustomResourceDefinition{}
+	if err := apiextensions.DeepCopy_apiextensions_CustomResourceDefinition(inCustomResourceDefinition, crd, cloner); err != nil {
 		return err
 	}
 
-	customResourceDefinition.Status.AcceptedNames = acceptedNames
-	apiextensions.SetCustomResourceDefinitionCondition(customResourceDefinition, namingCondition)
+	crd.Status.AcceptedNames = acceptedNames
+	apiextensions.SetCRDCondition(crd, namingCondition)
 
-	// if we're going to update our status, we may be releasing a name.  When this happens, we need to rekick everything in our group
-	list, err := c.customResourceDefinitionLister.List(labels.Everything())
+	updatedObj, err := c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
 	if err != nil {
 		return err
 	}
+
+	// if the update was successful, go ahead and add the entry to the mutation cache
+	c.crdMutationCache.Mutation(updatedObj)
+
+	// we updated our status, so we may be releasing a name.  When this happens, we need to rekick everything in our group
+	// if we fail to rekick, just return as normal.  We'll get everything on a resync
+	list, err := c.crdLister.List(labels.Everything())
+	if err != nil {
+		return nil
+	}
 	for _, curr := range list {
-		if curr.Spec.Group == customResourceDefinition.Spec.Group {
+		if curr.Spec.Group == crd.Spec.Group {
 			c.queue.Add(curr.Name)
 		}
 	}
 
-	_, err = c.customResourceDefinitionClient.CustomResourceDefinitions().UpdateStatus(customResourceDefinition)
-	return err
+	return nil
 }
 
 func (c *NamingConditionController) Run(stopCh <-chan struct{}) {
@@ -236,7 +260,7 @@ func (c *NamingConditionController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting NamingConditionController")
 	defer glog.Infof("Shutting down NamingConditionController")
 
-	if !cache.WaitForCacheSync(stopCh, c.customResourceDefinitionSynced) {
+	if !cache.WaitForCacheSync(stopCh, c.crdSynced) {
 		return
 	}
 

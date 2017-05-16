@@ -84,7 +84,7 @@ func (b *crdBuilder) NewOrDie() *apiextensions.CustomResourceDefinition {
 var goodCondition = apiextensions.CustomResourceDefinitionCondition{
 	Type:    apiextensions.NameConflict,
 	Status:  apiextensions.ConditionFalse,
-	Reason:  "Passed",
+	Reason:  "NoConflicts",
 	Message: "no conflicts found",
 }
 
@@ -235,20 +235,21 @@ func TestSync(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		customResourceDefinitionIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		crdIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		for _, obj := range tc.existing {
-			customResourceDefinitionIndexer.Add(obj)
+			crdIndexer.Add(obj)
 		}
 
 		c := NamingConditionController{
-			customResourceDefinitionLister: listers.NewCustomResourceDefinitionLister(customResourceDefinitionIndexer),
+			crdLister:        listers.NewCustomResourceDefinitionLister(crdIndexer),
+			crdMutationCache: cache.NewIntegerResourceVersionMutationCache(crdIndexer, crdIndexer),
 		}
 		actualNames, actualCondition := c.calculateNames(tc.in)
 
 		if e, a := tc.expectedNames, actualNames; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v expected %v, got %#v", tc.name, e, a)
 		}
-		if e, a := tc.expectedCondition, actualCondition; !apiextensions.IsCustomResourceDefinitionEquivalent(&e, &a) {
+		if e, a := tc.expectedCondition, actualCondition; !apiextensions.IsCRDConditionEquivalent(&e, &a) {
 			t.Errorf("%v expected %v, got %v", tc.name, e, a)
 		}
 	}
