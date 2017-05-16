@@ -225,7 +225,7 @@ if [ "${FAIL_ON_CHANGES}" = true ]; then
     echo "${CLIENT_REPO} up to date."
     exit 0
   else
-    echo "${CLIENT_REPO} is out of date. Please run hack/update-staging-client-go.sh"
+    echo "${CLIENT_REPO} is out of date. Please run hack/update-staging-client-go.sh. Note that the script is NOT included in hack/update-all.sh."
     exit 1
   fi
 fi

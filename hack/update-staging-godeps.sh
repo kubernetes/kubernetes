@@ -103,7 +103,10 @@ for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
   updateGodepManifest "${repo}"
 
   if [ "${FAIL_ON_DIFF}" == true ]; then
-    diff --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\"' -u "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps" "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json"
+    if ! diff --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\"' -u "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps" "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json"; then
+      echo "staging/src/k8s.io/${repo}/Godeps is out of date. Please run hack/update-staging-godeps.sh. Note that the script is NOT included in hack/update-all.sh."
+      exit 1
+    fi
   fi
   if [ "${DRY_RUN}" != true ]; then
     cp "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps"
