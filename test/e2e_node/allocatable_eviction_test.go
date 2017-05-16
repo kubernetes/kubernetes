@@ -64,16 +64,22 @@ var _ = framework.KubeDescribe("AllocatableEviction [Slow] [Serial] [Disruptive]
 	}
 	evictionTestTimeout := 40 * time.Minute
 	testCondition := "Memory Pressure"
-	kubeletConfigUpdate := func(initialConfig *componentconfig.KubeletConfiguration) {
-		initialConfig.EvictionHard = "memory.available<10%"
-		// Set large system and kube reserved values to trigger allocatable thresholds far before hard eviction thresholds.
-		initialConfig.SystemReserved = componentconfig.ConfigurationMap(map[string]string{"memory": "1Gi"})
-		initialConfig.KubeReserved = componentconfig.ConfigurationMap(map[string]string{"memory": "1Gi"})
-		initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
-		initialConfig.ExperimentalNodeAllocatableIgnoreEvictionThreshold = false
-		initialConfig.CgroupsPerQOS = true
-	}
-	runEvictionTest(f, testCondition, podTestSpecs, evictionTestTimeout, hasMemoryPressure, kubeletConfigUpdate)
+
+	Context(fmt.Sprintf("when we run containers that should cause %s", testCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
+			initialConfig.EvictionHard = "memory.available<10%"
+			// Set large system and kube reserved values to trigger allocatable thresholds far before hard eviction thresholds.
+			initialConfig.SystemReserved = componentconfig.ConfigurationMap(map[string]string{"memory": "1Gi"})
+			initialConfig.KubeReserved = componentconfig.ConfigurationMap(map[string]string{"memory": "1Gi"})
+			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
+			initialConfig.ExperimentalNodeAllocatableIgnoreEvictionThreshold = false
+			initialConfig.CgroupsPerQOS = true
+		})
+		// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
+		Context("With kubeconfig updated", func() {
+			runEvictionTest(f, testCondition, podTestSpecs, evictionTestTimeout, hasMemoryPressure)
+		})
+	})
 })
 
 // Returns TRUE if the node has Memory Pressure, FALSE otherwise
