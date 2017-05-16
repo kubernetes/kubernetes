@@ -368,7 +368,6 @@ filegroup(
         "//vendor/k8s.io/gengo/parser:all-srcs",
         "//vendor/k8s.io/gengo/types:all-srcs",
         "//vendor/k8s.io/heapster/metrics/api/v1/types:all-srcs",
-        "//vendor/k8s.io/heapster/metrics/apis/metrics/v1alpha1:all-srcs",
         "//vendor/vbom.ml/util/sortorder:all-srcs",
     ],
     tags = ["automanaged"],
