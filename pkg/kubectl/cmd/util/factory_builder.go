@@ -50,7 +50,8 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error) {
 	mapper, typer, err := f.objectMappingFactory.UnstructuredObject()
 	if err != nil {
-		return nil, false, err
+		// this may happen if apiserver cannot be contacted, but we need --local commands to work
+		mapper, typer = f.objectMappingFactory.Object()
 	}
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
@@ -129,11 +130,37 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, o
 	return printer.PrintObj(obj, out)
 }
 
-func (f *ring2Factory) NewBuilder() *resource.Builder {
-	mapper, typer := f.objectMappingFactory.Object()
+func (f *ring2Factory) NewBuilder(local, useUnstructured bool) (*resource.Builder, meta.RESTMapper, error) {
+	var mapper meta.RESTMapper
+	var typer runtime.ObjectTyper
+	if useUnstructured {
+		var err error
+		mapper, typer, err = f.objectMappingFactory.UnstructuredObject()
+		// this may happen if apiserver cannot be contacted, but we need  --local commands to work
+		if err != nil {
+			if !local {
+				return nil, nil, err
+			}
+			mapper, typer = f.objectMappingFactory.Object()
+			useUnstructured = false
+		}
+	} else {
+		mapper, typer = f.objectMappingFactory.Object()
+	}
 	categoryExpander := f.objectMappingFactory.CategoryExpander()
-
-	return resource.NewBuilder(mapper, categoryExpander, typer, resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping), f.clientAccessFactory.Decoder(true))
+	var clientMapper resource.ClientMapper
+	var decoder runtime.Decoder
+	if useUnstructured {
+		clientMapper = resource.ClientMapperFunc(f.objectMappingFactory.UnstructuredClientForMapping)
+		decoder = unstructured.UnstructuredJSONScheme
+	} else {
+		clientMapper = resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping)
+		decoder = f.clientAccessFactory.Decoder(true)
+	}
+	if local {
+		clientMapper = resource.DisabledClientForMapping{ClientMapper: clientMapper}
+	}
+	return resource.NewBuilder(mapper, categoryExpander, typer, clientMapper, decoder), mapper, nil
 }
 
 // PluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.

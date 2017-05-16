@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -466,8 +467,8 @@ func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMa
 	return f.tf.Printer, f.tf.Err
 }
 
-func (f *FakeFactory) NewBuilder() *resource.Builder {
-	return nil
+func (f *FakeFactory) NewBuilder(local, useUnstructured bool) (*resource.Builder, meta.RESTMapper, error) {
+	return nil, nil, nil
 }
 
 func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
@@ -704,10 +705,35 @@ func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RES
 	return f.tf.Printer, f.tf.Err
 }
 
-func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
-	mapper, typer := f.Object()
-
-	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+func (f *fakeAPIFactory) NewBuilder(local, useUnstructured bool) (*resource.Builder, meta.RESTMapper, error) {
+	var mapper meta.RESTMapper
+	var typer runtime.ObjectTyper
+	if useUnstructured {
+		var err error
+		mapper, typer, err = f.UnstructuredObject()
+		if err != nil {
+			if !local {
+				return nil, nil, err
+			}
+			mapper, typer = f.Object()
+			useUnstructured = false
+		}
+	} else {
+		mapper, typer = f.Object()
+	}
+	var clientMapper resource.ClientMapper
+	var decoder runtime.Decoder
+	if useUnstructured {
+		clientMapper = resource.ClientMapperFunc(f.UnstructuredClientForMapping)
+		decoder = unstructured.UnstructuredJSONScheme
+	} else {
+		clientMapper = resource.ClientMapperFunc(f.ClientForMapping)
+		decoder = f.Decoder(true)
+	}
+	if local {
+		clientMapper = resource.DisabledClientForMapping{ClientMapper: clientMapper}
+	}
+	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, clientMapper, decoder), mapper, nil
 }
 
 func (f *fakeAPIFactory) SuggestedPodTemplateResources() []schema.GroupResource {

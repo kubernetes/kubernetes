@@ -58,7 +58,6 @@ type SubjectOptions struct {
 	resource.FilenameOptions
 
 	Mapper            meta.RESTMapper
-	Typer             runtime.ObjectTyper
 	Infos             []*resource.Info
 	Encoder           runtime.Encoder
 	Out               io.Writer
@@ -110,7 +109,6 @@ func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Co
 
 func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Local = cmdutil.GetFlagBool(cmd, "local")
-	o.Mapper, o.Typer = f.Object()
 	o.Encoder = f.JSONEncoder()
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
@@ -123,8 +121,12 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	builder := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
-		ContinueOnError().
+	var builder *resource.Builder
+	builder, o.Mapper, err = f.NewBuilder(o.Local, false)
+	if err != nil {
+		return err
+	}
+	builder = builder.ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		Flatten()
@@ -134,6 +136,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 			ResourceTypeOrNameArgs(o.All, args...).
 			Latest()
 	}
+
 	o.Infos, err = builder.Do().Infos()
 	if err != nil {
 		return err

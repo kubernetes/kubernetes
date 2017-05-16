@@ -240,7 +240,11 @@ type BuilderFactory interface {
 	// PrintObject prints an api object given command line flags to modify the output format
 	PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	// One stop shopping for a Builder
-	NewBuilder() *resource.Builder
+	// If local is true, the resulting builder will be compatible
+	// with --local commands (i.e. will not fail when apiserver can't be accessed)
+	// If useUnstructured is true and apiserver is available, the resulting builder
+	// is suitable for handling unstructured objects (TPRs)
+	NewBuilder(local, useUnstructured bool) (*resource.Builder, meta.RESTMapper, error)
 	// PluginLoader provides the implementation to be used to load cli plugins.
 	PluginLoader() plugins.PluginLoader
 	// PluginRunner provides the implementation to be used to run cli plugins.
