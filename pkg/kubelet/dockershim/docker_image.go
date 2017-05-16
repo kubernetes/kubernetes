@@ -135,7 +135,30 @@ func getImageRef(client libdocker.Interface, image string) (string, error) {
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
 func (ds *dockerService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
-	return nil, fmt.Errorf("not implemented")
+	imageFSInfo, err := ds.cadvisor.ImagesFsInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	fsInfo := &runtimeapi.FsInfo{
+		Device:         imageFSInfo.Device,
+		Path:           imageFSInfo.Mountpoint,
+		CapacityBytes:  &runtimeapi.UInt64Value{Value: imageFSInfo.Capacity},
+		AvailableBytes: &runtimeapi.UInt64Value{Value: imageFSInfo.Available},
+		UsedBytes:      &runtimeapi.UInt64Value{Value: imageFSInfo.Usage},
+	}
+	if imageFSInfo.Inodes != nil {
+		fsInfo.InodesCapacity = &runtimeapi.UInt64Value{
+			Value: *imageFSInfo.Inodes,
+		}
+	}
+	if imageFSInfo.InodesFree != nil {
+		fsInfo.InodesAvailable = &runtimeapi.UInt64Value{
+			Value: *imageFSInfo.InodesFree,
+		}
+	}
+
+	return fsInfo, nil
 }
 
 func filterHTTPError(err error, image string) error {
