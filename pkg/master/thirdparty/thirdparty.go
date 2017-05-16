@@ -318,11 +318,12 @@ func (m *ThirdPartyResourceServer) thirdpartyapi(group, kind, version, pluralRes
 		Root:         apiRoot,
 		GroupVersion: externalVersion,
 
-		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
-		Convertor: api.Scheme,
-		Copier:    api.Scheme,
-		Defaulter: api.Scheme,
-		Typer:     api.Scheme,
+		Creater:         thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
+		Convertor:       api.Scheme,
+		Copier:          api.Scheme,
+		Defaulter:       api.Scheme,
+		Typer:           api.Scheme,
+		UnsafeConvertor: api.Scheme,
 
 		Mapper:                 thirdpartyresourcedata.NewMapper(api.Registry.GroupOrDie(extensions.GroupName).RESTMapper, kind, version, group),
 		Linker:                 api.Registry.GroupOrDie(extensions.GroupName).SelfLinker,
