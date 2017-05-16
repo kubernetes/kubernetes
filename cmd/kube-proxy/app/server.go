@@ -24,7 +24,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
+	"net/http/pprof"
 	"runtime"
 	"strings"
 	"time"
@@ -146,6 +146,7 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 		&options.config.Conntrack.TCPCloseWaitTimeout.Duration, "conntrack-tcp-timeout-close-wait",
 		options.config.Conntrack.TCPCloseWaitTimeout.Duration,
 		"NAT timeout for TCP connections in the CLOSE_WAIT state")
+	fs.BoolVar(&options.config.EnableProfiling, "profiling", options.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler.")
 
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
@@ -298,6 +299,7 @@ type ProxyServer struct {
 	NodeRef                *clientv1.ObjectReference
 	CleanupAndExit         bool
 	MetricsBindAddress     string
+	EnableProfiling        bool
 	OOMScoreAdj            *int32
 	ResourceContainer      string
 	ConfigSyncPeriod       time.Duration
@@ -507,6 +509,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		ProxyMode:              proxyMode,
 		NodeRef:                nodeRef,
 		MetricsBindAddress:     config.MetricsBindAddress,
+		EnableProfiling:        config.EnableProfiling,
 		OOMScoreAdj:            config.OOMScoreAdj,
 		ResourceContainer:      config.ResourceContainer,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
@@ -555,13 +558,20 @@ func (s *ProxyServer) Run() error {
 
 	// Start up a metrics server if requested
 	if len(s.MetricsBindAddress) > 0 {
-		http.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
-		http.Handle("/metrics", prometheus.Handler())
-		configz.InstallHandler(http.DefaultServeMux)
+		mux.Handle("/metrics", prometheus.Handler())
+		if s.EnableProfiling {
+			mux.HandleFunc("/debug/pprof/", pprof.Index)
+			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		}
+		configz.InstallHandler(mux)
 		go wait.Until(func() {
-			err := http.ListenAndServe(s.MetricsBindAddress, nil)
+			err := http.ListenAndServe(s.MetricsBindAddress, mux)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("starting metrics server failed: %v", err))
 			}
