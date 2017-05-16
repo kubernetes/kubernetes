@@ -668,6 +668,8 @@ type EmptyDirVolumeSource struct {
 	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	// +optional
 	Medium StorageMedium `json:"medium,omitempty" protobuf:"bytes,1,opt,name=medium,casttype=StorageMedium"`
+	// Size is the limit of EMptyDir volume size
+	SizeLimit resource.Quantity `json:"size,omitempty" protobuf:"bytes,2,opt,name=size"`
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.

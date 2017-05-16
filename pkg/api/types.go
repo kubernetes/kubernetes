@@ -583,6 +583,8 @@ type EmptyDirVolumeSource struct {
 	// The default is "" which means to use the node's default medium.
 	// +optional
 	Medium StorageMedium
+	// Size is the limit of EMptyDir volume size
+	SizeLimit resource.Quantity
 }
 
 // StorageMedium defines ways that storage can be allocated to a volume.

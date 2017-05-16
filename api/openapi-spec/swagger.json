@@ -42065,6 +42065,10 @@
      "medium": {
       "description": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
       "type": "string"
+     },
+     "size": {
+      "description": "Size is the limit of EMptyDir volume size",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
      }
     }
    },

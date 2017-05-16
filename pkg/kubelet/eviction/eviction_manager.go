@@ -287,6 +287,25 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	m.lastObservations = observations
 	m.Unlock()
 
+	// the only candidates viable for eviction are those pods that had anything running.
+	activePods := podFunc()
+	if len(activePods) == 0 {
+		glog.Errorf("eviction manager: eviction thresholds have been met, but no pods are active to evict")
+		return
+	}
+
+	evictPods := m.localVolumeEviction(activePods)
+
+	for _, pod := range evictPods {
+		gracePeriod := int64(0)
+		m.evictPod(pod, v1.ResourceName("EmptyDir"), gracePeriod)
+		if err != nil {
+			glog.Errorf("eviction manager: pod %s failed to evict %v", format.Pod(pod), err)
+		} else {
+			glog.Infof("eviction manager: pod %s evicted successfully", format.Pod(pod))
+		}
+	}
+
 	// determine the set of resources under starvation
 	starvedResources := getStarvedResources(thresholds)
 	if len(starvedResources) == 0 {
@@ -294,6 +313,11 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return
 	}
 
+	activePods = podFunc()
+	if len(activePods) == 0 {
+		glog.Errorf("eviction manager: eviction thresholds have been met, but no pods are active to evict")
+		return
+	}
 	// rank the resources to reclaim by eviction priority
 	sort.Sort(byEvictionPriority(starvedResources))
 	resourceToReclaim := starvedResources[0]
@@ -320,13 +344,6 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return
 	}
 
-	// the only candidates viable for eviction are those pods that had anything running.
-	activePods := podFunc()
-	if len(activePods) == 0 {
-		glog.Errorf("eviction manager: eviction thresholds have been met, but no pods are active to evict")
-		return
-	}
-
 	// rank the running pods for eviction for the specified resource
 	rank(activePods, statsFunc)
 
@@ -350,19 +367,12 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			kubelettypes.IsCriticalPod(pod) && kubepod.IsStaticPod(pod) {
 			continue
 		}
-		status := v1.PodStatus{
-			Phase:   v1.PodFailed,
-			Message: fmt.Sprintf(message, resourceToReclaim),
-			Reason:  reason,
-		}
-		// record that we are evicting the pod
-		m.recorder.Eventf(pod, v1.EventTypeWarning, reason, fmt.Sprintf(message, resourceToReclaim))
 		gracePeriodOverride := int64(0)
 		if softEviction {
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
 		}
 		// this is a blocking call and should only return when the pod and its containers are killed.
-		err := m.killPodFunc(pod, status, &gracePeriodOverride)
+		err := m.evictPod(pod, resourceToReclaim, gracePeriodOverride)
 		if err != nil {
 			glog.Infof("eviction manager: pod %s failed to evict %v", format.Pod(pod), err)
 			continue
@@ -372,6 +382,57 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return
 	}
 	glog.Infof("eviction manager: unable to evict any pods from the node")
+
+}
+
+func (m *managerImpl) evictPod(pod *v1.Pod, resourceName v1.ResourceName, gracePeriod int64) error {
+	status := v1.PodStatus{
+		Phase:   v1.PodFailed,
+		Message: fmt.Sprintf(message, resourceName),
+		Reason:  reason,
+	}
+	// record that we are evicting the pod
+	m.recorder.Eventf(pod, v1.EventTypeWarning, reason, fmt.Sprintf(message, resourceName))
+	return m.killPodFunc(pod, status, &gracePeriod)
+}
+
+// localVolumeEviction checks the EmptyDir volume usage and determine whether it exceeds the limit and needs
+// to be evicted
+func (m *managerImpl) localVolumeEviction(pods []*v1.Pod) []*v1.Pod {
+	evictPods := []*v1.Pod{}
+	summary, err := m.summaryProvider.Get()
+	if err != nil {
+		glog.Errorf("Could not get summary provider")
+		return evictPods
+	}
+
+	podVolumeUsed := make(map[string]*resource.Quantity)
+	// get Pod volume usage from summary object
+	for _, podStats := range summary.Pods {
+		for _, volume := range podStats.VolumeStats {
+			podVolumeName := getPodVolumeName(podStats.PodRef.Name, volume.Name)
+			podVolumeUsed[podVolumeName] = resource.NewQuantity(int64(*volume.UsedBytes), resource.BinarySI)
+		}
+	}
+	for _, pod := range pods {
+		for i := range pod.Spec.Volumes {
+			source := &pod.Spec.Volumes[i].VolumeSource
+			if source.EmptyDir != nil {
+				size := source.EmptyDir.SizeLimit
+				used := podVolumeUsed[getPodVolumeName(pod.Name, pod.Spec.Volumes[i].Name)]
+				zero := resource.NewQuantity(int64(0), resource.BinarySI)
+				if used != nil && size.Cmp(*zero) > 0 && used.Cmp(size) > 0 {
+					evictPods = append(evictPods, pod)
+				}
+			}
+		}
+	}
+
+	return evictPods
+}
+
+func getPodVolumeName(podUID, volumeName string) string {
+	return fmt.Sprintf("pod_%s_volume_%s", podUID, volumeName)
 }
 
 // reclaimNodeLevelResources attempts to reclaim node level resources.  returns true if thresholds were satisfied and no pod eviction is required.
