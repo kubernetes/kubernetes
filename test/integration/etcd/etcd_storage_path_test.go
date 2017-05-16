@@ -404,8 +404,10 @@ func TestEtcdStoragePath(t *testing.T) {
 	}()
 
 	kindSeen := sets.NewString()
+	pathSeen := map[string][]schema.GroupVersionResource{}
 	etcdSeen := map[schema.GroupVersionResource]empty{}
 	ephemeralSeen := map[schema.GroupVersionResource]empty{}
+	cohabitatingResources := map[string]map[schema.GroupVersionKind]empty{}
 
 	for gvk, apiType := range kapi.Scheme.AllKnownTypes() {
 		// we do not care about internal objects or lists // TODO make sure this is always true
@@ -509,6 +511,9 @@ func TestEtcdStoragePath(t *testing.T) {
 			if !apiequality.Semantic.DeepDerivative(input, output) {
 				t.Errorf("Test stub for %s from %s does not match: %s", kind, pkgPath, diff.ObjectGoPrintDiff(input, output))
 			}
+
+			addGVKToEtcdBucket(cohabitatingResources, actualGVK, getEtcdBucket(testData.expectedEtcdPath))
+			pathSeen[testData.expectedEtcdPath] = append(pathSeen[testData.expectedEtcdPath], gvResource)
 		}()
 	}
 
@@ -522,6 +527,26 @@ func TestEtcdStoragePath(t *testing.T) {
 
 	if inKindData, inKindSeen := diffMaps(kindWhiteList, kindSeen); len(inKindData) != 0 || len(inKindSeen) != 0 {
 		t.Errorf("kind whitelist data does not match the types we saw:\nin kind whitelist but not seen:\n%s\nseen but not in kind whitelist:\n%s", inKindData, inKindSeen)
+	}
+
+	for bucket, gvks := range cohabitatingResources {
+		if len(gvks) != 1 {
+			gvkStrings := []string{}
+			for key := range gvks {
+				gvkStrings = append(gvkStrings, keyStringer(key))
+			}
+			t.Errorf("cohabitating resources in etcd bucket %s have inconsistent GVKs\nyou may need to use DefaultStorageFactory.AddCohabitatingResources to sync the GVK of these resources:\n%s", bucket, gvkStrings)
+		}
+	}
+
+	for path, gvrs := range pathSeen {
+		if len(gvrs) != 1 {
+			gvrStrings := []string{}
+			for _, key := range gvrs {
+				gvrStrings = append(gvrStrings, keyStringer(key))
+			}
+			t.Errorf("invalid test data, please ensure all expectedEtcdPath are unique, path %s has duplicate GVRs:\n%s", path, gvrStrings)
+		}
 	}
 }
 
@@ -631,6 +656,28 @@ func dumpEtcdKVOnFailure(t *testing.T, kvClient clientv3.KV) {
 	}
 }
 
+func addGVKToEtcdBucket(cohabitatingResources map[string]map[schema.GroupVersionKind]empty, gvk schema.GroupVersionKind, bucket string) {
+	if cohabitatingResources[bucket] == nil {
+		cohabitatingResources[bucket] = map[schema.GroupVersionKind]empty{}
+	}
+	cohabitatingResources[bucket][gvk] = empty{}
+}
+
+// getEtcdBucket assumes the last segment of the given etcd path is the name of the object.
+// Thus it strips that segment to extract the object's storage "bucket" in etcd. We expect
+// all objects that share the a bucket (cohabitating resources) to be stored as the same GVK.
+func getEtcdBucket(path string) string {
+	idx := strings.LastIndex(path, "/")
+	if idx == -1 {
+		panic("path with no slashes " + path)
+	}
+	bucket := path[:idx]
+	if len(bucket) == 0 {
+		panic("invalid bucket for path " + path)
+	}
+	return bucket
+}
+
 // stable fields to compare as a sanity check
 type metaObject struct {
 	// all of type meta
@@ -697,6 +744,8 @@ func keyStringer(i interface{}) string {
 	case string:
 		return base + key
 	case schema.GroupVersionResource:
+		return base + key.String()
+	case schema.GroupVersionKind:
 		return base + key.String()
 	default:
 		panic("unexpected type")
