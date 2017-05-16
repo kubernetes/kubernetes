@@ -54,6 +54,7 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 
@@ -109,6 +110,8 @@ type Config struct {
 	// Will default to a value based on secure serving info and available ipv4 IPs.
 	ExternalAddress string
 
+	// SharedInformerFactory provides shared informers for resources
+	SharedInformerFactory informers.SharedInformerFactory
 	//===========================================================================
 	// Fields you probably don't care about changing
 	//===========================================================================
@@ -405,6 +408,16 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 		s.postStartHooks[k] = v
 	}
 
+	genericApiServerHookName := "generic-apiserver-start-informers"
+	if c.SharedInformerFactory != nil && !s.isHookRegistered(genericApiServerHookName) {
+		err := s.AddPostStartHook(genericApiServerHookName, func(context PostStartHookContext) error {
+			c.SharedInformerFactory.Start(context.StopCh)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
 	for _, delegateCheck := range delegationTarget.HealthzChecks() {
 		skip := false
 		for _, existingCheck := range c.HealthzChecks {

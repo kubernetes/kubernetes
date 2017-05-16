@@ -106,6 +106,14 @@ func (s *GenericAPIServer) RunPostStartHooks(stopCh <-chan struct{}) {
 	}
 }
 
+// isHookRegistered checks whether a given hook is registered
+func (s *GenericAPIServer) isHookRegistered(name string) bool {
+	s.postStartHookLock.Lock()
+	defer s.postStartHookLock.Unlock()
+	_, exists := s.postStartHooks[name]
+	return exists
+}
+
 func runPostStartHook(name string, entry postStartHookEntry, context PostStartHookContext) {
 	var err error
 	func() {
@@ -117,7 +125,6 @@ func runPostStartHook(name string, entry postStartHookEntry, context PostStartHo
 	if err != nil {
 		glog.Fatalf("PostStartHook %q failed: %v", name, err)
 	}
-
 	close(entry.done)
 }
 
