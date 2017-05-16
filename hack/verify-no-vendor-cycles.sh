@@ -18,23 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# TODO: this list should be empty.
-exceptions=("vendor/k8s.io/heapster/metrics/apis/metrics/v1alpha1")
-
 failed=false
 for i in $(find vendor/ -type d); do
-  exceptionFound=false
-  for e in ${exceptions[@]}; do
-    if [[ "${e}" == "${i}" ]]; then
-      echo "Skipping known violator $i"
-      exceptionFound=true
-      break
-    fi
-  done
-  if ( "${exceptionFound}" == "true" ); then
-    continue
-  fi
-
   deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ./$i 2> /dev/null | grep -v "k8s.io/kubernetes/vendor/" | grep "k8s.io/kubernetes" || echo "")
     if [ -n "${deps}" ]; then
     echo "Package ${i} has a cyclic dependency on the main repository."
