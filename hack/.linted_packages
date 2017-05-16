@@ -86,6 +86,7 @@ pkg/apis/settings/install
 pkg/apis/settings/validation
 pkg/apis/storage/install
 pkg/apis/storage/validation
+pkg/auth/nodeidentifier
 pkg/bootstrap/api
 pkg/client/conditions
 pkg/client/informers/informers_generated/externalversions
