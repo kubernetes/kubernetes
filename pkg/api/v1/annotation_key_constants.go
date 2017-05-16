@@ -14,9 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This file should be consistent with pkg/api/annotation_key_constants.go.
+
 package v1
 
 const (
+	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
+	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
+
+	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
+	// in the Annotations of a Pod.
+	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
+
+	// TaintsAnnotationKey represents the key of taints data (json serialized)
+	// in the Annotations of a Node.
+	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
+
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
 	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
@@ -56,4 +69,7 @@ const (
 	// in the Annotations of a Pod.
 	// TODO: remove when alpha support for affinity is removed
 	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
+
+	// annotation key prefix used to identify non-convertible json paths.
+	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"
 )
