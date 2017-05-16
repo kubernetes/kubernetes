@@ -239,7 +239,11 @@ func SetDefaults_ISCSIVolumeSource(obj *ISCSIVolumeSource) {
 func SetDefaults_AzureDiskVolumeSource(obj *AzureDiskVolumeSource) {
 	if obj.CachingMode == nil {
 		obj.CachingMode = new(AzureDataDiskCachingMode)
-		*obj.CachingMode = AzureDataDiskCachingNone
+		*obj.CachingMode = AzureDataDiskCachingReadWrite
+	}
+	if obj.Kind == nil {
+		obj.Kind = new(AzureDataDiskKind)
+		*obj.Kind = AzureSharedBlobDisk
 	}
 	if obj.FSType == nil {
 		obj.FSType = new(string)
