@@ -388,6 +388,9 @@ function start_apiserver {
     if [[ -n "${PSP_ADMISSION}" ]]; then
       security_admission=",PodSecurityPolicy"
     fi
+    if [[ -n "${NODE_ADMISSION}" ]]; then
+      security_admission=",NodeRestriction"
+    fi
 
     # Admission Controllers to invoke prior to persisting objects in cluster
     ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},ResourceQuota,DefaultStorageClass,DefaultTolerationSeconds
