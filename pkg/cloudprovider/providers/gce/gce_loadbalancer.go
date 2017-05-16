@@ -70,7 +70,7 @@ func newAddressMetricContext(request, region string) *metricContext {
 
 func init() {
 	var err error
-	lbSrcRngsFlag.ipn, err = netsets.ParseIPNets([]string{"130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22", "35.191.0.0/16"}...)
+	lbSrcRngsFlag.ipn, err = netsets.ParseIPNets([]string{"130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22"}...)
 	if err != nil {
 		panic("Incorrect default GCE L7 source ranges")
 	}
