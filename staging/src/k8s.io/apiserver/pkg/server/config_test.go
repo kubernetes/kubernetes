@@ -28,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 )
 
@@ -38,6 +40,11 @@ func TestNewWithDelegate(t *testing.T) {
 	delegateConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	delegateConfig.LoopbackClientConfig = &rest.Config{}
 	delegateConfig.SwaggerConfig = DefaultSwaggerConfig()
+	clientset := fake.NewSimpleClientset()
+	if clientset == nil {
+		t.Fatal("unable to create fake client set")
+	}
+	delegateConfig.SharedInformerFactory = informers.NewSharedInformerFactory(clientset, delegateConfig.LoopbackClientConfig.Timeout)
 
 	delegateHealthzCalled := false
 	delegateConfig.HealthzChecks = append(delegateConfig.HealthzChecks, healthz.NamedCheck("delegate-health", func(r *http.Request) error {
@@ -66,6 +73,7 @@ func TestNewWithDelegate(t *testing.T) {
 	wrappingConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	wrappingConfig.LoopbackClientConfig = &rest.Config{}
 	wrappingConfig.SwaggerConfig = DefaultSwaggerConfig()
+	wrappingConfig.SharedInformerFactory = informers.NewSharedInformerFactory(clientset, wrappingConfig.LoopbackClientConfig.Timeout)
 
 	wrappingHealthzCalled := false
 	wrappingConfig.HealthzChecks = append(wrappingConfig.HealthzChecks, healthz.NamedCheck("wrapping-health", func(r *http.Request) error {
@@ -102,6 +110,7 @@ func TestNewWithDelegate(t *testing.T) {
     "/healthz/delegate-health",
     "/healthz/ping",
     "/healthz/poststarthook/delegate-post-start-hook",
+    "/healthz/poststarthook/generic-apiserver-start-informers",
     "/healthz/poststarthook/wrapping-post-start-hook",
     "/healthz/wrapping-health",
     "/swaggerapi/"
@@ -110,6 +119,7 @@ func TestNewWithDelegate(t *testing.T) {
 	checkPath(server.URL+"/healthz", http.StatusInternalServerError, `[+]ping ok
 [-]wrapping-health failed: reason withheld
 [-]delegate-health failed: reason withheld
+[+]poststarthook/generic-apiserver-start-informers ok
 [+]poststarthook/delegate-post-start-hook ok
 [+]poststarthook/wrapping-post-start-hook ok
 healthz check failed

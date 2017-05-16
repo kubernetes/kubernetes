@@ -325,6 +325,10 @@ func (j *ServiceTestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName 
 			Logf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
 			return false, nil
 		}
+		if len(endpoints.Subsets) == 0 {
+			Logf("Expect endpoints with subsets, got none.")
+			return false, nil
+		}
 		// TODO: Handle multiple endpoints
 		if len(endpoints.Subsets[0].Addresses) == 0 {
 			Logf("Expected Ready endpoints - found none")

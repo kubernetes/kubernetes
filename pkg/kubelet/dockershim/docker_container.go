@@ -287,7 +287,6 @@ func (ds *dockerService) StopContainer(containerID string, timeout int64) error 
 }
 
 // RemoveContainer removes the container.
-// TODO: If a container is still running, should we forcibly remove it?
 func (ds *dockerService) RemoveContainer(containerID string) error {
 	// Ideally, log lifecycle should be independent of container lifecycle.
 	// However, docker will remove container log after container is removed,
@@ -296,7 +295,7 @@ func (ds *dockerService) RemoveContainer(containerID string) error {
 	if err != nil {
 		return err
 	}
-	err = ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+	err = ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true, Force: true})
 	if err != nil {
 		return fmt.Errorf("failed to remove container %q: %v", containerID, err)
 	}
@@ -329,7 +328,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 		return nil, err
 	}
 
-	// Parse the timstamps.
+	// Parse the timestamps.
 	createdAt, startedAt, finishedAt, err := getContainerTimestamps(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", containerID, err)

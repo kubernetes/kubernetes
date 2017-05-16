@@ -220,7 +220,7 @@ func createAndWaitForReplicasetOrFail(clientset *fedclientset.Clientset, nsName 
 	return rs
 }
 
-func createAndUpdateFedRSWithPref(clientset *fedclientset.Clientset, nsName string, clusters fedframework.ClusterSlice, pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) *v1beta1.ReplicaSet {
+func createAndUpdateFedRSWithPref(clientset *fedclientset.Clientset, nsName string, clusters fedframework.ClusterSlice, pref *federation.ReplicaAllocationPreferences, replicas int32, expect map[string]int32) *v1beta1.ReplicaSet {
 	framework.Logf("Replicas: %d, Preference: %#v", replicas, pref)
 	rs := newReplicaSet(nsName, FederationReplicaSetPrefix, replicas, pref)
 	rs = createReplicaSetOrFail(clientset, rs)
@@ -274,18 +274,18 @@ func verifyCascadingDeletionForReplicaSet(clientset *fedclientset.Clientset, clu
 	}
 }
 
-func generateFedRSPrefsWithWeight(clusters fedframework.ClusterSlice) (pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
+func generateFedRSPrefsWithWeight(clusters fedframework.ClusterSlice) (pref *federation.ReplicaAllocationPreferences, replicas int32, expect map[string]int32) {
 	By("Generating replicaset preferences with weights")
 	clusterNames := extractClusterNames(clusters)
-	pref = &federation.FederatedReplicaSetPreferences{
-		Clusters: map[string]federation.ClusterReplicaSetPreferences{},
+	pref = &federation.ReplicaAllocationPreferences{
+		Clusters: map[string]federation.ClusterPreferences{},
 	}
 	replicas = 0
 	expect = map[string]int32{}
 
 	for i, clusterName := range clusterNames {
 		if i != 0 { // do not set weight for cluster[0] thus it should have no replicas scheduled
-			pref.Clusters[clusterName] = federation.ClusterReplicaSetPreferences{
+			pref.Clusters[clusterName] = federation.ClusterPreferences{
 				Weight: int64(i),
 			}
 			replicas += int32(i)
@@ -295,11 +295,11 @@ func generateFedRSPrefsWithWeight(clusters fedframework.ClusterSlice) (pref *fed
 	return
 }
 
-func generateFedRSPrefsWithMin(clusters fedframework.ClusterSlice) (pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
+func generateFedRSPrefsWithMin(clusters fedframework.ClusterSlice) (pref *federation.ReplicaAllocationPreferences, replicas int32, expect map[string]int32) {
 	By("Generating replicaset preferences with min replicas")
 	clusterNames := extractClusterNames(clusters)
-	pref = &federation.FederatedReplicaSetPreferences{
-		Clusters: map[string]federation.ClusterReplicaSetPreferences{
+	pref = &federation.ReplicaAllocationPreferences{
+		Clusters: map[string]federation.ClusterPreferences{
 			clusterNames[0]: {Weight: 100},
 		},
 	}
@@ -308,7 +308,7 @@ func generateFedRSPrefsWithMin(clusters fedframework.ClusterSlice) (pref *federa
 
 	for i, clusterName := range clusterNames {
 		if i != 0 { // do not set weight and minReplicas for cluster[0] thus it should have no replicas scheduled
-			pref.Clusters[clusterName] = federation.ClusterReplicaSetPreferences{
+			pref.Clusters[clusterName] = federation.ClusterPreferences{
 				Weight:      int64(1),
 				MinReplicas: int64(i + 2),
 			}
@@ -322,11 +322,11 @@ func generateFedRSPrefsWithMin(clusters fedframework.ClusterSlice) (pref *federa
 	return
 }
 
-func generateFedRSPrefsWithMax(clusters fedframework.ClusterSlice) (pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
+func generateFedRSPrefsWithMax(clusters fedframework.ClusterSlice) (pref *federation.ReplicaAllocationPreferences, replicas int32, expect map[string]int32) {
 	By("Generating replicaset preferences with max replicas")
 	clusterNames := extractClusterNames(clusters)
-	pref = &federation.FederatedReplicaSetPreferences{
-		Clusters: map[string]federation.ClusterReplicaSetPreferences{
+	pref = &federation.ReplicaAllocationPreferences{
+		Clusters: map[string]federation.ClusterPreferences{
 			clusterNames[0]: {Weight: 1},
 		},
 	}
@@ -336,7 +336,7 @@ func generateFedRSPrefsWithMax(clusters fedframework.ClusterSlice) (pref *federa
 	for i, clusterName := range clusterNames {
 		if i != 0 { // do not set maxReplicas for cluster[0] thus replicas exceeds the total maxReplicas turned to cluster[0]
 			maxReplicas := int64(i)
-			pref.Clusters[clusterName] = federation.ClusterReplicaSetPreferences{
+			pref.Clusters[clusterName] = federation.ClusterPreferences{
 				Weight:      int64(100),
 				MaxReplicas: &maxReplicas,
 			}
@@ -350,18 +350,18 @@ func generateFedRSPrefsWithMax(clusters fedframework.ClusterSlice) (pref *federa
 	return
 }
 
-func updateFedRSPrefsRebalance(pref *federation.FederatedReplicaSetPreferences, rebalance bool) *federation.FederatedReplicaSetPreferences {
+func updateFedRSPrefsRebalance(pref *federation.ReplicaAllocationPreferences, rebalance bool) *federation.ReplicaAllocationPreferences {
 	pref.Rebalance = rebalance
 	return pref
 }
 
-func generateFedRSPrefsForRebalancing(clusters fedframework.ClusterSlice) (pref1, pref2 *federation.FederatedReplicaSetPreferences, replicas int32, expect1, expect2 map[string]int32) {
+func generateFedRSPrefsForRebalancing(clusters fedframework.ClusterSlice) (pref1, pref2 *federation.ReplicaAllocationPreferences, replicas int32, expect1, expect2 map[string]int32) {
 	By("Generating replicaset for rebalancing")
 	clusterNames := extractClusterNames(clusters)
 	replicas = 3
 
-	pref1 = &federation.FederatedReplicaSetPreferences{
-		Clusters: map[string]federation.ClusterReplicaSetPreferences{
+	pref1 = &federation.ReplicaAllocationPreferences{
+		Clusters: map[string]federation.ClusterPreferences{
 			clusterNames[0]: {Weight: 1},
 			clusterNames[1]: {Weight: 2},
 		},
@@ -370,8 +370,8 @@ func generateFedRSPrefsForRebalancing(clusters fedframework.ClusterSlice) (pref1
 		clusterNames[0]: 1,
 		clusterNames[1]: 2,
 	}
-	pref2 = &federation.FederatedReplicaSetPreferences{
-		Clusters: map[string]federation.ClusterReplicaSetPreferences{
+	pref2 = &federation.ReplicaAllocationPreferences{
+		Clusters: map[string]federation.ClusterPreferences{
 			clusterNames[0]: {Weight: 2},
 			clusterNames[1]: {Weight: 1},
 		},
@@ -478,7 +478,7 @@ func updateReplicaSetOrFail(clientset *fedclientset.Clientset, replicaset *v1bet
 	return newRS
 }
 
-func newReplicaSetObj(namespace string, replicas int32, pref *federation.FederatedReplicaSetPreferences) *v1beta1.ReplicaSet {
+func newReplicaSetObj(namespace string, replicas int32, pref *federation.ReplicaAllocationPreferences) *v1beta1.ReplicaSet {
 	// When the tests are run in parallel, replicasets from different tests can
 	// collide with each other. Prevent that by creating a unique label and
 	// label selector for each created replica set.
@@ -519,13 +519,13 @@ func newReplicaSetObj(namespace string, replicas int32, pref *federation.Federat
 
 }
 
-func newReplicaSet(namespace string, prefix string, replicas int32, pref *federation.FederatedReplicaSetPreferences) *v1beta1.ReplicaSet {
+func newReplicaSet(namespace string, prefix string, replicas int32, pref *federation.ReplicaAllocationPreferences) *v1beta1.ReplicaSet {
 	rs := newReplicaSetObj(namespace, replicas, pref)
 	rs.GenerateName = prefix
 	return rs
 }
 
-func newReplicaSetWithName(namespace string, name string, replicas int32, pref *federation.FederatedReplicaSetPreferences) *v1beta1.ReplicaSet {
+func newReplicaSetWithName(namespace string, name string, replicas int32, pref *federation.ReplicaAllocationPreferences) *v1beta1.ReplicaSet {
 	rs := newReplicaSetObj(namespace, replicas, pref)
 	rs.Name = name
 	return rs

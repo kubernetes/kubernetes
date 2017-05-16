@@ -47,6 +47,8 @@ import (
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	extinformers "k8s.io/client-go/informers"
+	extclient "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
@@ -245,7 +247,13 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	masterConfig.GenericConfig.LoopbackClientConfig.BearerToken = privilegedLoopbackToken
 
-	m, err := masterConfig.Complete().New(genericapiserver.EmptyDelegate)
+	clientset, err := extclient.NewForConfig(masterConfig.GenericConfig.LoopbackClientConfig)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	masterConfig.GenericConfig.SharedInformerFactory = extinformers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
+
+	m, err = masterConfig.Complete().New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		closeFn()
 		glog.Fatalf("error in bringing up the master: %v", err)

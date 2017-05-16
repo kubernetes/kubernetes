@@ -48,6 +48,7 @@ federation/cmd/federation-apiserver
 federation/cmd/federation-controller-manager
 federation/cmd/genfeddocs
 federation/cmd/kubefed
+federation/pkg/federation-controller/util/replicapreferences
 hack
 hack/boilerplate/test
 hack/cmd/teststale
@@ -314,6 +315,7 @@ staging/src/k8s.io/apimachinery/pkg/version
 staging/src/k8s.io/apimachinery/pkg/watch
 staging/src/k8s.io/apiserver/pkg/admission/initializer
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/install
+staging/src/k8s.io/apiserver/pkg/apis/audit
 staging/src/k8s.io/apiserver/pkg/apis/example/install
 staging/src/k8s.io/apiserver/pkg/authentication/authenticator
 staging/src/k8s.io/apiserver/pkg/authentication/request/union

@@ -414,8 +414,7 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 		return
 	}
 	node := obj.(*v1.Node)
-	for i := range dsList {
-		ds := dsList[i]
+	for _, ds := range dsList {
 		_, shouldSchedule, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
 		if err != nil {
 			continue
@@ -439,8 +438,7 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 		return
 	}
 	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
-	for i := range dsList {
-		ds := dsList[i]
+	for _, ds := range dsList {
 		_, oldShouldSchedule, oldShouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(oldNode, ds)
 		if err != nil {
 			continue
@@ -538,8 +536,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	}
 	var nodesNeedingDaemonPods, podsToDelete []string
 	var failedPodsObserved int
-	for i := range nodeList {
-		node := nodeList[i]
+	for _, node := range nodeList {
 		_, shouldSchedule, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(node, ds)
 		if err != nil {
 			continue
@@ -555,8 +552,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 			// If a daemon pod failed, delete it
 			// If there's no daemon pods left on this node, we will create it in the next sync loop
 			var daemonPodsRunning []*v1.Pod
-			for i := range daemonPods {
-				pod := daemonPods[i]
+			for _, pod := range daemonPods {
 				if pod.Status.Phase == v1.PodFailed {
 					msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
 					glog.V(2).Infof(msg)
@@ -578,8 +574,8 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 			}
 		case !shouldContinueRunning && exists:
 			// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
-			for i := range daemonPods {
-				podsToDelete = append(podsToDelete, daemonPods[i].Name)
+			for _, pod := range daemonPods {
+				podsToDelete = append(podsToDelete, pod.Name)
 			}
 		}
 	}
@@ -716,8 +712,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 	}
 
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable int
-	for i := range nodeList {
-		node := nodeList[i]
+	for _, node := range nodeList {
 		wantToRun, _, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
 		if err != nil {
 			return err
@@ -881,8 +876,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 	if err != nil {
 		return false, false, false, err
 	}
-	for i := range podList {
-		pod := podList[i]
+	for _, pod := range podList {
 		if pod.Spec.NodeName != node.Name {
 			continue
 		}

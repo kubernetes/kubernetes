@@ -27,14 +27,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
-	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -105,21 +105,21 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 			metrics := metricsapi.PodMetricsList{}
 			for i, containers := range tc.reportedPodMetrics {
 				metric := metricsapi.PodMetrics{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: namespace,
 					},
-					Timestamp:  unversioned.Time{Time: fixedTimestamp.Add(time.Duration(tc.targetTimestamp) * time.Minute)},
+					Timestamp:  metav1.Time{Time: fixedTimestamp.Add(time.Duration(tc.targetTimestamp) * time.Minute)},
 					Containers: []metricsapi.ContainerMetrics{},
 				}
 				for j, cpu := range containers {
 					cm := metricsapi.ContainerMetrics{
 						Name: fmt.Sprintf("%s-%d-container-%d", podNamePrefix, i, j),
-						Usage: v1.ResourceList{
-							v1.ResourceCPU: *resource.NewMilliQuantity(
+						Usage: clientv1.ResourceList{
+							clientv1.ResourceCPU: *resource.NewMilliQuantity(
 								cpu,
 								resource.DecimalSI),
-							v1.ResourceMemory: *resource.NewQuantity(
+							clientv1.ResourceMemory: *resource.NewQuantity(
 								int64(1024*1024),
 								resource.BinarySI),
 						},

@@ -761,11 +761,11 @@ function create_psp_policy {
 
 function create_storage_class {
     if [ -z "$CLOUD_PROVIDER" ]; then
-        # No cloud provider -> no default storage class
-        return
+        CLASS_FILE=${KUBE_ROOT}/cluster/addons/storage-class/local/default.yaml
+    else
+        CLASS_FILE=${KUBE_ROOT}/cluster/addons/storage-class/${CLOUD_PROVIDER}/default.yaml
     fi
 
-    CLASS_FILE=${KUBE_ROOT}/cluster/addons/storage-class/${CLOUD_PROVIDER}/default.yaml
     if [ -e $CLASS_FILE ]; then
         echo "Create default storage class for $CLOUD_PROVIDER"
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f $CLASS_FILE
