@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	apijson "k8s.io/apimachinery/pkg/util/json"
@@ -127,13 +126,18 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 }
 
 func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) error {
-	r := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	builder, err := f.NewUnstructuredBuilder(true)
+	if err != nil {
+		return err
+	}
+
+	r := builder.
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		Latest().
 		Flatten().
 		Do()
-	err := r.Err()
+	err = r.Err()
 	if err != nil {
 		return err
 	}

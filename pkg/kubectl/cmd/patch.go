@@ -149,11 +149,14 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		return fmt.Errorf("unable to parse %q: %v", patch, err)
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
+	// TODO: fix --local to work with thirdpartyresources without making use of the discovery client.
+	// https://github.com/kubernetes/kubernetes/issues/46722
+	builder, err := f.NewUnstructuredBuilder(true)
 	if err != nil {
 		return err
 	}
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+
+	r := builder.
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
@@ -220,6 +223,10 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			if len(options.OutputFormat) > 0 && options.OutputFormat != "name" {
 				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
 			}
+			mapper, _, err := f.UnstructuredObject()
+			if err != nil {
+				return err
+			}
 			cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
 			return nil
 		}
@@ -230,14 +237,17 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		if err != nil {
 			return err
 		}
+
 		originalPatchedObjJS, err := getPatchedJSON(patchType, originalObjJS, patchBytes, mapping.GroupVersionKind, api.Scheme)
 		if err != nil {
 			return err
 		}
+
 		targetObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, originalPatchedObjJS)
 		if err != nil {
 			return err
 		}
+
 		// TODO: if we ever want to go generic, this allows a clean -o yaml without trying to print columns or anything
 		// rawExtension := &runtime.Unknown{
 		//	Raw: originalPatchedObjJS,

@@ -65,14 +65,13 @@ func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error 
 	}
 	printService(out, "Kubernetes master", client.Host)
 
-	mapper, typer := f.Object()
 	cmdNamespace := cmdutil.GetFlagString(cmd, "namespace")
 	if cmdNamespace == "" {
 		cmdNamespace = metav1.NamespaceSystem
 	}
 
 	// TODO use generalized labels once they are implemented (#341)
-	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	b := f.NewBuilder(true).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		SelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).

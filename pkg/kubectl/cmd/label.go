@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -181,11 +180,12 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	changeCause := f.Command(cmd, false)
 
-	mapper, typer, err := f.UnstructuredObject()
+	builder, err := f.NewUnstructuredBuilder(!o.local)
 	if err != nil {
 		return err
 	}
-	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+
+	b := builder.
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -220,6 +220,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			if err != nil {
 				return err
 			}
+			dataChangeMsg = "labeled"
 			outputObj = info.Object
 		} else {
 			obj := info.Object
@@ -275,8 +276,18 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 				return err
 			}
 		}
+
+		var mapper meta.RESTMapper
+		if o.local {
+			mapper, _ = f.Object()
+		} else {
+			mapper, _, err = f.UnstructuredObject()
+			if err != nil {
+				return err
+			}
+		}
 		if o.outputFormat != "" {
-			return f.PrintObject(cmd, mapper, outputObj, o.out)
+			return f.PrintObject(cmd, o.local, mapper, outputObj, o.out)
 		}
 		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, dataChangeMsg)
 		return nil
