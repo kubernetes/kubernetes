@@ -70,6 +70,30 @@ func TestDescribePod(t *testing.T) {
 	}
 }
 
+func TestDescribePodNode(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: api.PodSpec{
+			NodeName: "all-in-one",
+		},
+		Status: api.PodStatus{
+			HostIP: "127.0.0.1",
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "all-in-one/127.0.0.1") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribePodTolerations(t *testing.T) {
 	fake := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
