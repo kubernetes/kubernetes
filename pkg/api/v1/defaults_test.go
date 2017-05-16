@@ -225,7 +225,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 			t.FailNow()
 		}
 		if rc2.Spec.Replicas == nil {
-			t.Errorf("unexpected nil Replicas")
+			t.Error("unexpected nil Replicas")
 		} else if test.expectReplicas != *rc2.Spec.Replicas {
 			t.Errorf("expected: %d replicas, got: %d", test.expectReplicas, *rc2.Spec.Replicas)
 		}
@@ -973,11 +973,11 @@ func TestSetDefaultNodeStatusAllocatable(t *testing.T) {
 		if rl == nil {
 			return nil
 		}
-		copy := make(v1.ResourceList, len(rl))
+		copy_ := make(v1.ResourceList, len(rl))
 		for k, v := range rl {
-			copy[k] = *v.Copy()
+			copy_[k] = *v.Copy()
 		}
-		return copy
+		return copy_
 	}
 
 	resourceListsEqual := func(a v1.ResourceList, b v1.ResourceList) bool {
