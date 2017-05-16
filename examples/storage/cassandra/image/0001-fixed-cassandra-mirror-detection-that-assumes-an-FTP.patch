@@ -1,0 +1,133 @@
+From 92c3b5cf2fe6d64376afa782192730b1d5995ce9 Mon Sep 17 00:00:00 2001
+From: Werner <sky.captin@gmail.com>
+Date: Tue, 16 May 2017 11:23:09 +0200
+Subject: [PATCH] fixed cassandra mirror detection that assumes an FTP site
+ will always be returned split one tldr docker command into many so that a
+ noob has a chance of debugging without suffering bash script suffocation by
+ tldr bumped cassandra image to v3.10 bumped ubuntu-slim to 0.9
+
+---
+ examples/storage/cassandra/image/Dockerfile        |  41 +++++++++++----------
+ examples/storage/cassandra/image/Makefile          |   3 +-
+ .../cassandra/image/files/kubernetes-cassandra.jar | Bin 9841 -> 9843 bytes
+ 3 files changed, 23 insertions(+), 21 deletions(-)
+
+diff --git a/examples/storage/cassandra/image/Dockerfile b/examples/storage/cassandra/image/Dockerfile
+index d14401b..c2f75c9 100644
+--- a/examples/storage/cassandra/image/Dockerfile
++++ b/examples/storage/cassandra/image/Dockerfile
+@@ -12,7 +12,7 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-FROM gcr.io/google_containers/ubuntu-slim:0.6
++FROM gcr.io/google_containers/ubuntu-slim:0.9
+ 
+ ARG BUILD_DATE
+ ARG VCS_REF
+@@ -45,28 +45,29 @@ RUN set -e && echo 'debconf debconf/frontend select Noninteractive' | debconf-se
+ 	openjdk-8-jre-headless \
+ 	libjemalloc1 \
+ 	localepurge \
+-	wget && \
+-  mirror_url=$( wget -q -O - http://www.apache.org/dyn/closer.cgi/cassandra/ \
+-        | sed -n 's#.*href="\(http://ftp.[^"]*\)".*#\1#p' \
++	wget
++
++RUN mirror_url=$( wget -q -O - http://www.apache.org/dyn/closer.cgi/cassandra/ \
++        | sed -n 's#.*href="\(http://.*/cassandra/[^"]*\)".*#\1#p' \
+         | head -n 1 \
+     ) \
+     && wget -q -O - ${mirror_url}/${CASSANDRA_VERSION}/apache-cassandra-${CASSANDRA_VERSION}-bin.tar.gz \
+-        | tar -xzf - -C /usr/local \
+-    && wget -q -O - https://github.com/Yelp/dumb-init/releases/download/v${DI_VERSION}/dumb-init_${DI_VERSION}_amd64 > /sbin/dumb-init \
+-    && echo "$DI_SHA  /sbin/dumb-init" | sha256sum -c - \
+-    && chmod +x /sbin/dumb-init \
+-    && chmod +x /ready-probe.sh \
+-    && mkdir -p /cassandra_data/data \
+-    && mkdir -p /etc/cassandra \
+-    && mv /logback.xml /cassandra.yaml /jvm.options /etc/cassandra/ \
+-    && mv /usr/local/apache-cassandra-${CASSANDRA_VERSION}/conf/cassandra-env.sh /etc/cassandra/ \
+-    && adduser --disabled-password --no-create-home --gecos '' --disabled-login cassandra \
+-    && chown cassandra: /ready-probe.sh \
+-    && if [ -n "$DEV_CONTAINER" ]; then apt-get -y --no-install-recommends install python; else rm -rf  $CASSANDRA_HOME/pylib; fi \
+-    && apt-get -y purge wget localepurge \
+-    && apt-get autoremove \
+-    && apt-get clean \
+-    && rm -rf \
++        | tar -xzf - -C /usr/local
++RUN wget -q -O - https://github.com/Yelp/dumb-init/releases/download/v${DI_VERSION}/dumb-init_${DI_VERSION}_amd64 > /sbin/dumb-init
++RUN echo "$DI_SHA  /sbin/dumb-init" | sha256sum -c -
++RUN chmod +x /sbin/dumb-init
++RUN chmod +x /ready-probe.sh
++RUN mkdir -p /cassandra_data/data
++RUN mkdir -p /etc/cassandra
++RUN mv /logback.xml /cassandra.yaml /jvm.options /etc/cassandra/
++RUN mv /usr/local/apache-cassandra-${CASSANDRA_VERSION}/conf/cassandra-env.sh /etc/cassandra/
++RUN adduser --disabled-password --no-create-home --gecos '' --disabled-login cassandra
++RUN chown cassandra: /ready-probe.sh
++RUN if [ -n "$DEV_CONTAINER" ]; then apt-get -y --no-install-recommends install python; else rm -rf  $CASSANDRA_HOME/pylib; fi
++RUN apt-get -y purge wget localepurge
++RUN apt-get -y autoremove
++RUN apt-get clean 
++RUN rm -rf \
+         $CASSANDRA_HOME/*.txt \
+         $CASSANDRA_HOME/doc \
+         $CASSANDRA_HOME/javadoc \
+diff --git a/examples/storage/cassandra/image/Makefile b/examples/storage/cassandra/image/Makefile
+index 3143d5c..ac8ef75 100644
+--- a/examples/storage/cassandra/image/Makefile
++++ b/examples/storage/cassandra/image/Makefile
+@@ -16,7 +16,7 @@
+ VERSION=v12
+ PROJECT_ID?=google_samples
+ PROJECT=gcr.io/${PROJECT_ID}
+-CASSANDRA_VERSION=3.9
++CASSANDRA_VERSION=3.10
+ 
+ all: kubernetes-cassandra.jar build
+ 
+@@ -26,6 +26,7 @@ kubernetes-cassandra.jar: ../java/* ../java/src/main/java/io/k8s/cassandra/*.jav
+ 	cd ../java && mvn clean
+ 
+ container:
++	@echo "Building ${PROJECT}/cassandra:${VERSION}"
+ 	docker build --pull --build-arg "CASSANDRA_VERSION=${CASSANDRA_VERSION}" -t ${PROJECT}/cassandra:${VERSION} .
+ 
+ container-dev:
+diff --git a/examples/storage/cassandra/image/files/kubernetes-cassandra.jar b/examples/storage/cassandra/image/files/kubernetes-cassandra.jar
+index c639d56d0e5d9092b429c73a6e25efe8dce46b63..c0a26286124a05ea34d72173dc878cb5f76bcf33 100644
+GIT binary patch
+delta 893
+zcmez9^Vx?tz?+$civa{uA~#IrRpCvJ+~8%xRoRsX6l$4h7g&F(+vu{_smh&mx`Twh
+zgMtqv^|5xIlw8TRuQPRJCD*a4V^z}xWHooiY2H-u*7?Hoh_{!ga%aU(2878VBf(Zc
+z31%RjnXivq0XsxNwnediz+@gqPG+D9lO-5+K=fvJ#y5;$2A@PI6PS@EwV#odg8?LI
+z#{3x~sl$3%04&KQ#?HhF_T6MH87*d@FDHk~ScB=QG6Br11A8{VkZETI`}=7`RAD~Q
+z?yAW(3O@CQT!#&K94_8nE|9WrqtTM36BY)ayr8+WL1^_+mM2O#8}ID9$5sF1!!C7h
+zZPC6B^FAzUK3eMibesAEhK}!H5(#x@xW6#2f0wXzN~()|&3n69ugklVPu1<8dH+O@
+zik9W2N%yu)O{<QLY~{ZF^u2w6HzSh>Gdw1M;WgP^(GWE@Cbue@g8VdjucD;HU&rIH
+zU_|HyNxoB*wEXM%0x1ZQj0P$|i3&lWG6)c0`0L2aI9X6kSO?)2aG-jHivRSR%gDg+
+zl8J%A1g0KHZ)vmvY0#S7z{taorfKp+Wl5GTjoQp$1sW>CV29hOfCQUa!GiOpcrmOx
+zedj~fLZDS|fmWHLSmn+>`Js}l0>}f?o=(2nEx^F=QHg;;7e$dRC(vZg$@$7cV1;{b
+zevRD^G|df|;`C7z3QJ91sB8^Q7YkLS8RaMMRgnXyihC;3Og=J`8x@o$%c}B#g>+P<
+znYuti=93$MLclaLxnC9Jle-{6>&eem`N8(V(+|)tXB7L=6@Us|Cr7IZu$e1@WB_e_
+B0G0p%
+
+delta 930
+zcmezD^U;Slz?+$civa`_`J*QCs_-iCM|quHq_92*DAY93F0g)5@u$;4l{@Ej2MK!z
+z1s`zgW9>XCxsq#NXX?sIu47fls-_9>YVL~Dys2QV^M&V;E^p<|ik%Dyb3q1zEr1ft
+zKsqyDAGZQ_h=Od3VvwTA0*vg;Kr<#wG3tQm&7O>J7{QDX_RkQ87w2UGu!w>bI}<Ah
+z14xwxb0`y7Yy#_kMpm%zChN#(F#~-$Ia0<NOiz~yVD1$5+x$wVof+)!ThXri`9Rw%
+zC)X+X)NkZEWFWwB!8X3|!p?_6E2cWBFMRZ1N!@{^mZ~CpMV?&$_U7&TTAD5vwn|2^
+z=7E=W_scxrgoh0O7+x$(oFnkC(7w^#eAe8pOLR7G&e&U-nfKm%PVlzd8*fbYQtb3<
+z+p<i3?bq^X?lp&|djJ0q^eH2g2s1n;fFU;7Q_&DLHYT?#nu7c^dB38h#9POsuz*D9
+z1WA5Sl(cy3_zXD^Q52v=h9FQG1PCy^b>yDxsH7kdG{h@Z{HNbsMh1qLObiSrFeN~G
+zNuw1|jmYF2PO-_Wlq3~EYER$!P_+=K_AOAYIf`0M=E;ppT9eNzOM{*LT3M21NuxX~
+zP*BrIFF7Z%xESGWaI|^tx%oAAKhP{UU@Fl^G3%=+*sNX^K_!UN>8*Sdxq((Xu%Iht
+zlmIK`RTc)j@6CdP2Ma-F0u`I0m>DSrR+yzMt_V&cC_%#yS1Q2p|G(_y{VH<cRP#VZ
+zn$c_WT2<xA@~S*w5j|CD#txu}1wXQPfGKP8L{&-VC5^X%a^7I4z!MnIY-hOnpkPf^
+Yn7mHadh$L6uF0`#0&J#02Qe@J0C!I5ZU6uP
+
+-- 
+2.7.4
+
