@@ -178,7 +178,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("failed to get supported resources from server: %v", err)
 	}
-	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, preferredResources)
+	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"get", "list", "watch", "patch", "update", "delete"}}, preferredResources)
 	deletableGroupVersionResources, err := discovery.GroupVersionResources(deletableResources)
 	if err != nil {
 		return true, fmt.Errorf("Failed to parse resources from server: %v", err)
