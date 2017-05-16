@@ -172,6 +172,7 @@ go_library(
         "//test/e2e_federation:go_default_library",
         "//test/images/net/nat:go_default_library",
         "//test/utils:go_default_library",
+        "//test/utils/junit:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/elazarl/goproxy:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
