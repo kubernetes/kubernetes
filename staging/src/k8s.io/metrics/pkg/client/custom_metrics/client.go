@@ -216,7 +216,7 @@ func (m *namespacedMetrics) GetForObject(groupKind schema.GroupKind, name string
 	}
 
 	if len(res.Items) != 1 {
-		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one")
+		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one", len(res.Items))
 	}
 
 	return &res.Items[0], nil
