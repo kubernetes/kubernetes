@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/google_containers/ubuntu-slim:0.6
+FROM gcr.io/google_containers/ubuntu-slim:0.9
 
 ARG BUILD_DATE
 ARG VCS_REF
@@ -45,28 +45,29 @@ RUN set -e && echo 'debconf debconf/frontend select Noninteractive' | debconf-se
 	openjdk-8-jre-headless \
 	libjemalloc1 \
 	localepurge \
-	wget && \
-  mirror_url=$( wget -q -O - http://www.apache.org/dyn/closer.cgi/cassandra/ \
-        | sed -n 's#.*href="\(http://ftp.[^"]*\)".*#\1#p' \
+	wget
+
+RUN mirror_url=$( wget -q -O - http://www.apache.org/dyn/closer.cgi/cassandra/ \
+        | sed -n 's#.*href="\(http://.*/cassandra/[^"]*\)".*#\1#p' \
         | head -n 1 \
     ) \
     && wget -q -O - ${mirror_url}/${CASSANDRA_VERSION}/apache-cassandra-${CASSANDRA_VERSION}-bin.tar.gz \
-        | tar -xzf - -C /usr/local \
-    && wget -q -O - https://github.com/Yelp/dumb-init/releases/download/v${DI_VERSION}/dumb-init_${DI_VERSION}_amd64 > /sbin/dumb-init \
-    && echo "$DI_SHA  /sbin/dumb-init" | sha256sum -c - \
-    && chmod +x /sbin/dumb-init \
-    && chmod +x /ready-probe.sh \
-    && mkdir -p /cassandra_data/data \
-    && mkdir -p /etc/cassandra \
-    && mv /logback.xml /cassandra.yaml /jvm.options /etc/cassandra/ \
-    && mv /usr/local/apache-cassandra-${CASSANDRA_VERSION}/conf/cassandra-env.sh /etc/cassandra/ \
-    && adduser --disabled-password --no-create-home --gecos '' --disabled-login cassandra \
-    && chown cassandra: /ready-probe.sh \
-    && if [ -n "$DEV_CONTAINER" ]; then apt-get -y --no-install-recommends install python; else rm -rf  $CASSANDRA_HOME/pylib; fi \
-    && apt-get -y purge wget localepurge \
-    && apt-get autoremove \
-    && apt-get clean \
-    && rm -rf \
+        | tar -xzf - -C /usr/local
+RUN wget -q -O - https://github.com/Yelp/dumb-init/releases/download/v${DI_VERSION}/dumb-init_${DI_VERSION}_amd64 > /sbin/dumb-init
+RUN echo "$DI_SHA  /sbin/dumb-init" | sha256sum -c -
+RUN chmod +x /sbin/dumb-init
+RUN chmod +x /ready-probe.sh
+RUN mkdir -p /cassandra_data/data
+RUN mkdir -p /etc/cassandra
+RUN mv /logback.xml /cassandra.yaml /jvm.options /etc/cassandra/
+RUN mv /usr/local/apache-cassandra-${CASSANDRA_VERSION}/conf/cassandra-env.sh /etc/cassandra/
+RUN adduser --disabled-password --no-create-home --gecos '' --disabled-login cassandra
+RUN chown cassandra: /ready-probe.sh
+RUN if [ -n "$DEV_CONTAINER" ]; then apt-get -y --no-install-recommends install python; else rm -rf  $CASSANDRA_HOME/pylib; fi
+RUN apt-get -y purge wget localepurge
+RUN apt-get -y autoremove
+RUN apt-get clean 
+RUN rm -rf \
         $CASSANDRA_HOME/*.txt \
         $CASSANDRA_HOME/doc \
         $CASSANDRA_HOME/javadoc \
