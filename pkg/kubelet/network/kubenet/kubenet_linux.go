@@ -54,7 +54,8 @@ const (
 	BridgeName    = "cbr0"
 	DefaultCNIDir = "/opt/cni/bin"
 
-	sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
+	sysctlBridgeCallIPTables  = "net/bridge/bridge-nf-call-iptables"
+	sysctlBridgeCallIP6Tables = "net/bridge/bridge-nf-call-ip6tables"
 
 	// fallbackMTU is used if an MTU is not specified, and we cannot determine the MTU
 	fallbackMTU = 1460
@@ -107,7 +108,16 @@ type kubenetNetworkPlugin struct {
 }
 
 func NewPlugin(networkPluginDir string) network.NetworkPlugin {
-	protocol := utiliptables.ProtocolIpv4
+	var protocol utiliptables.Protocol
+	var addr net.IP
+	addr, _ = utilnet.ChooseBindAddress(addr)
+	switch {
+	case addr.To4() != nil:
+		protocol = utiliptables.ProtocolIpv4
+	case addr.To16() != nil:
+		protocol = utiliptables.ProtocolIpv6
+	}
+
 	execer := utilexec.New()
 	dbus := utildbus.New()
 	sysctl := utilsysctl.New()
@@ -118,8 +128,8 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 		iptables:          iptInterface,
 		sysctl:            sysctl,
 		vendorDir:         networkPluginDir,
-		hostportSyncer:    hostport.NewHostportSyncer(),
-		hostportManager:   hostport.NewHostportManager(),
+		hostportSyncer:    hostport.NewHostportSyncer(protocol),
+		hostportManager:   hostport.NewHostportManager(protocol),
 		nonMasqueradeCIDR: "10.0.0.0/8",
 	}
 }
@@ -144,14 +154,20 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componen
 		plugin.mtu = mtu
 	}
 
-	// Since this plugin uses a Linux bridge, set bridge-nf-call-iptables=1
-	// is necessary to ensure kube-proxy functions correctly.
+	// Since this plugin uses a Linux bridge, set bridge-nf-call-iptables=1 or
+	// bridge-nf-call-ip6tables=1 to ensure kube-proxy functions correctly.
 	//
 	// This will return an error on older kernel version (< 3.18) as the module
 	// was built-in, we simply ignore the error here. A better thing to do is
 	// to check the kernel version in the future.
 	plugin.execer.Command("modprobe", "br-netfilter").CombinedOutput()
-	err := plugin.sysctl.SetSysctl(sysctlBridgeCallIPTables, 1)
+	var iptVer string
+	if plugin.iptables.IsIpv6() {
+		iptVer = sysctlBridgeCallIP6Tables
+	} else {
+		iptVer = sysctlBridgeCallIPTables
+	}
+	err := plugin.sysctl.SetSysctl(iptVer, 1)
 	if err != nil {
 		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIPTables, err)
 	}

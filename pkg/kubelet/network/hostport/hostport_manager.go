@@ -51,8 +51,8 @@ type hostportManager struct {
 	mu          sync.Mutex
 }
 
-func NewHostportManager() HostPortManager {
-	iptInterface := utiliptables.New(utilexec.New(), utildbus.New(), utiliptables.ProtocolIpv4)
+func NewHostportManager(protocol utiliptables.Protocol) HostPortManager {
+	iptInterface := utiliptables.New(utilexec.New(), utildbus.New(), protocol)
 	return &hostportManager{
 		hostPortMap: make(map[hostport]closeable),
 		iptables:    iptInterface,
@@ -72,7 +72,7 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		return nil
 	}
 
-	if podPortMapping.IP.To4() == nil {
+	if podPortMapping.IP.To4() == nil && podPortMapping.IP.To16() == nil {
 		return fmt.Errorf("invalid or missing IP of pod %s", podFullName)
 	}
 	podIP := podPortMapping.IP.String()

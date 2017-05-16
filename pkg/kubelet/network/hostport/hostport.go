@@ -188,8 +188,15 @@ func ensureKubeHostportChains(iptables utiliptables.Interface, natInterfaceName 
 			return fmt.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", tc.table, tc.chain, kubeHostportsChain, err)
 		}
 	}
+	// Set the proper loopback address based on iptables protocol type
+	var loopback string
+	if !iptables.IsIpv6() {
+		loopback = "127.0.0.0/8"
+	} else {
+		loopback = "::1/128"
+	}
 	// Need to SNAT traffic from localhost
-	args = []string{"-m", "comment", "--comment", "SNAT for localhost access to hostports", "-o", natInterfaceName, "-s", "127.0.0.0/8", "-j", "MASQUERADE"}
+	args = []string{"-m", "comment", "--comment", "SNAT for localhost access to hostports", "-o", natInterfaceName, "-s", loopback, "-j", "MASQUERADE"}
 	if _, err := iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
 		return fmt.Errorf("Failed to ensure that %s chain %s jumps to MASQUERADE: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, err)
 	}
