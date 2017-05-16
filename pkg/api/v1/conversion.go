@@ -301,7 +301,7 @@ func Convert_extensions_ReplicaSet_to_v1_ReplicationController(in *extensions.Re
 		if out.Annotations == nil {
 			out.Annotations = make(map[string]string)
 		}
-		out.Annotations[api.NonConvertibleAnnotationPrefix+"/"+fieldErr.Field] = reflect.ValueOf(fieldErr.BadValue).String()
+		out.Annotations[NonConvertibleAnnotationPrefix+"/"+fieldErr.Field] = reflect.ValueOf(fieldErr.BadValue).String()
 	}
 	if err := Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus(&in.Status, &out.Status, s); err != nil {
 		return err
