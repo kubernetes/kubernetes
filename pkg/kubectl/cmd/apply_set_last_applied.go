@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	apijson "k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/kubernetes/pkg/api/annotations"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -234,7 +234,7 @@ func (o *SetLastAppliedOptions) getPatch(info *resource.Info) ([]byte, []byte, e
 	if err != nil {
 		return nil, localFile, err
 	}
-	annotationsMap[annotations.LastAppliedConfigAnnotation] = string(localFile)
+	annotationsMap[api.LastAppliedConfigAnnotation] = string(localFile)
 	metadataMap["annotations"] = annotationsMap
 	objMap["metadata"] = metadataMap
 	jsonString, err := apijson.Marshal(objMap)
