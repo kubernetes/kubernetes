@@ -35,6 +35,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
@@ -289,4 +290,14 @@ func (r *Runtime) ImageStats() (*kubecontainer.ImageStats, error) {
 		imageStat.TotalStorageBytes = imageStat.TotalStorageBytes + uint64(image.Size)
 	}
 	return &imageStat, nil
+}
+
+// ImageFsInfo gets filesytem information of images.
+func (r *Runtime) ImageFsInfo() (runtimeapi.FsInfo, error) {
+	fsInfo, err := r.cadvisor.ImagesFsInfo()
+	if err != nil {
+		return runtimeapi.FsInfo{}, err
+	}
+
+	return kubecontainer.ConvertCadvisorFsInfo(fsInfo), nil
 }
