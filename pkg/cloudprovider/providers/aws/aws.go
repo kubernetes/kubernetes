@@ -130,6 +130,12 @@ const ServiceAnnotationLoadBalancerSSLPorts = "service.beta.kubernetes.io/aws-lo
 // a HTTP listener is used.
 const ServiceAnnotationLoadBalancerBEProtocol = "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
 
+// ServiceAnnotationLoadBalancerAdditionalTags is the annotation used on the service
+// to specify a comma-separated list of key-value pairs which will be recorded as
+// additional tags in the ELB.
+// For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2"
+const ServiceAnnotationLoadBalancerAdditionalTags = "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags"
+
 const (
 	// volumeAttachmentConsecutiveErrorLimit is the number of consecutive errors we will ignore when waiting for a volume to attach/detach
 	volumeAttachmentStatusConsecutiveErrorLimit = 10
@@ -2772,6 +2778,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		internalELB,
 		proxyProtocol,
 		loadBalancerAttributes,
+		annotations,
 	)
 	if err != nil {
 		return nil, err
