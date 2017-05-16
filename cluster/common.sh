@@ -690,6 +690,12 @@ EOF
 KUBELET_TEST_ARGS: $(yaml-quote ${KUBELET_TEST_ARGS})
 EOF
   fi
+  if [ -n "${KUBELET_ARGS:-}" ]; then
+      cat >>$file <<EOF
+KUBELET_ARGS: $(yaml-quote ${KUBELET_ARGS})
+EOF
+  fi
+
   if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
       cat >>$file <<EOF
 KUBELET_TEST_LOG_LEVEL: $(yaml-quote ${KUBELET_TEST_LOG_LEVEL})

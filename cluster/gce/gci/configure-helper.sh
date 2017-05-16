@@ -666,7 +666,7 @@ function start-kubelet {
     fi
   fi
   echo "Using kubelet binary at ${kubelet_bin}"
-  local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
+  local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_ARGS} ${KUBELET_TEST_ARGS:-}"
   flags+=" --allow-privileged=true"
   flags+=" --babysit-daemons=true"
   flags+=" --cgroup-root=/"
