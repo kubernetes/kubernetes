@@ -48,6 +48,7 @@ federation/cmd/federation-apiserver
 federation/cmd/federation-controller-manager
 federation/cmd/genfeddocs
 federation/cmd/kubefed
+federation/pkg/federation-controller/util/replicapreferences
 hack
 hack/boilerplate/test
 hack/cmd/teststale
