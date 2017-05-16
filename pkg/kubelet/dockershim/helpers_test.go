@@ -175,46 +175,6 @@ func TestGetApparmorSecurityOpts(t *testing.T) {
 	}
 }
 
-// TestGetSystclsFromAnnotations tests the logic of getting sysctls from annotations.
-func TestGetSystclsFromAnnotations(t *testing.T) {
-	tests := []struct {
-		annotations     map[string]string
-		expectedSysctls map[string]string
-	}{{
-		annotations: map[string]string{
-			v1.SysctlsPodAnnotationKey:       "kernel.shmmni=32768,kernel.shmmax=1000000000",
-			v1.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
-		},
-		expectedSysctls: map[string]string{
-			"kernel.shmmni":            "32768",
-			"kernel.shmmax":            "1000000000",
-			"knet.ipv4.route.min_pmtu": "1000",
-		},
-	}, {
-		annotations: map[string]string{
-			v1.SysctlsPodAnnotationKey: "kernel.shmmni=32768,kernel.shmmax=1000000000",
-		},
-		expectedSysctls: map[string]string{
-			"kernel.shmmni": "32768",
-			"kernel.shmmax": "1000000000",
-		},
-	}, {
-		annotations: map[string]string{
-			v1.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
-		},
-		expectedSysctls: map[string]string{
-			"knet.ipv4.route.min_pmtu": "1000",
-		},
-	}}
-
-	for i, test := range tests {
-		actual, err := getSysctlsFromAnnotations(test.annotations)
-		assert.NoError(t, err, "TestCase[%d]", i)
-		assert.Len(t, actual, len(test.expectedSysctls), "TestCase[%d]", i)
-		assert.Equal(t, test.expectedSysctls, actual, "TestCase[%d]", i)
-	}
-}
-
 // TestGetUserFromImageUser tests the logic of getting image uid or user name of image user.
 func TestGetUserFromImageUser(t *testing.T) {
 	newI64 := func(i int64) *int64 { return &i }

@@ -24,8 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// CustomResources returns a CustomResourceInformer.
-	CustomResources() CustomResourceInformer
+	// CustomResourceDefinitions returns a CustomResourceDefinitionInformer.
+	CustomResourceDefinitions() CustomResourceDefinitionInformer
 }
 
 type version struct {
@@ -37,7 +37,7 @@ func New(f internalinterfaces.SharedInformerFactory) Interface {
 	return &version{f}
 }
 
-// CustomResources returns a CustomResourceInformer.
-func (v *version) CustomResources() CustomResourceInformer {
-	return &customResourceInformer{factory: v.SharedInformerFactory}
+// CustomResourceDefinitions returns a CustomResourceDefinitionInformer.
+func (v *version) CustomResourceDefinitions() CustomResourceDefinitionInformer {
+	return &customResourceDefinitionInformer{factory: v.SharedInformerFactory}
 }

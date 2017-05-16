@@ -26,8 +26,8 @@ import (
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
 )
 
-// ValidateCustomResource statically validates
-func ValidateCustomResource(obj *apiextensions.CustomResource) field.ErrorList {
+// ValidateCustomResourceDefinition statically validates
+func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinition) field.ErrorList {
 	nameValidationFn := func(name string, prefix bool) []string {
 		ret := genericvalidation.NameIsDNSSubdomain(name, prefix)
 		requiredName := obj.Spec.Names.Plural + "." + obj.Spec.Group
@@ -38,28 +38,28 @@ func ValidateCustomResource(obj *apiextensions.CustomResource) field.ErrorList {
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateCustomResourceSpec(&obj.Spec, field.NewPath("spec"))...)
-	allErrs = append(allErrs, ValidateCustomResourceStatus(&obj.Status, field.NewPath("status"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionSpec(&obj.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
-// ValidateCustomResourceUpdate statically validates
-func ValidateCustomResourceUpdate(obj, oldObj *apiextensions.CustomResource) field.ErrorList {
+// ValidateCustomResourceDefinitionUpdate statically validates
+func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomResourceDefinition) field.ErrorList {
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateCustomResourceSpecUpdate(&obj.Spec, &oldObj.Spec, field.NewPath("spec"))...)
-	allErrs = append(allErrs, ValidateCustomResourceStatus(&obj.Status, field.NewPath("status"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionSpecUpdate(&obj.Spec, &oldObj.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
-// ValidateUpdateCustomResourceStatus statically validates
-func ValidateUpdateCustomResourceStatus(obj, oldObj *apiextensions.CustomResource) field.ErrorList {
+// ValidateUpdateCustomResourceDefinitionStatus statically validates
+func ValidateUpdateCustomResourceDefinitionStatus(obj, oldObj *apiextensions.CustomResourceDefinition) field.ErrorList {
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateCustomResourceStatus(&obj.Status, field.NewPath("status"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
-// ValidateCustomResourceSpec statically validates
-func ValidateCustomResourceSpec(spec *apiextensions.CustomResourceSpec, fldPath *field.Path) field.ErrorList {
+// ValidateCustomResourceDefinitionSpec statically validates
+func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(spec.Group) == 0 {
@@ -99,14 +99,14 @@ func ValidateCustomResourceSpec(spec *apiextensions.CustomResourceSpec, fldPath 
 		allErrs = append(allErrs, field.Required(fldPath.Child("names", "listKind"), ""))
 	}
 
-	allErrs = append(allErrs, ValidateCustomResourceNames(&spec.Names, fldPath.Child("names"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionNames(&spec.Names, fldPath.Child("names"))...)
 
 	return allErrs
 }
 
-// ValidateCustomResourceSpecUpdate statically validates
-func ValidateCustomResourceSpecUpdate(spec, oldSpec *apiextensions.CustomResourceSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := ValidateCustomResourceSpec(spec, fldPath)
+// ValidateCustomResourceDefinitionSpecUpdate statically validates
+func ValidateCustomResourceDefinitionSpecUpdate(spec, oldSpec *apiextensions.CustomResourceDefinitionSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := ValidateCustomResourceDefinitionSpec(spec, fldPath)
 
 	// these all affect the storage, so you can't change them
 	genericvalidation.ValidateImmutableField(spec.Group, oldSpec.Group, fldPath.Child("group"))
@@ -120,15 +120,15 @@ func ValidateCustomResourceSpecUpdate(spec, oldSpec *apiextensions.CustomResourc
 	return allErrs
 }
 
-// ValidateCustomResourceStatus statically validates
-func ValidateCustomResourceStatus(status *apiextensions.CustomResourceStatus, fldPath *field.Path) field.ErrorList {
+// ValidateCustomResourceDefinitionStatus statically validates
+func ValidateCustomResourceDefinitionStatus(status *apiextensions.CustomResourceDefinitionStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateCustomResourceNames(&status.AcceptedNames, fldPath.Child("acceptedNames"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionNames(&status.AcceptedNames, fldPath.Child("acceptedNames"))...)
 	return allErrs
 }
 
-// ValidateCustomResourceNames statically validates
-func ValidateCustomResourceNames(names *apiextensions.CustomResourceNames, fldPath *field.Path) field.ErrorList {
+// ValidateCustomResourceDefinitionNames statically validates
+func ValidateCustomResourceDefinitionNames(names *apiextensions.CustomResourceDefinitionNames, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if errs := validationutil.IsDNS1035Label(names.Plural); len(names.Plural) > 0 && len(errs) > 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("plural"), names.Plural, strings.Join(errs, ",")))

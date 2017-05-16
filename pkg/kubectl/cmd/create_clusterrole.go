@@ -36,7 +36,7 @@ var (
 		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods
 
 		# Create a ClusterRole named "pod-reader" with ResourceName specified
-		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod
+		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod --resource-name=anotherpod
 
 		# Create a ClusterRole named "foo" with API Group specified
 		kubectl create clusterrole foo --verb=get,list,watch --resource=rs.extensions
@@ -73,7 +73,7 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringSliceVar(&c.Verbs, "verb", []string{}, "verb that applies to the resources contained in the rule")
 	cmd.Flags().StringSlice("resource", []string{}, "resource that the rule applies to")
-	cmd.Flags().StringSliceVar(&c.ResourceNames, "resource-name", []string{}, "resource in the white list that the rule applies to")
+	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", []string{}, "resource in the white list that the rule applies to, repeat this flag for multiple items")
 
 	return cmd
 }

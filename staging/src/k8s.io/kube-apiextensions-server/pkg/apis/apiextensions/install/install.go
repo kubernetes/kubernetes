@@ -30,7 +30,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  apiextensions.GroupName,
-			RootScopedKinds:            sets.NewString("CustomResource"),
+			RootScopedKinds:            sets.NewString("CustomResourceDefinition"),
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
 			ImportPrefix:               "k8s.io/kube-apiextensions-server/pkg/apis/apiextension",
 			AddInternalObjectsToScheme: apiextensions.AddToScheme,

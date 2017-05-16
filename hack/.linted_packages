@@ -170,7 +170,6 @@ pkg/client/listers/storage/v1beta1
 pkg/client/metrics
 pkg/client/metrics/prometheus
 pkg/client/unversioned
-pkg/client/unversioned/remotecommand
 pkg/cloudprovider/providers
 pkg/cloudprovider/providers/azure
 pkg/cloudprovider/providers/cloudstack
@@ -386,6 +385,7 @@ staging/src/k8s.io/client-go/plugin/pkg/client/auth/gcp
 staging/src/k8s.io/client-go/rest/watch
 staging/src/k8s.io/client-go/tools/auth
 staging/src/k8s.io/client-go/tools/metrics
+staging/src/k8s.io/client-go/tools/remotecommand
 staging/src/k8s.io/client-go/util/cert
 staging/src/k8s.io/client-go/util/homedir
 staging/src/k8s.io/client-go/util/workqueue

@@ -14,15 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package customresourcestorage
+package customresourcedefinition
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
 )
 
 // rest implements a RESTStorage for API services against etcd
@@ -31,31 +29,24 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against API services.
-func NewREST(resource schema.GroupResource, listKind schema.GroupVersionKind, copier runtime.ObjectCopier, strategy CustomResourceStorageStrategy, optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST {
+	strategy := NewStrategy(scheme)
+
 	store := &genericregistry.Store{
-		Copier:  copier,
-		NewFunc: func() runtime.Object { return &unstructured.Unstructured{} },
-		NewListFunc: func() runtime.Object {
-			// lists are never stored, only manufactured, so stomp in the right kind
-			ret := &unstructured.UnstructuredList{}
-			ret.SetGroupVersionKind(listKind)
-			return ret
-		},
+		Copier:      scheme,
+		NewFunc:     func() runtime.Object { return &apiextensions.CustomResourceDefinition{} },
+		NewListFunc: func() runtime.Object { return &apiextensions.CustomResourceDefinitionList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			accessor, err := meta.Accessor(obj)
-			if err != nil {
-				return "", err
-			}
-			return accessor.GetName(), nil
+			return obj.(*apiextensions.CustomResourceDefinition).Name, nil
 		},
-		PredicateFunc:     strategy.MatchCustomResourceStorage,
-		QualifiedResource: resource,
+		PredicateFunc:     MatchCustomResourceDefinition,
+		QualifiedResource: apiextensions.Resource("customresourcedefinitions"),
 
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,
 		DeleteStrategy: strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: strategy.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

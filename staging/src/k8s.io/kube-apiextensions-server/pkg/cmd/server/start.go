@@ -32,15 +32,15 @@ import (
 
 const defaultEtcdPathPrefix = "/registry/apiextensions.kubernetes.io"
 
-type CustomResourcesServerOptions struct {
+type CustomResourceDefinitionsServerOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
 
 	StdOut io.Writer
 	StdErr io.Writer
 }
 
-func NewCustomResourcesServerOptions(out, errOut io.Writer) *CustomResourcesServerOptions {
-	o := &CustomResourcesServerOptions{
+func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
+	o := &CustomResourceDefinitionsServerOptions{
 		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Scheme, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
 
 		StdOut: out,
@@ -50,8 +50,8 @@ func NewCustomResourcesServerOptions(out, errOut io.Writer) *CustomResourcesServ
 	return o
 }
 
-func NewCommandStartCustomResourcesServer(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
-	o := NewCustomResourcesServerOptions(out, errOut)
+func NewCommandStartCustomResourceDefinitionsServer(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
+	o := NewCustomResourceDefinitionsServerOptions(out, errOut)
 
 	cmd := &cobra.Command{
 		Short: "Launch an API extensions API server",
@@ -63,7 +63,7 @@ func NewCommandStartCustomResourcesServer(out, errOut io.Writer, stopCh <-chan s
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunCustomResourcesServer(stopCh); err != nil {
+			if err := o.RunCustomResourceDefinitionsServer(stopCh); err != nil {
 				return err
 			}
 			return nil
@@ -76,15 +76,15 @@ func NewCommandStartCustomResourcesServer(out, errOut io.Writer, stopCh <-chan s
 	return cmd
 }
 
-func (o CustomResourcesServerOptions) Validate(args []string) error {
+func (o CustomResourceDefinitionsServerOptions) Validate(args []string) error {
 	return nil
 }
 
-func (o *CustomResourcesServerOptions) Complete() error {
+func (o *CustomResourceDefinitionsServerOptions) Complete() error {
 	return nil
 }
 
-func (o CustomResourcesServerOptions) Config() (*apiserver.Config, error) {
+func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, error) {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -95,7 +95,7 @@ func (o CustomResourcesServerOptions) Config() (*apiserver.Config, error) {
 		return nil, err
 	}
 
-	customResourceRESTOptionsGetter := apiserver.CustomResourceRESTOptionsGetter{
+	customResourceDefinitionRESTOptionsGetter := apiserver.CustomResourceDefinitionRESTOptionsGetter{
 		StorageConfig:           o.RecommendedOptions.Etcd.StorageConfig,
 		StoragePrefix:           o.RecommendedOptions.Etcd.StorageConfig.Prefix,
 		EnableWatchCache:        o.RecommendedOptions.Etcd.EnableWatchCache,
@@ -103,17 +103,17 @@ func (o CustomResourcesServerOptions) Config() (*apiserver.Config, error) {
 		EnableGarbageCollection: o.RecommendedOptions.Etcd.EnableGarbageCollection,
 		DeleteCollectionWorkers: o.RecommendedOptions.Etcd.DeleteCollectionWorkers,
 	}
-	customResourceRESTOptionsGetter.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
-	customResourceRESTOptionsGetter.StorageConfig.Copier = apiserver.UnstructuredCopier{}
+	customResourceDefinitionRESTOptionsGetter.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	customResourceDefinitionRESTOptionsGetter.StorageConfig.Copier = apiserver.UnstructuredCopier{}
 
 	config := &apiserver.Config{
-		GenericConfig:                   serverConfig,
-		CustomResourceRESTOptionsGetter: customResourceRESTOptionsGetter,
+		GenericConfig:                             serverConfig,
+		CustomResourceDefinitionRESTOptionsGetter: customResourceDefinitionRESTOptionsGetter,
 	}
 	return config, nil
 }
 
-func (o CustomResourcesServerOptions) RunCustomResourcesServer(stopCh <-chan struct{}) error {
+func (o CustomResourceDefinitionsServerOptions) RunCustomResourceDefinitionsServer(stopCh <-chan struct{}) error {
 	config, err := o.Config()
 	if err != nil {
 		return err

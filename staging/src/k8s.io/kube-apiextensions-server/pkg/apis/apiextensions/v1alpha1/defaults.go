@@ -23,17 +23,17 @@ import (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&CustomResource{}, func(obj interface{}) { SetDefaults_CustomResource(obj.(*CustomResource)) })
+	scheme.AddTypeDefaultingFunc(&CustomResourceDefinition{}, func(obj interface{}) { SetDefaults_CustomResourceDefinition(obj.(*CustomResourceDefinition)) })
 	// TODO figure out why I can't seem to get my defaulter generated
 	// return RegisterDefaults(scheme)
 	return nil
 }
 
-func SetDefaults_CustomResource(obj *CustomResource) {
-	SetDefaults_CustomResourceSpec(&obj.Spec)
+func SetDefaults_CustomResourceDefinition(obj *CustomResourceDefinition) {
+	SetDefaults_CustomResourceDefinitionSpec(&obj.Spec)
 }
 
-func SetDefaults_CustomResourceSpec(obj *CustomResourceSpec) {
+func SetDefaults_CustomResourceDefinitionSpec(obj *CustomResourceDefinitionSpec) {
 	if len(obj.Scope) == 0 {
 		obj.Scope = NamespaceScoped
 	}
