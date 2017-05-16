@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
-	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
+	cadvisorfake "k8s.io/kubernetes/pkg/kubelet/cadvisor/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubemark"
@@ -112,7 +112,7 @@ func main() {
 	}
 
 	if config.Morph == "kubelet" {
-		cadvisorInterface := new(cadvisortest.Fake)
+		cadvisorInterface := new(cadvisorfake.Fake)
 		containerManager := cm.NewStubContainerManager()
 		fakeDockerClient := libdocker.NewFakeDockerClient().WithTraceDisabled()
 		fakeDockerClient.EnableSleep = true

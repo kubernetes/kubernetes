@@ -389,10 +389,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		Namespace: "",
 	}
 
-	diskSpaceManager, err := newDiskSpaceManager(kubeDeps.CAdvisorInterface, diskSpacePolicy)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
-	}
 	containerRefManager := kubecontainer.NewRefManager()
 
 	oomWatcher := NewOOMWatcher(kubeDeps.CAdvisorInterface, kubeDeps.Recorder)
@@ -426,7 +422,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		streamingConnectionIdleTimeout: kubeCfg.StreamingConnectionIdleTimeout.Duration,
 		recorder:                       kubeDeps.Recorder,
 		cadvisor:                       kubeDeps.CAdvisorInterface,
-		diskSpaceManager:               diskSpaceManager,
 		cloud:                          kubeDeps.Cloud,
 		autoDetectCloudProvider:   (componentconfigv1alpha1.AutoDetectCloudProvider == kubeCfg.CloudProvider),
 		externalCloudProvider:     cloudprovider.IsExternal(kubeCfg.CloudProvider),
@@ -534,7 +529,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
 			ds, err := dockershim.NewDockerService(kubeDeps.DockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage,
 				streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver, kubeCfg.DockerExecHandlerName, dockershimRootDir,
-				kubeCfg.DockerDisableSharedPID)
+				kubeCfg.DockerDisableSharedPID, klet.cadvisor)
 			if err != nil {
 				return nil, err
 			}
@@ -625,6 +620,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			float32(kubeCfg.RegistryPullQPS),
 			int(kubeCfg.RegistryBurst),
 			kubeCfg.RuntimeRequestTimeout.Duration,
+			klet.cadvisor,
 		)
 		if err != nil {
 			return nil, err
@@ -632,6 +628,12 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		klet.containerRuntime = runtime
 		klet.runner = kubecontainer.DirectStreamingRunner(runtime)
 	}
+
+	diskSpaceManager, err := newDiskSpaceManager(kubeDeps.CAdvisorInterface, klet.containerRuntime.ImageFsInfo, diskSpacePolicy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
+	}
+	klet.diskSpaceManager = diskSpaceManager
 
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, klet.containerRuntime)

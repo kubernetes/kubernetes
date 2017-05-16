@@ -207,13 +207,14 @@ func newTestKubeletWithImageList(
 
 	mockCadvisor := &cadvisortest.Mock{}
 	kubelet.cadvisor = mockCadvisor
+	fakeRuntime.Cadvisor = mockCadvisor
 
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
 	secretManager := secret.NewSimpleSecretManager(kubelet.kubeClient)
 	kubelet.secretManager = secretManager
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager)
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{})
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
+	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, nil, DiskSpacePolicy{})
 	if err != nil {
 		t.Fatalf("can't initialize disk space manager: %v", err)
 	}
@@ -775,7 +776,7 @@ func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisortest.Mock, ro
 	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
 
 	dsp := DiskSpacePolicy{DockerFreeDiskMB: rootThreshold, RootFreeDiskMB: dockerThreshold}
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
+	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, nil, dsp)
 	if err != nil {
 		return err
 	}
