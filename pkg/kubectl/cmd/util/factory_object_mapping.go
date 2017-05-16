@@ -141,7 +141,7 @@ func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RES
 	switch gvk.Group {
 	case federation.GroupName:
 		mappingVersion := mapping.GroupVersionKind.GroupVersion()
-		return f.clientAccessFactory.FederationClientForVersion(&mappingVersion)
+		return f.clientAccessFactory.FederationClientForVersion(mappingVersion)
 	case api.GroupName:
 		cfg.APIPath = "/api"
 	default:
@@ -173,7 +173,7 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer, error) {
 	mappingVersion := mapping.GroupVersionKind.GroupVersion()
 	if mapping.GroupVersionKind.Group == federation.GroupName {
-		fedClientSet, err := f.clientAccessFactory.FederationClientSetForVersion(&mappingVersion)
+		fedClientSet, err := f.clientAccessFactory.FederationClientSetForVersion(mappingVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -182,7 +182,7 @@ func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer,
 		}
 	}
 
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, err := f.clientAccessFactory.ClientSetForVersion(mappingVersion)
 	if err != nil {
 		// if we can't make a client for this group/version, go generic if possible
 		if genericDescriber, genericErr := genericDescriber(f.clientAccessFactory, mapping); genericErr == nil {
@@ -233,7 +233,7 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 }
 
 func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(nil)
+	clientset, err := f.clientAccessFactory.ClientSetForVersion(v1.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +301,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 
 func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
 	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, err := f.clientAccessFactory.ClientSetForVersion(mappingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 
 func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, clientsetErr := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, clientsetErr := f.clientAccessFactory.ClientSetForVersion(mappingVersion)
 	reaper, reaperErr := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset)
 
 	if kubectl.IsNoSuchReaperError(reaperErr) {
@@ -324,7 +324,7 @@ func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 
 func (f *ring1Factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
 	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, err := f.clientAccessFactory.ClientSetForVersion(mappingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +333,7 @@ func (f *ring1Factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.History
 
 func (f *ring1Factory) Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
 	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, err := f.clientAccessFactory.ClientSetForVersion(mappingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +342,7 @@ func (f *ring1Factory) Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker
 
 func (f *ring1Factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
 	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, err := f.clientAccessFactory.ClientSetForVersion(mappingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -350,7 +350,7 @@ func (f *ring1Factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusVi
 }
 
 func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(nil)
+	clientset, err := f.clientAccessFactory.ClientSetForVersion(v1.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}

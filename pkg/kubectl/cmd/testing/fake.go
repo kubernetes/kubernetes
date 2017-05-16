@@ -314,16 +314,16 @@ func (f *FakeFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.REST
 	return f.tf.Client, f.tf.Err
 }
 
-func (f *FakeFactory) FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error) {
+func (f *FakeFactory) FederationClientSetForVersion(version schema.GroupVersion) (fedclientset.Interface, error) {
 	return nil, nil
 }
-func (f *FakeFactory) FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error) {
+func (f *FakeFactory) FederationClientForVersion(version schema.GroupVersion) (*restclient.RESTClient, error) {
 	return nil, nil
 }
-func (f *FakeFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
+func (f *FakeFactory) ClientSetForVersion(requiredVersion schema.GroupVersion) (internalclientset.Interface, error) {
 	return nil, nil
 }
-func (f *FakeFactory) ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
+func (f *FakeFactory) ClientConfigForVersion(requiredVersion schema.GroupVersion) (*restclient.Config, error) {
 	return nil, nil
 }
 
@@ -597,7 +597,7 @@ func (f *fakeAPIFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, 
 	return cmdutil.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
 }
 
-func (f *fakeAPIFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
+func (f *fakeAPIFactory) ClientSetForVersion(requiredVersion schema.GroupVersion) (internalclientset.Interface, error) {
 	return f.ClientSet()
 }
 
