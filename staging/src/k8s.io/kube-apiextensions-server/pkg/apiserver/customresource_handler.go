@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"path"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -257,14 +258,23 @@ func (r *customResourceDefinitionHandler) getServingInfoFor(customResourceDefini
 	parameterScheme.AddGeneratedDeepCopyFuncs(metav1.GetGeneratedDeepCopyFuncs()...)
 	parameterCodec := runtime.NewParameterCodec(parameterScheme)
 
+	selfLinkPrefix := ""
+	switch customResourceDefinition.Spec.Scope {
+	case apiextensions.ClusterScoped:
+		selfLinkPrefix = "/" + path.Join("apis", customResourceDefinition.Spec.Group, customResourceDefinition.Spec.Version) + "/"
+	case apiextensions.NamespaceScoped:
+		selfLinkPrefix = "/" + path.Join("apis", customResourceDefinition.Spec.Group, customResourceDefinition.Spec.Version, "namespaces") + "/"
+	}
+
 	requestScope := handlers.RequestScope{
 		Namer: handlers.ContextBasedNaming{
 			GetContext: func(req *http.Request) apirequest.Context {
 				ret, _ := r.requestContextMapper.Get(req)
 				return ret
 			},
-			SelfLinker:    meta.NewAccessor(),
-			ClusterScoped: customResourceDefinition.Spec.Scope == apiextensions.ClusterScoped,
+			SelfLinker:         meta.NewAccessor(),
+			ClusterScoped:      customResourceDefinition.Spec.Scope == apiextensions.ClusterScoped,
+			SelfLinkPathPrefix: selfLinkPrefix,
 		},
 		ContextFunc: func(req *http.Request) apirequest.Context {
 			ret, _ := r.requestContextMapper.Get(req)
