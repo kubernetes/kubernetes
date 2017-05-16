@@ -427,7 +427,11 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 		func(obj *api.AzureDiskVolumeSource, c fuzz.Continue) {
 			if obj.CachingMode == nil {
 				obj.CachingMode = new(api.AzureDataDiskCachingMode)
-				*obj.CachingMode = api.AzureDataDiskCachingNone
+				*obj.CachingMode = api.AzureDataDiskCachingReadWrite
+			}
+			if obj.Kind == nil {
+				obj.Kind = new(api.AzureDataDiskKind)
+				*obj.Kind = api.AzureSharedBlobDisk
 			}
 			if obj.FSType == nil {
 				obj.FSType = new(string)
