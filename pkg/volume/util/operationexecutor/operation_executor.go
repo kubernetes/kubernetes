@@ -160,11 +160,11 @@ type ActualStateOfWorldAttacherUpdater interface {
 	MarkVolumeAsDetached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 
 	// Marks desire to detach the specified volume (remove the volume from the node's
-	// volumesToReportedAsAttached list)
+	// volumesToReportAsAttached list)
 	RemoveVolumeFromReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) error
 
 	// Unmarks the desire to detach for the specified volume (add the volume back to
-	// the node's volumesToReportedAsAttached list)
+	// the node's volumesToReportAsAttached list)
 	AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 }
 
