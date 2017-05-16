@@ -424,6 +424,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
+		iptables.RegisterMetrics()
 		proxier = proxierIPTables
 		serviceEventHandler = proxierIPTables
 		endpointsEventHandler = proxierIPTables
