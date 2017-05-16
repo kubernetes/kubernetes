@@ -81,8 +81,6 @@ func (CustomResourceDefinitionStorageStrategy) ValidateUpdate(ctx genericapirequ
 	}
 
 	return validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))
-
-	return field.ErrorList{}
 }
 
 func (a CustomResourceDefinitionStorageStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
