@@ -329,7 +329,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 		return nil, err
 	}
 
-	// Parse the timstamps.
+	// Parse the timestamps.
 	createdAt, startedAt, finishedAt, err := getContainerTimestamps(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", containerID, err)
