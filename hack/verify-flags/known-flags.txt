@@ -42,6 +42,8 @@ apiserver-count
 apiserver-enable-basic-auth
 apiserver-enable-token-auth
 attach-detach-reconcile-sync-period
+audit-grouped-by-namespace
+audit-grouped-by-user
 audit-log-maxage
 audit-log-maxbackup
 audit-log-maxsize

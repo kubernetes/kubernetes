@@ -19,7 +19,8 @@ package filters
 import (
 	"bufio"
 	"bytes"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -28,6 +29,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apiserver/pkg/auditor"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -49,14 +51,15 @@ func (*fancyResponseWriter) Flush() {}
 func (*fancyResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) { return nil, nil, nil }
 
 func TestConstructResponseWriter(t *testing.T) {
-	actual := decorateResponseWriter(&simpleResponseWriter{}, ioutil.Discard, "")
+	out := auditor.NewGroupedAuditor("-", 0, 0, 0, false, false)
+	actual := decorateResponseWriter(&simpleResponseWriter{}, out, "", "", "")
 	switch v := actual.(type) {
 	case *auditResponseWriter:
 	default:
 		t.Errorf("Expected auditResponseWriter, got %v", reflect.TypeOf(v))
 	}
 
-	actual = decorateResponseWriter(&fancyResponseWriter{}, ioutil.Discard, "")
+	actual = decorateResponseWriter(&fancyResponseWriter{}, out, "", "", "")
 	switch v := actual.(type) {
 	case *fancyResponseWriterDelegator:
 	default:
@@ -70,12 +73,22 @@ func (*fakeHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(200)
 }
 
+type fakeAuditor struct {
+	buf io.Writer
+}
+
+func (a *fakeAuditor) Audit(user, namespace, context string) (n int, err error) {
+	return fmt.Fprint(a.buf, context)
+}
+
 func TestAudit(t *testing.T) {
 	var buf bytes.Buffer
-
+	out := fakeAuditor{
+		buf: &buf,
+	}
 	handler := WithAudit(&fakeHTTPHandler{}, &fakeRequestContextMapper{
 		user: &user.DefaultInfo{Name: "admin"},
-	}, &buf)
+	}, &out)
 
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
@@ -125,8 +138,11 @@ func (*fakeRequestContextMapper) Update(req *http.Request, context request.Conte
 
 func TestAuditNoPanicOnNilUser(t *testing.T) {
 	var buf bytes.Buffer
+	out := fakeAuditor{
+		buf: &buf,
+	}
 
-	handler := WithAudit(&fakeHTTPHandler{}, &fakeRequestContextMapper{}, &buf)
+	handler := WithAudit(&fakeHTTPHandler{}, &fakeRequestContextMapper{}, &out)
 
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"

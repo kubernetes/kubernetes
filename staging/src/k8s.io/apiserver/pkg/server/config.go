@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	goruntime "runtime"
@@ -39,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/auditor"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
@@ -100,7 +100,7 @@ type Config struct {
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
 	// AuditWriter is the destination for audit logs.  If nil, they will not be written.
-	AuditWriter io.Writer
+	AuditWriter auditor.Auditor
 	// SupportsBasicAuth indicates that's at least one Authenticator supports basic auth
 	// If this is true, a basic auth challenge is returned on authentication failure
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.

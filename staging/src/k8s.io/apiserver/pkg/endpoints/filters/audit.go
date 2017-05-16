@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -30,6 +29,7 @@ import (
 	"github.com/pborman/uuid"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/auditor"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	authenticationapi "k8s.io/client-go/pkg/apis/authentication/v1"
@@ -39,13 +39,15 @@ var _ http.ResponseWriter = &auditResponseWriter{}
 
 type auditResponseWriter struct {
 	http.ResponseWriter
-	out io.Writer
-	id  string
+	out       auditor.Auditor
+	id        string
+	user      string
+	namespace string
 }
 
 func (a *auditResponseWriter) WriteHeader(code int) {
 	line := fmt.Sprintf("%s AUDIT: id=%q response=\"%d\"\n", time.Now().Format(time.RFC3339Nano), a.id, code)
-	if _, err := fmt.Fprint(a.out, line); err != nil {
+	if _, err := a.out.Audit(a.user, a.namespace, line); err != nil {
 		glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
 	}
 
@@ -91,7 +93,7 @@ var _ http.Hijacker = &fancyResponseWriterDelegator{}
 // 2. the response line containing:
 //    - the unique id from 1
 //    - response code
-func WithAudit(handler http.Handler, requestContextMapper request.RequestContextMapper, out io.Writer) http.Handler {
+func WithAudit(handler http.Handler, requestContextMapper request.RequestContextMapper, out auditor.Auditor) http.Handler {
 	if out == nil {
 		return handler
 	}
@@ -132,10 +134,10 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 
 		line := fmt.Sprintf("%s AUDIT: id=%q ip=%q method=%q user=%q groups=%q as=%q asgroups=%q namespace=%q uri=%q\n",
 			time.Now().Format(time.RFC3339Nano), id, utilnet.GetClientIP(req), req.Method, username, groups, asuser, asgroups, namespace, req.URL)
-		if _, err := fmt.Fprint(out, line); err != nil {
+		if _, err := out.Audit(username, namespace, line); err != nil {
 			glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
 		}
-		respWriter := decorateResponseWriter(w, out, id)
+		respWriter := decorateResponseWriter(w, out, id, username, namespace)
 		handler.ServeHTTP(respWriter, req)
 	})
 }
@@ -148,8 +150,8 @@ func auditStringSlice(inList []string) string {
 	return strings.Join(quotedElements, ",")
 }
 
-func decorateResponseWriter(responseWriter http.ResponseWriter, out io.Writer, id string) http.ResponseWriter {
-	delegate := &auditResponseWriter{ResponseWriter: responseWriter, out: out, id: id}
+func decorateResponseWriter(responseWriter http.ResponseWriter, out auditor.Auditor, id, user, namespace string) http.ResponseWriter {
+	delegate := &auditResponseWriter{ResponseWriter: responseWriter, out: out, id: id, user: user, namespace: namespace}
 	// check if the ResponseWriter we're wrapping is the fancy one we need
 	// or if the basic is sufficient
 	_, cn := responseWriter.(http.CloseNotifier)
