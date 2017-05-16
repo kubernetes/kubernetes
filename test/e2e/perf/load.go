@@ -34,6 +34,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -185,17 +186,19 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			if itArg.services {
 				framework.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
-				for _, service := range services {
-					_, err := clientset.Core().Services(service.Namespace).Create(service)
+				createService := func(i int) {
+					_, err := clientset.Core().Services(services[i].Namespace).Create(services[i])
 					framework.ExpectNoError(err)
 				}
+				workqueue.Parallelize(25, len(services), createService)
 				framework.Logf("%v Services created.", len(services))
 				defer func(services []*v1.Service) {
 					framework.Logf("Starting to delete services...")
-					for _, service := range services {
-						err := clientset.Core().Services(service.Namespace).Delete(service.Name, nil)
+					deleteService := func(i int) {
+						err := clientset.Core().Services(services[i].Namespace).Delete(services[i].Name, nil)
 						framework.ExpectNoError(err)
 					}
+					workqueue.Parallelize(25, len(services), deleteService)
 					framework.Logf("Services deleted")
 				}(services)
 			} else {
