@@ -51,7 +51,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -1922,7 +1921,7 @@ func forEachReplicationController(c clientset.Interface, ns, selectorKey, select
 
 func validateReplicationControllerConfiguration(rc v1.ReplicationController) {
 	if rc.Name == "redis-master" {
-		if _, ok := rc.Annotations[annotations.LastAppliedConfigAnnotation]; !ok {
+		if _, ok := rc.Annotations[v1.LastAppliedConfigAnnotation]; !ok {
 			framework.Failf("Annotation not found in modified configuration:\n%v\n", rc)
 		}
 

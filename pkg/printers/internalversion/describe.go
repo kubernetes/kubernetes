@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/ref"
@@ -1702,7 +1701,7 @@ func describeSecret(secret *api.Secret) (string, error) {
 		w.Write(LEVEL_0, "Name:\t%s\n", secret.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", secret.Namespace)
 		printLabelsMultiline(w, "Labels", secret.Labels)
-		skipAnnotations := sets.NewString(annotations.LastAppliedConfigAnnotation)
+		skipAnnotations := sets.NewString(api.LastAppliedConfigAnnotation)
 		printAnnotationsMultilineWithFilter(w, "Annotations", secret.Annotations, skipAnnotations)
 
 		w.Write(LEVEL_0, "\nType:\t%s\n", secret.Type)

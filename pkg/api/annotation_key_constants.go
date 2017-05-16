@@ -72,4 +72,35 @@ const (
 
 	// annotation key prefix used to identify non-convertible json paths.
 	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"
+
+	kubectlPrefix = "kubectl.kubernetes.io/"
+
+	// LastAppliedConfigAnnotation is the annotation used to store the previous
+	// configuration of a resource for use in a three way diff by UpdateApplyAnnotation.
+	LastAppliedConfigAnnotation = kubectlPrefix + "last-applied-configuration"
+
+	// AnnotationLoadBalancerSourceRangesKey is the key of the annotation on a service to set allowed ingress ranges on their LoadBalancers
+	//
+	// It should be a comma-separated list of CIDRs, e.g. `0.0.0.0/0` to
+	// allow full access (the default) or `18.0.0.0/8,56.0.0.0/8` to allow
+	// access only from the CIDRs currently allocated to MIT & the USPS.
+	//
+	// Not all cloud providers support this annotation, though AWS & GCE do.
+	AnnotationLoadBalancerSourceRangesKey = "service.beta.kubernetes.io/load-balancer-source-ranges"
+
+	// AnnotationValueExternalTrafficLocal Value of annotation to specify local endpoints behavior.
+	AnnotationValueExternalTrafficLocal = "OnlyLocal"
+	// AnnotationValueExternalTrafficGlobal Value of annotation to specify global (legacy) behavior.
+	AnnotationValueExternalTrafficGlobal = "Global"
+
+	// TODO: The beta annotations have been deprecated, remove them when we release k8s 1.8.
+
+	// BetaAnnotationHealthCheckNodePort Annotation specifying the healthcheck nodePort for the service.
+	// If not specified, annotation is created by the service api backend with the allocated nodePort.
+	// Will use user-specified nodePort value if specified by the client.
+	BetaAnnotationHealthCheckNodePort = "service.beta.kubernetes.io/healthcheck-nodeport"
+
+	// BetaAnnotationExternalTraffic An annotation that denotes if this Service desires to route
+	// external traffic to local endpoints only. This preserves Source IP and avoids a second hop.
+	BetaAnnotationExternalTraffic = "service.beta.kubernetes.io/external-traffic"
 )
