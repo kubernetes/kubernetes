@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
@@ -157,6 +158,8 @@ type ImageService interface {
 	RemoveImage(image ImageSpec) error
 	// Returns Image statistics.
 	ImageStats() (*ImageStats, error)
+	// ImageFsInfo gets filesytem information of images.
+	ImageFsInfo() (runtimeapi.FsInfo, error)
 }
 
 type ContainerAttacher interface {
