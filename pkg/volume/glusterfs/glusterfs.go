@@ -65,15 +65,15 @@ var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
 var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
 const (
-	glusterfsPluginName         = "kubernetes.io/glusterfs"
-	volPrefix                   = "vol_"
-	dynamicEpSvcPrefix          = "glusterfs-dynamic-"
-	replicaCount                = 3
-	durabilityType              = "replicate"
-	secretKeyName               = "key" // key name used in secret
-	gciGlusterMountBinariesPath = "/sbin/mount.glusterfs"
-	defaultGidMin               = 2000
-	defaultGidMax               = math.MaxInt32
+	glusterfsPluginName            = "kubernetes.io/glusterfs"
+	volPrefix                      = "vol_"
+	dynamicEpSvcPrefix             = "glusterfs-dynamic-"
+	replicaCount                   = 3
+	durabilityType                 = "replicate"
+	secretKeyName                  = "key" // key name used in secret
+	gciLinuxGlusterMountBinaryPath = "/sbin/mount.glusterfs"
+	defaultGidMin                  = 2000
+	defaultGidMax                  = math.MaxInt32
 	// absoluteGidMin/Max are currently the same as the
 	// default values, but they play a different role and
 	// could take a different value. Only thing we need is:
@@ -291,8 +291,8 @@ func (b *glusterfsMounter) CanMount() error {
 	exe := exec.New()
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exe.Command("/bin/ls", gciGlusterMountBinariesPath).CombinedOutput(); err != nil {
-			return fmt.Errorf("Required binary %s is missing", gciGlusterMountBinariesPath)
+		if _, err := exe.Command("/bin/ls", gciLinuxGlusterMountBinaryPath).CombinedOutput(); err != nil {
+			return fmt.Errorf("Required binary %s is missing", gciLinuxGlusterMountBinaryPath)
 		}
 	}
 	return nil
