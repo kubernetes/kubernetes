@@ -48,7 +48,6 @@ type Event struct {
 	// Time the request reached the apiserver.
 	Timestamp metav1.Time
 	// Unique audit ID, generated for each request.
-	// +optional
 	AuditID types.UID
 	// RequestURI is the request URI as sent by the client to a server.
 	RequestURI string
@@ -116,8 +115,8 @@ type PolicyRule struct {
 	// An empty list implies every user.
 	// +optional
 	Users []string
-	// The user groups this rule applies to. If a user is considered matching
-	// if the are a member of any of these groups
+	// The user groups this rule applies to. A user is considered matching
+	// if it is a member of any of the UserGroups.
 	// An empty list implies every user group.
 	// +optional
 	UserGroups []string
