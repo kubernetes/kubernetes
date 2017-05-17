@@ -79,6 +79,7 @@ var supportedSubsystems map[string]struct{} = map[string]struct{}{
 	"memory":  {},
 	"cpuset":  {},
 	"blkio":   {},
+	"devices": {},
 }
 
 // Get cgroup and networking stats of the specified container
