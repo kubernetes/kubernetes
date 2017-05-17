@@ -18,6 +18,7 @@ package plugins
 
 import (
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -47,7 +48,7 @@ type ExecPluginRunner struct{}
 // Run takes a given plugin and runs it in a given context using os/exec, returning
 // any error found while running.
 func (r *ExecPluginRunner) Run(plugin *Plugin, ctx RunningContext) error {
-	command := strings.Split(plugin.Command, " ")
+	command := strings.Split(os.ExpandEnv(plugin.Command), " ")
 	base := command[0]
 	args := []string{}
 	if len(command) > 1 {
