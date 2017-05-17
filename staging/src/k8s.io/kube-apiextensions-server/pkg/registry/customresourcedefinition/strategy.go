@@ -89,7 +89,6 @@ func (statusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old r
 	newObj.Spec = oldObj.Spec
 	newObj.Labels = oldObj.Labels
 	newObj.Annotations = oldObj.Annotations
-	newObj.Finalizers = oldObj.Finalizers
 	newObj.OwnerReferences = oldObj.OwnerReferences
 }
 

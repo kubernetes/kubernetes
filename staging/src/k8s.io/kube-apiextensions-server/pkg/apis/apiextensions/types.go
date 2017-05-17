@@ -104,6 +104,10 @@ type CustomResourceDefinitionStatus struct {
 	AcceptedNames CustomResourceDefinitionNames
 }
 
+// CustomResourceCleanupFinalizer is the name of the finalizer which will delete instances of
+// a CustomResourceDefinition
+const CustomResourceCleanupFinalizer = "customresourcecleanup.apiextensions.k8s.io"
+
 // +genclient=true
 // +nonNamespaced=true
 
