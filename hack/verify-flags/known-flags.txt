@@ -703,6 +703,7 @@ upgrade-target
 use-kubernetes-cluster-service
 use-kubernetes-version
 use-legacy-policy-config
+use-real-proxier
 use-service-account-credentials
 user-whitelist
 use-service-account-credentials
