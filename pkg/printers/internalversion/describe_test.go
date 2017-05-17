@@ -111,6 +111,28 @@ func TestDescribeNamespace(t *testing.T) {
 	}
 }
 
+func TestDescribeConfigMap(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mycm",
+			Namespace: "foo",
+		},
+		Data: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := ConfigMapDescriber{c}
+	out, err := d.Describe("foo", "mycm", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") || !strings.Contains(out, "mycm") || !strings.Contains(out, "key1") || !strings.Contains(out, "value1") || !strings.Contains(out, "key2") || !strings.Contains(out, "value2") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribeService(t *testing.T) {
 	fake := fake.NewSimpleClientset(&api.Service{
 		ObjectMeta: metav1.ObjectMeta{
