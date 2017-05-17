@@ -53,6 +53,7 @@ go_library(
         "index.go",
         "listers.go",
         "listwatch.go",
+        "mutation_cache.go",
         "mutation_detector.go",
         "reflector.go",
         "shared_informer.go",
@@ -63,6 +64,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/hashicorp/golang-lru:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
