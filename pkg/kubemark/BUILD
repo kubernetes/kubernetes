@@ -29,6 +29,8 @@ go_library(
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubelet/types:go_default_library",
+        "//pkg/proxy:go_default_library",
+        "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/exec:go_default_library",
