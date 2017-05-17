@@ -752,12 +752,13 @@ func (List) SwaggerDoc() map[string]string {
 }
 
 var map_ListOptions = map[string]string{
-	"":                "ListOptions is the query options to a standard REST list call. DEPRECATED: This type has been moved to meta/v1 and will be removed soon.",
-	"labelSelector":   "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-	"fieldSelector":   "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-	"watch":           "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-	"resourceVersion": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-	"timeoutSeconds":  "Timeout for the list/watch call.",
+	"":                     "ListOptions is the query options to a standard REST list call. DEPRECATED: This type has been moved to meta/v1 and will be removed soon.",
+	"labelSelector":        "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+	"fieldSelector":        "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+	"includeUninitialized": "If true, partially initialized resources are included in the response.",
+	"watch":                "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+	"resourceVersion":      "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+	"timeoutSeconds":       "Timeout for the list/watch call.",
 }
 
 func (ListOptions) SwaggerDoc() map[string]string {
@@ -1027,6 +1028,7 @@ var map_ObjectMeta = map[string]string{
 	"labels":                     "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/",
 	"annotations":                "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/",
 	"ownerReferences":            "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
+	"initializers":               "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user.",
 	"finalizers":                 "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed.",
 	"clusterName":                "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.",
 }
