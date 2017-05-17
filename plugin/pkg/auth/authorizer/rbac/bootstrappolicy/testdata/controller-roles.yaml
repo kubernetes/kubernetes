@@ -187,6 +187,17 @@ items:
     verbs:
     - create
   - apiGroups:
+    - apps
+    resources:
+    - controllerrevisions
+    verbs:
+    - create
+    - delete
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
     - ""
     resources:
     - events
