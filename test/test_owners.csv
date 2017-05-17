@@ -114,11 +114,11 @@ Dynamic provisioning DynamicProvisioner External should let an external dynamic 
 Dynamic provisioning DynamicProvisioner should create and delete persistent volumes,jsafrane,0,storage
 Dynamic provisioning DynamicProvisioner should not provision a volume in an unmanaged GCE zone.,jszczepkowski,1,
 DynamicKubeletConfiguration When a configmap called `kubelet-` is added to the `kube-system` namespace The Kubelet on that node should restart to take up the new config,mwielgus,1,storage
-ESIPP should handle updates to source ip annotation,bprashanth,1,network
-ESIPP should only target nodes with endpoints,rrati,0,network
-ESIPP should work for type=LoadBalancer,fgrzadkowski,1,network
-ESIPP should work for type=NodePort,bprashanth,1,network
-ESIPP should work from pods,cjcullen,1,network
+ESIPP should handle updates to source ip annotation,MrHohn,1,network
+ESIPP should only target nodes with endpoints,MrHohn,0,network
+ESIPP should work for type=LoadBalancer,MrHohn,1,network
+ESIPP should work for type=NodePort,MrHohn,1,network
+ESIPP should work from pods,MrHohn,1,network
 Empty starts a pod,childsb,1,
 "EmptyDir volumes should support (non-root,0644,default)",timstclair,1,node
 "EmptyDir volumes should support (non-root,0644,tmpfs)",spxtr,1,node
@@ -189,8 +189,8 @@ Federation secrets Secret objects should be created and deleted successfully,pmo
 Federation secrets Secret objects should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0,federation
 Federation secrets Secret objects should not be deleted from underlying clusters when OrphanDependents is nil,nikhiljindal,0,federation
 Federation secrets Secret objects should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0,federation
-Firewall rule should create valid firewall rules for LoadBalancer type service,rkouj,0,network
-Firewall rule should have correct firewall rules for e2e cluster,rkouj,0,network
+Firewall rule should create valid firewall rules for LoadBalancer type service,MrHohn,0,network
+Firewall rule should have correct firewall rules for e2e cluster,MrHohn,0,network
 GCP Volumes GlusterFS should be mountable,nikhiljindal,0,storage
 GCP Volumes NFSv4 should be mountable for NFSv4,nikhiljindal,0,storage
 GKE local SSD should write and read from node local SSD,fabioy,0,storage
@@ -515,7 +515,7 @@ Services should be able to up and down services,bprashanth,0,network
 Services should check NodePort out-of-range,bprashanth,0,network
 Services should create endpoints for unready pods,maisem,0,network
 Services should only allow access from service loadbalancer source ranges,madhusudancs,0,network
-Services should preserve source pod IP for traffic thru service cluster IP,Random-Liu,1,network
+Services should preserve source pod IP for traffic thru service cluster IP,MrHohn,1,network
 Services should prevent NodePort collisions,bprashanth,0,network
 Services should provide secure master service,bprashanth,0,network
 Services should release NodePorts on delete,bprashanth,0,network
