@@ -422,6 +422,10 @@ func buildCallTreeForType(t *types.Type, root bool, existingDefaulters, newDefau
 				parent.children = append(parent.children, *child)
 			}
 		}
+	case types.Alias:
+		if child := buildCallTreeForType(t.Underlying, false, existingDefaulters, newDefaulters); child != nil {
+			parent.children = append(parent.children, *child)
+		}
 	}
 	if len(parent.children) == 0 && len(parent.call) == 0 {
 		//glog.V(6).Infof("decided type %s needs no generation", t.Name)
