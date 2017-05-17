@@ -265,6 +265,7 @@ pkg/util/yaml
 pkg/version/prometheus
 pkg/volume
 pkg/volume/downwardapi
+pkg/volume/glusterfs
 pkg/volume/projected
 pkg/volume/quobyte
 pkg/volume/util/nestedpendingoperations
