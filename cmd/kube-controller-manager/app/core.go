@@ -22,7 +22,9 @@ package app
 
 import (
 	"fmt"
+	"time"
 
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -35,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/memcachediscovery"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/podgc"
@@ -170,10 +173,28 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 
-	// TODO: should use a dynamic RESTMapper built from the discovery results.
-	restMapper := api.Registry.RESTMapper()
-
 	gcClientset := ctx.ClientBuilder.ClientOrDie("generic-garbage-collector")
+
+	// TODO: This pattern is not scalable to all clients, but it should be
+	// OK for the GC. It is a temporary patch for #44507.
+	restMapper := discovery.NewDeferredDiscoveryRESTMapper(
+		memcachediscovery.NewClient(gcClientset.Discovery()),
+		meta.InterfacesForUnstructured,
+	)
+	restMapper.Reset()
+	go func() {
+		t := time.NewTicker(30 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				restMapper.Reset()
+			case <-ctx.Stop:
+				return
+			}
+		}
+	}()
+
 	preferredResources, err := gcClientset.Discovery().ServerPreferredResources()
 	if err != nil {
 		return true, fmt.Errorf("failed to get supported resources from server: %v", err)
