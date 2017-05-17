@@ -100,10 +100,7 @@ func GetKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMetrics {
 	latencyMethods := sets.NewString(
 		kubeletmetrics.PodWorkerLatencyKey,
 		kubeletmetrics.PodWorkerStartLatencyKey,
-		kubeletmetrics.SyncPodsLatencyKey,
 		kubeletmetrics.PodStartLatencyKey,
-		kubeletmetrics.PodStatusLatencyKey,
-		kubeletmetrics.ContainerManagerOperationsKey,
 		kubeletmetrics.CgroupManagerOperationsKey,
 		kubeletmetrics.DockerOperationsLatencyKey,
 		kubeletmetrics.PodWorkerStartLatencyKey,
