@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -133,6 +134,7 @@ func describerMap(c clientset.Interface) map[schema.GroupKind]printers.Describer
 		api.Kind("Namespace"):             &NamespaceDescriber{c},
 		api.Kind("Endpoints"):             &EndpointsDescriber{c},
 		api.Kind("ConfigMap"):             &ConfigMapDescriber{c},
+		api.Kind("PriorityClass"):         &PriorityClassDescriber{c},
 
 		extensions.Kind("ReplicaSet"):                  &ReplicaSetDescriber{c},
 		extensions.Kind("NetworkPolicy"):               &ExtensionsNetworkPolicyDescriber{c},
@@ -152,6 +154,7 @@ func describerMap(c clientset.Interface) map[schema.GroupKind]printers.Describer
 		rbac.Kind("RoleBinding"):                       &RoleBindingDescriber{c},
 		rbac.Kind("ClusterRoleBinding"):                &ClusterRoleBindingDescriber{c},
 		networking.Kind("NetworkPolicy"):               &NetworkPolicyDescriber{c},
+		scheduling.Kind("PriorityClass"):               &PriorityClassDescriber{c},
 	}
 
 	return m
@@ -3089,6 +3092,42 @@ func describePodDisruptionBudget(pdb *policy.PodDisruptionBudget, events *api.Ev
 		w.Write(LEVEL_2, "Current:\t%d\n", pdb.Status.CurrentHealthy)
 		w.Write(LEVEL_2, "Desired:\t%d\n", pdb.Status.DesiredHealthy)
 		w.Write(LEVEL_2, "Total:\t%d\n", pdb.Status.ExpectedPods)
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+
+		return nil
+	})
+}
+
+// PriorityClassDescriber generates information about a PriorityClass.
+type PriorityClassDescriber struct {
+	clientset.Interface
+}
+
+func (s *PriorityClassDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
+	pc, err := s.Scheduling().PriorityClasses().Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = s.Core().Events(namespace).Search(api.Scheme, pc)
+	}
+
+	return describePriorityClass(pc, events)
+}
+
+func describePriorityClass(pc *scheduling.PriorityClass, events *api.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", pc.Name)
+		w.Write(LEVEL_0, "Value:\t%s\n", pc.Value)
+		w.Write(LEVEL_0, "GlobalDefault:\t%s\n", pc.GlobalDefault)
+		w.Write(LEVEL_0, "Description:\t%s\n", pc.Description)
+
+		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(pc.Annotations))
 		if events != nil {
 			DescribeEvents(events, w)
 		}
