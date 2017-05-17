@@ -274,7 +274,7 @@ func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]stri
 	return pod
 }
 
-// func to get pod spec with given volume paths, node selector lables and container commands
+// func to get pod spec with given volume paths, node selector labels and container commands
 func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[string]string, commands []string) *v1.Pod {
 	var volumeMounts []v1.VolumeMount
 	var volumes []v1.Volume

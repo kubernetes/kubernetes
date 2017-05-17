@@ -216,9 +216,6 @@ type roundTripper struct {
 }
 
 func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if len(req.Header.Get("Authorization")) != 0 {
-		return r.wrapped.RoundTrip(req)
-	}
 	token, err := r.provider.idToken()
 	if err != nil {
 		return nil, err
@@ -284,7 +281,7 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 
 	newCfg[cfgIDToken] = tokens.IDToken
 	if err = p.persister.Persist(newCfg); err != nil {
-		return "", fmt.Errorf("could not perist new tokens: %v", err)
+		return "", fmt.Errorf("could not persist new tokens: %v", err)
 	}
 
 	// Update the in memory config to reflect the on disk one.
