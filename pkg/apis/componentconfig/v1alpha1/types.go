@@ -97,6 +97,9 @@ type KubeProxyConfiguration struct {
 	// metricsBindAddress is the IP address and port for the metrics server to serve on,
 	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
 	MetricsBindAddress string `json:"metricsBindAddress"`
+	// enableProfiling enables profiling via web interface on /debug/pprof handler.
+	// Profiling handlers will be handled by metrics server.
+	EnableProfiling bool `json:"enableProfiling"`
 	// clusterCIDR is the CIDR range of the pods in the cluster. It is used to
 	// bridge traffic coming from outside of the cluster. If not provided,
 	// no off-cluster bridging will be performed.
