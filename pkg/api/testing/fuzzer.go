@@ -319,6 +319,10 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 			types := []api.ServiceType{api.ServiceTypeClusterIP, api.ServiceTypeNodePort, api.ServiceTypeLoadBalancer}
 			*p = types[c.Rand.Intn(len(types))]
 		},
+		func(p *api.ServiceExternalTrafficPolicyType, c fuzz.Continue) {
+			types := []api.ServiceExternalTrafficPolicyType{api.ServiceExternalTrafficPolicyTypeGlobal, api.ServiceExternalTrafficPolicyTypeLocal}
+			*p = types[c.Rand.Intn(len(types))]
+		},
 		func(ct *api.Container, c fuzz.Continue) {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty

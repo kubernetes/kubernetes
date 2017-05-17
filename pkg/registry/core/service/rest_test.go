@@ -1235,40 +1235,6 @@ func TestServiceRegistryExternalTrafficGlobalBeta(t *testing.T) {
 	}
 }
 
-// Validate that ExternalTraffic is default to Global for loadBalancer service.
-func TestServiceRegistryExternalTrafficDefaultGlobal(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	storage, _ := NewTestREST(t, nil)
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeLoadBalancer,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
-	created_svc, err := storage.Create(ctx, svc)
-	if created_svc == nil || err != nil {
-		t.Errorf("Unexpected failure creating service %v", err)
-	}
-	created_service := created_svc.(*api.Service)
-	if service.NeedsHealthCheck(created_service) {
-		t.Errorf("Expecting health check not needed, returned health check needed instead")
-	}
-	// Make sure the service does not have the health check node port allocated
-	if port := service.GetServiceHealthCheckNodePort(created_service); port != 0 {
-		t.Errorf("Unexpected allocation of health check node port: %v", port)
-	}
-	if created_service.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeGlobal {
-		t.Errorf("Expecting externalTraffic to be %v, got:%v", api.ServiceExternalTrafficPolicyTypeGlobal, created_service.Spec.ExternalTrafficPolicy)
-	}
-}
-
 // Validate that the health check nodePort is not allocated when service type is ClusterIP
 func TestServiceRegistryExternalTrafficAnnotationClusterIP(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
