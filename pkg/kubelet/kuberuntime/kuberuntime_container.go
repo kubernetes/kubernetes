@@ -402,9 +402,12 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			CreatedAt:    time.Unix(0, status.CreatedAt),
 		}
 
-		if c.State == runtimeapi.ContainerState_CONTAINER_RUNNING {
+		if c.State != runtimeapi.ContainerState_CONTAINER_CREATED {
+			// If container is not in the created state, we have tried and
+			// started the container. Set the StartedAt time.
 			cStatus.StartedAt = time.Unix(0, status.StartedAt)
-		} else {
+		}
+		if c.State == runtimeapi.ContainerState_CONTAINER_EXITED {
 			cStatus.Reason = status.Reason
 			cStatus.Message = status.Message
 			cStatus.ExitCode = int(status.ExitCode)
