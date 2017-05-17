@@ -28,6 +28,8 @@ type Indexer interface {
 	Store
 	// Retrieve list of objects that match on the named indexing function
 	Index(indexName string, obj interface{}) ([]interface{}, error)
+	// IndexKeys returns the set of keys that match on the named indexing function.
+	IndexKeys(indexName, indexKey string) ([]string, error)
 	// ListIndexFuncValues returns the list of generated values of an Index func
 	ListIndexFuncValues(indexName string) []string
 	// ByIndex lists object that match on the named indexing function with the exact key

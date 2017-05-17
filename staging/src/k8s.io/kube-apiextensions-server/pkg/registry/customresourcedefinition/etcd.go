@@ -18,8 +18,10 @@ package customresourcedefinition
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
 )
 
@@ -51,4 +53,29 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST
 		panic(err) // TODO: Propagate error up
 	}
 	return &REST{store}
+}
+
+// NewStatusREST makes a RESTStorage for status that has more limited options.
+// It is based on the original REST so that we can share the same underlying store
+func NewStatusREST(scheme *runtime.Scheme, rest *REST) *StatusREST {
+	statusStore := *rest.Store
+	statusStore.CreateStrategy = nil
+	statusStore.DeleteStrategy = nil
+	statusStore.UpdateStrategy = NewStatusStrategy(scheme)
+	return &StatusREST{store: &statusStore}
+}
+
+type StatusREST struct {
+	store *genericregistry.Store
+}
+
+var _ = rest.Updater(&StatusREST{})
+
+func (r *StatusREST) New() runtime.Object {
+	return &apiextensions.CustomResourceDefinition{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo)
 }
