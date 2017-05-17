@@ -73,7 +73,7 @@ func TestMultipleResourceInstances(t *testing.T) {
 	defer close(stopCh)
 
 	ns := "not-the-default"
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition()
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
 	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
 	if err != nil {
 		t.Fatal(err)
@@ -198,7 +198,7 @@ func TestMultipleRegistration(t *testing.T) {
 
 	ns := "not-the-default"
 	sameInstanceName := "foo"
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition()
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
 	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
 	if err != nil {
 		t.Fatal(err)
@@ -251,7 +251,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer close(stopCh)
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition()
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
 	ns := "not-the-default"
 	sameInstanceName := "foo"
 	func() {
