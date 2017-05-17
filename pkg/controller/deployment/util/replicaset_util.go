@@ -28,6 +28,7 @@ import (
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/retry"
+	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -76,5 +77,5 @@ func GetReplicaSetHash(rs *extensions.ReplicaSet, uniquifier *int64) (string, er
 	}
 	rsTemplate := template.(v1.PodTemplateSpec)
 	rsTemplate.Labels = labelsutil.CloneAndRemoveLabel(rsTemplate.Labels, extensions.DefaultDeploymentUniqueLabelKey)
-	return fmt.Sprintf("%d", GetPodTemplateSpecHash(&rsTemplate, uniquifier)), nil
+	return fmt.Sprintf("%d", controller.ComputeHash(&rsTemplate, uniquifier)), nil
 }

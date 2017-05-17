@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
@@ -84,6 +85,7 @@ func getKey(ds *extensions.DaemonSet, t *testing.T) string {
 }
 
 func newDaemonSet(name string) *extensions.DaemonSet {
+	two := int32(2)
 	return &extensions.DaemonSet{
 		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Extensions.GroupVersion().String()},
 		ObjectMeta: metav1.ObjectMeta{
@@ -92,6 +94,10 @@ func newDaemonSet(name string) *extensions.DaemonSet {
 			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: extensions.DaemonSetSpec{
+			RevisionHistoryLimit: &two,
+			UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+				Type: extensions.OnDeleteDaemonSetStrategyType,
+			},
 			Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -139,11 +145,18 @@ func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]
 }
 
 func newPod(podName string, nodeName string, label map[string]string, ds *extensions.DaemonSet) *v1.Pod {
+	// Add hash unique label to the pod
+	newLabels := label
+	if ds != nil {
+		hash := fmt.Sprint(controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount))
+		newLabels = labelsutil.CloneAndAddLabel(label, extensions.DefaultDaemonSetUniqueLabelKey, hash)
+	}
+
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: podName,
-			Labels:       label,
+			Labels:       newLabels,
 			Namespace:    metav1.NamespaceDefault,
 		},
 		Spec: v1.PodSpec{
@@ -168,7 +181,8 @@ func newPod(podName string, nodeName string, label map[string]string, ds *extens
 
 func addPods(podStore cache.Store, nodeName string, label map[string]string, ds *extensions.DaemonSet, number int) {
 	for i := 0; i < number; i++ {
-		podStore.Add(newPod(fmt.Sprintf("%s-", nodeName), nodeName, label, ds))
+		pod := newPod(fmt.Sprintf("%s-", nodeName), nodeName, label, ds)
+		podStore.Add(pod)
 	}
 }
 
@@ -251,6 +265,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 
 	manager := NewDaemonSetsController(
 		informerFactory.Extensions().V1beta1().DaemonSets(),
+		informerFactory.Apps().V1beta1().ControllerRevisions(),
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
 		clientset,
