@@ -223,6 +223,14 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 	if path == "" {
 		glog.V(5).Infof("Container %s log path isn't specified, will not create the symlink", containerID)
 		return nil
+	} else {
+		logDir := filepath.Dir(path)
+		if _, err := os.Stat(logDir); os.IsNotExist(err) {
+			if err = os.MkdirAll(logDir, os.FileMode(0755)); err != nil {
+				return fmt.Errorf("cannot create container log directory %q: %v", logDir, err)
+			}
+			glog.V(5).Infof("Create log directory %q", logDir)
+		}
 	}
 
 	if realPath != "" {
