@@ -17,11 +17,17 @@ limitations under the License.
 package customresourcedefinition
 
 import (
+	"fmt"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
+	storageerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
 )
 
@@ -53,6 +59,87 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST
 		panic(err) // TODO: Propagate error up
 	}
 	return &REST{store}
+}
+
+// Delete adds the CRD finalizer to the list
+func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	obj, err := r.Get(ctx, name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, false, err
+	}
+
+	crd := obj.(*apiextensions.CustomResourceDefinition)
+
+	// Ensure we have a UID precondition
+	if options == nil {
+		options = metav1.NewDeleteOptions(0)
+	}
+	if options.Preconditions == nil {
+		options.Preconditions = &metav1.Preconditions{}
+	}
+	if options.Preconditions.UID == nil {
+		options.Preconditions.UID = &crd.UID
+	} else if *options.Preconditions.UID != crd.UID {
+		err = apierrors.NewConflict(
+			apiextensions.Resource("customresourcedefinitions"),
+			name,
+			fmt.Errorf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *options.Preconditions.UID, crd.UID),
+		)
+		return nil, false, err
+	}
+
+	// upon first request to delete, add our finalizer and then delegate
+	if crd.DeletionTimestamp.IsZero() {
+		key, err := r.Store.KeyFunc(ctx, name)
+		if err != nil {
+			return nil, false, err
+		}
+
+		preconditions := storage.Preconditions{UID: options.Preconditions.UID}
+
+		out := r.Store.NewFunc()
+		err = r.Store.Storage.GuaranteedUpdate(
+			ctx, key, out, false, &preconditions,
+			storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
+				existingCRD, ok := existing.(*apiextensions.CustomResourceDefinition)
+				if !ok {
+					// wrong type
+					return nil, fmt.Errorf("expected *apiextensions.CustomResourceDefinition, got %v", existing)
+				}
+
+				// Set the deletion timestamp if needed
+				if existingCRD.DeletionTimestamp.IsZero() {
+					now := metav1.Now()
+					existingCRD.DeletionTimestamp = &now
+				}
+
+				if !apiextensions.CRDHasFinalizer(existingCRD, apiextensions.CustomResourceCleanupFinalizer) {
+					existingCRD.Finalizers = append(existingCRD.Finalizers, apiextensions.CustomResourceCleanupFinalizer)
+				}
+				// update the status condition too
+				apiextensions.SetCRDCondition(existingCRD, apiextensions.CustomResourceDefinitionCondition{
+					Type:    apiextensions.Terminating,
+					Status:  apiextensions.ConditionTrue,
+					Reason:  "InstanceDeletionPending",
+					Message: "CustomResourceDefinition marked for deletion; CustomResource deletion will begin soon",
+				})
+				return existingCRD, nil
+			}),
+		)
+
+		if err != nil {
+			err = storageerr.InterpretGetError(err, apiextensions.Resource("customresourcedefinitions"), name)
+			err = storageerr.InterpretUpdateError(err, apiextensions.Resource("customresourcedefinitions"), name)
+			if _, ok := err.(*apierrors.StatusError); !ok {
+				err = apierrors.NewInternalError(err)
+			}
+			return nil, false, err
+		}
+
+		return out, false, nil
+	}
+
+	return r.Store.Delete(ctx, name, options)
 }
 
 // NewStatusREST makes a RESTStorage for status that has more limited options.

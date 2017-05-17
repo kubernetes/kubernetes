@@ -153,6 +153,8 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		r.delegate.ServeHTTP(w, req)
 	}
 
+	terminating := apiextensions.IsCRDConditionTrue(crd, apiextensions.Terminating)
+
 	crdInfo := r.getServingInfoFor(crd)
 	storage := crdInfo.storage
 	requestScope := crdInfo.requestScope
@@ -174,20 +176,37 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		handler(w, req)
 		return
 	case "create":
+		if terminating {
+			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
+			return
+		}
 		handler := handlers.CreateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
 		handler(w, req)
 		return
 	case "update":
+		if terminating {
+			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
+			return
+		}
 		handler := handlers.UpdateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
 		handler(w, req)
 		return
 	case "patch":
+		if terminating {
+			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
+			return
+		}
 		handler := handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{})
 		handler(w, req)
 		return
 	case "delete":
 		allowsOptions := true
 		handler := handlers.DeleteResource(storage, allowsOptions, requestScope, r.admission)
+		handler(w, req)
+		return
+	case "deletecollection":
+		checkBody := true
+		handler := handlers.DeleteCollection(storage, checkBody, requestScope, r.admission)
 		handler(w, req)
 		return
 
