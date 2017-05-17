@@ -233,6 +233,9 @@ release:
     may disappear from the list of Debug Container Statuses.
 *   There's no specific integration with admission controller and pod security
     policy.
+*   Explicit reattaching isn't implemented. Instead a `kubectl debug` invocation
+    will implicitly reattach if there is an existing, running container with the
+    same name. In this case container configuration will be ignored.
 
 Debug Containers are implemented in the kubelet's generic runtime manager.
 Performing this operation with a legacy (non-CRI) runtime or a cluster without
