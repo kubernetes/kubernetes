@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"path"
 	"strings"
+	"time"
 
 	k8s_volume "k8s.io/kubernetes/pkg/volume"
 
@@ -31,6 +32,7 @@ import (
 	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/pagination"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/golang/glog"
 )
@@ -82,6 +84,8 @@ const (
 )
 
 func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, string, error) {
+	startTime := time.Now()
+
 	create_opts := volumes_v1.CreateOpts{
 		Name:             opts.Name,
 		Size:             opts.Size,
@@ -91,6 +95,8 @@ func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, string, e
 	}
 
 	vol, err := volumes_v1.Create(volumes.blockstorage, create_opts).Extract()
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("create_v1_volume", timeTaken, err)
 	if err != nil {
 		return "", "", err
 	}
@@ -98,6 +104,8 @@ func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, string, e
 }
 
 func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, string, error) {
+	startTime := time.Now()
+
 	create_opts := volumes_v2.CreateOpts{
 		Name:             opts.Name,
 		Size:             opts.Size,
@@ -107,6 +115,8 @@ func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, string, e
 	}
 
 	vol, err := volumes_v2.Create(volumes.blockstorage, create_opts).Extract()
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("create_v2_volume", timeTaken, err)
 	if err != nil {
 		return "", "", err
 	}
@@ -116,6 +126,7 @@ func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, string, e
 func (volumes *VolumesV1) getVolume(diskName string) (Volume, error) {
 	var volume_v1 volumes_v1.Volume
 	var volume Volume
+	startTime := time.Now()
 	err := volumes_v1.List(volumes.blockstorage, nil).EachPage(func(page pagination.Page) (bool, error) {
 		vols, err := volumes_v1.ExtractVolumes(page)
 		if err != nil {
@@ -134,6 +145,8 @@ func (volumes *VolumesV1) getVolume(diskName string) (Volume, error) {
 		errmsg := fmt.Sprintf("Unable to find disk: %s", diskName)
 		return false, errors.New(errmsg)
 	})
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("get_v1_volume", timeTaken, err)
 	if err != nil {
 		glog.Errorf("Error occurred getting volume: %s", diskName)
 		return volume, err
@@ -154,6 +167,7 @@ func (volumes *VolumesV1) getVolume(diskName string) (Volume, error) {
 func (volumes *VolumesV2) getVolume(diskName string) (Volume, error) {
 	var volume_v2 volumes_v2.Volume
 	var volume Volume
+	startTime := time.Now()
 	err := volumes_v2.List(volumes.blockstorage, nil).EachPage(func(page pagination.Page) (bool, error) {
 		vols, err := volumes_v2.ExtractVolumes(page)
 		if err != nil {
@@ -172,6 +186,8 @@ func (volumes *VolumesV2) getVolume(diskName string) (Volume, error) {
 		errmsg := fmt.Sprintf("Unable to find disk: %s", diskName)
 		return false, errors.New(errmsg)
 	})
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("get_v2_volume", timeTaken, err)
 	if err != nil {
 		glog.Errorf("Error occurred getting volume: %s", diskName)
 		return volume, err
@@ -190,19 +206,26 @@ func (volumes *VolumesV2) getVolume(diskName string) (Volume, error) {
 }
 
 func (volumes *VolumesV1) deleteVolume(volumeName string) error {
-
+	startTime := time.Now()
 	err := volumes_v1.Delete(volumes.blockstorage, volumeName).ExtractErr()
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("delete_v1_volume", timeTaken, err)
 	if err != nil {
 		glog.Errorf("Cannot delete volume %s: %v", volumeName, err)
 	}
+
 	return err
 }
 
 func (volumes *VolumesV2) deleteVolume(volumeName string) error {
+	startTime := time.Now()
 	err := volumes_v2.Delete(volumes.blockstorage, volumeName).ExtractErr()
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("delete_v2_volume", timeTaken, err)
 	if err != nil {
 		glog.Errorf("Cannot delete volume %s: %v", volumeName, err)
 	}
+
 	return err
 }
 
@@ -253,10 +276,13 @@ func (os *OpenStack) AttachDisk(instanceID string, diskName string) (string, err
 		}
 	}
 
+	startTime := time.Now()
 	// add read only flag here if possible spothanis
 	_, err = volumeattach.Create(cClient, instanceID, &volumeattach.CreateOpts{
 		VolumeID: volume.ID,
 	}).Extract()
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("attach_disk", timeTaken, err)
 	if err != nil {
 		glog.Errorf("Failed to attach %s volume to %s compute: %v", diskName, instanceID, err)
 		return "", err
@@ -288,9 +314,12 @@ func (os *OpenStack) DetachDisk(instanceID string, partialDiskId string) error {
 		glog.Errorf(errMsg)
 		return errors.New(errMsg)
 	} else {
+		startTime := time.Now()
 		// This is a blocking call and effects kubelet's performance directly.
 		// We should consider kicking it out into a separate routine, if it is bad.
 		err = volumeattach.Delete(cClient, instanceID, volume.ID).ExtractErr()
+		timeTaken := time.Since(startTime).Seconds()
+		recordOpenstackOperationMetric("detach_disk", timeTaken, err)
 		if err != nil {
 			glog.Errorf("Failed to delete volume %s from compute %s attached %v", volume.ID, instanceID, err)
 			return err
@@ -457,4 +486,13 @@ func (os *OpenStack) diskIsUsed(diskName string) (bool, error) {
 // query if we should trust the cinder provide deviceName, See issue #33128
 func (os *OpenStack) ShouldTrustDevicePath() bool {
 	return os.bsOpts.TrustDevicePath
+}
+
+// recordOpenstackOperationMetric records openstack operation metrics
+func recordOpenstackOperationMetric(operation string, timeTaken float64, err error) {
+	if err != nil {
+		OpenstackApiRequestErrors.With(prometheus.Labels{"request": operation}).Inc()
+	} else {
+		OpenstackOperationsLatency.With(prometheus.Labels{"request": operation}).Observe(timeTaken)
+	}
 }
