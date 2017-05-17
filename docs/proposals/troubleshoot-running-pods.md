@@ -135,10 +135,11 @@ describe pod`.
 
 Status of running Debug Containers will always be reported in this list, but
 Debug Containers that exit will be removed from this list when they are garbage
-collected. Initially we will satisfy inspection and audit requirements by
-exempting Debug Containers from garbage collection, making a list of every debug
-container that has ever run in a pod. A more sophisticated solution will require
-a better understanding of reporting requirements. This will be required to
+collected. In order to satisfy inspection and audit requirements, we need to
+fully understand the requirements and whether they will be satisfied by other
+audit features currently under development. Until then, Debug Containers may
+disappear from the list of Debug Container Statuses if the node is under
+resource pressure. This is acceptable for the alpha but must be resolved to
 graduate from alpha status.
 
 ### Restarting and Reattaching Debug Containers
@@ -228,9 +229,8 @@ release:
 
 *   `kubectl describe pod` will not report the running command, only container
     status
-*   Garbage collection of exited debug containers cannot be tuned. Note that
-    this could cause resource contention on a node with a long-running pod that
-    accumulates many Debug Containers with different names.
+*   Exited Debug Containers will be garbage collected as regular containers and
+    may disappear from the list of Debug Container Statuses.
 *   There's no specific integration with admission controller and pod security
     policy.
 
@@ -269,8 +269,7 @@ Currently only the Generic Runtime Manager (i.e. the CRI) implements the
 
 The Generic Runtime Manager's `RunDebugContainer()` calls `startContainer()` to
 create the Debug Container. Additionally, `SyncPod()` is modified to skip Debug
-Containers unless the sandbox is restarted and garbage collection doesn't delete
-Debug Containers until the pod is deleted.
+Containers unless the sandbox is restarted.
 
 ##### Step 3: kubelet API changes
 
