@@ -29,19 +29,20 @@ import (
 	"k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset"
 )
 
-func NewNoxuCustomResourceDefinition() *apiextensionsv1alpha1.CustomResourceDefinition {
+func NewNoxuCustomResourceDefinition(scope apiextensionsv1alpha1.ResourceScope) *apiextensionsv1alpha1.CustomResourceDefinition {
 	return &apiextensionsv1alpha1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
 		Spec: apiextensionsv1alpha1.CustomResourceDefinitionSpec{
 			Group:   "mygroup.example.com",
 			Version: "v1alpha1",
 			Names: apiextensionsv1alpha1.CustomResourceDefinitionNames{
-				Plural:   "noxus",
-				Singular: "nonenglishnoxu",
-				Kind:     "WishIHadChosenNoxu",
-				ListKind: "NoxuItemList",
+				Plural:     "noxus",
+				Singular:   "nonenglishnoxu",
+				Kind:       "WishIHadChosenNoxu",
+				ShortNames: []string{"foo", "bar", "abc", "def"},
+				ListKind:   "NoxuItemList",
 			},
-			Scope: apiextensionsv1alpha1.NamespaceScoped,
+			Scope: scope,
 		},
 	}
 }
