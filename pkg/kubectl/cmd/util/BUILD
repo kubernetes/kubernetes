@@ -27,7 +27,6 @@ go_library(
         "//federation/apis/federation:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/service:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/apps:go_default_library",

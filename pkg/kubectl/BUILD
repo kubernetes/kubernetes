@@ -52,7 +52,6 @@ go_library(
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/annotations:go_default_library",
         "//pkg/api/helper:go_default_library",
         "//pkg/api/util:go_default_library",
         "//pkg/api/v1:go_default_library",

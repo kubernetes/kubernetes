@@ -60,7 +60,6 @@ go_library(
         "//federation/apis/federation:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/annotations:go_default_library",
         "//pkg/api/events:go_default_library",
         "//pkg/api/helper:go_default_library",
         "//pkg/api/ref:go_default_library",
