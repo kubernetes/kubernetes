@@ -42,6 +42,7 @@ import (
 	triple "k8s.io/client-go/util/cert/triple"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/federation/apis/federation"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -55,6 +56,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"gopkg.in/gcfg.v1"
 )
 
 const (
@@ -379,7 +381,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 
 	glog.V(4).Info("Creating federation controller manager deployment")
 
-	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.image, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, sa.Name, dnsProviderSecret, i.options.controllerManagerOverrides, i.options.dryRun)
+	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.image, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, i.options.dnsProviderConfig, sa.Name, dnsProviderSecret, i.options.controllerManagerOverrides, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -847,7 +849,7 @@ func createRoleBindings(clientset client.Interface, namespace, saName, federatio
 	return newRole, newRolebinding, err
 }
 
-func createControllerManager(clientset client.Interface, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, saName string, dnsProviderSecret *api.Secret, argOverrides map[string]string, dryRun bool) (*extensions.Deployment, error) {
+func createControllerManager(clientset client.Interface, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, dnsProviderConfig, saName string, dnsProviderSecret *api.Secret, argOverrides map[string]string, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-controller-manager",
@@ -935,12 +937,19 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 		dep.Spec.Template.Spec.ServiceAccountName = saName
 	}
 
-	if dryRun {
-		return dep, nil
-	}
-
 	if dnsProviderSecret != nil {
 		dep = addDNSProviderConfig(dep, dnsProviderSecret.Name)
+		if dnsProvider == util.FedDNSProviderCoreDNS {
+			var err error
+			dep, err = addCoreDNSServerAnnotation(dep, dnsZoneName, dnsProviderConfig)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if dryRun {
+		return dep, nil
 	}
 
 	return clientset.Extensions().Deployments(namespace).Create(dep)
@@ -1153,4 +1162,16 @@ func addDNSProviderConfig(dep *extensions.Deployment, secretName string) *extens
 // authentication file in the format required by the federation-apiserver.
 func authFileContents(username, authSecret string) []byte {
 	return []byte(fmt.Sprintf("%s,%s,%s\n", authSecret, username, uuid.NewUUID()))
+}
+
+func addCoreDNSServerAnnotation(deployment *extensions.Deployment, dnsZoneName, dnsProviderConfig string) (*extensions.Deployment, error) {
+	var cfg coredns.Config
+	if err := gcfg.ReadFileInto(&cfg, dnsProviderConfig); err != nil {
+		return nil, err
+	}
+
+	deployment.Annotations[util.FedDNSZoneName] = dnsZoneName
+	deployment.Annotations[util.FedNameServer] = cfg.Global.CoreDNSEndpoints
+	deployment.Annotations[util.FedDNSProvider] = util.FedDNSProviderCoreDNS
+	return deployment, nil
 }
