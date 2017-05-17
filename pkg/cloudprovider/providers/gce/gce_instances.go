@@ -26,7 +26,7 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
-	computealpha "google.golang.org/api/compute/v0.alpha"
+	computealpha "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -244,7 +244,7 @@ func (gce *GCECloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err e
 	}
 
 	var res *computealpha.Instance
-	res, err = gce.serviceAlpha.Instances.Get(
+	res, err = gce.serviceBeta.Instances.Get(
 		gce.projectID, instance.Zone, instance.Name).Do()
 	if err != nil {
 		return
