@@ -171,7 +171,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// TODO convert this entire proxy to an UpgradeAwareProxy similar to
 	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
 	// That proxy needs to be modified to support multiple backends, not just 1.
-	if r.tryUpgrade(w, req, newReq, location, roundTripper, gv, ctx) {
+	if r.tryUpgrade(ctx, w, req, newReq, location, roundTripper, gv) {
 		return
 	}
 
@@ -220,7 +220,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 // tryUpgrade returns true if the request was handled.
-func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Request, location *url.URL, transport http.RoundTripper, gv schema.GroupVersion, ctx request.Context) bool {
+func (r *ProxyHandler) tryUpgrade(ctx request.Context, w http.ResponseWriter, req, newReq *http.Request, location *url.URL, transport http.RoundTripper, gv schema.GroupVersion) bool {
 	if !httpstream.IsUpgradeRequest(req) {
 		return false
 	}

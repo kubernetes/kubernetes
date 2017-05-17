@@ -406,7 +406,7 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 
 		healthzChecks: c.HealthzChecks,
 
-		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
+		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer, c.RequestContextMapper),
 	}
 
 	for k, v := range delegationTarget.PostStartHooks() {
