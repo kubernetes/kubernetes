@@ -40,6 +40,7 @@ package_group(
     packages = [
         "//build",
         "//build/debs",
+        "//build/rpms",
     ],
 )
 
