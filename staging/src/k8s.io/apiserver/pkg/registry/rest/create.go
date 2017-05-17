@@ -38,8 +38,7 @@ type RESTCreateStrategy interface {
 	// The NameGenerator will be invoked prior to validation.
 	names.NameGenerator
 
-	// NamespaceScoped returns true if the object must be within a namespace.
-	NamespaceScoped() bool
+	NamespaceScopedStrategy
 	// PrepareForCreate is invoked on create before validation to normalize
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
@@ -131,10 +130,4 @@ func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (metav1.Ob
 		return nil, schema.GroupVersionKind{}, errors.NewInternalError(err)
 	}
 	return objectMeta, kinds[0], nil
-}
-
-// NamespaceScopedStrategy has a method to tell if the object must be in a namespace.
-type NamespaceScopedStrategy interface {
-	// NamespaceScoped returns if the object must be in a namespace.
-	NamespaceScoped() bool
 }
