@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/v1"
 	internalextensions "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -285,12 +284,12 @@ func SetNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *exten
 }
 
 var annotationsToSkip = map[string]bool{
-	annotations.LastAppliedConfigAnnotation: true,
-	RevisionAnnotation:                      true,
-	RevisionHistoryAnnotation:               true,
-	DesiredReplicasAnnotation:               true,
-	MaxReplicasAnnotation:                   true,
-	OverlapAnnotation:                       true,
+	v1.LastAppliedConfigAnnotation: true,
+	RevisionAnnotation:             true,
+	RevisionHistoryAnnotation:      true,
+	DesiredReplicasAnnotation:      true,
+	MaxReplicasAnnotation:          true,
+	OverlapAnnotation:              true,
 }
 
 // skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key

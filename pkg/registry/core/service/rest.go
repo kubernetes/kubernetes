@@ -322,8 +322,8 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (boo
 		if oldHealthCheckNodePort != newHealthCheckNodePort {
 			glog.Warningf("Attempt to change value of health check node port DENIED")
 			var fldPath *field.Path
-			if _, ok := service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]; ok {
-				fldPath = field.NewPath("metadata", "annotations").Key(apiservice.BetaAnnotationHealthCheckNodePort)
+			if _, ok := service.Annotations[api.BetaAnnotationHealthCheckNodePort]; ok {
+				fldPath = field.NewPath("metadata", "annotations").Key(api.BetaAnnotationHealthCheckNodePort)
 			} else {
 				fldPath = field.NewPath("spec", "healthCheckNodePort")
 			}
