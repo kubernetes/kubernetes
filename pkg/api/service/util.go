@@ -118,20 +118,6 @@ func GetServiceHealthCheckNodePort(service *api.Service) int32 {
 	return service.Spec.HealthCheckNodePort
 }
 
-// SetDefaultExternalTrafficPolicyIfNeeded defaults the ExternalTrafficPolicy field
-// for NodePort / LoadBalancer service to Global for consistency.
-// TODO: Move this default logic to default.go once beta annotation is deprecated.
-func SetDefaultExternalTrafficPolicyIfNeeded(service *api.Service) {
-	if _, ok := service.Annotations[api.BetaAnnotationExternalTraffic]; ok {
-		// Don't default this field if beta annotation exists.
-		return
-	} else if (service.Spec.Type == api.ServiceTypeNodePort ||
-		service.Spec.Type == api.ServiceTypeLoadBalancer) &&
-		service.Spec.ExternalTrafficPolicy == "" {
-		service.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeGlobal
-	}
-}
-
 // ClearExternalTrafficPolicy resets the ExternalTrafficPolicy field.
 func ClearExternalTrafficPolicy(service *api.Service) {
 	// First check the beta annotation and then the first class field. This is so that

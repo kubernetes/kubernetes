@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"fmt"
-	"reflect"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -296,106 +295,6 @@ func TestGetServiceHealthCheckNodePort(t *testing.T) {
 			},
 		},
 	})
-}
-
-func TestSetDefaultExternalTrafficPolicyIfNeeded(t *testing.T) {
-	testCases := []struct {
-		inputService    *v1.Service
-		expectedService *v1.Service
-	}{
-		// First class fields cases.
-		{
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeGlobal,
-				},
-			},
-		},
-		{
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeNodePort,
-				},
-			},
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeNodePort,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeGlobal,
-				},
-			},
-		},
-		{
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-				},
-			},
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-				},
-			},
-		},
-		// Beta annotations cases.
-		{
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficLocal,
-					},
-				},
-			},
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficLocal,
-					},
-				},
-			},
-		},
-		{
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficGlobal,
-					},
-				},
-			},
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficGlobal,
-					},
-				},
-			},
-		},
-	}
-
-	for i, tc := range testCases {
-		SetDefaultExternalTrafficPolicyIfNeeded(tc.inputService)
-		if !reflect.DeepEqual(tc.inputService, tc.expectedService) {
-			t.Errorf("%v: got unexpected service", i)
-			spew.Dump(tc)
-		}
-	}
 }
 
 func TestClearExternalTrafficPolicy(t *testing.T) {
