@@ -27,8 +27,7 @@ static void sigdown(int signo) {
 }
 
 static void sigreap(int signo) {
-  while (waitpid(-1, NULL, WNOHANG) > 0)
-    ;
+  while (waitpid(-1, NULL, WNOHANG) > 0);
 }
 
 int main() {
