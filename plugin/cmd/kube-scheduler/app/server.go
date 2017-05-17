@@ -26,7 +26,6 @@ import (
 	goruntime "runtime"
 	"strconv"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/server/healthz"
 
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
@@ -112,17 +111,16 @@ func Run(s *options.SchedulerServer) error {
 		return fmt.Errorf("unable to get hostname: %v", err)
 	}
 
-	// TODO: enable other lock types
-	rl := &resourcelock.EndpointsLock{
-		EndpointsMeta: metav1.ObjectMeta{
-			Namespace: s.LockObjectNamespace,
-			Name:      s.LockObjectName,
-		},
-		Client: kubecli,
-		LockConfig: resourcelock.ResourceLockConfig{
+	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
+		s.LockObjectNamespace,
+		s.LockObjectName,
+		kubecli,
+		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
-		},
+		})
+	if err != nil {
+		glog.Fatalf("error creating lock: %v", err)
 	}
 
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
