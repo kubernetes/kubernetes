@@ -4,7 +4,7 @@ metadata:
   name: cassandra
 spec:
   serviceName: cassandra
-  replicas: 3
+  replicas: 2
   template:
     metadata:
       labels:
@@ -12,7 +12,7 @@ spec:
     spec:
       containers:
       - name: cassandra
-        image: gcr.io/google-samples/cassandra:v12
+        image: quay.io/vorstella/cassandra-k8s:v1.4
         imagePullPolicy: Always
         ports:
         - containerPort: 7000
@@ -44,7 +44,7 @@ spec:
           - name: HEAP_NEWSIZE
             value: 100M
           - name: CASSANDRA_SEEDS
-            value: "cassandra-0.cassandra.default.svc.cluster.local"
+            value: "cassandra-0.cassandra.default.svc.cluster.local,cassandra-1.cassandra.default.svc.cluster.local"
           - name: CASSANDRA_CLUSTER_NAME
             value: "K8Demo"
           - name: CASSANDRA_DC
@@ -77,7 +77,6 @@ spec:
           mountPath: /cassandra_data
   # These are converted to volume claims by the controller
   # and mounted at the paths mentioned above.
-  # do not use these in production until ssd GCEPersistentDisk or other ssd pd
   volumeClaimTemplates:
   - metadata:
       name: cassandra-data
@@ -89,10 +88,23 @@ spec:
         requests:
           storage: 1Gi
 ---
+#
+# StorageClass for GCE
+#
 kind: StorageClass
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 metadata:
   name: fast
 provisioner: kubernetes.io/gce-pd
 parameters:
   type: pd-ssd
+#
+# StorageClass for EC2
+#
+#kind: StorageClass
+#apiVersion: storage.k8s.io/v1
+#metadata:
+#  name: fast
+#provisioner: kubernetes.io/aws-ebs
+#parameters:
+# type: gp2
