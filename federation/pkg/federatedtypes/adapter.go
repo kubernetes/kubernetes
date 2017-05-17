@@ -61,3 +61,17 @@ type FederatedTypeAdapter interface {
 // be registered with RegisterAdapterFactory to ensure the type
 // adapter is discoverable.
 type AdapterFactory func(client federationclientset.Interface) FederatedTypeAdapter
+
+// SetAnnotation sets the given key and value in the given object's ObjectMeta.Annotations map
+func SetAnnotation(adapter FederatedTypeAdapter, obj pkgruntime.Object, key, value string) {
+	meta := adapter.ObjectMeta(obj)
+	if meta.Annotations == nil {
+		meta.Annotations = make(map[string]string)
+	}
+	meta.Annotations[key] = value
+}
+
+// ObjectKey returns a cluster-unique key for the given object
+func ObjectKey(adapter FederatedTypeAdapter, obj pkgruntime.Object) string {
+	return adapter.NamespacedName(obj).String()
+}

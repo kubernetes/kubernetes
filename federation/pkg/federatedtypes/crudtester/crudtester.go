@@ -193,11 +193,7 @@ func (c *FederatedTypeCRUDTester) waitForResource(client clientset.Interface, ob
 func (c *FederatedTypeCRUDTester) updateFedObject(obj pkgruntime.Object) (pkgruntime.Object, error) {
 	err := wait.PollImmediate(c.waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
 		// Target the metadata for simplicity (it's type-agnostic)
-		meta := c.adapter.ObjectMeta(obj)
-		if meta.Annotations == nil {
-			meta.Annotations = make(map[string]string)
-		}
-		meta.Annotations[AnnotationTestFederationCRUDUpdate] = "updated"
+		federatedtypes.SetAnnotation(c.adapter, obj, AnnotationTestFederationCRUDUpdate, "updated")
 
 		_, err := c.adapter.FedUpdate(obj)
 		if errors.IsConflict(err) {
