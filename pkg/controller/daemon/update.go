@@ -38,7 +38,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *extensions.DaemonSet) error {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
 
-	_, oldPods, err := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods)
+	_, oldPods := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods)
 	maxUnavailable, numUnavailable, err := dsc.getUnavailableNumbers(ds, nodeToDaemonPods)
 	if err != nil {
 		return fmt.Errorf("Couldn't get unavailable numbers: %v", err)
@@ -71,7 +71,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *extensions.DaemonSet) error {
 	return utilerrors.NewAggregate(errors)
 }
 
-func (dsc *DaemonSetsController) getAllDaemonSetPods(ds *extensions.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod) ([]*v1.Pod, []*v1.Pod, error) {
+func (dsc *DaemonSetsController) getAllDaemonSetPods(ds *extensions.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod) ([]*v1.Pod, []*v1.Pod) {
 	var newPods []*v1.Pod
 	var oldPods []*v1.Pod
 
@@ -84,7 +84,7 @@ func (dsc *DaemonSetsController) getAllDaemonSetPods(ds *extensions.DaemonSet, n
 			}
 		}
 	}
-	return newPods, oldPods, nil
+	return newPods, oldPods
 }
 
 func (dsc *DaemonSetsController) getUnavailableNumbers(ds *extensions.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod) (int, int, error) {
