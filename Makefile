@@ -532,5 +532,5 @@ bazel-release:
 	@echo "$$BAZEL_BUILD_HELP_INFO"
 else
 bazel-release:
-	bazel build //build/release-tars
+	hack/make-rules/bazel-release.sh
 endif
