@@ -180,6 +180,8 @@ const (
 
 	// Serve hostname image name
 	ServeHostnameImage = "gcr.io/google_containers/serve_hostname:v1.4"
+	// ssh port
+	sshPort = "22"
 )
 
 var (
@@ -1567,6 +1569,10 @@ func WaitForReplicationControllerwithSelector(c clientset.Interface, namespace s
 func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 	for t := time.Now(); time.Since(t) < EndpointRegisterTimeout; time.Sleep(Poll) {
 		endpoint, err := c.Core().Endpoints(ns).Get(name, metav1.GetOptions{})
+		if apierrs.IsNotFound(err) {
+			Logf("Endpoint %s/%s is not ready yet", ns, name)
+			continue
+		}
 		Expect(err).NotTo(HaveOccurred())
 		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
@@ -3781,7 +3787,7 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 
 	sshHosts := make([]string, 0, len(hosts))
 	for _, h := range hosts {
-		sshHosts = append(sshHosts, net.JoinHostPort(h, "22"))
+		sshHosts = append(sshHosts, net.JoinHostPort(h, sshPort))
 	}
 	return sshHosts, nil
 }
@@ -3793,6 +3799,13 @@ type SSHResult struct {
 	Stdout string
 	Stderr string
 	Code   int
+}
+
+// NodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
+// eg: the name returned by framework.GetMasterHost(). This is also not guaranteed to work across
+// cloud providers since it involves ssh.
+func NodeExec(nodeName, cmd string) (SSHResult, error) {
+	return SSH(cmd, net.JoinHostPort(nodeName, sshPort), TestContext.Provider)
 }
 
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
@@ -3835,7 +3848,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult,
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP {
-			host = a.Address + ":22"
+			host = net.JoinHostPort(a.Address, sshPort)
 			break
 		}
 	}
@@ -4051,12 +4064,12 @@ func CheckPodsCondition(c clientset.Interface, ns string, podNames []string, tim
 	np := len(podNames)
 	Logf("Waiting up to %v for %d pods to be %s: %s", timeout, np, desc, podNames)
 	result := make(chan bool, len(podNames))
-	for ix := range podNames {
+	for _, podName := range podNames {
 		// Launch off pod readiness checkers.
 		go func(name string) {
 			err := WaitForPodCondition(c, ns, name, desc, timeout, condition)
 			result <- err == nil
-		}(podNames[ix])
+		}(podName)
 	}
 	// Wait for them all to finish.
 	success := true
@@ -4413,7 +4426,7 @@ func sshRestartMaster() error {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
 	Logf("Restarting master via ssh, running: %v", command)
-	result, err := SSH(command, GetMasterHost()+":22", TestContext.Provider)
+	result, err := SSH(command, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		LogSSHResult(result)
 		return fmt.Errorf("couldn't restart apiserver: %v", err)
@@ -4801,8 +4814,7 @@ func ensureGCELoadBalancerResourcesDeleted(ip, portRange string) error {
 		if err != nil {
 			return false, err
 		}
-		for ix := range list.Items {
-			item := list.Items[ix]
+		for _, item := range list.Items {
 			if item.PortRange == portRange && item.IPAddress == ip {
 				Logf("found a load balancer: %v", item)
 				return false, nil
@@ -5382,7 +5394,7 @@ func GetNodeExternalIP(node *v1.Node) string {
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP {
-			host = a.Address + ":22"
+			host = net.JoinHostPort(a.Address, sshPort)
 			break
 		}
 	}
@@ -5525,4 +5537,39 @@ func GetAzureCloud() (*azure.Cloud, error) {
 		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to Azure: %#v", TestContext.CloudConfig.Provider)
 	}
 	return cloud, nil
+}
+
+func PrintSummaries(summaries []TestDataSummary, testBaseName string) {
+	now := time.Now()
+	for i := range summaries {
+		Logf("Printing summary: %v", summaries[i].SummaryKind())
+		switch TestContext.OutputPrintType {
+		case "hr":
+			if TestContext.ReportDir == "" {
+				Logf(summaries[i].PrintHumanReadable())
+			} else {
+				// TODO: learn to extract test name and append it to the kind instead of timestamp.
+				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".txt")
+				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
+					Logf("Failed to write file %v with test performance data: %v", filePath, err)
+				}
+			}
+		case "json":
+			fallthrough
+		default:
+			if TestContext.OutputPrintType != "json" {
+				Logf("Unknown output type: %v. Printing JSON", TestContext.OutputPrintType)
+			}
+			if TestContext.ReportDir == "" {
+				Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
+				Logf("Finished")
+			} else {
+				// TODO: learn to extract test name and append it to the kind instead of timestamp.
+				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".json")
+				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
+					Logf("Failed to write file %v with test performance data: %v", filePath, err)
+				}
+			}
+		}
+	}
 }

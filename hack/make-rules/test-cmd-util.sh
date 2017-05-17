@@ -28,6 +28,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 API_PORT=${API_PORT:-8080}
+SECURE_API_PORT=${SECURE_API_PORT:-6443}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 KUBELET_HEALTHZ_PORT=${KUBELET_HEALTHZ_PORT:-10248}
@@ -2014,6 +2015,9 @@ run_service_tests() {
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:'
   # Command
   kubectl delete service redis-master "${kube_flags[@]}"
+  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+    kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+  fi
   # Post-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
 
@@ -2059,6 +2063,9 @@ __EOF__
   # Command
   kubectl delete service redis-master "${kube_flags[@]}"
   kubectl delete service "service-v1-test" "${kube_flags[@]}"
+  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+    kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+  fi
   # Post-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
 
@@ -2082,6 +2089,9 @@ __EOF__
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:redis-slave:'
   # Command
   kubectl delete services redis-master redis-slave "${kube_flags[@]}" # delete multiple services at once
+  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+    kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+  fi
   # Post-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
 
@@ -2098,9 +2108,11 @@ __EOF__
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'beep-boop:kubernetes:'
   # Command
   kubectl delete service beep-boop "${kube_flags[@]}"
+  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+    kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+  fi
   # Post-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
-
 }
 
 run_rc_tests() {
@@ -2844,8 +2856,14 @@ runTests() {
   kube_flags=(
     -s "http://127.0.0.1:${API_PORT}"
   )
+
+  kube_flags_with_token=(
+    -s "https://127.0.0.1:${SECURE_API_PORT}" --token=admin/system:masters --insecure-skip-tls-verify=true
+  )
+
   if [[ -z "${ALLOW_SKEW:-}" ]]; then
     kube_flags+=("--match-server-version")
+    kube_flags_with_token+=("--match-server-version")
   fi
   if kube::test::if_supports_resource "${nodes}" ; then
     [ "$(kubectl get nodes -o go-template='{{ .apiVersion }}' "${kube_flags[@]}")" == "v1" ]
@@ -2932,7 +2950,7 @@ runTests() {
 
   # Make sure the UI can be proxied
   start-proxy
-  check-curl-proxy-code /ui 301
+  check-curl-proxy-code /ui 307
   check-curl-proxy-code /api/ui 404
   check-curl-proxy-code /api/v1/namespaces 200
   if kube::test::if_supports_resource "${metrics}" ; then
@@ -2951,7 +2969,7 @@ runTests() {
 
   # Custom paths let you see everything.
   start-proxy /custom
-  check-curl-proxy-code /custom/ui 301
+  check-curl-proxy-code /custom/ui 307
   if kube::test::if_supports_resource "${metrics}" ; then
     check-curl-proxy-code /custom/metrics 200
   fi
@@ -3001,21 +3019,41 @@ runTests() {
     kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
     kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.resourceNames}}{{.}}:{{end}}{{end}}" 'foo:'
 
-    # test `kubectl create clusterrolebinding`
+    # test `kubectl create rolebinding/clusterrolebinding`
+    # test `kubectl set subject rolebinding/clusterrolebinding`
     kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --clusterrole=admin --user=super-admin
     kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:'
+    kubectl set subject "${kube_flags[@]}" clusterrolebinding super-admin --user=foo
+    kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:foo:'
+
     kubectl create "${kube_flags[@]}" clusterrolebinding super-group --clusterrole=admin --group=the-group
     kube::test::get_object_assert clusterrolebinding/super-group "{{range.subjects}}{{.name}}:{{end}}" 'the-group:'
+    kubectl set subject "${kube_flags[@]}" clusterrolebinding super-group --group=foo
+    kube::test::get_object_assert clusterrolebinding/super-group "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:'
+
     kubectl create "${kube_flags[@]}" clusterrolebinding super-sa --clusterrole=admin --serviceaccount=otherns:sa-name
     kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:'
     kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:'
+    kubectl set subject "${kube_flags[@]}" clusterrolebinding super-sa --serviceaccount=otherfoo:foo
+    kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:otherfoo:'
+    kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:'
+
     kubectl create "${kube_flags[@]}" rolebinding admin --clusterrole=admin --user=default-admin -n default
     kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:'
+    kubectl set subject "${kube_flags[@]}" rolebinding admin --user=foo -n default
+    kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:foo:'
+
     kubectl create "${kube_flags[@]}" rolebinding localrole --role=localrole --group=the-group -n default
     kube::test::get_object_assert rolebinding/localrole "{{range.subjects}}{{.name}}:{{end}}" 'the-group:'
+    kubectl set subject "${kube_flags[@]}" rolebinding localrole --group=foo -n default
+    kube::test::get_object_assert rolebinding/localrole "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:'
+
     kubectl create "${kube_flags[@]}" rolebinding sarole --role=localrole --serviceaccount=otherns:sa-name -n default
     kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:'
     kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:'
+    kubectl set subject "${kube_flags[@]}" rolebinding sarole --serviceaccount=otherfoo:foo -n default
+    kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:otherfoo:'
+    kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:'
   fi
 
   ########
@@ -3730,6 +3768,26 @@ __EOF__
   kube::test::if_has_string "${output_message}" 'unknown command'
   output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/ kubectl plugin error 2>&1)
   kube::test::if_has_string "${output_message}" 'error: exit status 1'
+
+  #################
+  # Impersonation #
+  #################
+  output_message=$(! kubectl get pods "${kube_flags_with_token[@]}" --as-group=foo 2>&1)
+  kube::test::if_has_string "${output_message}" 'without impersonating a user'
+
+  if kube::test::if_supports_resource "${csr}" ; then
+    # --as
+    kubectl create -f hack/testdata/csr.yml "${kube_flags_with_token[@]}" --as=user1
+    kube::test::get_object_assert 'csr/foo' '{{.spec.username}}' 'user1'
+    kube::test::get_object_assert 'csr/foo' '{{range .spec.groups}}{{.}}{{end}}' 'system:authenticated'
+    kubectl delete -f hack/testdata/csr.yml "${kube_flags_with_token[@]}"
+
+    # --as-group
+    kubectl create -f hack/testdata/csr.yml "${kube_flags_with_token[@]}" --as=user1 --as-group=group2 --as-group=group1 --as-group=,,,chameleon
+    kube::test::get_object_assert 'csr/foo' '{{len .spec.groups}}' '3'
+    kube::test::get_object_assert 'csr/foo' '{{range .spec.groups}}{{.}} {{end}}' 'group2 group1 ,,,chameleon '
+    kubectl delete -f hack/testdata/csr.yml "${kube_flags_with_token[@]}"
+  fi
 
   kube::test::clear_all
 }

@@ -92,8 +92,11 @@ type KubeProxyConfiguration struct {
 	// for all interfaces)
 	BindAddress string `json:"bindAddress"`
 	// healthzBindAddress is the IP address and port for the health check server to serve on,
-	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
+	// defaulting to 0.0.0.0:10256
 	HealthzBindAddress string `json:"healthzBindAddress"`
+	// metricsBindAddress is the IP address and port for the metrics server to serve on,
+	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
+	MetricsBindAddress string `json:"metricsBindAddress"`
 	// clusterCIDR is the CIDR range of the pods in the cluster. It is used to
 	// bridge traffic coming from outside of the cluster. If not provided,
 	// no off-cluster bridging will be performed.
@@ -230,6 +233,9 @@ type LeaderElectionConfiguration struct {
 	// acquisition and renewal of a leadership. This is only applicable if
 	// leader election is enabled.
 	RetryPeriod metav1.Duration `json:"retryPeriod"`
+	// resourceLock indicates the resource object type that will be used to lock
+	// during leader election cycles.
+	ResourceLock string `json:"resourceLock"`
 }
 
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
@@ -560,9 +566,6 @@ type KubeletConfiguration struct {
 	// featureGates is a string of comma-separated key=value pairs that describe feature
 	// gates for alpha/experimental features.
 	FeatureGates string `json:"featureGates,omitempty"`
-	// Enable Container Runtime Interface (CRI) integration.
-	// +optional
-	EnableCRI *bool `json:"enableCRI,omitempty"`
 	// Enable dockershim only mode.
 	// +optional
 	ExperimentalDockershim *bool `json:"experimentalDockershim,omitempty"`
@@ -576,8 +579,8 @@ type KubeletConfiguration struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool `json:"keepTerminatedPodVolumes,omitempty"`
-	// This flag, if set, enables use of a shared PID namespace for pods run by the docker CRI runtime.
-	DockerEnableSharedPID *bool `json:"dockerEnableSharedPID,omitempty"`
+	// This flag, if set, disables use of a shared PID namespace for pods run by the docker CRI runtime.
+	DockerDisableSharedPID *bool `json:"dockerDisableSharedPID,omitempty"`
 
 	/* following flags are meant for Node Allocatable */
 

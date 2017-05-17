@@ -1,7 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel//tools/build_defs/docker:docker.bzl", "docker_build")
-load("@io_kubernetes_build//defs:build.bzl", "md5sum", "release_filegroup")
+load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build", "docker_bundle")
+load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 
 filegroup(
     name = "package-srcs",
@@ -15,6 +15,7 @@ filegroup(
         ":package-srcs",
         "//build/debs:all-srcs",
         "//build/release-tars:all-srcs",
+        "//build/visible_to:all-srcs",
     ],
     tags = ["automanaged"],
 )
@@ -44,7 +45,13 @@ docker_build(
     ],
 )
 
+# This list should roughly match kube::build::get_docker_wrapped_binaries()
+# in build/common.sh.
 DOCKERIZED_BINARIES = {
+    "cloud-controller-manager": {
+        "base": ":busybox",
+        "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
+    },
     "kube-apiserver": {
         "base": ":busybox",
         "target": "//cmd/kube-apiserver:kube-apiserver",
@@ -63,28 +70,32 @@ DOCKERIZED_BINARIES = {
     },
 }
 
-[md5sum(
-    name = binary + ".docker_tag",
-    src = meta["target"],
-) for binary, meta in DOCKERIZED_BINARIES.items()]
-
 [docker_build(
-    name = binary,
+    name = binary + "-internal",
     base = meta["base"],
     cmd = ["/usr/bin/" + binary],
     debs = [
         "//build/debs:%s.deb" % binary,
     ],
-    image_tags = [
-        "@%s.docker_tag" % binary,
-    ],
-    repository = "gcr.io/google_containers/" + binary,
-    repository_append_package = False,
     symlinks = {
         # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
         # but the debs install the binaries into /usr/bin.
         "/usr/local/bin/" + binary: "/usr/bin/" + binary,
     },
+) for binary, meta in DOCKERIZED_BINARIES.items()]
+
+[docker_bundle(
+    name = binary,
+    images = {"gcr.io/google_containers/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal"},
+    stamp = True,
+) for binary in DOCKERIZED_BINARIES.keys()]
+
+[genrule(
+    name = binary + "_docker_tag",
+    srcs = [meta["target"]],
+    outs = [binary + ".docker_tag"],
+    cmd = "grep ^STABLE_DOCKER_TAG bazel-out/stable-status.txt | awk '{print $$2}' >$@",
+    stamp = 1,
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
 
 release_filegroup(

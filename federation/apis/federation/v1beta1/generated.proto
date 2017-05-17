@@ -35,7 +35,7 @@ option go_package = "v1beta1";
 // Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.
 message Cluster {
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -76,7 +76,7 @@ message ClusterCondition {
 // A list of all the kubernetes clusters registered to the federation
 message ClusterList {
   // Standard list metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

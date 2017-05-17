@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
@@ -60,7 +60,7 @@ func TestRemoveContainer(t *testing.T) {
 	expectedContainerLogSymlink := legacyLogSymlink(containerId, "foo", "bar", "new")
 	assert.Equal(t, fakeOS.Removes, []string{expectedContainerLogPath, expectedContainerLogSymlink})
 	// Verify container is removed
-	fakeRuntime.AssertCalls([]string{"RemoveContainer"})
+	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
 	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerId})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)

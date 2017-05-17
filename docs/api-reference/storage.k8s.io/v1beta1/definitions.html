@@ -476,7 +476,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata More info: <a href="https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata">https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_listmeta">v1.ListMeta</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -648,6 +648,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">kind</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">uid</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UID of the resource. (when there is a single resource which can be described). More info: <a href="http://kubernetes.io/docs/user-guide/identifiers#uids">http://kubernetes.io/docs/user-guide/identifiers#uids</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -829,7 +836,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Standard object&#8217;s metadata. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard object&#8217;s metadata. More info: <a href="https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata">https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectmeta">v1.ObjectMeta</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1245,7 +1252,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-03-21 14:23:34 UTC
+Last updated 2017-05-15 21:12:53 UTC
 </div>
 </div>
 </body>

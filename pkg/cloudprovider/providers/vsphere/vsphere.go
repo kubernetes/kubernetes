@@ -80,6 +80,8 @@ const (
 	NonSupportedControllerTypeErrMsg = "Disk is attached to non-supported controller type"
 	FileAlreadyExistErrMsg           = "File requested already exist"
 	CleanUpDummyVMRoutine_Interval   = 5
+	UUIDPath                         = "/sys/class/dmi/id/product_serial"
+	UUIDPrefix                       = "VMware-"
 )
 
 // Controller types that are currently supported for hot attach of disks
@@ -227,24 +229,46 @@ func init() {
 	})
 }
 
+// UUID gets the BIOS UUID via the sys interface.  This UUID is known by vsphere
+func getvmUUID() (string, error) {
+	id, err := ioutil.ReadFile(UUIDPath)
+	if err != nil {
+		return "", fmt.Errorf("error retrieving vm uuid: %s", err)
+	}
+	uuidFromFile := string(id[:])
+	//strip leading and trailing white space and new line char
+	uuid := strings.TrimSpace(uuidFromFile)
+	// check the uuid starts with "VMware-"
+	if !strings.HasPrefix(uuid, UUIDPrefix) {
+		return "", fmt.Errorf("Failed to match Prefix, UUID read from the file is %v", uuidFromFile)
+	}
+	// Strip the prefix and while spaces and -
+	uuid = strings.Replace(uuid[len(UUIDPrefix):(len(uuid))], " ", "", -1)
+	uuid = strings.Replace(uuid, "-", "", -1)
+	if len(uuid) != 32 {
+		return "", fmt.Errorf("Length check failed, UUID read from the file is %v", uuidFromFile)
+	}
+	// need to add dashes, e.g. "564d395e-d807-e18a-cb25-b79f65eb2b9f"
+	uuid = fmt.Sprintf("%s-%s-%s-%s-%s", uuid[0:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:32])
+	return uuid, nil
+}
+
 // Returns the name of the VM on which this code is running.
-// Prerequisite: this code assumes VMWare vmtools or open-vm-tools to be installed in the VM.
 // Will attempt to determine the machine's name via it's UUID in this precedence order, failing if neither have a UUID:
 // * cloud config value VMUUID
 // * sysfs entry
 func getVMName(client *govmomi.Client, cfg *VSphereConfig) (string, error) {
 	var vmUUID string
+	var err error
 
 	if cfg.Global.VMUUID != "" {
 		vmUUID = cfg.Global.VMUUID
 	} else {
 		// This needs root privileges on the host, and will fail otherwise.
-		vmUUIDbytes, err := ioutil.ReadFile("/sys/devices/virtual/dmi/id/product_uuid")
+		vmUUID, err = getvmUUID()
 		if err != nil {
 			return "", err
 		}
-
-		vmUUID = string(vmUUIDbytes)
 		cfg.Global.VMUUID = vmUUID
 	}
 
@@ -530,12 +554,14 @@ func (vs *VSphere) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 			addressType = v1.NodeInternalIP
 		}
 		for _, ip := range v.IpAddress {
-			v1helper.AddToNodeAddresses(&addrs,
-				v1.NodeAddress{
-					Type:    addressType,
-					Address: ip,
-				},
-			)
+			if net.ParseIP(ip).To4() != nil {
+				v1helper.AddToNodeAddresses(&addrs,
+					v1.NodeAddress{
+						Type:    addressType,
+						Address: ip,
+					},
+				)
+			}
 		}
 	}
 	return addrs, nil
@@ -740,7 +766,10 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName k8stypes.NodeName) (di
 		return "", "", err
 	}
 
-	attached, _ := checkDiskAttached(vmDiskPath, vmDevices, dc, vs.client)
+	attached, err := checkDiskAttached(vmDiskPath, vmDevices, dc, vs.client)
+	if err != nil {
+		return "", "", err
+	}
 	if attached {
 		diskID, _ = getVirtualDiskID(vmDiskPath, vmDevices, dc, vs.client)
 		diskUUID, _ = getVirtualDiskUUIDByPath(vmDiskPath, dc, vs.client)
@@ -980,14 +1009,10 @@ func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName k8stypes.NodeNam
 	defer cancel()
 
 	// Create vSphere client
-	attached := make(map[string]bool)
-	for _, volPath := range volPaths {
-		attached[volPath] = false
-	}
 	err := vSphereLogin(ctx, vs)
 	if err != nil {
 		glog.Errorf("Failed to login into vCenter, err: %v", err)
-		return attached, err
+		return nil, err
 	}
 
 	// Find VM to detach disk from
@@ -1003,14 +1028,14 @@ func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName k8stypes.NodeNam
 
 	if err != nil {
 		glog.Errorf("Failed to check whether node exist. err: %s.", err)
-		return attached, err
+		return nil, err
 	}
 
 	if !nodeExist {
 		glog.Errorf("DisksAreAttached failed to determine whether disks %v are still attached: node %q does not exist",
 			volPaths,
 			vSphereInstance)
-		return attached, fmt.Errorf("DisksAreAttached failed to determine whether disks %v are still attached: node %q does not exist",
+		return nil, fmt.Errorf("DisksAreAttached failed to determine whether disks %v are still attached: node %q does not exist",
 			volPaths,
 			vSphereInstance)
 	}
@@ -1019,17 +1044,23 @@ func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName k8stypes.NodeNam
 	_, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
 	if err != nil {
 		glog.Errorf("Failed to get VM devices for VM %#q. err: %s", vSphereInstance, err)
-		return attached, err
+		return nil, err
 	}
 
+	attached := make(map[string]bool)
 	for _, volPath := range volPaths {
-		result, _ := checkDiskAttached(volPath, vmDevices, dc, vs.client)
-		if result {
-			attached[volPath] = true
+		result, err := checkDiskAttached(volPath, vmDevices, dc, vs.client)
+		if err == nil {
+			if result {
+				attached[volPath] = true
+			} else {
+				attached[volPath] = false
+			}
+		} else {
+			return nil, err
 		}
 	}
-
-	return attached, err
+	return attached, nil
 }
 
 func checkDiskAttached(volPath string, vmdevices object.VirtualDeviceList, dc *object.Datacenter, client *govmomi.Client) (bool, error) {

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
+	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -63,10 +65,15 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if len(obj.BindAddress) == 0 {
 		obj.BindAddress = "0.0.0.0"
 	}
-	if len(obj.HealthzBindAddress) == 0 {
-		obj.HealthzBindAddress = "127.0.0.1:10249"
+	if obj.HealthzBindAddress == "" {
+		obj.HealthzBindAddress = fmt.Sprintf("0.0.0.0:%v", ports.ProxyHealthzPort)
 	} else if !strings.Contains(obj.HealthzBindAddress, ":") {
-		obj.HealthzBindAddress = ":10249"
+		obj.HealthzBindAddress += fmt.Sprintf(":%v", ports.ProxyHealthzPort)
+	}
+	if obj.MetricsBindAddress == "" {
+		obj.MetricsBindAddress = fmt.Sprintf("127.0.0.1:%v", ports.ProxyStatusPort)
+	} else if !strings.Contains(obj.MetricsBindAddress, ":") {
+		obj.MetricsBindAddress += fmt.Sprintf(":%v", ports.ProxyStatusPort)
 	}
 	if obj.OOMScoreAdj == nil {
 		temp := int32(qos.KubeProxyOOMScoreAdj)
@@ -186,6 +193,9 @@ func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {
 	}
 	if obj.RetryPeriod == zero {
 		obj.RetryPeriod = metav1.Duration{Duration: 2 * time.Second}
+	}
+	if obj.ResourceLock == "" {
+		obj.ResourceLock = rl.EndpointsResourceLock
 	}
 }
 
@@ -424,9 +434,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = defaultNodeAllocatableEnforcement
-	}
-	if obj.EnableCRI == nil {
-		obj.EnableCRI = boolVar(true)
 	}
 	if obj.ExperimentalDockershim == nil {
 		obj.ExperimentalDockershim = boolVar(false)

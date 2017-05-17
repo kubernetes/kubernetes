@@ -48,6 +48,7 @@ federation/cmd/federation-apiserver
 federation/cmd/federation-controller-manager
 federation/cmd/genfeddocs
 federation/cmd/kubefed
+federation/pkg/federation-controller/util/replicapreferences
 hack
 hack/boilerplate/test
 hack/cmd/teststale
@@ -170,7 +171,6 @@ pkg/client/listers/storage/v1beta1
 pkg/client/metrics
 pkg/client/metrics/prometheus
 pkg/client/unversioned
-pkg/client/unversioned/remotecommand
 pkg/cloudprovider/providers
 pkg/cloudprovider/providers/azure
 pkg/cloudprovider/providers/cloudstack
@@ -185,7 +185,8 @@ pkg/fieldpath
 pkg/fields
 pkg/hyperkube
 pkg/kubectl/cmd/util/openapi
-pkg/kubelet/api
+pkg/kubelet/apis/cri
+pkg/kubelet/apis/stats/v1alpha1
 pkg/kubelet/container
 pkg/kubelet/envvars
 pkg/kubelet/eviction
@@ -199,6 +200,7 @@ pkg/kubelet/volumemanager/cache
 pkg/kubelet/volumemanager/populator
 pkg/kubelet/volumemanager/reconciler
 pkg/labels
+pkg/master/ports
 pkg/printers
 pkg/proxy/config
 pkg/proxy/healthcheck
@@ -313,6 +315,7 @@ staging/src/k8s.io/apimachinery/pkg/version
 staging/src/k8s.io/apimachinery/pkg/watch
 staging/src/k8s.io/apiserver/pkg/admission/initializer
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/install
+staging/src/k8s.io/apiserver/pkg/apis/audit
 staging/src/k8s.io/apiserver/pkg/apis/example/install
 staging/src/k8s.io/apiserver/pkg/authentication/authenticator
 staging/src/k8s.io/apiserver/pkg/authentication/request/union
@@ -339,6 +342,7 @@ staging/src/k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth
 staging/src/k8s.io/client-go/discovery
 staging/src/k8s.io/client-go/examples/in-cluster
 staging/src/k8s.io/client-go/examples/out-of-cluster
+staging/src/k8s.io/client-go/examples/third-party-resources
 staging/src/k8s.io/client-go/informers
 staging/src/k8s.io/client-go/informers/apps
 staging/src/k8s.io/client-go/informers/apps/v1beta1
@@ -383,6 +387,7 @@ staging/src/k8s.io/client-go/plugin/pkg/client/auth/gcp
 staging/src/k8s.io/client-go/rest/watch
 staging/src/k8s.io/client-go/tools/auth
 staging/src/k8s.io/client-go/tools/metrics
+staging/src/k8s.io/client-go/tools/remotecommand
 staging/src/k8s.io/client-go/util/cert
 staging/src/k8s.io/client-go/util/homedir
 staging/src/k8s.io/client-go/util/workqueue
@@ -397,6 +402,18 @@ staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregis
 staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion
 staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1alpha1
 staging/src/k8s.io/kube-aggregator/pkg/controllers
+staging/src/k8s.io/kube-apiextensions-server
+staging/src/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/install
+staging/src/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/validation
+staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions
+staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions/apiextensions
+staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions/apiextensions/v1alpha1
+staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion
+staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion/apiextensions
+staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion/apiextensions/internalversion
+staging/src/k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/internalversion
+staging/src/k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/v1alpha1
+staging/src/k8s.io/kube-apiextensions-server/test/integration
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics/install
 staging/src/k8s.io/metrics/pkg/apis/metrics/install
 staging/src/k8s.io/sample-apiserver

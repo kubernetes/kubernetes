@@ -14,14 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
 from charms import layer
 from charms.layer import snap
 
 from charms.reactive import hook
 from charms.reactive import is_state
-from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import when
 from charms.reactive import when_not
@@ -30,7 +27,6 @@ from charmhelpers.core import hookenv
 
 from shlex import split
 
-from subprocess import call
 from subprocess import check_call
 from subprocess import check_output
 

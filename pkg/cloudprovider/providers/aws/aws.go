@@ -69,8 +69,6 @@ const TagNameSubnetPublicELB = "kubernetes.io/role/elb"
 
 // ServiceAnnotationLoadBalancerInternal is the annotation used on the service
 // to indicate that we want an internal ELB.
-// Currently we accept only the value "0.0.0.0/0" - other values are an error.
-// This lets us define more advanced semantics in future.
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/aws-load-balancer-internal"
 
 // ServiceAnnotationLoadBalancerProxyProtocol is the annotation used on the
@@ -935,8 +933,6 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 			return nil, err
 		}
 		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: internalIP})
-		// Legacy compatibility: the private ip was the legacy host ip
-		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeLegacyHostIP, Address: internalIP})
 
 		externalIP, err := c.metadata.GetMetadata("public-ipv4")
 		if err != nil {
@@ -981,9 +977,6 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", orEmpty(instance.InstanceId), ipAddress)
 		}
 		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip.String()})
-
-		// Legacy compatibility: the private ip was the legacy host ip
-		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeLegacyHostIP, Address: ip.String()})
 	}
 
 	// TODO: Other IP addresses (multiple ips)?
@@ -2594,13 +2587,6 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 	internalELB := false
 	internalAnnotation := apiService.Annotations[ServiceAnnotationLoadBalancerInternal]
 	if internalAnnotation != "" {
-		if internalAnnotation != "0.0.0.0/0" {
-			return nil, fmt.Errorf("annotation %q=%q detected, but the only value supported currently is 0.0.0.0/0", ServiceAnnotationLoadBalancerInternal, internalAnnotation)
-		}
-		if !service.IsAllowAll(sourceRanges) {
-			// TODO: Unify the two annotations
-			return nil, fmt.Errorf("source-range annotation cannot be combined with the internal-elb annotation")
-		}
 		internalELB = true
 	}
 

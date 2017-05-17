@@ -195,19 +195,15 @@ func (nfsMounter *nfsMounter) CanMount() error {
 	exe := exec.New()
 	switch runtime.GOOS {
 	case "linux":
-		_, err1 := exe.Command("/bin/ls", "/sbin/mount.nfs").CombinedOutput()
-		_, err2 := exe.Command("/bin/ls", "/sbin/mount.nfs4").CombinedOutput()
-
-		if err1 != nil {
+		if _, err := exe.Command("/bin/ls", "/sbin/mount.nfs").CombinedOutput(); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs is missing")
 		}
-		if err2 != nil {
+		if _, err := exe.Command("/bin/ls", "/sbin/mount.nfs4").CombinedOutput(); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs4 is missing")
 		}
 		return nil
 	case "darwin":
-		_, err := exe.Command("/bin/ls", "/sbin/mount_nfs").CombinedOutput()
-		if err != nil {
+		if _, err := exe.Command("/bin/ls", "/sbin/mount_nfs").CombinedOutput(); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount_nfs is missing")
 		}
 	}
@@ -233,11 +229,11 @@ func (b *nfsMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *nfsMounter) SetUp(fsGroup *int64) error {
+func (b *nfsMounter) SetUp(fsGroup *types.UnixGroupID) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *nfsMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {

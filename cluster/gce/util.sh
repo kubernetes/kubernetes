@@ -498,13 +498,22 @@ function create-node-template() {
   #                 distinguish an ephemeral failed call from a "not-exists".
   if gcloud compute instance-templates describe "$template_name" --project "${PROJECT}" &>/dev/null; then
     echo "Instance template ${1} already exists; deleting." >&2
-    if ! gcloud compute instance-templates delete "$template_name" --project "${PROJECT}" &>/dev/null; then
+    if ! gcloud compute instance-templates delete "$template_name" --project "${PROJECT}" --quiet &>/dev/null; then
       echo -e "${color_yellow}Failed to delete existing instance template${color_norm}" >&2
       exit 2
     fi
   fi
 
   local gcloud="gcloud"
+
+  local accelerator_args=""
+  # VMs with Accelerators cannot be live migrated.
+  # More details here - https://cloud.google.com/compute/docs/gpus/add-gpus#create-new-gpu-instance
+  if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
+    accelerator_args="--maintenance-policy TERMINATE --restart-on-failure --accelerator ${NODE_ACCELERATORS}"
+    gcloud="gcloud beta"
+  fi
+
   if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
     gcloud="gcloud alpha"
   fi
@@ -539,6 +548,7 @@ function create-node-template() {
       --image-project="${NODE_IMAGE_PROJECT}" \
       --image "${NODE_IMAGE}" \
       --tags "${NODE_TAG}" \
+      ${accelerator_args} \
       ${local_ssds} \
       --region "${REGION}" \
       ${network} \

@@ -185,7 +185,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 
 	s.federatedInformer = fedutil.NewFederatedInformer(federationClient, fedInformerFactory, &clusterLifecycle)
 
-	s.federatedUpdater = fedutil.NewFederatedUpdater(s.federatedInformer,
+	s.federatedUpdater = fedutil.NewFederatedUpdater(s.federatedInformer, "service", updateTimeout, s.eventRecorder,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			svc := obj.(*v1.Service)
 			_, err := client.Core().Services(svc.Namespace).Create(svc)
@@ -240,10 +240,8 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
 			service := obj.(*v1.Service)
-			return service.Name
+			return fmt.Sprintf("%s/%s", service.Namespace, service.Name)
 		},
-		updateTimeout,
-		s.eventRecorder,
 		s.federatedInformer,
 		s.federatedUpdater,
 	)
@@ -537,7 +535,7 @@ func (s *ServiceController) reconcileService(key string) reconciliationStatus {
 	if fedService.DeletionTimestamp != nil {
 		if err := s.delete(fedService); err != nil {
 			runtime.HandleError(fmt.Errorf("Failed to delete %s: %v", key, err))
-			s.eventRecorder.Eventf(fedService, api.EventTypeNormal, "DeleteFailed", "Deleting service failed: %v", err)
+			s.eventRecorder.Eventf(fedService, api.EventTypeWarning, "DeleteFailed", "Deleting service failed: %v", err)
 			return statusRecoverableError
 		}
 		glog.V(3).Infof("Deleting federated service succeeded: %s", key)
@@ -601,11 +599,7 @@ func (s *ServiceController) reconcileService(key string) reconciliationStatus {
 	}
 
 	if len(operations) != 0 {
-		err = s.federatedUpdater.UpdateWithOnError(operations, s.updateTimeout,
-			func(op fedutil.FederatedOperation, operror error) {
-				runtime.HandleError(fmt.Errorf("Service update in cluster %s failed: %v", op.ClusterName, operror))
-				s.eventRecorder.Eventf(fedService, api.EventTypeNormal, "UpdateInClusterFailed", "Service update in cluster %s failed: %v", op.ClusterName, operror)
-			})
+		err = s.federatedUpdater.Update(operations)
 		if err != nil {
 			if !errors.IsAlreadyExists(err) {
 				runtime.HandleError(fmt.Errorf("Failed to execute updates for %s: %v", key, err))
@@ -642,12 +636,12 @@ func (s *ServiceController) getOperationsToPerformOnCluster(cluster *v1beta1.Clu
 		desiredService.ResourceVersion = ""
 
 		glog.V(4).Infof("Creating service in underlying cluster %s: %+v", cluster.Name, desiredService)
-		s.eventRecorder.Eventf(fedService, api.EventTypeNormal, "CreateInCluster", "Creating service in cluster %s", cluster.Name)
 
 		operation = &fedutil.FederatedOperation{
 			Type:        fedutil.OperationTypeAdd,
 			Obj:         desiredService,
 			ClusterName: cluster.Name,
+			Key:         key,
 		}
 	} else {
 		clusterService, ok := clusterServiceObj.(*v1.Service)
@@ -670,11 +664,15 @@ func (s *ServiceController) getOperationsToPerformOnCluster(cluster *v1beta1.Clu
 				}
 			}
 		}
+		// If ExternalTrafficPolicy is not set in federated service, use the ExternalTrafficPolicy
+		// defaulted to in federated cluster.
+		if desiredService.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyType("") {
+			desiredService.Spec.ExternalTrafficPolicy = clusterService.Spec.ExternalTrafficPolicy
+		}
 
 		// Update existing service, if needed.
 		if !Equivalent(desiredService, clusterService) {
 			glog.V(4).Infof("Service in underlying cluster %s does not match, Desired: %+v, Existing: %+v", cluster.Name, desiredService, clusterService)
-			s.eventRecorder.Eventf(fedService, api.EventTypeNormal, "UpdateInCluster", "Updating service in cluster %s. Desired: %+v\n Actual: %+v\n", cluster.Name, desiredService, clusterService)
 
 			// ResourceVersion of cluster service can be different from federated service,
 			// so do not update ResourceVersion while updating cluster service
@@ -684,6 +682,7 @@ func (s *ServiceController) getOperationsToPerformOnCluster(cluster *v1beta1.Clu
 				Type:        fedutil.OperationTypeUpdate,
 				Obj:         desiredService,
 				ClusterName: cluster.Name,
+				Key:         key,
 			}
 		} else {
 			glog.V(5).Infof("Service in underlying cluster %s is up to date: %+v", cluster.Name, desiredService)

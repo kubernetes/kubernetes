@@ -32,6 +32,8 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 )
 
@@ -125,7 +127,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns "+
 		"trump over extracted names. For multiple key/certificate pairs, use the "+
 		"--tls-sni-cert-key multiple times. "+
-		"Examples: \"example.key,example.crt\" or \"*.foo.com,foo.com:foo.key,foo.crt\".")
+		"Examples: \"example.crt,example.key\" or \"foo.crt,foo.key:*.foo.com,foo.com\".")
 }
 
 func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
@@ -166,6 +168,13 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 		c.LoopbackClientConfig = secureLoopbackClientConfig
 		c.SecureServingInfo.SNICerts[server.LoopbackClientServerNameOverride] = &tlsCert
 	}
+
+	// create shared informers
+	clientset, err := kubernetes.NewForConfig(c.LoopbackClientConfig)
+	if err != nil {
+		return err
+	}
+	c.SharedInformerFactory = informers.NewSharedInformerFactory(clientset, c.LoopbackClientConfig.Timeout)
 
 	return nil
 }

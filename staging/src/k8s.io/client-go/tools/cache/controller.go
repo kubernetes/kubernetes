@@ -296,6 +296,7 @@ func NewInformer(
 //    long as possible (until the upstream source closes the watch or times out,
 //    or you stop the controller).
 //  * h is the object you want notifications sent to.
+//  * indexers is the indexer for the received object type.
 //
 func NewIndexerInformer(
 	lw ListerWatcher,

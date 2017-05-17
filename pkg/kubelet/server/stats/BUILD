@@ -21,7 +21,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
+        "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
@@ -49,7 +49,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
+        "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",

@@ -20,10 +20,12 @@
 function run-gcloud-compute-with-retries {
   RETRIES="${RETRIES:-3}"
   for attempt in $(seq 1 ${RETRIES}); do
-    local -r gcloud_result=$(gcloud compute "$@" 2>&1)
-    local -r ret_val="$?"
+    exec 5>&1  # Duplicate &1 to &5 for use below.
+    # We don't use 'local' to declare gcloud_result as then ret_val always gets value 0.
+    # We use tee to output to &5 (redirected to stdout) while also storing it in the variable.
+    gcloud_result=$(gcloud compute "$@" 2>&1 | tee >(cat - >&5)) || local ret_val="$?"
     echo "${gcloud_result}"
-    if [[ "${ret_val}" -ne "0" ]]; then
+    if [[ "${ret_val:-0}" -ne "0" ]]; then
       if [[ $(echo "${gcloud_result}" | grep -c "already exists") -gt 0 ]]; then
         if [[ "${attempt}" == 1 ]]; then
           echo -e "${color_red}Failed to $1 $2 $3 as the resource hasn't been deleted from a previous run.${color_norm}" >& 2
@@ -78,6 +80,7 @@ function create-master-instance-with-resources {
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 
   run-gcloud-compute-with-retries instances add-metadata "${MASTER_NAME}" \
+    ${GCLOUD_COMMON_ARGS} \
     --metadata-from-file startup-script="${KUBE_ROOT}/test/kubemark/resources/start-kubemark-master.sh"
   
   if [ "${EVENT_PD:-false}" == "true" ]; then

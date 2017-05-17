@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
@@ -35,7 +35,9 @@ type customMetricsClient struct {
 }
 
 func New(client rest.Interface) CustomMetricsClient {
-	return NewForMapper(client, api.Registry.RESTMapper())
+	return &customMetricsClient{
+		client: client,
+	}
 }
 
 func NewForConfig(c *rest.Config) (CustomMetricsClient, error) {
@@ -48,7 +50,7 @@ func NewForConfig(c *rest.Config) (CustomMetricsClient, error) {
 		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	configShallowCopy.GroupVersion = &v1alpha1.SchemeGroupVersion
-	configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 
 	client, err := rest.RESTClientFor(&configShallowCopy)
 	if err != nil {
@@ -66,6 +68,8 @@ func NewForConfigOrDie(c *rest.Config) CustomMetricsClient {
 	return client
 }
 
+// NewForMapper constucts the client with a RESTMapper, which allows more
+// accurate translation from GroupVersionKind to GroupVersionResource.
 func NewForMapper(client rest.Interface, mapper meta.RESTMapper) CustomMetricsClient {
 	return &customMetricsClient{
 		client: client,
@@ -85,6 +89,15 @@ func (c *customMetricsClient) NamespacedMetrics(namespace string) MetricsInterfa
 }
 
 func (c *customMetricsClient) qualResourceForKind(groupKind schema.GroupKind) (string, error) {
+	if c.mapper == nil {
+		// the version doesn't matter
+		gvk := groupKind.WithVersion("")
+		gvr, _ := meta.UnsafeGuessKindToResource(gvk)
+		gr := gvr.GroupResource()
+		return gr.String(), nil
+	}
+
+	// use the mapper if it's available
 	mapping, err := c.mapper.RESTMapping(groupKind)
 	if err != nil {
 		return "", fmt.Errorf("unable to map kind %s to resource: %v", groupKind.String(), err)
@@ -94,7 +107,6 @@ func (c *customMetricsClient) qualResourceForKind(groupKind schema.GroupKind) (s
 		Group:    mapping.GroupVersionKind.Group,
 		Resource: mapping.Resource,
 	}
-
 	return groupResource.String(), nil
 }
 
@@ -204,7 +216,7 @@ func (m *namespacedMetrics) GetForObject(groupKind schema.GroupKind, name string
 	}
 
 	if len(res.Items) != 1 {
-		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one")
+		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one", len(res.Items))
 	}
 
 	return &res.Items[0], nil

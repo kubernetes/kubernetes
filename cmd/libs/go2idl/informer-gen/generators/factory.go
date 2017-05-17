@@ -127,6 +127,28 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
   }
 }
 
+// WaitForCacheSync waits for all started informers' cache were synced.
+func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
+	informers := func()map[reflect.Type]cache.SharedIndexInformer{
+               f.lock.Lock()
+               defer f.lock.Unlock()
+
+               informers := map[reflect.Type]cache.SharedIndexInformer{}
+               for informerType, informer := range f.informers {
+                       if f.startedInformers[informerType] {
+                               informers[informerType] = informer
+                       }
+               }
+               return informers
+       }()
+
+       res := map[reflect.Type]bool{}
+       for informType, informer := range informers {
+               res[informType] = cache.WaitForCacheSync(stopCh, informer.HasSynced)
+       }
+       return res
+}
+
 // InternalInformerFor returns the SharedIndexInformer for obj using an internal
 // client.
 func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc {{.interfacesNewInformerFunc|raw}}) {{.cacheSharedIndexInformer|raw}} {
@@ -152,6 +174,7 @@ var sharedInformerFactoryInterface = `
 type SharedInformerFactory interface {
 	{{.informerFactoryInterface|raw}}
 	ForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error)
+	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	{{$gvInterfaces := .gvInterfaces}}
 	{{range $groupName, $group := .groupVersions}}{{$groupName}}() {{index $gvInterfaces $groupName|raw}}

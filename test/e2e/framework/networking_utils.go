@@ -256,12 +256,15 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 				eps.Insert(trimmed)
 			}
 		}
-		Logf("Waiting for %+v endpoints, got endpoints %+v", expectedEps.Difference(eps), eps)
 
 		// Check against i+1 so we exit if minTries == maxTries.
-		if (eps.Equal(expectedEps) || eps.Len() == 0 && expectedEps.Len() == 0) && i+1 >= minTries {
+		if eps.Equal(expectedEps) && i+1 >= minTries {
+			Logf("Found all expected endpoints: %+v", eps.List())
 			return
 		}
+
+		Logf("Waiting for %+v endpoints (expected=%+v, actual=%+v)", expectedEps.Difference(eps).List(), expectedEps.List(), eps.List())
+
 		// TODO: get rid of this delay #36281
 		time.Sleep(hitEndpointRetryDelay)
 	}
@@ -273,8 +276,8 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 // GetSelfURL executes a curl against the given path via kubectl exec into a
 // test container running with host networking, and fails if the output
 // doesn't match the expected string.
-func (config *NetworkingTestConfig) GetSelfURL(path string, expected string) {
-	cmd := fmt.Sprintf("curl -q -s --connect-timeout 1 http://localhost:10249%s", path)
+func (config *NetworkingTestConfig) GetSelfURL(port int32, path string, expected string) {
+	cmd := fmt.Sprintf("curl -i -q -s --connect-timeout 1 http://localhost:%d%s", port, path)
 	By(fmt.Sprintf("Getting kube-proxy self URL %s", path))
 
 	// These are arbitrary timeouts. The curl command should pass on first try,
@@ -476,10 +479,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 	config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeExternalIP)
-	if len(config.ExternalAddrs) < 2 {
-		// fall back to legacy IPs
-		config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeLegacyHostIP)
-	}
+
 	SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
 

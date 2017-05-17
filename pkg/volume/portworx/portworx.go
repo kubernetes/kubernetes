@@ -255,12 +255,12 @@ func (b *portworxVolumeMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *portworxVolumeMounter) SetUp(fsGroup *int64) error {
+func (b *portworxVolumeMounter) SetUp(fsGroup *types.UnixGroupID) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("Portworx Volume set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {

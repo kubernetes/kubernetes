@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 licenses(["notice"])
 
 load(
@@ -11,6 +9,9 @@ go_library(
     name = "go_default_library",
     srcs = ["fake.go"],
     tags = ["automanaged"],
+    visibility = [
+        "//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS",
+    ],
     deps = [
         "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
         "//pkg/api:go_default_library",
@@ -23,7 +24,7 @@ go_library(
         "//pkg/kubectl/plugins:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/printers:go_default_library",
-        "//vendor/github.com/emicklei/go-restful/swagger:go_default_library",
+        "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -41,11 +42,13 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
-    visibility = ["//visibility:private"],
 )
 
 filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = [
+        "//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS",
+    ],
 )

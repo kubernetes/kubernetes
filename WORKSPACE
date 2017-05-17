@@ -1,26 +1,42 @@
-git_repository(
+http_archive(
     name = "io_bazel_rules_go",
-    commit = "805fd1566500997379806373feb05e138a4dfe28",
-    remote = "https://github.com/bazelbuild/rules_go.git",
+    sha256 = "a1cae429e9d591017421150e3173478c46c693bc594322c7fa7e6cb5f672ef59",
+    strip_prefix = "rules_go-805fd1566500997379806373feb05e138a4dfe28",
+    urls = ["https://github.com/bazelbuild/rules_go/archive/805fd1566500997379806373feb05e138a4dfe28.tar.gz"],
 )
 
-git_repository(
+http_archive(
     name = "io_kubernetes_build",
-    commit = "684e550a2f006dbe3cf3b3d481d3f19217b228f7",
-    remote = "https://github.com/kubernetes/repo-infra.git",
+    sha256 = "8d1cff71523565996903076cec6cad8424afa6eb93a342d0d810a55c911e23c7",
+    strip_prefix = "repo-infra-61b7247ebf472398bdea148d8f67e3a1849d6de9",
+    urls = ["https://github.com/kubernetes/repo-infra/archive/61b7247ebf472398bdea148d8f67e3a1849d6de9.tar.gz"],
 )
 
-git_repository(
+# This contains a patch to not prepend ./ to tarfiles produced by pkg_tar.
+# When merged upstream, we'll no longer need to use ixdy's fork:
+# https://bazel-review.googlesource.com/#/c/10390/
+http_archive(
     name = "io_bazel",
-    commit = "1fe52dd4b2d77a740648bc1509b68acae49deffc",
-    remote = "https://github.com/ixdy/bazel.git",
+    sha256 = "667d32da016b1e2f63cf345cd3583989ec4a165034df383a01996d93635753a0",
+    strip_prefix = "bazel-df2c687c22bdd7c76f3cdcc85f38fefd02f0b844",
+    urls = ["https://github.com/ixdy/bazel/archive/df2c687c22bdd7c76f3cdcc85f38fefd02f0b844.tar.gz"],
+)
+
+http_archive(
+    name = "io_bazel_rules_docker",
+    sha256 = "261fbd8fda1d06a12a0479019b46acd302c6aaa8df8e49383dc37917f20492a1",
+    strip_prefix = "rules_docker-52d9faf209ff6d16eb850b6b66d03483735e0633",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/52d9faf209ff6d16eb850b6b66d03483735e0633.tar.gz"],
 )
 
 load("@io_bazel_rules_go//go:def.bzl", "go_repositories")
+load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories")
 
 go_repositories(
     go_version = "1.8.1",
 )
+
+docker_repositories()
 
 # for building docker base images
 debs = (

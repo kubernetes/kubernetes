@@ -133,8 +133,8 @@ type Type struct {
 	Extensions spec.Extensions
 }
 
-// newOpenAPIData parses the resource definitions in openapi data by groupversionkind and name
-func newOpenAPIData(s *spec.Swagger) (*Resources, error) {
+// NewOpenAPIData parses the resource definitions in openapi data by groupversionkind and name
+func NewOpenAPIData(s *spec.Swagger) (*Resources, error) {
 	o := &Resources{
 		GroupVersionKindToName: map[schema.GroupVersionKind]string{},
 		NameToDefinition:       map[string]Kind{},
@@ -338,7 +338,7 @@ func (o *Resources) nameForDefinitionField(s spec.Schema) string {
 	return strings.Replace(p, "/definitions/", "", -1)
 }
 
-// getGroupVersionKind implements openAPIData
+// getGroupVersionKind implements OpenAPIData
 // getGVK parses the gropuversionkind for a resource definition from the x-kubernetes
 // extensions
 // Expected format for s.Extensions: map[string][]map[string]string

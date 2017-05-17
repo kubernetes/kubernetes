@@ -237,6 +237,7 @@ define TEST_E2E_NODE_HELP_INFO
 #   Used when RUNTIME is set to "remote".
 #  IMAGE_SERVICE_ENDPOINT: remote image endpoint to connect to, to prepull images.
 #   Used when RUNTIME is set to "remote".
+#  IMAGE_CONFIG_FILE: path to a file containing image configuration.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
@@ -517,7 +518,7 @@ bazel-test:
 	@echo "$$BAZEL_TEST_HELP_INFO"
 else
 bazel-test:
-	bazel test --flaky_test_attempts=3 //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all //vendor/k8s.io/...
+	bazel test --test_tag_filters=-integration --flaky_test_attempts=3 //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all //vendor/k8s.io/...
 endif
 
 ifeq ($(PRINT_HELP),y)

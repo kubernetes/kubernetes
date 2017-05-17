@@ -51,6 +51,3 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }
-
-func (obj *Cluster) GetObjectKind() schema.ObjectKind     { return &obj.TypeMeta }
-func (obj *ClusterList) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

@@ -24,7 +24,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/emicklei/go-restful/swagger"
+	"github.com/emicklei/go-restful-swagger12"
 	ejson "github.com/exponent-io/jsonpath"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -359,7 +359,7 @@ func (s *SwaggerSchema) isGenericArray(p swagger.ModelProperty) bool {
 }
 
 // This matches type name in the swagger spec, such as "v1.Binding".
-var versionRegexp = regexp.MustCompile(`^(v.+|unversioned)\..*`)
+var versionRegexp = regexp.MustCompile(`^(v.+|unversioned|types)\..*`)
 
 func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType string, fieldDetails *swagger.ModelProperty) []error {
 	allErrs := []error{}

@@ -193,7 +193,7 @@ func (b *vsphereVolumeMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *vsphereVolumeMounter) SetUp(fsGroup *int64) error {
+func (b *vsphereVolumeMounter) SetUp(fsGroup *types.UnixGroupID) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
@@ -205,7 +205,7 @@ func (b *vsphereVolumeMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	glog.V(5).Infof("vSphere volume setup %s to %s", b.volPath, dir)
 
 	// TODO: handle failed mounts here.

@@ -14,12 +14,13 @@ filegroup(
         "//build:docker-artifacts-and-hashes",
         "//build:node-targets-and-hashes",
         "//build:server-targets-and-hashes",
+        "//build/debs:debs-and-hashes",
     ],
     visibility = ["//visibility:private"],
 )
 
 gcs_upload(
-    name = "ci-artifacts",
+    name = "push-build",
     data = [
         ":_binary-artifacts-and-hashes",
         "//build/release-tars:release-tars-and-hashes",
@@ -30,6 +31,13 @@ gcs_upload(
         "//build/release-tars:release-tars-and-hashes": "",
         "//cluster/gce:gcs-release-artifacts-and-hashes": "extra/gce",
     },
+)
+
+# TODO: remove this alias after 2017-05-22
+alias(
+    name = "ci-artifacts",
+    actual = "push-build",
+    deprecation = "This rule will be removed after 2017-05-22. Use //:push-build instead.",
 )
 
 filegroup(
@@ -72,6 +80,6 @@ filegroup(
 genrule(
     name = "save_git_version",
     outs = ["version"],
-    cmd = "grep ^STABLE_BUILD_SCM_REVISION bazel-out/stable-status.txt | cut -d' ' -f2 >$@",
+    cmd = "grep ^STABLE_BUILD_SCM_REVISION bazel-out/stable-status.txt | awk '{print $$2}' >$@",
     stamp = 1,
 )

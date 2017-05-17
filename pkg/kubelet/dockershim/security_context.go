@@ -25,8 +25,8 @@ import (
 	dockercontainer "github.com/docker/engine-api/types/container"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/securitycontext"
 	knetwork "k8s.io/kubernetes/pkg/kubelet/network"
 )
 

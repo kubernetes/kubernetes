@@ -25,7 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
@@ -34,6 +34,20 @@ func TestSandboxGC(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
+	fakePodGetter := m.containerGC.podGetter.(*fakePodGetter)
+	makeGCSandbox := func(pod *v1.Pod, attempt uint32, state runtimeapi.PodSandboxState, withPodGetter bool, createdAt int64) sandboxTemplate {
+		if withPodGetter {
+			// initialize the pod getter
+			fakePodGetter.pods[pod.UID] = pod
+		}
+		return sandboxTemplate{
+			pod:       pod,
+			state:     state,
+			attempt:   attempt,
+			createdAt: createdAt,
+		}
+	}
+
 	pods := []*v1.Pod{
 		makeTestPod("foo1", "new", "1234", []v1.Container{
 			makeTestContainer("bar1", "busybox"),
@@ -41,6 +55,9 @@ func TestSandboxGC(t *testing.T) {
 		}),
 		makeTestPod("foo2", "new", "5678", []v1.Container{
 			makeTestContainer("bar3", "busybox"),
+		}),
+		makeTestPod("deleted", "new", "9012", []v1.Container{
+			makeTestContainer("bar4", "busybox"),
 		}),
 	}
 
@@ -52,25 +69,34 @@ func TestSandboxGC(t *testing.T) {
 		remain      []int               // template indexes of remaining sandboxes
 	}{
 		{
-			description: "sandbox with no containers should be garbage collected.",
+			description: "notready sandboxes without containers for deleted pods should be garbage collected.",
 			sandboxes: []sandboxTemplate{
-				{pod: pods[0], state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
+				makeGCSandbox(pods[2], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, false, 0),
 			},
 			containers: []containerTemplate{},
 			remain:     []int{},
 		},
 		{
-			description: "running sandbox should not be garbage collected.",
+			description: "ready sandboxes without containers for deleted pods should not be garbage collected.",
 			sandboxes: []sandboxTemplate{
-				{pod: pods[0], state: runtimeapi.PodSandboxState_SANDBOX_READY},
+				makeGCSandbox(pods[2], 0, runtimeapi.PodSandboxState_SANDBOX_READY, false, 0),
 			},
 			containers: []containerTemplate{},
 			remain:     []int{0},
 		},
 		{
+			description: "sandboxes for existing pods should not be garbage collected.",
+			sandboxes: []sandboxTemplate{
+				makeGCSandbox(pods[0], 0, runtimeapi.PodSandboxState_SANDBOX_READY, true, 0),
+				makeGCSandbox(pods[1], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 0),
+			},
+			containers: []containerTemplate{},
+			remain:     []int{0, 1},
+		},
+		{
 			description: "sandbox with containers should not be garbage collected.",
 			sandboxes: []sandboxTemplate{
-				{pod: pods[0], state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
+				makeGCSandbox(pods[0], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, false, 0),
 			},
 			containers: []containerTemplate{
 				{pod: pods[0], container: &pods[0].Spec.Containers[0], state: runtimeapi.ContainerState_CONTAINER_EXITED},
@@ -78,29 +104,23 @@ func TestSandboxGC(t *testing.T) {
 			remain: []int{0},
 		},
 		{
-			description: "sandbox within min age should not be garbage collected.",
-			sandboxes: []sandboxTemplate{
-				{pod: pods[0], createdAt: time.Now().UnixNano(), state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
-				{pod: pods[1], createdAt: time.Now().Add(-2 * time.Hour).UnixNano(), state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
-			},
-			containers: []containerTemplate{},
-			minAge:     time.Hour, // assume the test won't take an hour
-			remain:     []int{0},
-		},
-		{
 			description: "multiple sandboxes should be handled properly.",
 			sandboxes: []sandboxTemplate{
 				// running sandbox.
-				{pod: pods[0], attempt: 1, state: runtimeapi.PodSandboxState_SANDBOX_READY},
-				// exited sandbox with containers.
-				{pod: pods[1], attempt: 1, state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
+				makeGCSandbox(pods[0], 1, runtimeapi.PodSandboxState_SANDBOX_READY, true, 1),
 				// exited sandbox without containers.
-				{pod: pods[1], attempt: 0, state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
+				makeGCSandbox(pods[0], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 0),
+				// exited sandbox with containers.
+				makeGCSandbox(pods[1], 1, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 1),
+				// exited sandbox without containers.
+				makeGCSandbox(pods[1], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 0),
+				// exited sandbox without containers for deleted pods.
+				makeGCSandbox(pods[2], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, false, 0),
 			},
 			containers: []containerTemplate{
 				{pod: pods[1], container: &pods[1].Spec.Containers[0], sandboxAttempt: 1, state: runtimeapi.ContainerState_CONTAINER_EXITED},
 			},
-			remain: []int{0, 1},
+			remain: []int{0, 2},
 		},
 	} {
 		t.Logf("TestCase #%d: %+v", c, test)
@@ -109,7 +129,7 @@ func TestSandboxGC(t *testing.T) {
 		fakeRuntime.SetFakeSandboxes(fakeSandboxes)
 		fakeRuntime.SetFakeContainers(fakeContainers)
 
-		err := m.containerGC.evictSandboxes(test.minAge)
+		err := m.containerGC.evictSandboxes()
 		assert.NoError(t, err)
 		realRemain, err := fakeRuntime.ListPodSandbox(nil)
 		assert.NoError(t, err)

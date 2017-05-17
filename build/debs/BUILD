@@ -1,16 +1,18 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
+load("@io_bazel//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
 load("@io_kubernetes_build//defs:deb.bzl", "k8s_deb", "deb_data")
+load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 
 # We do not include kube-scheduler, kube-controller-manager,
 # kube-apiserver, and kube-proxy in this list even though we
 # produce debs for them. We recommend that they be run in docker
 # images. We use the debs that we produce here to build those
 # images.
-filegroup(
+release_filegroup(
     name = "debs",
     srcs = [
+        ":cloud-controller-manager.deb",
         ":kubeadm.deb",
         ":kubectl.deb",
         ":kubelet.deb",
@@ -28,6 +30,7 @@ filegroup(
         },
     ],
 ) for binary in [
+    "cloud-controller-manager",
     "kubectl",
     "kube-apiserver",
     "kube-controller-manager",
@@ -81,6 +84,11 @@ pkg_tar(
     name = "kubernetes-cni-data",
     package_dir = "/opt/cni",
     deps = ["@kubernetes_cni//file"],
+)
+
+k8s_deb(
+    name = "cloud-controller-manager",
+    description = "Kubernetes Cloud Controller Manager",
 )
 
 k8s_deb(

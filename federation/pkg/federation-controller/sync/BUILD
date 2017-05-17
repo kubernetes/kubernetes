@@ -27,12 +27,15 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
     ],
 )
 
@@ -53,6 +56,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "configmap_controller_test.go",
+        "controller_test.go",
         "daemonset_controller_test.go",
         "secret_controller_test.go",
     ],
@@ -71,6 +75,7 @@ go_test(
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",

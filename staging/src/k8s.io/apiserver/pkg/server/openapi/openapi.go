@@ -32,7 +32,8 @@ import (
 )
 
 const (
-	OpenAPIVersion = "2.0"
+	OpenAPIVersion  = "2.0"
+	extensionPrefix = "x-kubernetes-"
 )
 
 type openAPI struct {
@@ -132,7 +133,9 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 			SwaggerSchemaProps: item.Schema.SwaggerSchemaProps,
 		}
 		if extensions != nil {
-			schema.Extensions = spec.Extensions{}
+			if schema.Extensions == nil {
+				schema.Extensions = spec.Extensions{}
+			}
 			for k, v := range extensions {
 				schema.Extensions[k] = v
 			}
@@ -256,6 +259,14 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 				},
 			},
 		},
+	}
+	for k, v := range route.Metadata {
+		if strings.HasPrefix(k, extensionPrefix) {
+			if ret.Extensions == nil {
+				ret.Extensions = spec.Extensions{}
+			}
+			ret.Extensions.Add(k, v)
+		}
 	}
 	if ret.ID, ret.Tags, err = o.config.GetOperationIDAndTags(o.servePath, &route); err != nil {
 		return ret, err

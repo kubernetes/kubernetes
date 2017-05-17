@@ -32,7 +32,6 @@ import (
 	"strconv"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -177,7 +176,7 @@ func Run(s *options.CMServer) error {
 			clientBuilder = rootClientBuilder
 		}
 
-		err := StartControllers(newControllerInitializers(), s, rootClientBuilder, clientBuilder, stop)
+		err := StartControllers(NewControllerInitializers(), s, rootClientBuilder, clientBuilder, stop)
 		glog.Fatalf("error running controllers: %v", err)
 		panic("unreachable")
 	}
@@ -192,21 +191,20 @@ func Run(s *options.CMServer) error {
 		return err
 	}
 
-	// TODO: enable other lock types
-	rl := resourcelock.EndpointsLock{
-		EndpointsMeta: metav1.ObjectMeta{
-			Namespace: "kube-system",
-			Name:      "kube-controller-manager",
-		},
-		Client: leaderElectionClient,
-		LockConfig: resourcelock.ResourceLockConfig{
+	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
+		"kube-system",
+		"kube-controller-manager",
+		leaderElectionClient,
+		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
-		},
+		})
+	if err != nil {
+		glog.Fatalf("error creating lock: %v", err)
 	}
 
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
-		Lock:          &rl,
+		Lock:          rl,
 		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
 		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
@@ -272,7 +270,7 @@ func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, 
 type InitFunc func(ctx ControllerContext) (bool, error)
 
 func KnownControllers() []string {
-	ret := sets.StringKeySet(newControllerInitializers())
+	ret := sets.StringKeySet(NewControllerInitializers())
 
 	ret.Insert(
 		saTokenControllerName,
@@ -292,7 +290,9 @@ var ControllersDisabledByDefault = sets.NewString(
 	"tokencleaner",
 )
 
-func newControllerInitializers() map[string]InitFunc {
+// NewControllerInitializers is a public map of named controller groups (you can start more than one in an init func)
+// paired to their InitFunc.  This allows for structured downstream composition and subdivision.
+func NewControllerInitializers() map[string]InitFunc {
 	controllers := map[string]InitFunc{}
 	controllers["endpoint"] = startEndpointController
 	controllers["replicationcontroller"] = startReplicationController
@@ -307,7 +307,7 @@ func newControllerInitializers() map[string]InitFunc {
 	controllers["replicaset"] = startReplicaSetController
 	controllers["horizontalpodautoscaling"] = startHPAController
 	controllers["disruption"] = startDisruptionController
-	controllers["statefuleset"] = startStatefulSetController
+	controllers["statefulset"] = startStatefulSetController
 	controllers["cronjob"] = startCronJobController
 	controllers["certificatesigningrequests"] = startCSRController
 	controllers["ttl"] = startTTLController
@@ -319,7 +319,8 @@ func newControllerInitializers() map[string]InitFunc {
 
 // TODO: In general, any controller checking this needs to be dynamic so
 //  users don't have to restart their controller manager if they change the apiserver.
-func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
+// Until we get there, the structure here needs to be exposed for the construction of a proper ControllerContext.
+func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
 	var discoveryClient discovery.DiscoveryInterface
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
@@ -410,7 +411,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		glog.Warningf("%q is disabled", saTokenControllerName)
 	}
 
-	availableResources, err := getAvailableResources(clientBuilder)
+	availableResources, err := GetAvailableResources(clientBuilder)
 	if err != nil {
 		return err
 	}
@@ -566,8 +567,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 				cloud,
 				ProbeAttachableVolumePlugins(s.VolumeConfiguration),
 				s.DisableAttachDetachReconcilerSync,
-				s.ReconcilerSyncLoopPeriod.Duration,
-			)
+				s.ReconcilerSyncLoopPeriod.Duration)
 		if attachDetachControllerErr != nil {
 			return fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 		}

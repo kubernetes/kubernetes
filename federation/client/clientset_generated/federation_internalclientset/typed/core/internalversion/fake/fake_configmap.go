@@ -34,6 +34,8 @@ type FakeConfigMaps struct {
 
 var configmapsResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "configmaps"}
 
+var configmapsKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "ConfigMap"}
+
 func (c *FakeConfigMaps) Create(configMap *api.ConfigMap) (result *api.ConfigMap, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(configmapsResource, c.ns, configMap), &api.ConfigMap{})
@@ -80,7 +82,7 @@ func (c *FakeConfigMaps) Get(name string, options v1.GetOptions) (result *api.Co
 
 func (c *FakeConfigMaps) List(opts v1.ListOptions) (result *api.ConfigMapList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(configmapsResource, c.ns, opts), &api.ConfigMapList{})
+		Invokes(testing.NewListAction(configmapsResource, configmapsKind, c.ns, opts), &api.ConfigMapList{})
 
 	if obj == nil {
 		return nil, err

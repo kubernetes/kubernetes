@@ -103,14 +103,14 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, sharedInformers, stopCh)
+	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, sharedInformers)
 	if err != nil {
 		return err
 	}
 
 	// run the insecure server now, don't block.  It doesn't have any aggregator goodies since authentication wouldn't work
 	if insecureServingOptions != nil {
-		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(kubeAPIServer.GenericAPIServer.HandlerContainer.ServeMux, kubeAPIServerConfig.GenericConfig)
+		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(kubeAPIServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig)
 		if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, stopCh); err != nil {
 			return err
 		}
@@ -129,7 +129,7 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers, stopCh)
+	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return err
@@ -138,13 +138,13 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 }
 
 // CreateKubeAPIServer creates and wires a workable kube-apiserver
-func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, sharedInformers informers.SharedInformerFactory, stopCh <-chan struct{}) (*master.Master, error) {
-	kubeAPIServer, err := kubeAPIServerConfig.Complete().New()
+func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, sharedInformers informers.SharedInformerFactory) (*master.Master, error) {
+	kubeAPIServer, err := kubeAPIServerConfig.Complete().New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		return nil, err
 	}
 	kubeAPIServer.GenericAPIServer.AddPostStartHook("start-kube-apiserver-informers", func(context genericapiserver.PostStartHookContext) error {
-		sharedInformers.Start(stopCh)
+		sharedInformers.Start(context.StopCh)
 		return nil
 	})
 
@@ -359,39 +359,41 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
-	genericConfig.AdmissionControl, err = BuildAdmission(s,
-		s.Admission.Plugins,
+	pluginInitializer, err := BuildAdmissionPluginInitializer(
+		s,
 		client,
 		sharedInformers,
 		genericConfig.Authorizer,
 	)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to initialize admission: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
 	}
 
+	err = s.Admission.ApplyTo(
+		genericConfig,
+		pluginInitializer)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to initialize admission: %v", err)
+	}
 	return genericConfig, sharedInformers, insecureServingOptions, nil
 }
 
-// BuildAdmission constructs the admission chain
-func BuildAdmission(s *options.ServerRunOptions, plugins *admission.Plugins, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, apiAuthorizer authorizer.Authorizer) (admission.Interface, error) {
-	admissionControlPluginNames := strings.Split(s.Admission.Control, ",")
+// BuildAdmissionPluginInitializer constructs the admission plugin initializer
+func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, apiAuthorizer authorizer.Authorizer) (admission.PluginInitializer, error) {
 	var cloudConfig []byte
-	var err error
 
 	if s.CloudProvider.CloudConfigFile != "" {
+		var err error
 		cloudConfig, err = ioutil.ReadFile(s.CloudProvider.CloudConfigFile)
 		if err != nil {
 			glog.Fatalf("Error reading from cloud configuration file %s: %#v", s.CloudProvider.CloudConfigFile, err)
 		}
 	}
+
 	// TODO: use a dynamic restmapper. See https://github.com/kubernetes/kubernetes/pull/42615.
 	restMapper := api.Registry.RESTMapper()
 	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig, restMapper)
-	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.Admission.ControlConfigFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read plugin config: %v", err)
-	}
-	return plugins.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
+	return pluginInitializer, nil
 }
 
 // BuildAuthenticator constructs the authenticator

@@ -278,12 +278,16 @@ function kube::release::create_docker_images_for_server() {
       kube::log::status "Starting Docker build for image: ${binary_name}"
 
       (
-        local md5_sum
-        md5_sum=$(kube::release::md5 "${binary_dir}/${binary_name}")
-
+        # Docker tags cannot contain '+'
+        local docker_tag="${KUBE_GIT_VERSION/+/_}"
+        if [[ -z "${docker_tag}" ]]; then
+          kube::log::error "git version information missing; cannot create Docker tag"
+          return 1
+        fi
         local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
         local docker_file_path="${docker_build_path}/Dockerfile"
         local binary_file_path="${binary_dir}/${binary_name}"
+        local docker_image_tag="${KUBE_DOCKER_REGISTRY:-gcr.io/google_containers}"
 
         rm -rf ${docker_build_path}
         mkdir -p ${docker_build_path}
@@ -291,26 +295,31 @@ function kube::release::create_docker_images_for_server() {
         printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
         if [[ ${arch} == "amd64" ]]; then
-          # If we are building a amd64 docker image, preserve the original image name
-          local docker_image_tag=gcr.io/google_containers/${binary_name}:${md5_sum}
+          # If we are building a amd64 docker image, preserve the original
+          # image name
+          docker_image_tag+="/${binary_name}:${docker_tag}"
         else
-          # If we are building a docker image for another architecture, append the arch in the image tag
-          local docker_image_tag=gcr.io/google_containers/${binary_name}-${arch}:${md5_sum}
+          # If we are building a docker image for another architecture,
+          # append the arch in the image tag
+          docker_image_tag+="/${binary_name}-${arch}:${docker_tag}"
         fi
 
         "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
         "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
-        echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
+        echo "${docker_tag}" > ${binary_dir}/${binary_name}.docker_tag
 
         rm -rf ${docker_build_path}
 
-        # If we are building an official/alpha/beta release we want to keep docker images
-        # and tag them appropriately.
+        # If we are building an official/alpha/beta release we want to keep
+        # docker images and tag them appropriately.
         if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
           local release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
-          kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
-          "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
-          "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
+          # Only rmi and tag if name is different
+          if [[ $docker_image_tag != $release_docker_image_tag ]]; then
+            kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
+            "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
+            "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
+          fi
         fi
 
         kube::log::status "Deleting docker image ${docker_image_tag}"

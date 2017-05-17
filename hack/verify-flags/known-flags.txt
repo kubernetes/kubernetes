@@ -178,6 +178,7 @@ dns-provider
 dns-provider-config
 dns-zone-name
 dockercfg-path
+docker-disable-shared-pid
 docker-email
 docker-endpoint
 docker-exec-handler
@@ -192,7 +193,6 @@ duration-sec
 e2e-output-dir
 e2e-verify-service-account
 enable-controller-attach-detach
-enable-cri
 enable-custom-metrics
 enable-debugging-handlers
 enable-dynamic-provisioning
@@ -245,7 +245,6 @@ experimental-check-node-capabilities-before-mount
 experimental-cri
 experimental-dockershim
 experimental-dockershim-root-directory
-experimental-docker-enable-shared-pid
 experimental-fail-swap-on
 experimental-kernel-memcg-notification
 experimental-keystone-ca-file
@@ -426,7 +425,9 @@ large-cluster-size-threshold
 last-release-pr
 leader-elect
 leader-elect-lease-duration
+leader-elect-lock-type
 leader-elect-renew-deadline
+leader-elect-resource-lock
 leader-elect-retry-period
 lease-duration
 leave-stdin-open
@@ -545,6 +546,7 @@ private-mountns
 prom-push-gateway
 protect-kernel-defaults
 proto-import
+provider-id
 proxy-bindall
 proxy-client-cert-file
 proxy-client-key-file
@@ -667,6 +669,7 @@ storage-media-type
 storage-version
 storage-versions
 streaming-connection-idle-timeout
+subresource
 suicide-timeout
 sync-frequency
 system-cgroups

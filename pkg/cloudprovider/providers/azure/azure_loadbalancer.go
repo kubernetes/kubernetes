@@ -503,10 +503,11 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 	} else {
 		ports = []v1.ServicePort{}
 	}
-	expectedProbes := make([]network.Probe, len(ports))
-	expectedRules := make([]network.LoadBalancingRule, len(ports))
-	for i, port := range ports {
-		lbRuleName := getRuleName(service, port)
+
+	var expectedProbes []network.Probe
+	var expectedRules []network.LoadBalancingRule
+	for _, port := range ports {
+		lbRuleName := getLoadBalancerRuleName(service, port)
 
 		transportProto, _, probeProto, err := getProtocolsFromKubernetesProtocol(port.Protocol)
 		if err != nil {
@@ -514,9 +515,16 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 		}
 
 		if serviceapi.NeedsHealthCheck(service) {
+			if port.Protocol == v1.ProtocolUDP {
+				// ERROR: this isn't supported
+				// health check (aka source ip preservation) is not
+				// compatible with UDP (it uses an HTTP check)
+				return lb, false, fmt.Errorf("services requiring health checks are incompatible with UDP ports")
+			}
+
 			podPresencePath, podPresencePort := serviceapi.GetServiceHealthCheckPathPort(service)
 
-			expectedProbes[i] = network.Probe{
+			expectedProbes = append(expectedProbes, network.Probe{
 				Name: &lbRuleName,
 				ProbePropertiesFormat: &network.ProbePropertiesFormat{
 					RequestPath:       to.StringPtr(podPresencePath),
@@ -525,37 +533,49 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 					IntervalInSeconds: to.Int32Ptr(5),
 					NumberOfProbes:    to.Int32Ptr(2),
 				},
-			}
-		} else {
-			expectedProbes[i] = network.Probe{
+			})
+		} else if port.Protocol != v1.ProtocolUDP {
+			// we only add the expected probe if we're doing TCP
+			expectedProbes = append(expectedProbes, network.Probe{
 				Name: &lbRuleName,
 				ProbePropertiesFormat: &network.ProbePropertiesFormat{
-					Protocol:          probeProto,
+					Protocol:          *probeProto,
 					Port:              to.Int32Ptr(port.NodePort),
 					IntervalInSeconds: to.Int32Ptr(5),
 					NumberOfProbes:    to.Int32Ptr(2),
 				},
-			}
+			})
 		}
 
-		expectedRules[i] = network.LoadBalancingRule{
+		loadDistribution := network.Default
+		if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
+			loadDistribution = network.SourceIP
+		}
+		expectedRule := network.LoadBalancingRule{
 			Name: &lbRuleName,
 			LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
-				Protocol: transportProto,
+				Protocol: *transportProto,
 				FrontendIPConfiguration: &network.SubResource{
 					ID: to.StringPtr(lbFrontendIPConfigID),
 				},
 				BackendAddressPool: &network.SubResource{
 					ID: to.StringPtr(lbBackendPoolID),
 				},
-				Probe: &network.SubResource{
-					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
-				},
+				LoadDistribution: loadDistribution,
 				FrontendPort:     to.Int32Ptr(port.Port),
 				BackendPort:      to.Int32Ptr(port.Port),
 				EnableFloatingIP: to.BoolPtr(true),
 			},
 		}
+
+		// we didn't construct the probe objects for UDP because they're not used/needed/allowed
+		if port.Protocol != v1.ProtocolUDP {
+			expectedRule.Probe = &network.SubResource{
+				ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
+			}
+		}
+
+		expectedRules = append(expectedRules, expectedRule)
 	}
 
 	// remove unwanted probes
@@ -670,17 +690,17 @@ func (az *Cloud) reconcileSecurityGroup(sg network.SecurityGroup, clusterName st
 	expectedSecurityRules := make([]network.SecurityRule, len(ports)*len(sourceAddressPrefixes))
 
 	for i, port := range ports {
-		securityRuleName := getRuleName(service, port)
 		_, securityProto, _, err := getProtocolsFromKubernetesProtocol(port.Protocol)
 		if err != nil {
 			return sg, false, err
 		}
 		for j := range sourceAddressPrefixes {
 			ix := i*len(sourceAddressPrefixes) + j
+			securityRuleName := getSecurityRuleName(service, port, sourceAddressPrefixes[j])
 			expectedSecurityRules[ix] = network.SecurityRule{
 				Name: to.StringPtr(securityRuleName),
 				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
-					Protocol:                 securityProto,
+					Protocol:                 *securityProto,
 					SourcePortRange:          to.StringPtr("*"),
 					DestinationPortRange:     to.StringPtr(strconv.Itoa(int(port.Port))),
 					SourceAddressPrefix:      to.StringPtr(sourceAddressPrefixes[j]),

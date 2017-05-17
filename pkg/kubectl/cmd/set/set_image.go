@@ -121,6 +121,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.Record = cmdutil.GetRecordFlag(cmd)
 	o.ChangeCause = f.Command(cmd, false)
 	o.PrintObject = f.PrintObject
+	o.Local = cmdutil.GetFlagBool(cmd, "local")
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.ResolveImage = f.ResolveImage

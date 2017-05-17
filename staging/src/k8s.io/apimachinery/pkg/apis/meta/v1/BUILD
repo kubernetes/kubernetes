@@ -44,6 +44,7 @@ go_library(
         "types.go",
         "types_swagger_doc_generated.go",
         "watch.go",
+        "well_known_annotations.go",
         "well_known_labels.go",
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",

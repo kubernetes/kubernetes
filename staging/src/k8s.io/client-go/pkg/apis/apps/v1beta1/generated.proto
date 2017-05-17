@@ -260,7 +260,7 @@ message ScaleStatus {
   // avoid introspection in the clients. The string will be in the same format as the
   // query-param syntax. If the target type only supports map-based selectors, both this
   // field and map-based selector field are populated.
-  // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +optional
   optional string targetSelector = 3;
 }
@@ -305,7 +305,7 @@ message StatefulSetSpec {
 
   // Selector is a label query over pods that should match the replica count.
   // If empty, defaulted to labels on the pod template.
-  // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 

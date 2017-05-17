@@ -38,7 +38,6 @@ import (
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/util"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
@@ -51,9 +50,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/proxy/winuserspace"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -249,7 +250,7 @@ func applyDefaults(in *componentconfig.KubeProxyConfiguration) (*componentconfig
 func NewProxyCommand() *cobra.Command {
 	opts := Options{
 		config:      new(componentconfig.KubeProxyConfiguration),
-		healthzPort: 10249,
+		healthzPort: 10256,
 	}
 
 	cmd := &cobra.Command{
@@ -296,15 +297,13 @@ type ProxyServer struct {
 	ProxyMode              string
 	NodeRef                *clientv1.ObjectReference
 	CleanupAndExit         bool
-	HealthzBindAddress     string
+	MetricsBindAddress     string
 	OOMScoreAdj            *int32
 	ResourceContainer      string
 	ConfigSyncPeriod       time.Duration
 	ServiceEventHandler    proxyconfig.ServiceHandler
-	// TODO: Migrate all handlers to ServiceHandler types and
-	// get rid of this one.
-	ServiceHandler        proxyconfig.ServiceConfigHandler
-	EndpointsEventHandler proxyconfig.EndpointsHandler
+	EndpointsEventHandler  proxyconfig.EndpointsHandler
+	HealthzServer          *healthcheck.HealthzServer
 }
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
@@ -388,11 +387,13 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
 
+	var healthzServer *healthcheck.HealthzServer
+	if len(config.HealthzBindAddress) > 0 {
+		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration)
+	}
+
 	var proxier proxy.ProxyProvider
 	var serviceEventHandler proxyconfig.ServiceHandler
-	// TODO: Migrate all handlers to ServiceHandler types and
-	// get rid of this one.
-	var serviceHandler proxyconfig.ServiceConfigHandler
 	var endpointsEventHandler proxyconfig.EndpointsHandler
 
 	proxyMode := getProxyMode(string(config.Mode), iptInterface, iptables.LinuxKernelCompatTester{})
@@ -416,6 +417,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 			hostname,
 			getNodeIP(client, hostname),
 			recorder,
+			healthzServer,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
@@ -447,7 +449,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
 			}
-			serviceHandler = proxierUserspace
+			serviceEventHandler = proxierUserspace
 			proxier = proxierUserspace
 		} else {
 			// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
@@ -470,7 +472,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
 			}
-			serviceHandler = proxierUserspace
+			serviceEventHandler = proxierUserspace
 			proxier = proxierUserspace
 		}
 		// Remove artifacts from the pure-iptables Proxier, if not on Windows.
@@ -504,13 +506,13 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		Conntracker:            &realConntracker{},
 		ProxyMode:              proxyMode,
 		NodeRef:                nodeRef,
-		HealthzBindAddress:     config.HealthzBindAddress,
+		MetricsBindAddress:     config.MetricsBindAddress,
 		OOMScoreAdj:            config.OOMScoreAdj,
 		ResourceContainer:      config.ResourceContainer,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		ServiceEventHandler:    serviceEventHandler,
-		ServiceHandler:         serviceHandler,
 		EndpointsEventHandler:  endpointsEventHandler,
+		HealthzServer:          healthzServer,
 	}, nil
 }
 
@@ -546,17 +548,22 @@ func (s *ProxyServer) Run() error {
 
 	s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
 
-	// Start up a webserver if requested
-	if len(s.HealthzBindAddress) > 0 {
+	// Start up a healthz server if requested
+	if s.HealthzServer != nil {
+		s.HealthzServer.Run()
+	}
+
+	// Start up a metrics server if requested
+	if len(s.MetricsBindAddress) > 0 {
 		http.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
 		http.Handle("/metrics", prometheus.Handler())
 		configz.InstallHandler(http.DefaultServeMux)
 		go wait.Until(func() {
-			err := http.ListenAndServe(s.HealthzBindAddress, nil)
+			err := http.ListenAndServe(s.MetricsBindAddress, nil)
 			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("starting health server failed: %v", err))
+				utilruntime.HandleError(fmt.Errorf("starting metrics server failed: %v", err))
 			}
 		}, 5*time.Second, wait.NeverStop)
 	}
@@ -607,12 +614,7 @@ func (s *ProxyServer) Run() error {
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
 	serviceConfig := proxyconfig.NewServiceConfig(informerFactory.Core().InternalVersion().Services(), s.ConfigSyncPeriod)
-	if s.ServiceHandler != nil {
-		serviceConfig.RegisterHandler(s.ServiceHandler)
-	}
-	if s.ServiceEventHandler != nil {
-		serviceConfig.RegisterEventHandler(s.ServiceEventHandler)
-	}
+	serviceConfig.RegisterEventHandler(s.ServiceEventHandler)
 	go serviceConfig.Run(wait.NeverStop)
 
 	endpointsConfig := proxyconfig.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), s.ConfigSyncPeriod)

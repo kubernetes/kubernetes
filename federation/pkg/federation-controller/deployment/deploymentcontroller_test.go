@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,39 +41,6 @@ const (
 	deployments = "deployments"
 	pods        = "pods"
 )
-
-func TestParseFederationDeploymentPreference(t *testing.T) {
-	successPrefs := []string{
-		`{"rebalance": true,
-		  "clusters": {
-		    "k8s-1": {"minReplicas": 10, "maxReplicas": 20, "weight": 2},
-		    "*": {"weight": 1}
-		}}`,
-	}
-	failedPrefes := []string{
-		`{`, // bad json
-	}
-
-	rs := newDeploymentWithReplicas("d-1", 100)
-	accessor, _ := meta.Accessor(rs)
-	anno := accessor.GetAnnotations()
-	if anno == nil {
-		anno = make(map[string]string)
-		accessor.SetAnnotations(anno)
-	}
-	for _, prefString := range successPrefs {
-		anno[FedDeploymentPreferencesAnnotation] = prefString
-		pref, err := parseFederationDeploymentPreference(rs)
-		assert.NotNil(t, pref)
-		assert.Nil(t, err)
-	}
-	for _, prefString := range failedPrefes {
-		anno[FedDeploymentPreferencesAnnotation] = prefString
-		pref, err := parseFederationDeploymentPreference(rs)
-		assert.Nil(t, pref)
-		assert.NotNil(t, err)
-	}
-}
 
 func TestDeploymentController(t *testing.T) {
 	flag.Set("logtostderr", "true")

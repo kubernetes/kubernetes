@@ -43,7 +43,7 @@ var (
 		kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods
 
 		# Create a Role named "pod-reader" with ResourceName specified
-		kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods --resource-name=readablepod
+		kubectl create role pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod --resource-name=anotherpod
 
 		# Create a Role named "foo" with API Group specified
 		kubectl create role foo --verb=get,list,watch --resource=rs.extensions
@@ -53,6 +53,40 @@ var (
 
 	// Valid resource verb list for validation.
 	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "redirect", "deletecollection", "use", "bind", "impersonate"}
+
+	// Specialized verbs and GroupResources
+	specialVerbs = map[string][]schema.GroupResource{
+		"use": {
+			{
+				Group:    "extensions",
+				Resource: "podsecuritypolicies",
+			},
+		},
+		"bind": {
+			{
+				Group:    "rbac.authorization.k8s.io",
+				Resource: "roles",
+			},
+			{
+				Group:    "rbac.authorization.k8s.io",
+				Resource: "clusterroles",
+			},
+		},
+		"impersonate": {
+			{
+				Group:    "",
+				Resource: "users",
+			},
+			{
+				Group:    "",
+				Resource: "groups",
+			},
+			{
+				Group:    "authentication.k8s.io",
+				Resource: "userextras",
+			},
+		},
+	}
 )
 
 type ResourceOptions struct {
@@ -98,7 +132,7 @@ func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringSliceVar(&c.Verbs, "verb", []string{}, "verb that applies to the resources contained in the rule")
 	cmd.Flags().StringSlice("resource", []string{}, "resource that the rule applies to")
-	cmd.Flags().StringSliceVar(&c.ResourceNames, "resource-name", []string{}, "resource in the white list that the rule applies to")
+	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", []string{}, "resource in the white list that the rule applies to, repeat this flag for multiple items")
 
 	return cmd
 }
@@ -202,7 +236,30 @@ func (c *CreateRoleOptions) Validate() error {
 		if len(r.Resource) == 0 {
 			return fmt.Errorf("resource must be specified if apiGroup/subresource specified")
 		}
-		if _, err := c.Mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group}); err != nil {
+
+		resource := schema.GroupVersionResource{Resource: r.Resource, Group: r.Group}
+		groupVersionResource, err := c.Mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group})
+		if err == nil {
+			resource = groupVersionResource
+		}
+
+		for _, v := range c.Verbs {
+			if groupResources, ok := specialVerbs[v]; ok {
+				match := false
+				for _, extra := range groupResources {
+					if resource.Resource == extra.Resource && resource.Group == extra.Group {
+						match = true
+						err = nil
+						break
+					}
+				}
+				if !match {
+					return fmt.Errorf("can not perform '%s' on '%s' in group '%s'", v, resource.Resource, resource.Group)
+				}
+			}
+		}
+
+		if err != nil {
 			return err
 		}
 	}
@@ -255,10 +312,12 @@ func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resourc
 	// 2. Prevents pointing to non-existent resources.
 	// 3. Transfers resource short name to long name. E.g. rs.extensions is transferred to replicasets.extensions
 	for _, r := range resources {
-		resource, err := mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group})
-		if err != nil {
-			return []rbac.PolicyRule{}, err
+		resource := schema.GroupVersionResource{Resource: r.Resource, Group: r.Group}
+		groupVersionResource, err := mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group})
+		if err == nil {
+			resource = groupVersionResource
 		}
+
 		if len(r.SubResource) > 0 {
 			resource.Resource = resource.Resource + "/" + r.SubResource
 		}

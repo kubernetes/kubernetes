@@ -99,6 +99,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	out.FeatureGates = in.FeatureGates
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress
+	out.MetricsBindAddress = in.MetricsBindAddress
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
 	if err := Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
@@ -128,6 +129,7 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	out.FeatureGates = in.FeatureGates
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress
+	out.MetricsBindAddress = in.MetricsBindAddress
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
 	if err := Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
@@ -513,16 +515,13 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	}
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.FeatureGates = in.FeatureGates
-	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableCRI, &out.EnableCRI, s); err != nil {
-		return err
-	}
 	if err := v1.Convert_Pointer_bool_To_bool(&in.ExperimentalDockershim, &out.ExperimentalDockershim, s); err != nil {
 		return err
 	}
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
 	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
-	if err := v1.Convert_Pointer_bool_To_bool(&in.DockerEnableSharedPID, &out.DockerEnableSharedPID, s); err != nil {
+	if err := v1.Convert_Pointer_bool_To_bool(&in.DockerDisableSharedPID, &out.DockerDisableSharedPID, s); err != nil {
 		return err
 	}
 	out.SystemReserved = *(*componentconfig.ConfigurationMap)(unsafe.Pointer(&in.SystemReserved))
@@ -717,16 +716,13 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	}
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.FeatureGates = in.FeatureGates
-	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableCRI, &out.EnableCRI, s); err != nil {
-		return err
-	}
 	if err := v1.Convert_bool_To_Pointer_bool(&in.ExperimentalDockershim, &out.ExperimentalDockershim, s); err != nil {
 		return err
 	}
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
 	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
-	if err := v1.Convert_bool_To_Pointer_bool(&in.DockerEnableSharedPID, &out.DockerEnableSharedPID, s); err != nil {
+	if err := v1.Convert_bool_To_Pointer_bool(&in.DockerDisableSharedPID, &out.DockerDisableSharedPID, s); err != nil {
 		return err
 	}
 	out.SystemReserved = *(*map[string]string)(unsafe.Pointer(&in.SystemReserved))
@@ -818,6 +814,7 @@ func autoConvert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderE
 	out.LeaseDuration = in.LeaseDuration
 	out.RenewDeadline = in.RenewDeadline
 	out.RetryPeriod = in.RetryPeriod
+	out.ResourceLock = in.ResourceLock
 	return nil
 }
 
@@ -833,6 +830,7 @@ func autoConvert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderE
 	out.LeaseDuration = in.LeaseDuration
 	out.RenewDeadline = in.RenewDeadline
 	out.RetryPeriod = in.RetryPeriod
+	out.ResourceLock = in.ResourceLock
 	return nil
 }
 

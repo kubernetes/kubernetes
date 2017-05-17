@@ -181,11 +181,10 @@ func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, se
 	copy(info.loadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges)
 	copy(info.externalIPs, service.Spec.ExternalIPs)
 
-	if info.onlyNodeLocalEndpoints {
+	if apiservice.NeedsHealthCheck(service) {
 		p := apiservice.GetServiceHealthCheckNodePort(service)
 		if p == 0 {
-			glog.Errorf("Service does not contain necessary annotation %v",
-				apiservice.BetaAnnotationHealthCheckNodePort)
+			glog.Errorf("Service %q has no healthcheck nodeport", serviceName)
 		} else {
 			info.healthCheckNodePort = int(p)
 		}
@@ -200,7 +199,7 @@ type endpointsChange struct {
 }
 
 type endpointsChangeMap struct {
-	sync.Mutex
+	lock  sync.Mutex
 	items map[types.NamespacedName]*endpointsChange
 }
 
@@ -210,7 +209,7 @@ type serviceChange struct {
 }
 
 type serviceChangeMap struct {
-	sync.Mutex
+	lock  sync.Mutex
 	items map[types.NamespacedName]*serviceChange
 }
 
@@ -224,8 +223,8 @@ func newEndpointsChangeMap() endpointsChangeMap {
 }
 
 func (ecm *endpointsChangeMap) update(namespacedName *types.NamespacedName, previous, current *api.Endpoints) {
-	ecm.Lock()
-	defer ecm.Unlock()
+	ecm.lock.Lock()
+	defer ecm.lock.Unlock()
 
 	change, exists := ecm.items[*namespacedName]
 	if !exists {
@@ -243,8 +242,8 @@ func newServiceChangeMap() serviceChangeMap {
 }
 
 func (scm *serviceChangeMap) update(namespacedName *types.NamespacedName, previous, current *api.Service) {
-	scm.Lock()
-	defer scm.Unlock()
+	scm.lock.Lock()
+	defer scm.lock.Unlock()
 
 	change, exists := scm.items[*namespacedName]
 	if !exists {
@@ -302,6 +301,7 @@ type Proxier struct {
 	portMapper     portOpener
 	recorder       record.EventRecorder
 	healthChecker  healthcheck.Server
+	healthzServer  healthcheck.HealthzUpdater
 }
 
 type localPort struct {
@@ -352,10 +352,11 @@ func NewProxier(ipt utiliptables.Interface,
 	hostname string,
 	nodeIP net.IP,
 	recorder record.EventRecorder,
+	healthzServer healthcheck.HealthzUpdater,
 ) (*Proxier, error) {
 	// check valid user input
 	if minSyncPeriod > syncPeriod {
-		return nil, fmt.Errorf("min-sync (%v) must be < sync(%v)", minSyncPeriod, syncPeriod)
+		return nil, fmt.Errorf("min-sync (%v) must be <= sync(%v)", minSyncPeriod, syncPeriod)
 	}
 
 	// Set the route_localnet sysctl we need for
@@ -415,6 +416,7 @@ func NewProxier(ipt utiliptables.Interface,
 		portMapper:       &listenPortOpener{},
 		recorder:         recorder,
 		healthChecker:    healthChecker,
+		healthzServer:    healthzServer,
 	}, nil
 }
 
@@ -507,13 +509,17 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 
 // Sync is called to immediately synchronize the proxier state to iptables
 func (proxier *Proxier) Sync() {
-	proxier.syncProxyRules(syncReasonForce)
+	proxier.syncProxyRules()
 }
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
 	t := time.NewTicker(proxier.syncPeriod)
 	defer t.Stop()
+	// Update healthz timestamp at beginning in case Sync() never succeeds.
+	if proxier.healthzServer != nil {
+		proxier.healthzServer.UpdateTimestamp()
+	}
 	for {
 		<-t.C
 		glog.V(6).Infof("Periodic sync")
@@ -525,21 +531,21 @@ func (proxier *Proxier) OnServiceAdd(service *api.Service) {
 	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	proxier.serviceChanges.update(&namespacedName, nil, service)
 
-	proxier.syncProxyRules(syncReasonServices)
+	proxier.syncProxyRules()
 }
 
 func (proxier *Proxier) OnServiceUpdate(oldService, service *api.Service) {
 	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	proxier.serviceChanges.update(&namespacedName, oldService, service)
 
-	proxier.syncProxyRules(syncReasonServices)
+	proxier.syncProxyRules()
 }
 
 func (proxier *Proxier) OnServiceDelete(service *api.Service) {
 	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	proxier.serviceChanges.update(&namespacedName, service, nil)
 
-	proxier.syncProxyRules(syncReasonServices)
+	proxier.syncProxyRules()
 }
 
 func (proxier *Proxier) OnServiceSynced() {
@@ -547,7 +553,7 @@ func (proxier *Proxier) OnServiceSynced() {
 	proxier.servicesSynced = true
 	proxier.mu.Unlock()
 
-	proxier.syncProxyRules(syncReasonServices)
+	proxier.syncProxyRules()
 }
 
 func shouldSkipService(svcName types.NamespacedName, service *api.Service) bool {
@@ -581,7 +587,7 @@ func (sm *proxyServiceMap) mergeService(service *api.Service) (bool, sets.String
 		info := newServiceInfo(serviceName, servicePort, service)
 		oldInfo, exists := (*sm)[serviceName]
 		equal := reflect.DeepEqual(info, oldInfo)
-		if exists {
+		if !exists {
 			glog.V(1).Infof("Adding new service %q at %s:%d/%s", serviceName, info.clusterIP, servicePort.Port, servicePort.Protocol)
 		} else if !equal {
 			glog.V(1).Infof("Updating existing service %q at %s:%d/%s", serviceName, info.clusterIP, servicePort.Port, servicePort.Protocol)
@@ -644,14 +650,8 @@ func updateServiceMap(
 	// computing this incrementally similarly to serviceMap.
 	hcServices = make(map[types.NamespacedName]uint16)
 	for svcPort, info := range serviceMap {
-		if info.onlyNodeLocalEndpoints {
+		if info.healthCheckNodePort != 0 {
 			hcServices[svcPort.NamespacedName] = uint16(info.healthCheckNodePort)
-		}
-	}
-	for nsn, port := range hcServices {
-		if port == 0 {
-			glog.Errorf("Service %q has no healthcheck nodeport", nsn)
-			delete(hcServices, nsn)
 		}
 	}
 
@@ -662,21 +662,21 @@ func (proxier *Proxier) OnEndpointsAdd(endpoints *api.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 	proxier.endpointsChanges.update(&namespacedName, nil, endpoints)
 
-	proxier.syncProxyRules(syncReasonEndpoints)
+	proxier.syncProxyRules()
 }
 
 func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 	proxier.endpointsChanges.update(&namespacedName, oldEndpoints, endpoints)
 
-	proxier.syncProxyRules(syncReasonEndpoints)
+	proxier.syncProxyRules()
 }
 
 func (proxier *Proxier) OnEndpointsDelete(endpoints *api.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 	proxier.endpointsChanges.update(&namespacedName, endpoints, nil)
 
-	proxier.syncProxyRules(syncReasonEndpoints)
+	proxier.syncProxyRules()
 }
 
 func (proxier *Proxier) OnEndpointsSynced() {
@@ -684,7 +684,7 @@ func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.endpointsSynced = true
 	proxier.mu.Unlock()
 
-	proxier.syncProxyRules(syncReasonEndpoints)
+	proxier.syncProxyRules()
 }
 
 // <endpointsMap> is updated by this function (based on the given changes).
@@ -873,16 +873,10 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServ
 	}
 }
 
-type syncReason string
-
-const syncReasonServices syncReason = "ServicesUpdate"
-const syncReasonEndpoints syncReason = "EndpointsUpdate"
-const syncReasonForce syncReason = "Force"
-
 // This is where all of the iptables-save/restore calls happen.
 // The only other iptables rules are those that are setup in iptablesInit()
 // assumes proxier.mu is held
-func (proxier *Proxier) syncProxyRules(reason syncReason) {
+func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
@@ -891,7 +885,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	}
 	start := time.Now()
 	defer func() {
-		glog.V(4).Infof("syncProxyRules(%s) took %v", reason, time.Since(start))
+		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints
 	if !proxier.endpointsSynced || !proxier.servicesSynced {
@@ -900,28 +894,20 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	}
 
 	// Figure out the new services we need to activate.
-	proxier.serviceChanges.Lock()
+	proxier.serviceChanges.lock.Lock()
 	serviceSyncRequired, hcServices, staleServices := updateServiceMap(
 		proxier.serviceMap, &proxier.serviceChanges)
-	proxier.serviceChanges.Unlock()
+	proxier.serviceChanges.lock.Unlock()
 
-	// If this was called because of a services update, but nothing actionable has changed, skip it.
-	if reason == syncReasonServices && !serviceSyncRequired {
-		glog.V(3).Infof("Skipping iptables sync because nothing changed")
-		return
-	}
-
-	proxier.endpointsChanges.Lock()
+	proxier.endpointsChanges.lock.Lock()
 	endpointsSyncRequired, hcEndpoints, staleEndpoints := updateEndpointsMap(
 		proxier.endpointsMap, &proxier.endpointsChanges, proxier.hostname)
-	proxier.endpointsChanges.Unlock()
+	proxier.endpointsChanges.lock.Unlock()
 
-	// If this was called because of an endpoints update, but nothing actionable has changed, skip it.
-	if reason == syncReasonEndpoints && !endpointsSyncRequired {
+	if !serviceSyncRequired && !endpointsSyncRequired {
 		glog.V(3).Infof("Skipping iptables sync because nothing changed")
 		return
 	}
-
 	glog.V(3).Infof("Syncing iptables rules")
 
 	// Create and link the kube services chain.
@@ -1069,7 +1055,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 
 		svcXlbChain := serviceLBChainName(svcNameString, protocol)
 		if svcInfo.onlyNodeLocalEndpoints {
-			// Only for services with the externalTraffic annotation set to OnlyLocal
+			// Only for services request OnlyLocal traffic
 			// create the per-service LB chain, retaining counters if possible.
 			if lbChain, ok := existingNATChains[svcXlbChain]; ok {
 				writeLine(natChains, lbChain)
@@ -1385,7 +1371,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 			continue
 		}
 
-		// Now write ingress loadbalancing & DNAT rules only for services that have a localOnly annotation
+		// Now write ingress loadbalancing & DNAT rules only for services that request OnlyLocal traffic.
 		// TODO - This logic may be combinable with the block above that creates the svc balancer chain
 		localEndpoints := make([]*endpointsInfo, 0)
 		localEndpointChains := make([]utiliptables.Chain, 0)
@@ -1494,6 +1480,11 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 		}
 	}
 	proxier.portsMap = replacementPortsMap
+
+	// Update healthz timestamp.
+	if proxier.healthzServer != nil {
+		proxier.healthzServer.UpdateTimestamp()
+	}
 
 	// Update healthchecks.  The endpoints list might include services that are
 	// not "OnlyLocal", but the services list will not, and the healthChecker

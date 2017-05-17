@@ -174,7 +174,6 @@ func (v *OVirtCloud) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, e
 	}
 
 	return []v1.NodeAddress{
-		{Type: v1.NodeLegacyHostIP, Address: address.String()},
 		{Type: v1.NodeInternalIP, Address: address.String()},
 		{Type: v1.NodeExternalIP, Address: address.String()},
 	}, nil

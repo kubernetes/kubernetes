@@ -46,7 +46,8 @@ func (apiServerStrategy) NamespaceScoped() bool {
 }
 
 func (apiServerStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
-	_ = obj.(*apiregistration.APIService)
+	apiservice := obj.(*apiregistration.APIService)
+	apiservice.Status = apiregistration.APIServiceStatus{}
 }
 
 func (apiServerStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
@@ -72,6 +73,44 @@ func (apiServerStrategy) Canonicalize(obj runtime.Object) {
 
 func (apiServerStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateAPIServiceUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
+}
+
+type apiServerStatusStrategy struct {
+	runtime.ObjectTyper
+	names.NameGenerator
+}
+
+func NewStatusStrategy(typer runtime.ObjectTyper) apiServerStatusStrategy {
+	return apiServerStatusStrategy{typer, names.SimpleNameGenerator}
+}
+
+func (apiServerStatusStrategy) NamespaceScoped() bool {
+	return false
+}
+
+func (apiServerStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+	newAPIService := obj.(*apiregistration.APIService)
+	oldAPIService := old.(*apiregistration.APIService)
+	newAPIService.Spec = oldAPIService.Spec
+	newAPIService.Labels = oldAPIService.Labels
+	newAPIService.Annotations = oldAPIService.Annotations
+	newAPIService.Finalizers = oldAPIService.Finalizers
+	newAPIService.OwnerReferences = oldAPIService.OwnerReferences
+}
+
+func (apiServerStatusStrategy) AllowCreateOnUpdate() bool {
+	return false
+}
+
+func (apiServerStatusStrategy) AllowUnconditionalUpdate() bool {
+	return false
+}
+
+func (apiServerStatusStrategy) Canonicalize(obj runtime.Object) {
+}
+
+func (apiServerStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return validation.ValidateAPIServiceStatusUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
 }
 
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {

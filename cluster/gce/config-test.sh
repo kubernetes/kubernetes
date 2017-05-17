@@ -32,6 +32,7 @@ MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
+NODE_ACCELERATORS=${NODE_ACCELERATORS:-""}
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 KUBE_APISERVER_REQUEST_TIMEOUT=300
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
@@ -54,6 +55,11 @@ fi
 
 if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
     NODE_OS_DISTRIBUTION="gci"
+fi
+
+# GPUs supported in GCE do not have compatible drivers in Debian 7.
+if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
+    NODE_ACCELERATORS=""
 fi
 
 # By default a cluster will be started with the master on GCI and nodes on
@@ -90,6 +96,10 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
+
+if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
+    FEATURE_GATES="${FEATURE_GATES},Accelerators=true"
+fi
 
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
@@ -139,6 +149,12 @@ TEST_CLUSTER_RESYNC_PERIOD="${TEST_CLUSTER_RESYNC_PERIOD:---min-resync-period=3m
 TEST_CLUSTER_API_CONTENT_TYPE="${TEST_CLUSTER_API_CONTENT_TYPE:-}"
 
 KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --max-pods=110 --serialize-image-pulls=false --outofdisk-transition-frequency=0 ${TEST_CLUSTER_API_CONTENT_TYPE}"
+if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
+  NODE_KUBELET_TEST_ARGS=" --experimental-kernel-memcg-notification=true"
+fi
+if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
+  MASTER_KUBELET_TEST_ARGS=" --experimental-kernel-memcg-notification=true"
+fi
 APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-} --runtime-config=extensions/v1beta1 ${TEST_CLUSTER_DELETE_COLLECTION_WORKERS} ${TEST_CLUSTER_MAX_REQUESTS_INFLIGHT}"
 CONTROLLER_MANAGER_TEST_ARGS="${CONTROLLER_MANAGER_TEST_ARGS:-} ${TEST_CLUSTER_RESYNC_PERIOD} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"

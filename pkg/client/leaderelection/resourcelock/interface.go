@@ -17,12 +17,17 @@ limitations under the License.
 package resourcelock
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	cs "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
 	LeaderElectionRecordAnnotationKey = "control-plane.alpha.kubernetes.io/leader"
+	EndpointsResourceLock             = "endpoints"
+	ConfigMapsResourceLock            = "configmaps"
 )
 
 // LeaderElectionRecord is the record that is stored in the leader election annotation.
@@ -68,4 +73,30 @@ type Interface interface {
 	// Describe is used to convert details on current resource lock
 	// into a string
 	Describe() string
+}
+
+// Manufacture will create a lock of a given type according to the input parameters
+func New(lockType string, ns string, name string, client *cs.Clientset, rlc ResourceLockConfig) (Interface, error) {
+	switch lockType {
+	case EndpointsResourceLock:
+		return &EndpointsLock{
+			EndpointsMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+			Client:     client,
+			LockConfig: rlc,
+		}, nil
+	case ConfigMapsResourceLock:
+		return &ConfigMapLock{
+			ConfigMapMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+			Client:     client,
+			LockConfig: rlc,
+		}, nil
+	default:
+		return nil, fmt.Errorf("Invalid lock-type %s", lockType)
+	}
 }

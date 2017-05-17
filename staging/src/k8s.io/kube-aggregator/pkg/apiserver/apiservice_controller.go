@@ -96,6 +96,13 @@ func (c *APIServiceRegistrationController) sync(key string) error {
 		return err
 	}
 
+	// remove registration handling for APIServices which are not available
+	if !apiregistration.IsAPIServiceConditionTrue(apiService, apiregistration.Available) {
+		c.apiHandlerManager.RemoveAPIService(key)
+		return nil
+	}
+
+	// TODO move the destination host to status so that you can see where its going
 	c.apiHandlerManager.AddAPIService(apiService, c.getDestinationHost(apiService))
 	return nil
 }

@@ -36,7 +36,7 @@ import (
 )
 
 type volumeService interface {
-	createVolume(opts VolumeCreateOpts) (string, error)
+	createVolume(opts VolumeCreateOpts) (string, string, error)
 	getVolume(diskName string) (Volume, error)
 	deleteVolume(volumeName string) error
 }
@@ -74,8 +74,14 @@ type VolumeCreateOpts struct {
 	Metadata     map[string]string
 }
 
-func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, error) {
+const (
+	VolumeAvailableStatus = "available"
+	VolumeInUseStatus     = "in-use"
+	VolumeDeletedStatus   = "deleted"
+	VolumeErrorStatus     = "error"
+)
 
+func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, string, error) {
 	create_opts := volumes_v1.CreateOpts{
 		Name:             opts.Name,
 		Size:             opts.Size,
@@ -86,13 +92,12 @@ func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, error) {
 
 	vol, err := volumes_v1.Create(volumes.blockstorage, create_opts).Extract()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return vol.ID, nil
+	return vol.ID, vol.AvailabilityZone, nil
 }
 
-func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, error) {
-
+func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, string, error) {
 	create_opts := volumes_v2.CreateOpts{
 		Name:             opts.Name,
 		Size:             opts.Size,
@@ -103,9 +108,9 @@ func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, error) {
 
 	vol, err := volumes_v2.Create(volumes.blockstorage, create_opts).Extract()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return vol.ID, nil
+	return vol.ID, vol.AvailabilityZone, nil
 }
 
 func (volumes *VolumesV1) getVolume(diskName string) (Volume, error) {
@@ -201,11 +206,32 @@ func (volumes *VolumesV2) deleteVolume(volumeName string) error {
 	return err
 }
 
+func (os *OpenStack) OperationPending(diskName string) (bool, string, error) {
+	volume, err := os.getVolume(diskName)
+	if err != nil {
+		return false, "", err
+	}
+	volumeStatus := volume.Status
+	if volumeStatus == VolumeErrorStatus {
+		glog.Errorf("status of volume %s is %s", diskName, volumeStatus)
+		return false, volumeStatus, nil
+	}
+	if volumeStatus == VolumeAvailableStatus || volumeStatus == VolumeInUseStatus || volumeStatus == VolumeDeletedStatus {
+		return false, volume.Status, nil
+	}
+	return true, volumeStatus, nil
+}
+
 // Attaches given cinder volume to the compute running kubelet
 func (os *OpenStack) AttachDisk(instanceID string, diskName string) (string, error) {
 	volume, err := os.getVolume(diskName)
 	if err != nil {
 		return "", err
+	}
+	if volume.Status != VolumeAvailableStatus {
+		errmsg := fmt.Sprintf("volume %s status is %s, not %s, can not be attached to instance %s.", volume.Name, volume.Status, VolumeAvailableStatus, instanceID)
+		glog.Errorf(errmsg)
+		return "", errors.New(errmsg)
 	}
 	cClient, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -245,6 +271,11 @@ func (os *OpenStack) DetachDisk(instanceID string, partialDiskId string) error {
 	if err != nil {
 		return err
 	}
+	if volume.Status != VolumeInUseStatus {
+		errmsg := fmt.Sprintf("can not detach volume %s, its status is %s.", volume.Name, volume.Status)
+		glog.Errorf(errmsg)
+		return errors.New(errmsg)
+	}
 	cClient, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
 	})
@@ -283,12 +314,12 @@ func (os *OpenStack) getVolume(diskName string) (Volume, error) {
 }
 
 // Create a volume of given size (in GiB)
-func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, err error) {
+func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, error) {
 
 	volumes, err := os.volumeService("")
 	if err != nil || volumes == nil {
 		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
-		return "", err
+		return "", "", err
 	}
 	opts := VolumeCreateOpts{
 		Name:         name,
@@ -299,15 +330,15 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 	if tags != nil {
 		opts.Metadata = *tags
 	}
-	volume_id, err := volumes.createVolume(opts)
+	volumeId, volumeAZ, err := volumes.createVolume(opts)
 
 	if err != nil {
 		glog.Errorf("Failed to create a %d GB volume: %v", size, err)
-		return "", err
+		return "", "", err
 	}
 
-	glog.Infof("Created volume %v", volume_id)
-	return volume_id, nil
+	glog.Infof("Created volume %v in Availability Zone: %v", volumeId, volumeAZ)
+	return volumeId, volumeAZ, nil
 }
 
 // GetDevicePath returns the path of an attached block storage volume, specified by its id.
@@ -369,6 +400,11 @@ func (os *OpenStack) GetAttachmentDiskPath(instanceID string, diskName string) (
 	if err != nil {
 		return "", err
 	}
+	if volume.Status != VolumeInUseStatus {
+		errmsg := fmt.Sprintf("can not get device path of volume %s, its status is %s.", volume.Name, volume.Status)
+		glog.Errorf(errmsg)
+		return "", errors.New(errmsg)
+	}
 	if volume.AttachedServerId != "" {
 		if instanceID == volume.AttachedServerId {
 			// Attachment[0]["device"] points to the device path
@@ -380,7 +416,7 @@ func (os *OpenStack) GetAttachmentDiskPath(instanceID string, diskName string) (
 			return "", errors.New(errMsg)
 		}
 	}
-	return "", fmt.Errorf("volume %s is not attached to %s", diskName, instanceID)
+	return "", fmt.Errorf("volume %s has not ServerId.", diskName)
 }
 
 // query if a volume is attached to a compute instance

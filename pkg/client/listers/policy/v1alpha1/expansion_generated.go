@@ -23,5 +23,5 @@ package v1alpha1
 type PodDisruptionBudgetListerExpansion interface{}
 
 // PodDisruptionBudgetNamespaceListerExpansion allows custom methods to be added to
-// PodDisruptionBudgetNamespaeLister.
+// PodDisruptionBudgetNamespaceLister.
 type PodDisruptionBudgetNamespaceListerExpansion interface{}

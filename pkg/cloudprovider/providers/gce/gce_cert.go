@@ -32,7 +32,9 @@ func newCertMetricContext(request string) *metricContext {
 
 // GetSslCertificate returns the SslCertificate by name.
 func (gce *GCECloud) GetSslCertificate(name string) (*compute.SslCertificate, error) {
-	return gce.service.SslCertificates.Get(gce.projectID, name).Do()
+	mc := newCertMetricContext("get")
+	v, err := gce.service.SslCertificates.Get(gce.projectID, name).Do()
+	return v, mc.Observe(err)
 }
 
 // CreateSslCertificate creates and returns a SslCertificate.
@@ -69,6 +71,8 @@ func (gce *GCECloud) DeleteSslCertificate(name string) error {
 
 // ListSslCertificates lists all SslCertificates in the project.
 func (gce *GCECloud) ListSslCertificates() (*compute.SslCertificateList, error) {
+	mc := newCertMetricContext("list")
 	// TODO: use PageToken to list all not just the first 500
-	return gce.service.SslCertificates.List(gce.projectID).Do()
+	v, err := gce.service.SslCertificates.List(gce.projectID).Do()
+	return v, mc.Observe(err)
 }

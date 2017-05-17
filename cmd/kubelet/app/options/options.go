@@ -77,6 +77,10 @@ type KubeletFlags struct {
 	// DockershimRootDirectory is the path to the dockershim root directory. Defaults to
 	// /var/lib/dockershim if unset. Exposed for integration testing (e.g. in OpenShift).
 	DockershimRootDirectory string
+
+	// This flag, if set, sets the unique id of the instance that an external provider (i.e. cloudprovider)
+	// can use to identify a specific node
+	ProviderID string
 }
 
 // KubeletServer encapsulates all of the parameters necessary for starting up
@@ -127,7 +131,7 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("api-servers", "Use --kubeconfig instead. Will be removed in a future version.")
 
 	fs.BoolVar(&f.ReallyCrashForTesting, "really-crash-for-testing", f.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
-	fs.Float64Var(&f.ChaosChance, "chaos-chance", f.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
+	fs.Float64Var(&f.ChaosChance, "chaos-chance", f.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing.")
 
 	fs.BoolVar(&f.RunOnce, "runonce", f.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api-servers, and --enable-server")
 
@@ -136,6 +140,7 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&f.NodeIP, "node-ip", f.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
 
 	fs.StringVar(&f.DockershimRootDirectory, "experimental-dockershim-root-directory", f.DockershimRootDirectory, "Path to the dockershim root directory.")
+	fs.StringVar(&f.ProviderID, "provider-id", f.ProviderID, "Unique identifier for identifying the node in a machine database, i.e cloudprovider")
 	fs.MarkHidden("experimental-dockershim-root-directory")
 }
 
@@ -189,7 +194,7 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.DockerEndpoint, "docker-endpoint", c.DockerEndpoint, "Use this for the docker endpoint to communicate with")
 	fs.StringVar(&c.RootDirectory, "root-dir", c.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 	fs.StringVar(&c.SeccompProfileRoot, "seccomp-profile-root", c.SeccompProfileRoot, "Directory path for seccomp profiles.")
-	fs.BoolVar(&c.AllowPrivileged, "allow-privileged", c.AllowPrivileged, "If true, allow containers to request privileged mode. [default=false]")
+	fs.BoolVar(&c.AllowPrivileged, "allow-privileged", c.AllowPrivileged, "If true, allow containers to request privileged mode.")
 	fs.StringSliceVar(&c.HostNetworkSources, "host-network-sources", c.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network.")
 	fs.StringSliceVar(&c.HostPIDSources, "host-pid-sources", c.HostPIDSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host pid namespace.")
 	fs.StringSliceVar(&c.HostIPCSources, "host-ipc-sources", c.HostIPCSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host ipc namespace.")
@@ -202,9 +207,9 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&c.EnableContentionProfiling, "contention-profiling", false, "Enable lock contention profiling, if profiling is enabled")
 	fs.DurationVar(&c.MinimumGCAge.Duration, "minimum-container-ttl-duration", c.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	fs.MarkDeprecated("minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
-	fs.Int32Var(&c.MaxPerPodContainerCount, "maximum-dead-containers-per-container", c.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.  Default: 1.")
+	fs.Int32Var(&c.MaxPerPodContainerCount, "maximum-dead-containers-per-container", c.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.")
 	fs.MarkDeprecated("maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
-	fs.Int32Var(&c.MaxContainerCount, "maximum-dead-containers", c.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space. To disable, set to a negative number.  Default: -1.")
+	fs.Int32Var(&c.MaxContainerCount, "maximum-dead-containers", c.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space. To disable, set to a negative number.")
 	fs.MarkDeprecated("maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&c.CAdvisorPort, "cadvisor-port", c.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.Int32Var(&c.HealthzPort, "healthz-port", c.HealthzPort, "The port of the localhost healthz endpoint")
@@ -213,6 +218,7 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&c.RegisterNode, "register-node", c.RegisterNode, "Register the node with the apiserver (defaults to true if --api-servers is set)")
 	fs.StringVar(&c.ClusterDomain, "cluster-domain", c.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	fs.StringVar(&c.MasterServiceNamespace, "master-service-namespace", c.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
+	fs.MarkDeprecated("master-service-namespace", "This flag will be removed in a future version.")
 	fs.StringSliceVar(&c.ClusterDNS, "cluster-dns", c.ClusterDNS, "Comma-separated list of DNS server IP address.  This value is used for containers DNS server in case of Pods with \"dnsPolicy=ClusterFirst\". Note: all DNS servers appearing in the list MUST serve the same set of records otherwise name resolution within the cluster may not work correctly. There is no guarantee as to which DNS server may be contacted for name resolution.")
 	fs.DurationVar(&c.StreamingConnectionIdleTimeout.Duration, "streaming-connection-idle-timeout", c.StreamingConnectionIdleTimeout.Duration, "Maximum time a streaming connection can be idle before the connection is automatically closed. 0 indicates no timeout. Example: '5m'")
 	fs.DurationVar(&c.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", c.NodeStatusUpdateFrequency.Duration, "Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller.")
@@ -237,7 +243,7 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 
 	fs.StringVar(&c.KubeletCgroups, "kubelet-cgroups", c.KubeletCgroups, "Optional absolute name of cgroups to create and run the Kubelet in.")
-	fs.StringVar(&c.SystemCgroups, "system-cgroups", c.SystemCgroups, "Optional absolute name of cgroups in which to place all non-kernel processes that are not already inside a cgroup under `/`. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
+	fs.StringVar(&c.SystemCgroups, "system-cgroups", c.SystemCgroups, "Optional absolute name of cgroups in which to place all non-kernel processes that are not already inside a cgroup under `/`. Empty for no container. Rolling back the flag requires a reboot.")
 
 	fs.BoolVar(&c.CgroupsPerQOS, "cgroups-per-qos", c.CgroupsPerQOS, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
 	fs.StringVar(&c.CgroupDriver, "cgroup-driver", c.CgroupDriver, "Driver that the kubelet uses to manipulate cgroups on the host.  Possible values: 'cgroupfs', 'systemd'")
@@ -257,7 +263,7 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("babysit-daemons", "Will be removed in a future version.")
 	fs.Int32Var(&c.MaxPods, "max-pods", c.MaxPods, "Number of Pods that can run on this Kubelet.")
 	// TODO(#40229): Remove the docker-exec-handler flag.
-	fs.StringVar(&c.DockerExecHandlerName, "docker-exec-handler", c.DockerExecHandlerName, "Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.")
+	fs.StringVar(&c.DockerExecHandlerName, "docker-exec-handler", c.DockerExecHandlerName, "Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'.")
 	fs.MarkDeprecated("docker-exec-handler", "this flag will be removed and only the 'native' handler will be supported in the future.")
 	fs.StringVar(&c.NonMasqueradeCIDR, "non-masquerade-cidr", c.NonMasqueradeCIDR, "Traffic to IPs outside this range will use IP masquerade.")
 	fs.StringVar(&c.PodCIDR, "pod-cidr", "", "The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.")
@@ -270,16 +276,16 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&c.AllowedUnsafeSysctls, "experimental-allowed-unsafe-sysctls", c.AllowedUnsafeSysctls, "Comma-separated whitelist of unsafe sysctls or unsafe sysctl patterns (ending in *). Use these at your own risk.")
 
 	// Flags intended for testing, not recommended used in production environments.
-	fs.BoolVar(&c.Containerized, "containerized", c.Containerized, "Experimental support for running kubelet in a container.  Intended for testing. [default=false]")
+	fs.BoolVar(&c.Containerized, "containerized", c.Containerized, "Experimental support for running kubelet in a container.  Intended for testing.")
 	fs.Int64Var(&c.MaxOpenFiles, "max-open-files", c.MaxOpenFiles, "Number of files that can be opened by Kubelet process.")
-	fs.BoolVar(&c.RegisterSchedulable, "register-schedulable", c.RegisterSchedulable, "Register the node as schedulable. Won't have any effect if register-node is false. [default=true]")
+	fs.BoolVar(&c.RegisterSchedulable, "register-schedulable", c.RegisterSchedulable, "Register the node as schedulable. Won't have any effect if register-node is false.")
 	fs.MarkDeprecated("register-schedulable", "will be removed in a future version")
 	fs.Var(utiltaints.NewTaintsVar(&c.RegisterWithTaints), "register-with-taints", "Register the node with the given list of taints (comma seperated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
 	fs.StringVar(&c.ContentType, "kube-api-content-type", c.ContentType, "Content type of requests sent to apiserver.")
 	fs.Int32Var(&c.KubeAPIQPS, "kube-api-qps", c.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.Int32Var(&c.KubeAPIBurst, "kube-api-burst", c.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.BoolVar(&c.SerializeImagePulls, "serialize-image-pulls", c.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details.")
-	fs.DurationVar(&c.OutOfDiskTransitionFrequency.Duration, "outofdisk-transition-frequency", c.OutOfDiskTransitionFrequency.Duration, "Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status. Default: 5m0s")
+	fs.DurationVar(&c.OutOfDiskTransitionFrequency.Duration, "outofdisk-transition-frequency", c.OutOfDiskTransitionFrequency.Duration, "Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status.")
 	fs.MarkDeprecated("outofdisk-transition-frequency", "Use --eviction-pressure-transition-period instead. Will be removed in a future version.")
 
 	fs.BoolVar(&c.EnableCustomMetrics, "enable-custom-metrics", c.EnableCustomMetrics, "Support for gathering custom metrics.")
@@ -296,20 +302,11 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&c.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", c.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
 
 	// CRI flags.
-	// TODO: Remove experimental-cri in kubernetes 1.7.
-	fs.BoolVar(&c.EnableCRI, "experimental-cri", c.EnableCRI, "Same as --enable-cri. [default=true]")
-	fs.MarkDeprecated("experimental-cri", "Please use --enable-cri instead.")
-	fs.MarkHidden("experimental-cri")
-	// TODO: Remove enable-cri once we stop supporting the non-cri
-	// implementation.
-	fs.BoolVar(&c.EnableCRI, "enable-cri", c.EnableCRI, "Enable the Container Runtime Interface (CRI) integration. If --container-runtime is set to \"remote\", Kubelet will communicate with the runtime/image CRI server listening on the endpoint specified by --remote-runtime-endpoint/--remote-image-endpoint. If --container-runtime is set to \"docker\", Kubelet will launch a in-process CRI server on behalf of docker, and communicate over a default endpoint. If --container-runtime is \"rkt\", the flag will be ignored because rkt integration doesn't support CRI yet. [default=true]")
-	fs.MarkDeprecated("enable-cri", "The non-CRI implementation will be deprecated and removed in a future version.")
 	fs.BoolVar(&c.ExperimentalDockershim, "experimental-dockershim", c.ExperimentalDockershim, "Enable dockershim only mode. In this mode, kubelet will only start dockershim without any other functionalities. This flag only serves test purpose, please do not use it unless you are conscious of what you are doing. [default=false]")
 	fs.MarkHidden("experimental-dockershim")
-
-	fs.StringVar(&c.RemoteRuntimeEndpoint, "container-runtime-endpoint", c.RemoteRuntimeEndpoint, "[Experimental] The unix socket endpoint of remote runtime service. The endpoint is used only when CRI integration is enabled (--enable-cri)")
-	fs.StringVar(&c.RemoteImageEndpoint, "image-service-endpoint", c.RemoteImageEndpoint, "[Experimental] The unix socket endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. The endpoint is used only when CRI integration is enabled (--enable-cri)")
-	fs.BoolVar(&c.DockerEnableSharedPID, "experimental-docker-enable-shared-pid", c.DockerEnableSharedPID, "[Experimental] The Container Runtime Interface (CRI) will eventually default to using a shared PID namespace for containers in a pod. Setting this flag allows previewing this behavior when running with the CRI enabled and Docker version 1.13.1 or higher.")
+	fs.StringVar(&c.RemoteRuntimeEndpoint, "container-runtime-endpoint", c.RemoteRuntimeEndpoint, "[Experimental] The unix socket endpoint of remote runtime service.")
+	fs.StringVar(&c.RemoteImageEndpoint, "image-service-endpoint", c.RemoteImageEndpoint, "[Experimental] The unix socket endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default.")
+	fs.BoolVar(&c.DockerDisableSharedPID, "docker-disable-shared-pid", c.DockerDisableSharedPID, "The Container Runtime Interface (CRI) defaults to using a shared PID namespace for containers in a pod when running with Docker 1.13.1 or higher. Setting this flag reverts to the previous behavior of isolated PID namespaces. This ability will be removed in a future Kubernetes release.")
 
 	fs.BoolVar(&c.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", c.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required componenets (binaries, etc.) before performing the mount")
 

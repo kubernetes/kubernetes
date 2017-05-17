@@ -195,6 +195,7 @@ function mvfolder {
 }
 
 mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
+rm -f "${CLIENT_REPO_TEMP}/kubernetes/import_known_versions.go"
 mvfolder "pkg/client/informers/informers_generated/externalversions" informers
 mvfolder "pkg/client/listers" listers
 if [ "$(find "${CLIENT_REPO_TEMP}"/pkg/client -type f -name "*.go")" ]; then
