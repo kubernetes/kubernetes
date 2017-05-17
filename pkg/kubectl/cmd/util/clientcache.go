@@ -24,7 +24,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	oldclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/version"
@@ -98,19 +97,7 @@ func (c *ClientCache) ClientConfigForVersion(requiredVersion *schema.GroupVersio
 
 // clientConfigForVersion returns the correct config for a server
 func (c *ClientCache) clientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
-	// TODO: have a better config copy method
-	config, discoveryClient, err := c.getDefaultConfig()
-	if err != nil {
-		return nil, err
-	}
-	if requiredVersion == nil && config.GroupVersion != nil {
-		// if someone has set the values via flags, our config will have the groupVersion set
-		// that means it is required.
-		requiredVersion = config.GroupVersion
-	}
-
-	// required version may still be nil, since config.GroupVersion may have been nil.  Do the check
-	// before looking up from the cache
+	// only lookup in the cache if the requiredVersion is set
 	if requiredVersion != nil {
 		if config, ok := c.configs[*requiredVersion]; ok {
 			return copyConfig(config), nil
@@ -119,11 +106,21 @@ func (c *ClientCache) clientConfigForVersion(requiredVersion *schema.GroupVersio
 		return copyConfig(c.noVersionConfig), nil
 	}
 
-	negotiatedVersion, err := discovery.NegotiateVersion(discoveryClient, requiredVersion, api.Registry.EnabledVersions())
+	// this returns a shallow copy to work with
+	config, discoveryClient, err := c.getDefaultConfig()
 	if err != nil {
 		return nil, err
 	}
-	config.GroupVersion = negotiatedVersion
+
+	if requiredVersion != nil {
+		if err := discovery.ServerSupportsVersion(discoveryClient, *requiredVersion); err != nil {
+			return nil, err
+		}
+		config.GroupVersion = requiredVersion
+	} else {
+		// TODO remove this hack.  This is allowing the GetOptions to be serialized.
+		config.GroupVersion = &schema.GroupVersion{Group: "", Version: "v1"}
+	}
 
 	// TODO this isn't what we want.  Each clientset should be setting defaults as it sees fit.
 	oldclient.SetKubernetesDefaults(&config)

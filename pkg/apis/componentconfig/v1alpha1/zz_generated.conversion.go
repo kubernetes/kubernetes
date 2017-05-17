@@ -100,6 +100,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
+	out.EnableProfiling = in.EnableProfiling
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
 	if err := Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
@@ -130,6 +131,7 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
+	out.EnableProfiling = in.EnableProfiling
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
 	if err := Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
@@ -459,7 +461,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	}
 	out.ExitOnLockContention = in.ExitOnLockContention
 	out.HairpinMode = in.HairpinMode
-	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
 	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
@@ -656,7 +657,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	}
 	out.ExitOnLockContention = in.ExitOnLockContention
 	out.HairpinMode = in.HairpinMode
-	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
 	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
@@ -814,6 +814,7 @@ func autoConvert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderE
 	out.LeaseDuration = in.LeaseDuration
 	out.RenewDeadline = in.RenewDeadline
 	out.RetryPeriod = in.RetryPeriod
+	out.ResourceLock = in.ResourceLock
 	return nil
 }
 
@@ -829,6 +830,7 @@ func autoConvert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderE
 	out.LeaseDuration = in.LeaseDuration
 	out.RenewDeadline = in.RenewDeadline
 	out.RetryPeriod = in.RetryPeriod
+	out.ResourceLock = in.ResourceLock
 	return nil
 }
 

@@ -62,7 +62,6 @@ auth-provider
 auth-provider-arg
 auth-provider-arg
 azure-container-registry-config
-babysit-daemons
 basic-auth-file
 bench-pods
 bench-quiet
@@ -425,7 +424,9 @@ large-cluster-size-threshold
 last-release-pr
 leader-elect
 leader-elect-lease-duration
+leader-elect-lock-type
 leader-elect-renew-deadline
+leader-elect-resource-lock
 leader-elect-retry-period
 lease-duration
 leave-stdin-open

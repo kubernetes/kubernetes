@@ -10,10 +10,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "annotations.go",
-        "util.go",
-    ],
+    srcs = ["util.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

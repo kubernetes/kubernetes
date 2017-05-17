@@ -77,3 +77,22 @@ RUN export ETCD_VERSION=v3.0.17; \
   && cd /usr/local/src/etcd \
   && curl -fsSL https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz | tar -xz \
   && ln -s ../src/etcd/etcd-${ETCD_VERSION}-linux-amd64/etcd /usr/local/bin/
+
+
+# There is a significant performance regression in Go 1.8 comparing to Go 1.7.
+# Until this is solved in Go itself, we are patching 1.8.1 version of Go to
+# reduce the impact of this regression - for more detailed discussion see:
+# https://github.com/kubernetes/kubernetes/issues/45216
+#
+# TODO: Once this issue is fixed in Go itself, we can get rid of the code below.
+ENV K8S_PATCHED_GOLANG_VERSION=1.8.1 \
+    K8S_PATCHED_GOROOT=/usr/local/go_k8s_patched
+RUN mkdir -p ${K8S_PATCHED_GOROOT} \
+  && curl -sSL https://github.com/golang/go/archive/go${K8S_PATCHED_GOLANG_VERSION}.tar.gz | tar -xz -C ${K8S_PATCHED_GOROOT} --strip-components=1
+
+COPY go_181_performance_fix.patch ${K8S_PATCHED_GOROOT}/
+RUN cd ${K8S_PATCHED_GOROOT} \
+  && patch -p1 < go_181_performance_fix.patch \
+  && cd src \
+  && GOROOT_FINAL=${K8S_PATCHED_GOROOT} GOROOT_BOOTSTRAP=/usr/local/go ./make.bash \
+  && for platform in ${KUBE_CROSSPLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} GOROOT=${K8S_PATCHED_GOROOT} go install std; done

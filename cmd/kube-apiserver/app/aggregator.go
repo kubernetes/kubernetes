@@ -58,7 +58,7 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
-	etcdOptions.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(schema.GroupVersion{Group: "apiregistration.k8s.io", Version: "v1alpha1"})
+	etcdOptions.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(schema.GroupVersion{Group: "apiregistration.k8s.io", Version: "v1beta1"})
 	etcdOptions.StorageConfig.Copier = aggregatorapiserver.Scheme
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 

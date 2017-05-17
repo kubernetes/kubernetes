@@ -32,42 +32,80 @@ import (
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/validation"
 )
 
-type apiServerStrategy struct {
+type strategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 }
 
-func NewStrategy(typer runtime.ObjectTyper) apiServerStrategy {
-	return apiServerStrategy{typer, names.SimpleNameGenerator}
+func NewStrategy(typer runtime.ObjectTyper) strategy {
+	return strategy{typer, names.SimpleNameGenerator}
 }
 
-func (apiServerStrategy) NamespaceScoped() bool {
+func (strategy) NamespaceScoped() bool {
 	return false
 }
 
-func (apiServerStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 }
 
-func (apiServerStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 }
 
-func (apiServerStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (strategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	return validation.ValidateCustomResourceDefinition(obj.(*apiextensions.CustomResourceDefinition))
 }
 
-func (apiServerStrategy) AllowCreateOnUpdate() bool {
+func (strategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (apiServerStrategy) AllowUnconditionalUpdate() bool {
+func (strategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 
-func (apiServerStrategy) Canonicalize(obj runtime.Object) {
+func (strategy) Canonicalize(obj runtime.Object) {
 }
 
-func (apiServerStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateCustomResourceDefinitionUpdate(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
+}
+
+type statusStrategy struct {
+	runtime.ObjectTyper
+	names.NameGenerator
+}
+
+func NewStatusStrategy(typer runtime.ObjectTyper) statusStrategy {
+	return statusStrategy{typer, names.SimpleNameGenerator}
+}
+
+func (statusStrategy) NamespaceScoped() bool {
+	return false
+}
+
+func (statusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+	newObj := obj.(*apiextensions.CustomResourceDefinition)
+	oldObj := old.(*apiextensions.CustomResourceDefinition)
+	newObj.Spec = oldObj.Spec
+	newObj.Labels = oldObj.Labels
+	newObj.Annotations = oldObj.Annotations
+	newObj.Finalizers = oldObj.Finalizers
+	newObj.OwnerReferences = oldObj.OwnerReferences
+}
+
+func (statusStrategy) AllowCreateOnUpdate() bool {
+	return false
+}
+
+func (statusStrategy) AllowUnconditionalUpdate() bool {
+	return false
+}
+
+func (statusStrategy) Canonicalize(obj runtime.Object) {
+}
+
+func (statusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return validation.ValidateUpdateCustomResourceDefinitionStatus(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
 }
 
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {

@@ -97,6 +97,9 @@ type KubeProxyConfiguration struct {
 	// metricsBindAddress is the IP address and port for the metrics server to serve on,
 	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
 	MetricsBindAddress string `json:"metricsBindAddress"`
+	// enableProfiling enables profiling via web interface on /debug/pprof handler.
+	// Profiling handlers will be handled by metrics server.
+	EnableProfiling bool `json:"enableProfiling"`
 	// clusterCIDR is the CIDR range of the pods in the cluster. It is used to
 	// bridge traffic coming from outside of the cluster. If not provided,
 	// no off-cluster bridging will be performed.
@@ -233,6 +236,9 @@ type LeaderElectionConfiguration struct {
 	// acquisition and renewal of a leadership. This is only applicable if
 	// leader election is enabled.
 	RetryPeriod metav1.Duration `json:"retryPeriod"`
+	// resourceLock indicates the resource object type that will be used to lock
+	// during leader election cycles.
+	ResourceLock string `json:"resourceLock"`
 }
 
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
@@ -468,8 +474,6 @@ type KubeletConfiguration struct {
 	// Generally, one must set --hairpin-mode=veth-flag to achieve hairpin NAT,
 	// because promiscous-bridge assumes the existence of a container bridge named cbr0.
 	HairpinMode string `json:"hairpinMode"`
-	// The node has babysitter process monitoring docker and kubelet.
-	BabysitDaemons bool `json:"babysitDaemons"`
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32 `json:"maxPods"`
 	// dockerExecHandlerName is the handler to use when executing a command

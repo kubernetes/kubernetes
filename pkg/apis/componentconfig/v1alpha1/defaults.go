@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
+	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -192,6 +193,9 @@ func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {
 	}
 	if obj.RetryPeriod == zero {
 		obj.RetryPeriod = metav1.Duration{Duration: 2 * time.Second}
+	}
+	if obj.ResourceLock == "" {
+		obj.ResourceLock = rl.EndpointsResourceLock
 	}
 }
 

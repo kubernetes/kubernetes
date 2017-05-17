@@ -29,11 +29,8 @@ type Config struct {
 	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
 	// +optional
 	Kind string `json:"kind,omitempty"`
-	// DEPRECATED: APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
-	// Because a cluster can run multiple API groups and potentially multiple versions of each, it no longer makes sense to specify
-	// a single value for the cluster version.
-	// This field isn't really needed anyway, so we are deprecating it without replacement.
-	// It will be ignored if it is present.
+	// Legacy field from pkg/api/types.go TypeMeta.
+	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
@@ -63,9 +60,6 @@ type Preferences struct {
 type Cluster struct {
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
-	// APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
-	// +optional
-	APIVersion string `json:"api-version,omitempty"`
 	// InsecureSkipTLSVerify skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
 	// +optional
 	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`

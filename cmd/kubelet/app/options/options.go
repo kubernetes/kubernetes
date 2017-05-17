@@ -259,8 +259,6 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.RktStage1Image, "rkt-stage1-image", c.RktStage1Image, "image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used.")
 	fs.MarkDeprecated("rkt-stage1-image", "Will be removed in a future version. The default stage1 image will be specified by the rkt configurations, see https://github.com/coreos/rkt/blob/master/Documentation/configuration.md for more details.")
 	fs.StringVar(&c.HairpinMode, "hairpin-mode", c.HairpinMode, "How should the kubelet setup hairpin NAT. This allows endpoints of a Service to loadbalance back to themselves if they should try to access their own Service. Valid values are \"promiscuous-bridge\", \"hairpin-veth\" and \"none\".")
-	fs.BoolVar(&c.BabysitDaemons, "babysit-daemons", c.BabysitDaemons, "If true, the node has babysitter process monitoring docker and kubelet.")
-	fs.MarkDeprecated("babysit-daemons", "Will be removed in a future version.")
 	fs.Int32Var(&c.MaxPods, "max-pods", c.MaxPods, "Number of Pods that can run on this Kubelet.")
 	// TODO(#40229): Remove the docker-exec-handler flag.
 	fs.StringVar(&c.DockerExecHandlerName, "docker-exec-handler", c.DockerExecHandlerName, "Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'.")

@@ -342,9 +342,13 @@ func (b *Builder) importPackage(dir string, userRequested bool) (*tc.Package, er
 	// and we can't miss pkgs that are only depended on.
 	pkg, err := b.typeCheckPackage(pkgPath)
 	if err != nil {
-		if ignoreError && pkg != nil {
-			glog.V(2).Infof("type checking encountered some errors in %q, but ignoring.\n", pkgPath)
-		} else {
+		switch {
+		case ignoreError && pkg != nil:
+			glog.V(2).Infof("type checking encountered some issues in %q, but ignoring.\n", pkgPath)
+		case !ignoreError && pkg != nil:
+			glog.V(2).Infof("type checking encountered some errors in %q\n", pkgPath)
+			return nil, err
+		default:
 			return nil, err
 		}
 	}
@@ -391,7 +395,7 @@ func (b *Builder) typeCheckPackage(pkgPath importPathString) (*tc.Package, error
 		// method. So there can't be cycles in the import graph.
 		Importer: importAdapter{b},
 		Error: func(err error) {
-			glog.V(2).Infof("type checker error: %v\n", err)
+			glog.V(2).Infof("type checker: %v\n", err)
 		},
 	}
 	pkg, err := c.Check(string(pkgPath), b.fset, files, nil)

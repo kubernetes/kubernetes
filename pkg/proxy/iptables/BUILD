@@ -10,7 +10,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["proxier.go"],
+    srcs = [
+        "metrics.go",
+        "proxier.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
@@ -25,6 +28,7 @@ go_library(
         "//pkg/util/sysctl:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
@@ -41,7 +45,6 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/service:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables:go_default_library",

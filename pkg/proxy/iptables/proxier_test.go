@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -856,7 +855,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			svc.Status.LoadBalancer.Ingress = []api.LoadBalancerIngress{{
 				IP: svcLBIP,
 			}}
-			svc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+			svc.Annotations[api.BetaAnnotationExternalTraffic] = api.AnnotationValueExternalTrafficLocal
 		}),
 	)
 
@@ -947,7 +946,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 				Protocol: api.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
-			svc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+			svc.Annotations[api.BetaAnnotationExternalTraffic] = api.AnnotationValueExternalTrafficLocal
 		}),
 	)
 
@@ -1059,8 +1058,8 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 		}),
 		makeTestService("somewhere", "only-local-load-balancer", func(svc *api.Service) {
 			svc.ObjectMeta.Annotations = map[string]string{
-				service.BetaAnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
-				service.BetaAnnotationHealthCheckNodePort: "345",
+				api.BetaAnnotationExternalTraffic:     api.AnnotationValueExternalTrafficLocal,
+				api.BetaAnnotationHealthCheckNodePort: "345",
 			}
 			svc.Spec.Type = api.ServiceTypeLoadBalancer
 			svc.Spec.ClusterIP = "172.16.55.12"
@@ -1200,8 +1199,8 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	})
 	servicev2 := makeTestService("somewhere", "some-service", func(svc *api.Service) {
 		svc.ObjectMeta.Annotations = map[string]string{
-			service.BetaAnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
-			service.BetaAnnotationHealthCheckNodePort: "345",
+			api.BetaAnnotationExternalTraffic:     api.AnnotationValueExternalTrafficLocal,
+			api.BetaAnnotationHealthCheckNodePort: "345",
 		}
 		svc.Spec.Type = api.ServiceTypeLoadBalancer
 		svc.Spec.ClusterIP = "172.16.55.4"

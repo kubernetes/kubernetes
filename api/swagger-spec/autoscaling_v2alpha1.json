@@ -1067,11 +1067,11 @@
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "metadata is the standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "metadata is the standard object metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v2alpha1.HorizontalPodAutoscalerSpec",
-      "description": "spec is the specification for the behaviour of the autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
+      "description": "spec is the specification for the behaviour of the autoscaler. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status."
      },
      "status": {
       "$ref": "v2alpha1.HorizontalPodAutoscalerStatus",

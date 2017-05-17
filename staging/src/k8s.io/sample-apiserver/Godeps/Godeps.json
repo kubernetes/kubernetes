@@ -183,6 +183,14 @@
 			"Rev": "84398b94e188ee336f307779b57b3aa91af7063c"
 		},
 		{
+			"ImportPath": "github.com/hashicorp/golang-lru",
+			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/golang-lru/simplelru",
+			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
+		},
+		{
 			"ImportPath": "github.com/howeyc/gopass",
 			"Rev": "3ca23474a7c7203e0a0a070fd33508f6efdb9b3d"
 		},

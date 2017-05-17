@@ -56,7 +56,7 @@ func GetLoadBalancerSourceRanges(service *v1.Service) (netsets.IPNet, error) {
 			return nil, fmt.Errorf("service.Spec.LoadBalancerSourceRanges: %v is not valid. Expecting a list of IP ranges. For example, 10.0.0.0/24. Error msg: %v", specs, err)
 		}
 	} else {
-		val := service.Annotations[AnnotationLoadBalancerSourceRangesKey]
+		val := service.Annotations[v1.AnnotationLoadBalancerSourceRangesKey]
 		val = strings.TrimSpace(val)
 		if val == "" {
 			val = defaultLoadBalancerSourceRanges
@@ -64,7 +64,7 @@ func GetLoadBalancerSourceRanges(service *v1.Service) (netsets.IPNet, error) {
 		specs := strings.Split(val, ",")
 		ipnets, err = netsets.ParseIPNets(specs...)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %s is not valid. Expecting a comma-separated list of source IP ranges. For example, 10.0.0.0/24,192.168.2.0/24", AnnotationLoadBalancerSourceRangesKey, val)
+			return nil, fmt.Errorf("%s: %s is not valid. Expecting a comma-separated list of source IP ranges. For example, 10.0.0.0/24,192.168.2.0/24", v1.AnnotationLoadBalancerSourceRangesKey, val)
 		}
 	}
 	return ipnets, nil
@@ -80,14 +80,14 @@ func RequestsOnlyLocalTraffic(service *v1.Service) bool {
 	// First check the beta annotation and then the first class field. This is so that
 	// existing Services continue to work till the user decides to transition to the
 	// first class field.
-	if l, ok := service.Annotations[BetaAnnotationExternalTraffic]; ok {
+	if l, ok := service.Annotations[v1.BetaAnnotationExternalTraffic]; ok {
 		switch l {
-		case AnnotationValueExternalTrafficLocal:
+		case v1.AnnotationValueExternalTrafficLocal:
 			return true
-		case AnnotationValueExternalTrafficGlobal:
+		case v1.AnnotationValueExternalTrafficGlobal:
 			return false
 		default:
-			glog.Errorf("Invalid value for annotation %v: %v", BetaAnnotationExternalTraffic, l)
+			glog.Errorf("Invalid value for annotation %v: %v", v1.BetaAnnotationExternalTraffic, l)
 			return false
 		}
 	}
@@ -107,10 +107,10 @@ func GetServiceHealthCheckNodePort(service *v1.Service) int32 {
 	// First check the beta annotation and then the first class field. This is so that
 	// existing Services continue to work till the user decides to transition to the
 	// first class field.
-	if l, ok := service.Annotations[BetaAnnotationHealthCheckNodePort]; ok {
+	if l, ok := service.Annotations[v1.BetaAnnotationHealthCheckNodePort]; ok {
 		p, err := strconv.Atoi(l)
 		if err != nil {
-			glog.Errorf("Failed to parse annotation %v: %v", BetaAnnotationHealthCheckNodePort, err)
+			glog.Errorf("Failed to parse annotation %v: %v", v1.BetaAnnotationHealthCheckNodePort, err)
 			return 0
 		}
 		return int32(p)
@@ -122,7 +122,7 @@ func GetServiceHealthCheckNodePort(service *v1.Service) int32 {
 // for NodePort / LoadBalancer service to Global for consistency.
 // TODO: Move this default logic to default.go once beta annotation is deprecated.
 func SetDefaultExternalTrafficPolicyIfNeeded(service *v1.Service) {
-	if _, ok := service.Annotations[BetaAnnotationExternalTraffic]; ok {
+	if _, ok := service.Annotations[v1.BetaAnnotationExternalTraffic]; ok {
 		// Don't default this field if beta annotation exists.
 		return
 	} else if (service.Spec.Type == v1.ServiceTypeNodePort ||
@@ -136,8 +136,8 @@ func SetDefaultExternalTrafficPolicyIfNeeded(service *v1.Service) {
 func ClearExternalTrafficPolicy(service *v1.Service) {
 	// First check the beta annotation and then the first class field. This is so existing
 	// Services continue to work till the user decides to transition to the first class field.
-	if _, ok := service.Annotations[BetaAnnotationExternalTraffic]; ok {
-		delete(service.Annotations, BetaAnnotationExternalTraffic)
+	if _, ok := service.Annotations[v1.BetaAnnotationExternalTraffic]; ok {
+		delete(service.Annotations, v1.BetaAnnotationExternalTraffic)
 		return
 	}
 	service.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType("")
@@ -149,11 +149,11 @@ func SetServiceHealthCheckNodePort(service *v1.Service, hcNodePort int32) {
 	// First check the beta annotation and then the first class field. This is so that
 	// existing Services continue to work till the user decides to transition to the
 	// first class field.
-	if _, ok := service.Annotations[BetaAnnotationExternalTraffic]; ok {
+	if _, ok := service.Annotations[v1.BetaAnnotationExternalTraffic]; ok {
 		if hcNodePort == 0 {
-			delete(service.Annotations, BetaAnnotationHealthCheckNodePort)
+			delete(service.Annotations, v1.BetaAnnotationHealthCheckNodePort)
 		} else {
-			service.Annotations[BetaAnnotationHealthCheckNodePort] = fmt.Sprintf("%d", hcNodePort)
+			service.Annotations[v1.BetaAnnotationHealthCheckNodePort] = fmt.Sprintf("%d", hcNodePort)
 		}
 		return
 	}

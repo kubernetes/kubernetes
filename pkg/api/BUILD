@@ -101,7 +101,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/api/annotations:all-srcs",
         "//pkg/api/endpoints:all-srcs",
         "//pkg/api/errors:all-srcs",
         "//pkg/api/events:all-srcs",
