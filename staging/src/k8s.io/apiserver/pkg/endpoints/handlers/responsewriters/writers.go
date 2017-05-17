@@ -103,6 +103,12 @@ func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupV
 		delay := strconv.Itoa(int(status.Details.RetryAfterSeconds))
 		w.Header().Set("Retry-After", delay)
 	}
+
+	if code == http.StatusNoContent {
+		w.WriteHeader(code)
+		return code
+	}
+
 	WriteObjectNegotiated(s, gv, w, req, code, status)
 	return code
 }
