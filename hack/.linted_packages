@@ -52,7 +52,6 @@ hack
 hack/boilerplate/test
 hack/cmd/teststale
 pkg/api
-pkg/api/annotations
 pkg/api/errors
 pkg/api/events
 pkg/api/install
