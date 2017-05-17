@@ -352,6 +352,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"some-scheduler-name",
 			client,
 			informerFactory.Core().V1().Nodes(),
+			informerFactory.Core().V1().Pods(),
 			informerFactory.Core().V1().PersistentVolumes(),
 			informerFactory.Core().V1().PersistentVolumeClaims(),
 			informerFactory.Core().V1().ReplicationControllers(),
