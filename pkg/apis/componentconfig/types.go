@@ -685,6 +685,9 @@ type LeaderElectionConfiguration struct {
 	// acquisition and renewal of a leadership. This is only applicable if
 	// leader election is enabled.
 	RetryPeriod metav1.Duration
+	// resourceLock indicates the resource object type that will be used to lock
+	// during leader election cycles.
+	ResourceLock string
 }
 
 type KubeControllerManagerConfiguration struct {
