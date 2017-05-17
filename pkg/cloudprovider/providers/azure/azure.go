@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"time"
 
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -30,7 +32,6 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
-	"time"
 )
 
 // CloudProviderName is the value used for the --cloud-provider flag
@@ -178,6 +179,9 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 
 	return &az, nil
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (az *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 // LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 func (az *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {

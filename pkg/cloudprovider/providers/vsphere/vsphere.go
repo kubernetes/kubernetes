@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -228,6 +229,9 @@ func init() {
 		return newVSphere(cfg)
 	})
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (vs *VSphere) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 // UUID gets the BIOS UUID via the sys interface.  This UUID is known by vsphere
 func getvmUUID() (string, error) {
