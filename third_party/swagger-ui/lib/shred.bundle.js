@@ -2328,7 +2328,7 @@ var iconv = module.exports = {
         table: function(options) {
             var table = options.table, key, revCharsTable = options.revCharsTable;
             if (!table) {
-                throw new Error("Encoding '" + options.type +"' has incorect 'table' option");
+                throw new Error("Encoding '" + options.type +"' has incorrect 'table' option");
             }
             if(!revCharsTable) {
                 revCharsTable = options.revCharsTable = {};
