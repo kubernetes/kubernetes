@@ -34,6 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 type testGenerator struct {
@@ -220,6 +222,7 @@ func TestTokenCreation(t *testing.T) {
 		UpdatedServiceAccount *v1.ServiceAccount
 		DeletedServiceAccount *v1.ServiceAccount
 		AddedSecret           *v1.Secret
+		AddedSecretLocal      *v1.Secret
 		UpdatedSecret         *v1.Secret
 		DeletedSecret         *v1.Secret
 
@@ -305,6 +308,13 @@ func TestTokenCreation(t *testing.T) {
 				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, createdTokenSecret()),
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, serviceAccount(addTokenSecretReference(missingSecretReferences()))),
 			},
+		},
+		"new serviceaccount with missing secrets and a local secret in the cache": {
+			ClientObjects: []runtime.Object{serviceAccount(missingSecretReferences())},
+
+			AddedServiceAccount: serviceAccount(tokenSecretReferences()),
+			AddedSecretLocal:    serviceAccountTokenSecret(),
+			ExpectedActions:     []core.Action{},
 		},
 		"new serviceaccount with non-token secrets": {
 			ClientObjects: []runtime.Object{serviceAccount(regularSecretReferences()), opaqueSecret()},
@@ -572,38 +582,44 @@ func TestTokenCreation(t *testing.T) {
 		for _, reactor := range tc.Reactors {
 			client.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 		}
-
-		controller := NewTokensController(client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+		secretInformer := informers.Core().V1().Secrets().Informer()
+		secrets := secretInformer.GetStore()
+		serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
+		controller := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
 
 		if tc.ExistingServiceAccount != nil {
-			controller.serviceAccounts.Add(tc.ExistingServiceAccount)
+			serviceAccounts.Add(tc.ExistingServiceAccount)
 		}
 		for _, s := range tc.ExistingSecrets {
-			controller.secrets.Add(s)
+			secrets.Add(s)
 		}
 
 		if tc.AddedServiceAccount != nil {
-			controller.serviceAccounts.Add(tc.AddedServiceAccount)
+			serviceAccounts.Add(tc.AddedServiceAccount)
 			controller.queueServiceAccountSync(tc.AddedServiceAccount)
 		}
 		if tc.UpdatedServiceAccount != nil {
-			controller.serviceAccounts.Add(tc.UpdatedServiceAccount)
+			serviceAccounts.Add(tc.UpdatedServiceAccount)
 			controller.queueServiceAccountUpdateSync(nil, tc.UpdatedServiceAccount)
 		}
 		if tc.DeletedServiceAccount != nil {
-			controller.serviceAccounts.Delete(tc.DeletedServiceAccount)
+			serviceAccounts.Delete(tc.DeletedServiceAccount)
 			controller.queueServiceAccountSync(tc.DeletedServiceAccount)
 		}
 		if tc.AddedSecret != nil {
-			controller.secrets.Add(tc.AddedSecret)
+			secrets.Add(tc.AddedSecret)
 			controller.queueSecretSync(tc.AddedSecret)
 		}
+		if tc.AddedSecretLocal != nil {
+			controller.updatedSecrets.Mutation(tc.AddedSecretLocal)
+		}
 		if tc.UpdatedSecret != nil {
-			controller.secrets.Add(tc.UpdatedSecret)
+			secrets.Add(tc.UpdatedSecret)
 			controller.queueSecretUpdateSync(nil, tc.UpdatedSecret)
 		}
 		if tc.DeletedSecret != nil {
-			controller.secrets.Delete(tc.DeletedSecret)
+			secrets.Delete(tc.DeletedSecret)
 			controller.queueSecretSync(tc.DeletedSecret)
 		}
 
