@@ -19,20 +19,20 @@ package fake
 import (
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
-	v1alpha1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1"
+	v1beta1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1beta1"
 )
 
-type FakeApiregistrationV1alpha1 struct {
+type FakeApiregistrationV1beta1 struct {
 	*testing.Fake
 }
 
-func (c *FakeApiregistrationV1alpha1) APIServices() v1alpha1.APIServiceInterface {
+func (c *FakeApiregistrationV1beta1) APIServices() v1beta1.APIServiceInterface {
 	return &FakeAPIServices{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeApiregistrationV1alpha1) RESTClient() rest.Interface {
+func (c *FakeApiregistrationV1beta1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

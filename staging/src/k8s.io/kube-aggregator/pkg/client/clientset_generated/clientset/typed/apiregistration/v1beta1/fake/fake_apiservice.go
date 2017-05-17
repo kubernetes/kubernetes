@@ -23,70 +23,70 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	v1alpha1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
+	v1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 )
 
 // FakeAPIServices implements APIServiceInterface
 type FakeAPIServices struct {
-	Fake *FakeApiregistrationV1alpha1
+	Fake *FakeApiregistrationV1beta1
 }
 
-var apiservicesResource = schema.GroupVersionResource{Group: "apiregistration.k8s.io", Version: "v1alpha1", Resource: "apiservices"}
+var apiservicesResource = schema.GroupVersionResource{Group: "apiregistration.k8s.io", Version: "v1beta1", Resource: "apiservices"}
 
-var apiservicesKind = schema.GroupVersionKind{Group: "apiregistration.k8s.io", Version: "v1alpha1", Kind: "APIService"}
+var apiservicesKind = schema.GroupVersionKind{Group: "apiregistration.k8s.io", Version: "v1beta1", Kind: "APIService"}
 
-func (c *FakeAPIServices) Create(aPIService *v1alpha1.APIService) (result *v1alpha1.APIService, err error) {
+func (c *FakeAPIServices) Create(aPIService *v1beta1.APIService) (result *v1beta1.APIService, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(apiservicesResource, aPIService), &v1alpha1.APIService{})
+		Invokes(testing.NewRootCreateAction(apiservicesResource, aPIService), &v1beta1.APIService{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.APIService), err
+	return obj.(*v1beta1.APIService), err
 }
 
-func (c *FakeAPIServices) Update(aPIService *v1alpha1.APIService) (result *v1alpha1.APIService, err error) {
+func (c *FakeAPIServices) Update(aPIService *v1beta1.APIService) (result *v1beta1.APIService, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(apiservicesResource, aPIService), &v1alpha1.APIService{})
+		Invokes(testing.NewRootUpdateAction(apiservicesResource, aPIService), &v1beta1.APIService{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.APIService), err
+	return obj.(*v1beta1.APIService), err
 }
 
-func (c *FakeAPIServices) UpdateStatus(aPIService *v1alpha1.APIService) (*v1alpha1.APIService, error) {
+func (c *FakeAPIServices) UpdateStatus(aPIService *v1beta1.APIService) (*v1beta1.APIService, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(apiservicesResource, "status", aPIService), &v1alpha1.APIService{})
+		Invokes(testing.NewRootUpdateSubresourceAction(apiservicesResource, "status", aPIService), &v1beta1.APIService{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.APIService), err
+	return obj.(*v1beta1.APIService), err
 }
 
 func (c *FakeAPIServices) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(apiservicesResource, name), &v1alpha1.APIService{})
+		Invokes(testing.NewRootDeleteAction(apiservicesResource, name), &v1beta1.APIService{})
 	return err
 }
 
 func (c *FakeAPIServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(apiservicesResource, listOptions)
 
-	_, err := c.Fake.Invokes(action, &v1alpha1.APIServiceList{})
+	_, err := c.Fake.Invokes(action, &v1beta1.APIServiceList{})
 	return err
 }
 
-func (c *FakeAPIServices) Get(name string, options v1.GetOptions) (result *v1alpha1.APIService, err error) {
+func (c *FakeAPIServices) Get(name string, options v1.GetOptions) (result *v1beta1.APIService, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(apiservicesResource, name), &v1alpha1.APIService{})
+		Invokes(testing.NewRootGetAction(apiservicesResource, name), &v1beta1.APIService{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.APIService), err
+	return obj.(*v1beta1.APIService), err
 }
 
-func (c *FakeAPIServices) List(opts v1.ListOptions) (result *v1alpha1.APIServiceList, err error) {
+func (c *FakeAPIServices) List(opts v1.ListOptions) (result *v1beta1.APIServiceList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(apiservicesResource, apiservicesKind, opts), &v1alpha1.APIServiceList{})
+		Invokes(testing.NewRootListAction(apiservicesResource, apiservicesKind, opts), &v1beta1.APIServiceList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -95,8 +95,8 @@ func (c *FakeAPIServices) List(opts v1.ListOptions) (result *v1alpha1.APIService
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.APIServiceList{}
-	for _, item := range obj.(*v1alpha1.APIServiceList).Items {
+	list := &v1beta1.APIServiceList{}
+	for _, item := range obj.(*v1beta1.APIServiceList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -111,11 +111,11 @@ func (c *FakeAPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched aPIService.
-func (c *FakeAPIServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.APIService, err error) {
+func (c *FakeAPIServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.APIService, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(apiservicesResource, name, data, subresources...), &v1alpha1.APIService{})
+		Invokes(testing.NewRootPatchSubresourceAction(apiservicesResource, name, data, subresources...), &v1beta1.APIService{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.APIService), err
+	return obj.(*v1beta1.APIService), err
 }
