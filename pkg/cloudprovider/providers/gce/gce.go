@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
@@ -232,6 +233,9 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		operationPollRateLimiter: operationPollRateLimiter,
 	}, nil
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (gce *GCECloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 // LoadBalancer returns an implementation of LoadBalancer for Google Compute Engine.
 func (gce *GCECloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {

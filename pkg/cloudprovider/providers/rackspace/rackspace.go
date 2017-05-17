@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -217,6 +218,9 @@ func newRackspace(cfg Config) (*Rackspace, error) {
 
 	return &os, nil
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (os *Rackspace) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 type Instances struct {
 	compute *gophercloud.ServiceClient
