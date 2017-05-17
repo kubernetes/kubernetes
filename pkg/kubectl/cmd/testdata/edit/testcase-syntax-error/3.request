@@ -3,5 +3,12 @@
 		"labels": {
 			"new-label": "foo"
 		}
+	},
+	"spec": {
+		"$setElementOrder/ports": [
+			{
+				"port": 443
+			}
+		]
 	}
 }

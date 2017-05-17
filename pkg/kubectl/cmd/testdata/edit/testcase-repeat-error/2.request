@@ -1,5 +1,10 @@
 {
 	"spec": {
+		"$setElementOrder/ports": [
+			{
+				"port": 443
+			}
+		],
 		"clusterIP": "10.0.0.1.1"
 	}
 }

@@ -1,7 +1,14 @@
 {
-  "metadata": {
-    "labels": {
-      "new-label": "new-value"
-    }
-  }
+	"metadata": {
+		"labels": {
+			"new-label": "new-value"
+		}
+	},
+	"spec": {
+		"$setElementOrder/ports": [
+			{
+				"port": 80
+			}
+		]
+	}
 }
