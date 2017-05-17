@@ -549,12 +549,14 @@ func (vs *VSphere) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 			addressType = v1.NodeInternalIP
 		}
 		for _, ip := range v.IpAddress {
-			v1.AddToNodeAddresses(&addrs,
-				v1.NodeAddress{
-					Type:    addressType,
-					Address: ip,
-				},
-			)
+			if net.ParseIP(ip).To4() != nil {
+				v1.AddToNodeAddresses(&addrs,
+					v1.NodeAddress{
+						Type:    addressType,
+						Address: ip,
+					},
+				)
+			}
 		}
 	}
 	return addrs, nil
@@ -759,7 +761,10 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName k8stypes.NodeName) (di
 		return "", "", err
 	}
 
-	attached, _ := checkDiskAttached(vmDiskPath, vmDevices, dc, vs.client)
+	attached, err := checkDiskAttached(vmDiskPath, vmDevices, dc, vs.client)
+	if err != nil {
+		return "", "", err
+	}
 	if attached {
 		diskID, _ = getVirtualDiskID(vmDiskPath, vmDevices, dc, vs.client)
 		diskUUID, _ = getVirtualDiskUUIDByPath(vmDiskPath, dc, vs.client)
@@ -999,14 +1004,10 @@ func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName k8stypes.NodeNam
 	defer cancel()
 
 	// Create vSphere client
-	attached := make(map[string]bool)
-	for _, volPath := range volPaths {
-		attached[volPath] = false
-	}
 	err := vSphereLogin(ctx, vs)
 	if err != nil {
 		glog.Errorf("Failed to login into vCenter, err: %v", err)
-		return attached, err
+		return nil, err
 	}
 
 	// Find VM to detach disk from
@@ -1022,14 +1023,14 @@ func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName k8stypes.NodeNam
 
 	if err != nil {
 		glog.Errorf("Failed to check whether node exist. err: %s.", err)
-		return attached, err
+		return nil, err
 	}
 
 	if !nodeExist {
 		glog.Errorf("DisksAreAttached failed to determine whether disks %v are still attached: node %q does not exist",
 			volPaths,
 			vSphereInstance)
-		return attached, fmt.Errorf("DisksAreAttached failed to determine whether disks %v are still attached: node %q does not exist",
+		return nil, fmt.Errorf("DisksAreAttached failed to determine whether disks %v are still attached: node %q does not exist",
 			volPaths,
 			vSphereInstance)
 	}
@@ -1038,17 +1039,23 @@ func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName k8stypes.NodeNam
 	_, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
 	if err != nil {
 		glog.Errorf("Failed to get VM devices for VM %#q. err: %s", vSphereInstance, err)
-		return attached, err
+		return nil, err
 	}
 
+	attached := make(map[string]bool)
 	for _, volPath := range volPaths {
-		result, _ := checkDiskAttached(volPath, vmDevices, dc, vs.client)
-		if result {
-			attached[volPath] = true
+		result, err := checkDiskAttached(volPath, vmDevices, dc, vs.client)
+		if err == nil {
+			if result {
+				attached[volPath] = true
+			} else {
+				attached[volPath] = false
+			}
+		} else {
+			return nil, err
 		}
 	}
-
-	return attached, err
+	return attached, nil
 }
 
 func checkDiskAttached(volPath string, vmdevices object.VirtualDeviceList, dc *object.Datacenter, client *govmomi.Client) (bool, error) {
