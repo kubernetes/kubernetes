@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"fmt"
-	"reflect"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -296,106 +295,6 @@ func TestGetServiceHealthCheckNodePort(t *testing.T) {
 			},
 		},
 	})
-}
-
-func TestSetDefaultExternalTrafficPolicyIfNeeded(t *testing.T) {
-	testCases := []struct {
-		inputService    *api.Service
-		expectedService *api.Service
-	}{
-		// First class fields cases.
-		{
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeLoadBalancer,
-				},
-			},
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
-				},
-			},
-		},
-		{
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeNodePort,
-				},
-			},
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeNodePort,
-					ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
-				},
-			},
-		},
-		{
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
-				},
-			},
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
-				},
-			},
-		},
-		// Beta annotations cases.
-		{
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeLoadBalancer,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						api.BetaAnnotationExternalTraffic: api.AnnotationValueExternalTrafficLocal,
-					},
-				},
-			},
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeLoadBalancer,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						api.BetaAnnotationExternalTraffic: api.AnnotationValueExternalTrafficLocal,
-					},
-				},
-			},
-		},
-		{
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeLoadBalancer,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						api.BetaAnnotationExternalTraffic: api.AnnotationValueExternalTrafficGlobal,
-					},
-				},
-			},
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeLoadBalancer,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						api.BetaAnnotationExternalTraffic: api.AnnotationValueExternalTrafficGlobal,
-					},
-				},
-			},
-		},
-	}
-
-	for i, tc := range testCases {
-		SetDefaultExternalTrafficPolicyIfNeeded(tc.inputService)
-		if !reflect.DeepEqual(tc.inputService, tc.expectedService) {
-			t.Errorf("%v: got unexpected service", i)
-			spew.Dump(tc)
-		}
-	}
 }
 
 func TestClearExternalTrafficPolicy(t *testing.T) {
