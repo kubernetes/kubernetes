@@ -51,7 +51,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -126,8 +125,6 @@ var (
 		"app":    "federated-cluster",
 		"module": "federation-controller-manager",
 	}
-
-	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
 )
 
 type initFederation struct {
@@ -154,9 +151,7 @@ type initFederationOptions struct {
 	apiServerEnableTokenAuth         bool
 }
 
-func (o *initFederationOptions) Bind(flags *pflag.FlagSet) {
-	defaultImage := fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
-
+func (o *initFederationOptions) Bind(flags *pflag.FlagSet, defaultImage string) {
 	flags.StringVar(&o.dnsZoneName, "dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
 	flags.StringVar(&o.image, "image", defaultImage, "Image to use for federation API server and controller manager binaries.")
 	flags.StringVar(&o.dnsProvider, "dns-provider", "", "Dns provider to be used for this deployment.")
@@ -174,7 +169,7 @@ func (o *initFederationOptions) Bind(flags *pflag.FlagSet) {
 
 // NewCmdInit defines the `init` command that bootstraps a federation
 // control plane inside a set of host clusters.
-func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
+func NewCmdInit(cmdOut io.Writer, config util.AdminConfig, defaultImage string) *cobra.Command {
 	opts := &initFederation{}
 
 	cmd := &cobra.Command{
@@ -190,7 +185,7 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 
 	flags := cmd.Flags()
 	opts.commonOptions.Bind(flags)
-	opts.options.Bind(flags)
+	opts.options.Bind(flags, defaultImage)
 
 	return cmd
 }
