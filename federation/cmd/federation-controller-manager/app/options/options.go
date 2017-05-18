@@ -83,6 +83,8 @@ type ControllerManagerConfiguration struct {
 	// by cluster local hpas on local replicas, but too low a value can result in thrashing.
 	// Higher values will result in slower response to scalibility conditions on local replicas.
 	HpaScaleForbiddenWindow metav1.Duration `json:"HpaScaleForbiddenWindow"`
+	// pre-configured namespace name that would be created only in federation control plane
+	FederationOnlyNamespace string `json:"federationOnlyNamespaceName"`
 }
 
 // CMServer is the main context object for the controller manager.
@@ -113,6 +115,7 @@ func NewCMServer() *CMServer {
 			LeaderElection:            leaderelectionconfig.DefaultLeaderElectionConfiguration(),
 			Controllers:               make(utilflag.ConfigurationMap),
 			HpaScaleForbiddenWindow:   metav1.Duration{Duration: 2 * time.Minute},
+			FederationOnlyNamespace:   "federation-only",
 		},
 	}
 	return &s
@@ -144,5 +147,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 		"A set of key=value pairs that describe controller configuration "+
 		"to enable/disable specific controllers. Key should be the resource name (like services) and value should be true or false. "+
 		"For example: services=false,ingresses=false")
+	fs.StringVar(&s.FederationOnlyNamespace, "federation-only-namespace", s.FederationOnlyNamespace, "Name of the namespace that would be created only in federation control plane.")
 	leaderelectionconfig.BindFlags(&s.LeaderElection, fs)
 }
