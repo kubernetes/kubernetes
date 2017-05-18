@@ -36,6 +36,7 @@ import (
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
+	apiextensionsinformers "k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/master/thirdparty"
@@ -89,7 +90,7 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 
 }
 
-func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, sharedInformers informers.SharedInformerFactory) (*aggregatorapiserver.APIAggregator, error) {
+func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, kubeInformers informers.SharedInformerFactory, apiExtensionInformers apiextensionsinformers.SharedInformerFactory) (*aggregatorapiserver.APIAggregator, error) {
 	aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(delegateAPIServer)
 	if err != nil {
 		return nil, err
@@ -102,7 +103,10 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	}
 	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices(), apiRegistrationClient)
 	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
-	tprRegistrationController := thirdparty.NewAutoRegistrationController(sharedInformers.Extensions().InternalVersion().ThirdPartyResources(), autoRegistrationController)
+	tprRegistrationController := thirdparty.NewAutoRegistrationController(
+		kubeInformers.Extensions().InternalVersion().ThirdPartyResources(),
+		apiExtensionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
+		autoRegistrationController)
 
 	aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
 		go autoRegistrationController.Run(5, context.StopCh)
