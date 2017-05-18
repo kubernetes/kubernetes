@@ -92,7 +92,8 @@ func (f *FederationFixture) StartCluster(t *testing.T) {
 
 	cluster := &federationapi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("cluster-%d", clusterId),
+			Name:   fmt.Sprintf("cluster-%d", clusterId),
+			Labels: map[string]string{"cluster": fmt.Sprintf("%d", clusterId)},
 		},
 		Spec: federationapi.ClusterSpec{
 			ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
