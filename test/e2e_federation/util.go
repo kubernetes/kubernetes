@@ -154,34 +154,28 @@ func createService(clientset *fedclientset.Clientset, namespace, name string, cl
 	}
 
 	var err error
+	var service *v1.Service
 	// until the availablePort list is not empty, lets try to create the service
 	for len(availablePorts) > 0 {
 		// select the Id of an available port
 		i := rand.Intn(len(availablePorts))
 
-		service, err := createServiceWithNodePort(clientset, namespace, name, availablePorts[i])
+		By(fmt.Sprintf("try creating federated service %q in namespace %q with nodePort %d", name, namespace, availablePorts[i]))
+
+		service, err = createServiceWithNodePort(clientset, namespace, name, availablePorts[i])
+
 		if err == nil {
+			// check if service have been created properly in all clusters.
+			// if the service is not present in one of the clusters, we should cleanup all services
+			err = checkServicesCreation(namespace, name, clusters)
+		}
+
+		if err == nil {
+			// everything was created properly so returns the federated service.
 			return service, nil
 		}
 
-		// check if service have been created in some clusters.
-		// if it's the case, delete them.
-		err = wait.Poll(5*time.Second, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
-			var err error
-			service, err = clientset.Core().Services(namespace).Get(name, metav1.GetOptions{})
-			if service != nil && err == nil {
-				return true, err
-			}
-			if errors.IsNotFound(err) {
-				return true, err
-			}
-			return false, nil
-		})
-
-		if err != nil {
-			framework.Failf("Getting the service %q creation status after a partial createService(): %v", name, err)
-		}
-
+		// in case of error, cleanup everything
 		if service != nil {
 			if err = deleteService(clientset, namespace, name, nil); err != nil {
 				framework.ExpectNoError(err, "Deleting service %q after a partial createService() error", service.Name)
@@ -197,6 +191,19 @@ func createService(clientset *fedclientset.Clientset, namespace, name string, cl
 	}
 
 	return nil, err
+}
+
+// checkServicesCreation checks if the service have been created successfuly in all the clusters.
+// if the service is not present in at least one of the clusters, this function returns an error.
+func checkServicesCreation(namespace, serviceName string, clusters fedframework.ClusterSlice) error {
+	framework.Logf("check if service %q have been created in %d clusters", serviceName, len(clusters))
+	for _, c := range clusters {
+		_, err := getServiceShardWithRetry(namespace, serviceName, true, c)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name string, clusters fedframework.ClusterSlice) *v1.Service {
@@ -230,11 +237,15 @@ func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, se
 	err := deleteService(clientset, namespace, serviceName, orphanDependents)
 	if err != nil {
 		framework.DescribeSvc(namespace)
-		framework.Failf("Error in deleting service %s: %v", serviceName, err)
+		framework.Failf("Error in deleting service %v in namespace %v err: %v", serviceName, namespace, err)
 	}
 }
 
 func getServiceShard(namespace string, serviceName string, cluster *fedframework.Cluster) (*v1.Service, error) {
+	return getServiceShardWithRetry(namespace, serviceName, false, cluster)
+}
+
+func getServiceShardWithRetry(namespace string, serviceName string, retry bool, cluster *fedframework.Cluster) (*v1.Service, error) {
 	name := cluster.Name
 	var cSvc *v1.Service
 	err := wait.PollImmediate(framework.Poll, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
@@ -246,6 +257,11 @@ func getServiceShard(namespace string, serviceName string, cluster *fedframework
 			return false, nil
 		} else if errors.IsNotFound(err) {
 			cSvc = nil
+			if retry {
+				// don't return the
+				framework.Logf("Service %q in namespace %q in cluster %q not found. Trying again in %s", serviceName, namespace, name, framework.Poll)
+				return false, nil
+			}
 			By(fmt.Sprintf("Service %q in namespace %q in cluster %q not found", serviceName, namespace, name))
 			return true, err
 		}
