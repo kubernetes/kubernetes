@@ -78,10 +78,6 @@ func (f *FakeIPTables) Save(table iptables.Table) ([]byte, error) {
 	return lines, nil
 }
 
-func (*FakeIPTables) SaveAll() ([]byte, error) {
-	return make([]byte, 0), nil
-}
-
 func (*FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
 	return nil
 }
