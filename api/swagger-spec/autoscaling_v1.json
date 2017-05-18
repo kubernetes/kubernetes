@@ -45,6 +45,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -173,6 +181,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -252,6 +268,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -605,6 +629,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -700,6 +732,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -773,6 +813,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -1140,6 +1188,10 @@
       },
       "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller."
      },
+     "initializers": {
+      "$ref": "v1.Initializers",
+      "description": "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user."
+     },
      "finalizers": {
       "type": "array",
       "items": {
@@ -1189,88 +1241,36 @@
      }
     }
    },
-   "v1.HorizontalPodAutoscalerSpec": {
-    "id": "v1.HorizontalPodAutoscalerSpec",
-    "description": "specification of a horizontal pod autoscaler.",
+   "v1.Initializers": {
+    "id": "v1.Initializers",
+    "description": "Initializers tracks the progress of initialization.",
     "required": [
-     "scaleTargetRef",
-     "maxReplicas"
+     "pending"
     ],
     "properties": {
-     "scaleTargetRef": {
-      "$ref": "v1.CrossVersionObjectReference",
-      "description": "reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource."
+     "pending": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Initializer"
+      },
+      "description": "Pending is a list of initializers that must execute in order before this object is visible. When the last pending initializer is removed, and no failing result is set, the initializers struct will be set to nil and the object is considered as initialized and visible to all clients."
      },
-     "minReplicas": {
-      "type": "integer",
-      "format": "int32",
-      "description": "lower limit for the number of pods that can be set by the autoscaler, default 1."
-     },
-     "maxReplicas": {
-      "type": "integer",
-      "format": "int32",
-      "description": "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas."
-     },
-     "targetCPUUtilizationPercentage": {
-      "type": "integer",
-      "format": "int32",
-      "description": "target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified the default autoscaling policy will be used."
+     "result": {
+      "$ref": "v1.Status",
+      "description": "If result is set with the Failure field, the object will be persisted to storage and then deleted, ensuring that other clients can observe the deletion."
      }
     }
    },
-   "v1.CrossVersionObjectReference": {
-    "id": "v1.CrossVersionObjectReference",
-    "description": "CrossVersionObjectReference contains enough information to let you identify the referred resource.",
+   "v1.Initializer": {
+    "id": "v1.Initializer",
+    "description": "Initializer is information about an initializer that has not yet completed.",
     "required": [
-     "kind",
      "name"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\""
-     },
      "name": {
       "type": "string",
-      "description": "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "API version of the referent"
-     }
-    }
-   },
-   "v1.HorizontalPodAutoscalerStatus": {
-    "id": "v1.HorizontalPodAutoscalerStatus",
-    "description": "current status of a horizontal pod autoscaler",
-    "required": [
-     "currentReplicas",
-     "desiredReplicas"
-    ],
-    "properties": {
-     "observedGeneration": {
-      "type": "integer",
-      "format": "int64",
-      "description": "most recent generation observed by this autoscaler."
-     },
-     "lastScaleTime": {
-      "type": "string",
-      "description": "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed."
-     },
-     "currentReplicas": {
-      "type": "integer",
-      "format": "int32",
-      "description": "current number of replicas of pods managed by this autoscaler."
-     },
-     "desiredReplicas": {
-      "type": "integer",
-      "format": "int32",
-      "description": "desired number of replicas of pods managed by this autoscaler."
-     },
-     "currentCPUUtilizationPercentage": {
-      "type": "integer",
-      "format": "int32",
-      "description": "current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU."
+      "description": "name of the process that is responsible for initializing this object."
      }
     }
    },
@@ -1362,6 +1362,91 @@
      "field": {
       "type": "string",
       "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed.  Fields may appear more than once in an array of causes due to fields having multiple errors. Optional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\""
+     }
+    }
+   },
+   "v1.HorizontalPodAutoscalerSpec": {
+    "id": "v1.HorizontalPodAutoscalerSpec",
+    "description": "specification of a horizontal pod autoscaler.",
+    "required": [
+     "scaleTargetRef",
+     "maxReplicas"
+    ],
+    "properties": {
+     "scaleTargetRef": {
+      "$ref": "v1.CrossVersionObjectReference",
+      "description": "reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource."
+     },
+     "minReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "lower limit for the number of pods that can be set by the autoscaler, default 1."
+     },
+     "maxReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas."
+     },
+     "targetCPUUtilizationPercentage": {
+      "type": "integer",
+      "format": "int32",
+      "description": "target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified the default autoscaling policy will be used."
+     }
+    }
+   },
+   "v1.CrossVersionObjectReference": {
+    "id": "v1.CrossVersionObjectReference",
+    "description": "CrossVersionObjectReference contains enough information to let you identify the referred resource.",
+    "required": [
+     "kind",
+     "name"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\""
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent"
+     }
+    }
+   },
+   "v1.HorizontalPodAutoscalerStatus": {
+    "id": "v1.HorizontalPodAutoscalerStatus",
+    "description": "current status of a horizontal pod autoscaler",
+    "required": [
+     "currentReplicas",
+     "desiredReplicas"
+    ],
+    "properties": {
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "most recent generation observed by this autoscaler."
+     },
+     "lastScaleTime": {
+      "type": "string",
+      "description": "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed."
+     },
+     "currentReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "current number of replicas of pods managed by this autoscaler."
+     },
+     "desiredReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "desired number of replicas of pods managed by this autoscaler."
+     },
+     "currentCPUUtilizationPercentage": {
+      "type": "integer",
+      "format": "int32",
+      "description": "current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU."
      }
     }
    },

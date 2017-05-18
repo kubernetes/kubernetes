@@ -55,8 +55,12 @@ func (meta *ObjectMeta) GetLabels() map[string]string                 { return m
 func (meta *ObjectMeta) SetLabels(labels map[string]string)           { meta.Labels = labels }
 func (meta *ObjectMeta) GetAnnotations() map[string]string            { return meta.Annotations }
 func (meta *ObjectMeta) SetAnnotations(annotations map[string]string) { meta.Annotations = annotations }
-func (meta *ObjectMeta) GetFinalizers() []string                      { return meta.Finalizers }
-func (meta *ObjectMeta) SetFinalizers(finalizers []string)            { meta.Finalizers = finalizers }
+func (meta *ObjectMeta) GetInitializers() *metav1.Initializers        { return meta.Initializers }
+func (meta *ObjectMeta) SetInitializers(initializers *metav1.Initializers) {
+	meta.Initializers = initializers
+}
+func (meta *ObjectMeta) GetFinalizers() []string           { return meta.Finalizers }
+func (meta *ObjectMeta) SetFinalizers(finalizers []string) { meta.Finalizers = finalizers }
 
 func (meta *ObjectMeta) GetOwnerReferences() []metav1.OwnerReference {
 	ret := make([]metav1.OwnerReference, len(meta.OwnerReferences))
