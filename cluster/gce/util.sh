@@ -515,7 +515,7 @@ function create-node-template() {
   fi
 
   if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
-    gcloud="gcloud alpha"
+    gcloud="gcloud beta"
   fi
 
   local preemptible_minions=""
@@ -745,7 +745,7 @@ function create-subnetwork() {
 
   # Look for the subnet, it must exist and have a secondary range
   # configured.
-  local subnet=$(gcloud alpha compute networks subnets describe \
+  local subnet=$(gcloud beta compute networks subnets describe \
     --project "${PROJECT}" \
     --region ${REGION} \
     ${IP_ALIAS_SUBNETWORK} 2>/dev/null)
@@ -762,7 +762,7 @@ function create-subnetwork() {
     fi
 
     echo "Creating subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
-    gcloud alpha compute networks subnets create \
+    gcloud beta compute networks subnets create \
       ${IP_ALIAS_SUBNETWORK} \
       --description "Automatically generated subnet for ${INSTANCE_PREFIX} cluster. This will be removed on cluster teardown." \
       --project "${PROJECT}" \
@@ -812,11 +812,11 @@ function delete-subnetwork() {
   fi
 
   echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
-  if [[ -n $(gcloud alpha compute networks subnets describe \
+  if [[ -n $(gcloud beta compute networks subnets describe \
         --project "${PROJECT}" \
         --region ${REGION} \
         ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
-    gcloud alpha --quiet compute networks subnets delete \
+    gcloud beta --quiet compute networks subnets delete \
       --project "${PROJECT}" \
       --region ${REGION} \
       ${IP_ALIAS_SUBNETWORK}
