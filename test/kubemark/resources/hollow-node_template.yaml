@@ -79,7 +79,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - /kubemark --morph=proxy --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --alsologtostderr {{kubeproxy_verbosity_level}} 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1
+        - /kubemark --morph=proxy --name=$(NODE_NAME) --use-real-proxier={{use_real_proxier}} --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --alsologtostderr {{kubeproxy_verbosity_level}} 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
