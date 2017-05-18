@@ -1497,8 +1497,8 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	proxier.iptablesLines.Write(proxier.natChains.Bytes())
 	proxier.iptablesLines.Write(proxier.natRules.Bytes())
 
-	if glog.V(4) {
-		glog.V(4).Infof("Restoring iptables rules: %s", proxier.iptablesLines.Bytes())
+	if glog.V(5) {
+		glog.V(5).Infof("Restoring iptables rules: %s", proxier.iptablesLines.Bytes())
 	}
 	err = proxier.iptables.RestoreAll(proxier.iptablesLines.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
