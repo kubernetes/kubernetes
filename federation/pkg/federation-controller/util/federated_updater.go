@@ -122,7 +122,7 @@ func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation) error {
 				fu.recordEvent(op.Obj, eventType, "Deleting", eventArgs...)
 				err = fu.deleteFunction(clientset, op.Obj)
 				// IsNotFound error is fine since that means the object is deleted already.
-				if err != nil && !errors.IsNotFound(err) {
+				if errors.IsNotFound(err) {
 					err = nil
 				}
 			}
