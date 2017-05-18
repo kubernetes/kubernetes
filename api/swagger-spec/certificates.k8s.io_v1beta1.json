@@ -45,6 +45,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -157,6 +165,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -228,6 +244,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -541,6 +565,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -847,6 +879,10 @@
       },
       "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller."
      },
+     "initializers": {
+      "$ref": "v1.Initializers",
+      "description": "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user."
+     },
      "finalizers": {
       "type": "array",
       "items": {
@@ -896,86 +932,36 @@
      }
     }
    },
-   "v1beta1.CertificateSigningRequestSpec": {
-    "id": "v1beta1.CertificateSigningRequestSpec",
-    "description": "This information is immutable after the request is created. Only the Request and Usages fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
+   "v1.Initializers": {
+    "id": "v1.Initializers",
+    "description": "Initializers tracks the progress of initialization.",
     "required": [
-     "request"
+     "pending"
     ],
     "properties": {
-     "request": {
-      "type": "string",
-      "description": "Base64-encoded PKCS#10 CSR data"
-     },
-     "usages": {
+     "pending": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.KeyUsage"
+       "$ref": "v1.Initializer"
       },
-      "description": "allowedUsages specifies a set of usage contexts the key will be valid for. See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3\n     https://tools.ietf.org/html/rfc5280#section-4.2.1.12"
+      "description": "Pending is a list of initializers that must execute in order before this object is visible. When the last pending initializer is removed, and no failing result is set, the initializers struct will be set to nil and the object is considered as initialized and visible to all clients."
      },
-     "username": {
-      "type": "string",
-      "description": "Information about the requesting user. See user.Info interface for details."
-     },
-     "uid": {
-      "type": "string",
-      "description": "UID information about the requesting user. See user.Info interface for details."
-     },
-     "groups": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      },
-      "description": "Group information about the requesting user. See user.Info interface for details."
-     },
-     "extra": {
-      "type": "object",
-      "description": "Extra information about the requesting user. See user.Info interface for details."
+     "result": {
+      "$ref": "v1.Status",
+      "description": "If result is set with the Failure field, the object will be persisted to storage and then deleted, ensuring that other clients can observe the deletion."
      }
     }
    },
-   "v1beta1.KeyUsage": {
-    "id": "v1beta1.KeyUsage",
-    "properties": {}
-   },
-   "v1beta1.CertificateSigningRequestStatus": {
-    "id": "v1beta1.CertificateSigningRequestStatus",
-    "properties": {
-     "conditions": {
-      "type": "array",
-      "items": {
-       "$ref": "v1beta1.CertificateSigningRequestCondition"
-      },
-      "description": "Conditions applied to the request, such as approval or denial."
-     },
-     "certificate": {
-      "type": "string",
-      "description": "If request was approved, the controller will place the issued certificate here."
-     }
-    }
-   },
-   "v1beta1.CertificateSigningRequestCondition": {
-    "id": "v1beta1.CertificateSigningRequestCondition",
+   "v1.Initializer": {
+    "id": "v1.Initializer",
+    "description": "Initializer is information about an initializer that has not yet completed.",
     "required": [
-     "type"
+     "name"
     ],
     "properties": {
-     "type": {
+     "name": {
       "type": "string",
-      "description": "request approval state, currently Approved or Denied."
-     },
-     "reason": {
-      "type": "string",
-      "description": "brief reason for the request state"
-     },
-     "message": {
-      "type": "string",
-      "description": "human readable message with details about the request state"
-     },
-     "lastUpdateTime": {
-      "type": "string",
-      "description": "timestamp for the last update to this condition"
+      "description": "name of the process that is responsible for initializing this object."
      }
     }
    },
@@ -1067,6 +1053,89 @@
      "field": {
       "type": "string",
       "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed.  Fields may appear more than once in an array of causes due to fields having multiple errors. Optional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\""
+     }
+    }
+   },
+   "v1beta1.CertificateSigningRequestSpec": {
+    "id": "v1beta1.CertificateSigningRequestSpec",
+    "description": "This information is immutable after the request is created. Only the Request and Usages fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
+    "required": [
+     "request"
+    ],
+    "properties": {
+     "request": {
+      "type": "string",
+      "description": "Base64-encoded PKCS#10 CSR data"
+     },
+     "usages": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.KeyUsage"
+      },
+      "description": "allowedUsages specifies a set of usage contexts the key will be valid for. See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3\n     https://tools.ietf.org/html/rfc5280#section-4.2.1.12"
+     },
+     "username": {
+      "type": "string",
+      "description": "Information about the requesting user. See user.Info interface for details."
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID information about the requesting user. See user.Info interface for details."
+     },
+     "groups": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Group information about the requesting user. See user.Info interface for details."
+     },
+     "extra": {
+      "type": "object",
+      "description": "Extra information about the requesting user. See user.Info interface for details."
+     }
+    }
+   },
+   "v1beta1.KeyUsage": {
+    "id": "v1beta1.KeyUsage",
+    "properties": {}
+   },
+   "v1beta1.CertificateSigningRequestStatus": {
+    "id": "v1beta1.CertificateSigningRequestStatus",
+    "properties": {
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.CertificateSigningRequestCondition"
+      },
+      "description": "Conditions applied to the request, such as approval or denial."
+     },
+     "certificate": {
+      "type": "string",
+      "description": "If request was approved, the controller will place the issued certificate here."
+     }
+    }
+   },
+   "v1beta1.CertificateSigningRequestCondition": {
+    "id": "v1beta1.CertificateSigningRequestCondition",
+    "required": [
+     "type"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "request approval state, currently Approved or Denied."
+     },
+     "reason": {
+      "type": "string",
+      "description": "brief reason for the request state"
+     },
+     "message": {
+      "type": "string",
+      "description": "human readable message with details about the request state"
+     },
+     "lastUpdateTime": {
+      "type": "string",
+      "description": "timestamp for the last update to this condition"
      }
     }
    },
