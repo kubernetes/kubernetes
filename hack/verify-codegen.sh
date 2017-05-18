@@ -29,4 +29,3 @@ vendor/k8s.io/sample-apiserver/hack/verify-codegen.sh
 vendor/k8s.io/kube-apiextensions-server/hack/verify-codegen.sh
 
 "${KUBE_ROOT}/hack/update-codegen.sh" --verify-only
-
