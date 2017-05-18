@@ -155,7 +155,9 @@ func (nm *NamespaceController) worker() {
 // syncNamespaceFromKey looks for a namespace with the specified key in its store and synchronizes it
 func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 	startTime := time.Now()
-	defer glog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Now().Sub(startTime))
+	defer func() {
+		glog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Now().Sub(startTime))
+	}()
 
 	namespace, err := nm.lister.Get(key)
 	if errors.IsNotFound(err) {
@@ -174,16 +176,14 @@ func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer nm.queue.ShutDown()
 
-	glog.Info("Starting namespace controller")
-	defer glog.Infof("Shutting down namespace controller")
-
 	if !controller.WaitForCacheSync("namespace", stopCh, nm.listerSynced) {
 		return
 	}
 
+	glog.V(5).Info("Starting workers")
 	for i := 0; i < workers; i++ {
 		go wait.Until(nm.worker, time.Second, stopCh)
 	}
-
 	<-stopCh
+	glog.V(1).Infof("Shutting down")
 }

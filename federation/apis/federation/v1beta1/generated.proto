@@ -83,6 +83,27 @@ message ClusterList {
   repeated Cluster items = 2;
 }
 
+// ClusterSelectorRequirement contains values, a key, and an operator that relates the key and values.
+// The zero value of ClusterSelectorRequirement is invalid.
+// ClusterSelectorRequirement implements both set based match and exact match
+message ClusterSelectorRequirement {
+  // +patchMergeKey=key
+  // +patchStrategy=merge
+  optional string key = 1;
+
+  // The Operator defines how the Key is matched to the Values. One of "in", "notin",
+  // "exists", "!", "=", "!=", "gt" or "lt".
+  optional string operator = 2;
+
+  // An array of string values. If the operator is "in" or "notin",
+  // the values array must be non-empty. If the operator is "exists" or "!",
+  // the values array must be empty. If the operator is "gt" or "lt", the values
+  // array must have a single element, which will be interpreted as an integer.
+  // This array is replaced during a strategic merge patch.
+  // +optional
+  repeated string values = 3;
+}
+
 // ClusterSpec describes the attributes of a kubernetes cluster.
 message ClusterSpec {
   // A map of client CIDR to server address.

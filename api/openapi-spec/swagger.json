@@ -119,6 +119,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -256,6 +263,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -335,6 +349,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -422,6 +443,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -505,6 +533,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -566,6 +601,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -683,6 +725,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -836,6 +885,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -949,6 +1005,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -1282,6 +1345,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -1395,6 +1465,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -1728,6 +1805,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -1841,6 +1925,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -2174,6 +2265,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -2287,6 +2385,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -2620,6 +2725,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -2733,6 +2845,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -3220,6 +3339,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -3333,6 +3459,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -4942,6 +5075,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -5055,6 +5195,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -5388,6 +5535,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -5501,6 +5655,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -6142,6 +6303,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -6255,6 +6423,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -6742,6 +6917,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -6855,6 +7037,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -7188,6 +7377,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -7301,6 +7497,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -7630,6 +7833,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -9093,6 +9303,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -9206,6 +9423,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -10195,6 +10419,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -10256,6 +10487,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -10373,6 +10611,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -10854,6 +11099,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -10933,6 +11185,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -12534,6 +12793,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -12613,6 +12879,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -12700,6 +12973,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -12779,6 +13059,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -12866,6 +13153,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -12945,6 +13239,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -13032,6 +13333,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -13111,6 +13419,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -13198,6 +13513,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -13281,6 +13603,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -13360,6 +13689,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -13451,6 +13787,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -13554,6 +13897,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -13641,6 +13991,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -13744,6 +14101,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -13831,6 +14195,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -13934,6 +14305,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -14021,6 +14399,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -14124,6 +14509,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -14211,6 +14603,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -14314,6 +14713,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -14401,6 +14807,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -14504,6 +14917,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -14591,6 +15011,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -14694,6 +15121,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -14781,6 +15215,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -14884,6 +15325,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -14971,6 +15419,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -15074,6 +15529,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -15161,6 +15623,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -15264,6 +15733,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -15351,6 +15827,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -15454,6 +15937,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -15541,6 +16031,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -15644,6 +16141,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -15735,6 +16239,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -15814,6 +16325,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -15909,6 +16427,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -15992,6 +16517,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -16071,6 +16603,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -16166,6 +16705,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -16245,6 +16791,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -16332,6 +16885,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -16411,6 +16971,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -16498,6 +17065,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -16581,6 +17155,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -16660,6 +17241,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -16846,6 +17434,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -16907,6 +17502,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -17024,6 +17626,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -17737,6 +18346,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -17850,6 +18466,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -18355,6 +18978,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -18438,6 +19068,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -18517,6 +19154,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -18608,6 +19252,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -18711,6 +19362,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -18798,6 +19456,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -18897,6 +19562,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -19712,6 +20384,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -19773,6 +20452,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -19890,6 +20576,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -20395,6 +21088,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -20474,6 +21174,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -20565,6 +21272,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -20701,6 +21415,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -20762,6 +21483,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -20879,6 +21607,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -21384,6 +22119,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -21463,6 +22205,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -21554,6 +22303,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -21723,6 +22479,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -21784,6 +22547,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -21901,6 +22671,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -22406,6 +23183,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -22485,6 +23269,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -22576,6 +23367,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -22712,6 +23510,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -22773,6 +23578,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -22890,6 +23702,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -23377,6 +24196,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -23490,6 +24316,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -23995,6 +24828,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -24078,6 +24918,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -24157,6 +25004,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -24248,6 +25102,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -24351,6 +25212,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -24438,6 +25306,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -24537,6 +25412,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -24672,6 +25554,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -24785,6 +25674,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -25248,6 +26144,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -25327,6 +26230,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -25488,6 +26398,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -25567,6 +26484,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -25654,6 +26578,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -25715,6 +26646,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -25832,6 +26770,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -26319,6 +27264,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -26432,6 +27384,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -27145,6 +28104,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -27258,6 +28224,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -27745,6 +28718,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -27858,6 +28838,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -28191,6 +29178,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -28304,6 +29298,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -29117,6 +30118,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -29178,6 +30186,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -29295,6 +30310,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -29630,6 +30652,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -29691,6 +30720,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -29808,6 +30844,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -30143,6 +31186,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -30222,6 +31272,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -30309,6 +31366,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -30388,6 +31452,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -30479,6 +31550,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -30582,6 +31660,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -30669,6 +31754,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -30772,6 +31864,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -30859,6 +31958,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -30962,6 +32068,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -31049,6 +32162,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -31152,6 +32272,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -31239,6 +32366,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -31342,6 +32476,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -31425,6 +32566,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -31504,6 +32652,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -31599,6 +32754,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -31682,6 +32844,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -31761,6 +32930,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -31904,6 +33080,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -32017,6 +33200,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -32522,6 +33712,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -32601,6 +33798,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -32692,6 +33896,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -32791,6 +34002,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -32926,6 +34144,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -33039,6 +34264,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -33340,6 +34572,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -33453,6 +34692,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -33754,6 +35000,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -33867,6 +35120,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -34184,6 +35444,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -34297,6 +35564,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -34632,6 +35906,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -34711,6 +35992,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -34798,6 +36086,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -34877,6 +36172,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -34972,6 +36274,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -35051,6 +36360,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -35146,6 +36462,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -35233,6 +36556,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -35336,6 +36666,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -35423,6 +36760,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -35526,6 +36870,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -35605,6 +36956,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -35703,6 +37061,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -35820,6 +37185,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -36121,6 +37493,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -36234,6 +37613,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -36535,6 +37921,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -36648,6 +38041,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -36965,6 +38365,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -37078,6 +38485,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -37413,6 +38827,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -37492,6 +38913,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -37579,6 +39007,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -37658,6 +39093,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -37753,6 +39195,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -37832,6 +39281,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -37927,6 +39383,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -38014,6 +39477,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -38117,6 +39587,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -38204,6 +39681,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -38307,6 +39791,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -38386,6 +39877,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -38521,6 +40019,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -38634,6 +40139,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -38985,6 +40497,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -39064,6 +40583,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -39155,6 +40681,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -39254,6 +40787,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -39389,6 +40929,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -39502,6 +41049,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -39837,6 +41391,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -39916,6 +41477,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -40022,6 +41590,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -40139,6 +41714,13 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -40474,6 +42056,13 @@
      },
      {
       "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
@@ -40553,6 +42142,13 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -40887,6 +42483,37 @@
      }
     }
    },
+   "io.k8s.apimachinery.pkg.apis.meta.v1.Initializer": {
+    "description": "Initializer is information about an initializer that has not yet completed.",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "description": "name of the process that is responsible for initializing this object.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.apimachinery.pkg.apis.meta.v1.Initializers": {
+    "description": "Initializers tracks the progress of initialization.",
+    "required": [
+     "pending"
+    ],
+    "properties": {
+     "pending": {
+      "description": "Pending is a list of initializers that must execute in order before this object is visible. When the last pending initializer is removed, and no failing result is set, the initializers struct will be set to nil and the object is considered as initialized and visible to all clients.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Initializer"
+      }
+     },
+     "result": {
+      "description": "If result is set with the Failure field, the object will be persisted to storage and then deleted, ensuring that other clients can observe the deletion.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+     }
+    }
+   },
    "io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector": {
     "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
     "properties": {
@@ -40988,6 +42615,10 @@
       "description": "A sequence number representing a specific generation of the desired state. Populated by the system. Read-only.",
       "type": "integer",
       "format": "int64"
+     },
+     "initializers": {
+      "description": "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Initializers"
      },
      "labels": {
       "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels",

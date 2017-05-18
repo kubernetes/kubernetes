@@ -28,6 +28,7 @@ go_library(
         "//pkg/util/netsh:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/miekg/dns:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
@@ -38,7 +39,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "proxier_test.go",
-        "proxysocket_test.go",
         "roundrobin_test.go",
     ],
     library = ":go_default_library",
