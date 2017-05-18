@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	versionedextension "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	versionedclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -143,6 +144,8 @@ func describerMap(c clientset.Interface) map[schema.GroupKind]printers.Describer
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
 		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
 		policy.Kind("PodDisruptionBudget"):             &PodDisruptionBudgetDescriber{c},
+		rbac.Kind("RoleBinding"):                       &RoleBindingDescriber{c},
+		rbac.Kind("ClusterRoleBinding"):                &ClusterRoleBindingDescriber{c},
 	}
 
 	return m
@@ -2091,6 +2094,70 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 				}
 			}
 			w.WriteLine()
+		}
+
+		return nil
+	})
+}
+
+// RoleBindingDescriber generates information about a node.
+type RoleBindingDescriber struct {
+	clientset.Interface
+}
+
+func (d *RoleBindingDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
+	binding, err := d.Rbac().RoleBindings(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", binding.Name)
+		printLabelsMultiline(w, "Labels", binding.Labels)
+		printAnnotationsMultiline(w, "Annotations", binding.Annotations)
+
+		w.Write(LEVEL_0, "Role:\n")
+		w.Write(LEVEL_1, "Kind:\t%s\n", binding.RoleRef.Kind)
+		w.Write(LEVEL_1, "Name:\t%s\n", binding.RoleRef.Name)
+
+		w.Write(LEVEL_0, "Subjects:\n")
+		w.Write(LEVEL_1, "Kind\tName\tNamespace\n")
+		w.Write(LEVEL_1, "----\t----\t---------\n")
+		for _, s := range binding.Subjects {
+			w.Write(LEVEL_1, "%s\t%s\t%s\n", s.Kind, s.Name, s.Namespace)
+		}
+
+		return nil
+	})
+}
+
+// ClusterRoleBindingDescriber generates information about a node.
+type ClusterRoleBindingDescriber struct {
+	clientset.Interface
+}
+
+func (d *ClusterRoleBindingDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
+	binding, err := d.Rbac().ClusterRoleBindings().Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", binding.Name)
+		printLabelsMultiline(w, "Labels", binding.Labels)
+		printAnnotationsMultiline(w, "Annotations", binding.Annotations)
+
+		w.Write(LEVEL_0, "Role:\n")
+		w.Write(LEVEL_1, "Kind:\t%s\n", binding.RoleRef.Kind)
+		w.Write(LEVEL_1, "Name:\t%s\n", binding.RoleRef.Name)
+
+		w.Write(LEVEL_0, "Subjects:\n")
+		w.Write(LEVEL_1, "Kind\tName\tNamespace\n")
+		w.Write(LEVEL_1, "----\t----\t---------\n")
+		for _, s := range binding.Subjects {
+			w.Write(LEVEL_1, "%s\t%s\t%s\n", s.Kind, s.Name, s.Namespace)
 		}
 
 		return nil
