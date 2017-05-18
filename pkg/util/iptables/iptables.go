@@ -56,8 +56,6 @@ type Interface interface {
 	IsIpv6() bool
 	// Save calls `iptables-save` for table.
 	Save(table Table) ([]byte, error)
-	// SaveAll calls `iptables-save`.
-	SaveAll() ([]byte, error)
 	// Restore runs `iptables-restore` passing data through []byte.
 	// table is the Table to restore
 	// data should be formatted like the output of Save()
@@ -315,16 +313,6 @@ func (runner *runner) Save(table Table) ([]byte, error) {
 	args := []string{"-t", string(table)}
 	glog.V(4).Infof("running iptables-save %v", args)
 	return runner.exec.Command(cmdIPTablesSave, args...).CombinedOutput()
-}
-
-// SaveAll is part of Interface.
-func (runner *runner) SaveAll() ([]byte, error) {
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
-	// run and return
-	glog.V(4).Infof("running iptables-save")
-	return runner.exec.Command(cmdIPTablesSave, []string{}...).CombinedOutput()
 }
 
 // Restore is part of Interface.

@@ -246,20 +246,6 @@ func (f *fakeIPTables) Save(tableName utiliptables.Table) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-func (f *fakeIPTables) SaveAll() ([]byte, error) {
-	data := bytes.NewBuffer(nil)
-	for _, table := range f.tables {
-		tableData, err := f.Save(table.name)
-		if err != nil {
-			return nil, err
-		}
-		if _, err = data.Write(tableData); err != nil {
-			return nil, err
-		}
-	}
-	return data.Bytes(), nil
-}
-
 func (f *fakeIPTables) restore(restoreTableName utiliptables.Table, data []byte, flush utiliptables.FlushFlag) error {
 	buf := bytes.NewBuffer(data)
 	var tableName utiliptables.Table
