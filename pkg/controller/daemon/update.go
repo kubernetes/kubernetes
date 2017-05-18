@@ -17,8 +17,6 @@ limitations under the License.
 package daemon
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -29,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -297,23 +296,18 @@ func (dsc *DaemonSetsController) controlledHistories(ds *extensions.DaemonSet) (
 
 // Match check if ds template is semantically equal to the template stored in history
 func Match(template *v1.PodTemplateSpec, history *apps.ControllerRevision) (bool, error) {
-	t, err := decodeHistory(history)
+	t, err := DecodeHistory(history)
 	return apiequality.Semantic.DeepEqual(template, t), err
 }
 
-func decodeHistory(history *apps.ControllerRevision) (*v1.PodTemplateSpec, error) {
-	raw := history.Data.Raw
-	decoder := json.NewDecoder(bytes.NewBuffer(raw))
+func DecodeHistory(history *apps.ControllerRevision) (*v1.PodTemplateSpec, error) {
 	template := v1.PodTemplateSpec{}
-	err := decoder.Decode(&template)
+	err := json.Unmarshal(history.Data.Raw, &template)
 	return &template, err
 }
 
 func encodeTemplate(template *v1.PodTemplateSpec) ([]byte, error) {
-	buffer := new(bytes.Buffer)
-	encoder := json.NewEncoder(buffer)
-	err := encoder.Encode(template)
-	return buffer.Bytes(), err
+	return json.Marshal(template)
 }
 
 func (dsc *DaemonSetsController) snapshot(ds *extensions.DaemonSet, revision int64) (*apps.ControllerRevision, error) {

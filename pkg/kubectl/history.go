@@ -29,8 +29,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/daemon"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	sliceutil "k8s.io/kubernetes/pkg/util/slice"
@@ -49,6 +52,8 @@ func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryView
 	switch kind {
 	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
 		return &DeploymentHistoryViewer{c}, nil
+	case extensions.Kind("DaemonSet"):
+		return &DaemonSetHistoryViewer{c}, nil
 	}
 	return nil, fmt.Errorf("no history viewer has been implemented for %q", kind)
 }
@@ -100,14 +105,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		if !ok {
 			return "", fmt.Errorf("unable to find the specified revision")
 		}
-		buf := bytes.NewBuffer([]byte{})
-		internalTemplate := &api.PodTemplateSpec{}
-		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
-			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
-		}
-		w := printersinternal.NewPrefixWriter(buf)
-		printersinternal.DescribePodTemplate(internalTemplate, w)
-		return buf.String(), nil
+		return printTemplate(template)
 	}
 
 	// Sort the revisionToChangeCause map by revision
@@ -129,6 +127,101 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		}
 		return nil
 	})
+}
+
+func printTemplate(template *v1.PodTemplateSpec) (string, error) {
+	buf := bytes.NewBuffer([]byte{})
+	internalTemplate := &api.PodTemplateSpec{}
+	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
+		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
+	}
+	w := printersinternal.NewPrefixWriter(buf)
+	printersinternal.DescribePodTemplate(internalTemplate, w)
+	return buf.String(), nil
+}
+
+type DaemonSetHistoryViewer struct {
+	c clientset.Interface
+}
+
+// ViewHistory returns a revision-to-history map as the revision history of a deployment
+// TODO: this should be a describer
+func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
+	ds, err := h.c.Extensions().DaemonSets(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve DaemonSet %s: %v", name, err)
+	}
+	allHistory, err := controlledHistories(h.c, ds)
+	if err != nil {
+		return "", fmt.Errorf("unable to find history controlled by DaemonSet %s: %v", ds.Name, err)
+	}
+	historyInfo := make(map[int64]*appsv1beta1.ControllerRevision)
+	for _, history := range allHistory {
+		// TODO: for now we assume revisions don't overlap, we may need to handle it
+		historyInfo[history.Revision] = history
+	}
+
+	if len(historyInfo) == 0 {
+		return "No rollout history found.", nil
+	}
+
+	// Print details of a specific revision
+	if revision > 0 {
+		history, ok := historyInfo[revision]
+		if !ok {
+			return "", fmt.Errorf("unable to find the specified revision")
+		}
+		template, err := daemon.DecodeHistory(history)
+		if err != nil {
+			return "", fmt.Errorf("unable to decode history %s", history.Name)
+		}
+		return printTemplate(template)
+	}
+
+	// Print an overview of all Revisions
+	// Sort the revisionToChangeCause map by revision
+	revisions := make([]int64, 0, len(historyInfo))
+	for r := range historyInfo {
+		revisions = append(revisions, r)
+	}
+	sliceutil.SortInts64(revisions)
+
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "REVISION\tCHANGE-CAUSE\n")
+		for _, r := range revisions {
+			// Find the change-cause of revision r
+			changeCause := historyInfo[r].Annotations[ChangeCauseAnnotation]
+			if len(changeCause) == 0 {
+				changeCause = "<none>"
+			}
+			fmt.Fprintf(out, "%d\t%s\n", r, changeCause)
+		}
+		return nil
+	})
+}
+
+// controlledHistories returns all ControllerRevisions controlled by the given DaemonSet
+// TODO: Use external version DaemonSet instead when #3955 is fixed
+func controlledHistories(c clientset.Interface, ds *extensions.DaemonSet) ([]*appsv1beta1.ControllerRevision, error) {
+	var result []*appsv1beta1.ControllerRevision
+	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	versionedClient := versionedClientsetForDaemonSet(c)
+	historyList, err := versionedClient.AppsV1beta1().ControllerRevisions(ds.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return nil, err
+	}
+	for i := range historyList.Items {
+		history := historyList.Items[i]
+		// Skip history that doesn't belong to the DaemonSet
+		if controllerRef := controller.GetControllerOf(&history); controllerRef == nil || controllerRef.UID != ds.UID {
+			continue
+		}
+		result = append(result, &history)
+	}
+	return result, nil
 }
 
 // TODO: copied here until this becomes a describer
