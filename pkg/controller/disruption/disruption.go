@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -176,14 +177,14 @@ func (dc *DisruptionController) finders() []podControllerFinder {
 
 var (
 	controllerKindRS  = v1beta1.SchemeGroupVersion.WithKind("ReplicaSet")
-	controllerKindSS  = v1beta1.SchemeGroupVersion.WithKind("StatefulSet")
-	controllerKindRC  = v1beta1.SchemeGroupVersion.WithKind("ReplicationController")
+	controllerKindSS  = apps.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindRC  = v1.SchemeGroupVersion.WithKind("ReplicationController")
 	controllerKindDep = v1beta1.SchemeGroupVersion.WithKind("Deployment")
 )
 
 // getPodReplicaSets finds replicasets which have no matching deployments.
 func (dc *DisruptionController) getPodReplicaSets(pod *v1.Pod) ([]controllerAndScale, error) {
-	casSlice := []controllerAndScale{}
+	var casSlice []controllerAndScale
 	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
 		if controllerRef.Kind == controllerKindRS.Kind {
 			rs, err := dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
@@ -191,13 +192,8 @@ func (dc *DisruptionController) getPodReplicaSets(pod *v1.Pod) ([]controllerAndS
 				return nil, nil
 			}
 			controllerRef := controller.GetControllerOf(rs)
-			if controllerRef == nil {
+			if controllerRef == nil || controllerRef.Kind != controllerKindDep.Kind {
 				casSlice = append(casSlice, controllerAndScale{rs.UID, *(rs.Spec.Replicas)})
-			} else if controllerRef != nil {
-				if controllerRef.Kind != controllerKindDep.Kind {
-					// deployments are not found.
-					casSlice = append(casSlice, controllerAndScale{rs.UID, *(rs.Spec.Replicas)})
-				}
 			}
 		}
 	}
@@ -206,7 +202,7 @@ func (dc *DisruptionController) getPodReplicaSets(pod *v1.Pod) ([]controllerAndS
 
 // getPodStatefulSet returns the statefulset managing the given pod.
 func (dc *DisruptionController) getPodStatefulSets(pod *v1.Pod) ([]controllerAndScale, error) {
-	casSlice := []controllerAndScale{}
+	var casSlice []controllerAndScale
 	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
 		if controllerRef.Kind == controllerKindSS.Kind {
 			ss, err := dc.ssLister.StatefulSets(pod.Namespace).Get(controllerRef.Name)
@@ -222,7 +218,7 @@ func (dc *DisruptionController) getPodStatefulSets(pod *v1.Pod) ([]controllerAnd
 
 // getPodDeployments finds deployments for any replicasets which are being managed by deployments.
 func (dc *DisruptionController) getPodDeployments(pod *v1.Pod) ([]controllerAndScale, error) {
-	casSlice := []controllerAndScale{}
+	var casSlice []controllerAndScale
 	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
 		if controllerRef.Kind == controllerKindRS.Kind {
 			rs, err := dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
@@ -245,7 +241,7 @@ func (dc *DisruptionController) getPodDeployments(pod *v1.Pod) ([]controllerAndS
 }
 
 func (dc *DisruptionController) getPodReplicationControllers(pod *v1.Pod) ([]controllerAndScale, error) {
-	casSlice := []controllerAndScale{}
+	var casSlice []controllerAndScale
 	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
 		if controllerRef.Kind == controllerKindRC.Kind {
 			rc, err := dc.rcLister.ReplicationControllers(pod.Namespace).Get(controllerRef.Name)
