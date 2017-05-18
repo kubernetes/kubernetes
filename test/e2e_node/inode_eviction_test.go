@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -175,6 +176,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 			for _, p := range updatedPods {
 				framework.Logf("fetching pod %s; phase= %v", p.Name, p.Status.Phase)
 			}
+			logKubeletMetrics(kubeletmetrics.EvictionStatsAgeKey)
 			_, err = hasPressureCondition(f, testCondition)
 			if err != nil {
 				return err
@@ -261,6 +263,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 				if priorityPodSpec.evictionPriority == 0 {
 					for _, p := range updatedPodList.Items {
 						if p.Name == priorityPodSpec.pod.Name && p.Status.Phase == v1.PodFailed {
+							logKubeletMetrics(kubeletmetrics.EvictionStatsAgeKey)
 							return fmt.Errorf("%s pod failed (delayed) and shouldn't have failed", p.Name)
 						}
 					}
