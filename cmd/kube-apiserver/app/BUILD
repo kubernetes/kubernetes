@@ -38,6 +38,7 @@ go_library(
         "//pkg/master:go_default_library",
         "//pkg/master/thirdparty:go_default_library",
         "//pkg/master/tunneler:go_default_library",
+        "//pkg/quota/install:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/rbac/rest:go_default_library",
         "//pkg/version:go_default_library",
