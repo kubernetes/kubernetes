@@ -958,12 +958,13 @@ func CheckTestingNSDeletedExcept(c clientset.Interface, skip string) error {
 // deleteNS deletes the provided namespace, waits for it to be completely deleted, and then checks
 // whether there are any pods remaining in a non-terminating state.
 func deleteNS(c clientset.Interface, clientPool dynamic.ClientPool, namespace string, timeout time.Duration) error {
+	startTime := time.Now()
 	if err := c.Core().Namespaces().Delete(namespace, nil); err != nil {
 		return err
 	}
 
 	// wait for namespace to delete or timeout.
-	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
+	err := wait.PollImmediate(2*time.Second, timeout, func() (bool, error) {
 		if _, err := c.Core().Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
 			if apierrs.IsNotFound(err) {
 				return true, nil
@@ -1011,6 +1012,7 @@ func deleteNS(c clientset.Interface, clientPool dynamic.ClientPool, namespace st
 		// no remaining content, but namespace was not deleted (namespace controller is probably wedged)
 		return fmt.Errorf("namespace %v was not deleted with limit: %v, namespace is empty but is not yet removed", namespace, err)
 	}
+	Logf("namespace %v deletion completed in %s", namespace, time.Now().Sub(startTime))
 	return nil
 }
 
