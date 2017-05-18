@@ -237,6 +237,10 @@ func (pb *prober) newExecInContainer(container v1.Container, containerID kubecon
 	}}
 }
 
+func (eic execInContainer) Run() error {
+	return fmt.Errorf("unimplemented")
+}
+
 func (eic execInContainer) CombinedOutput() ([]byte, error) {
 	return eic.run()
 }
@@ -254,6 +258,10 @@ func (eic execInContainer) SetStdin(in io.Reader) {
 }
 
 func (eic execInContainer) SetStdout(out io.Writer) {
+	//unimplemented
+}
+
+func (eic execInContainer) SetStderr(out io.Writer) {
 	//unimplemented
 }
 
