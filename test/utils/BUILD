@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "conditions.go",
         "density_utils.go",
+        "deployment.go",
         "pod_store.go",
         "runners.go",
         "tmpdir.go",
@@ -20,12 +21,15 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/controller/deployment/util:go_default_library",
+        "//pkg/util/labels:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
