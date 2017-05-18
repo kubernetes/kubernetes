@@ -29,6 +29,7 @@ go_library(
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/mergepatch:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/third_party/forked/golang/json:go_default_library",
     ],
 )
