@@ -21,13 +21,14 @@ import (
 	"io/ioutil"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/client-go/util/cert"
 	capi "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 )
 
 func TestSigner(t *testing.T) {
-	s, err := newCFSSLSigner("./testdata/ca.crt", "./testdata/ca.key", nil)
+	s, err := newCFSSLSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}

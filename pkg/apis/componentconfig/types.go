@@ -836,6 +836,9 @@ type KubeControllerManagerConfiguration struct {
 	// clusterSigningCertFile is the filename containing a PEM-encoded
 	// RSA or ECDSA private key used to issue cluster-scoped certificates
 	ClusterSigningKeyFile string
+	// clusterSigningDuration is the length of duration signed certificates
+	// will be given.
+	ClusterSigningDuration metav1.Duration
 	// approveAllKubeletCSRs tells the CSR controller to approve all CSRs originating
 	// from the kubelet bootstrapping group automatically.
 	// WARNING: this grants all users with access to the certificates API group

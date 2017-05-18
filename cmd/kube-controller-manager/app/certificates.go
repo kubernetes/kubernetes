@@ -42,6 +42,7 @@ func startCSRSigningController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
 		ctx.Options.ClusterSigningCertFile,
 		ctx.Options.ClusterSigningKeyFile,
+		ctx.Options.ClusterSigningDuration.Duration,
 	)
 	if err != nil {
 		glog.Errorf("Failed to start certificate controller: %v", err)
