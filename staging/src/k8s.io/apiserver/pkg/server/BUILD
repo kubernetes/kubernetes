@@ -77,6 +77,8 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/apiserver/install:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/apis/audit:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/audit:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticatorfactory:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/request/union:go_default_library",

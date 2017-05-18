@@ -30,6 +30,7 @@ go_library(
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/apis/audit:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )
