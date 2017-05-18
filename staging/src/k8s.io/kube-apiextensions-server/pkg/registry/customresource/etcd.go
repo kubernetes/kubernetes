@@ -17,7 +17,6 @@ limitations under the License.
 package customresource
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,13 +39,6 @@ func NewREST(resource schema.GroupResource, listKind schema.GroupVersionKind, co
 			ret := &unstructured.UnstructuredList{}
 			ret.SetGroupVersionKind(listKind)
 			return ret
-		},
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			accessor, err := meta.Accessor(obj)
-			if err != nil {
-				return "", err
-			}
-			return accessor.GetName(), nil
 		},
 		PredicateFunc:     strategy.MatchCustomResourceDefinitionStorage,
 		QualifiedResource: resource,
