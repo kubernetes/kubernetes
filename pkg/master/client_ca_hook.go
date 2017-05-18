@@ -18,10 +18,13 @@ package master
 
 import (
 	"encoding/json"
+	"fmt"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
@@ -38,25 +41,42 @@ type ClientCARegistrationHook struct {
 }
 
 func (h ClientCARegistrationHook) PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
+	// no work to do
 	if len(h.ClientCA) == 0 && len(h.RequestHeaderCA) == 0 {
 		return nil
 	}
 
-	client, err := coreclient.NewForConfig(hookContext.LoopbackClientConfig)
+	// intializing CAs is important so that aggregated API servers can come up with "normal" config.
+	// We've seen lagging etcd before, so we want to retry this a few times before we decide to crashloop
+	// the API server on it.
+	err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
+		// retry building the config since sometimes the server can be in an inbetween state which caused
+		// some kind of auto detection failure as I recall from other post start hooks.
+		// TODO see if this is still true and fix the RBAC one too if it isn't.
+		client, err := coreclient.NewForConfig(hookContext.LoopbackClientConfig)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return false, nil
+		}
+
+		return h.tryToWriteClientCAs(client)
+	})
+
+	// if we're never able to make it through intialization, kill the API server
 	if err != nil {
-		utilruntime.HandleError(err)
-		return nil
+		return fmt.Errorf("unable to initialize client CA configmap: %v", err)
 	}
 
-	h.writeClientCAs(client)
 	return nil
+
 }
 
-// writeClientCAs is here for unit testing with a fake client
-func (h ClientCARegistrationHook) writeClientCAs(client coreclient.CoreInterface) {
+// tryToWriteClientCAs is here for unit testing with a fake client.  This is a wait.ConditionFunc so the bool
+// indicates if the condition was met.  True when its finished, false when it should retry.
+func (h ClientCARegistrationHook) tryToWriteClientCAs(client coreclient.CoreInterface) (bool, error) {
 	if _, err := client.Namespaces().Create(&api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: metav1.NamespaceSystem}}); err != nil && !apierrors.IsAlreadyExists(err) {
 		utilruntime.HandleError(err)
-		return
+		return false, nil
 	}
 
 	data := map[string]string{}
@@ -67,34 +87,33 @@ func (h ClientCARegistrationHook) writeClientCAs(client coreclient.CoreInterface
 	if len(h.RequestHeaderCA) > 0 {
 		var err error
 
+		// encoding errors aren't going to get better, so just fail on them.
 		data["requestheader-username-headers"], err = jsonSerializeStringSlice(h.RequestHeaderUsernameHeaders)
 		if err != nil {
-			utilruntime.HandleError(err)
-			return
+			return false, err
 		}
 		data["requestheader-group-headers"], err = jsonSerializeStringSlice(h.RequestHeaderGroupHeaders)
 		if err != nil {
-			utilruntime.HandleError(err)
-			return
+			return false, err
 		}
 		data["requestheader-extra-headers-prefix"], err = jsonSerializeStringSlice(h.RequestHeaderExtraHeaderPrefixes)
 		if err != nil {
-			utilruntime.HandleError(err)
-			return
+			return false, err
 		}
 		data["requestheader-client-ca-file"] = string(h.RequestHeaderCA)
 		data["requestheader-allowed-names"], err = jsonSerializeStringSlice(h.RequestHeaderAllowedNames)
 		if err != nil {
-			utilruntime.HandleError(err)
-			return
+			return false, err
 		}
 	}
 
+	// write errors may work next time if we retry, so queue for retry
 	if err := writeConfigMap(client, "extension-apiserver-authentication", data); err != nil {
 		utilruntime.HandleError(err)
+		return false, nil
 	}
 
-	return
+	return true, nil
 }
 
 func jsonSerializeStringSlice(in []string) (string, error) {
