@@ -74,7 +74,7 @@ func init() {
 type Config struct {
 	GenericConfig *genericapiserver.Config
 
-	CustomResourceDefinitionRESTOptionsGetter genericregistry.RESTOptionsGetter
+	CRDRESTOptionsGetter genericregistry.RESTOptionsGetter
 }
 
 type CustomResourceDefinitions struct {
@@ -105,7 +105,7 @@ func (c *Config) SkipComplete() completedConfig {
 
 // New returns a new instance of CustomResourceDefinitions from the given config.
 func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*CustomResourceDefinitions, error) {
-	genericServer, err := c.Config.GenericConfig.SkipComplete().New(genericapiserver.EmptyDelegate) // completion is done in Complete, no need for a second time
+	genericServer, err := c.Config.GenericConfig.SkipComplete().New(delegationTarget) // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		s.GenericAPIServer.RequestContextMapper(),
 		customResourceDefinitionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions().Lister(),
 		delegateHandler,
-		c.CustomResourceDefinitionRESTOptionsGetter,
+		c.CRDRESTOptionsGetter,
 		c.GenericConfig.AdmissionControl,
 	)
 	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle("/apis", customResourceDefinitionHandler)
