@@ -164,7 +164,6 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runti
 
 	// Handle ExternalTraiffc related fields during service creation.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
-		apiservice.SetDefaultExternalTrafficPolicyIfNeeded(service)
 		if apiservice.NeedsHealthCheck(service) {
 			if err := rs.allocateHealthCheckNodePort(service); err != nil {
 				return nil, errors.NewInternalError(err)
@@ -414,7 +413,6 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 
 	// Handle ExternalTraiffc related updates.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
-		apiservice.SetDefaultExternalTrafficPolicyIfNeeded(service)
 		success, err := rs.healthCheckNodePortUpdate(oldService, service)
 		if !success || err != nil {
 			return nil, false, err
