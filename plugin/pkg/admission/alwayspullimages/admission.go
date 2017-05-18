@@ -34,7 +34,12 @@ import (
 )
 
 func init() {
-	kubeapiserveradmission.Plugins.Register("AlwaysPullImages", func(config io.Reader) (admission.Interface, error) {
+	Register(&kubeapiserveradmission.Plugins)
+}
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("AlwaysPullImages", func(config io.Reader) (admission.Interface, error) {
 		return NewAlwaysPullImages(), nil
 	})
 }
