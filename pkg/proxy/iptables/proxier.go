@@ -302,6 +302,10 @@ type Proxier struct {
 	recorder       record.EventRecorder
 	healthChecker  healthcheck.Server
 	healthzServer  healthcheck.HealthzUpdater
+
+	// The following buffers are used to reuse memory and avoid allocations
+	// that are significantly impacting performance.
+	iptablesLines *bytes.Buffer
 }
 
 type localPort struct {
@@ -417,6 +421,7 @@ func NewProxier(ipt utiliptables.Interface,
 		recorder:         recorder,
 		healthChecker:    healthChecker,
 		healthzServer:    healthzServer,
+		iptablesLines:    bytes.NewBuffer(nil),
 	}, nil
 }
 
@@ -976,19 +981,21 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
 	existingFilterChains := make(map[utiliptables.Chain]string)
-	iptablesSaveRaw, err := proxier.iptables.Save(utiliptables.TableFilter)
+	proxier.iptablesLines.Reset()
+	err := proxier.iptables.SaveInto(utiliptables.TableFilter, proxier.iptablesLines)
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, iptablesSaveRaw)
+		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, proxier.iptablesLines.Bytes())
 	}
 
 	existingNATChains := make(map[utiliptables.Chain]string)
-	iptablesSaveRaw, err = proxier.iptables.Save(utiliptables.TableNAT)
+	proxier.iptablesLines.Reset()
+	err = proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesLines)
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, iptablesSaveRaw)
+		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, proxier.iptablesLines.Bytes())
 	}
 
 	filterChains := bytes.NewBuffer(nil)
