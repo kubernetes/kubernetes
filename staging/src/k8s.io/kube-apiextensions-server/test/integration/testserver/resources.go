@@ -63,7 +63,7 @@ func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
 	}
 }
 
-func NewCurletCustomResourceDefinition() *apiextensionsv1alpha1.CustomResourceDefinition {
+func NewCurletCustomResourceDefinition(scope apiextensionsv1alpha1.ResourceScope) *apiextensionsv1alpha1.CustomResourceDefinition {
 	return &apiextensionsv1alpha1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "curlets.mygroup.example.com"},
 		Spec: apiextensionsv1alpha1.CustomResourceDefinitionSpec{
@@ -75,7 +75,7 @@ func NewCurletCustomResourceDefinition() *apiextensionsv1alpha1.CustomResourceDe
 				Kind:     "Curlet",
 				ListKind: "CurletList",
 			},
-			Scope: apiextensionsv1alpha1.NamespaceScoped,
+			Scope: scope,
 		},
 	}
 }
