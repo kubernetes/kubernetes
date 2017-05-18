@@ -20,16 +20,19 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilcache "k8s.io/apimachinery/pkg/util/cache"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // MutationCache is able to take the result of update operations and stores them in an LRU
-// that can be used to provide a more current view of a requested object.  It requires interpretting
+// that can be used to provide a more current view of a requested object.  It requires interpreting
 // resourceVersions for comparisons.
 // Implementations must be thread-safe.
 // TODO find a way to layer this into an informer/lister
@@ -50,19 +53,20 @@ type ResourceVersionComparator interface {
 //   - increases when updated
 //   - is comparable across the same resource in a namespace
 //
-// Most backends will have these semantics. Indexer may be nil.
-func NewIntegerResourceVersionMutationCache(backingCache Store, indexer Indexer) MutationCache {
-	lru, err := lru.New(100)
-	if err != nil {
-		// errors only happen on invalid sizes, this would be programmer error
-		panic(err)
-	}
-
+// Most backends will have these semantics. Indexer may be nil. ttl controls how long an item
+// remains in the mutation cache before it is removed.
+//
+// If includeAdds is true, objects in the mutation cache will be returned even if they don't exist
+// in the underlying store. This is only safe if your use of the cache can handle mutation entries
+// remaining in the cache for up to ttl when mutations and deletes occur very closely in time.
+func NewIntegerResourceVersionMutationCache(backingCache Store, indexer Indexer, ttl time.Duration, includeAdds bool) MutationCache {
 	return &mutationCache{
 		backingCache:  backingCache,
 		indexer:       indexer,
-		mutationCache: lru,
+		mutationCache: utilcache.NewLRUExpireCache(100),
 		comparator:    etcdObjectVersioner{},
+		ttl:           ttl,
+		includeAdds:   includeAdds,
 	}
 }
 
@@ -73,7 +77,9 @@ type mutationCache struct {
 	lock          sync.Mutex
 	backingCache  Store
 	indexer       Indexer
-	mutationCache *lru.Cache
+	mutationCache *utilcache.LRUExpireCache
+	includeAdds   bool
+	ttl           time.Duration
 
 	comparator ResourceVersionComparator
 }
@@ -90,9 +96,15 @@ func (c *mutationCache) GetByKey(key string) (interface{}, bool, error) {
 		return nil, false, err
 	}
 	if !exists {
-		// we can't distinguish between, "didn't observe create" and "was deleted after create", so
-		// if the key is missing, we always return it as missing
-		return nil, false, nil
+		if !c.includeAdds {
+			// we can't distinguish between, "didn't observe create" and "was deleted after create", so
+			// if the key is missing, we always return it as missing
+			return nil, false, nil
+		}
+		obj, exists = c.mutationCache.Get(key)
+		if !exists {
+			return nil, false, nil
+		}
 	}
 	objRuntime, ok := obj.(runtime.Object)
 	if !ok {
@@ -114,7 +126,9 @@ func (c *mutationCache) ByIndex(name string, indexKey string) ([]interface{}, er
 		return nil, err
 	}
 	var items []interface{}
+	keySet := sets.NewString()
 	for _, key := range keys {
+		keySet.Insert(key)
 		obj, exists, err := c.indexer.GetByKey(key)
 		if err != nil {
 			return nil, err
@@ -128,6 +142,33 @@ func (c *mutationCache) ByIndex(name string, indexKey string) ([]interface{}, er
 			items = append(items, obj)
 		}
 	}
+
+	if c.includeAdds {
+		fn := c.indexer.GetIndexers()[name]
+		// Keys() is returned oldest to newest, so full traversal does not alter the LRU behavior
+		for _, key := range c.mutationCache.Keys() {
+			updated, ok := c.mutationCache.Get(key)
+			if !ok {
+				continue
+			}
+			if keySet.Has(key.(string)) {
+				continue
+			}
+			elements, err := fn(updated)
+			if err != nil {
+				glog.V(4).Info("Unable to calculate an index entry for mutation cache entry %s: %v", key, err)
+				continue
+			}
+			for _, inIndex := range elements {
+				if inIndex != indexKey {
+					continue
+				}
+				items = append(items, updated)
+				break
+			}
+		}
+	}
+
 	return items, nil
 }
 
@@ -175,7 +216,7 @@ func (c *mutationCache) Mutation(obj interface{}) {
 			}
 		}
 	}
-	c.mutationCache.Add(key, obj)
+	c.mutationCache.Add(key, obj, c.ttl)
 }
 
 // etcdObjectVersioner implements versioning and extracting etcd node information
