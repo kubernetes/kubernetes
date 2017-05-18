@@ -17,16 +17,19 @@ limitations under the License.
 package service
 
 import (
+	"testing"
+
+	"fmt"
 	"net"
 	"reflect"
 	"strings"
-	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/rand"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -45,6 +48,10 @@ func init() {
 // TODO(wojtek-t): Cleanup this file.
 // It is now testing mostly the same things as other resources but
 // in a completely different way. We should unify it.
+
+func generateRandomNodePort() int32 {
+	return int32(rand.IntnRange(30001, 30999))
+}
 
 func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registrytest.ServiceRegistry) {
 	registry := registrytest.NewServiceRegistry()
@@ -1034,6 +1041,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocationBeta(t *test
 // Validate using the user specified nodePort when ExternalTrafficPolicy is set to Local
 // and type is LoadBalancer.
 func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *testing.T) {
+	randomNodePort := generateRandomNodePort()
 	ctx := genericapirequest.NewDefaultContext()
 	storage, _ := NewTestREST(t, nil)
 	svc := &api.Service{
@@ -1048,7 +1056,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 				TargetPort: intstr.FromInt(6502),
 			}},
 			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
-			HealthCheckNodePort:   int32(30200),
+			HealthCheckNodePort:   randomNodePort,
 		},
 	}
 	created_svc, err := storage.Create(ctx, svc)
@@ -1063,14 +1071,15 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 	if port == 0 {
 		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
 	}
-	if port != 30200 {
-		t.Errorf("Failed to allocate requested nodePort expected 30200, got %d", port)
+	if port != randomNodePort {
+		t.Errorf("Failed to allocate requested nodePort expected %d, got %d", randomNodePort, port)
 	}
 }
 
 // Validate using the user specified nodePort when ExternalTraffic beta annotation is set to OnlyLocal
 // and type is LoadBalancer.
 func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocationBeta(t *testing.T) {
+	randomNodePort := generateRandomNodePort()
 	ctx := genericapirequest.NewDefaultContext()
 	storage, _ := NewTestREST(t, nil)
 	svc := &api.Service{
@@ -1078,7 +1087,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocationBeta(t *
 			Name: "external-lb-esipp",
 			Annotations: map[string]string{
 				api.BetaAnnotationExternalTraffic:     api.AnnotationValueExternalTrafficLocal,
-				api.BetaAnnotationHealthCheckNodePort: "30200",
+				api.BetaAnnotationHealthCheckNodePort: fmt.Sprintf("%v", randomNodePort),
 			},
 		},
 		Spec: api.ServiceSpec{
@@ -1104,8 +1113,8 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocationBeta(t *
 	if port == 0 {
 		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
 	}
-	if port != 30200 {
-		t.Errorf("Failed to allocate requested nodePort expected 30200, got %d", port)
+	if port != randomNodePort {
+		t.Errorf("Failed to allocate requested nodePort expected %d, got %d", randomNodePort, port)
 	}
 }
 
