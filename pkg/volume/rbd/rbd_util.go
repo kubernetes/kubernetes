@@ -264,7 +264,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) error {
 		// modprobe
 		_, err = b.plugin.execCommand("modprobe", []string{"rbd"})
 		if err != nil {
-			return fmt.Errorf("rbd: failed to modprobe rbd error:%v", err)
+			glog.Warningf("rbd: failed to load rbd kernel module:%v", err)
 		}
 
 		// fence off other mappers
