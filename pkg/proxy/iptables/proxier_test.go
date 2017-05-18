@@ -17,6 +17,7 @@ limitations under the License.
 package iptables
 
 import (
+	"bytes"
 	"reflect"
 	"strconv"
 	"testing"
@@ -394,6 +395,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		portsMap:         make(map[localPort]closeable),
 		portMapper:       &fakePortOpener{[]*localPort{}},
 		healthChecker:    newFakeHealthChecker(),
+		iptablesLines:    bytes.NewBuffer(nil),
 	}
 }
 
