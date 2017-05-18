@@ -284,6 +284,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdCreate(f, out, err),
 				NewCmdExposeService(f, out),
 				NewCmdRun(f, in, out, err),
+				deprecatedCmd("run-container", NewCmdRun(f, in, out, err)),
 				set.NewCmdSet(f, out, err),
 			},
 		},
@@ -301,7 +302,9 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				rollout.NewCmdRollout(f, out, err),
 				NewCmdRollingUpdate(f, out),
+				deprecatedCmd("rollingupdate", NewCmdRollingUpdate(f, out)),
 				NewCmdScale(f, out),
+				deprecatedCmd("resize", NewCmdScale(f, out)),
 				NewCmdAutoscale(f, out),
 			},
 		},
@@ -310,6 +313,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				NewCmdCertificate(f, out),
 				NewCmdClusterInfo(f, out),
+				deprecatedCmd("clusterinfo", NewCmdClusterInfo(f, out)),
 				NewCmdTop(f, out, err),
 				NewCmdCordon(f, out),
 				NewCmdUncordon(f, out),
@@ -336,6 +340,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdApply(f, out, err),
 				NewCmdPatch(f, out),
 				NewCmdReplace(f, out),
+				deprecatedCmd("update", NewCmdReplace(f, out)),
 				NewCmdConvert(f, out),
 			},
 		},
@@ -372,6 +377,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
+	cmds.AddCommand(deprecatedCmd("apiversions", NewCmdApiVersions(f, out)))
 	cmds.AddCommand(NewCmdOptions())
 
 	return cmds
@@ -383,6 +389,19 @@ func runHelp(cmd *cobra.Command, args []string) {
 
 func printDeprecationWarning(command, alias string) {
 	glog.Warningf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", alias, command)
+}
+
+// Create a constructor for a command that redirects to another command, but
+// first prints a deprecation message.
+func deprecatedCmd(deprecatedVersion string, cmd *cobra.Command) *cobra.Command {
+	// Have to be careful here because Cobra automatically extracts the name
+	// of the command from the .Use field.
+	originalName := cmd.Name()
+
+	cmd.Use = deprecatedVersion
+	cmd.Deprecated = fmt.Sprintf("use %q instead", originalName)
+	cmd.Hidden = true
+	return cmd
 }
 
 func Deprecated(baseName, to string, parent, cmd *cobra.Command) string {
