@@ -337,28 +337,6 @@ func validateMergeKeyInLists(mergeKey string, lists ...[]interface{}) error {
 	return nil
 }
 
-// Return the setElementOrder list by referring the order in orderRef.
-// setElementOrder list is a list of items that each item contains only the merge key.
-// It will also sort the patch list according the order in the setElementOrder list.
-func genSetOrderList(orderRef []interface{}, mergeKey string, kind reflect.Kind) ([]interface{}, error) {
-	setOrderList := make([]interface{}, len(orderRef))
-	switch kind {
-	case reflect.Map:
-		for i, v := range orderRef {
-			typedV := v.(map[string]interface{})
-			setOrderList[i] = map[string]interface{}{
-				mergeKey: typedV[mergeKey],
-			}
-		}
-	case reflect.Slice:
-		// Lists of Lists are not permitted by the api
-		return nil, mergepatch.ErrNoListOfLists
-	default:
-		setOrderList = orderRef
-	}
-	return setOrderList, nil
-}
-
 // sortSliceByMultipleOrders sort `patch` list by patchOrder and
 // sort `serverOnly` list by serverOrder.
 // Then it merges the 2 sorted lists by serverOrder with best effort.
@@ -511,23 +489,32 @@ func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string
 
 	var patchList, deleteList, setOrderList []interface{}
 	kind := elementType.Kind()
-	if diffOptions.SetElementOrder {
-		setOrderList, err = genSetOrderList(modified, mergeKey, kind)
-	}
 	switch kind {
 	case reflect.Map:
+		if diffOptions.SetElementOrder {
+			// Generate a list of maps that each item contains only the merge key.
+			setOrderList = make([]interface{}, len(modified))
+			for i, v := range modified {
+				typedV := v.(map[string]interface{})
+				setOrderList[i] = map[string]interface{}{
+					mergeKey: typedV[mergeKey],
+				}
+			}
+		}
 		patchList, deleteList, err = diffListsOfMaps(original, modified, t, mergeKey, diffOptions)
+		patchList, err = sortSliceByOneOrder(patchList, modified, mergeKey, kind)
+		// append the deletions to the end of the patch list.
+		patchList = append(patchList, deleteList...)
+		deleteList = nil
 	case reflect.Slice:
 		// Lists of Lists are not permitted by the api
 		return nil, nil, nil, mergepatch.ErrNoListOfLists
 	default:
+		if diffOptions.SetElementOrder {
+			setOrderList = modified
+		}
 		patchList, deleteList, err = diffListsOfScalars(original, modified, diffOptions)
-	}
-	patchList, err = sortSliceByOneOrder(patchList, modified, mergeKey, kind)
-	if kind == reflect.Map {
-		// append the deletions to the end of the patch list.
-		patchList = append(patchList, deleteList...)
-		deleteList = nil
+		patchList, err = sortSliceByOneOrder(patchList, modified, mergeKey, kind)
 	}
 	return patchList, deleteList, setOrderList, err
 }
@@ -999,44 +986,54 @@ func processSetElementOrderList(original, patch map[string]interface{}, t reflec
 	return nil
 }
 
-// extractServerOnlyItems return patchItems and server-only items
+// extractServerOnlyItems return patchItems and server-only items in their original relative order
 func extractServerOnlyItems(original, setElementOrderList []interface{}, mergeKey string) ([]interface{}, []interface{}, error) {
-	// server-only items come first, in server-order. all patch items come last, in patch-order.
+	if len(mergeKey) == 0 {
+		patch, serverOnly := extractServerOnlyItemsFromListOfPrimitives(original, setElementOrderList)
+		return patch, serverOnly, nil
+	} else {
+		return extractServerOnlyItemsFromListOfMaps(original, setElementOrderList, mergeKey)
+	}
+}
+
+func extractServerOnlyItemsFromListOfPrimitives(original, setElementOrderList []interface{}) ([]interface{}, []interface{}) {
 	patch := make([]interface{}, 0, len(original))
 	serverOnly := make([]interface{}, 0, len(original))
-	if len(mergeKey) == 0 {
-		// mergeKey is empty indicating original is a list of primitives
-		inPatch := map[interface{}]bool{}
-		for _, v := range setElementOrderList {
-			inPatch[v] = true
+	inPatch := map[interface{}]bool{}
+	for _, v := range setElementOrderList {
+		inPatch[v] = true
+	}
+	for _, v := range original {
+		if !inPatch[v] {
+			serverOnly = append(serverOnly, v)
+		} else {
+			patch = append(patch, v)
 		}
-		for _, v := range original {
-			if !inPatch[v] {
-				serverOnly = append(serverOnly, v)
-			} else {
-				patch = append(patch, v)
-			}
+	}
+	return patch, serverOnly
+}
+
+func extractServerOnlyItemsFromListOfMaps(original, setElementOrderList []interface{}, mergeKey string) ([]interface{}, []interface{}, error) {
+	patch := make([]interface{}, 0, len(original))
+	serverOnly := make([]interface{}, 0, len(original))
+	for _, v := range original {
+		typedV, ok := v.(map[string]interface{})
+		if !ok {
+			// TODO: change this line after #46057 merged
+			return nil, nil, mergepatch.ErrBadArgType("map[string]interface{}", reflect.TypeOf(v).Kind().String())
 		}
-	} else {
-		// original is a list of maps
-		for _, v := range original {
-			typedV, ok := v.(map[string]interface{})
-			if !ok {
-				return nil, nil, mergepatch.ErrBadArgType("map[string]interface{}", reflect.TypeOf(v).Kind().String())
-			}
-			mergeKeyValue, foundMergeKey := typedV[mergeKey]
-			if !foundMergeKey {
-				return nil, nil, mergepatch.ErrNoMergeKey(typedV, mergeKey)
-			}
-			_, _, found, err := findMapInSliceBasedOnKeyValue(setElementOrderList, mergeKey, mergeKeyValue)
-			if err != nil {
-				return nil, nil, err
-			}
-			if !found {
-				serverOnly = append(serverOnly, v)
-			} else {
-				patch = append(patch, v)
-			}
+		mergeKeyValue, foundMergeKey := typedV[mergeKey]
+		if !foundMergeKey {
+			return nil, nil, mergepatch.ErrNoMergeKey(typedV, mergeKey)
+		}
+		_, _, found, err := findMapInSliceBasedOnKeyValue(setElementOrderList, mergeKey, mergeKeyValue)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !found {
+			serverOnly = append(serverOnly, v)
+		} else {
+			patch = append(patch, v)
 		}
 	}
 	return patch, serverOnly, nil
