@@ -29,6 +29,13 @@ import (
 	"github.com/golang/glog"
 )
 
+type AddressFamily uint
+
+const (
+	familyIPv4 AddressFamily = 4
+	familyIPv6 AddressFamily = 6
+)
+
 type Route struct {
 	Interface   string
 	Destination net.IP
@@ -96,6 +103,10 @@ func isInterfaceUp(intf *net.Interface) bool {
 	return false
 }
 
+func isLoopbackOrPointToPoint(intf *net.Interface) bool {
+	return intf.Flags&(net.FlagLoopback|net.FlagPointToPoint) != 0
+}
+
 //getFinalIP method receives all the IP addrs of a Interface
 //and returns a nil if the address is Loopback, Ipv6, link-local or nil.
 //It returns a valid IPv4 if an Ipv4 address is found in the array.
@@ -149,50 +160,65 @@ func getIPFromInterface(intfName string, nw networkInterfacer) (net.IP, error) {
 	return nil, nil
 }
 
-func flagsSet(flags net.Flags, test net.Flags) bool {
-	return flags&test != 0
+// memberOF tells if the IP is of the desired family. Used for checking interface addresses.
+func memberOf(ip net.IP, family AddressFamily) bool {
+	if ip.To4() != nil {
+		return family == familyIPv4
+	} else {
+		return family == familyIPv6
+	}
 }
 
-func flagsClear(flags net.Flags, test net.Flags) bool {
-	return flags&test == 0
-}
-
-func chooseHostInterfaceNativeGo() (net.IP, error) {
-	intfs, err := net.Interfaces()
+// chooseIPFromHostInterfaces looks at all system interfaces, trying to find one that is up that
+// has a global unicast address (non-loopback, non-link local, non-point2point), and returns the IP.
+// Searches for IPv4 addresses, and then IPv6 addresses.
+func chooseIPFromHostInterfaces(nw networkInterfacer) (net.IP, error) {
+	intfs, err := nw.Interfaces()
 	if err != nil {
 		return nil, err
 	}
-	i := 0
-	var ip net.IP
-	for i = range intfs {
-		if flagsSet(intfs[i].Flags, net.FlagUp) && flagsClear(intfs[i].Flags, net.FlagLoopback|net.FlagPointToPoint) {
-			addrs, err := intfs[i].Addrs()
+	if len(intfs) == 0 {
+		return nil, fmt.Errorf("no interfaces found on host.")
+	}
+	for _, family := range []AddressFamily{familyIPv4, familyIPv6} {
+		glog.V(4).Infof("Looking for system interface with a global IPv%d address", uint(family))
+		for _, intf := range intfs {
+			if !isInterfaceUp(&intf) {
+				glog.V(4).Infof("Skipping: down interface %q", intf.Name)
+				continue
+			}
+			if isLoopbackOrPointToPoint(&intf) {
+				glog.V(4).Infof("Skipping: LB or P2P interface %q", intf.Name)
+				continue
+			}
+			addrs, err := nw.Addrs(&intf)
 			if err != nil {
 				return nil, err
 			}
-			if len(addrs) > 0 {
-				for _, addr := range addrs {
-					if addrIP, _, err := net.ParseCIDR(addr.String()); err == nil {
-						if addrIP.To4() != nil {
-							ip = addrIP.To4()
-							if !ip.IsLinkLocalMulticast() && !ip.IsLinkLocalUnicast() {
-								break
-							}
-						}
-					}
+			if len(addrs) == 0 {
+				glog.V(4).Infof("Skipping: no addresses on interface %q", intf.Name)
+				continue
+			}
+			for _, addr := range addrs {
+				ip, _, err := net.ParseCIDR(addr.String())
+				if err != nil {
+					return nil, fmt.Errorf("Unable to parse CIDR for interface %q: %s", intf.Name, err)
 				}
-				if ip != nil {
-					// This interface should suffice.
-					break
+				if !memberOf(ip, family) {
+					glog.V(4).Infof("Skipping: no address family match for %q on interface %q.", ip, intf.Name)
+					continue
 				}
+				// TODO: Decide if should open up to allow IPv6 LLAs in future.
+				if !ip.IsGlobalUnicast() {
+					glog.V(4).Infof("Skipping: non-global address %q on interface %q.", ip, intf.Name)
+					continue
+				}
+				glog.V(4).Infof("Found global unicast address %q on interface %q.", ip, intf.Name)
+				return ip, nil
 			}
 		}
 	}
-	if ip == nil {
-		return nil, fmt.Errorf("no acceptable interface from host")
-	}
-	glog.V(4).Infof("Choosing interface %s (IP %v) as default", intfs[i].Name, ip)
-	return ip, nil
+	return nil, fmt.Errorf("no acceptable interface with global unicast address found on host")
 }
 
 //ChooseHostInterface is a method used fetch an IP for a daemon.
@@ -200,39 +226,41 @@ func chooseHostInterfaceNativeGo() (net.IP, error) {
 //For a node with no internet connection ,it returns error
 //For a multi n/w interface node it returns the IP of the interface with gateway on it.
 func ChooseHostInterface() (net.IP, error) {
+	var nw networkInterfacer = networkInterface{}
 	inFile, err := os.Open("/proc/net/route")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return chooseHostInterfaceNativeGo()
+			return chooseIPFromHostInterfaces(nw)
 		}
 		return nil, err
 	}
 	defer inFile.Close()
-	var nw networkInterfacer = networkInterface{}
 	return chooseHostInterfaceFromRoute(inFile, nw)
 }
 
+// networkInterfacer defines an interface for several net library functions. Production
+// code will forward to net library functions, and unit tests will override the methods
+// for testing purposes.
 type networkInterfacer interface {
 	InterfaceByName(intfName string) (*net.Interface, error)
 	Addrs(intf *net.Interface) ([]net.Addr, error)
+	Interfaces() ([]net.Interface, error)
 }
 
+// networkInterface implements the networkInterfacer interface for production code, just
+// wrapping the underlying net library function calls.
 type networkInterface struct{}
 
 func (_ networkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
-	intf, err := net.InterfaceByName(intfName)
-	if err != nil {
-		return nil, err
-	}
-	return intf, nil
+	return net.InterfaceByName(intfName)
 }
 
 func (_ networkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
-	addrs, err := intf.Addrs()
-	if err != nil {
-		return nil, err
-	}
-	return addrs, nil
+	return intf.Addrs()
+}
+
+func (_ networkInterface) Interfaces() ([]net.Interface, error) {
+	return net.Interfaces()
 }
 
 func chooseHostInterfaceFromRoute(inFile io.Reader, nw networkInterfacer) (net.IP, error) {
