@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
+	"k8s.io/apimachinery/pkg/util/sets"
 	forkedjson "k8s.io/apimachinery/third_party/forked/golang/json"
 )
 
@@ -657,32 +658,33 @@ func preprocessDeletionListForMerging(key string, original map[string]interface{
 // then clear the fields that are not in the list.
 func processReplaceKeys(original, patch map[string]interface{}, options MergeOptions) error {
 	replaceKeysInPatch, foundInPatch := patch[replaceKeysDirective]
+	if !foundInPatch {
+		return nil
+	}
 	delete(patch, replaceKeysDirective)
+
 	if !options.MergeParallelList {
 		replaceKeysInOriginal, foundInOriginal := original[replaceKeysDirective]
-		switch {
-		case foundInOriginal && foundInPatch:
+		if foundInOriginal {
 			if !reflect.DeepEqual(replaceKeysInOriginal, replaceKeysInPatch) {
-				return fmt.Errorf("%v and %v are not deep equal", replaceKeysInOriginal, replaceKeysInPatch)
+				// This error actually should never happen.
+				return fmt.Errorf("%v and %v are not deep equal: this may happen when calculating the 3-way diff patch", replaceKeysInOriginal, replaceKeysInPatch)
 			}
-		case !foundInOriginal && foundInPatch:
+		} else {
 			original[replaceKeysDirective] = replaceKeysInPatch
 		}
 		return nil
 	}
 
-	if !foundInPatch {
-		return nil
-	}
 	replaceKeysList, ok := replaceKeysInPatch.([]interface{})
 	if !ok {
 		return mergepatch.ErrBadPatchFormatForReplaceKeys
 	}
 
 	// validate patch to make sure all field in patch is covered in replaceKeysList
-	m := map[interface{}]bool{}
+	m := map[interface{}]sets.Empty{}
 	for _, v := range replaceKeysList {
-		m[v] = true
+		m[v] = sets.Empty{}
 	}
 	for k, v := range patch {
 		if v == nil || strings.HasPrefix(k, deleteFromPrimitiveListDirectivePrefix) {
@@ -690,14 +692,14 @@ func processReplaceKeys(original, patch map[string]interface{}, options MergeOpt
 		}
 		// If there is an item present in the patch but not in the replaceKeys list,
 		// the patch is invalid.
-		if !m[k] {
+		if _, found := m[k]; !found {
 			return mergepatch.ErrPatchContentNotMatchReplaceKeys
 		}
 	}
 
 	// clear not present fields
 	for k := range original {
-		if !m[k] {
+		if _, found := m[k]; !found {
 			delete(original, k)
 		}
 	}
@@ -1544,7 +1546,7 @@ func sliceTypeAssertion(original, patch interface{}) ([]interface{}, []interface
 
 // extractReplaceKeysPatchStrategy process patch strategy, which is a string may contains multiple
 // patch strategies seperated by ",". It returns a boolean var indicating if it has
-// replaceKeys strategies and a string or other strategy.
+// replaceKeys strategies and a string for the other strategy.
 func extractReplaceKeysPatchStrategy(strategies []string) (bool, string, error) {
 	switch len(strategies) {
 	case 0:
@@ -1564,10 +1566,10 @@ func extractReplaceKeysPatchStrategy(strategies []string) (bool, string, error) 
 		case strategies[1] == replaceKeysStrategy:
 			return true, strategies[0], nil
 		default:
-			return false, "", fmt.Errorf("unexpected patch strategy: %v\n", strategies)
+			return false, "", fmt.Errorf("unexpected patch strategy: %v", strategies)
 		}
 	default:
-		return false, "", fmt.Errorf("unexpected patch strategy: %v\n", strategies)
+		return false, "", fmt.Errorf("unexpected patch strategy: %v", strategies)
 	}
 }
 
