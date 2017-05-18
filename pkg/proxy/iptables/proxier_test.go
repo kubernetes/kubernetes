@@ -396,6 +396,10 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		portMapper:       &fakePortOpener{[]*localPort{}},
 		healthChecker:    newFakeHealthChecker(),
 		iptablesLines:    bytes.NewBuffer(nil),
+		filterChains:     bytes.NewBuffer(nil),
+		filterRules:      bytes.NewBuffer(nil),
+		natChains:        bytes.NewBuffer(nil),
+		natRules:         bytes.NewBuffer(nil),
 	}
 }
 
