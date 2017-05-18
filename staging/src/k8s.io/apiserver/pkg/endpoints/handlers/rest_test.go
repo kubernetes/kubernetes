@@ -652,7 +652,7 @@ func TestFinishRequest(t *testing.T) {
 			t.Errorf("%d: unexpected err. expected: %v, got: %v", i, tc.expectedErr, err)
 		}
 		if !apiequality.Semantic.DeepEqual(obj, tc.expectedObj) {
-			t.Errorf("%d: unexpected obj. expected %#v, got %#v", tc.expectedObj, obj)
+			t.Errorf("%d: unexpected obj. expected %#v, got %#v", i, tc.expectedObj, obj)
 		}
 	}
 }
