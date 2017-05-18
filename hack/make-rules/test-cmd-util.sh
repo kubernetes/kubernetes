@@ -67,6 +67,7 @@ static="static"
 storageclass="storageclass"
 subjectaccessreviews="subjectaccessreviews"
 thirdpartyresources="thirdpartyresources"
+customresourcedefinitions="customresourcedefinitions"
 daemonsets="daemonsets"
 
 
@@ -1286,6 +1287,57 @@ run_kubectl_request_timeout_tests() {
   kubectl delete pods valid-pod "${kube_flags[@]}"
 }
 
+run_crd_tests() {
+  create_and_use_new_namespace
+  kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1alpha1",
+  "metadata": {
+    "name": "foos.company.com"
+  },
+  "spec": {
+    "group": "company.com",
+    "version": "v1",
+    "names": {
+      "plural": "foos",
+      "kind": "Foo"
+    }
+  }
+}
+__EOF__
+
+  # Post-Condition: assertion object exist
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{$id_field}}:{{end}}" 'foos.company.com:'
+
+  kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1alpha1",
+  "metadata": {
+    "name": "bars.company.com"
+  },
+  "spec": {
+    "group": "company.com",
+    "version": "v1",
+    "names": {
+      "plural": "bars",
+      "kind": "Bar"
+    }
+  }
+}
+__EOF__
+
+  # Post-Condition: assertion object exist
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{$id_field}}:{{end}}" 'bars.company.com:foos.company.com:'
+
+  run_non_native_resource_tests
+
+  # teardown
+  kubectl delete customresourcedefinitions/foos.company.com "${kube_flags_with_token[@]}"
+  kubectl delete customresourcedefinitions/bars.company.com "${kube_flags_with_token[@]}"
+}
+
 run_tpr_tests() {
   create_and_use_new_namespace
   kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
@@ -1324,11 +1376,39 @@ __EOF__
   # Post-Condition: assertion object exist
   kube::test::get_object_assert thirdpartyresources "{{range.items}}{{$id_field}}:{{end}}" 'bar.company.com:foo.company.com:'
 
-  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/apis/company.com/v1" "third party api"
+  run_non_native_resource_tests
 
-  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/apis/company.com/v1/foos" "third party api Foo"
+  # teardown
+  kubectl delete thirdpartyresources/foo.company.com "${kube_flags[@]}"
+  kubectl delete thirdpartyresources/bar.company.com "${kube_flags[@]}"
+}
 
-  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/apis/company.com/v1/bars" "third party api Bar"
+
+kube::util::non_native_resources() {
+  local times
+  local wait
+  local failed
+  times=30
+  wait=10
+  local i
+  for i in $(seq 1 $times); do
+    failed=""
+    kubectl "${kube_flags[@]}" get --raw '/apis/company.com/v1' || failed=true
+    kubectl "${kube_flags[@]}" get --raw '/apis/company.com/v1/foos' || failed=true
+    kubectl "${kube_flags[@]}" get --raw '/apis/company.com/v1/bars' || failed=true
+
+    if [ -z "${failed}" ]; then
+      return 0
+    fi
+    sleep ${wait}
+  done
+
+  kube::log::error "Timed out waiting for non-native-resources; tried ${times} waiting ${wait}s between each"
+  return 1
+}
+
+run_non_native_resource_tests() {
+  kube::util::non_native_resources
 
   # Test that we can list this new third party resource (foos)
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -1363,7 +1443,7 @@ __EOF__
   kubectl "${kube_flags[@]}" get foos/test -o "jsonpath={.someField}"          --allow-missing-template-keys=false
   kubectl "${kube_flags[@]}" get foos      -o "go-template={{range .items}}{{.someField}}{{end}}" --allow-missing-template-keys=false
   kubectl "${kube_flags[@]}" get foos/test -o "go-template={{.someField}}"                        --allow-missing-template-keys=false
-  output_message=$(kubectl get foos/test -o name)
+  output_message=$(kubectl "${kube_flags[@]}" get foos/test -o name)
   kube::test::if_has_string "${output_message}" 'foos/test'
 
   # Test patching
@@ -1558,10 +1638,6 @@ __EOF__
   # Make sure it's gone
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
-
-  # teardown
-  kubectl delete thirdpartyresources foo.company.com "${kube_flags[@]}"
-  kubectl delete thirdpartyresources bar.company.com "${kube_flags[@]}"
 }
 
 run_recursive_resources_tests() {
@@ -3171,6 +3247,11 @@ runTests() {
   #####################################
   # Third Party Resources             #
   #####################################
+
+  # customresourcedefinitions cleanup after themselves.  Run these first, then TPRs
+  if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
+    run_crd_tests
+  fi
 
   if kube::test::if_supports_resource "${thirdpartyresources}" ; then
     run_tpr_tests

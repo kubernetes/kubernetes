@@ -127,10 +127,6 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
-	if len(requestInfo.Subresource) > 0 {
-		http.NotFound(w, req)
-		return
-	}
 
 	crdName := requestInfo.Resource + "." + requestInfo.APIGroup
 	crd, err := r.crdLister.Get(crdName)
@@ -149,6 +145,10 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// if we can't definitively determine that our names are good, delegate
 	if !apiextensions.IsCRDConditionFalse(crd, apiextensions.NameConflict) {
 		r.delegate.ServeHTTP(w, req)
+	}
+	if len(requestInfo.Subresource) > 0 {
+		http.NotFound(w, req)
+		return
 	}
 
 	terminating := apiextensions.IsCRDConditionTrue(crd, apiextensions.Terminating)
