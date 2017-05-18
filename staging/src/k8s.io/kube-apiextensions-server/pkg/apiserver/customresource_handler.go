@@ -379,7 +379,7 @@ type UnstructuredDefaulter struct{}
 
 func (UnstructuredDefaulter) Default(in runtime.Object) {}
 
-type CustomResourceDefinitionRESTOptionsGetter struct {
+type CRDRESTOptionsGetter struct {
 	StorageConfig           storagebackend.Config
 	StoragePrefix           string
 	EnableWatchCache        bool
@@ -388,7 +388,7 @@ type CustomResourceDefinitionRESTOptionsGetter struct {
 	DeleteCollectionWorkers int
 }
 
-func (t CustomResourceDefinitionRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret := generic.RESTOptions{
 		StorageConfig:           &t.StorageConfig,
 		Decorator:               generic.UndecoratedStorage,
