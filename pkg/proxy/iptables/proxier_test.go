@@ -395,7 +395,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		portsMap:         make(map[localPort]closeable),
 		portMapper:       &fakePortOpener{[]*localPort{}},
 		healthChecker:    newFakeHealthChecker(),
-		iptablesLines:    bytes.NewBuffer(nil),
+		iptablesData:     bytes.NewBuffer(nil),
 		filterChains:     bytes.NewBuffer(nil),
 		filterRules:      bytes.NewBuffer(nil),
 		natChains:        bytes.NewBuffer(nil),
