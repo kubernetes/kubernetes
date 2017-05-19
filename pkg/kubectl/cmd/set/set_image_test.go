@@ -70,3 +70,66 @@ func TestImageLocal(t *testing.T) {
 		t.Errorf("did not set image: %s", buf.String())
 	}
 }
+
+func TestSetImageValidation(t *testing.T) {
+	testCases := []struct {
+		name         string
+		imageOptions *ImageOptions
+		expectErr    string
+	}{
+		{
+			name:         "test resource < 1 and filenames empty",
+			imageOptions: &ImageOptions{},
+			expectErr:    "[one or more resources must be specified as <resource> <name> or <resource>/<name>, at least one image update is required]",
+		},
+		{
+			name: "test containerImages < 1",
+			imageOptions: &ImageOptions{
+				Resources: []string{"a", "b", "c"},
+
+				FilenameOptions: resource.FilenameOptions{
+					Filenames: []string{"testFile"},
+				},
+			},
+			expectErr: "at least one image update is required",
+		},
+		{
+			name: "test containerImages > 1 and all containers are already specified by *",
+			imageOptions: &ImageOptions{
+				Resources: []string{"a", "b", "c"},
+				FilenameOptions: resource.FilenameOptions{
+					Filenames: []string{"testFile"},
+				},
+				ContainerImages: map[string]string{
+					"test": "test",
+					"*":    "test",
+				},
+			},
+			expectErr: "all containers are already specified by *, but saw more than one container_name=container_image pairs",
+		},
+		{
+			name: "sucess case",
+			imageOptions: &ImageOptions{
+				Resources: []string{"a", "b", "c"},
+				FilenameOptions: resource.FilenameOptions{
+					Filenames: []string{"testFile"},
+				},
+				ContainerImages: map[string]string{
+					"test": "test",
+				},
+			},
+			expectErr: "",
+		},
+	}
+	for _, testCase := range testCases {
+		err := testCase.imageOptions.Validate()
+		if err != nil {
+			if err.Error() != testCase.expectErr {
+				t.Errorf("[%s]:expect err:%s got err:%s", testCase.name, testCase.expectErr, err.Error())
+			}
+		}
+		if err == nil && (testCase.expectErr != "") {
+			t.Errorf("[%s]:expect err:%s got err:%v", testCase.name, testCase.expectErr, err)
+		}
+	}
+}
