@@ -1,14 +1,15 @@
-approvers:
-- lavalamp
-- smarterclayton
 reviewers:
-- lavalamp
-- smarterclayton
-- wojtek-t
-- deads2k
-- caesarxuchao
-- mikedanese
-- liggitt
-- nikhiljindal
-- sttts
-- krousey
+  - lavalamp
+  - smarterclayton
+  - wojtek-t
+  - deads2k
+  - caesarxuchao
+  - mikedanese
+  - liggitt
+  - nikhiljindal
+  - sttts
+  - krousey
+approvers:
+  - eparis
+  - lavalamp
+  - smarterclayton
