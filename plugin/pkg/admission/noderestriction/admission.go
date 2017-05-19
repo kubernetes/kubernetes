@@ -196,8 +196,19 @@ func (c *nodePlugin) admitPodStatus(nodeName string, a admission.Attributes) err
 }
 
 func (c *nodePlugin) admitNode(nodeName string, a admission.Attributes) error {
-	if a.GetName() != nodeName {
-		return admission.NewForbidden(a, fmt.Errorf("cannot modify other nodes"))
+	requestedName := a.GetName()
+
+	// On create, get name from new object if unset in admission
+	if len(requestedName) == 0 && a.GetOperation() == admission.Create {
+		node, ok := a.GetObject().(*api.Node)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+		requestedName = node.Name
+	}
+
+	if requestedName != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("node %s cannot modify node %s", nodeName, requestedName))
 	}
 	return nil
 }
