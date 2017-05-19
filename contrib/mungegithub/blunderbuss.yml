@@ -1,0 +1,108 @@
+prefixMap:
+  test:
+    - ixdy
+
+  pkg/admission:
+    - lavalamp
+    - davidopp
+    - derekwaynecarr
+    - erictune
+    - liggitt
+
+  pkg/api:
+    - bgrant0607
+    - thockin
+    - erictune
+    - lavalamp
+    - smarterclayton
+
+  pkg/exapi:
+    - bgrant0607
+    - thockin
+    - erictune
+    - lavalamp
+    - smarterclayton
+
+  pkg/apiserver:
+    - lavalamp
+    - smarterclayton
+
+  pkg/authentication:
+    - liggitt
+    - erictune
+
+  pkg/client:
+    - lavalamp
+    - smarterclayton
+    - deads2k
+
+  pkg/clientauth:
+    - lavalamp
+
+  pkg/cloudprovider:
+    - davidopp
+
+  pkg/cloudprovider/aws:
+    - justinsb
+
+  pkg/controller:
+    - davidopp
+    - derekwaynecarr
+
+  pkg/conversion:
+    - lavalamp
+    - derekwaynecarr
+
+  pkg/credentialprovider:
+    - erictune
+    - liggitt
+ 
+  pkg/kubectl:
+    - jlowdermilk
+    - brendandburns
+    - bgrant0607
+    - deads2k
+    - smarterclayton
+
+  pkg/kubelet:
+    - dchen1107
+
+  pkg/master:
+    - davidopp
+    - derekwaynecarr
+  
+  pkg/registry:
+    - lavalamp
+    - smarterclayton
+
+  # fall through for things that miss everything else
+  pkg:
+    - brendandburns
+    - bgrant0607
+    - thockin
+    - smarterclayton
+    - eparis
+
+  plugin/pkg/scheduler:
+    - davidopp
+
+  plugin/pkg/admission:
+    - derekwaynecarr
+
+  plugin/pkg/auth
+    - liggitt
+    - erictune
+
+  contrib/mesos:
+    - jdef
+    - karlkfi
+
+  hack/:
+    - zmerlynn
+    - lavalamp
+    - ixdy
+
+  build/:
+    - zmerlynn
+    - lavalamp
+    - ixdy
