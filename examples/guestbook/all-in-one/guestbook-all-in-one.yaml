@@ -96,8 +96,14 @@ spec:
   # if your cluster supports it, uncomment the following to automatically create
   # an external load-balanced IP for the frontend service.
   # type: LoadBalancer
+  # If you wish to access the app locally, uncomment the following to expose
+  # the service on the named port i.e. http://localk8s:31234/
+  # type: NodePort
   ports:
   - port: 80
+  # If you wish to access the app locally, uncomment the following to expose
+  # the service on the named port i.e. http://localk8s:31234/
+  # nodePort: 31234
   selector:
     app: guestbook
     tier: frontend
