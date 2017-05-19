@@ -333,19 +333,20 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 
 	firstPod := podWithPort("foo", "", 8080)
 	conflictPod := podWithPort("bar", "", 8080)
-	pods := map[string]*v1.Pod{firstPod.Name: firstPod, conflictPod.Name: conflictPod}
+	noConflictPod := podWithPort("qux", "", 80)
+	pods := map[string]*v1.Pod{firstPod.Name: firstPod, conflictPod.Name: conflictPod, noConflictPod.Name: noConflictPod}
 	for _, test := range []struct {
 		Expected        map[string]bool
 		CacheTTL        time.Duration
 		BindingDuration time.Duration
 	}{
 		{
-			Expected:        map[string]bool{firstPod.Name: true},
+			Expected:        map[string]bool{noConflictPod.Name: true},
 			CacheTTL:        100 * time.Millisecond,
 			BindingDuration: 300 * time.Millisecond,
 		},
 		{
-			Expected:        map[string]bool{firstPod.Name: true},
+			Expected:        map[string]bool{noConflictPod.Name: true},
 			CacheTTL:        10 * time.Second,
 			BindingDuration: 300 * time.Millisecond,
 		},
@@ -353,7 +354,8 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 		queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 		scache := schedulercache.New(test.CacheTTL, stop)
 
-		node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
+		nodeName := "machine1"
+		node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 		scache.AddNode(&node)
 
 		nodeLister := schedulertesting.FakeNodeLister([]*v1.Node{&node})
@@ -362,8 +364,12 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 		scheduler, bindingChan := setupTestSchedulerLongBindingWithRetry(
 			queuedPodStore, scache, nodeLister, predicateMap, stop, test.BindingDuration)
 		scheduler.Run()
-		queuedPodStore.Add(firstPod)
+		// Pre-condition: The firstPod had been scheduled to the node.
+		firstPod.Spec.NodeName = nodeName
+		scache.AddPod(firstPod)
+
 		queuedPodStore.Add(conflictPod)
+		queuedPodStore.Add(noConflictPod)
 
 		resultBindings := map[string]bool{}
 		waitChan := time.After(5 * time.Second)
@@ -373,7 +379,6 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 				resultBindings[b.Name] = true
 				p := pods[b.Name]
 				p.Spec.NodeName = b.Target.Name
-				scache.AddPod(p)
 			case <-waitChan:
 				finished = true
 			}
