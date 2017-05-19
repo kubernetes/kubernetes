@@ -8,6 +8,8 @@
 // translations/kubectl/en_US/LC_MESSAGES/k8s.po
 // translations/kubectl/fr_FR/LC_MESSAGES/k8s.mo
 // translations/kubectl/fr_FR/LC_MESSAGES/k8s.po
+// translations/kubectl/ja_JP/LC_MESSAGES/k8s.mo
+// translations/kubectl/ja_JP/LC_MESSAGES/k8s.po
 // translations/kubectl/template.pot
 // translations/test/default/LC_MESSAGES/k8s.mo
 // translations/test/default/LC_MESSAGES/k8s.po
@@ -7285,6 +7287,132 @@ func translationsKubectlFr_frLc_messagesK8sPo() (*asset, error) {
 	return a, nil
 }
 
+var _translationsKubectlJa_jpLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x11\x00\x00\x00\x1c\x00\x00\x00\xa4\x00\x00\x00\x17\x00\x00\x00,\x01\x00\x00\x00\x00\x00\x00\x88\x01\x00\x008\x00\x00\x00\x89\x01\x00\x000\x00\x00\x00\xc2\x01\x00\x000\x00\x00\x00\xf3\x01\x00\x00\x1d\x00\x00\x00$\x02\x00\x00*\x00\x00\x00B\x02\x00\x00A\x00\x00\x00m\x02\x00\x00\x1c\x00\x00\x00\xaf\x02\x00\x00\x17\x00\x00\x00\xcc\x02\x00\x00\"\x00\x00\x00\xe4\x02\x00\x00\"\x00\x00\x00\a\x03\x00\x00\x1f\x00\x00\x00*\x03\x00\x00-\x00\x00\x00J\x03\x00\x00-\x00\x00\x00x\x03\x00\x00/\x00\x00\x00\xa6\x03\x00\x00$\x00\x00\x00\xd6\x03\x00\x00\xc5\x00\x00\x00\xfb\x03\x00\x00\xa5\x01\x00\x00\xc1\x04\x00\x00c\x00\x00\x00g\x06\x00\x00:\x00\x00\x00\xcb\x06\x00\x00=\x00\x00\x00\x06\a\x00\x007\x00\x00\x00D\a\x00\x00:\x00\x00\x00|\a\x00\x00b\x00\x00\x00\xb7\a\x00\x00-\x00\x00\x00\x1a\b\x00\x00%\x00\x00\x00H\b\x00\x007\x00\x00\x00n\b\x00\x00:\x00\x00\x00\xa6\b\x00\x004\x00\x00\x00\xe1\b\x00\x00:\x00\x00\x00\x16\t\x00\x00:\x00\x00\x00Q\t\x00\x00:\x00\x00\x00\x8c\t\x00\x003\x00\x00\x00\xc7\t\x00\x00\x1d\x01\x00\x00\xfb\t\x00\x00\x01\x00\x00\x00\n\x00\x00\x00\v\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x11\x00\x00\x00\t\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\a\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\b\x00\x00\x00\x0e\x00\x00\x00\x00\x00\x00\x00\x0f\x00\x00\x00\f\x00\x00\x00\x05\x00\x00\x00\r\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00Apply a configuration to a resource by filename or stdin\x00Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x00Describe one or many contexts\x00Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x00Modify kubeconfig files\x00Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x00Unsets an individual value in a kubeconfig file\x00Update the annotations on a resource\x00watch is only supported on individual resources and resource collections - %d resources were found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2017-05-11 13:20-0700\nLast-Translator: Giri Kuncoro <girikuncoro@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 2.0.1\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n > 1);\nLanguage: ja\n\x00\u30d5\u30a1\u30a4\u30eb\u540d\u3092\u6307\u5b9a\u307e\u305f\u306f\u6a19\u6e96\u5165\u529b\u7d4c\u7531\u3067\u30ea\u30bd\u30fc\u30b9\u306b\u30b3\u30f3\u30d5\u30a3\u30b0\u3092\u9069\u7528\u3059\u308b\x00kubeconfig\u304b\u3089\u6307\u5b9a\u3057\u305f\u30af\u30e9\u30b9\u30bf\u30fc\u3092\u524a\u9664\u3059\u308b\x00kubeconfig\u304b\u3089\u6307\u5b9a\u3057\u305f\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u3092\u524a\u9664\u3059\u308b\x001\u3064\u307e\u305f\u306f\u8907\u6570\u306e\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u3092\u8a18\u8ff0\u3059\u308b\x00kubeconfig\u3067\u5b9a\u7fa9\u3055\u308c\u305f\u30af\u30e9\u30b9\u30bf\u30fc\u3092\u8868\u793a\u3059\u308b\x00\u30de\u30fc\u30b8\u3055\u308c\u305fkubeconfig\u306e\u8a2d\u5b9a\u307e\u305f\u306f\u6307\u5b9a\u3055\u308c\u305fkubeconfig\u30d5\u30a1\u30a4\u30eb\u3092\u8868\u793a\u3059\u308b\x00\u30ab\u30ec\u30f3\u30c8\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u3092\u8868\u793a\u3059\u308b\x00kubeconfig\u30d5\u30a1\u30a4\u30eb\u3092\u5909\u66f4\u3059\u308b\x00kubeconfig\u306b\u30af\u30e9\u30b9\u30bf\u30fc\u30a8\u30f3\u30c8\u30ea\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u306b\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u30a8\u30f3\u30c8\u30ea\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u306b\u30e6\u30fc\u30b6\u30fc\u30a8\u30f3\u30c8\u30ea\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u30d5\u30a1\u30a4\u30eb\u5185\u306e\u5909\u6570\u3092\u500b\u5225\u306b\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u306b\u30ab\u30ec\u30f3\u30c8\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u30d5\u30a1\u30a4\u30eb\u304b\u3089\u5909\u6570\u3092\u500b\u5225\u306b\u524a\u9664\u3059\u308b\x00\u30ea\u30bd\u30fc\u30b9\u306e\u30a2\u30ce\u30c6\u30fc\u30b7\u30e7\u30f3\u3092\u66f4\u65b0\u3059\u308b\x00watch\u306f\u5358\u4e00\u30ea\u30bd\u30fc\u30b9\u53ca\u3073\u30ea\u30bd\u30fc\u30b9\u30b3\u30ec\u30af\u30b7\u30e7\u30f3\u306e\u307f\u30b5\u30dd\u30fc\u30c8\u3057\u3066\u3044\u307e\u3059 - %d\u500b\u306e\u30ea\u30bd\u30fc\u30b9\u304c\u898b\u3064\u304b\u308a\u307e\u3057\u305f\x00watch\u306f\u5358\u4e00\u30ea\u30bd\u30fc\u30b9\u53ca\u3073\u30ea\u30bd\u30fc\u30b9\u30b3\u30ec\u30af\u30b7\u30e7\u30f3\u306e\u307f\u30b5\u30dd\u30fc\u30c8\u3057\u3066\u3044\u307e\u3059 - %d\u500b\u306e\u30ea\u30bd\u30fc\u30b9\u304c\u898b\u3064\u304b\u308a\u307e\u3057\u305f\x00")
+
+func translationsKubectlJa_jpLc_messagesK8sMoBytes() ([]byte, error) {
+	return _translationsKubectlJa_jpLc_messagesK8sMo, nil
+}
+
+func translationsKubectlJa_jpLc_messagesK8sMo() (*asset, error) {
+	bytes, err := translationsKubectlJa_jpLc_messagesK8sMoBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "translations/kubectl/ja_JP/LC_MESSAGES/k8s.mo", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _translationsKubectlJa_jpLc_messagesK8sPo = []byte(`# Test translations for unit tests.
+# Copyright (C) 2017
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR girikuncoro@gmail.com, 2017.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: gettext-go-examples-hello\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-12-12 20:03+0000\n"
+"PO-Revision-Date: 2017-01-29 22:54-0800\n"
+"Last-Translator: Giri Kuncoro <girikuncoro@gmail.com>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 1.6.10\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"Language-Team: \n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"Language: ja\n"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/apply.go#L98
+msgid "Apply a configuration to a resource by filename or stdin"
+msgstr "ファイル名を指定または標準入力経由でリソースにコンフィグを適用する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
+msgid "Delete the specified cluster from the kubeconfig"
+msgstr "kubeconfigから指定したクラスターを削除する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_context.go#L38
+msgid "Delete the specified context from the kubeconfig"
+msgstr "kubeconfigから指定したコンテキストを削除する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_contexts.go#L62
+msgid "Describe one or many contexts"
+msgstr "1つまたは複数のコンテキストを記述する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
+msgid "Display clusters defined in the kubeconfig"
+msgstr "kubeconfigで定義されたクラスターを表示する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/view.go#L64
+msgid "Display merged kubeconfig settings or a specified kubeconfig file"
+msgstr "マージされたkubeconfigの設定または指定されたkubeconfigファイルを表示する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
+msgid "Displays the current-context"
+msgstr "カレントコンテキストを表示する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
+msgid "Modify kubeconfig files"
+msgstr "kubeconfigファイルを変更する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
+msgid "Sets a cluster entry in kubeconfig"
+msgstr "kubeconfigにクラスターエントリを設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_context.go#L57
+msgid "Sets a context entry in kubeconfig"
+msgstr "kubeconfigにコンテキストエントリを設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_authinfo.go#L103
+msgid "Sets a user entry in kubeconfig"
+msgstr "kubeconfigにユーザーエントリを設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
+msgid "Sets an individual value in a kubeconfig file"
+msgstr "kubeconfigファイル内の変数を個別に設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
+msgid "Sets the current-context in a kubeconfig file"
+msgstr "kubeconfigにカレントコンテキストを設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
+msgid "Unsets an individual value in a kubeconfig file"
+msgstr "kubeconfigファイルから変数を個別に削除する"
+
+msgid "Update the annotations on a resource"
+msgstr "リソースのアノテーションを更新する"
+
+msgid ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgid_plural ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgstr[0] ""
+"watchは単一リソース及びリソースコレクションのみサポートしています - "
+"%d個のリソースが見つかりました"
+msgstr[1] ""
+"watchは単一リソース及びリソースコレクションのみサポートしています - "
+"%d個のリソースが見つかりました"
+`)
+
+func translationsKubectlJa_jpLc_messagesK8sPoBytes() ([]byte, error) {
+	return _translationsKubectlJa_jpLc_messagesK8sPo, nil
+}
+
+func translationsKubectlJa_jpLc_messagesK8sPo() (*asset, error) {
+	bytes, err := translationsKubectlJa_jpLc_messagesK8sPoBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "translations/kubectl/ja_JP/LC_MESSAGES/k8s.po", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _translationsKubectlTemplatePot = []byte(`# SOME DESCRIPTIVE TITLE.
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
@@ -9604,6 +9732,8 @@ var _bindata = map[string]func() (*asset, error){
 	"translations/kubectl/en_US/LC_MESSAGES/k8s.po":   translationsKubectlEn_usLc_messagesK8sPo,
 	"translations/kubectl/fr_FR/LC_MESSAGES/k8s.mo":   translationsKubectlFr_frLc_messagesK8sMo,
 	"translations/kubectl/fr_FR/LC_MESSAGES/k8s.po":   translationsKubectlFr_frLc_messagesK8sPo,
+	"translations/kubectl/ja_JP/LC_MESSAGES/k8s.mo":   translationsKubectlJa_jpLc_messagesK8sMo,
+	"translations/kubectl/ja_JP/LC_MESSAGES/k8s.po":   translationsKubectlJa_jpLc_messagesK8sPo,
 	"translations/kubectl/template.pot":               translationsKubectlTemplatePot,
 	"translations/test/default/LC_MESSAGES/k8s.mo":    translationsTestDefaultLc_messagesK8sMo,
 	"translations/test/default/LC_MESSAGES/k8s.po":    translationsTestDefaultLc_messagesK8sPo,
@@ -9672,6 +9802,12 @@ var _bintree = &bintree{nil, map[string]*bintree{
 				"LC_MESSAGES": {nil, map[string]*bintree{
 					"k8s.mo": {translationsKubectlFr_frLc_messagesK8sMo, map[string]*bintree{}},
 					"k8s.po": {translationsKubectlFr_frLc_messagesK8sPo, map[string]*bintree{}},
+				}},
+			}},
+			"ja_JP": {nil, map[string]*bintree{
+				"LC_MESSAGES": {nil, map[string]*bintree{
+					"k8s.mo": {translationsKubectlJa_jpLc_messagesK8sMo, map[string]*bintree{}},
+					"k8s.po": {translationsKubectlJa_jpLc_messagesK8sPo, map[string]*bintree{}},
 				}},
 			}},
 			"template.pot": {translationsKubectlTemplatePot, map[string]*bintree{}},
