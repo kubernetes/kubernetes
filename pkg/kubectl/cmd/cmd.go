@@ -357,7 +357,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 
 	filters := []string{
 		"options",
-		Deprecated("kubectl", "delete", cmds, NewCmdStop(f, out)),
+		deprecated("kubectl", "delete", cmds, NewCmdStop(f, out)),
 	}
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
@@ -405,12 +405,12 @@ func deprecatedAlias(deprecatedVersion string, cmd *cobra.Command) *cobra.Comman
 	return cmd
 }
 
-// Deprecated is similar to deprecatedAlias, but it is used for deprecations
+// deprecated is similar to deprecatedAlias, but it is used for deprecations
 // that are not simple aliases; this command is actually a different
 // (deprecated) codepath.
-func Deprecated(baseName, to string, parent, cmd *cobra.Command) string {
-	cmd.Long = fmt.Sprintf("Deprecated: This command is deprecated, all its functionalities are covered by \"%s %s\"", baseName, to)
-	cmd.Short = fmt.Sprintf("Deprecated: %s", to)
+func deprecated(baseName, to string, parent, cmd *cobra.Command) string {
+	cmd.Long = fmt.Sprintf("Deprecated: all functionality can be found in \"%s %s\"", baseName, to)
+	cmd.Short = fmt.Sprintf("Deprecated: use %s", to)
 	parent.AddCommand(cmd)
 	return cmd.Name()
 }
