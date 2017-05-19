@@ -26,6 +26,7 @@ cmd/kubectl
 cmd/kubelet
 cmd/libs/go2idl/client-gen
 cmd/libs/go2idl/client-gen/generators
+cmd/libs/go2idl/client-gen/path
 cmd/libs/go2idl/client-gen/test_apis/testgroup/install
 cmd/libs/go2idl/conversion-gen
 cmd/libs/go2idl/deepcopy-gen
