@@ -105,7 +105,7 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
 
 	// TODO: For now we're taking the safe route and disallowing all updates to
-	// spec except for Replicas, for scaling, and Template.Spec.containers.image
+	// spec except for Replicas for scaling, and Template.Spec.Containers/InitContainers/Affinity.image
 	// for rolling-update. Enable others on a case by case basis.
 	restoreReplicas := statefulSet.Spec.Replicas
 	statefulSet.Spec.Replicas = oldStatefulSet.Spec.Replicas
@@ -113,11 +113,19 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 	restoreContainers := statefulSet.Spec.Template.Spec.Containers
 	statefulSet.Spec.Template.Spec.Containers = oldStatefulSet.Spec.Template.Spec.Containers
 
+	restoreInitContainers := statefulSet.Spec.Template.Spec.InitContainers
+	statefulSet.Spec.Template.Spec.InitContainers = oldStatefulSet.Spec.Template.Spec.InitContainers
+
+	restoreAffinity := statefulSet.Spec.Template.Spec.Affinity
+	statefulSet.Spec.Template.Spec.Affinity = oldStatefulSet.Spec.Template.Spec.Affinity
+
 	if !reflect.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas' and 'containers' are forbidden."))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'containers', 'initContainers', and 'affinity' are forbidden."))
 	}
 	statefulSet.Spec.Replicas = restoreReplicas
 	statefulSet.Spec.Template.Spec.Containers = restoreContainers
+	statefulSet.Spec.Template.Spec.InitContainers = restoreInitContainers
+	statefulSet.Spec.Template.Spec.Affinity = restoreAffinity
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
 	containerErrs, _ := apivalidation.ValidateContainerUpdates(statefulSet.Spec.Template.Spec.Containers, oldStatefulSet.Spec.Template.Spec.Containers, field.NewPath("spec").Child("template").Child("containers"))
