@@ -391,8 +391,9 @@ func printDeprecationWarning(command, alias string) {
 	glog.Warningf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", alias, command)
 }
 
-// Create a constructor for a command that redirects to another command, but
-// first prints a deprecation message.
+// deprecatedCmd is intended to be used to create a "wrapper" command around an
+// existing command. The wrapper works the same but prints a deprecation
+// message before running.
 func deprecatedCmd(deprecatedVersion string, cmd *cobra.Command) *cobra.Command {
 	// Have to be careful here because Cobra automatically extracts the name
 	// of the command from the .Use field.
