@@ -25,8 +25,11 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	stdstrings "strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -658,4 +661,39 @@ func genResponseWithJsonEncodedBody(bodyStruct interface{}) (*http.Response, err
 		return nil, err
 	}
 	return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bytesBody(jsonBytes)}, nil
+}
+
+func Test_deprecatedAlias(t *testing.T) {
+	makeCobraCommand := func() *cobra.Command {
+		cobraCmd := new(cobra.Command)
+		cobraCmd.Use = "print five lines"
+		return cobraCmd
+	}
+
+	original := makeCobraCommand()
+	alias := deprecatedAlias("echo", makeCobraCommand())
+
+	if len(alias.Deprecated) == 0 {
+		t.Error("deprecatedAlias should always have a non-empty .Deprecated")
+	}
+	if !stdstrings.Contains(alias.Deprecated, "print") {
+		t.Error("deprecatedAlias should give the name of the new function in its .Deprecated field")
+	}
+	if !alias.Hidden {
+		t.Error("deprecatedAlias should never have .Hidden == false (deprecated aliases should be hidden)")
+	}
+
+	if alias.Name() != "echo" {
+		t.Errorf("deprecatedAlias has name %q, expected %q",
+			alias.Name(), "echo")
+	}
+	if original.Name() != "print" {
+		t.Errorf("original command has name %q, expected %q",
+			original.Name(), "print")
+	}
+
+	// It would be nice to test to see that original.Run == alias.Run
+	// Unfortunately Golang does not allow comparing functions. I could do
+	// this with reflect, but that's technically invoking undefined
+	// behavior.
 }
