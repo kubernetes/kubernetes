@@ -664,9 +664,13 @@ func genResponseWithJsonEncodedBody(bodyStruct interface{}) (*http.Response, err
 }
 
 func Test_deprecatedAlias(t *testing.T) {
+	var correctCommandCalled bool
 	makeCobraCommand := func() *cobra.Command {
 		cobraCmd := new(cobra.Command)
 		cobraCmd.Use = "print five lines"
+		cobraCmd.Run = func(*cobra.Command, []string) {
+			correctCommandCalled = true
+		}
 		return cobraCmd
 	}
 
@@ -692,8 +696,19 @@ func Test_deprecatedAlias(t *testing.T) {
 			original.Name(), "print")
 	}
 
+	buffer := new(bytes.Buffer)
+	alias.SetOutput(buffer)
+	alias.Execute()
+	str := buffer.String()
+	if !stdstrings.Contains(str, "deprecated") || !stdstrings.Contains(str, "print") {
+		t.Errorf("deprecation warning %q does not include enough information", str)
+	}
+
 	// It would be nice to test to see that original.Run == alias.Run
 	// Unfortunately Golang does not allow comparing functions. I could do
 	// this with reflect, but that's technically invoking undefined
-	// behavior.
+	// behavior. Best we can do is make sure that the function is called.
+	if !correctCommandCalled {
+		t.Errorf("original function doesn't appear to have been called by alias")
+	}
 }
