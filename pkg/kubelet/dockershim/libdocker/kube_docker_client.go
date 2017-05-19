@@ -171,6 +171,16 @@ func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 	return err
 }
 
+func (d *kubeDockerClient) UpdateContainerResources(id string, updateConfig dockercontainer.UpdateConfig) error {
+	ctx, cancel := d.getTimeoutContext()
+	defer cancel()
+	_, err := d.client.ContainerUpdate(ctx, id, updateConfig)
+	if ctxErr := contextError(ctx); ctxErr != nil {
+		return ctxErr
+	}
+	return err
+}
+
 func (d *kubeDockerClient) inspectImageRaw(ref string) (*dockertypes.ImageInspect, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
