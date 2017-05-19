@@ -198,6 +198,8 @@ if [ ${ENABLE_IP_ALIASES} = true ]; then
   # Size of ranges allocated to each node. gcloud alpha supports only /32 and /24.
   IP_ALIAS_SIZE=${KUBE_GCE_IP_ALIAS_SIZE:-/24}
   IP_ALIAS_SUBNETWORK=${KUBE_GCE_IP_ALIAS_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-default}
+  # Reserve the services IP space to avoid being allocated for other GCP resources.
+  SERVICE_CLUSTER_IP_SUBNETWORK=${KUBE_GCE_SERVICE_CLUSTER_IP_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-services}
   # NODE_IP_RANGE is used when ENABLE_IP_ALIASES=true. It is the primary range in
   # the subnet and is the range used for node instance IPs.
   NODE_IP_RANGE="${NODE_IP_RANGE:-10.40.0.0/22}"
