@@ -38,10 +38,6 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return "", nil
-}
-
 func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
 	return false, nil
 }
