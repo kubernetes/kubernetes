@@ -19,6 +19,7 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/controller:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/vmware/govmomi:go_default_library",
         "//vendor/github.com/vmware/govmomi/find:go_default_library",

@@ -101,12 +101,18 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 		}
 		foundVersion = true
 
+		verbs := metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"})
+		// if we're terminating we don't allow some verbs
+		if apiextensions.IsCRDConditionTrue(crd, apiextensions.Terminating) {
+			verbs = metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "watch"})
+		}
+
 		apiResourcesForDiscovery = append(apiResourcesForDiscovery, metav1.APIResource{
 			Name:         crd.Status.AcceptedNames.Plural,
 			SingularName: crd.Status.AcceptedNames.Singular,
 			Namespaced:   crd.Spec.Scope == apiextensions.NamespaceScoped,
 			Kind:         crd.Status.AcceptedNames.Kind,
-			Verbs:        metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"}),
+			Verbs:        verbs,
 			ShortNames:   crd.Status.AcceptedNames.ShortNames,
 		})
 	}

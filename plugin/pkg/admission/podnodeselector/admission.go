@@ -40,7 +40,12 @@ import (
 var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
 
 func init() {
-	kubeapiserveradmission.Plugins.Register("PodNodeSelector", func(config io.Reader) (admission.Interface, error) {
+	Register(&kubeapiserveradmission.Plugins)
+}
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("PodNodeSelector", func(config io.Reader) (admission.Interface, error) {
 		// TODO move this to a versioned configuration file format.
 		pluginConfig := readConfig(config)
 		plugin := NewPodNodeSelector(pluginConfig.PodNodeSelectorPluginConfig)

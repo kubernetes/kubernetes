@@ -31,12 +31,14 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/client-go/dynamic"
 
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/install"
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
 	"k8s.io/kube-apiextensions-server/pkg/client/clientset/internalclientset"
 	internalinformers "k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion"
+	"k8s.io/kube-apiextensions-server/pkg/controller/finalizer"
 	"k8s.io/kube-apiextensions-server/pkg/controller/status"
 	"k8s.io/kube-apiextensions-server/pkg/registry/customresourcedefinition"
 
@@ -157,6 +159,10 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	customResourceDefinitionController := NewDiscoveryController(customResourceDefinitionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
 	namingController := status.NewNamingConditionController(customResourceDefinitionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(), customResourceDefinitionClient)
+	finalizingController := finalizer.NewCRDFinalizer(
+		customResourceDefinitionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
+		customResourceDefinitionClient,
+		dynamic.NewDynamicClientPool(s.GenericAPIServer.LoopbackClientConfig))
 
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
 		customResourceDefinitionInformers.Start(context.StopCh)
@@ -165,6 +171,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
 		go customResourceDefinitionController.Run(context.StopCh)
 		go namingController.Run(context.StopCh)
+		go finalizingController.Run(5, context.StopCh)
 		return nil
 	})
 

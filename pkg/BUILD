@@ -31,6 +31,7 @@ filegroup(
         "//pkg/apis/settings:all-srcs",
         "//pkg/apis/storage:all-srcs",
         "//pkg/auth/authorizer/abac:all-srcs",
+        "//pkg/auth/nodeidentifier:all-srcs",
         "//pkg/auth/user:all-srcs",
         "//pkg/bootstrap/api:all-srcs",
         "//pkg/capabilities:all-srcs",

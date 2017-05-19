@@ -27,7 +27,12 @@ import (
 )
 
 func init() {
-	kubeapiserveradmission.Plugins.Register("SecurityContextDeny", func(config io.Reader) (admission.Interface, error) {
+	Register(&kubeapiserveradmission.Plugins)
+}
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("SecurityContextDeny", func(config io.Reader) (admission.Interface, error) {
 		return NewSecurityContextDeny(), nil
 	})
 }

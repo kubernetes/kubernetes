@@ -59,6 +59,10 @@ func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
 			"content": map[string]interface{}{
 				"key": "value",
 			},
+			"num": map[string]interface{}{
+				"num1": 9223372036854775807,
+				"num2": 1000000,
+			},
 		},
 	}
 }

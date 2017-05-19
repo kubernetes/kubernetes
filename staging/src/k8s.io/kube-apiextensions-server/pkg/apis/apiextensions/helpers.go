@@ -18,10 +18,10 @@ package apiextensions
 
 // SetCRDCondition sets the status condition.  It either overwrites the existing one or
 // creates a new one
-func SetCRDCondition(customResourceDefinition *CustomResourceDefinition, newCondition CustomResourceDefinitionCondition) {
-	existingCondition := FindCRDCondition(customResourceDefinition, newCondition.Type)
+func SetCRDCondition(crd *CustomResourceDefinition, newCondition CustomResourceDefinitionCondition) {
+	existingCondition := FindCRDCondition(crd, newCondition.Type)
 	if existingCondition == nil {
-		customResourceDefinition.Status.Conditions = append(customResourceDefinition.Status.Conditions, newCondition)
+		crd.Status.Conditions = append(crd.Status.Conditions, newCondition)
 		return
 	}
 
@@ -34,11 +34,22 @@ func SetCRDCondition(customResourceDefinition *CustomResourceDefinition, newCond
 	existingCondition.Message = newCondition.Message
 }
 
+// RemoveCRDCondition removes the status condition.
+func RemoveCRDCondition(crd *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType) {
+	newConditions := []CustomResourceDefinitionCondition{}
+	for _, condition := range crd.Status.Conditions {
+		if condition.Type != conditionType {
+			newConditions = append(newConditions, condition)
+		}
+	}
+	crd.Status.Conditions = newConditions
+}
+
 // FindCRDCondition returns the condition you're looking for or nil
-func FindCRDCondition(customResourceDefinition *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType) *CustomResourceDefinitionCondition {
-	for i := range customResourceDefinition.Status.Conditions {
-		if customResourceDefinition.Status.Conditions[i].Type == conditionType {
-			return &customResourceDefinition.Status.Conditions[i]
+func FindCRDCondition(crd *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType) *CustomResourceDefinitionCondition {
+	for i := range crd.Status.Conditions {
+		if crd.Status.Conditions[i].Type == conditionType {
+			return &crd.Status.Conditions[i]
 		}
 	}
 
@@ -46,18 +57,18 @@ func FindCRDCondition(customResourceDefinition *CustomResourceDefinition, condit
 }
 
 // IsCRDConditionTrue indicates if the condition is present and strictly true
-func IsCRDConditionTrue(customResourceDefinition *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType) bool {
-	return IsCRDConditionPresentAndEqual(customResourceDefinition, conditionType, ConditionTrue)
+func IsCRDConditionTrue(crd *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType) bool {
+	return IsCRDConditionPresentAndEqual(crd, conditionType, ConditionTrue)
 }
 
 // IsCRDConditionFalse indicates if the condition is present and false true
-func IsCRDConditionFalse(customResourceDefinition *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType) bool {
-	return IsCRDConditionPresentAndEqual(customResourceDefinition, conditionType, ConditionFalse)
+func IsCRDConditionFalse(crd *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType) bool {
+	return IsCRDConditionPresentAndEqual(crd, conditionType, ConditionFalse)
 }
 
 // IsCRDConditionPresentAndEqual indicates if the condition is present and equal to the arg
-func IsCRDConditionPresentAndEqual(customResourceDefinition *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType, status ConditionStatus) bool {
-	for _, condition := range customResourceDefinition.Status.Conditions {
+func IsCRDConditionPresentAndEqual(crd *CustomResourceDefinition, conditionType CustomResourceDefinitionConditionType, status ConditionStatus) bool {
+	for _, condition := range crd.Status.Conditions {
 		if condition.Type == conditionType {
 			return condition.Status == status
 		}
@@ -75,4 +86,26 @@ func IsCRDConditionEquivalent(lhs, rhs *CustomResourceDefinitionCondition) bool 
 	}
 
 	return lhs.Message == rhs.Message && lhs.Reason == rhs.Reason && lhs.Status == rhs.Status && lhs.Type == rhs.Type
+}
+
+// CRDHasFinalizer returns true if the finalizer is in the list
+func CRDHasFinalizer(crd *CustomResourceDefinition, needle string) bool {
+	for _, finalizer := range crd.Finalizers {
+		if finalizer == needle {
+			return true
+		}
+	}
+
+	return false
+}
+
+// CRDRemoveFinalizer removes the finalizer if present
+func CRDRemoveFinalizer(crd *CustomResourceDefinition, needle string) {
+	newFinalizers := []string{}
+	for _, finalizer := range crd.Finalizers {
+		if finalizer != needle {
+			newFinalizers = append(newFinalizers, finalizer)
+		}
+	}
+	crd.Finalizers = newFinalizers
 }

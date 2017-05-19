@@ -2,6 +2,12 @@
 
 **Is this a request for help?** (If yes, you should use our troubleshooting guide and community support channels, see http://kubernetes.io/docs/troubleshooting/.):
 
+**Note:** Please file issues for subcomponents under the appropriate repo
+
+| Component | Repo                                                               |
+| --------- | ------------------------------------------------------------------ |
+| kubectl   | [kubernetes/kubectl](https://github.com/kubernetes/kubectl/issues/new) |
+| kubeadm   | [kubernetes/kubeadm](https://github.com/kubernetes/kubeadm/issues/new) |
 
 **What keywords did you search in Kubernetes issues before filing this one?** (If you have found any duplicates, you should instead reply there.):
 
