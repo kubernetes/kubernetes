@@ -51,6 +51,7 @@ const (
 	optionKeySecret = "kubernetes.io/secret"
 	optionFSGroup   = "kubernetes.io/fsGroup"
 	optionMountsDir = "kubernetes.io/mountsDir"
+	optionPVorVolumeName = "kubernetes.io/pvOrVolumeName"
 )
 
 const (

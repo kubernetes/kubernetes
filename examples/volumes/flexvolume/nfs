@@ -21,7 +21,6 @@ usage() {
 	err "\t$0 init"
 	err "\t$0 mount <mount dir> <json params>"
 	err "\t$0 unmount <mount dir>"
-	err "\t$0 getvolumename <json params>"
 	exit 1
 }
 
@@ -78,14 +77,6 @@ unmount() {
 	fi
 
 	log "{\"status\": \"Success\"}"
-	exit 0
-}
-
-getvolumename() {
-	NFS_SERVER=$(echo $1 | jq -r '.server')
-	SHARE=$(echo $1 | jq -r '.share')
-
-	log "{\"status\": \"Success\", \"volumeName\": \"${NFS_SERVER}/${SHARE}\"}"
 	exit 0
 }
 

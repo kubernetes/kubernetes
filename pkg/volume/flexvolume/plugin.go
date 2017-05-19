@@ -25,7 +25,6 @@ import (
 	api "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -67,16 +66,7 @@ func (plugin *flexVolumePlugin) GetPluginName() string {
 
 // GetVolumeName is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	call := plugin.NewDriverCall(getVolumeNameCmd)
-	call.AppendSpec(spec, plugin.host, nil)
-
-	status, err := call.Run()
-	if isCmdNotSupportedErr(err) {
-		return (*pluginDefaults)(plugin).GetVolumeName(spec)
-	} else if err != nil {
-		return "", err
-	}
-	return utilstrings.EscapeQualifiedNameForDisk(status.VolumeName), nil
+	return (*pluginDefaults)(plugin).GetVolumeName(spec)
 }
 
 // CanSupport is part of the volume.VolumePlugin interface.
