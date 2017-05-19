@@ -1220,6 +1220,22 @@
 			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
 		},
 		{
+			"ImportPath": "github.com/golang/protobuf/ptypes",
+			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/any",
+			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/duration",
+			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/timestamp",
+			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+		},
+		{
 			"ImportPath": "github.com/google/btree",
 			"Rev": "7d79101e329e5a3adf994758c578dab82b90c017"
 		},
@@ -1451,6 +1467,18 @@
 		{
 			"ImportPath": "github.com/google/gofuzz",
 			"Rev": "44d81051d367757e1c7c6a5a86423ece9afcf63c"
+		},
+		{
+			"ImportPath": "github.com/googleapis/gnostic/OpenAPIv2",
+			"Rev": "68f4ded48ba9414dab2ae69b3f0d69971da73aa5"
+		},
+		{
+			"ImportPath": "github.com/googleapis/gnostic/compiler",
+			"Rev": "68f4ded48ba9414dab2ae69b3f0d69971da73aa5"
+		},
+		{
+			"ImportPath": "github.com/googleapis/gnostic/extensions",
+			"Rev": "68f4ded48ba9414dab2ae69b3f0d69971da73aa5"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud",
@@ -2698,10 +2726,6 @@
 		},
 		{
 			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",
-			"Rev": "e3824ed33c72bf7e81da0286772c34b987520914"
-		},
-		{
-			"ImportPath": "google.golang.org/api/compute/v0.alpha",
 			"Rev": "e3824ed33c72bf7e81da0286772c34b987520914"
 		},
 		{
