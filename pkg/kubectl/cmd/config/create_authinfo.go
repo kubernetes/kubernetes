@@ -270,8 +270,8 @@ func (o createAuthInfoOptions) validate() error {
 	if len(o.token.Value()) > 0 {
 		methods = append(methods, fmt.Sprintf("--%v", clientcmd.FlagBearerToken))
 	}
-	if len(o.username.Value()) > 0 || len(o.password.Value()) > 0 {
-		methods = append(methods, fmt.Sprintf("--%v/--%v", clientcmd.FlagUsername, clientcmd.FlagPassword))
+	if len(o.password.Value()) > 0 {
+		methods = append(methods, fmt.Sprintf("--%v", clientcmd.FlagPassword))
 	}
 	if len(methods) > 1 {
 		return fmt.Errorf("you cannot specify more than one authentication method at the same time: %v", strings.Join(methods, ", "))
