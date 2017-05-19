@@ -28,7 +28,8 @@ import (
 
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
-	// Initialize provides the cloud with a kubernetes client builder
+	// Initialize provides the cloud with a kubernetes client builder and may spawn goroutines
+	// to perform housekeeping activities within the cloud provider.
 	Initialize(clientBuilder controller.ControllerClientBuilder)
 	// LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 	LoadBalancer() (LoadBalancer, bool)
