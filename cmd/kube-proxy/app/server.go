@@ -68,6 +68,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/resourcecontainer"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -333,6 +334,7 @@ environment variables specifying ports opened by the service proxy. There is an 
 addon that provides cluster DNS for these cluster IPs. The user must create a service
 with the apiserver API to configure the proxy.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			verflag.PrintAndExitIfRequested()
 			cmdutil.CheckErr(opts.Complete())
 			cmdutil.CheckErr(opts.Validate(args))
 			cmdutil.CheckErr(opts.Run())
