@@ -104,6 +104,10 @@ type CustomResourceDefinitionStatus struct {
 	AcceptedNames CustomResourceDefinitionNames `json:"acceptedNames" protobuf:"bytes,2,opt,name=acceptedNames"`
 }
 
+// CustomResourceCleanupFinalizer is the name of the finalizer which will delete instances of
+// a CustomResourceDefinition
+const CustomResourceCleanupFinalizer = "customresourcecleanup.apiextensions.k8s.io"
+
 // +genclient=true
 // +nonNamespaced=true
 
