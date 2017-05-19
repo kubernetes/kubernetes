@@ -7,6 +7,7 @@
 | Component | Repo                                                               |
 | --------- | ------------------------------------------------------------------ |
 | kubectl   | [kubernetes/kubectl](https://github.com/kubernetes/kubectl/issues/new) |
+| kubeadm   | [kubernetes/kubeadm](https://github.com/kubernetes/kubeadm/issues/new) |
 
 **What keywords did you search in Kubernetes issues before filing this one?** (If you have found any duplicates, you should instead reply there.):
 
