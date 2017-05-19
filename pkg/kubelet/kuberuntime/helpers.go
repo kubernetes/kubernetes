@@ -105,14 +105,14 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
 
-	labeledInfo := getContainerInfoFromLabels(c.Labels)
 	annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
 	return &kubecontainer.Container{
-		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
-		Name:  labeledInfo.ContainerName,
-		Image: c.Image.Image,
-		Hash:  annotatedInfo.Hash,
-		State: toKubeContainerState(c.State),
+		ID:      kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
+		Name:    c.GetMetadata().GetName(),
+		ImageID: c.ImageRef,
+		Image:   c.Image.Image,
+		Hash:    annotatedInfo.Hash,
+		State:   toKubeContainerState(c.State),
 	}, nil
 }
 
