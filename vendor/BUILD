@@ -346,6 +346,7 @@ filegroup(
         "//vendor/golang.org/x/text/unicode/norm:all-srcs",
         "//vendor/golang.org/x/text/width:all-srcs",
         "//vendor/golang.org/x/time/rate:all-srcs",
+        "//vendor/golang.org/x/tools/container/intsets:all-srcs",
         "//vendor/google.golang.org/api/cloudmonitoring/v2beta2:all-srcs",
         "//vendor/google.golang.org/api/compute/v0.alpha:all-srcs",
         "//vendor/google.golang.org/api/compute/v0.beta:all-srcs",
