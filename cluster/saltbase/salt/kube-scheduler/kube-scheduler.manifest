@@ -42,7 +42,8 @@
     "image": "{{pillar['kube_docker_registry']}}/kube-scheduler:{{pillar['kube-scheduler_docker_tag']}}",
     "resources": {
       "requests": {
-        "cpu": "100m"
+        "cpu": "100m",
+        "memory": "250Mi"
       }
     },
     "command": [

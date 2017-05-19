@@ -107,7 +107,8 @@
     "image": "{{pillar['kube_docker_registry']}}/kube-controller-manager:{{pillar['kube-controller-manager_docker_tag']}}",
     "resources": {
       "requests": {
-        "cpu": "200m"
+        "cpu": "200m",
+        "memory": "375Mi"
       }
     },
     "command": [
