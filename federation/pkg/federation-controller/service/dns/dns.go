@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service
+package dns
 
 import (
 	"fmt"
@@ -35,18 +35,21 @@ import (
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/service/ingress"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 )
 
 const (
-	DNSControllerName = "service-dns"
+	ControllerName = "service-dns"
 
-	DNSUserAgentName = "federation-service-dns-controller"
+	UserAgentName = "federation-service-dns-controller"
 
 	// minDNSTTL is the minimum safe DNS TTL value to use (in seconds).  We use this as the TTL for all DNS records.
 	minDNSTTL = 180
+
+	serviceSyncPeriod = 30 * time.Second
 )
 
 type ServiceDNSController struct {
@@ -149,7 +152,7 @@ func (s *ServiceDNSController) workerFunction() bool {
 		return false
 	}
 
-	ingress, err := ParseFederatedServiceIngress(service)
+	ingress, err := ingress.ParseFederatedServiceIngress(service)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("Error in parsing lb ingress for service %s/%s: %v", service.Namespace, service.Name, err))
 		return false
@@ -237,7 +240,7 @@ func (s *ServiceDNSController) getHealthyEndpoints(clusterName string, service *
 		return zoneEndpoints, regionEndpoints, globalEndpoints, nil
 	}
 
-	serviceIngress, err := ParseFederatedServiceIngress(service)
+	serviceIngress, err := ingress.ParseFederatedServiceIngress(service)
 	if err != nil {
 		return nil, nil, nil, err
 	}
