@@ -1424,6 +1424,9 @@ function start-kube-addons {
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi
+  if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
+    setup-addon-manifests "addons" "ip-masq-agent"
+  fi
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests

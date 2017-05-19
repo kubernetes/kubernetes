@@ -729,7 +729,11 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.KubeReserved = *(*map[string]string)(unsafe.Pointer(&in.KubeReserved))
 	out.SystemReservedCgroup = in.SystemReservedCgroup
 	out.KubeReservedCgroup = in.KubeReservedCgroup
-	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
+	if in.EnforceNodeAllocatable == nil {
+		out.EnforceNodeAllocatable = make([]string, 0)
+	} else {
+		out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
+	}
 	out.ExperimentalNodeAllocatableIgnoreEvictionThreshold = in.ExperimentalNodeAllocatableIgnoreEvictionThreshold
 	return nil
 }
