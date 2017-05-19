@@ -103,10 +103,11 @@ func InstrumentRouteFunc(verb, resource string, routeFunc restful.RouteFunction)
 
 		routeFunc(request, response)
 
+		reportedVerb := verb
 		if verb == "LIST" && strings.ToLower(request.QueryParameter("watch")) == "true" {
-			verb = "WATCH"
+			reportedVerb = "WATCH"
 		}
-		Monitor(&verb, &resource, cleanUserAgent(utilnet.GetHTTPClient(request.Request)), rw.Header().Get("Content-Type"), delegate.status, now)
+		Monitor(&reportedVerb, &resource, cleanUserAgent(utilnet.GetHTTPClient(request.Request)), rw.Header().Get("Content-Type"), delegate.status, now)
 	})
 }
 

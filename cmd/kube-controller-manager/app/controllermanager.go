@@ -451,6 +451,11 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		return fmt.Errorf("cloud provider could not be initialized: %v", err)
 	}
 
+	if cloud != nil {
+		// Initialize the cloud provider with a reference to the clientBuilder
+		cloud.Initialize(clientBuilder)
+	}
+
 	if ctx.IsControllerEnabled(nodeControllerName) {
 		_, clusterCIDR, err := net.ParseCIDR(s.ClusterCIDR)
 		if err != nil {
