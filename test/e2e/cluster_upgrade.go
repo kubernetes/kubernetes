@@ -209,8 +209,8 @@ func (cma *chaosMonkeyAdapter) Test(sem *chaosmonkey.Semaphore) {
 		return
 	}
 
-	cma.test.Setup(cma.framework)
 	defer cma.test.Teardown(cma.framework)
+	cma.test.Setup(cma.framework)
 	sem.Ready()
 	cma.test.Test(cma.framework, sem.StopCh, cma.upgradeType)
 }
