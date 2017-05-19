@@ -231,7 +231,7 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 		})
 		return err
 	}
-	metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
+	metrics.BindingTime.Observe(metrics.SinceInMicroseconds(bindingStart))
 	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", assumed.Name, b.Target.Name)
 	return nil
 }
@@ -250,7 +250,7 @@ func (sched *Scheduler) scheduleOne() {
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
 	suggestedHost, err := sched.schedule(pod)
-	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
+	metrics.SchedulingAlgorithmTime.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
 		return
 	}
@@ -271,7 +271,7 @@ func (sched *Scheduler) scheduleOne() {
 				Name: suggestedHost,
 			},
 		})
-		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+		metrics.E2eSchedulingTime.Observe(metrics.SinceInMicroseconds(start))
 		if err != nil {
 			glog.Errorf("Internal error binding pod: (%v)", err)
 		}

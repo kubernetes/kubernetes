@@ -28,27 +28,27 @@ const schedulerSubsystem = "scheduler"
 var BindingSaturationReportInterval = 1 * time.Second
 
 var (
-	E2eSchedulingLatency = prometheus.NewHistogram(
+	E2eSchedulingTime = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: schedulerSubsystem,
 			Name:      "e2e_scheduling_latency_microseconds",
-			Help:      "E2e scheduling latency (scheduling algorithm + binding)",
+			Help:      "E2e scheduling: the end-to-end time that it takes to ASSIGN (schedule + bind) a pod to a host.",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
-	SchedulingAlgorithmLatency = prometheus.NewHistogram(
+	SchedulingAlgorithmTime = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: schedulerSubsystem,
 			Name:      "scheduling_algorithm_latency_microseconds",
-			Help:      "Scheduling algorithm latency",
+			Help:      "Scheduling algorithm: total time that it takes to SCHEDULE a single pod (without binding).",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
-	BindingLatency = prometheus.NewHistogram(
+	BindingTime = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: schedulerSubsystem,
 			Name:      "binding_latency_microseconds",
-			Help:      "Binding latency",
+			Help:      "Scheduling binding: total time that it takes to BIND a pod.",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
@@ -60,9 +60,9 @@ var registerMetrics sync.Once
 func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(E2eSchedulingLatency)
-		prometheus.MustRegister(SchedulingAlgorithmLatency)
-		prometheus.MustRegister(BindingLatency)
+		prometheus.MustRegister(E2eSchedulingTime)
+		prometheus.MustRegister(SchedulingAlgorithmTime)
+		prometheus.MustRegister(BindingTime)
 	})
 }
 
