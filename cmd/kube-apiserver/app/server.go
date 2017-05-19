@@ -263,7 +263,7 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions) (*master.Config, inf
 		EventTTL:                s.EventTTL,
 		KubeletClientConfig:     s.KubeletConfig,
 		EnableUISupport:         true,
-		EnableLogsSupport:       true,
+		EnableLogsSupport:       s.EnableLogsHandler,
 		ProxyTransport:          proxyTransport,
 
 		Tunneler: nodeTunneler,
