@@ -16,7 +16,7 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor/k8s.io/client-go/util/clock:go_default_library"],
+    deps = ["//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library"],
 )
 
 go_library(
@@ -28,7 +28,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/juju/ratelimit:go_default_library",
-        "//vendor/k8s.io/client-go/util/clock:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//vendor/k8s.io/client-go/util/integer:go_default_library",
     ],
 )
