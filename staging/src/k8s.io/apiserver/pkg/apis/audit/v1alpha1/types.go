@@ -23,6 +23,14 @@ import (
 	authnv1 "k8s.io/client-go/pkg/apis/authentication/v1"
 )
 
+// Header keys used by the audit system.
+const (
+	// Header to hold the audit ID as the request is propagated through the serving hierarchy. The
+	// Audit-ID header should be set by the first server to receive the request (e.g. the federation
+	// server or kube-aggregator).
+	HeaderAuditID = "Audit-ID"
+)
+
 // Level defines the amount of information logged during auditing
 type Level string
 
@@ -40,6 +48,22 @@ const (
 	LevelRequestResponse Level = "RequestResponse"
 )
 
+// Stage defines the stages in request handling that audit events may be generated.
+type Stage string
+
+// Valid audit stages.
+const (
+	// The stage for events generated as soon as the audit handler receives the request, and before it
+	// is delegated down the handler chain.
+	StageRequestReceived = "RequestReceived"
+	// The stage for events generated once the response headers are sent, but before the response body
+	// is sent. This stage is only generated for long-running requests (e.g. watch).
+	StageResponseStarted = "ResponseStarted"
+	// The stage for events generated once the response body has been completed, and no more bytes
+	// will be sent.
+	StageResponseComplete = "ResponseComplete"
+)
+
 // Event captures all the information that can be included in an API audit log.
 type Event struct {
 	metav1.TypeMeta `json:",inline"`
@@ -53,7 +77,10 @@ type Event struct {
 	// Time the request reached the apiserver.
 	Timestamp metav1.Time `json:"timestamp"`
 	// Unique audit ID, generated for each request.
-	AuditID types.UID `json:"auditID,omitempty"`
+	AuditID types.UID `json:"auditID"`
+	// Stage of the request handling when this event instance was generated.
+	Stage Stage `json:"stage"`
+
 	// RequestURI is the request URI as sent by the client to a server.
 	RequestURI string `json:"requestURI"`
 	// Verb is the kubernetes verb associated with the request.
@@ -82,12 +109,12 @@ type Event struct {
 	// merging. It is an external versioned object type, and may not be a valid object on its own.
 	// Omitted for non-resource requests.  Only logged at Request Level and higher.
 	// +optional
-	RequestObject runtime.RawExtension `json:"requestObject,omitempty"`
+	RequestObject *runtime.Unknown `json:"requestObject,omitempty"`
 	// API object returned in the response, in JSON. The ResponseObject is recorded after conversion
 	// to the external type, and serialized as JSON.  Omitted for non-resource requests.  Only logged
 	// at Response Level.
 	// +optional
-	ResponseObject runtime.RawExtension `json:"responseObject,omitempty"`
+	ResponseObject *runtime.Unknown `json:"responseObject,omitempty"`
 }
 
 // EventList is a list of audit Events.
@@ -192,4 +219,6 @@ type ObjectReference struct {
 	APIVersion string `json:"apiVersion,omitempty"`
 	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty"`
+	// +optional
+	Subresource string `json:"subresource,omitempty"`
 }
