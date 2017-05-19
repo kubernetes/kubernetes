@@ -271,11 +271,6 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		if _, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns, sameInstanceName), noxuNamespacedResourceClient, noxuDefinition); err != nil {
 			t.Fatal(err)
 		}
-		// Remove sameInstanceName since at the moment there's no finalizers.
-		// TODO: as soon finalizers will be implemented Delete can be removed.
-		if err := noxuNamespacedResourceClient.Delete(sameInstanceName, nil); err != nil {
-			t.Fatal(err)
-		}
 		if err := testserver.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
