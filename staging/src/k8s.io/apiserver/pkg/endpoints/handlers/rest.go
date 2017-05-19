@@ -292,7 +292,11 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			opts.FieldSelector = nameSelector
 		}
 
-		if (opts.Watch || forceWatch) && rw != nil {
+		if opts.Watch || forceWatch {
+			if rw == nil {
+				scope.err(errors.NewMethodNotSupported(scope.Resource.GroupResource(), "watch"), w, req)
+				return
+			}
 			// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
 			timeout := time.Duration(0)
 			if opts.TimeoutSeconds != nil {
