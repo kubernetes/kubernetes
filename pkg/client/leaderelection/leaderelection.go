@@ -71,7 +71,7 @@ const (
 	DefaultRetryPeriod   = 2 * time.Second
 )
 
-// NewLeadereElector creates a LeaderElector from a LeaderElecitionConfig
+// NewLeaderElector creates a LeaderElector from a LeaderElectionConfig
 func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	if lec.LeaseDuration <= lec.RenewDeadline {
 		return nil, fmt.Errorf("leaseDuration must be greater than renewDeadline")
