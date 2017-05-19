@@ -30,7 +30,7 @@
     - user: root
     - group: root
     - mode: 644
-
+    
 #stop legacy kube-proxy service
 stop_kube-proxy:
   service.dead:

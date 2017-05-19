@@ -108,7 +108,6 @@ spec:
     name: varlog
   - hostPath:
       path: /run
-    name: run
-  - hostPath:
-      path: /run/xtables.lock
+      subPath: xtables.lock
     name: iptableslock
+    
