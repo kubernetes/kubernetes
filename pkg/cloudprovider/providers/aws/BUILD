@@ -30,6 +30,7 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/credentialprovider/aws:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
