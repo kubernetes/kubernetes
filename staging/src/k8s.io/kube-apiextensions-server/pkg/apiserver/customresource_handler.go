@@ -104,13 +104,11 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !ok {
 		// programmer error
 		panic("missing context")
-		return
 	}
 	requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 	if !ok {
 		// programmer error
 		panic("missing requestInfo")
-		return
 	}
 	if !requestInfo.IsResourceRequest {
 		pathParts := splitPath(requestInfo.Path)
