@@ -18,6 +18,7 @@ go_library(
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1:go_default_library",
         "//pkg/kubelet/dockershim:go_default_library",
+        "//pkg/kubelet/util:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/interrupt:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

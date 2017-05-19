@@ -1,7 +1,7 @@
-// +build !linux,!windows
+// +build windows
 
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,18 +19,17 @@ limitations under the License.
 package cm
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
-type unsupportedContainerManager struct {
+// no-op
+type containerManager struct {
 }
 
 func NewContainerManager(_ string, _ libdocker.Interface) ContainerManager {
-	return &unsupportedContainerManager{}
+	return &containerManager{}
 }
 
-func (m *unsupportedContainerManager) Start() error {
-	return fmt.Errorf("Container Manager is unsupported in this build")
+func (m *containerManager) Start() error {
+	return nil
 }
