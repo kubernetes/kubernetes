@@ -158,6 +158,10 @@ type nodeManaged struct {
 
 // The volume object represents a volume that should be attached to a node.
 type volumeToAttach struct {
+	// multiAttachErrorReported indicates whether the multi-attach error has been reported for the given volume.
+	// It is used to to prevent reporting the error from being reported more than once for a given volume.
+	multiAttachErrorReported bool
+
 	// volumeName contains the unique identifier for this volume.
 	volumeName v1.UniqueVolumeName
 
@@ -231,9 +235,10 @@ func (dsw *desiredStateOfWorld) AddPod(
 	volumeObj, volumeExists := nodeObj.volumesToAttach[volumeName]
 	if !volumeExists {
 		volumeObj = volumeToAttach{
-			volumeName:    volumeName,
-			spec:          volumeSpec,
-			scheduledPods: make(map[types.UniquePodName]pod),
+			multiAttachErrorReported: false,
+			volumeName:               volumeName,
+			spec:                     volumeSpec,
+			scheduledPods:            make(map[types.UniquePodName]pod),
 		}
 		dsw.nodesManaged[nodeName].volumesToAttach[volumeName] = volumeObj
 	}
@@ -349,10 +354,11 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 			volumesToAttach = append(volumesToAttach,
 				VolumeToAttach{
 					VolumeToAttach: operationexecutor.VolumeToAttach{
-						VolumeName:    volumeName,
-						VolumeSpec:    volumeObj.spec,
-						NodeName:      nodeName,
-						ScheduledPods: getPodsFromMap(volumeObj.scheduledPods),
+						MultiAttachErrorReported: volumeObj.multiAttachErrorReported,
+						VolumeName:               volumeName,
+						VolumeSpec:               volumeObj.spec,
+						NodeName:                 nodeName,
+						ScheduledPods:            getPodsFromMap(volumeObj.scheduledPods),
 					}})
 		}
 	}
