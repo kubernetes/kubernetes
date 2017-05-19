@@ -305,11 +305,11 @@ type Proxier struct {
 
 	// The following buffers are used to reuse memory and avoid allocations
 	// that are significantly impacting performance.
-	iptablesLines *bytes.Buffer
-	filterChains  *bytes.Buffer
-	filterRules   *bytes.Buffer
-	natChains     *bytes.Buffer
-	natRules      *bytes.Buffer
+	iptablesData *bytes.Buffer
+	filterChains *bytes.Buffer
+	filterRules  *bytes.Buffer
+	natChains    *bytes.Buffer
+	natRules     *bytes.Buffer
 }
 
 type localPort struct {
@@ -425,7 +425,7 @@ func NewProxier(ipt utiliptables.Interface,
 		recorder:         recorder,
 		healthChecker:    healthChecker,
 		healthzServer:    healthzServer,
-		iptablesLines:    bytes.NewBuffer(nil),
+		iptablesData:     bytes.NewBuffer(nil),
 		filterChains:     bytes.NewBuffer(nil),
 		filterRules:      bytes.NewBuffer(nil),
 		natChains:        bytes.NewBuffer(nil),
@@ -989,24 +989,25 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
 	existingFilterChains := make(map[utiliptables.Chain]string)
-	proxier.iptablesLines.Reset()
-	err := proxier.iptables.SaveInto(utiliptables.TableFilter, proxier.iptablesLines)
+	proxier.iptablesData.Reset()
+	err := proxier.iptables.SaveInto(utiliptables.TableFilter, proxier.iptablesData)
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, proxier.iptablesLines.Bytes())
+		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, proxier.iptablesData.Bytes())
 	}
 
 	existingNATChains := make(map[utiliptables.Chain]string)
-	proxier.iptablesLines.Reset()
-	err = proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesLines)
+	proxier.iptablesData.Reset()
+	err = proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData)
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, proxier.iptablesLines.Bytes())
+		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, proxier.iptablesData.Bytes())
 	}
 
 	// Reset all buffers used later.
+	// This is to avoid memory reallocations and thus improve performance.
 	proxier.filterChains.Reset()
 	proxier.filterRules.Reset()
 	proxier.natChains.Reset()
@@ -1491,18 +1492,18 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 
 	// Sync rules.
 	// NOTE: NoFlushTables is used so we don't flush non-kubernetes chains in the table
-	proxier.iptablesLines.Reset()
-	proxier.iptablesLines.Write(proxier.filterChains.Bytes())
-	proxier.iptablesLines.Write(proxier.filterRules.Bytes())
-	proxier.iptablesLines.Write(proxier.natChains.Bytes())
-	proxier.iptablesLines.Write(proxier.natRules.Bytes())
+	proxier.iptablesData.Reset()
+	proxier.iptablesData.Write(proxier.filterChains.Bytes())
+	proxier.iptablesData.Write(proxier.filterRules.Bytes())
+	proxier.iptablesData.Write(proxier.natChains.Bytes())
+	proxier.iptablesData.Write(proxier.natRules.Bytes())
 
 	if glog.V(5) {
-		glog.V(5).Infof("Restoring iptables rules: %s", proxier.iptablesLines.Bytes())
+		glog.V(5).Infof("Restoring iptables rules: %s", proxier.iptablesData.Bytes())
 	}
-	err = proxier.iptables.RestoreAll(proxier.iptablesLines.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		glog.Errorf("Failed to execute iptables-restore: %v\nRules:\n%s", err, proxier.iptablesLines.Bytes())
+		glog.Errorf("Failed to execute iptables-restore: %v\nRules:\n%s", err, proxier.iptablesData.Bytes())
 		// Revert new local ports.
 		revertPorts(replacementPortsMap, proxier.portsMap)
 		return
