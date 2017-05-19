@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	statefulsetstore "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
 	expcontrollerstore "k8s.io/kubernetes/pkg/registry/extensions/controller/storage"
 	daemonstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
 	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
@@ -103,6 +104,11 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("networkpolicies")) {
 		networkExtensionsStorage := networkpolicystore.NewREST(restOptionsGetter)
 		storage["networkpolicies"] = networkExtensionsStorage
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("statefulsets")) {
+		statefulsetStorage, statefulsetStatusStorage := statefulsetstore.NewREST(restOptionsGetter)
+		storage["statefulsets"] = statefulsetStorage
+		storage["statefulsets/status"] = statefulsetStatusStorage
 	}
 
 	return storage
