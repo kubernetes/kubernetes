@@ -32,7 +32,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
 
-	"k8s.io/client-go/util/clock"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 

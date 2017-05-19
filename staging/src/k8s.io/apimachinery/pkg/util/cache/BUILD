@@ -18,7 +18,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
-        "//vendor/k8s.io/client-go/util/clock:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
     ],
 )
 

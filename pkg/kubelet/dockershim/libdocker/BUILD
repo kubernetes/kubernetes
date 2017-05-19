@@ -51,7 +51,7 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/client-go/util/clock:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
     ],
 )
 

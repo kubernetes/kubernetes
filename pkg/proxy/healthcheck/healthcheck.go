@@ -29,9 +29,9 @@ import (
 	"github.com/renstrom/dedent"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api"
 )
 
