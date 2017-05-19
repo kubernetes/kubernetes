@@ -199,7 +199,7 @@ type endpointsChange struct {
 }
 
 type endpointsChangeMap struct {
-	sync.Mutex
+	lock     sync.Mutex
 	hostname string
 	items    map[types.NamespacedName]*endpointsChange
 }
@@ -210,7 +210,7 @@ type serviceChange struct {
 }
 
 type serviceChangeMap struct {
-	sync.Mutex
+	lock  sync.Mutex
 	items map[types.NamespacedName]*serviceChange
 }
 
@@ -225,8 +225,8 @@ func newEndpointsChangeMap(hostname string) endpointsChangeMap {
 }
 
 func (ecm *endpointsChangeMap) update(namespacedName *types.NamespacedName, previous, current *api.Endpoints) bool {
-	ecm.Lock()
-	defer ecm.Unlock()
+	ecm.lock.Lock()
+	defer ecm.lock.Unlock()
 
 	change, exists := ecm.items[*namespacedName]
 	if !exists {
@@ -254,8 +254,8 @@ func newServiceChangeMap() serviceChangeMap {
 }
 
 func (scm *serviceChangeMap) update(namespacedName *types.NamespacedName, previous, current *api.Service) bool {
-	scm.Lock()
-	defer scm.Unlock()
+	scm.lock.Lock()
+	defer scm.lock.Unlock()
 
 	change, exists := scm.items[*namespacedName]
 	if !exists {
@@ -664,8 +664,8 @@ func updateServiceMap(
 	staleServices = sets.NewString()
 
 	func() {
-		changes.Lock()
-		defer changes.Unlock()
+		changes.lock.Lock()
+		defer changes.lock.Unlock()
 		for _, change := range changes.items {
 			existingPorts := serviceMap.merge(change.current)
 			serviceMap.unmerge(change.previous, existingPorts, staleServices)
@@ -741,8 +741,8 @@ func updateEndpointsMap(
 	staleSet = make(map[endpointServicePair]bool)
 
 	func() {
-		changes.Lock()
-		defer changes.Unlock()
+		changes.lock.Lock()
+		defer changes.lock.Unlock()
 		for _, change := range changes.items {
 			endpointsMap.unmerge(change.previous)
 			endpointsMap.merge(change.current)
