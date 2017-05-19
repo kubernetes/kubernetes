@@ -26,6 +26,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-openapi/spec"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
@@ -183,6 +186,56 @@ func TestGetSchemaObject(t *testing.T) {
 	if !strings.Contains(buf.String(), "\"foo\"") {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
+}
+
+func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
+	pods, _, _ := testData()
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	// overide the openAPISchema function to return custom output
+	// for Pod type.
+	tf.OpenAPISchemaFunc = testOpenAPISchemaData
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf, errBuf)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set(useOpenAPIPrintColumnFlagLabel, "true")
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	expected := []runtime.Object{&pods.Items[0]}
+	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+
+	if len(buf.String()) == 0 {
+		t.Errorf("unexpected empty output")
+	}
+}
+
+func testOpenAPISchemaData() (*openapi.Resources, error) {
+	return &openapi.Resources{
+		GroupVersionKindToName: map[schema.GroupVersionKind]string{
+			{
+				Version: "v1",
+				Kind:    "Pod",
+			}: "io.k8s.kubernetes.pkg.api.v1.Pod",
+		},
+		NameToDefinition: map[string]openapi.Kind{
+			"io.k8s.kubernetes.pkg.api.v1.Pod": {
+				Name:       "io.k8s.kubernetes.pkg.api.v1.Pod",
+				IsResource: false,
+				Extensions: spec.Extensions{
+					"x-kubernetes-print-columns": "custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion",
+				},
+			},
+		},
+	}, nil
 }
 
 func TestGetObjects(t *testing.T) {

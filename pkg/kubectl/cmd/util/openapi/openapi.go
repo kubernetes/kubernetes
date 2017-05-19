@@ -194,7 +194,7 @@ func (o *Resources) parseDefinition(name string, s spec.Schema) Kind {
 		Fields:           map[string]Type{},
 	}
 	if err != nil {
-		glog.Warning(err)
+		glog.V(2).Info(err)
 	}
 
 	// Definition represents a primitive type - e.g.

@@ -48,7 +48,7 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	return f
 }
 
-func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	mapper, typer, err := f.objectMappingFactory.UnstructuredObject()
 	if err != nil {
 		return nil, err
@@ -56,10 +56,10 @@ func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, options printers.Pr
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
 	encoder := f.clientAccessFactory.JSONEncoder()
-	return PrinterForCommand(cmd, mapper, typer, encoder, decoders, options)
+	return PrinterForCommand(cmd, outputOpts, mapper, typer, encoder, decoders, options)
 }
 
-func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
+func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
 	// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
 	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
 	if err != nil {
@@ -76,7 +76,7 @@ func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTM
 		ColumnLabels:       columnLabel,
 	}
 
-	printer, err := f.PrinterForCommand(cmd, options)
+	printer, err := f.PrinterForCommand(cmd, outputOpts, options)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, o
 		return err
 	}
 
-	printer, err := f.PrinterForMapping(cmd, mapping, false)
+	printer, err := f.PrinterForMapping(cmd, nil, mapping, false)
 	if err != nil {
 		return err
 	}
