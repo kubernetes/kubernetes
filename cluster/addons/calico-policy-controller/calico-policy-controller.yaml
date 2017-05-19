@@ -22,7 +22,7 @@ spec:
       hostNetwork: true
       containers:
         - name: calico-policy-controller
-          image: calico/kube-policy-controller:v0.2.0
+          image: calico/kube-policy-controller:v0.3.0
           env:
             - name: ETCD_ENDPOINTS
               value: "http://10.0.0.17:6666"

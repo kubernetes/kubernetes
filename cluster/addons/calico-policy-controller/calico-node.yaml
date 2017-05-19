@@ -1,0 +1,100 @@
+kind: DaemonSet
+apiVersion: extensions/v1beta1
+metadata:
+  name: calico-node
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    k8s-app: calico-node
+spec:
+  selector:
+    matchLabels:
+      kubernetes.io/cluster-service: "true"
+      k8s-app: calico-node
+  template:
+    metadata:
+      labels:
+        kubernetes.io/cluster-service: "true"
+        k8s-app: calico-node
+    spec:
+      hostNetwork: true
+      containers:
+        # The Calico per-node agent.
+        - name: calico-node
+          image: calico/node:latest 
+          env:
+            # Tell Calico the location of the etcd Service.
+            - name: ETCD_ENDPOINTS
+              value: "http://10.0.0.17:6666"
+            # Disable BGP and just use Calico for enforcing
+            # policy.
+            - name: CALICO_NETWORKING
+              value: "false"
+            # Don't fail if we can't access etcd right away.
+            - name: WAIT_FOR_DATASTORE
+              value: "true"
+            # The GCI image doesn't support IPv6, so inform Felix that 
+            # it cannot program IPv6 routes / policy.
+            - name: FELIX_IPV6SUPPORT
+              value: "false"
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /lib/modules
+              name: lib-modules
+              readOnly: false 
+            - mountPath: /var/log/calico
+              name: var-log-calico
+              readOnly: false
+            - mountPath: /var/run/calico
+              name: var-run-calico
+              readOnly: false
+        # This container installs the Calico CNI binaries
+        # and CNI network config file on each node.
+        - name: install-cni
+          image: calico/cni:v1.4.2
+          imagePullPolicy: Always
+          command: ["/install-cni.sh"]
+          env:
+            - name: CNI_NETWORK_CONFIG
+              value: |-
+                {
+                    "name": "k8s-pod-network",
+                    "type": "calico",
+                    "etcd_endpoints": "__ETCD_ENDPOINTS__",
+                    "log_level": "info",
+                    "ipam": {
+                        "type": "host-local",
+                        "subnet": "usePodCidr"
+                    },
+                    "policy": {
+                        "type": "k8s"
+                    },
+                    "kubernetes": {
+                        "k8s_api_root": "https://kubernetes-master",
+                        "kubeconfig": "/var/lib/kubelet/kubeconfig"
+                    }
+                }
+          volumeMounts:
+            - mountPath: /host/opt/cni/bin
+              name: cni-bin-dir
+            - mountPath: /host/etc/cni/net.d
+              name: cni-net-dir
+      volumes:
+        # Used by calico/node.
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: var-run-calico
+          hostPath:
+            path: /var/run/calico
+        - name: var-log-calico
+          hostPath:
+            path: /var/log/calico
+        # Used to install CNI.
+        - name: cni-bin-dir
+          hostPath:
+            path: /home/kubernetes/bin
+        - name: cni-net-dir
+          hostPath:
+            path: /etc/cni/net.d
