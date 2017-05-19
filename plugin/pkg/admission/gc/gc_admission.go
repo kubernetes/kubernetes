@@ -32,7 +32,12 @@ import (
 )
 
 func init() {
-	kubeapiserveradmission.Plugins.Register("OwnerReferencesPermissionEnforcement", func(config io.Reader) (admission.Interface, error) {
+	Register(&kubeapiserveradmission.Plugins)
+}
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("OwnerReferencesPermissionEnforcement", func(config io.Reader) (admission.Interface, error) {
 		// the pods/status endpoint is ignored by this plugin since old kubelets
 		// corrupt them.  the pod status strategy ensures status updates cannot mutate
 		// ownerRef.

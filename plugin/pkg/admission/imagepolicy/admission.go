@@ -50,7 +50,12 @@ var (
 )
 
 func init() {
-	kubeapiserveradmission.Plugins.Register("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
+	Register(&kubeapiserveradmission.Plugins)
+}
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
 		newImagePolicyWebhook, err := NewImagePolicyWebhook(config)
 		if err != nil {
 			return nil, err
