@@ -45,6 +45,9 @@ go_library(
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
@@ -67,9 +70,11 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/util:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
     ],
 )
 
