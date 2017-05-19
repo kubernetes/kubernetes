@@ -28,7 +28,7 @@ const (
 	// MyFeature() bool
 
 	// owner: timstclair
-	// alpha: v1.5
+	// GA: v1.7
 	//
 	// StreamingProxyRedirects controls whether the apiserver should intercept (and follow)
 	// redirects from the backend (Kubelet) for streaming requests (exec/attach/port-forward).
@@ -43,5 +43,5 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
+	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.GA},
 }
