@@ -17,18 +17,15 @@ limitations under the License.
 package helper
 
 import (
-	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
@@ -262,14 +259,6 @@ func AddToNodeAddresses(addresses *[]api.NodeAddress, addAddresses ...api.NodeAd
 	}
 }
 
-func HashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
-	data, err := runtime.Encode(codec, obj)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", md5.Sum(data)), nil
-}
-
 // TODO: make method on LoadBalancerStatus?
 func LoadBalancerStatusEqual(l, r *api.LoadBalancerStatus) bool {
 	return ingressSliceEqual(l.Ingress, r.Ingress)
@@ -360,18 +349,6 @@ func containsAccessMode(modes []api.PersistentVolumeAccessMode, mode api.Persist
 		}
 	}
 	return false
-}
-
-// ParseRFC3339 parses an RFC3339 date in either RFC3339Nano or RFC3339 format.
-func ParseRFC3339(s string, nowFn func() metav1.Time) (metav1.Time, error) {
-	if t, timeErr := time.Parse(time.RFC3339Nano, s); timeErr == nil {
-		return metav1.Time{Time: t}, nil
-	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return metav1.Time{}, err
-	}
-	return metav1.Time{Time: t}, nil
 }
 
 // NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
