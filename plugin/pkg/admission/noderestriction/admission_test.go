@@ -357,6 +357,12 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "",
 		},
 		{
+			name:       "allow create of my node pulling name from object",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(mynodeObj, nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, mynode),
+			err:        "",
+		},
+		{
 			name:       "allow update of my node",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
@@ -380,25 +386,31 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid create of other node",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(othernodeObj, nil, nodeKind, othernodeObj.Namespace, othernodeObj.Name, nodeResource, "", admission.Create, mynode),
-			err:        "cannot modify other nodes",
+			err:        "cannot modify node",
+		},
+		{
+			name:       "forbid create of other node pulling name from object",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(othernodeObj, nil, nodeKind, othernodeObj.Namespace, "", nodeResource, "", admission.Create, mynode),
+			err:        "cannot modify node",
 		},
 		{
 			name:       "forbid update of other node",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(othernodeObj, othernodeObj, nodeKind, othernodeObj.Namespace, othernodeObj.Name, nodeResource, "", admission.Update, mynode),
-			err:        "cannot modify other nodes",
+			err:        "cannot modify node",
 		},
 		{
 			name:       "forbid delete of other node",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nil, nil, nodeKind, othernodeObj.Namespace, othernodeObj.Name, nodeResource, "", admission.Delete, mynode),
-			err:        "cannot modify other nodes",
+			err:        "cannot modify node",
 		},
 		{
 			name:       "forbid update of other node status",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(othernodeObj, othernodeObj, nodeKind, othernodeObj.Namespace, othernodeObj.Name, nodeResource, "status", admission.Update, mynode),
-			err:        "cannot modify other nodes",
+			err:        "cannot modify node",
 		},
 
 		// Unrelated objects
