@@ -37,7 +37,12 @@ func ImageLocalityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *scheduler
 
 	var sumSize int64
 	for i := range pod.Spec.Containers {
-		sumSize += checkContainerImageOnNode(node, &pod.Spec.Containers[i])
+		container := &pod.Spec.Containers[i]
+		// Ignore `PullNever` policy for image locality priority.
+		if container.ImagePullPolicy == v1.PullNever {
+			continue
+		}
+		sumSize += checkContainerImageOnNode(node, container)
 	}
 	return schedulerapi.HostPriority{
 		Host:  node.Name,

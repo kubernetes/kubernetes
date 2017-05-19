@@ -39,6 +39,18 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 	}
 
+	test_40_250a := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Image: "gcr.io/40",
+			},
+			{
+				Image:           "gcr.io/250",
+				ImagePullPolicy: v1.PullNever,
+			},
+		},
+	}
+
 	test_40_140 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
@@ -126,6 +138,21 @@ func TestImageLocalityPriority(t *testing.T) {
 			nodes:        []*v1.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 3}},
 			test:         "two images spread on two nodes, prefer the larger image one",
+		},
+		{
+			// Pod: gcr.io/40 gcr.io/250 (PullNever)
+
+			// Node1
+			// Image: gcr.io/40 40MB
+			// Score: (40M-23M)/97.7M + 1 = 1
+
+			// Node2
+			// Image: gcr.io/250 250MB
+			// Score: 0
+			pod:          &v1.Pod{Spec: test_40_250a},
+			nodes:        []*v1.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 0}},
+			test:         "two images spread on two nodes, prefer the one which pull image if not present",
 		},
 		{
 			// Pod: gcr.io/40 gcr.io/140
