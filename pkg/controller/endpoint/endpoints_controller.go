@@ -146,7 +146,6 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 
 	go func() {
 		defer utilruntime.HandleCrash()
-		time.Sleep(5 * time.Minute) // give time for our cache to fill
 		e.checkLeftoverEndpoints()
 	}()
 
