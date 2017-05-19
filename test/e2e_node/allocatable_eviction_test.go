@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -67,14 +67,13 @@ var _ = framework.KubeDescribe("AllocatableEviction [Slow] [Serial] [Disruptive]
 	testCondition := "Memory Pressure"
 
 	Context(fmt.Sprintf("when we run containers that should cause %s", testCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *nodeconfig.KubeletConfiguration) {
 			initialConfig.EvictionHard = "memory.available<10%"
 			// Set large system and kube reserved values to trigger allocatable thresholds far before hard eviction thresholds.
-			initialConfig.SystemReserved = componentconfig.ConfigurationMap(map[string]string{"memory": "1Gi"})
-			initialConfig.KubeReserved = componentconfig.ConfigurationMap(map[string]string{"memory": "1Gi"})
+			initialConfig.SystemReserved = nodeconfig.ConfigurationMap(map[string]string{"memory": "1Gi"})
+			initialConfig.KubeReserved = nodeconfig.ConfigurationMap(map[string]string{"memory": "1Gi"})
 			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
 			initialConfig.ExperimentalNodeAllocatableIgnoreEvictionThreshold = false
-			initialConfig.CgroupsPerQOS = true
 		})
 		// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
 		Context("With kubeconfig updated", func() {

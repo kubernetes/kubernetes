@@ -58,8 +58,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -67,6 +65,8 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig"
+	nodeconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -254,20 +254,20 @@ func startKubeletConfigSyncLoop(s *options.KubeletServer, currentKC string) {
 
 // Try to check for config on the API server, return that config if we get it, and start
 // a background thread that checks for updates to configs.
-func initKubeletConfigSync(s *options.KubeletServer) (*componentconfig.KubeletConfiguration, error) {
+func initKubeletConfigSync(s *options.KubeletServer) (*nodeconfig.KubeletConfiguration, error) {
 	jsonstr, err := getRemoteKubeletConfig(s, nil)
 	if err == nil {
 		// We will compare future API server config against the config we just got (jsonstr):
 		startKubeletConfigSyncLoop(s, jsonstr)
 
 		// Convert json from API server to external type struct, and convert that to internal type struct
-		extKC := componentconfigv1alpha1.KubeletConfiguration{}
+		extKC := nodeconfigv1alpha1.KubeletConfiguration{}
 		err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(jsonstr), &extKC)
 		if err != nil {
 			return nil, err
 		}
 		api.Scheme.Default(&extKC)
-		kc := componentconfig.KubeletConfiguration{}
+		kc := nodeconfig.KubeletConfiguration{}
 		err = api.Scheme.Convert(&extKC, &kc, nil)
 		if err != nil {
 			return nil, err
@@ -302,20 +302,28 @@ func checkPermissions() error {
 	return nil
 }
 
-func setConfigz(cz *configz.Config, kc *componentconfig.KubeletConfiguration) {
-	tmp := componentconfigv1alpha1.KubeletConfiguration{}
+func setConfigz(cz *configz.Config, kc *nodeconfig.KubeletConfiguration) {
+	tmp := nodeconfigv1alpha1.KubeletConfiguration{}
 	api.Scheme.Convert(kc, &tmp, nil)
 	cz.Set(tmp)
 }
 
-func initConfigz(kc *componentconfig.KubeletConfiguration) (*configz.Config, error) {
-	cz, err := configz.New("componentconfig")
-	if err == nil {
-		setConfigz(cz, kc)
-	} else {
-		glog.Errorf("unable to register configz: %s", err)
+func initConfigz(kf *nodeconfig.KubeletFlags, kc *nodeconfig.KubeletConfiguration) (*configz.Config, *configz.Config, error) {
+	flags, err := configz.New("kubeletFlags")
+	if err != nil {
+		glog.Errorf("unable to register kubeletFlags configz: %s", err)
+		return nil, nil, err
 	}
-	return cz, err
+	flags.Set(kf)
+
+	config, err := configz.New("nodeconfig")
+	if err != nil {
+		glog.Errorf("unable to register nodeconfig configz: %s", err)
+		return nil, nil, err
+	}
+	setConfigz(config, kc)
+
+	return flags, config, err
 }
 
 // validateConfig validates configuration of Kubelet and returns an error is the input configuration is invalid.
@@ -340,7 +348,7 @@ func validateConfig(s *options.KubeletServer) error {
 }
 
 // makeEventRecorder sets up kubeDeps.Recorder if its nil. Its a no-op otherwise.
-func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, nodeName types.NodeName) {
+func makeEventRecorder(s *nodeconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, nodeName types.NodeName) {
 	if kubeDeps.Recorder != nil {
 		return
 	}
@@ -384,7 +392,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	// Register current configuration with /configz endpoint
-	cfgz, cfgzErr := initConfigz(&s.KubeletConfiguration)
+	_, cfgz, cfgzErr := initConfigz(&s.KubeletFlags, &s.KubeletConfiguration)
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		// Look for config on the API server. If it exists, replace s.KubeletConfiguration
 		// with it and continue. initKubeletConfigSync also starts the background thread that checks for new config.
@@ -423,7 +431,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		var externalKubeClient clientgoclientset.Interface
 		var cloud cloudprovider.Interface
 
-		if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != componentconfigv1alpha1.AutoDetectCloudProvider {
+		if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != nodeconfigv1alpha1.AutoDetectCloudProvider {
 			cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 			if err != nil {
 				return err
@@ -622,7 +630,7 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
-func InitializeTLS(kf *options.KubeletFlags, kc *componentconfig.KubeletConfiguration) (*server.TLSOptions, error) {
+func InitializeTLS(kf *nodeconfig.KubeletFlags, kc *nodeconfig.KubeletConfiguration) (*server.TLSOptions, error) {
 	if kc.TLSCertFile == "" && kc.TLSPrivateKeyFile == "" {
 		kc.TLSCertFile = path.Join(kc.CertDirectory, "kubelet.crt")
 		kc.TLSPrivateKeyFile = path.Join(kc.CertDirectory, "kubelet.key")
@@ -763,7 +771,7 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, runOnce bool, standaloneMode bool) error {
+func RunKubelet(kubeFlags *nodeconfig.KubeletFlags, kubeCfg *nodeconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, runOnce bool, standaloneMode bool) error {
 	hostname := nodeutil.GetHostname(kubeFlags.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname if kcfg.Cloud == nil
 	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
@@ -800,8 +808,8 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.Kubele
 	}
 	capabilities.Setup(kubeCfg.AllowPrivileged, privilegedSources, 0)
 
-	credentialprovider.SetPreferredDockercfgPath(kubeCfg.RootDirectory)
-	glog.V(2).Infof("Using root directory: %v", kubeCfg.RootDirectory)
+	credentialprovider.SetPreferredDockercfgPath(kubeFlags.RootDirectory)
+	glog.V(2).Infof("Using root directory: %v", kubeFlags.RootDirectory)
 
 	builder := kubeDeps.Builder
 	if builder == nil {
@@ -810,7 +818,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.Kubele
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
-	k, err := builder(kubeCfg, kubeDeps, standaloneMode, kubeFlags.HostnameOverride, kubeFlags.NodeIP, kubeFlags.DockershimRootDirectory, kubeFlags.ProviderID)
+	k, err := builder(kubeFlags, kubeCfg, kubeDeps, standaloneMode, kubeFlags.HostnameOverride, kubeFlags.NodeIP, kubeFlags.DockershimRootDirectory, kubeFlags.ProviderID)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -873,7 +881,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.Kubele
 	return nil
 }
 
-func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps) {
+func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg *nodeconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps) {
 	// start the kubelet
 	go wait.Until(func() { k.Run(podCfg.Updates()) }, 0, wait.NeverStop)
 
@@ -890,11 +898,11 @@ func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg 
 	}
 }
 
-func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, standaloneMode bool, hostnameOverride, nodeIP, dockershimRootDir, providerID string) (k kubelet.KubeletBootstrap, err error) {
+func CreateAndInitKubelet(kubeFlags *nodeconfig.KubeletFlags, kubeCfg *nodeconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, standaloneMode bool, hostnameOverride, nodeIP, dockershimRootDir, providerID string) (k kubelet.KubeletBootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, standaloneMode, hostnameOverride, nodeIP, dockershimRootDir, providerID)
+	k, err = kubelet.NewMainKubelet(kubeFlags, kubeCfg, kubeDeps, standaloneMode, hostnameOverride, nodeIP, dockershimRootDir, providerID)
 	if err != nil {
 		return nil, err
 	}
@@ -908,7 +916,7 @@ func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDep
 
 // parseResourceList parses the given configuration map into an API
 // ResourceList or returns an error.
-func parseResourceList(m componentconfig.ConfigurationMap) (v1.ResourceList, error) {
+func parseResourceList(m nodeconfig.ConfigurationMap) (v1.ResourceList, error) {
 	if len(m) == 0 {
 		return nil, nil
 	}
@@ -934,24 +942,24 @@ func parseResourceList(m componentconfig.ConfigurationMap) (v1.ResourceList, err
 
 // RunDockershim only starts the dockershim in current process. This is only used for cri validate testing purpose
 // TODO(random-liu): Move this to a separate binary.
-func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir string) error {
+func RunDockershim(f *nodeconfig.KubeletFlags, c *nodeconfig.KubeletConfiguration, dockershimRootDir string) error {
 	// Create docker client.
-	dockerClient := libdocker.ConnectToDockerOrDie(c.DockerEndpoint, c.RuntimeRequestTimeout.Duration,
+	dockerClient := libdocker.ConnectToDockerOrDie(f.DockerEndpoint, f.RuntimeRequestTimeout.Duration,
 		c.ImagePullProgressDeadline.Duration)
 
 	// Initialize network plugin settings.
-	binDir := c.CNIBinDir
+	binDir := f.CNIBinDir
 	if binDir == "" {
-		binDir = c.NetworkPluginDir
+		binDir = f.NetworkPluginDir
 	}
 	nh := &kubelet.NoOpLegacyHost{}
 	pluginSettings := dockershim.NetworkPluginSettings{
-		HairpinMode:       componentconfig.HairpinMode(c.HairpinMode),
+		HairpinMode:       nodeconfig.HairpinMode(c.HairpinMode),
 		NonMasqueradeCIDR: c.NonMasqueradeCIDR,
-		PluginName:        c.NetworkPluginName,
-		PluginConfDir:     c.CNIConfDir,
+		PluginName:        f.NetworkPluginName,
+		PluginConfDir:     f.CNIConfDir,
 		PluginBinDir:      binDir,
-		MTU:               int(c.NetworkPluginMTU),
+		MTU:               int(f.NetworkPluginMTU),
 		LegacyRuntimeHost: nh,
 	}
 
@@ -965,9 +973,9 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
 	}
 
-	ds, err := dockershim.NewDockerService(dockerClient, c.SeccompProfileRoot, c.PodInfraContainerImage,
-		streamingConfig, &pluginSettings, c.RuntimeCgroups, c.CgroupDriver, c.DockerExecHandlerName, dockershimRootDir,
-		c.DockerDisableSharedPID)
+	ds, err := dockershim.NewDockerService(dockerClient, c.SeccompProfileRoot, f.PodInfraContainerImage,
+		streamingConfig, &pluginSettings, f.RuntimeCgroups, f.CgroupDriver, f.DockerExecHandlerName, dockershimRootDir,
+		f.DockerDisableSharedPID)
 	if err != nil {
 		return err
 	}
@@ -976,7 +984,7 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 	}
 
 	// The unix socket for kubelet <-> dockershim communication.
-	ep := c.RemoteRuntimeEndpoint
+	ep := f.RemoteRuntimeEndpoint
 	if len(ep) == 0 {
 		ep = "/var/run/dockershim.sock"
 	}

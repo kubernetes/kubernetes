@@ -575,7 +575,7 @@ func setKubeletAPIQPSLimit(f *framework.Framework, newAPIQPS int32) {
 	const restartGap = 40 * time.Second
 
 	resp := pollConfigz(2*time.Minute, 5*time.Second)
-	kubeCfg, err := decodeConfigz(resp)
+	_, kubeCfg, err := decodeConfigz(resp)
 	framework.ExpectNoError(err)
 	framework.Logf("Old QPS limit is: %d\n", kubeCfg.KubeAPIQPS)
 
@@ -591,7 +591,7 @@ func setKubeletAPIQPSLimit(f *framework.Framework, newAPIQPS int32) {
 
 	// Check new QPS has been set
 	resp = pollConfigz(2*time.Minute, 5*time.Second)
-	kubeCfg, err = decodeConfigz(resp)
+	_, kubeCfg, err = decodeConfigz(resp)
 	framework.ExpectNoError(err)
 	framework.Logf("New QPS limit is: %d\n", kubeCfg.KubeAPIQPS)
 

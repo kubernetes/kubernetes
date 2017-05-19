@@ -751,7 +751,7 @@ func (kl *Kubelet) OkToDeletePod(pod *v1.Pod) bool {
 		glog.V(3).Infof("Pod %q is terminated, but some volumes have not been cleaned up", format.Pod(pod))
 		return false
 	}
-	if kl.kubeletConfiguration.CgroupsPerQOS {
+	if kl.kubeletFlags.CgroupsPerQOS {
 		pcm := kl.containerManager.NewPodContainerManager()
 		if pcm.Exists(pod) {
 			glog.V(3).Infof("Pod %q is terminated, but pod cgroup sandbox has not been cleaned up", format.Pod(pod))

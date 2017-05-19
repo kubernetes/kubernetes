@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 
 	"fmt"
@@ -119,7 +119,7 @@ func parsePercentage(v string) (int64, error) {
 }
 
 // ParseQOSReserved parses the --qos-reserve-requests option
-func ParseQOSReserved(m componentconfig.ConfigurationMap) (*map[v1.ResourceName]int64, error) {
+func ParseQOSReserved(m nodeconfig.ConfigurationMap) (*map[v1.ResourceName]int64, error) {
 	reservations := make(map[v1.ResourceName]int64)
 	for k, v := range m {
 		switch v1.ResourceName(k) {

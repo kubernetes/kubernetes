@@ -44,7 +44,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			staticPodName = "static-pod-" + string(uuid.NewUUID())
 			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 
-			manifestPath = framework.TestContext.KubeletConfig.PodManifestPath
+			manifestPath = framework.TestContext.KubeletFlags.PodManifestPath
 
 			By("create the static pod")
 			err := createStaticPod(manifestPath, staticPodName, ns,

@@ -28,8 +28,8 @@ import (
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
@@ -53,7 +53,7 @@ const (
 type NetworkPlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any other methods are called.
-	Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error
+	Init(host Host, hairpinMode nodeconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error
 
 	// Called on various events like:
 	// NET_PLUGIN_EVENT_POD_CIDR_CHANGE
@@ -156,7 +156,7 @@ type PortMappingGetter interface {
 }
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
-func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
+func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode nodeconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
 	if networkPluginName == "" {
 		// default to the no_op plugin
 		plug := &NoopNetworkPlugin{}
@@ -207,7 +207,7 @@ type NoopNetworkPlugin struct {
 
 const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 
-func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
+func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode nodeconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	// Set bridge-nf-call-iptables=1 to maintain compatibility with older
 	// kubernetes versions to ensure the iptables-based kube proxy functions
 	// correctly.  Other plugins are responsible for setting this correctly

@@ -249,6 +249,13 @@ func updateTestContext() error {
 		return fmt.Errorf("failed to get kubelet configuration: %v", err)
 	}
 	framework.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config.
+
+	kubeletFlags, err := getCurrentKubeletFlags()
+	if err != nil {
+		return fmt.Errorf("failed to get kubelet flags: %v", err)
+	}
+	framework.TestContext.KubeletFlags = *kubeletFlags
+
 	return nil
 }
 

@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/nodeconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -46,7 +46,7 @@ var _ = framework.KubeDescribe("GPU [Serial]", func() {
 			}
 
 			By("enabling support for GPUs")
-			var oldCfg *componentconfig.KubeletConfiguration
+			var oldCfg *nodeconfig.KubeletConfiguration
 			defer func() {
 				if oldCfg != nil {
 					framework.ExpectNoError(setKubeletConfiguration(f, oldCfg))
@@ -57,7 +57,7 @@ var _ = framework.KubeDescribe("GPU [Serial]", func() {
 			framework.ExpectNoError(err)
 			clone, err := api.Scheme.DeepCopy(oldCfg)
 			framework.ExpectNoError(err)
-			newCfg := clone.(*componentconfig.KubeletConfiguration)
+			newCfg := clone.(*nodeconfig.KubeletConfiguration)
 			if newCfg.FeatureGates != "" {
 				newCfg.FeatureGates = fmt.Sprintf("%s,%s", acceleratorsFeatureGate, newCfg.FeatureGates)
 			} else {
