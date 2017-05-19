@@ -385,31 +385,11 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			glog.Errorf("ContainerStatus for %s error: %v", c.Id, err)
 			return nil, err
 		}
-
-		annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
-		labeledInfo := getContainerInfoFromLabels(c.Labels)
-		cStatus := &kubecontainer.ContainerStatus{
-			ID: kubecontainer.ContainerID{
-				Type: m.runtimeName,
-				ID:   c.Id,
-			},
-			Name:         labeledInfo.ContainerName,
-			Image:        status.Image.Image,
-			ImageID:      status.ImageRef,
-			Hash:         annotatedInfo.Hash,
-			RestartCount: annotatedInfo.RestartCount,
-			State:        toKubeContainerState(c.State),
-			CreatedAt:    time.Unix(0, status.CreatedAt),
-		}
-
-		if c.State == runtimeapi.ContainerState_CONTAINER_RUNNING {
-			cStatus.StartedAt = time.Unix(0, status.StartedAt)
-		} else {
-			cStatus.Reason = status.Reason
-			cStatus.Message = status.Message
-			cStatus.ExitCode = int(status.ExitCode)
-			cStatus.FinishedAt = time.Unix(0, status.FinishedAt)
-
+		cStatus := toKubeContainerStatus(status, m.runtimeName)
+		if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
+			// Populate the termination message if needed.
+			annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
+			labeledInfo := getContainerInfoFromLabels(status.Labels)
 			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError && (cStatus.ExitCode != 0 || cStatus.Reason == "OOMKilled")
 			tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
 			if checkLogs {
@@ -421,12 +401,42 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 				cStatus.Message = tMessage
 			}
 		}
-
 		statuses[i] = cStatus
 	}
 
 	sort.Sort(containerStatusByCreated(statuses))
 	return statuses, nil
+}
+
+func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.ContainerStatus {
+	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
+	labeledInfo := getContainerInfoFromLabels(status.Labels)
+	cStatus := &kubecontainer.ContainerStatus{
+		ID: kubecontainer.ContainerID{
+			Type: runtimeName,
+			ID:   status.Id,
+		},
+		Name:         labeledInfo.ContainerName,
+		Image:        status.Image.Image,
+		ImageID:      status.ImageRef,
+		Hash:         annotatedInfo.Hash,
+		RestartCount: annotatedInfo.RestartCount,
+		State:        toKubeContainerState(status.State),
+		CreatedAt:    time.Unix(0, status.CreatedAt),
+	}
+
+	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {
+		// If container is not in the created state, we have tried and
+		// started the container. Set the StartedAt time.
+		cStatus.StartedAt = time.Unix(0, status.StartedAt)
+	}
+	if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
+		cStatus.Reason = status.Reason
+		cStatus.Message = status.Message
+		cStatus.ExitCode = int(status.ExitCode)
+		cStatus.FinishedAt = time.Unix(0, status.FinishedAt)
+	}
+	return cStatus
 }
 
 // generateContainerEvent generates an event for the container.
