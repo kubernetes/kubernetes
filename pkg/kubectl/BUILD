@@ -52,7 +52,6 @@ go_library(
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/helper:go_default_library",
         "//pkg/api/util:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
@@ -80,6 +79,7 @@ go_library(
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
+        "//pkg/kubectl/util:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/util:go_default_library",
@@ -142,7 +142,6 @@ go_test(
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/helper:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/api/v1:go_default_library",
@@ -159,6 +158,7 @@ go_test(
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
+        "//pkg/kubectl/util:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -193,6 +193,7 @@ filegroup(
         "//pkg/kubectl/plugins:all-srcs",
         "//pkg/kubectl/resource:all-srcs",
         "//pkg/kubectl/testing:all-srcs",
+        "//pkg/kubectl/util:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = [
