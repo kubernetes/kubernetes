@@ -26,6 +26,7 @@ cmd/kubectl
 cmd/kubelet
 cmd/libs/go2idl/client-gen
 cmd/libs/go2idl/client-gen/generators
+cmd/libs/go2idl/client-gen/path
 cmd/libs/go2idl/client-gen/test_apis/testgroup/install
 cmd/libs/go2idl/conversion-gen
 cmd/libs/go2idl/deepcopy-gen
@@ -86,6 +87,7 @@ pkg/apis/settings/install
 pkg/apis/settings/validation
 pkg/apis/storage/install
 pkg/apis/storage/validation
+pkg/auth/nodeidentifier
 pkg/bootstrap/api
 pkg/client/conditions
 pkg/client/informers/informers_generated/externalversions

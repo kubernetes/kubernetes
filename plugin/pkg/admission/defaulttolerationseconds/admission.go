@@ -40,7 +40,12 @@ var (
 )
 
 func init() {
-	kubeapiserveradmission.Plugins.Register("DefaultTolerationSeconds", func(config io.Reader) (admission.Interface, error) {
+	Register(&kubeapiserveradmission.Plugins)
+}
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("DefaultTolerationSeconds", func(config io.Reader) (admission.Interface, error) {
 		return NewDefaultTolerationSeconds(), nil
 	})
 }

@@ -24,7 +24,12 @@ import (
 )
 
 func init() {
-	kubeapiserveradmission.Plugins.Register("AlwaysAdmit", func(config io.Reader) (admission.Interface, error) {
+	Register(&kubeapiserveradmission.Plugins)
+}
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("AlwaysAdmit", func(config io.Reader) (admission.Interface, error) {
 		return NewAlwaysAdmit(), nil
 	})
 }

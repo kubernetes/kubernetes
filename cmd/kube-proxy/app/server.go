@@ -25,11 +25,15 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
-	"runtime"
+	"os"
+	goruntime "runtime"
 	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -89,6 +93,8 @@ func checkKnownProxyMode(proxyMode string) bool {
 type Options struct {
 	// ConfigFile is the location of the proxy server's configuration file.
 	ConfigFile string
+	// WriteConfigTo is the path where the default configuration will be written.
+	WriteConfigTo string
 	// CleanupAndExit, when true, makes the proxy server clean up iptables rules, then exit.
 	CleanupAndExit bool
 
@@ -104,11 +110,15 @@ type Options struct {
 	master string
 	// healthzPort is the port to be used by the healthz server.
 	healthzPort int32
+
+	scheme *runtime.Scheme
+	codecs serializer.CodecFactory
 }
 
 // AddFlags adds flags to fs and binds them to options.
 func AddFlags(options *Options, fs *pflag.FlagSet) {
 	fs.StringVar(&options.ConfigFile, "config", options.ConfigFile, "The path to the configuration file.")
+	fs.StringVar(&options.WriteConfigTo, "write-config-to", options.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
 	fs.BoolVar(&options.CleanupAndExit, "cleanup-iptables", options.CleanupAndExit, "If true cleanup iptables rules and exit.")
 
 	// All flags below here are deprecated and will eventually be removed.
@@ -151,17 +161,37 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
 
+func NewOptions() (*Options, error) {
+	o := &Options{
+		config:      new(componentconfig.KubeProxyConfiguration),
+		healthzPort: 10256,
+	}
+
+	o.scheme = runtime.NewScheme()
+	o.codecs = serializer.NewCodecFactory(o.scheme)
+
+	if err := componentconfig.AddToScheme(o.scheme); err != nil {
+		return nil, err
+	}
+	if err := v1alpha1.AddToScheme(o.scheme); err != nil {
+		return nil, err
+	}
+
+	return o, nil
+}
+
 // Complete completes all the required options.
-func (o Options) Complete() error {
-	if len(o.ConfigFile) == 0 {
-		glog.Warning("WARNING: all flags other than --config and --cleanup-iptables are deprecated. Please begin using a config file ASAP.")
+func (o *Options) Complete() error {
+	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
+		glog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup-iptables are deprecated. Please begin using a config file ASAP.")
 		o.applyDeprecatedHealthzPortToConfig()
 	}
+
 	return nil
 }
 
 // Validate validates all the required options.
-func (o Options) Validate(args []string) error {
+func (o *Options) Validate(args []string) error {
 	if len(args) != 0 {
 		return errors.New("no arguments are supported")
 	}
@@ -169,11 +199,15 @@ func (o Options) Validate(args []string) error {
 	return nil
 }
 
-func (o Options) Run() error {
+func (o *Options) Run() error {
 	config := o.config
 
+	if len(o.WriteConfigTo) > 0 {
+		return o.writeConfigFile()
+	}
+
 	if len(o.ConfigFile) > 0 {
-		if c, err := loadConfigFromFile(o.ConfigFile); err != nil {
+		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
 			return err
 		} else {
 			config = c
@@ -182,12 +216,42 @@ func (o Options) Run() error {
 		}
 	}
 
-	proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.master)
+	proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.scheme, o.master)
 	if err != nil {
 		return err
 	}
 
 	return proxyServer.Run()
+}
+
+func (o *Options) writeConfigFile() error {
+	var encoder runtime.Encoder
+	mediaTypes := o.codecs.SupportedMediaTypes()
+	for _, info := range mediaTypes {
+		if info.MediaType == "application/yaml" {
+			encoder = info.Serializer
+			break
+		}
+	}
+	if encoder == nil {
+		return errors.New("unable to locate yaml encoder")
+	}
+	encoder = json.NewYAMLSerializer(json.DefaultMetaFactory, o.scheme, o.scheme)
+	encoder = o.codecs.EncoderForVersion(encoder, v1alpha1.SchemeGroupVersion)
+
+	configFile, err := os.Create(o.WriteConfigTo)
+	if err != nil {
+		return err
+	}
+	defer configFile.Close()
+
+	if err := encoder.Encode(o.config, configFile); err != nil {
+		return err
+	}
+
+	fmt.Printf("Wrote configuration to: %s\n", o.WriteConfigTo)
+
+	return nil
 }
 
 // applyDeprecatedHealthzPortToConfig sets o.config.HealthzBindAddress from
@@ -196,7 +260,7 @@ func (o Options) Run() error {
 // 1. If --healthz-port is 0, disable the healthz server.
 // 2. Otherwise, use the value of --healthz-port for the port portion of
 //    o.config.HealthzBindAddress
-func (o Options) applyDeprecatedHealthzPortToConfig() {
+func (o *Options) applyDeprecatedHealthzPortToConfig() {
 	if o.healthzPort == 0 {
 		o.config.HealthzBindAddress = ""
 		return
@@ -212,13 +276,18 @@ func (o Options) applyDeprecatedHealthzPortToConfig() {
 
 // loadConfigFromFile loads the contents of file and decodes it as a
 // KubeProxyConfiguration object.
-func loadConfigFromFile(file string) (*componentconfig.KubeProxyConfiguration, error) {
+func (o *Options) loadConfigFromFile(file string) (*componentconfig.KubeProxyConfiguration, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	configObj, gvk, err := api.Codecs.UniversalDecoder().Decode(data, nil, nil)
+	return o.loadConfig(data)
+}
+
+// loadConfig decodes data as a KubeProxyConfiguration object.
+func (o *Options) loadConfig(data []byte) (*componentconfig.KubeProxyConfiguration, error) {
+	configObj, gvk, err := o.codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -229,15 +298,15 @@ func loadConfigFromFile(file string) (*componentconfig.KubeProxyConfiguration, e
 	return config, nil
 }
 
-func applyDefaults(in *componentconfig.KubeProxyConfiguration) (*componentconfig.KubeProxyConfiguration, error) {
-	external, err := api.Scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
+func (o *Options) applyDefaults(in *componentconfig.KubeProxyConfiguration) (*componentconfig.KubeProxyConfiguration, error) {
+	external, err := o.scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	api.Scheme.Default(external)
+	o.scheme.Default(external)
 
-	internal, err := api.Scheme.ConvertToVersion(external, componentconfig.SchemeGroupVersion)
+	internal, err := o.scheme.ConvertToVersion(external, componentconfig.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -249,9 +318,9 @@ func applyDefaults(in *componentconfig.KubeProxyConfiguration) (*componentconfig
 
 // NewProxyCommand creates a *cobra.Command object with default parameters
 func NewProxyCommand() *cobra.Command {
-	opts := Options{
-		config:      new(componentconfig.KubeProxyConfiguration),
-		healthzPort: 10256,
+	opts, err := NewOptions()
+	if err != nil {
+		glog.Fatalf("Unable to initialize command options: %v", err)
 	}
 
 	cmd := &cobra.Command{
@@ -270,14 +339,13 @@ with the apiserver API to configure the proxy.`,
 		},
 	}
 
-	var err error
-	opts.config, err = applyDefaults(opts.config)
+	opts.config, err = opts.applyDefaults(opts.config)
 	if err != nil {
 		glog.Fatalf("unable to create flag defaults: %v", err)
 	}
 
 	flags := cmd.Flags()
-	AddFlags(&opts, flags)
+	AddFlags(opts, flags)
 
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
@@ -344,7 +412,7 @@ func createClients(config componentconfig.ClientConnectionConfiguration, masterO
 }
 
 // NewProxyServer returns a new ProxyServer.
-func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndExit bool, master string) (*ProxyServer, error) {
+func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndExit bool, scheme *runtime.Scheme, master string) (*ProxyServer, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
@@ -367,7 +435,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	// Create a iptables utils.
 	execer := exec.New()
 
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		netshInterface = utilnetsh.New(execer)
 	} else {
 		dbus = utildbus.New()
@@ -387,7 +455,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	// Create event recorder
 	hostname := nodeutil.GetHostname(config.HostnameOverride)
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
+	recorder := eventBroadcaster.NewRecorder(scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
 
 	var healthzServer *healthcheck.HealthzServer
 	if len(config.HealthzBindAddress) > 0 {
@@ -434,7 +502,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		userspace.CleanupLeftovers(iptInterface)
 	} else {
 		glog.V(0).Info("Using userspace Proxier.")
-		if runtime.GOOS == "windows" {
+		if goruntime.GOOS == "windows" {
 			// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
 			// our config.EndpointsConfigHandler.
 			loadBalancer := winuserspace.NewLoadBalancerRR()
@@ -479,7 +547,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 			proxier = proxierUserspace
 		}
 		// Remove artifacts from the pure-iptables Proxier, if not on Windows.
-		if runtime.GOOS != "windows" {
+		if goruntime.GOOS != "windows" {
 			glog.V(0).Info("Tearing down pure-iptables proxy rules.")
 			// TODO this has side effects that should only happen when Run() is invoked.
 			iptables.CleanupLeftovers(iptInterface)
@@ -487,7 +555,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	}
 
 	// Add iptables reload function, if not on Windows.
-	if runtime.GOOS != "windows" {
+	if goruntime.GOOS != "windows" {
 		iptInterface.AddReloadFunc(proxier.Sync)
 	}
 
@@ -580,7 +648,7 @@ func (s *ProxyServer) Run() error {
 	}
 
 	// Tune conntrack, if requested
-	if s.Conntracker != nil && runtime.GOOS != "windows" {
+	if s.Conntracker != nil && goruntime.GOOS != "windows" {
 		max, err := getConntrackMax(s.ConntrackConfiguration)
 		if err != nil {
 			return err
@@ -654,7 +722,7 @@ func getConntrackMax(config componentconfig.KubeProxyConntrackConfiguration) (in
 	}
 	if config.MaxPerCore > 0 {
 		floor := int(config.Min)
-		scaled := int(config.MaxPerCore) * runtime.NumCPU()
+		scaled := int(config.MaxPerCore) * goruntime.NumCPU()
 		if scaled > floor {
 			glog.V(3).Infof("getConntrackMax: using scaled conntrack-max-per-core")
 			return scaled, nil

@@ -85,7 +85,6 @@ cgroups-per-qos
 chaos-chance
 cidr-allocator-type
 clean-start
-cleanup
 cleanup-iptables
 client-ca-file
 client-certificate
@@ -273,7 +272,6 @@ federation-name
 federation-system-namespace
 federation-upgrade-target
 file-check-frequency
-file_content_in_loop
 file-suffix
 flex-volume-plugin-dir
 forward-services
@@ -302,7 +300,6 @@ google-json-key
 grace-period
 ha-domain
 hairpin-mode
-hard
 hard-pod-affinity-symmetric-weight
 healthz-bind-address
 healthz-port
@@ -563,7 +560,6 @@ pv-recycler-minimum-timeout-nfs
 pv-recycler-pod-template-filepath-hostpath
 pv-recycler-pod-template-filepath-nfs
 pv-recycler-timeout-increment-hostpath
-quiet
 read-only-port
 really-crash-for-testing
 reconcile-cidr
@@ -592,13 +588,11 @@ requestheader-username-headers
 required-contexts
 require-kubeconfig
 resolv-conf
-resource
 resource-container
 resource-name
 resource-quota-sync-period
 resource-version
 results-dir
-retry_time
 rkt-api-endpoint
 rkt-path
 rkt-stage1-image
@@ -617,7 +611,6 @@ schedule-pods-here
 scheduler-config
 scheduler-name
 schema-cache-dir
-scopes
 scrape-timeout
 seccomp-profile-root
 secondary-node-eviction-rate
@@ -668,7 +661,6 @@ storage-media-type
 storage-version
 storage-versions
 streaming-connection-idle-timeout
-subresource
 suicide-timeout
 sync-frequency
 system-cgroups
@@ -712,7 +704,6 @@ use-service-account-credentials
 user-whitelist
 use-service-account-credentials
 use-taint-based-evictions
-verb
 verify-only
 versioned-clientset-package
 viper-config
@@ -725,6 +716,7 @@ watch-cache-sizes
 watch-only
 whitelist-override-label
 windows-line-endings
+write-config-to
 www-prefix
 zone-id
 zone-name
