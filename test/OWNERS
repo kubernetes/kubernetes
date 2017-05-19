@@ -1,4 +1,5 @@
 reviewers:
+  - crassirostris # for test/e2e/cluster_logging_*.go
   - deads2k
   - enisoc
   - erictune
@@ -25,6 +26,7 @@ reviewers:
   - spxtr
   - sttts
 approvers:
+  - crassirostris # for test/e2e/cluster_logging_*.go
   - deads2k
   - enisoc
   - eparis
