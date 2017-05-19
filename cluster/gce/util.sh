@@ -650,7 +650,7 @@ function kube-up() {
   if [[ ${KUBE_USE_EXISTING_MASTER:-} == "true" ]]; then
     detect-master
     parse-master-env
-    create-subnetwork
+    create-subnetworks
     create-nodes
   elif [[ ${KUBE_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
     if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" && "${MASTER_OS_DISTRIBUTION}" != "debian" && "${MASTER_OS_DISTRIBUTION}" != "ubuntu" ]]; then
@@ -666,7 +666,7 @@ function kube-up() {
   else
     check-existing
     create-network
-    create-subnetwork
+    create-subnetworks
     write-cluster-name
     create-autoscaler-config
     create-master
@@ -735,7 +735,7 @@ function create-network() {
   fi
 }
 
-function create-subnetwork() {
+function create-subnetworks() {
   case ${ENABLE_IP_ALIASES} in
     true) ;;
     false) return;;
@@ -743,8 +743,8 @@ function create-subnetwork() {
        exit 1;;
   esac
 
-  # Look for the subnet, it must exist and have a secondary range
-  # configured.
+  # Look for the alias subnet, it must exist and have a secondary
+  # range configured.
   local subnet=$(gcloud beta compute networks subnets describe \
     --project "${PROJECT}" \
     --region ${REGION} \
@@ -770,13 +770,37 @@ function create-subnetwork() {
       --region ${REGION} \
       --range ${NODE_IP_RANGE} \
       --secondary-range "name=pods-default,range=${CLUSTER_IP_RANGE}"
-
     echo "Created subnetwork ${IP_ALIAS_SUBNETWORK}"
   else
     if ! echo ${subnet} | grep --quiet secondaryIpRanges ${subnet}; then
       echo "${color_red}Subnet ${IP_ALIAS_SUBNETWORK} does not have a secondary range${color_norm}"
       exit 1
     fi
+  fi
+
+  # Services subnetwork.
+  local subnet=$(gcloud beta compute networks subnets describe \
+    --project "${PROJECT}" \
+    --region ${REGION} \
+    ${SERVICE_CLUSTER_IP_SUBNETWORK} 2>/dev/null)
+
+  if [[ -z ${subnet} ]]; then
+    if [[ ${SERVICE_CLUSTER_IP_SUBNETWORK} != ${INSTANCE_PREFIX}-subnet-services ]]; then
+      echo "${color_red}Subnetwork ${NETWORK}:${SERVICE_CLUSTER_IP_SUBNETWORK} does not exist${color_norm}"
+      exit 1
+    fi
+
+    echo "Creating subnet for reserving service cluster IPs ${NETWORK}:${SERVICE_CLUSTER_IP_SUBNETWORK}"
+    gcloud beta compute networks subnets create \
+      ${SERVICE_CLUSTER_IP_SUBNETWORK} \
+      --description "Automatically generated subnet for ${INSTANCE_PREFIX} cluster. This will be removed on cluster teardown." \
+      --project "${PROJECT}" \
+      --network ${NETWORK} \
+      --region ${REGION} \
+      --range ${SERVICE_CLUSTER_IP_RANGE}
+    echo "Created subnetwork ${SERVICE_CLUSTER_IP_SUBNETWORK}"
+  else
+    echo "Subnet ${SERVICE_CLUSTER_IP_SUBNETWORK} already exists"
   fi
 }
 
@@ -801,25 +825,36 @@ function delete-network() {
   fi
 }
 
-function delete-subnetwork() {
+function delete-subnetworks() {
   if [[ ${ENABLE_IP_ALIASES:-} != "true" ]]; then
     return
   fi
 
   # Only delete automatically created subnets.
-  if [[ ${IP_ALIAS_SUBNETWORK} != ${INSTANCE_PREFIX}-subnet-default ]]; then
-    return
-  fi
-
-  echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
-  if [[ -n $(gcloud beta compute networks subnets describe \
+  if [[ ${IP_ALIAS_SUBNETWORK} == ${INSTANCE_PREFIX}-subnet-default ]]; then
+    echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
+    if [[ -n $(gcloud beta compute networks subnets describe \
+          --project "${PROJECT}" \
+          --region ${REGION} \
+          ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
+      gcloud beta --quiet compute networks subnets delete \
         --project "${PROJECT}" \
         --region ${REGION} \
-        ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
-    gcloud beta --quiet compute networks subnets delete \
-      --project "${PROJECT}" \
-      --region ${REGION} \
-      ${IP_ALIAS_SUBNETWORK}
+        ${IP_ALIAS_SUBNETWORK}
+    fi
+  fi
+
+  if [[ ${SERVICE_CLUSTER_IP_SUBNETWORK} == ${INSTANCE_PREFIX}-subnet-services ]]; then
+    echo "Removing auto-created subnet ${NETWORK}:${SERVICE_CLUSTER_IP_SUBNETWORK}"
+    if [[ -n $(gcloud beta compute networks subnets describe \
+          --project "${PROJECT}" \
+          --region ${REGION} \
+          ${SERVICE_CLUSTER_IP_SUBNETWORK} 2>/dev/null) ]]; then
+      gcloud --quiet beta compute networks subnets delete \
+        --project "${PROJECT}" \
+        --region ${REGION} \
+        ${SERVICE_CLUSTER_IP_SUBNETWORK}
+    fi
   fi
 }
 
@@ -1537,7 +1572,7 @@ function kube-down() {
       "${NETWORK}-default-ssh" \
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
 
-    delete-subnetwork
+    delete-subnetworks
 
     if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
       delete-network || true  # might fail if there are leaked firewall rules
