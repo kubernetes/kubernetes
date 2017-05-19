@@ -225,6 +225,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 		if m.Existing[i].Name == node.Name {
 			origNodeCopy = *m.Existing[i]
 			found = true
+			break
 		}
 	}
 	updatedNodeIndex := -1
@@ -233,6 +234,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 			origNodeCopy = *m.UpdatedNodes[i]
 			updatedNodeIndex = i
 			found = true
+			break
 		}
 	}
 
