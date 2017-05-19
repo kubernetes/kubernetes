@@ -34,7 +34,7 @@ func NewKubectlServer() *Server {
 		SimpleUsage: "Kubernetes command line client",
 		Long:        "Kubernetes command line client",
 		Run: func(s *Server, args []string) error {
-			cmd.SetArgs(args)
+			cmd.SetArgs(os.Args[2:])
 			return cmd.Execute()
 		},
 		flags: localFlags,
