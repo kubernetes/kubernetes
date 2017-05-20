@@ -35,7 +35,7 @@ import (
 )
 
 // NewCmdCerts returns main command for kubeadm certs phase.
-// This command is not meant to be create on its own, but acts as container for related sum commands
+// This command is not meant to be create on its own, but acts as container for related subcommands
 func NewCmdCerts() *cobra.Command {
 
 	certCmd := &cobra.Command{
@@ -77,12 +77,12 @@ func newSubCmdCerts() []*cobra.Command {
 		},
 		{
 			use:     "apiserver",
-			short:   "Generate api server certificate and key.",
+			short:   "Generate API Server serving certificate and key.",
 			cmdFunc: createOrUseAPIServerCertAndKey,
 		},
 		{
 			use:     "apiserver-kubelet-client",
-			short:   "Generate a client certificate for the apiservers to connect to the kubelets securely.",
+			short:   "Generate a client certificate for the API Server to connect to the kubelets securely.",
 			cmdFunc: createOrUseAPIServerKubeletClientCertAndKey,
 		},
 		{
