@@ -193,8 +193,8 @@ func TryLoadKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
-// IsServerAuth returns true if the given certificate is a ServerAuth
-func IsServerAuth(cert *x509.Certificate) bool {
+// HasServerAuth returns true if the given certificate is a ServerAuth
+func HasServerAuth(cert *x509.Certificate) bool {
 	for i := range cert.ExtKeyUsage {
 		if cert.ExtKeyUsage[i] == x509.ExtKeyUsageServerAuth {
 			return true

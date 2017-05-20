@@ -387,7 +387,7 @@ func createOrUseSignedCertificate(pkiDir string, CABaseName string, baseName str
 		}
 
 		fmt.Printf("[certificates] Generated %s certificate and key.\n", UXName)
-		if pkiutil.IsServerAuth(signedCert) {
+		if pkiutil.HasServerAuth(signedCert) {
 			fmt.Printf("[certificates] %s serving cert is signed for DNS names %v and IPs %v\n", UXName, signedCert.DNSNames, signedCert.IPAddresses)
 		}
 	}

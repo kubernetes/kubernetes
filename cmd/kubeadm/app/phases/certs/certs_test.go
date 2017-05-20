@@ -53,7 +53,7 @@ func TestNewAPIServerCertAndKey(t *testing.T) {
 	}
 
 	assertIsSignedByCa(t, apiServerCert, caCert)
-	assertIsServerAuth(t, apiServerCert)
+	assertHasServerAuth(t, apiServerCert)
 
 	for _, DNSName := range []string{hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local"} {
 		assertHasDNSNames(t, apiServerCert, DNSName)
@@ -72,7 +72,7 @@ func TestNewAPIServerKubeletClientCertAndKey(t *testing.T) {
 	}
 
 	assertIsSignedByCa(t, apiClientCert, caCert)
-	assertIsClientAuth(t, apiClientCert)
+	assertHasClientAuth(t, apiClientCert)
 	assertHasOrganization(t, apiClientCert, constants.MastersGroup)
 }
 
@@ -102,7 +102,7 @@ func TestNewFrontProxyClientCertAndKey(t *testing.T) {
 	}
 
 	assertIsSignedByCa(t, frontProxyClientCert, frontProxyCACert)
-	assertIsClientAuth(t, frontProxyClientCert)
+	assertHasClientAuth(t, frontProxyClientCert)
 }
 
 func assertIsCa(t *testing.T, cert *x509.Certificate) {
@@ -117,7 +117,7 @@ func assertIsSignedByCa(t *testing.T, cert *x509.Certificate, ca *x509.Certifica
 	}
 }
 
-func assertIsClientAuth(t *testing.T, cert *x509.Certificate) {
+func assertHasClientAuth(t *testing.T, cert *x509.Certificate) {
 	for i := range cert.ExtKeyUsage {
 		if cert.ExtKeyUsage[i] == x509.ExtKeyUsageClientAuth {
 			return
@@ -126,7 +126,7 @@ func assertIsClientAuth(t *testing.T, cert *x509.Certificate) {
 	t.Error("cert is not a ClientAuth")
 }
 
-func assertIsServerAuth(t *testing.T, cert *x509.Certificate) {
+func assertHasServerAuth(t *testing.T, cert *x509.Certificate) {
 	for i := range cert.ExtKeyUsage {
 		if cert.ExtKeyUsage[i] == x509.ExtKeyUsageServerAuth {
 			return
