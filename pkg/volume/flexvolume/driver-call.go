@@ -169,6 +169,8 @@ func NewOptionsForDriver(spec *volume.Spec, host volume.VolumeHost, extraOptions
 		options[optionReadWrite] = "rw"
 	}
 
+	options[optionPVorVolumeName] = spec.Name()
+
 	for key, value := range extraOptions {
 		options[key] = value
 	}

@@ -21,6 +21,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -66,7 +68,24 @@ func (plugin *flexVolumePlugin) GetPluginName() string {
 
 // GetVolumeName is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	return (*pluginDefaults)(plugin).GetVolumeName(spec)
+	call := plugin.NewDriverCall(getVolumeNameCmd)
+	call.AppendSpec(spec, plugin.host, nil)
+
+	_, err := call.Run()
+	if isCmdNotSupportedErr(err) {
+		return (*pluginDefaults)(plugin).GetVolumeName(spec)
+	} else if err != nil {
+		return "", err
+	}
+
+	name, err := (*pluginDefaults)(plugin).GetVolumeName(spec)
+	if err != nil {
+		return "", err
+	}
+
+	glog.Warning(logPrefix(plugin), "GetVolumeName is not supported yet. Defaulting to PV or volume name: ", name)
+
+	return name, nil
 }
 
 // CanSupport is part of the volume.VolumePlugin interface.
