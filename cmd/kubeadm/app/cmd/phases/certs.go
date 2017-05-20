@@ -166,40 +166,20 @@ func runCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration) error, cfgPath
 // Please note that this action is a bulk action calling all the atomic certphase actions
 func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 
-	// create a new self signed CA, or use the existing one
-	err := createOrUseCACertAndKey(cfg)
-	if err != nil {
-		return err
+	certActions := []func(cfg *kubeadmapi.MasterConfiguration) error{
+		createOrUseCACertAndKey,
+		createOrUseAPIServerCertAndKey,
+		createOrUseAPIServerKubeletClientCertAndKey,
+		createOrUseServiceAccountKeyAndPublicKey,
+		createOrUseFrontProxyCACertAndKey,
+		createOrUseFrontProxyClientCertAndKey,
 	}
 
-	// create a new CA certificate for apiserver, or use the existing one
-	err = createOrUseAPIServerCertAndKey(cfg)
-	if err != nil {
-		return err
-	}
-
-	// create a new CA certificate for kubelets calling apiserver, or use the existing one
-	err = createOrUseAPIServerKubeletClientCertAndKey(cfg)
-	if err != nil {
-		return err
-	}
-
-	// create a new public/private key pairs for signing service account user, or use the existing one
-	err = createOrUseServiceAccountKeyAndPublicKey(cfg)
-	if err != nil {
-		return err
-	}
-
-	// create a new self signed front proxy CA, or use the existing one
-	err = createOrUseFrontProxyCACertAndKey(cfg)
-	if err != nil {
-		return err
-	}
-
-	// create a new certificate for proxy server client, or use the existing one
-	err = createOrUseFrontProxyClientCertAndKey(cfg)
-	if err != nil {
-		return err
+	for _, action := range certActions {
+		err := action(cfg)
+		if err != nil {
+			return err
+		}
 	}
 
 	fmt.Printf("[certificates] Valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
