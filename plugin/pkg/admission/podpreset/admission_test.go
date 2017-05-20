@@ -556,6 +556,73 @@ func TestAdmit(t *testing.T) {
 	}
 }
 
+func TestAdmitMirrorPod(t *testing.T) {
+	containerName := "container"
+
+	mirrorPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mypod",
+			Namespace: "namespace",
+			Labels: map[string]string{
+				"security": "S2",
+			},
+			Annotations: map[string]string{api.MirrorPodAnnotationKey: "mirror"},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: containerName,
+				},
+			},
+		},
+	}
+
+	pip := &settings.PodPreset{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "hello",
+			Namespace: "namespace",
+		},
+		Spec: settings.PodPresetSpec{
+			Selector: v1.LabelSelector{
+				MatchExpressions: []v1.LabelSelectorRequirement{
+					{
+						Key:      "security",
+						Operator: v1.LabelSelectorOpIn,
+						Values:   []string{"S2"},
+					},
+				},
+			},
+			Volumes: []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Env:     []api.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
+			EnvFrom: []api.EnvFromSource{
+				{
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					},
+				},
+				{
+					Prefix: "pre_",
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					},
+				},
+			},
+		},
+	}
+
+	if err := admitPod(mirrorPod, pip); err != nil {
+		t.Fatal(err)
+	}
+
+	container := mirrorPod.Spec.Containers[0]
+	if len(mirrorPod.Spec.Volumes) != 0 ||
+		len(container.VolumeMounts) != 0 ||
+		len(container.Env) != 0 ||
+		len(container.EnvFrom) != 0 {
+		t.Fatalf("mirror pod is updated by PodPreset admission:\n\tVolumes got %d, expected 0\n\tVolumeMounts go %d, expected 0\n\tEnv got, %d expected 0\n\tEnvFrom got %d, expected 0", len(mirrorPod.Spec.Volumes), len(container.VolumeMounts), len(container.Env), len(container.EnvFrom))
+	}
+}
+
 func admitPod(pod *api.Pod, pip *settings.PodPreset) error {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	store := informerFactory.Settings().InternalVersion().PodPresets().Informer().GetStore()
