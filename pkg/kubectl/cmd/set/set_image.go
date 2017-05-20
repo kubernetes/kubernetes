@@ -38,7 +38,6 @@ type ImageOptions struct {
 	resource.FilenameOptions
 
 	Mapper       meta.RESTMapper
-	Typer        runtime.ObjectTyper
 	Infos        []*resource.Info
 	Encoder      runtime.Encoder
 	Selector     string
@@ -114,7 +113,6 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 }
 
 func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Mapper, o.Typer = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
@@ -137,8 +135,12 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return err
 	}
 
-	builder := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
-		ContinueOnError().
+	var builder *resource.Builder
+	builder, o.Mapper, err = f.NewBuilder(o.Local, false)
+	if err != nil {
+		return err
+	}
+	builder = builder.ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		Flatten()

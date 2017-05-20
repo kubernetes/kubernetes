@@ -2834,7 +2834,45 @@ run_multi_resources_tests() {
 
 }
 
-# Runs all kubectl tests.
+# Run tests that require apiserver NOT to be running
+runLocalTests() {
+  kube::log::status "Running local tests"
+
+  ## Convert a pod
+  output_message=$(kubectl convert --local -f hack/testdata/pod.yaml -o jsonpath='{.metadata.labels.name}')
+  kube::test::if_has_string "${output_message}" "test-pod-label"
+
+  ## Annotate a pod
+  output_message=$(kubectl annotate --local -f hack/testdata/pod.yaml annotatekey=localvalue -o yaml)
+  kube::test::if_has_string "${output_message}" "localvalue"
+
+  ## Patch can modify a local object
+  output_message=$(kubectl patch --local -f pkg/api/validation/testdata/v1/validPod.yaml --patch='{"spec": {"restartPolicy":"Never"}}' -o jsonpath='{.spec.restartPolicy}')
+  kube::test::if_has_string "${output_message}" "Never"
+
+  ## Label POD YAML file locally
+  output_message=$(kubectl label --local --overwrite -f hack/testdata/pod.yaml name=localonlyvalue -o yaml)
+  # Post-condition: command output is the new value
+  kube::test::if_has_string "${output_message}" "localonlyvalue"
+
+  ## Set resources of a local file
+  output_message=$(kubectl set resources --local -f pkg/api/validation/testdata/v1/validPod.yaml -c=master --limits=cpu=300m --requests=cpu=300m -o yaml)
+  kube::test::if_has_string "${output_message}" "300m"
+
+  ## Set selector of a local file
+  output_message=$(kubectl set selector --local -f hack/testdata/kubernetes-service.yaml 'environment=qa' -o yaml --v=20)
+  kube::test::if_has_string "${output_message}" "environment: qa"
+
+  ## Set image of a local file
+  output_message=$(kubectl set image --local -f pkg/api/validation/testdata/v1/validPod.yaml master=gcr.io/fake_project/fake_image:fake_tag1 -o yaml)
+  kube::test::if_has_string "${output_message}" "gcr.io/fake_project/fake_image:fake_tag1"
+
+  ## Set subject of a ClusterRoleBinding
+  output_message=$(kubectl set subject --local -f hack/testdata/cluster-role-binding.yaml --user=user1 -o yaml)
+  kube::test::if_has_string "${output_message}" "user1"
+}
+
+# Runs all kubectl tests except local ones.
 # Requires an env var SUPPORTED_RESOURCES which is a comma separated list of
 # resources for which tests should be run.
 runTests() {
@@ -3768,6 +3806,15 @@ __EOF__
   kube::test::if_has_string "${output_message}" 'unknown command'
   output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/ kubectl plugin error 2>&1)
   kube::test::if_has_string "${output_message}" 'error: exit status 1'
+
+  ###########
+  # Convert #
+  ###########
+  kube::log::status "Testing kubectl convert"
+
+  ## Convert a pod
+  output_message=$(kubectl convert -f hack/testdata/pod.yaml -o jsonpath='{.metadata.labels.name}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "test-pod-label"
 
   #################
   # Impersonation #

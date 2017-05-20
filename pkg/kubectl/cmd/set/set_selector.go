@@ -48,9 +48,8 @@ type SelectorOptions struct {
 	resources []string
 	selector  *metav1.LabelSelector
 
-	out              io.Writer
-	PrintObject      func(obj runtime.Object) error
-	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	out         io.Writer
+	PrintObject func(obj runtime.Object) error
 
 	builder *resource.Builder
 	mapper  meta.RESTMapper
@@ -113,21 +112,19 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 
 	o.changeCause = f.Command(cmd, false)
-	mapper, _ := f.Object()
-	o.mapper = mapper
 	o.encoder = f.JSONEncoder()
 
-	o.builder = f.NewBuilder().
-		ContinueOnError().
+	o.builder, o.mapper, err = f.NewBuilder(o.local, false)
+	if err != nil {
+		return err
+	}
+	o.builder = o.builder.ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.fileOptions).
 		Flatten()
 
 	o.PrintObject = func(obj runtime.Object) error {
-		return f.PrintObject(cmd, mapper, obj, o.out)
-	}
-	o.ClientForMapping = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-		return f.ClientForMapping(mapping)
+		return f.PrintObject(cmd, o.mapper, obj, o.out)
 	}
 
 	o.resources, o.selector, err = getResourcesAndSelector(args)

@@ -96,6 +96,7 @@ __EOF__
 kube::log::status "Running kubectl tests for kube-apiserver"
 
 setup
+runLocalTests
 run_kube_apiserver
 run_kube_controller_manager
 create_node
