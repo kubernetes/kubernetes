@@ -2863,6 +2863,9 @@ type AttachedVolume struct {
 
 	// DevicePath represents the device path where the volume should be available
 	DevicePath string
+
+	// Has the process of attaching the volume finished already?
+	IsAttached bool
 }
 
 // AvoidPods describes pods that should avoid this node. This is the value for a

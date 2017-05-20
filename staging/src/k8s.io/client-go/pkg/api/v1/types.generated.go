@@ -48544,14 +48544,14 @@ func (x *AttachedVolume) CodecEncodeSelf(e *codec1978.Encoder) {
 		} else {
 			yysep2 := !z.EncBinary()
 			yy2arr2 := z.EncBasicHandle().StructToArray
-			var yyq2 [2]bool
+			var yyq2 [3]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
 			var yynn2 int
 			if yyr2 || yy2arr2 {
-				r.EncodeArrayStart(2)
+				r.EncodeArrayStart(3)
 			} else {
-				yynn2 = 2
+				yynn2 = 3
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -48586,6 +48586,25 @@ func (x *AttachedVolume) CodecEncodeSelf(e *codec1978.Encoder) {
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.DevicePath))
+				}
+			}
+			if yyr2 || yy2arr2 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				yym10 := z.EncBinary()
+				_ = yym10
+				if false {
+				} else {
+					r.EncodeBool(bool(x.IsAttached))
+				}
+			} else {
+				z.EncSendContainerState(codecSelfer_containerMapKey1234)
+				r.EncodeString(codecSelferC_UTF81234, string("isAttached"))
+				z.EncSendContainerState(codecSelfer_containerMapValue1234)
+				yym11 := z.EncBinary()
+				_ = yym11
+				if false {
+				} else {
+					r.EncodeBool(bool(x.IsAttached))
 				}
 			}
 			if yyr2 || yy2arr2 {
@@ -48668,6 +48687,18 @@ func (x *AttachedVolume) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 					*((*string)(yyv5)) = r.DecodeString()
 				}
 			}
+		case "isAttached":
+			if r.TryDecodeAsNil() {
+				x.IsAttached = false
+			} else {
+				yyv7 := &x.IsAttached
+				yym8 := z.DecBinary()
+				_ = yym8
+				if false {
+				} else {
+					*((*bool)(yyv7)) = r.DecodeBool()
+				}
+			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
 		} // end switch yys3
@@ -48679,16 +48710,16 @@ func (x *AttachedVolume) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj7 int
-	var yyb7 bool
-	var yyhl7 bool = l >= 0
-	yyj7++
-	if yyhl7 {
-		yyb7 = yyj7 > l
+	var yyj9 int
+	var yyb9 bool
+	var yyhl9 bool = l >= 0
+	yyj9++
+	if yyhl9 {
+		yyb9 = yyj9 > l
 	} else {
-		yyb7 = r.CheckBreak()
+		yyb9 = r.CheckBreak()
 	}
-	if yyb7 {
+	if yyb9 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -48696,16 +48727,16 @@ func (x *AttachedVolume) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Name = ""
 	} else {
-		yyv8 := &x.Name
-		yyv8.CodecDecodeSelf(d)
+		yyv10 := &x.Name
+		yyv10.CodecDecodeSelf(d)
 	}
-	yyj7++
-	if yyhl7 {
-		yyb7 = yyj7 > l
+	yyj9++
+	if yyhl9 {
+		yyb9 = yyj9 > l
 	} else {
-		yyb7 = r.CheckBreak()
+		yyb9 = r.CheckBreak()
 	}
-	if yyb7 {
+	if yyb9 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -48713,26 +48744,48 @@ func (x *AttachedVolume) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.DevicePath = ""
 	} else {
-		yyv9 := &x.DevicePath
-		yym10 := z.DecBinary()
-		_ = yym10
+		yyv11 := &x.DevicePath
+		yym12 := z.DecBinary()
+		_ = yym12
 		if false {
 		} else {
-			*((*string)(yyv9)) = r.DecodeString()
+			*((*string)(yyv11)) = r.DecodeString()
+		}
+	}
+	yyj9++
+	if yyhl9 {
+		yyb9 = yyj9 > l
+	} else {
+		yyb9 = r.CheckBreak()
+	}
+	if yyb9 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.IsAttached = false
+	} else {
+		yyv13 := &x.IsAttached
+		yym14 := z.DecBinary()
+		_ = yym14
+		if false {
+		} else {
+			*((*bool)(yyv13)) = r.DecodeBool()
 		}
 	}
 	for {
-		yyj7++
-		if yyhl7 {
-			yyb7 = yyj7 > l
+		yyj9++
+		if yyhl9 {
+			yyb9 = yyj9 > l
 		} else {
-			yyb7 = r.CheckBreak()
+			yyb9 = r.CheckBreak()
 		}
-		if yyb7 {
+		if yyb9 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj7-1, "")
+		z.DecStructFieldNotFound(yyj9-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -73067,7 +73120,7 @@ func (x codecSelfer1234) decSliceAttachedVolume(v *[]AttachedVolume, d *codec197
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 32)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 40)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]

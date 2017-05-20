@@ -86,6 +86,9 @@ message AttachedVolume {
 
   // DevicePath represents the device path where the volume should be available
   optional string devicePath = 2;
+
+  // Has the process of attaching the volume finished already?
+  optional bool isAttached = 3;
 }
 
 // AvoidPods describes pods that should avoid this node. This is the value for a

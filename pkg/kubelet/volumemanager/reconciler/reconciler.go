@@ -233,6 +233,60 @@ func (rc *reconciler) reconcile() {
 				}
 			}
 		} else if !volMounted || cache.IsRemountRequiredError(err) {
+			if volumeToMount.PluginIsAttachable {
+				// Verify the volume has finished attaching before attempting to mount it
+				plugin, err := rc.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+				if err != nil || plugin == nil {
+					glog.Errorf(
+						"skipping volume %q (spec.Name: %q) for pod %q (UID: %q): it does not implement attacher interface. err=%v",
+						volumeToMount.VolumeName,
+						volumeToMount.VolumeSpec.Name(),
+						volumeToMount.PodName,
+						volumeToMount.Pod.UID,
+						err)
+					continue
+				}
+				volumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(plugin, volumeToMount.VolumeSpec)
+				if err != nil {
+					glog.Errorf(
+						"failed to find unique name for volume %q (spec.Name: %q) pod %q (UID: %q): %v",
+						volumeToMount.VolumeName,
+						volumeToMount.VolumeSpec.Name(),
+						volumeToMount.PodName,
+						volumeToMount.Pod.UID,
+						err)
+					continue
+				}
+				isAttached, devicePath, err := rc.getVolumeIsAttached(volumeName)
+				if err != nil {
+					glog.Errorf(
+						"failed to find to retrieve node status for volume %q (spec.Name: %q) pod %q (UID: %q): %v",
+						volumeToMount.VolumeName,
+						volumeToMount.VolumeSpec.Name(),
+						volumeToMount.PodName,
+						volumeToMount.Pod.UID,
+						err)
+					continue
+				}
+				if !isAttached {
+					glog.V(3).Infof(
+						"Volume %q (spec.Name: %q) for pod %q (UID: %q) is not yet fully attached: will not attempt to mount",
+						volumeToMount.VolumeName,
+						volumeToMount.VolumeSpec.Name(),
+						volumeToMount.PodName,
+						volumeToMount.Pod.UID)
+					continue
+				} else {
+					// Volume is ready to be mounted: the devicePath might have been updated too, so use the new one
+					glog.V(3).Infof(
+						"Volume %q (spec.Name: %q) for pod %q (UID: %q) is attached: mounting",
+						volumeToMount.VolumeName,
+						volumeToMount.VolumeSpec.Name(),
+						volumeToMount.PodName,
+						volumeToMount.Pod.UID)
+					volumeToMount.DevicePath = devicePath
+				}
+			}
 			// Volume is not mounted, or is already mounted, but requires remounting
 			remountingLogStr := ""
 			if cache.IsRemountRequiredError(err) {
@@ -305,6 +359,29 @@ func (rc *reconciler) reconcile() {
 			}
 		}
 	}
+}
+
+func (rc *reconciler) getVolumeIsAttached(volumeName v1.UniqueVolumeName) (bool, string, error) {
+	var isAttached bool
+	var devicePath string
+	var found bool
+	node, err := rc.kubeClient.Core().Nodes().Get(string(rc.nodeName), metav1.GetOptions{})
+	if err != nil {
+		return false, "", err
+	}
+	for _, attachedVolume := range node.Status.VolumesAttached {
+		if volumeName == attachedVolume.Name {
+			isAttached = attachedVolume.IsAttached
+			devicePath = attachedVolume.DevicePath
+			found = true
+			break
+		}
+	}
+	if !found {
+		err = fmt.Errorf("volume %s not found on node %s", volumeName, rc.nodeName)
+	}
+
+	return isAttached, devicePath, err
 }
 
 // sync process tries to observe the real world by scanning all pods' volume directories from the disk.

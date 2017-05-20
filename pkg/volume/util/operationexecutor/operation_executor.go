@@ -147,6 +147,10 @@ type ActualStateOfWorldMounterUpdater interface {
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the
 // actual state of the world cache after successful attach/detach/mount/unmount.
 type ActualStateOfWorldAttacherUpdater interface {
+	// Marks the specified volume as being attached to the node (i.e. attaching
+	// has been started but didn't finish yet).
+	MarkVolumeAsBeingAttached(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName) error
+
 	// Marks the specified volume as attached to the specified node.  If the
 	// volume name is supplied, that volume name will be used.  If not, the
 	// volume name is computed using the result from querying the plugin.

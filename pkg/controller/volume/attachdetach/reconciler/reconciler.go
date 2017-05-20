@@ -255,6 +255,7 @@ func (rc *reconciler) reconcile() {
 
 			// Volume/Node doesn't exist, spawn a goroutine to attach it
 			glog.V(5).Infof(volumeToAttach.GenerateMsgDetailed("Starting attacherDetacher.AttachVolume", ""))
+			rc.actualStateOfWorld.MarkVolumeAsBeingAttached(volumeToAttach.VolumeName, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
 			err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
 			if err == nil {
 				glog.Infof(volumeToAttach.GenerateMsgDetailed("attacherDetacher.AttachVolume started", ""))
