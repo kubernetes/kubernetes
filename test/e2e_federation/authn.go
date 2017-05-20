@@ -40,7 +40,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 		)
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			clusters = fedframework.ClusterSlice{}
+			clusters = f.GetRegisteredClusters()
 		})
 
 		It("should accept cluster resources when the client has certificate authentication credentials", func() {

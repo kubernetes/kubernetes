@@ -187,7 +187,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				By("Deleting service")
 				deleteServiceOrFail(f.FederationClientset, ns, service.Name, nil)
 				By("Cleanup service shards and provider resources")
-				cleanupServiceShardsAndProviderResources(ns, service.Name, clusters)
+				cleanupServiceShardsAndProviderResources(ns, service, clusters)
 				service = nil
 			} else {
 				By("No service to delete. Service is nil")

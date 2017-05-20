@@ -181,9 +181,9 @@ func createService(clientset *fedclientset.Clientset, namespace, name string, cl
 				framework.ExpectNoError(err, "Deleting service %q after a partial createService() error", service.Name)
 				return nil, err
 			}
-		}
 
-		cleanupServiceShardsAndProviderResources(namespace, name, clusters)
+			cleanupServiceShardsAndProviderResources(namespace, service, clusters)
+		}
 
 		// creation failed, lets try with another port
 		// first remove from the availablePorts the port with which the creation failed
@@ -272,24 +272,24 @@ func getServiceShardWithRetry(namespace string, serviceName string, retry bool, 
 	return cSvc, err
 }
 
-func cleanupServiceShardsAndProviderResources(namespace string, serviceName string, clusters fedframework.ClusterSlice) {
-	framework.Logf("Deleting service %q in %d clusters", serviceName, len(clusters))
+func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Service, clusters fedframework.ClusterSlice) {
+	framework.Logf("Deleting service %q in %d clusters", service.Name, len(clusters))
 	for _, c := range clusters {
 		name := c.Name
-		cSvc, err := getServiceShard(namespace, serviceName, c)
+		cSvc, err := getServiceShard(namespace, service.Name, c)
 
 		if err != nil || cSvc == nil {
-			By(fmt.Sprintf("Failed to find service %q in namespace %q, in cluster %q in %s", serviceName, namespace, name, fedframework.FederatedDefaultTestTimeout))
+			By(fmt.Sprintf("Failed to find service %q in namespace %q, in cluster %q in %s", service.Name, namespace, name, fedframework.FederatedDefaultTestTimeout))
 			continue
 		}
 
 		err = cleanupServiceShard(c.Clientset, name, namespace, cSvc, fedframework.FederatedDefaultTestTimeout)
 		if err != nil {
-			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q: %v", serviceName, namespace, name, err)
+			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q: %v", service.Name, namespace, name, err)
 		}
 		err = cleanupServiceShardLoadBalancer(name, cSvc, fedframework.FederatedDefaultTestTimeout)
 		if err != nil {
-			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", serviceName, namespace, name)
+			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", service.Name, namespace, name)
 		}
 	}
 }
