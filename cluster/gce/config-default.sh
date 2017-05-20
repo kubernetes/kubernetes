@@ -70,7 +70,7 @@ fi
 CVM_VERSION=${CVM_VERSION:-container-vm-v20170214}
 # NOTE: Update the kernel commit SHA in cluster/addons/nvidia-gpus/cos-installer-daemonset.yaml
 # while updating the COS version here.
-GCI_VERSION=${KUBE_GCI_VERSION:-gci-stable-56-9000-84-2}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-beta-59-9460-20-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
