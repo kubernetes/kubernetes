@@ -52,6 +52,7 @@ type FakeCmd struct {
 	Dirs                 []string
 	Stdin                io.Reader
 	Stdout               io.Writer
+	Stderr               io.Writer
 }
 
 func InitFakeCmd(fake *FakeCmd, cmd string, args ...string) Cmd {
@@ -71,6 +72,14 @@ func (fake *FakeCmd) SetStdin(in io.Reader) {
 
 func (fake *FakeCmd) SetStdout(out io.Writer) {
 	fake.Stdout = out
+}
+
+func (fake *FakeCmd) SetStderr(out io.Writer) {
+	fake.Stderr = out
+}
+
+func (fake *FakeCmd) Run() error {
+	return fmt.Errorf("unimplemented")
 }
 
 func (fake *FakeCmd) CombinedOutput() ([]byte, error) {

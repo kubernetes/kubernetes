@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
@@ -78,8 +79,9 @@ func (f *FakeIPTables) Save(table iptables.Table) ([]byte, error) {
 	return lines, nil
 }
 
-func (*FakeIPTables) SaveAll() ([]byte, error) {
-	return make([]byte, 0), nil
+func (f *FakeIPTables) SaveInto(table iptables.Table, buffer *bytes.Buffer) error {
+	buffer.Write(f.Lines)
+	return nil
 }
 
 func (*FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
