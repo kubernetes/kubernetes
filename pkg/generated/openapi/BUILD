@@ -13,6 +13,7 @@ openapi_library(
         "pkg/api/v1",
         "pkg/apis/abac/v0",
         "pkg/apis/abac/v1beta1",
+        "pkg/apis/admission/v1alpha1",
         "pkg/apis/apps/v1beta1",
         "pkg/apis/authentication/v1",
         "pkg/apis/authentication/v1beta1",
