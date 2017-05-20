@@ -257,6 +257,10 @@ func (eic execInContainer) SetStdout(out io.Writer) {
 	//unimplemented
 }
 
+func (eic execInContainer) SetStderr(err io.Writer) {
+	//unimplemented
+}
+
 func (eic execInContainer) Stop() {
 	//unimplemented
 }

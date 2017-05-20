@@ -52,6 +52,7 @@ type FakeCmd struct {
 	Dirs                 []string
 	Stdin                io.Reader
 	Stdout               io.Writer
+	Stderr               io.Writer
 }
 
 func InitFakeCmd(fake *FakeCmd, cmd string, args ...string) Cmd {
@@ -86,8 +87,15 @@ func (fake *FakeCmd) CombinedOutput() ([]byte, error) {
 	return fake.CombinedOutputScript[i]()
 }
 
+func (fake *FakeCmd) SetStderr(err io.Writer) {
+	fake.Stderr = err
+}
+
 func (fake *FakeCmd) Output() ([]byte, error) {
-	return nil, fmt.Errorf("unimplemented")
+	if fake.Stderr != nil {
+		fake.Stderr.Write([]byte("test message\nanother test message"))
+	}
+	return fake.CombinedOutput()
 }
 
 func (fake *FakeCmd) Stop() {

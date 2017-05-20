@@ -17,9 +17,13 @@ limitations under the License.
 package flexvolume
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -130,7 +134,35 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 		defer timer.Stop()
 	}
 
-	output, execErr := cmd.CombinedOutput()
+	errPipe, errwPipe, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	defer errPipe.Close()
+	defer errwPipe.Close()
+	cmd.SetStderr(errwPipe)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		r := bufio.NewReaderSize(errPipe, 4096)
+		for {
+			l, _, err := r.ReadLine()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				glog.Errorf("FlexVolume: Unable to read Stderr: %s", err)
+				break
+			}
+			glog.Warningf("FlexVolume: %s", string(l))
+		}
+	}()
+
+	output, execErr := cmd.Output()
+	errwPipe.Close()
+	wg.Wait()
 	if execErr != nil {
 		if timeout {
 			return nil, TimeoutError
