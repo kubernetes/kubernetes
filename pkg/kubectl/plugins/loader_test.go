@@ -27,7 +27,7 @@ import (
 )
 
 func TestSuccessfulDirectoryPluginLoader(t *testing.T) {
-	tmp, err := setupValidPlugins(3)
+	tmp, err := setupValidPlugins(3, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -54,6 +54,9 @@ func TestSuccessfulDirectoryPluginLoader(t *testing.T) {
 		}
 		if m, _ := regexp.MatchString("^echo plugin[123]$", plugin.Command); !m {
 			t.Errorf("Unexpected plugin command %s", plugin.Command)
+		}
+		if count := len(plugin.Tree); count != 0 {
+			t.Errorf("Unexpected number of loaded child plugins, wanted 0, got %d", count)
 		}
 	}
 }
@@ -107,7 +110,7 @@ func TestUnexistentDirectoryPluginLoader(t *testing.T) {
 }
 
 func TestPluginsEnvVarPluginLoader(t *testing.T) {
-	tmp, err := setupValidPlugins(1)
+	tmp, err := setupValidPlugins(1, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -172,18 +175,77 @@ shortDesc: The incomplete test plugin`
 	}
 }
 
-func setupValidPlugins(count int) (string, error) {
+func TestDirectoryTreePluginLoader(t *testing.T) {
+	tmp, err := setupValidPlugins(1, 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer os.RemoveAll(tmp)
+
+	loader := &DirectoryPluginLoader{
+		Directory: tmp,
+	}
+	plugins, err := loader.Load()
+	if err != nil {
+		t.Errorf("Unexpected error loading plugins: %v", err)
+	}
+
+	if count := len(plugins); count != 1 {
+		t.Errorf("Unexpected number of loaded plugins, wanted 1, got %d", count)
+	}
+
+	for _, plugin := range plugins {
+		if m, _ := regexp.MatchString("^plugin1$", plugin.Name); !m {
+			t.Errorf("Unexpected plugin name %s", plugin.Name)
+		}
+		if m, _ := regexp.MatchString("^The plugin1 test plugin$", plugin.ShortDesc); !m {
+			t.Errorf("Unexpected plugin short desc %s", plugin.ShortDesc)
+		}
+		if m, _ := regexp.MatchString("^echo plugin1$", plugin.Command); !m {
+			t.Errorf("Unexpected plugin command %s", plugin.Command)
+		}
+		if count := len(plugin.Tree); count != 2 {
+			t.Errorf("Unexpected number of loaded child plugins, wanted 2, got %d", count)
+		}
+		for _, child := range plugin.Tree {
+			if m, _ := regexp.MatchString("^child[12]$", child.Name); !m {
+				t.Errorf("Unexpected plugin child name %s", child.Name)
+			}
+			if m, _ := regexp.MatchString("^The child[12] test plugin child of plugin1 of House Targaryen$", child.ShortDesc); !m {
+				t.Errorf("Unexpected plugin child short desc %s", child.ShortDesc)
+			}
+			if m, _ := regexp.MatchString("^echo child[12]$", child.Command); !m {
+				t.Errorf("Unexpected plugin child command %s", child.Command)
+			}
+		}
+	}
+}
+
+func setupValidPlugins(nPlugins, nChildren int) (string, error) {
 	tmp, err := ioutil.TempDir("", "")
 	if err != nil {
 		return "", fmt.Errorf("unexpected ioutil.TempDir error: %v", err)
 	}
 
-	for i := 1; i <= count; i++ {
+	for i := 1; i <= nPlugins; i++ {
 		name := fmt.Sprintf("plugin%d", i)
 		descriptor := fmt.Sprintf(`
 name: %[1]s
 shortDesc: The %[1]s test plugin
 command: echo %[1]s`, name)
+
+		if nChildren > 0 {
+			descriptor += `
+tree:`
+		}
+
+		for j := 1; j <= nChildren; j++ {
+			child := fmt.Sprintf("child%d", i)
+			descriptor += fmt.Sprintf(`
+  - name: %[1]s
+    shortDesc: The %[1]s test plugin child of %[2]s of House Targaryen
+    command: echo %[1]s`, child, name)
+		}
 
 		if err := os.Mkdir(filepath.Join(tmp, name), 0755); err != nil {
 			return "", fmt.Errorf("unexpected os.Mkdir error: %v", err)
