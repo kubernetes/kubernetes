@@ -25,6 +25,9 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+# This only runs on master
+[[ $(git rev-parse --abbrev-ref HEAD) == "master" ]] || exit
+
 kube::golang::setup_env
 
 BINS=(
