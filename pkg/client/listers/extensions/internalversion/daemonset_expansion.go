@@ -52,8 +52,7 @@ func (s *daemonSetLister) GetPodDaemonSets(pod *api.Pod) ([]*extensions.DaemonSe
 	}
 
 	var daemonSets []*extensions.DaemonSet
-	for i := range list {
-		daemonSet = list[i]
+	for _, daemonSet := range list {
 		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}
