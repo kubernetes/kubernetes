@@ -41,7 +41,10 @@ func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, resource s
 		if err != nil {
 			return nil, err
 		}
-		return informer.Lister().ByNamespace(namespace).List(labelSelector)
+		if !informer.Informer().HasSynced() {
+		       return nil , fmt.Errorf("Informer had not syncd yet")
+		}
+		return informer.Lister().ByNamespace(namespace).List(options.LabelSelector)
 	}
 }
 
