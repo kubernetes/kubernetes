@@ -61,8 +61,9 @@ func TestExecRunner(t *testing.T) {
 		}
 
 		ctx := RunningContext{
-			Out:        outBuf,
-			WorkingDir: ".",
+			Out:         outBuf,
+			WorkingDir:  ".",
+			EnvProvider: &EmptyEnvProvider{},
 		}
 
 		runner := &ExecPluginRunner{}
