@@ -153,7 +153,6 @@ else
   # Runtime flags
   test_args='--kubelet-flags="--container-runtime='$runtime'" '$test_args
   if [[ $runtime == "remote" ]] ; then
-      test_args='--kubelet-flags="--experimental-cri=true" '$test_args
       if [[ ! -z $container_runtime_endpoint ]] ; then
 	      test_args='--kubelet-flags="--container-runtime-endpoint='$container_runtime_endpoint'" '$test_args
       fi
