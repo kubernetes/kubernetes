@@ -43,6 +43,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/api/v1/helper/qos:all-srcs",
+    ],
     tags = ["automanaged"],
 )
