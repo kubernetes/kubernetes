@@ -55,6 +55,7 @@ type FakeDockerClient struct {
 	ContainerMap         map[string]*dockertypes.ContainerJSON
 	ImageInspects        map[string]*dockertypes.ImageInspect
 	Images               []dockertypes.Image
+	ImageIDsNeedingAuth  map[string]dockertypes.AuthConfig
 	Errors               map[string]error
 	called               []calledDetail
 	pulled               []string
@@ -91,8 +92,9 @@ func NewFakeDockerClient() *FakeDockerClient {
 		ContainerMap: make(map[string]*dockertypes.ContainerJSON),
 		Clock:        clock.RealClock{},
 		// default this to true, so that we trace calls, image pulls and container lifecycle
-		EnableTrace:   true,
-		ImageInspects: make(map[string]*dockertypes.ImageInspect),
+		EnableTrace:         true,
+		ImageInspects:       make(map[string]*dockertypes.ImageInspect),
+		ImageIDsNeedingAuth: make(map[string]dockertypes.AuthConfig),
 	}
 }
 
@@ -632,6 +634,14 @@ func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 	return f.popError("logs")
 }
 
+func (f *FakeDockerClient) isAuthorizedForImage(image string, auth dockertypes.AuthConfig) bool {
+	if reqd, exists := f.ImageIDsNeedingAuth[image]; !exists {
+		return true // no auth needed
+	} else {
+		return auth.Username == reqd.Username && auth.Password == reqd.Password
+	}
+}
+
 // PullImage is a test-spy implementation of Interface.PullImage.
 // It adds an entry "pull" to the internal method call record.
 func (f *FakeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
@@ -640,6 +650,10 @@ func (f *FakeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 	f.appendCalled(calledDetail{name: "pull"})
 	err := f.popError("pull")
 	if err == nil {
+		if !f.isAuthorizedForImage(image, auth) {
+			return ImageNotFoundError{ID: image}
+		}
+
 		authJson, _ := json.Marshal(auth)
 		inspect := createImageInspectFromRef(image)
 		f.ImageInspects[image] = inspect
@@ -720,11 +734,20 @@ func (f *FakeDockerClient) InjectImages(images []dockertypes.Image) {
 	}
 }
 
+func (f *FakeDockerClient) MakeImagesPrivate(images []dockertypes.Image, auth dockertypes.AuthConfig) {
+	f.Lock()
+	defer f.Unlock()
+	for _, i := range images {
+		f.ImageIDsNeedingAuth[i.ID] = auth
+	}
+}
+
 func (f *FakeDockerClient) ResetImages() {
 	f.Lock()
 	defer f.Unlock()
 	f.Images = []dockertypes.Image{}
 	f.ImageInspects = make(map[string]*dockertypes.ImageInspect)
+	f.ImageIDsNeedingAuth = make(map[string]dockertypes.AuthConfig)
 }
 
 func (f *FakeDockerClient) InjectImageInspects(inspects []dockertypes.ImageInspect) {
