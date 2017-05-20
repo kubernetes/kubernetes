@@ -388,7 +388,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		serviceMap:       make(proxyServiceMap),
 		serviceChanges:   newServiceChangeMap(),
 		endpointsMap:     make(proxyEndpointsMap),
-		endpointsChanges: newEndpointsChangeMap(),
+		endpointsChanges: newEndpointsChangeMap(testHostname),
 		iptables:         ipt,
 		clusterCIDR:      "10.0.0.0/24",
 		hostname:         testHostname,
@@ -1611,7 +1611,7 @@ func compareEndpointsMaps(t *testing.T, tci int, newMap, expected map[proxy.Serv
 }
 
 func Test_updateEndpointsMap(t *testing.T) {
-	var nodeName = "host"
+	var nodeName = testHostname
 
 	unnamedPort := func(ept *api.Endpoints) {
 		ept.Subsets = []api.EndpointSubset{{
