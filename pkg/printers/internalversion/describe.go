@@ -1709,7 +1709,11 @@ func describeSecret(secret *api.Secret) (string, error) {
 		skipAnnotations := sets.NewString(api.LastAppliedConfigAnnotation)
 		printAnnotationsMultilineWithFilter(w, "Annotations", secret.Annotations, skipAnnotations)
 
-		w.Write(LEVEL_0, "\nType:\t%s\n", secret.Type)
+		if secret.Type == "" {
+			w.Write(LEVEL_0, "\nType:\t<none>\n")
+		} else {
+			w.Write(LEVEL_0, "\nType:\t%s\n", secret.Type)
+		}
 
 		w.Write(LEVEL_0, "\nData\n====\n")
 		for k, v := range secret.Data {
