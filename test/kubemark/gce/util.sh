@@ -66,7 +66,14 @@ function create-master-instance-with-resources {
   
   MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
     --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
-  
+
+  # Override the master image project to cos-cloud for COS images staring with `cos` string prefix.
+  DEFAULT_GCI_PROJECT=google-containers
+  if [[ "${GCI_VERSION}" == "cos"* ]]; then
+      DEFAULT_GCI_PROJECT=cos-cloud
+  fi
+  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
+
   run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
     ${GCLOUD_COMMON_ARGS} \
     --address "${MASTER_IP}" \
