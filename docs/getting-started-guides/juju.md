@@ -1,4 +1,4 @@
-This file has moved to: http://kubernetes.github.io/docs/getting-started-guides/juju/
+This file has moved to: https://kubernetes.io/docs/getting-started-guides/ubuntu/installation/
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
