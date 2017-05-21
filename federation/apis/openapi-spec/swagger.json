@@ -13426,6 +13426,13 @@
      "servicePort"
     ],
     "properties": {
+     "controllerOptions": {
+      "description": "Controller-specific options. See controller documentation for details.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
      "serviceName": {
       "description": "Specifies the name of the referenced service.",
       "type": "string"

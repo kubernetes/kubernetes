@@ -33,6 +33,8 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&DaemonSetList{}, func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*DaemonSetList)) })
 	scheme.AddTypeDefaultingFunc(&Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*Deployment)) })
 	scheme.AddTypeDefaultingFunc(&DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*DeploymentList)) })
+	scheme.AddTypeDefaultingFunc(&Ingress{}, func(obj interface{}) { SetObjectDefaults_Ingress(obj.(*Ingress)) })
+	scheme.AddTypeDefaultingFunc(&IngressList{}, func(obj interface{}) { SetObjectDefaults_IngressList(obj.(*IngressList)) })
 	scheme.AddTypeDefaultingFunc(&NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*NetworkPolicy)) })
 	scheme.AddTypeDefaultingFunc(&NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*NetworkPolicyList)) })
 	scheme.AddTypeDefaultingFunc(&ReplicaSet{}, func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*ReplicaSet)) })
@@ -319,6 +321,28 @@ func SetObjectDefaults_DeploymentList(in *DeploymentList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Deployment(a)
+	}
+}
+
+func SetObjectDefaults_Ingress(in *Ingress) {
+	if in.Spec.Backend != nil {
+		SetDefaults_IngressBackend(in.Spec.Backend)
+	}
+	for i := range in.Spec.Rules {
+		a := &in.Spec.Rules[i]
+		if a.IngressRuleValue.HTTP != nil {
+			for j := range a.IngressRuleValue.HTTP.Paths {
+				b := &a.IngressRuleValue.HTTP.Paths[j]
+				SetDefaults_IngressBackend(&b.Backend)
+			}
+		}
+	}
+}
+
+func SetObjectDefaults_IngressList(in *IngressList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_Ingress(a)
 	}
 }
 

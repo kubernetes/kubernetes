@@ -428,6 +428,10 @@ message IngressBackend {
 
   // Specifies the port of the referenced service.
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString servicePort = 2;
+
+  // Controller-specific options. See controller documentation for details.
+  // +optional
+  map<string, string> controllerOptions = 3;
 }
 
 // IngressList is a collection of Ingress.

@@ -426,6 +426,9 @@ func DeepCopy_v1beta1_HTTPIngressPath(in interface{}, out interface{}, c *conver
 		in := in.(*HTTPIngressPath)
 		out := out.(*HTTPIngressPath)
 		*out = *in
+		if err := DeepCopy_v1beta1_IngressBackend(&in.Backend, &out.Backend, c); err != nil {
+			return err
+		}
 		return nil
 	}
 }
@@ -439,7 +442,11 @@ func DeepCopy_v1beta1_HTTPIngressRuleValue(in interface{}, out interface{}, c *c
 		if in.Paths != nil {
 			in, out := &in.Paths, &out.Paths
 			*out = make([]HTTPIngressPath, len(*in))
-			copy(*out, *in)
+			for i := range *in {
+				if err := DeepCopy_v1beta1_HTTPIngressPath(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}
@@ -492,6 +499,13 @@ func DeepCopy_v1beta1_IngressBackend(in interface{}, out interface{}, c *convers
 		in := in.(*IngressBackend)
 		out := out.(*IngressBackend)
 		*out = *in
+		if in.ControllerOptions != nil {
+			in, out := &in.ControllerOptions, &out.ControllerOptions
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		}
 		return nil
 	}
 }
@@ -554,7 +568,9 @@ func DeepCopy_v1beta1_IngressSpec(in interface{}, out interface{}, c *conversion
 		if in.Backend != nil {
 			in, out := &in.Backend, &out.Backend
 			*out = new(IngressBackend)
-			**out = **in
+			if err := DeepCopy_v1beta1_IngressBackend(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		if in.TLS != nil {
 			in, out := &in.TLS, &out.TLS

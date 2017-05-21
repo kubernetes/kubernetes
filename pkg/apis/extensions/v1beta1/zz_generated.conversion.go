@@ -809,6 +809,7 @@ func Convert_extensions_Ingress_To_v1beta1_Ingress(in *extensions.Ingress, out *
 func autoConvert_v1beta1_IngressBackend_To_extensions_IngressBackend(in *IngressBackend, out *extensions.IngressBackend, s conversion.Scope) error {
 	out.ServiceName = in.ServiceName
 	out.ServicePort = in.ServicePort
+	out.ControllerOptions = *(*map[string]string)(unsafe.Pointer(&in.ControllerOptions))
 	return nil
 }
 
@@ -820,6 +821,7 @@ func Convert_v1beta1_IngressBackend_To_extensions_IngressBackend(in *IngressBack
 func autoConvert_extensions_IngressBackend_To_v1beta1_IngressBackend(in *extensions.IngressBackend, out *IngressBackend, s conversion.Scope) error {
 	out.ServiceName = in.ServiceName
 	out.ServicePort = in.ServicePort
+	out.ControllerOptions = *(*map[string]string)(unsafe.Pointer(&in.ControllerOptions))
 	return nil
 }
 
