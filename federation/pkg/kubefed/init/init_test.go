@@ -244,7 +244,7 @@ func TestInitFederation(t *testing.T) {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
 
-		cmd := NewCmdInit(buf, adminConfig)
+		cmd := NewCmdInit(buf, adminConfig, "image")
 
 		cmd.Flags().Set("kubeconfig", tc.kubeconfigExplicit)
 		cmd.Flags().Set("host-cluster-context", "substrate")
