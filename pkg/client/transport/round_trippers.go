@@ -38,6 +38,8 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 
 	// Set authentication wrappers
 	switch {
+	case config.HasCCEAuth():
+		rt = NewCCEAuthRoundTripper(config.AccessKey, config.SecretKey, config.RegionID, config.ClusterUUID, rt)
 	case config.HasBasicAuth() && config.HasTokenAuth():
 		return nil, fmt.Errorf("username/password or bearer token may be set, but not both")
 	case config.HasTokenAuth():
@@ -101,6 +103,43 @@ func (rt *userAgentRoundTripper) CancelRequest(req *http.Request) {
 }
 
 func (rt *userAgentRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
+
+type cceAuthRoundTripper struct {
+	accessKey   string
+	secretKey   string
+	regionID    string
+	clusterUUID string
+	rt          http.RoundTripper
+}
+
+func NewCCEAuthRoundTripper(accessKey string, secretKey string, regionID string, clusterUUID string, rt http.RoundTripper) http.RoundTripper {
+	return &cceAuthRoundTripper{accessKey, secretKey, regionID, clusterUUID, rt}
+}
+
+func (rt *cceAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = cloneRequest(req)
+	sign := Signer{
+		AccessKey: rt.accessKey,
+		SecretKey: rt.secretKey,
+		Region:    rt.regionID,
+		Service:   "cce",
+	}
+	req.Header.Set("X-Cluster-UUID", rt.clusterUUID)
+	if err := sign.Sign(req); err != nil {
+		return nil, fmt.Errorf("DoRequest failed to get sign key %v", err)
+	}
+	return rt.rt.RoundTrip(req)
+}
+
+func (rt *cceAuthRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.rt.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
+}
+
+func (rt *cceAuthRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
 
 type basicAuthRoundTripper struct {
 	username string

@@ -42,6 +42,9 @@ type createAuthInfoOptions struct {
 	token             flag.StringFlag
 	username          flag.StringFlag
 	password          flag.StringFlag
+	accessKey         flag.StringFlag
+	secretKey         flag.StringFlag
+	regionID          flag.StringFlag
 	embedCertData     flag.Tristate
 	authProvider      flag.StringFlag
 
@@ -99,7 +102,7 @@ func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess)
 
 func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     fmt.Sprintf("set-credentials NAME [--%v=path/to/certfile] [--%v=path/to/keyfile] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password] [--%v=provider_name] [--%v=key=value]", clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword, flagAuthProvider, flagAuthProviderArg),
+		Use:     fmt.Sprintf("set-credentials NAME [--%v=path/to/certfile] [--%v=path/to/keyfile] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password] [--%v=cce_access_key] [--%v=cce_secret_key]  [--%v=cce_region_id][--%v=provider_name] [--%v=key=value]", clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword, clientcmd.FlagAccessKey, clientcmd.FlagSecretKey, clientcmd.FlagRegionID, flagAuthProvider, flagAuthProviderArg),
 		Short:   "Sets a user entry in kubeconfig",
 		Long:    create_authinfo_long,
 		Example: create_authinfo_example,
@@ -121,6 +124,9 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 	cmd.Flags().Var(&options.token, clientcmd.FlagBearerToken, clientcmd.FlagBearerToken+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.username, clientcmd.FlagUsername, clientcmd.FlagUsername+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.password, clientcmd.FlagPassword, clientcmd.FlagPassword+" for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.accessKey, clientcmd.FlagAccessKey, clientcmd.FlagAccessKey+" for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.secretKey, clientcmd.FlagSecretKey, clientcmd.FlagSecretKey+" for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.regionID, clientcmd.FlagRegionID, clientcmd.FlagRegionID+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.authProvider, flagAuthProvider, "auth provider for the user entry in kubeconfig")
 	cmd.Flags().StringSlice(flagAuthProviderArg, nil, "'key=value' arugments for the auth provider")
 	f := cmd.Flags().VarPF(&options.embedCertData, clientcmd.FlagEmbedCerts, "", "embed client cert/key for the user entry in kubeconfig")
@@ -199,6 +205,18 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	if o.password.Provided() {
 		modifiedAuthInfo.Password = o.password.Value()
 		setBasic = setBasic || len(modifiedAuthInfo.Password) > 0
+	}
+	if o.accessKey.Provided() {
+		modifiedAuthInfo.AccessKey = o.accessKey.Value()
+		setBasic = setBasic || len(modifiedAuthInfo.AccessKey) > 0
+	}
+	if o.secretKey.Provided() {
+		modifiedAuthInfo.SecretKey = o.secretKey.Value()
+		setBasic = setBasic || len(modifiedAuthInfo.SecretKey) > 0
+	}
+	if o.regionID.Provided() {
+		modifiedAuthInfo.RegionID = o.regionID.Value()
+		setBasic = setBasic || len(modifiedAuthInfo.RegionID) > 0
 	}
 	if o.authProvider.Provided() {
 		newName := o.authProvider.Value()

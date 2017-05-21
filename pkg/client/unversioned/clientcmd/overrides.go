@@ -54,6 +54,9 @@ type AuthOverrideFlags struct {
 	Impersonate       FlagInfo
 	Username          FlagInfo
 	Password          FlagInfo
+	AccessKey         FlagInfo
+	SecretKey         FlagInfo
+	RegionID          FlagInfo
 }
 
 // ContextOverrideFlags holds the flag names to be used for binding command line flags for Cluster objects
@@ -69,6 +72,7 @@ type ClusterOverrideFlags struct {
 	APIVersion            FlagInfo
 	CertificateAuthority  FlagInfo
 	InsecureSkipTLSVerify FlagInfo
+	ClusterUUID           FlagInfo
 }
 
 // FlagInfo contains information about how to register a flag.  This struct is useful if you want to provide a way for an extender to
@@ -115,6 +119,7 @@ const (
 	FlagAPIServer    = "server"
 	FlagAPIVersion   = "api-version"
 	FlagInsecure     = "insecure-skip-tls-verify"
+	FlagClusterUUID  = "cluster-uuid"
 	FlagCertFile     = "client-certificate"
 	FlagKeyFile      = "client-key"
 	FlagCAFile       = "certificate-authority"
@@ -123,6 +128,9 @@ const (
 	FlagImpersonate  = "as"
 	FlagUsername     = "username"
 	FlagPassword     = "password"
+	FlagAccessKey    = "access-key"
+	FlagSecretKey    = "secret-key"
+	FlagRegionID     = "region-id"
 	FlagTimeout      = "request-timeout"
 )
 
@@ -135,6 +143,9 @@ func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 		Impersonate:       FlagInfo{prefix + FlagImpersonate, "", "", "Username to impersonate for the operation"},
 		Username:          FlagInfo{prefix + FlagUsername, "", "", "Username for basic authentication to the API server"},
 		Password:          FlagInfo{prefix + FlagPassword, "", "", "Password for basic authentication to the API server"},
+		AccessKey:         FlagInfo{prefix + FlagAccessKey, "", "", "access key for cce authentication to the API server."},
+		SecretKey:         FlagInfo{prefix + FlagSecretKey, "", "", "secret key for cce authentication to the API server."},
+		RegionID:          FlagInfo{prefix + FlagRegionID, "", "", "region id for basic authentication to the API server."},
 	}
 }
 
@@ -143,8 +154,9 @@ func RecommendedClusterOverrideFlags(prefix string) ClusterOverrideFlags {
 	return ClusterOverrideFlags{
 		APIServer:             FlagInfo{prefix + FlagAPIServer, "", "", "The address and port of the Kubernetes API server"},
 		APIVersion:            FlagInfo{prefix + FlagAPIVersion, "", "", "DEPRECATED: The API version to use when talking to the server"},
-		CertificateAuthority:  FlagInfo{prefix + FlagCAFile, "", "", "Path to a cert. file for the certificate authority"},
-		InsecureSkipTLSVerify: FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure"},
+		CertificateAuthority:  FlagInfo{prefix + FlagCAFile, "", "", "Path to a cert. file for the certificate authority."},
+		InsecureSkipTLSVerify: FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure."},
+		ClusterUUID:           FlagInfo{prefix + FlagClusterUUID, "", "", "The uuid of cluster"},
 	}
 }
 
@@ -177,6 +189,9 @@ func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, fl
 	flagNames.Impersonate.BindStringFlag(flags, &authInfo.Impersonate)
 	flagNames.Username.BindStringFlag(flags, &authInfo.Username)
 	flagNames.Password.BindStringFlag(flags, &authInfo.Password)
+	flagNames.AccessKey.BindStringFlag(flags, &authInfo.AccessKey)
+	flagNames.SecretKey.BindStringFlag(flags, &authInfo.SecretKey)
+	flagNames.RegionID.BindStringFlag(flags, &authInfo.RegionID)
 }
 
 // BindClusterFlags is a convenience method to bind the specified flags to their associated variables
@@ -187,6 +202,7 @@ func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, f
 	flags.MarkDeprecated(FlagAPIVersion, "flag is no longer respected and will be deleted in the next release")
 	flagNames.CertificateAuthority.BindStringFlag(flags, &clusterInfo.CertificateAuthority)
 	flagNames.InsecureSkipTLSVerify.BindBoolFlag(flags, &clusterInfo.InsecureSkipTLSVerify)
+	flagNames.ClusterUUID.BindStringFlag(flags, &clusterInfo.ClusterUUID)
 }
 
 // BindOverrideFlags is a convenience method to bind the specified flags to their associated variables

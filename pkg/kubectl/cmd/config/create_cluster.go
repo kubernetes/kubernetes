@@ -38,6 +38,7 @@ type createClusterOptions struct {
 	server                flag.StringFlag
 	apiVersion            flag.StringFlag
 	insecureSkipTLSVerify flag.Tristate
+	clusterUUID           flag.StringFlag
 	certificateAuthority  flag.StringFlag
 	embedCAData           flag.Tristate
 }
@@ -63,7 +64,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options := &createClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
+		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certficate/authority] [--%v=true] [--%v=cluster_uuid]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure, clientcmd.FlagClusterUUID),
 		Short:   "Sets a cluster entry in kubeconfig",
 		Long:    create_cluster_long,
 		Example: create_cluster_example,
@@ -78,7 +79,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	}
 
 	options.insecureSkipTLSVerify.Default(false)
-
+	cmd.Flags().Var(&options.clusterUUID, clientcmd.FlagClusterUUID, clientcmd.FlagClusterUUID+" for the cluster entry in kubeconfig")
 	cmd.Flags().Var(&options.server, clientcmd.FlagAPIServer, clientcmd.FlagAPIServer+" for the cluster entry in kubeconfig")
 	cmd.Flags().Var(&options.apiVersion, clientcmd.FlagAPIVersion, clientcmd.FlagAPIVersion+" for the cluster entry in kubeconfig")
 	f := cmd.Flags().VarPF(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, "", clientcmd.FlagInsecure+" for the cluster entry in kubeconfig")
@@ -130,6 +131,9 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 			modifiedCluster.CertificateAuthority = ""
 			modifiedCluster.CertificateAuthorityData = nil
 		}
+	}
+	if o.clusterUUID.Provided() {
+		modifiedCluster.ClusterUUID = o.clusterUUID.Value()
 	}
 	if o.certificateAuthority.Provided() {
 		caPath := o.certificateAuthority.Value()
