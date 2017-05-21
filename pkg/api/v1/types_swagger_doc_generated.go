@@ -794,6 +794,15 @@ func (LocalObjectReference) SwaggerDoc() map[string]string {
 	return map_LocalObjectReference
 }
 
+var map_LocalVolumeSource = map[string]string{
+	"":     "Local represents directly-attached storage with node affinity",
+	"path": "The full path to the volume on the node For alpha, this path must be a directory Once block as a source is supported, then this path can point to a block device",
+}
+
+func (LocalVolumeSource) SwaggerDoc() map[string]string {
+	return map_LocalVolumeSource
+}
+
 var map_NFSVolumeSource = map[string]string{
 	"":         "Represents an NFS mount that lasts the lifetime of a pod. NFS volumes do not support ownership management or SELinux relabeling.",
 	"server":   "Server is the hostname or IP address of the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
@@ -1150,6 +1159,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+	"local":                "Local represents directly-attached storage with node affinity",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
