@@ -159,10 +159,6 @@
 			"Rev": "44145f04b68cf362d9c4df2182967c2275eaefed"
 		},
 		{
-			"ImportPath": "github.com/golang/groupcache/lru",
-			"Rev": "02826c3e79038b59d737d3b1c0a1d937f71a4433"
-		},
-		{
 			"ImportPath": "github.com/golang/protobuf/jsonpb",
 			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
 		},

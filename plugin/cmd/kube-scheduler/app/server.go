@@ -31,9 +31,11 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -71,11 +73,14 @@ func Run(s *options.SchedulerServer) error {
 	recorder := createRecorder(kubecli, s)
 
 	informerFactory := informers.NewSharedInformerFactory(kubecli, 0)
+	// cache only non-terminal pods
+	podInformer := factory.NewPodInformer(kubecli, 0)
 
 	sched, err := CreateScheduler(
 		s,
 		kubecli,
 		informerFactory.Core().V1().Nodes(),
+		podInformer,
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -92,9 +97,11 @@ func Run(s *options.SchedulerServer) error {
 
 	stop := make(chan struct{})
 	defer close(stop)
+	go podInformer.Informer().Run(stop)
 	informerFactory.Start(stop)
 	// Waiting for all cache to sync before scheduling.
 	informerFactory.WaitForCacheSync(stop)
+	controller.WaitForCacheSync("scheduler", stop, podInformer.Informer().HasSynced)
 
 	run := func(_ <-chan struct{}) {
 		sched.Run()

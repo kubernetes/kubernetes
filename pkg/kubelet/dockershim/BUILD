@@ -112,7 +112,7 @@ go_test(
         "//vendor/github.com/golang/mock/gomock:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
-        "//vendor/k8s.io/client-go/util/clock:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
     ],
 )
 
