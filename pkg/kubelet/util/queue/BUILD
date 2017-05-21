@@ -14,7 +14,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/client-go/util/clock:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
     ],
 )
 
@@ -25,8 +25,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/client-go/util/clock:go_default_library",
     ],
 )
 

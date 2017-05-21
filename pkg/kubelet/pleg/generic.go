@@ -23,9 +23,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/clock"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
@@ -186,8 +186,6 @@ func (g *GenericPLEG) relist() {
 	}
 
 	timestamp := g.clock.Now()
-	// Update the relist time.
-	g.updateRelisTime(timestamp)
 	defer func() {
 		metrics.PLEGRelistLatency.Observe(metrics.SinceInMicroseconds(timestamp))
 	}()
@@ -198,6 +196,10 @@ func (g *GenericPLEG) relist() {
 		glog.Errorf("GenericPLEG: Unable to retrieve pods: %v", err)
 		return
 	}
+
+	// Update the relist time.
+	g.updateRelisTime(timestamp)
+
 	pods := kubecontainer.Pods(podList)
 	g.podRecords.setCurrent(pods)
 

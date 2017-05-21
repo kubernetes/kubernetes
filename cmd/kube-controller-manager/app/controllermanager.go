@@ -397,14 +397,20 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 				rootCA = rootClientBuilder.ConfigOrDie("tokens-controller").CAData
 			}
 
-			go serviceaccountcontroller.NewTokensController(
+			controller := serviceaccountcontroller.NewTokensController(
+				sharedInformers.Core().V1().ServiceAccounts(),
+				sharedInformers.Core().V1().Secrets(),
 				rootClientBuilder.ClientOrDie("tokens-controller"),
 				serviceaccountcontroller.TokensControllerOptions{
 					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
 					RootCA:         rootCA,
 				},
-			).Run(int(s.ConcurrentSATokenSyncs), stop)
+			)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+			go controller.Run(int(s.ConcurrentSATokenSyncs), stop)
+
+			// start the first set of informers now so that other controllers can start
+			sharedInformers.Start(stop)
 		}
 
 	} else {
