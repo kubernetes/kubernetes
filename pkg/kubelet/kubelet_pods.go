@@ -730,7 +730,7 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 		// restarted.
 		status = pod.Status
 	}
-	return status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
+	return status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded
 }
 
 // OkToDeletePod returns true if all required node-level resources that a pod was consuming have
