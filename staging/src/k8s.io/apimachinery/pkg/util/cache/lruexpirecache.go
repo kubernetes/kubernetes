@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/groupcache/lru"
+	"github.com/hashicorp/golang-lru"
 )
 
 // Clock defines an interface for obtaining the current time
@@ -33,6 +33,8 @@ type realClock struct{}
 
 func (realClock) Now() time.Time { return time.Now() }
 
+// LRUExpireCache is a cache that ensures the mostly recently accessed keys are returned with
+// a ttl beyond which keys are forcibly expired.
 type LRUExpireCache struct {
 	// clock is used to obtain the current time
 	clock Clock
@@ -43,12 +45,17 @@ type LRUExpireCache struct {
 
 // NewLRUExpireCache creates an expiring cache with the given size
 func NewLRUExpireCache(maxSize int) *LRUExpireCache {
-	return &LRUExpireCache{clock: realClock{}, cache: lru.New(maxSize)}
+	return NewLRUExpireCacheWithClock(maxSize, realClock{})
 }
 
-// NewLRUExpireCache creates an expiring cache with the given size, using the specified clock to obtain the current time
+// NewLRUExpireCacheWithClock creates an expiring cache with the given size, using the specified clock to obtain the current time.
 func NewLRUExpireCacheWithClock(maxSize int, clock Clock) *LRUExpireCache {
-	return &LRUExpireCache{clock: clock, cache: lru.New(maxSize)}
+	cache, err := lru.New(maxSize)
+	if err != nil {
+		// if called with an invalid size
+		panic(err)
+	}
+	return &LRUExpireCache{clock: clock, cache: cache}
 }
 
 type cacheEntry struct {
@@ -56,15 +63,16 @@ type cacheEntry struct {
 	expireTime time.Time
 }
 
-func (c *LRUExpireCache) Add(key lru.Key, value interface{}, ttl time.Duration) {
+// Add adds the value to the cache at key with the specified maximum duration.
+func (c *LRUExpireCache) Add(key interface{}, value interface{}, ttl time.Duration) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.cache.Add(key, &cacheEntry{value, c.clock.Now().Add(ttl)})
-	// Remove entry from cache after ttl.
-	time.AfterFunc(ttl, func() { c.remove(key) })
 }
 
-func (c *LRUExpireCache) Get(key lru.Key) (interface{}, bool) {
+// Get returns the value at the specified key from the cache if it exists and is not
+// expired, or returns false.
+func (c *LRUExpireCache) Get(key interface{}) (interface{}, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	e, ok := c.cache.Get(key)
@@ -72,14 +80,23 @@ func (c *LRUExpireCache) Get(key lru.Key) (interface{}, bool) {
 		return nil, false
 	}
 	if c.clock.Now().After(e.(*cacheEntry).expireTime) {
-		go c.remove(key)
+		c.cache.Remove(key)
 		return nil, false
 	}
 	return e.(*cacheEntry).value, true
 }
 
-func (c *LRUExpireCache) remove(key lru.Key) {
+// Remove removes the specified key from the cache if it exists
+func (c *LRUExpireCache) Remove(key interface{}) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.cache.Remove(key)
+}
+
+// Keys returns all the keys in the cache, even if they are expired. Subsequent calls to
+// get may return not found. It returns all keys from oldest to newest.
+func (c *LRUExpireCache) Keys() []interface{} {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.cache.Keys()
 }
