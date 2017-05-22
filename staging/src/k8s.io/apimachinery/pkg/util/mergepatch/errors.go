@@ -19,6 +19,7 @@ package mergepatch
 import (
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 var (
@@ -31,8 +32,25 @@ func ErrNoMergeKey(m map[string]interface{}, k string) error {
 	return fmt.Errorf("map: %v does not contain declared merge key: %s", m, k)
 }
 
-func ErrBadArgType(expected, actual string) error {
-	return fmt.Errorf("expected a %s, but received a %s", expected, actual)
+func ErrBadArgType(expected, actual interface{}) error {
+	return fmt.Errorf("expected a %s, but received a %s",
+		reflect.TypeOf(expected),
+		reflect.TypeOf(actual))
+}
+
+func ErrBadArgKind(expected, actual interface{}) error {
+	var expectedKindString, actualKindString string
+	if expected == nil {
+		expectedKindString = "nil"
+	} else {
+		expectedKindString = reflect.TypeOf(expected).Kind().String()
+	}
+	if actual == nil {
+		actualKindString = "nil"
+	} else {
+		actualKindString = reflect.TypeOf(actual).Kind().String()
+	}
+	return fmt.Errorf("expected a %s, but received a %s", expectedKindString, actualKindString)
 }
 
 func ErrBadPatchType(t interface{}, m map[string]interface{}) error {

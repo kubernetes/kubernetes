@@ -1998,9 +1998,9 @@ func TestStrategicMergePatch(t *testing.T) {
 	testStrategicMergePatchWithCustomArguments(t, "bad patch",
 		"{}", "<THIS IS NOT JSON>", mergeItem, mergepatch.ErrBadJSONDoc)
 	testStrategicMergePatchWithCustomArguments(t, "bad struct",
-		"{}", "{}", []byte("<THIS IS NOT A STRUCT>"), mergepatch.ErrBadArgType("struct", "slice"))
+		"{}", "{}", []byte("<THIS IS NOT A STRUCT>"), mergepatch.ErrBadArgKind(struct{}{}, []byte{}))
 	testStrategicMergePatchWithCustomArguments(t, "nil struct",
-		"{}", "{}", nil, mergepatch.ErrBadArgType("struct", "nil"))
+		"{}", "{}", nil, mergepatch.ErrBadArgKind(struct{}{}, nil))
 
 	tc := StrategicMergePatchTestCases{}
 	err := yaml.Unmarshal(createStrategicMergePatchTestCaseData, &tc)
