@@ -65,6 +65,41 @@ type RuntimeSpec struct {
 	*DockerSpec
 }
 
+// PackageSpec defines the required packages and their versions.
+// PackageSpec is only supported on OS distro with Debian package manager.
+//
+// TODO(yguo0905): Support operator OR of multiple packages for the case where
+// either "foo (>=1.0)" or "bar (>=2.0)" is required.
+type PackageSpec struct {
+	// Name is the name of the package to be checked.
+	Name string
+	// VersionRange represents a range of versions that the package must
+	// satisfy. Note that the version requirement will not be enforced if
+	// the version range is empty. For example,
+	// - "" would match any versions but the package must be installed.
+	// - ">=1" would match "1.0.0", "1.0.1", "1.1.0", and "2.0".
+	// - ">1.0 <2.0" would match between both ranges, so "1.1.1" and "1.8.7"
+	//   but not "1.0.0" or "2.0.0".
+	// - "<2.0.0 || >=3.0.0" would match "1.0.0" and "3.0.0" but not "2.0.0".
+	VersionRange string
+	// Description explains the reason behind this package requirements.
+	Description string
+}
+
+// PackageSpecOverride defines the overrides on the PackageSpec for an OS
+// distro.
+type PackageSpecOverride struct {
+	// OSDistro identifies to which OS distro this override applies.
+	// Must be "ubuntu", "cos" or "coreos".
+	OSDistro string
+	// Subtractions is a list of package names that are excluded from the
+	// package spec.
+	Subtractions []PackageSpec
+	// Additions is a list of additional package requirements included the
+	// package spec.
+	Additions []PackageSpec
+}
+
 // SysSpec defines the requirement of supported system. Currently, it only contains
 // spec for OS, Kernel and Cgroups.
 type SysSpec struct {
@@ -76,6 +111,11 @@ type SysSpec struct {
 	Cgroups []string
 	// RuntimeSpec defines the spec for runtime.
 	RuntimeSpec RuntimeSpec
+	// PackageSpec defines the required packages and their versions.
+	PackageSpecs []PackageSpec
+	// PackageSpec defines the overrides of the required packages and their
+	// versions for an OS distro.
+	PackageSpecOverrides []PackageSpecOverride
 }
 
 // DefaultSysSpec is the default SysSpec.
