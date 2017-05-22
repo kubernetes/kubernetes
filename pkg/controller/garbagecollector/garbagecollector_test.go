@@ -44,20 +44,58 @@ import (
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
-func TestNewGarbageCollector(t *testing.T) {
+func TestGarbageCollectorConstruction(t *testing.T) {
 	config := &restclient.Config{}
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
-	metaOnlyClientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+	tweakableRM := meta.NewDefaultRESTMapper(nil, nil)
+	rm := meta.MultiRESTMapper{tweakableRM, api.Registry.RESTMapper()}
+	metaOnlyClientPool := dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
-	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+	clientPool := dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc)
 	podResource := map[schema.GroupVersionResource]struct{}{
 		{Version: "v1", Resource: "pods"}: {},
-		// no monitor will be constructed for non-core resource, the GC construction will not fail.
+	}
+	twoResources := map[schema.GroupVersionResource]struct{}{
+		{Version: "v1", Resource: "pods"}:                     {},
 		{Group: "tpr.io", Version: "v1", Resource: "unknown"}: {},
 	}
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), podResource)
+
+	// No monitor will be constructed for the non-core resource, but the GC
+	// construction will not fail.
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, rm, twoResources)
 	if err != nil {
 		t.Fatal(err)
+	}
+	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
+
+	// Make sure resource monitor syncing creates and stops resource monitors.
+	tweakableRM.Add(schema.GroupVersionKind{"tpr.io", "v1", "unknown"}, nil)
+	err = gc.SyncResourceMonitors(twoResources)
+	if err != nil {
+		t.Errorf("Failed adding a monitor: %v", err)
+	}
+	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
+
+	err = gc.SyncResourceMonitors(podResource)
+	if err != nil {
+		t.Errorf("Failed removing a monitor: %v", err)
+	}
+	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
+
+	// Make sure the syncing mechanism also works after Run() has been called
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go gc.Run(1, stopCh)
+
+	err = gc.SyncResourceMonitors(twoResources)
+	if err != nil {
+		t.Errorf("Failed adding a monitor: %v", err)
+	}
+	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
+
+	err = gc.SyncResourceMonitors(podResource)
+	if err != nil {
+		t.Errorf("Failed removing a monitor: %v", err)
 	}
 	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
 }

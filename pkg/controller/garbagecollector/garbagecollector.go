@@ -95,12 +95,18 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
 	}
-	if err := gb.monitorsForResources(deletableResources); err != nil {
-		return nil, err
+	if err := gb.syncMonitors(deletableResources); err != nil {
+		utilruntime.HandleError(fmt.Errorf("Unable to start all monitors: %v", err))
 	}
 	gc.dependencyGraphBuilder = gb
 
 	return gc, nil
+}
+
+// SyncResourceMonitors starts or stops resource monitors as needed to ensure
+// that all (and only) those resources present in the map are monitored.
+func (gc *GarbageCollector) SyncResourceMonitors(deletableResources map[schema.GroupVersionResource]struct{}) error {
+	return gc.dependencyGraphBuilder.syncMonitors(deletableResources)
 }
 
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
