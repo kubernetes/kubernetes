@@ -54,13 +54,11 @@ type Interface interface {
 	DeleteRule(table Table, chain Chain, args ...string) error
 	// IsIpv6 returns true if this is managing ipv6 tables
 	IsIpv6() bool
-	// Save calls `iptables-save` for table.
-	Save(table Table) ([]byte, error)
 	// SaveInto calls `iptables-save` for table and stores result in a given buffer.
 	SaveInto(table Table, buffer *bytes.Buffer) error
 	// Restore runs `iptables-restore` passing data through []byte.
 	// table is the Table to restore
-	// data should be formatted like the output of Save()
+	// data should be formatted like the output of SaveInto()
 	// flush sets the presence of the "--noflush" flag. see: FlushFlag
 	// counters sets the "--counters" flag. see: RestoreCountersFlag
 	Restore(table Table, data []byte, flush FlushFlag, counters RestoreCountersFlag) error
@@ -304,17 +302,6 @@ func (runner *runner) DeleteRule(table Table, chain Chain, args ...string) error
 
 func (runner *runner) IsIpv6() bool {
 	return runner.protocol == ProtocolIpv6
-}
-
-// Save is part of Interface.
-func (runner *runner) Save(table Table) ([]byte, error) {
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
-	// run and return
-	args := []string{"-t", string(table)}
-	glog.V(4).Infof("running iptables-save %v", args)
-	return runner.exec.Command(cmdIPTablesSave, args...).CombinedOutput()
 }
 
 // SaveInto is part of Interface.
