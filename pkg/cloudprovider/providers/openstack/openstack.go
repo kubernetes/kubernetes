@@ -557,7 +557,7 @@ func (apiVersions APIVersionsByID) Swap(i, j int) {
 }
 
 func (apiVersions APIVersionsByID) Less(i, j int) bool {
-	return apiVersions[i].ID > apiVersions[j].ID
+	return apiVersions[i].ID < apiVersions[j].ID
 }
 
 func autoVersionSelector(apiVersion *apiversions_v1.APIVersion) string {

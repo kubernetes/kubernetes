@@ -58,7 +58,7 @@ type KubeletLatencyMetrics []KubeletLatencyMetric
 
 func (a KubeletLatencyMetrics) Len() int           { return len(a) }
 func (a KubeletLatencyMetrics) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a KubeletLatencyMetrics) Less(i, j int) bool { return a[i].Latency > a[j].Latency }
+func (a KubeletLatencyMetrics) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
 
 // If a apiserver client is passed in, the function will try to get kubelet metrics from metrics grabber;
 // or else, the function will try to get kubelet metrics directly from the node.

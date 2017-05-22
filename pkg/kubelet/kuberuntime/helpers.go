@@ -62,7 +62,7 @@ type podSandboxByCreated []*runtimeapi.PodSandbox
 
 func (p podSandboxByCreated) Len() int           { return len(p) }
 func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func (p podSandboxByCreated) Less(i, j int) bool { return p[i].CreatedAt > p[j].CreatedAt }
+func (p podSandboxByCreated) Less(i, j int) bool { return p[i].CreatedAt < p[j].CreatedAt }
 
 type containerStatusByCreated []*kubecontainer.ContainerStatus
 
