@@ -24,6 +24,8 @@ go_library(
         "//vendor/github.com/vmware/govmomi:go_default_library",
         "//vendor/github.com/vmware/govmomi/find:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",
+        "//vendor/github.com/vmware/govmomi/pbm:go_default_library",
+        "//vendor/github.com/vmware/govmomi/pbm/types:go_default_library",
         "//vendor/github.com/vmware/govmomi/property:go_default_library",
         "//vendor/github.com/vmware/govmomi/session:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",
