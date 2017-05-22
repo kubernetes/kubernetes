@@ -35,7 +35,6 @@ func newForwardingRuleMetricContext(request, region string) *metricContext {
 // targetProxyLink is the SelfLink of a TargetHttp(s)Proxy.
 func (gce *GCECloud) CreateGlobalForwardingRule(targetProxyLink, ip, name, portRange string) (*compute.ForwardingRule, error) {
 	mc := newForwardingRuleMetricContext("create", "")
-
 	rule := &compute.ForwardingRule{
 		Name:       name,
 		IPAddress:  ip,
@@ -59,7 +58,6 @@ func (gce *GCECloud) CreateGlobalForwardingRule(targetProxyLink, ip, name, portR
 // targetProxyLink is the SelfLink of a TargetHttp(s)Proxy.
 func (gce *GCECloud) SetProxyForGlobalForwardingRule(fw *compute.ForwardingRule, targetProxyLink string) error {
 	mc := newForwardingRuleMetricContext("set_proxy", "")
-
 	op, err := gce.service.GlobalForwardingRules.SetTarget(
 		gce.projectID, fw.Name, &compute.TargetReference{Target: targetProxyLink}).Do()
 	if err != nil {
@@ -73,7 +71,6 @@ func (gce *GCECloud) SetProxyForGlobalForwardingRule(fw *compute.ForwardingRule,
 // DeleteGlobalForwardingRule deletes the GlobalForwardingRule by name.
 func (gce *GCECloud) DeleteGlobalForwardingRule(name string) error {
 	mc := newForwardingRuleMetricContext("delete", "")
-
 	op, err := gce.service.GlobalForwardingRules.Delete(gce.projectID, name).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
@@ -90,11 +87,15 @@ func (gce *GCECloud) DeleteGlobalForwardingRule(name string) error {
 
 // GetGlobalForwardingRule returns the GlobalForwardingRule by name.
 func (gce *GCECloud) GetGlobalForwardingRule(name string) (*compute.ForwardingRule, error) {
-	return gce.service.GlobalForwardingRules.Get(gce.projectID, name).Do()
+	mc := newForwardingRuleMetricContext("get", "")
+	v, err := gce.service.GlobalForwardingRules.Get(gce.projectID, name).Do()
+	return v, mc.Observe(err)
 }
 
 // ListGlobalForwardingRules lists all GlobalForwardingRules in the project.
 func (gce *GCECloud) ListGlobalForwardingRules() (*compute.ForwardingRuleList, error) {
+	mc := newForwardingRuleMetricContext("list", "")
 	// TODO: use PageToken to list all not just the first 500
-	return gce.service.GlobalForwardingRules.List(gce.projectID).Do()
+	v, err := gce.service.GlobalForwardingRules.List(gce.projectID).Do()
+	return v, mc.Observe(err)
 }

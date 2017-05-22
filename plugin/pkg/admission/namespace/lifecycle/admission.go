@@ -26,10 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilcache "k8s.io/apimachinery/pkg/util/cache"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
-	utilcache "k8s.io/apiserver/pkg/util/cache"
-	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -51,7 +51,12 @@ const (
 )
 
 func init() {
-	kubeapiserveradmission.Plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
+	Register(&kubeapiserveradmission.Plugins)
+}
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewLifecycle(sets.NewString(metav1.NamespaceDefault, metav1.NamespaceSystem, metav1.NamespacePublic))
 	})
 }

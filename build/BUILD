@@ -1,6 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel//tools/build_defs/docker:docker.bzl", "docker_build")
+load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build", "docker_bundle")
 load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 
 filegroup(
@@ -15,6 +15,8 @@ filegroup(
         ":package-srcs",
         "//build/debs:all-srcs",
         "//build/release-tars:all-srcs",
+        "//build/rpms:all-srcs",
+        "//build/visible_to:all-srcs",
     ],
     tags = ["automanaged"],
 )
@@ -44,7 +46,13 @@ docker_build(
     ],
 )
 
+# This list should roughly match kube::build::get_docker_wrapped_binaries()
+# in build/common.sh.
 DOCKERIZED_BINARIES = {
+    "cloud-controller-manager": {
+        "base": ":busybox",
+        "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
+    },
     "kube-apiserver": {
         "base": ":busybox",
         "target": "//cmd/kube-apiserver:kube-apiserver",
@@ -63,6 +71,26 @@ DOCKERIZED_BINARIES = {
     },
 }
 
+[docker_build(
+    name = binary + "-internal",
+    base = meta["base"],
+    cmd = ["/usr/bin/" + binary],
+    debs = [
+        "//build/debs:%s.deb" % binary,
+    ],
+    symlinks = {
+        # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
+        # but the debs install the binaries into /usr/bin.
+        "/usr/local/bin/" + binary: "/usr/bin/" + binary,
+    },
+) for binary, meta in DOCKERIZED_BINARIES.items()]
+
+[docker_bundle(
+    name = binary,
+    images = {"gcr.io/google_containers/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal"},
+    stamp = True,
+) for binary in DOCKERIZED_BINARIES.keys()]
+
 [genrule(
     name = binary + "_docker_tag",
     srcs = [meta["target"]],
@@ -71,24 +99,17 @@ DOCKERIZED_BINARIES = {
     stamp = 1,
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
 
-[docker_build(
-    name = binary,
-    base = meta["base"],
-    cmd = ["/usr/bin/" + binary],
-    debs = [
-        "//build/debs:%s.deb" % binary,
-    ],
-    image_tags = [
-        "@%s.docker_tag" % binary,
-    ],
-    repository = "gcr.io/google_containers/" + binary,
-    repository_append_package = False,
-    symlinks = {
-        # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
-        # but the debs install the binaries into /usr/bin.
-        "/usr/local/bin/" + binary: "/usr/bin/" + binary,
-    },
-) for binary, meta in DOCKERIZED_BINARIES.items()]
+genrule(
+    name = "os_package_version",
+    outs = ["version"],
+    cmd = """
+grep ^STABLE_BUILD_SCM_REVISION bazel-out/stable-status.txt \
+    | awk '{print $$2}' \
+    | sed -e 's/^v//' -e 's/[\+-]/_/g' \
+    >$@
+""",
+    stamp = 1,
+)
 
 release_filegroup(
     name = "docker-artifacts",

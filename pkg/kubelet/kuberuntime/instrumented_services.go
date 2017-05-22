@@ -19,8 +19,8 @@ package kuberuntime
 import (
 	"time"
 
-	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -255,4 +255,13 @@ func (in instrumentedImageManagerService) RemoveImage(image *runtimeapi.ImageSpe
 	err := in.service.RemoveImage(image)
 	recordError(operation, err)
 	return err
+}
+
+func (in instrumentedImageManagerService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
+	const operation = "image_fs_info"
+	defer recordOperation(operation, time.Now())
+
+	fsInfo, err := in.service.ImageFsInfo()
+	recordError(operation, err)
+	return fsInfo, nil
 }

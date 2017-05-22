@@ -671,6 +671,81 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
+<h3 id="_v1_preconditions">v1.Preconditions</h3>
+<div class="paragraph">
+<p>Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">uid</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the target UID.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_types_uid">types.UID</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_initializers">v1.Initializers</h3>
+<div class="paragraph">
+<p>Initializers tracks the progress of initialization.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pending</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Pending is a list of initializers that must execute in order before this object is visible. When the last pending initializer is removed, and no failing result is set, the initializers struct will be set to nil and the object is considered as initialized and visible to all clients.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_initializer">v1.Initializer</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">result</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If result is set with the Failure field, the object will be persisted to storage and then deleted, ensuring that other clients can observe the deletion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_status">v1.Status</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v2alpha1_horizontalpodautoscaler">v2alpha1.HorizontalPodAutoscaler</h3>
 <div class="paragraph">
 <p>HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.</p>
@@ -709,14 +784,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">metadata is the standard object metadata. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">metadata is the standard object metadata. More info: <a href="https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata">https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectmeta">v1.ObjectMeta</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">spec</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">spec is the specification for the behaviour of the autoscaler. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">spec is the specification for the behaviour of the autoscaler. More info: <a href="https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status">https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status</a>.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2alpha1_horizontalpodautoscalerspec">v2alpha1.HorizontalPodAutoscalerSpec</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -726,40 +801,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">status is the current information about the autoscaler.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2alpha1_horizontalpodautoscalerstatus">v2alpha1.HorizontalPodAutoscalerStatus</a></p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect2">
-<h3 id="_v1_preconditions">v1.Preconditions</h3>
-<div class="paragraph">
-<p>Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.</p>
-</div>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">uid</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the target UID.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_types_uid">types.UID</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -1224,6 +1265,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">uid</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UID of the resource. (when there is a single resource which can be described). More info: <a href="http://kubernetes.io/docs/user-guide/identifiers#uids">http://kubernetes.io/docs/user-guide/identifiers#uids</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">causes</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -1235,6 +1283,40 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">If specified, the time in seconds before the operation should be retried.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_initializer">v1.Initializer</h3>
+<div class="paragraph">
+<p>Initializer is information about an initializer that has not yet completed.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the process that is responsible for initializing this object.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -1281,54 +1363,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">currentAverageValue</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">currentAverageValue is the the current value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the "pods" metric source type. It will always be set, regardless of the corresponding metric specification.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect2">
-<h3 id="_v2alpha1_objectmetricsource">v2alpha1.ObjectMetricSource</h3>
-<div class="paragraph">
-<p>ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).</p>
-</div>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">target</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">target is the described Kubernetes object.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2alpha1_crossversionobjectreference">v2alpha1.CrossVersionObjectReference</a></p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">metricName</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">metricName is the name of the metric in question.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">targetValue</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">targetValue is the target value of the metric (as a quantity).</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1535,6 +1569,15 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">initializers</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven&#8217;t explicitly asked to observe uninitialized objects.<br>
+<br>
+When an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_initializers">v1.Initializers</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">finalizers</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -1545,6 +1588,54 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">clusterName</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v2alpha1_objectmetricsource">v2alpha1.ObjectMetricSource</h3>
+<div class="paragraph">
+<p>ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">target</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">target is the described Kubernetes object.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2alpha1_crossversionobjectreference">v2alpha1.CrossVersionObjectReference</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">metricName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">metricName is the name of the metric in question.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">targetValue</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">targetValue is the target value of the metric (as a quantity).</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
@@ -1791,7 +1882,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-03-27 13:42:39 UTC
+Last updated 2017-05-17 22:25:01 UTC
 </div>
 </div>
 </body>

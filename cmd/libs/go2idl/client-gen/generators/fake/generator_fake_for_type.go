@@ -24,6 +24,7 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/path"
 )
 
 // genFakeForType produces a file for each top-level type.
@@ -99,7 +100,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	}
 
 	// allow user to define a group name that's different from the one parsed from the directory.
-	p := c.Universe.Package(g.inputPackage)
+	p := c.Universe.Package(path.Vendorless(g.inputPackage))
 	if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
 		groupName = override[0]
 	}
@@ -120,6 +121,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"GetOptions":           c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
 		"Everything":           c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/labels", Name: "Everything"}),
 		"GroupVersionResource": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersionResource"}),
+		"GroupVersionKind":     c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersionKind"}),
 		"PatchType":            c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
 		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
 
@@ -156,6 +158,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 
 	if !noMethods {
 		sw.Do(resource, m)
+		sw.Do(kind, m)
 		sw.Do(createTemplate, m)
 		sw.Do(updateTemplate, m)
 		// Generate the UpdateStatus method if the type has a status
@@ -198,11 +201,15 @@ var resource = `
 var $.type|allLowercasePlural$Resource = $.GroupVersionResource|raw${Group: "$.groupName$", Version: "$.version$", Resource: "$.type|allLowercasePlural$"}
 `
 
+var kind = `
+var $.type|allLowercasePlural$Kind = $.GroupVersionKind|raw${Group: "$.groupName$", Version: "$.version$", Kind: "$.type|public$"}
+`
+
 var listTemplate = `
 func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type|raw$List, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewListAction|raw$($.type|allLowercasePlural$Resource, c.ns, opts), &$.type|raw$List{})
-		$else$Invokes($.NewRootListAction|raw$($.type|allLowercasePlural$Resource, opts), &$.type|raw$List{})$end$
+		$if .namespaced$Invokes($.NewListAction|raw$($.type|allLowercasePlural$Resource, $.type|allLowercasePlural$Kind, c.ns, opts), &$.type|raw$List{})
+		$else$Invokes($.NewRootListAction|raw$($.type|allLowercasePlural$Resource, $.type|allLowercasePlural$Kind, opts), &$.type|raw$List{})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -213,8 +220,8 @@ func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type
 var listUsingOptionsTemplate = `
 func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type|raw$List, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewListAction|raw$($.type|allLowercasePlural$Resource, c.ns, opts), &$.type|raw$List{})
-		$else$Invokes($.NewRootListAction|raw$($.type|allLowercasePlural$Resource, opts), &$.type|raw$List{})$end$
+		$if .namespaced$Invokes($.NewListAction|raw$($.type|allLowercasePlural$Resource, $.type|allLowercasePlural$Kind, c.ns, opts), &$.type|raw$List{})
+		$else$Invokes($.NewRootListAction|raw$($.type|allLowercasePlural$Resource, $.type|allLowercasePlural$Kind, opts), &$.type|raw$List{})$end$
 	if obj == nil {
 		return nil, err
 	}

@@ -31,9 +31,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeschema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/util/cache"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 
@@ -50,7 +50,12 @@ var (
 )
 
 func init() {
-	kubeapiserveradmission.Plugins.Register("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
+	Register(&kubeapiserveradmission.Plugins)
+}
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
 		newImagePolicyWebhook, err := NewImagePolicyWebhook(config)
 		if err != nil {
 			return nil, err
@@ -169,7 +174,7 @@ func (a *imagePolicyWebhook) admitPod(attributes admission.Attributes, review *v
 
 	if !review.Status.Allowed {
 		if len(review.Status.Reason) > 0 {
-			return fmt.Errorf("image policy webook backend denied one or more images: %s", review.Status.Reason)
+			return fmt.Errorf("image policy webhook backend denied one or more images: %s", review.Status.Reason)
 		}
 		return errors.New("one or more images rejected by webhook backend")
 	}

@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -1001,13 +1001,10 @@ func deleteImages(imageGC ImageGC, reportBytesFreed bool) nodeReclaimFunc {
 	return func() (*resource.Quantity, error) {
 		glog.Infof("eviction manager: attempting to delete unused images")
 		bytesFreed, err := imageGC.DeleteUnusedImages()
-		if err != nil {
-			return nil, err
-		}
 		reclaimed := int64(0)
 		if reportBytesFreed {
 			reclaimed = bytesFreed
 		}
-		return resource.NewQuantity(reclaimed, resource.BinarySI), nil
+		return resource.NewQuantity(reclaimed, resource.BinarySI), err
 	}
 }

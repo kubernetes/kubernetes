@@ -53,7 +53,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//vendor/github.com/emicklei/go-restful/log:all-srcs",
-        "//vendor/github.com/emicklei/go-restful/swagger:all-srcs",
     ],
     tags = ["automanaged"],
 )

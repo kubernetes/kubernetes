@@ -40,10 +40,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	fedapi "k8s.io/kubernetes/federation/apis/federation"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	federationcache "k8s.io/kubernetes/federation/client/cache"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	"k8s.io/kubernetes/federation/pkg/dnsprovider"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/pkg/api"
@@ -70,25 +67,12 @@ var (
 )
 
 type ServiceController struct {
-	dns              dnsprovider.Interface
 	federationClient fedclientset.Interface
-	federationName   string
-	// serviceDnsSuffix is the DNS suffix we use when publishing service DNS names
-	serviceDnsSuffix string
-	// zoneName and zoneID are used to identify the zone in which to put records
-	zoneName string
-	zoneID   string
-	// each federation should be configured with a single zone (e.g. "mycompany.com")
-	dnsZones dnsprovider.Zones
 	// A store of services, populated by the serviceController
 	serviceStore corelisters.ServiceLister
 	// Watches changes to all services
 	serviceController cache.Controller
 	federatedInformer fedutil.FederatedInformer
-	// A store of services, populated by the serviceController
-	clusterStore federationcache.StoreToClusterLister
-	// Watches changes to all services
-	clusterController cache.Controller
 	eventBroadcaster  record.EventBroadcaster
 	eventRecorder     record.EventRecorder
 	// services that need to be synced
@@ -96,7 +80,7 @@ type ServiceController struct {
 
 	// For triggering all services reconciliation. This is used when
 	// a new cluster becomes available.
-	clusterDeliverer *util.DelayingDeliverer
+	clusterDeliverer *fedutil.DelayingDeliverer
 
 	deletionHelper *deletionhelper.DeletionHelper
 
@@ -106,26 +90,20 @@ type ServiceController struct {
 
 	endpointFederatedInformer fedutil.FederatedInformer
 	federatedUpdater          fedutil.FederatedUpdater
-	objectDeliverer           *util.DelayingDeliverer
+	objectDeliverer           *fedutil.DelayingDeliverer
 	flowcontrolBackoff        *flowcontrol.Backoff
 }
 
 // New returns a new service controller to keep DNS provider service resources
 // (like Kubernetes Services and DNS server records for service discovery) in sync with the registry.
-func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
-	federationName, serviceDnsSuffix, zoneName string, zoneID string) *ServiceController {
+func New(federationClient fedclientset.Interface) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	// federationClient event is not supported yet
 	// broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: UserAgentName})
 
 	s := &ServiceController{
-		dns:                   dns,
 		federationClient:      federationClient,
-		federationName:        federationName,
-		serviceDnsSuffix:      serviceDnsSuffix,
-		zoneName:              zoneName,
-		zoneID:                zoneID,
 		eventBroadcaster:      broadcaster,
 		eventRecorder:         recorder,
 		queue:                 workqueue.New(),
@@ -134,8 +112,8 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		updateTimeout:         updateTimeout,
 		flowcontrolBackoff:    flowcontrol.NewBackOff(5*time.Second, time.Minute),
 	}
-	s.objectDeliverer = util.NewDelayingDeliverer()
-	s.clusterDeliverer = util.NewDelayingDeliverer()
+	s.objectDeliverer = fedutil.NewDelayingDeliverer()
+	s.clusterDeliverer = fedutil.NewDelayingDeliverer()
 	var serviceIndexer cache.Indexer
 	serviceIndexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
@@ -148,7 +126,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		},
 		&v1.Service{},
 		serviceSyncPeriod,
-		util.NewTriggerOnAllChanges(func(obj pkgruntime.Object) {
+		fedutil.NewTriggerOnAllChanges(func(obj pkgruntime.Object) {
 			glog.V(5).Infof("Delivering notification from federation: %v", obj)
 			s.deliverObject(obj, 0, false)
 		}),
@@ -175,7 +153,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 			controller.NoResyncPeriodFunc(),
 			// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
 			// would be just confirmation that some service operation succeeded.
-			util.NewTriggerOnAllChanges(
+			fedutil.NewTriggerOnAllChanges(
 				func(obj pkgruntime.Object) {
 					glog.V(5).Infof("Delivering service notification from federated cluster %s: %v", cluster.Name, obj)
 					s.deliverObject(obj, s.reviewDelay, false)
@@ -185,7 +163,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 
 	s.federatedInformer = fedutil.NewFederatedInformer(federationClient, fedInformerFactory, &clusterLifecycle)
 
-	s.federatedUpdater = fedutil.NewFederatedUpdater(s.federatedInformer,
+	s.federatedUpdater = fedutil.NewFederatedUpdater(s.federatedInformer, "service", updateTimeout, s.eventRecorder,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			svc := obj.(*v1.Service)
 			_, err := client.Core().Services(svc.Namespace).Create(svc)
@@ -240,10 +218,8 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
 			service := obj.(*v1.Service)
-			return service.Name
+			return fmt.Sprintf("%s/%s", service.Namespace, service.Name)
 		},
-		updateTimeout,
-		s.eventRecorder,
 		s.federatedInformer,
 		s.federatedUpdater,
 	)
@@ -269,17 +245,16 @@ func (s *ServiceController) updateService(obj pkgruntime.Object) (pkgruntime.Obj
 
 // It's an error to call Run() more than once for a given ServiceController
 // object.
-func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
-	if err := s.init(); err != nil {
-		return err
-	}
+func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) {
+	glog.Infof("Starting federation service controller")
+
 	defer runtime.HandleCrash()
 	s.federatedInformer.Start()
 	s.endpointFederatedInformer.Start()
-	s.objectDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
+	s.objectDeliverer.StartWithHandler(func(item *fedutil.DelayingDelivererItem) {
 		s.queue.Add(item.Value.(string))
 	})
-	s.clusterDeliverer.StartWithHandler(func(_ *util.DelayingDelivererItem) {
+	s.clusterDeliverer.StartWithHandler(func(_ *fedutil.DelayingDelivererItem) {
 		s.deliverServicesOnClusterChange()
 	})
 	fedutil.StartBackoffGC(s.flowcontrolBackoff, stopCh)
@@ -297,55 +272,6 @@ func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
 		s.objectDeliverer.Stop()
 		s.clusterDeliverer.Stop()
 	}()
-	return nil
-}
-
-func (s *ServiceController) init() error {
-	if s.federationName == "" {
-		return fmt.Errorf("ServiceController should not be run without federationName.")
-	}
-	if s.zoneName == "" && s.zoneID == "" {
-		return fmt.Errorf("ServiceController must be run with either zoneName or zoneID.")
-	}
-	if s.serviceDnsSuffix == "" {
-		// TODO: Is this the right place to do defaulting?
-		if s.zoneName == "" {
-			return fmt.Errorf("ServiceController must be run with zoneName, if serviceDnsSuffix is not set.")
-		}
-		s.serviceDnsSuffix = s.zoneName
-	}
-	if s.dns == nil {
-		return fmt.Errorf("ServiceController should not be run without a dnsprovider.")
-	}
-	zones, ok := s.dns.Zones()
-	if !ok {
-		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records")
-	}
-	s.dnsZones = zones
-	matchingZones, err := getDnsZones(s.zoneName, s.zoneID, s.dnsZones)
-	if err != nil {
-		return fmt.Errorf("error querying for DNS zones: %v", err)
-	}
-	if len(matchingZones) == 0 {
-		if s.zoneName == "" {
-			return fmt.Errorf("ServiceController must be run with zoneName to create zone automatically.")
-		}
-		glog.Infof("DNS zone %q not found.  Creating DNS zone %q.", s.zoneName, s.zoneName)
-		managedZone, err := s.dnsZones.New(s.zoneName)
-		if err != nil {
-			return err
-		}
-		zone, err := s.dnsZones.Add(managedZone)
-		if err != nil {
-			return err
-		}
-		glog.Infof("DNS zone %q successfully created.  Note that DNS resolution will not work until you have registered this name with "+
-			"a DNS registrar and they have changed the authoritative name servers for your domain to point to your DNS provider.", zone.Name())
-	}
-	if len(matchingZones) > 1 {
-		return fmt.Errorf("Multiple matching DNS zones found for %q; please specify zoneID", s.zoneName)
-	}
-	return nil
 }
 
 type reconciliationStatus string
@@ -357,36 +283,37 @@ const (
 	statusNotSynced           = reconciliationStatus("NOSYNC")
 )
 
+func (s *ServiceController) workerFunction() bool {
+	key, quit := s.queue.Get()
+	if quit {
+		return true
+	}
+	defer s.queue.Done(key)
+
+	service := key.(string)
+	status := s.reconcileService(service)
+	switch status {
+	case statusAllOk:
+	// do nothing, reconcile is successful.
+	case statusNotSynced:
+		glog.V(5).Infof("Delivering notification for %q after clusterAvailableDelay", service)
+		s.deliverService(service, s.clusterAvailableDelay, false)
+	case statusRecoverableError:
+		s.deliverService(service, 0, true)
+	case statusNonRecoverableError:
+		// do nothing, error is already logged.
+	}
+	return false
+}
+
 // fedServiceWorker runs a worker thread that just dequeues items, processes them, and marks them done.
 func (s *ServiceController) fedServiceWorker() {
 	for {
-		func() {
-			key, quit := s.queue.Get()
-			if quit {
-				return
-			}
-			defer s.queue.Done(key)
-			service := key.(string)
-			status := s.reconcileService(service)
-			switch status {
-			case statusAllOk:
-				break
-			case statusNotSynced:
-				glog.V(5).Infof("Delivering notification for %q after clusterAvailableDelay", service)
-				s.deliverService(service, s.clusterAvailableDelay, false)
-			case statusRecoverableError:
-				s.deliverService(service, 0, true)
-			case statusNonRecoverableError:
-				// error is already logged, do nothing
-			default:
-				// unreachable
-			}
-		}()
+		if quit := s.workerFunction(); quit {
+			glog.Infof("service controller worker queue shutting down")
+			return
+		}
 	}
-}
-
-func wantsDNSRecords(service *v1.Service) bool {
-	return service.Spec.Type == v1.ServiceTypeLoadBalancer
 }
 
 // delete deletes the given service or returns error if the deletion was not complete.
@@ -395,24 +322,6 @@ func (s *ServiceController) delete(service *v1.Service) error {
 	_, err := s.deletionHelper.HandleObjectInUnderlyingClusters(service)
 	if err != nil {
 		return err
-	}
-
-	// Ensure DNS records are removed for service
-	if wantsDNSRecords(service) {
-		key := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-		serviceIngress, err := ParseFederatedServiceIngress(service)
-		if err != nil {
-			runtime.HandleError(fmt.Errorf("Failed to parse endpoint annotations for service %s: %v", key, err))
-			return err
-		}
-		for _, ingress := range serviceIngress.Items {
-			err := s.ensureDnsRecords(ingress.Cluster, service)
-			if err != nil {
-				glog.V(4).Infof("Error ensuring DNS Records for service %s on cluster %s: %v", key, ingress.Cluster, err)
-				return err
-			}
-			glog.V(4).Infof("Ensured DNS records for Service %s in cluster %q", key, ingress.Cluster)
-		}
 	}
 
 	err = s.federationClient.Core().Services(service.Namespace).Delete(service.Name, nil)
@@ -537,7 +446,7 @@ func (s *ServiceController) reconcileService(key string) reconciliationStatus {
 	if fedService.DeletionTimestamp != nil {
 		if err := s.delete(fedService); err != nil {
 			runtime.HandleError(fmt.Errorf("Failed to delete %s: %v", key, err))
-			s.eventRecorder.Eventf(fedService, api.EventTypeNormal, "DeleteFailed", "Deleting service failed: %v", err)
+			s.eventRecorder.Eventf(fedService, api.EventTypeWarning, "DeleteFailed", "Deleting service failed: %v", err)
 			return statusRecoverableError
 		}
 		glog.V(3).Infof("Deleting federated service succeeded: %s", key)
@@ -601,11 +510,7 @@ func (s *ServiceController) reconcileService(key string) reconciliationStatus {
 	}
 
 	if len(operations) != 0 {
-		err = s.federatedUpdater.UpdateWithOnError(operations, s.updateTimeout,
-			func(op fedutil.FederatedOperation, operror error) {
-				runtime.HandleError(fmt.Errorf("Service update in cluster %s failed: %v", op.ClusterName, operror))
-				s.eventRecorder.Eventf(fedService, api.EventTypeNormal, "UpdateInClusterFailed", "Service update in cluster %s failed: %v", op.ClusterName, operror)
-			})
+		err = s.federatedUpdater.Update(operations)
 		if err != nil {
 			if !errors.IsAlreadyExists(err) {
 				runtime.HandleError(fmt.Errorf("Failed to execute updates for %s: %v", key, err))
@@ -642,12 +547,12 @@ func (s *ServiceController) getOperationsToPerformOnCluster(cluster *v1beta1.Clu
 		desiredService.ResourceVersion = ""
 
 		glog.V(4).Infof("Creating service in underlying cluster %s: %+v", cluster.Name, desiredService)
-		s.eventRecorder.Eventf(fedService, api.EventTypeNormal, "CreateInCluster", "Creating service in cluster %s", cluster.Name)
 
 		operation = &fedutil.FederatedOperation{
 			Type:        fedutil.OperationTypeAdd,
 			Obj:         desiredService,
 			ClusterName: cluster.Name,
+			Key:         key,
 		}
 	} else {
 		clusterService, ok := clusterServiceObj.(*v1.Service)
@@ -670,11 +575,15 @@ func (s *ServiceController) getOperationsToPerformOnCluster(cluster *v1beta1.Clu
 				}
 			}
 		}
+		// If ExternalTrafficPolicy is not set in federated service, use the ExternalTrafficPolicy
+		// defaulted to in federated cluster.
+		if desiredService.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyType("") {
+			desiredService.Spec.ExternalTrafficPolicy = clusterService.Spec.ExternalTrafficPolicy
+		}
 
 		// Update existing service, if needed.
 		if !Equivalent(desiredService, clusterService) {
 			glog.V(4).Infof("Service in underlying cluster %s does not match, Desired: %+v, Existing: %+v", cluster.Name, desiredService, clusterService)
-			s.eventRecorder.Eventf(fedService, api.EventTypeNormal, "UpdateInCluster", "Updating service in cluster %s. Desired: %+v\n Actual: %+v\n", cluster.Name, desiredService, clusterService)
 
 			// ResourceVersion of cluster service can be different from federated service,
 			// so do not update ResourceVersion while updating cluster service
@@ -684,6 +593,7 @@ func (s *ServiceController) getOperationsToPerformOnCluster(cluster *v1beta1.Clu
 				Type:        fedutil.OperationTypeUpdate,
 				Obj:         desiredService,
 				ClusterName: cluster.Name,
+				Key:         key,
 			}
 		} else {
 			glog.V(5).Infof("Service in underlying cluster %s is up to date: %+v", cluster.Name, desiredService)
@@ -790,17 +700,6 @@ func (s *ServiceController) updateFederatedService(fedService *v1.Service, newLB
 		}
 	}
 
-	// Ensure DNS records based on Annotations in federated service for all federated clusters
-	if needUpdate && wantsDNSRecords(fedService) {
-		for _, ingress := range newServiceIngress.Items {
-			err := s.ensureDnsRecords(ingress.Cluster, fedService)
-			if err != nil {
-				runtime.HandleError(fmt.Errorf("Error ensuring DNS Records for service %s on cluster %q: %v", key, ingress.Cluster, err))
-				return err
-			}
-			glog.V(4).Infof("Ensured DNS records for Service %s in cluster %q", key, ingress.Cluster)
-		}
-	}
 	return nil
 }
 

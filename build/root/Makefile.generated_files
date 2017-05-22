@@ -1,0 +1,745 @@
+# Copyright 2016 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Don't allow users to call this directly.  There are too many variables this
+# assumes to inherit from the main Makefile.  This is not a user-facing file.
+ifeq ($(CALLED_FROM_MAIN_MAKEFILE),)
+    $(error Please use the main Makefile, e.g. `make generated_files`)
+endif
+
+# Don't allow an implicit 'all' rule.  This is not a user-facing file.
+ifeq ($(MAKECMDGOALS),)
+    $(error This Makefile requires an explicit rule to be specified)
+endif
+
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** starting Makefile.generated_files for goal(s) "$(MAKECMDGOALS)")
+    $(warning ***** $(shell date))
+endif
+
+
+# It's necessary to set this because some environments don't link sh -> bash.
+SHELL := /bin/bash
+
+# This rule collects all the generated file sets into a single rule.  Other
+# rules should depend on this to ensure generated files are rebuilt.
+.PHONY: generated_files
+generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi
+
+.PHONY: verify_generated_files
+verify_generated_files: verify_gen_deepcopy    \
+                        verify_gen_defaulter   \
+                        verify_gen_conversion
+
+# Code-generation logic.
+#
+# This stuff can be pretty tricky, and there's probably some corner cases that
+# we don't handle well.  That said, here's a straightforward test to prove that
+# the most common cases work.  Sadly, it is manual.
+#
+#     make clean
+#     find . -name .make\* | xargs rm -f
+#     find . -name zz_generated\* | xargs rm -f
+#     # verify `find . -name zz_generated.deepcopy.go | wc -l` is 0
+#     # verify `find . -name .make | wc -l` is 0
+#
+#     make nonexistent
+#     # expect "No rule to make target"
+#     # verify `find .make/ -type f | wc -l` has many files
+#
+#     make gen_deepcopy
+#     # expect deepcopy-gen is built exactly once
+#     # expect many files to be regenerated
+#     # verify `find . -name zz_generated.deepcopy.go | wc -l` has files
+#     make gen_deepcopy
+#     # expect nothing to be rebuilt, finish in O(seconds)
+#     touch pkg/api/types.go
+#     make gen_deepcopy
+#     # expect one file to be regenerated
+#     make gen_deepcopy
+#     # expect nothing to be rebuilt, finish in O(seconds)
+#     touch cmd/libs/go2idl/deepcopy-gen/main.go
+#     make gen_deepcopy
+#     # expect deepcopy-gen is built exactly once
+#     # expect many files to be regenerated
+#     # verify `find . -name zz_generated.deepcopy.go | wc -l` has files
+#     make gen_deepcopy
+#     # expect nothing to be rebuilt, finish in O(seconds)
+#
+#     make gen_conversion
+#     # expect conversion-gen is built exactly once
+#     # expect many files to be regenerated
+#     # verify `find . -name zz_generated.conversion.go | wc -l` has files
+#     make gen_conversion
+#     # expect nothing to be rebuilt, finish in O(seconds)
+#     touch pkg/api/types.go
+#     make gen_conversion
+#     # expect one file to be regenerated
+#     make gen_conversion
+#     # expect nothing to be rebuilt, finish in O(seconds)
+#     touch cmd/libs/go2idl/conversion-gen/main.go
+#     make gen_conversion
+#     # expect conversion-gen is built exactly once
+#     # expect many files to be regenerated
+#     # verify `find . -name zz_generated.conversion.go | wc -l` has files
+#     make gen_conversion
+#     # expect nothing to be rebuilt, finish in O(seconds)
+#
+#     make all
+#     # expect it to build
+#
+#     make test
+#     # expect it to pass
+#
+#     make clean
+#     # verify `find . -name zz_generated.deepcopy.go | wc -l` is 0
+#     # verify `find . -name .make | wc -l` is 0
+#
+#     make all WHAT=cmd/kube-proxy
+#     # expect it to build
+#
+#     make clean
+#     make test WHAT=cmd/kube-proxy
+#     # expect it to pass
+
+# This variable holds a list of every directory that contains Go files in this
+# project.  Other rules and variables can use this as a starting point to
+# reduce filesystem accesses.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all *.go dirs)
+endif
+ALL_GO_DIRS := $(shell                                                   \
+    hack/make-rules/helpers/cache_go_dirs.sh $(META_DIR)/all_go_dirs.mk  \
+)
+
+# The name of the metadata file which lists *.go files in each pkg.
+GOFILES_META := gofiles.mk
+
+# Establish a dependency between the deps file and the dir.  Whenever a dir
+# changes (files added or removed) the deps file will be considered stale.
+#
+# The variable value was set in $(GOFILES_META) and included as part of the
+# dependency management logic.
+#
+# This is looser than we really need (e.g. we don't really care about non *.go
+# files or even *_test.go files), but this is much easier to represent.
+#
+# Because we 'sinclude' the deps file, it is considered for rebuilding, as part
+# of make's normal evaluation.  If it gets rebuilt, make will restart.
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+$(foreach dir, $(ALL_GO_DIRS), $(eval           \
+    $(META_DIR)/$(dir)/$(GOFILES_META): $(dir)  \
+))
+
+# How to rebuild a deps file.  When make determines that the deps file is stale
+# (see above), it executes this rule, and then re-loads the deps file.
+#
+# This is looser than we really need (e.g. we don't really care about test
+# files), but this is MUCH faster than calling `go list`.
+#
+# We regenerate the output file in order to satisfy make's "newer than" rules,
+# but we only need to rebuild targets if the contents actually changed.  That
+# is what the .stamp file represents.
+$(foreach dir, $(ALL_GO_DIRS),  \
+    $(META_DIR)/$(dir)/$(GOFILES_META)):
+	FILES=$$(ls $</*.go | grep --color=never -v $(GENERATED_FILE_PREFIX));  \
+	mkdir -p $(@D);                                           \
+	echo "gofiles__$< := $$(echo $${FILES})" >$@.tmp;         \
+	cmp -s $@.tmp $@ || touch $@.stamp;                       \
+	mv $@.tmp $@
+# This is required to fill in the DAG, since some cases (e.g. 'make clean all')
+# will reference the .stamp file when it doesn't exist.  We don't need to
+# rebuild it in that case, just keep make happy.
+$(foreach dir, $(ALL_GO_DIRS),  \
+    $(META_DIR)/$(dir)/$(GOFILES_META).stamp):
+
+# Include any deps files as additional Makefile rules.  This triggers make to
+# consider the deps files for rebuild, which makes the whole
+# dependency-management logic work.  'sinclude' is "silent include" which does
+# not fail if the file does not exist.
+$(foreach dir, $(ALL_GO_DIRS), $(eval            \
+    sinclude $(META_DIR)/$(dir)/$(GOFILES_META)  \
+))
+
+# Generate a list of all files that have a `+k8s:` comment-tag.  This will be
+# used to derive lists of files/dirs for generation tools.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s: tags)
+endif
+ALL_K8S_TAG_FILES := $(shell                             \
+    find $(ALL_GO_DIRS) -maxdepth 1 -type f -name \*.go  \
+        | xargs grep --color=never -l '^// *+k8s:'       \
+)
+
+#
+# Deep-copy generation
+#
+# Any package that wants deep-copy functions generated must include a
+# comment-tag in column 0 of one file of the form:
+#     // +k8s:deepcopy-gen=<VALUE>
+#
+# The <VALUE> may be one of:
+#     generate: generate deep-copy functions into the package
+#     register: generate deep-copy functions and register them with a
+#               scheme
+
+# The result file, in each pkg, of deep-copy generation.
+DEEPCOPY_BASENAME := $(GENERATED_FILE_PREFIX)deepcopy
+DEEPCOPY_FILENAME := $(DEEPCOPY_BASENAME).go
+
+# The tool used to generate deep copies.
+DEEPCOPY_GEN := $(BIN_DIR)/deepcopy-gen
+
+# Find all the directories that request deep-copy generation.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s:deepcopy-gen tags)
+endif
+DEEPCOPY_DIRS := $(shell                                             \
+    grep --color=never -l '+k8s:deepcopy-gen=' $(ALL_K8S_TAG_FILES)  \
+        | xargs -n1 dirname                                          \
+        | LC_ALL=C sort -u                                           \
+)
+DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
+
+# Shell function for reuse in rules.
+RUN_GEN_DEEPCOPY =                                                          \
+    function run_gen_deepcopy() {                                           \
+        if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                  \
+            ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                         \
+                --v $(KUBE_VERBOSE)                                         \
+                --logtostderr                                               \
+                -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
+                --bounding-dirs $(PRJ_SRC_PATH)                             \
+                -O $(DEEPCOPY_BASENAME)                                     \
+                "$$@";                                                      \
+        fi                                                                  \
+    };                                                                      \
+    run_gen_deepcopy
+
+# This rule aggregates the set of files to generate and then generates them all
+# in a single run of the tool.
+.PHONY: gen_deepcopy
+gen_deepcopy: $(DEEPCOPY_FILES) $(DEEPCOPY_GEN)
+	$(RUN_GEN_DEEPCOPY)
+
+.PHONY: verify_gen_deepcopy
+verify_gen_deepcopy: $(DEEPCOPY_GEN)
+	$(RUN_GEN_DEEPCOPY) --verify-only
+
+# For each dir in DEEPCOPY_DIRS, this establishes a dependency between the
+# output file and the input files that should trigger a rebuild.
+#
+# Note that this is a deps-only statement, not a full rule (see below).  This
+# has to be done in a distinct step because wildcards don't work in static
+# pattern rules.
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+#
+# We depend on the $(GOFILES_META).stamp to detect when the set of input files
+# has changed.  This allows us to detect deleted input files.
+$(foreach dir, $(DEEPCOPY_DIRS), $(eval                                    \
+    $(dir)/$(DEEPCOPY_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp  \
+                                 $(gofiles__$(dir))                        \
+))
+
+# Unilaterally remove any leftovers from previous runs.
+$(shell rm -f $(META_DIR)/$(DEEPCOPY_GEN)*.todo)
+
+# How to regenerate deep-copy code.  This is a little slow to run, so we batch
+# it up and trigger the batch from the 'generated_files' target.
+$(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
+	mkdir -p $$(dirname $(META_DIR)/$(DEEPCOPY_GEN))
+	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(DEEPCOPY_GEN).todo
+
+# This calculates the dependencies for the generator tool, so we only rebuild
+# it when needed.  It is PHONY so that it always runs, but it only updates the
+# file if the contents have actually changed.  We 'sinclude' this later.
+.PHONY: $(META_DIR)/$(DEEPCOPY_GEN).mk
+$(META_DIR)/$(DEEPCOPY_GEN).mk:
+	mkdir -p $(@D);                                                       \
+	(echo -n "$(DEEPCOPY_GEN): ";                                         \
+	 ./hack/run-in-gopath.sh go list                                      \
+	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
+	     ./cmd/libs/go2idl/deepcopy-gen                                   \
+	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
+	     | xargs ./hack/run-in-gopath.sh go list                          \
+	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
+	     | paste -sd' ' -                                                 \
+	     | sed 's/ / \\=,/g'                                              \
+	     | tr '=,' '\n\t'                                                 \
+	     | sed "s|$$(pwd -P)/||";                                         \
+	) > $@.tmp;                                                           \
+	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
+
+# Include dependency info for the generator tool.  This will cause the rule of
+# the same name to be considered and if it is updated, make will restart.
+sinclude $(META_DIR)/$(DEEPCOPY_GEN).mk
+
+# How to build the generator tool.  The deps for this are defined in
+# the $(DEEPCOPY_GEN).mk, above.
+#
+# A word on the need to touch: This rule might trigger if, for example, a
+# non-Go file was added or deleted from a directory on which this depends.
+# This target needs to be reconsidered, but Go realizes it doesn't actually
+# have to be rebuilt.  In that case, make will forever see the dependency as
+# newer than the binary, and try to rebuild it over and over.  So we touch it,
+# and make is happy.
+$(DEEPCOPY_GEN):
+	hack/make-rules/build.sh cmd/libs/go2idl/deepcopy-gen
+	touch $@
+
+#
+# Defaulter generation
+#
+# Any package that wants defaulter functions generated must include a
+# comment-tag in column 0 of one file of the form:
+#     // +k8s:defaulter-gen=<VALUE>
+#
+# The <VALUE> depends on context:
+#     on types:
+#       true:  always generate a defaulter for this type
+#       false: never generate a defaulter for this type
+#     on functions:
+#       covers: if the function name matches SetDefault_NAME, instructs
+#               the generator not to recurse
+#     on packages:
+#       FIELDNAME: any object with a field of this name is a candidate
+#                  for having a defaulter generated
+
+# The result file, in each pkg, of defaulter generation.
+DEFAULTER_BASENAME := $(GENERATED_FILE_PREFIX)defaults
+DEFAULTER_FILENAME := $(DEFAULTER_BASENAME).go
+
+# The tool used to generate defaulters.
+DEFAULTER_GEN := $(BIN_DIR)/defaulter-gen
+
+# All directories that request any form of defaulter generation.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s:defaulter-gen tags)
+endif
+DEFAULTER_DIRS := $(shell                                            \
+    grep --color=never -l '+k8s:defaulter-gen=' $(ALL_K8S_TAG_FILES) \
+        | xargs -n1 dirname                                          \
+        | LC_ALL=C sort -u                                           \
+)
+
+DEFAULTER_FILES := $(addsuffix /$(DEFAULTER_FILENAME), $(DEFAULTER_DIRS))
+
+RUN_GEN_DEFAULTER :=                                                         \
+    function run_gen_defaulter() {                                           \
+        if [[ -f $(META_DIR)/$(DEFAULTER_GEN).todo ]]; then                  \
+            ./hack/run-in-gopath.sh $(DEFAULTER_GEN)                         \
+                --v $(KUBE_VERBOSE)                                          \
+                --logtostderr                                                \
+                -i $$(cat $(META_DIR)/$(DEFAULTER_GEN).todo | paste -sd, -)  \
+                --extra-peer-dirs $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(DEFAULTER_DIRS)) | sed 's/ /,/g') \
+                -O $(DEFAULTER_BASENAME)                                     \
+                "$$@";                                                       \
+        fi                                                                   \
+    };                                                                       \
+    run_gen_defaulter
+
+# This rule aggregates the set of files to generate and then generates them all
+# in a single run of the tool.
+.PHONY: gen_defaulter
+gen_defaulter: $(DEFAULTER_FILES) $(DEFAULTER_GEN)
+	$(RUN_GEN_DEFAULTER)
+
+.PHONY: verify_gen_deepcopy
+verify_gen_defaulter: $(DEFAULTER_GEN)
+	$(RUN_GEN_DEFAULTER) --verify-only
+
+# For each dir in DEFAULTER_DIRS, this establishes a dependency between the
+# output file and the input files that should trigger a rebuild.
+#
+# The variable value was set in $(GOFILES_META) and included as part of the
+# dependency management logic.
+#
+# Note that this is a deps-only statement, not a full rule (see below).  This
+# has to be done in a distinct step because wildcards don't work in static
+# pattern rules.
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+#
+# We depend on the $(GOFILES_META).stamp to detect when the set of input files
+# has changed.  This allows us to detect deleted input files.
+$(foreach dir, $(DEFAULTER_DIRS), $(eval                                    \
+    $(dir)/$(DEFAULTER_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp  \
+                                   $(gofiles__$(dir))                       \
+))
+
+# For each dir in DEFAULTER_DIRS, for each target in $(defaulters__$(dir)),
+# this establishes a dependency between the output file and the input files
+# that should trigger a rebuild.
+#
+# The variable value was set in $(GOFILES_META) and included as part of the
+# dependency management logic.
+#
+# Note that this is a deps-only statement, not a full rule (see below).  This
+# has to be done in a distinct step because wildcards don't work in static
+# pattern rules.
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+#
+# We depend on the $(GOFILES_META).stamp to detect when the set of input files
+# has changed.  This allows us to detect deleted input files.
+$(foreach dir, $(DEFAULTER_DIRS),                                               \
+    $(foreach tgt, $(defaulters__$(dir)), $(eval                                \
+        $(dir)/$(DEFAULTER_FILENAME): $(META_DIR)/$(tgt)/$(GOFILES_META).stamp  \
+                                       $(gofiles__$(tgt))                       \
+    ))                                                                          \
+)
+
+# Unilaterally remove any leftovers from previous runs.
+$(shell rm -f $(META_DIR)/$(DEFAULTER_GEN)*.todo)
+
+# How to regenerate defaulter code.  This is a little slow to run, so we batch
+# it up and trigger the batch from the 'generated_files' target.
+$(DEFAULTER_FILES): $(DEFAULTER_GEN)
+	mkdir -p $$(dirname $(META_DIR)/$(DEFAULTER_GEN))
+	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(DEFAULTER_GEN).todo
+
+# This calculates the dependencies for the generator tool, so we only rebuild
+# it when needed.  It is PHONY so that it always runs, but it only updates the
+# file if the contents have actually changed.  We 'sinclude' this later.
+.PHONY: $(META_DIR)/$(DEFAULTER_GEN).mk
+$(META_DIR)/$(DEFAULTER_GEN).mk:
+	mkdir -p $(@D);                                                       \
+	(echo -n "$(DEFAULTER_GEN): ";                                        \
+	 ./hack/run-in-gopath.sh go list                                      \
+	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
+	     ./cmd/libs/go2idl/defaulter-gen                                  \
+	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
+	     | xargs ./hack/run-in-gopath.sh go list                          \
+	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
+	     | paste -sd' ' -                                                 \
+	     | sed 's/ / \\=,/g'                                              \
+	     | tr '=,' '\n\t'                                                 \
+	     | sed "s|$$(pwd -P)/||";                                         \
+	) > $@.tmp;                                                           \
+	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
+
+# Include dependency info for the generator tool.  This will cause the rule of
+# the same name to be considered and if it is updated, make will restart.
+sinclude $(META_DIR)/$(DEFAULTER_GEN).mk
+
+# How to build the generator tool.  The deps for this are defined in
+# the $(DEFAULTER_GEN).mk, above.
+#
+# A word on the need to touch: This rule might trigger if, for example, a
+# non-Go file was added or deleted from a directory on which this depends.
+# This target needs to be reconsidered, but Go realizes it doesn't actually
+# have to be rebuilt.  In that case, make will forever see the dependency as
+# newer than the binary, and try to rebuild it over and over.  So we touch it,
+# and make is happy.
+$(DEFAULTER_GEN):
+	hack/make-rules/build.sh cmd/libs/go2idl/defaulter-gen
+	touch $@
+
+#
+# Open-api generation
+#
+# Any package that wants open-api functions generated must include a
+# comment-tag in column 0 of one file of the form:
+#     // +k8s:openapi-gen=true
+#
+# The result file, in each pkg, of open-api generation.
+OPENAPI_BASENAME := $(GENERATED_FILE_PREFIX)openapi
+OPENAPI_FILENAME := $(OPENAPI_BASENAME).go
+OPENAPI_OUTPUT_PKG := pkg/generated/openapi
+
+# The tool used to generate open apis.
+OPENAPI_GEN := $(BIN_DIR)/openapi-gen
+
+# Find all the directories that request open-api generation.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s:openapi-gen tags)
+endif
+OPENAPI_DIRS := $(shell                                             \
+    grep --color=never -l '+k8s:openapi-gen=' $(ALL_K8S_TAG_FILES)  \
+        | xargs -n1 dirname                                         \
+        | LC_ALL=C sort -u                                          \
+)
+
+OPENAPI_OUTFILE := $(OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
+
+# This rule is the user-friendly entrypoint for openapi generation.
+.PHONY: gen_openapi
+gen_openapi: $(OPENAPI_OUTFILE) $(OPENAPI_GEN)
+
+# For each dir in OPENAPI_DIRS, this establishes a dependency between the
+# output file and the input files that should trigger a rebuild.
+#
+# Note that this is a deps-only statement, not a full rule (see below).  This
+# has to be done in a distinct step because wildcards don't work in static
+# pattern rules.
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+#
+# We depend on the $(GOFILES_META).stamp to detect when the set of input files
+# has changed.  This allows us to detect deleted input files.
+$(foreach dir, $(OPENAPI_DIRS), $(eval                                     \
+    $(OPENAPI_OUTFILE): $(META_DIR)/$(dir)/$(GOFILES_META).stamp           \
+                                 $(gofiles__$(dir))                        \
+))
+
+# How to regenerate open-api code.  This emits a single file for all results.
+$(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(OPENAPI_GEN)
+	function run_gen_openapi() {                                                        \
+        ./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
+            --v $(KUBE_VERBOSE)                                                         \
+            --logtostderr                                                               \
+            -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
+            -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                                    \
+            -O $(OPENAPI_BASENAME)                                                      \
+            "$$@";                                                                      \
+    };                                                                                  \
+    run_gen_openapi
+
+# This calculates the dependencies for the generator tool, so we only rebuild
+# it when needed.  It is PHONY so that it always runs, but it only updates the
+# file if the contents have actually changed.  We 'sinclude' this later.
+.PHONY: $(META_DIR)/$(OPENAPI_GEN).mk
+$(META_DIR)/$(OPENAPI_GEN).mk:
+	mkdir -p $(@D);                                                       \
+	(echo -n "$(OPENAPI_GEN): ";                                          \
+	 ./hack/run-in-gopath.sh go list                                      \
+	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
+	     ./cmd/libs/go2idl/openapi-gen                                    \
+	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
+	     | xargs ./hack/run-in-gopath.sh go list                          \
+	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
+	     | paste -sd' ' -                                                 \
+	     | sed 's/ / \\=,/g'                                              \
+	     | tr '=,' '\n\t'                                                 \
+	     | sed "s|$$(pwd -P)/||";                                         \
+	) > $@.tmp;                                                           \
+	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
+
+# Include dependency info for the generator tool.  This will cause the rule of
+# the same name to be considered and if it is updated, make will restart.
+sinclude $(META_DIR)/$(OPENAPI_GEN).mk
+
+# How to build the generator tool.  The deps for this are defined in
+# the $(OPENAPI_GEN).mk, above.
+#
+# A word on the need to touch: This rule might trigger if, for example, a
+# non-Go file was added or deleted from a directory on which this depends.
+# This target needs to be reconsidered, but Go realizes it doesn't actually
+# have to be rebuilt.  In that case, make will forever see the dependency as
+# newer than the binary, and try to rebuild it over and over.  So we touch it,
+# and make is happy.
+$(OPENAPI_GEN):
+	hack/make-rules/build.sh cmd/libs/go2idl/openapi-gen
+	touch $@
+
+#
+# Conversion generation
+#
+# Any package that wants conversion functions generated must include one or
+# more comment-tags in any .go file, in column 0, of the form:
+#     // +k8s:conversion-gen=<CONVERSION_TARGET_DIR>
+#
+# The CONVERSION_TARGET_DIR is a project-local path to another directory which
+# should be considered when evaluating peer types for conversions.  Types which
+# are found in the source package (where conversions are being generated)
+# but do not have a peer in one of the target directories will not have
+# conversions generated.
+#
+# TODO: it might be better in the long term to make peer-types explicit in the
+# IDL.
+
+# The result file, in each pkg, of conversion generation.
+CONVERSION_BASENAME := $(GENERATED_FILE_PREFIX)conversion
+CONVERSION_FILENAME := $(CONVERSION_BASENAME).go
+
+# The tool used to generate conversions.
+CONVERSION_GEN := $(BIN_DIR)/conversion-gen
+
+# The name of the metadata file listing conversion peers for each pkg.
+CONVERSIONS_META := conversions.mk
+
+# All directories that request any form of conversion generation.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s:conversion-gen tags)
+endif
+CONVERSION_DIRS := $(shell                                              \
+    grep --color=never '^// *+k8s:conversion-gen=' $(ALL_K8S_TAG_FILES) \
+        | cut -f1 -d:                                                   \
+        | xargs -n1 dirname                                             \
+        | LC_ALL=C sort -u                                              \
+)
+
+CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
+
+# Shell function for reuse in rules.
+RUN_GEN_CONVERSION =                                                          \
+    function run_gen_conversion() {                                           \
+        if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                  \
+            ./hack/run-in-gopath.sh $(CONVERSION_GEN)                         \
+                --v $(KUBE_VERBOSE)                                           \
+                --logtostderr                                                 \
+                -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -)  \
+                -O $(CONVERSION_BASENAME)                                     \
+                "$$@";                                                        \
+        fi                                                                    \
+    };                                                                        \
+    run_gen_conversion
+
+# This rule aggregates the set of files to generate and then generates them all
+# in a single run of the tool.
+.PHONY: gen_conversion
+gen_conversion: $(CONVERSION_FILES) $(CONVERSION_GEN)
+	$(RUN_GEN_CONVERSION)
+
+.PHONY: verify_gen_conversion
+verify_gen_conversion: $(CONVERSION_GEN)
+	$(RUN_GEN_CONVERSION) --verify-only
+
+# Establish a dependency between the deps file and the dir.  Whenever a dir
+# changes (files added or removed) the deps file will be considered stale.
+#
+# This is looser than we really need (e.g. we don't really care about non *.go
+# files or even *_test.go files), but this is much easier to represent.
+#
+# Because we 'sinclude' the deps file, it is considered for rebuilding, as part
+# of make's normal evaluation.  If it gets rebuilt, make will restart.
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+$(foreach dir, $(CONVERSION_DIRS), $(eval           \
+    $(META_DIR)/$(dir)/$(CONVERSIONS_META): $(dir)  \
+))
+
+# How to rebuild a deps file.  When make determines that the deps file is stale
+# (see above), it executes this rule, and then re-loads the deps file.
+#
+# This is looser than we really need (e.g. we don't really care about test
+# files), but this is MUCH faster than calling `go list`.
+#
+# We regenerate the output file in order to satisfy make's "newer than" rules,
+# but we only need to rebuild targets if the contents actually changed.  That
+# is what the .stamp file represents.
+$(foreach dir, $(CONVERSION_DIRS),  \
+    $(META_DIR)/$(dir)/$(CONVERSIONS_META)):
+	TAGS=$$(grep --color=never -h '^// *+k8s:conversion-gen=' $</*.go   \
+	    | cut -f2- -d=                                                  \
+	    | sed 's|$(PRJ_SRC_PATH)/||');                                  \
+	mkdir -p $(@D);                                                     \
+	echo "conversions__$< := $$(echo $${TAGS})" >$@.tmp;                \
+	cmp -s $@.tmp $@ || touch $@.stamp;                                 \
+	mv $@.tmp $@
+
+# Include any deps files as additional Makefile rules.  This triggers make to
+# consider the deps files for rebuild, which makes the whole
+# dependency-management logic work.  'sinclude' is "silent include" which does
+# not fail if the file does not exist.
+$(foreach dir, $(CONVERSION_DIRS), $(eval            \
+    sinclude $(META_DIR)/$(dir)/$(CONVERSIONS_META)  \
+))
+
+# For each dir in CONVERSION_DIRS, this establishes a dependency between the
+# output file and the input files that should trigger a rebuild.
+#
+# The variable value was set in $(GOFILES_META) and included as part of the
+# dependency management logic.
+#
+# Note that this is a deps-only statement, not a full rule (see below).  This
+# has to be done in a distinct step because wildcards don't work in static
+# pattern rules.
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+#
+# We depend on the $(GOFILES_META).stamp to detect when the set of input files
+# has changed.  This allows us to detect deleted input files.
+$(foreach dir, $(CONVERSION_DIRS), $(eval                                    \
+    $(dir)/$(CONVERSION_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp  \
+                                   $(gofiles__$(dir))                        \
+))
+
+# For each dir in CONVERSION_DIRS, for each target in $(conversions__$(dir)),
+# this establishes a dependency between the output file and the input files
+# that should trigger a rebuild.
+#
+# The variable value was set in $(GOFILES_META) and included as part of the
+# dependency management logic.
+#
+# Note that this is a deps-only statement, not a full rule (see below).  This
+# has to be done in a distinct step because wildcards don't work in static
+# pattern rules.
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+#
+# We depend on the $(GOFILES_META).stamp to detect when the set of input files
+# has changed.  This allows us to detect deleted input files.
+$(foreach dir, $(CONVERSION_DIRS),                                               \
+    $(foreach tgt, $(conversions__$(dir)), $(eval                                \
+        $(dir)/$(CONVERSION_FILENAME): $(META_DIR)/$(tgt)/$(GOFILES_META).stamp  \
+                                       $(gofiles__$(tgt))                        \
+    ))                                                                           \
+)
+
+# Unilaterally remove any leftovers from previous runs.
+$(shell rm -f $(META_DIR)/$(CONVERSION_GEN)*.todo)
+
+# How to regenerate conversion code.  This is a little slow to run, so we batch
+# it up and trigger the batch from the 'generated_files' target.
+$(CONVERSION_FILES): $(CONVERSION_GEN)
+	mkdir -p $$(dirname $(META_DIR)/$(CONVERSION_GEN))
+	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(CONVERSION_GEN).todo
+
+# This calculates the dependencies for the generator tool, so we only rebuild
+# it when needed.  It is PHONY so that it always runs, but it only updates the
+# file if the contents have actually changed.  We 'sinclude' this later.
+.PHONY: $(META_DIR)/$(CONVERSION_GEN).mk
+$(META_DIR)/$(CONVERSION_GEN).mk:
+	mkdir -p $(@D);                                                       \
+	(echo -n "$(CONVERSION_GEN): ";                                       \
+	 ./hack/run-in-gopath.sh go list                                      \
+	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
+	     ./cmd/libs/go2idl/conversion-gen                                 \
+	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
+	     | xargs ./hack/run-in-gopath.sh go list                          \
+	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
+	     | paste -sd' ' -                                                 \
+	     | sed 's/ / \\=,/g'                                              \
+	     | tr '=,' '\n\t'                                                 \
+	     | sed "s|$$(pwd -P)/||";                                         \
+	) > $@.tmp;                                                           \
+	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
+
+# Include dependency info for the generator tool.  This will cause the rule of
+# the same name to be considered and if it is updated, make will restart.
+sinclude $(META_DIR)/$(CONVERSION_GEN).mk
+
+# How to build the generator tool.  The deps for this are defined in
+# the $(CONVERSION_GEN).mk, above.
+#
+# A word on the need to touch: This rule might trigger if, for example, a
+# non-Go file was added or deleted from a directory on which this depends.
+# This target needs to be reconsidered, but Go realizes it doesn't actually
+# have to be rebuilt.  In that case, make will forever see the dependency as
+# newer than the binary, and try to rebuild it over and over.  So we touch it,
+# and make is happy.
+$(CONVERSION_GEN):
+	hack/make-rules/build.sh cmd/libs/go2idl/conversion-gen
+	touch $@

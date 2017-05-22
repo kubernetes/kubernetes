@@ -67,3 +67,69 @@ func TestUnregisterHandlers(t *testing.T) {
 	assert.Equal(t, second, 1)
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
 }
+
+func TestPrefixHandlers(t *testing.T) {
+	c := NewPathRecorderMux()
+	s := httptest.NewServer(c)
+	defer s.Close()
+
+	secretPrefixCount := 0
+	c.UnlistedHandlePrefix("/secretPrefix/", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		secretPrefixCount = secretPrefixCount + 1
+	}))
+	publicPrefixCount := 0
+	c.HandlePrefix("/publicPrefix/", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		publicPrefixCount = publicPrefixCount + 1
+	}))
+	precisePrefixCount := 0
+	c.HandlePrefix("/publicPrefix/but-more-precise/", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		precisePrefixCount = precisePrefixCount + 1
+	}))
+	exactMatchCount := 0
+	c.Handle("/publicPrefix/exactmatch", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		exactMatchCount = exactMatchCount + 1
+	}))
+	slashMatchCount := 0
+	c.Handle("/otherPublic/exactmatchslash/", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		slashMatchCount = slashMatchCount + 1
+	}))
+	fallThroughCount := 0
+	c.NotFoundHandler(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		fallThroughCount = fallThroughCount + 1
+	}))
+
+	assert.NotContains(t, c.ListedPaths(), "/secretPrefix/")
+	assert.Contains(t, c.ListedPaths(), "/publicPrefix/")
+
+	resp, _ := http.Get(s.URL + "/fallthrough")
+	assert.Equal(t, 1, fallThroughCount)
+	assert.Equal(t, resp.StatusCode, http.StatusOK)
+	resp, _ = http.Get(s.URL + "/publicPrefix")
+	assert.Equal(t, 2, fallThroughCount)
+	assert.Equal(t, resp.StatusCode, http.StatusOK)
+
+	http.Get(s.URL + "/publicPrefix/")
+	assert.Equal(t, 1, publicPrefixCount)
+	http.Get(s.URL + "/publicPrefix/something")
+	assert.Equal(t, 2, publicPrefixCount)
+	http.Get(s.URL + "/publicPrefix/but-more-precise")
+	assert.Equal(t, 3, publicPrefixCount)
+	http.Get(s.URL + "/publicPrefix/but-more-precise/")
+	assert.Equal(t, 1, precisePrefixCount)
+	http.Get(s.URL + "/publicPrefix/but-more-precise/more-stuff")
+	assert.Equal(t, 2, precisePrefixCount)
+
+	http.Get(s.URL + "/publicPrefix/exactmatch")
+	assert.Equal(t, 1, exactMatchCount)
+	http.Get(s.URL + "/publicPrefix/exactmatch/")
+	assert.Equal(t, 4, publicPrefixCount)
+	http.Get(s.URL + "/otherPublic/exactmatchslash")
+	assert.Equal(t, 3, fallThroughCount)
+	http.Get(s.URL + "/otherPublic/exactmatchslash/")
+	assert.Equal(t, 1, slashMatchCount)
+
+	http.Get(s.URL + "/secretPrefix/")
+	assert.Equal(t, 1, secretPrefixCount)
+	http.Get(s.URL + "/secretPrefix/something")
+	assert.Equal(t, 2, secretPrefixCount)
+}

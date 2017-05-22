@@ -44,9 +44,6 @@ import (
 	"github.com/golang/glog"
 )
 
-// defaultWatchCacheSize is the default size of a watch catch per resource in number of entries.
-const DefaultWatchCacheSize = 100
-
 // ObjectFunc is a function to act on a given object. An error may be returned
 // if the hook cannot be completed. An ObjectFunc may transform the provided
 // object.
@@ -164,9 +161,9 @@ type Store struct {
 	// Called to cleanup clients used by the underlying Storage; optional.
 	DestroyFunc func()
 	// Maximum size of the watch history cached in memory, in number of entries.
-	// A zero value here means that a default is used. This value is ignored if
-	// Storage is non-nil.
-	WatchCacheSize int
+	// This value is ignored if Storage is non-nil. Nil is replaced with a default value.
+	// A zero integer will disable caching.
+	WatchCacheSize *int
 }
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
@@ -995,7 +992,20 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 		}
 		return obj, nil
 	}
-	return &metav1.Status{Status: metav1.StatusSuccess}, nil
+	// Return information about the deleted object, which enables clients to
+	// verify that the object was actually deleted and not waiting for finalizers.
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	details := &metav1.StatusDetails{
+		Name:  accessor.GetName(),
+		Group: e.QualifiedResource.Group,
+		Kind:  e.QualifiedResource.Resource, // Yes we set Kind field to resource.
+		UID:   accessor.GetUID(),
+	}
+	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
+	return status, nil
 }
 
 // Watch makes a matcher for the given label and field, and calls
@@ -1205,14 +1215,10 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	}
 
 	if e.Storage == nil {
-		capacity := DefaultWatchCacheSize
-		if e.WatchCacheSize != 0 {
-			capacity = e.WatchCacheSize
-		}
 		e.Storage, e.DestroyFunc = opts.Decorator(
 			e.Copier,
 			opts.StorageConfig,
-			capacity,
+			e.WatchCacheSize,
 			e.NewFunc(),
 			prefix,
 			keyFunc,

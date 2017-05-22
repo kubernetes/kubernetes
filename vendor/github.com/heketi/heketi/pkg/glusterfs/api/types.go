@@ -1,17 +1,13 @@
 //
 // Copyright (c) 2016 The heketi Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// This file is licensed to you under your choice of the GNU Lesser
+// General Public License, version 3 or any later version (LGPLv3 or
+// later), as published by the Free Software Foundation,
+// or under the Apache License, Version 2.0 <LICENSE-APACHE2 or
+// http://www.apache.org/licenses/LICENSE-2.0>.
 //
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// You may not use this file except in compliance with those terms.
 //
 
 //
@@ -66,6 +62,7 @@ type BrickInfo struct {
 	Path     string `json:"path"`
 	DeviceId string `json:"device"`
 	NodeId   string `json:"node"`
+	VolumeId string `json:"volume"`
 
 	// Size in KB
 	Size uint64 `json:"size"`

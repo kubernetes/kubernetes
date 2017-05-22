@@ -51,7 +51,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -217,14 +216,15 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 				framework.Failf("Failed getting ScheduledJob %s: %v", sjName, err)
 			}
 			if sj.Spec.Schedule != schedule {
-				framework.Failf("Failed creating a ScheduledJob with correct schedule %s", schedule)
+				framework.Failf("Failed creating a ScheduledJob with correct schedule %s, but got %s", schedule, sj.Spec.Schedule)
 			}
 			containers := sj.Spec.JobTemplate.Spec.Template.Spec.Containers
 			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
 				framework.Failf("Failed creating ScheduledJob %s for 1 pod with expected image %s: %#v", sjName, busyboxImage, containers)
 			}
+			restartPolicy := sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy
 			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
-				framework.Failf("Failed creating a ScheduledJob with correct restart policy for --restart=OnFailure")
+				framework.Failf("Failed creating a ScheduledJob with correct restart policy %s, but got %s", v1.RestartPolicyOnFailure, restartPolicy)
 			}
 		})
 	})
@@ -1921,7 +1921,7 @@ func forEachReplicationController(c clientset.Interface, ns, selectorKey, select
 
 func validateReplicationControllerConfiguration(rc v1.ReplicationController) {
 	if rc.Name == "redis-master" {
-		if _, ok := rc.Annotations[annotations.LastAppliedConfigAnnotation]; !ok {
+		if _, ok := rc.Annotations[v1.LastAppliedConfigAnnotation]; !ok {
 			framework.Failf("Annotation not found in modified configuration:\n%v\n", rc)
 		}
 

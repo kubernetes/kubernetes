@@ -28,12 +28,8 @@ import (
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
 	"github.com/golang/glog"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-)
-
-const (
-	dockerDefaultLoggingDriver = "json-file"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 // ListContainers lists all containers matching the filter.
@@ -151,7 +147,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 		if rOpts != nil {
 			hc.Resources = dockercontainer.Resources{
 				Memory:     rOpts.MemoryLimitInBytes,
-				MemorySwap: dockertools.DefaultMemorySwap(),
+				MemorySwap: DefaultMemorySwap(),
 				CPUShares:  rOpts.CpuShares,
 				CPUQuota:   rOpts.CpuQuota,
 				CPUPeriod:  rOpts.CpuPeriod,
@@ -236,19 +232,16 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 				path, realPath, containerID, err)
 		}
 	} else {
-		dockerLoggingDriver := ""
-		dockerInfo, err := ds.client.Info()
+		supported, err := IsCRISupportedLogDriver(ds.client)
 		if err != nil {
-			glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
-		} else {
-			dockerLoggingDriver = dockerInfo.LoggingDriver
-			glog.V(10).Infof("Docker logging driver is %s", dockerLoggingDriver)
+			glog.Warningf("Failed to check supported logging driver by CRI: %v", err)
+			return nil
 		}
 
-		if dockerLoggingDriver == dockerDefaultLoggingDriver {
-			glog.Errorf("Cannot create symbolic link because container log file doesn't exist!")
+		if supported {
+			glog.Warningf("Cannot create symbolic link because container log file doesn't exist!")
 		} else {
-			glog.V(5).Infof("Unsupported logging driver: %s", dockerLoggingDriver)
+			glog.V(5).Infof("Unsupported logging driver by CRI")
 		}
 	}
 
@@ -294,7 +287,6 @@ func (ds *dockerService) StopContainer(containerID string, timeout int64) error 
 }
 
 // RemoveContainer removes the container.
-// TODO: If a container is still running, should we forcibly remove it?
 func (ds *dockerService) RemoveContainer(containerID string) error {
 	// Ideally, log lifecycle should be independent of container lifecycle.
 	// However, docker will remove container log after container is removed,
@@ -303,7 +295,7 @@ func (ds *dockerService) RemoveContainer(containerID string) error {
 	if err != nil {
 		return err
 	}
-	err = ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+	err = ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true, Force: true})
 	if err != nil {
 		return fmt.Errorf("failed to remove container %q: %v", containerID, err)
 	}
@@ -314,15 +306,15 @@ func getContainerTimestamps(r *dockertypes.ContainerJSON) (time.Time, time.Time,
 	var createdAt, startedAt, finishedAt time.Time
 	var err error
 
-	createdAt, err = dockertools.ParseDockerTimestamp(r.Created)
+	createdAt, err = libdocker.ParseDockerTimestamp(r.Created)
 	if err != nil {
 		return createdAt, startedAt, finishedAt, err
 	}
-	startedAt, err = dockertools.ParseDockerTimestamp(r.State.StartedAt)
+	startedAt, err = libdocker.ParseDockerTimestamp(r.State.StartedAt)
 	if err != nil {
 		return createdAt, startedAt, finishedAt, err
 	}
-	finishedAt, err = dockertools.ParseDockerTimestamp(r.State.FinishedAt)
+	finishedAt, err = libdocker.ParseDockerTimestamp(r.State.FinishedAt)
 	if err != nil {
 		return createdAt, startedAt, finishedAt, err
 	}
@@ -336,7 +328,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 		return nil, err
 	}
 
-	// Parse the timstamps.
+	// Parse the timestamps.
 	createdAt, startedAt, finishedAt, err := getContainerTimestamps(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", containerID, err)
@@ -437,5 +429,6 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 		Message:     message,
 		Labels:      labels,
 		Annotations: annotations,
+		LogPath:     r.Config.Labels[containerLogPathLabelKey],
 	}, nil
 }

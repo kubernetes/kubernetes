@@ -1059,7 +1059,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 type resultFunc func() (runtime.Object, error)
 
 // finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
-// Any api.Status object returned is considered an "error", which interrupts the normal response flow.
+// An api.Status object with status != success is considered an "error", which interrupts the normal response flow.
 func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object, err error) {
 	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
 	// when the select statement reads something other than the one the goroutine sends on.
@@ -1083,7 +1083,9 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	select {
 	case result = <-ch:
 		if status, ok := result.(*metav1.Status); ok {
-			return nil, errors.FromObject(status)
+			if status.Status != metav1.StatusSuccess {
+				return nil, errors.FromObject(status)
+			}
 		}
 		return result, nil
 	case err = <-errCh:

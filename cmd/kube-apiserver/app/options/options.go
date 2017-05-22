@@ -102,8 +102,6 @@ func NewServerRunOptions() *ServerRunOptions {
 				// external, preferring DNS if reported
 				string(api.NodeExternalDNS),
 				string(api.NodeExternalIP),
-
-				string(api.NodeLegacyHostIP),
 			},
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
@@ -112,6 +110,8 @@ func NewServerRunOptions() *ServerRunOptions {
 	}
 	// Overwrite the default for storage data format.
 	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
+	// Set the default for admission plugins names
+	s.Admission.PluginNames = []string{"AlwaysAdmit"}
 	return &s
 }
 

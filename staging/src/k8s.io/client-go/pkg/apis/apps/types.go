@@ -56,7 +56,7 @@ type StatefulSetSpec struct {
 
 	// Selector is a label query over pods that should match the replica count.
 	// If empty, defaulted to labels on the pod template.
-	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
 	Selector *metav1.LabelSelector
 

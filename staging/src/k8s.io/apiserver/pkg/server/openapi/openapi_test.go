@@ -17,6 +17,7 @@ limitations under the License.
 package openapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -186,6 +187,7 @@ func getConfig(fullMethods bool) (*openapi.Config, *restful.Container) {
 			InfoProps: spec.InfoProps{
 				Title:       "TestAPI",
 				Description: "Test API",
+				Version:     "unversioned",
 			},
 		},
 		GetDefinitions: func(_ openapi.ReferenceCallback) map[string]openapi.OpenAPIDefinition {
@@ -203,7 +205,7 @@ func getConfig(fullMethods bool) (*openapi.Config, *restful.Container) {
 			if strings.HasPrefix(friendlyName, "go_default_test") {
 				friendlyName = "openapi" + friendlyName[len("go_default_test"):]
 			}
-			return friendlyName, nil
+			return friendlyName, spec.Extensions{"x-test2": "test2"}
 		},
 	}, container
 }
@@ -329,7 +331,7 @@ func getAdditionalTestParameters() []spec.Parameter {
 		ParamProps: spec.ParamProps{
 			Name:        "fparam",
 			Description: "a test form parameter",
-			In:          "form",
+			In:          "formData",
 		},
 		SimpleSchema: spec.SimpleSchema{
 			Type: "number",
@@ -388,7 +390,8 @@ func getTestInputDefinition() spec.Schema {
 		},
 		VendorExtensible: spec.VendorExtensible{
 			Extensions: spec.Extensions{
-				"x-test": "test",
+				"x-test":  "test",
+				"x-test2": "test2",
 			},
 		},
 	}
@@ -414,6 +417,11 @@ func getTestOutputDefinition() spec.Schema {
 				},
 			},
 		},
+		VendorExtensible: spec.VendorExtensible{
+			Extensions: spec.Extensions{
+				"x-test2": "test2",
+			},
+		},
 	}
 }
 
@@ -425,6 +433,7 @@ func TestBuildSwaggerSpec(t *testing.T) {
 				InfoProps: spec.InfoProps{
 					Title:       "TestAPI",
 					Description: "Test API",
+					Version:     "unversioned",
 				},
 			},
 			Swagger: "2.0",
@@ -441,7 +450,16 @@ func TestBuildSwaggerSpec(t *testing.T) {
 		},
 	}
 	err := o.init(container.RegisteredWebServices())
-	if assert.NoError(err) {
-		assert.Equal(expected, o.swagger)
+	if !assert.NoError(err) {
+		return
 	}
+	expected_json, err := json.Marshal(expected)
+	if !assert.NoError(err) {
+		return
+	}
+	actual_json, err := json.Marshal(o.swagger)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(string(expected_json), string(actual_json))
 }

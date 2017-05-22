@@ -32,8 +32,9 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 )
@@ -73,7 +74,8 @@ var (
 func TestDisabledGroupVersion(t *testing.T) {
 	gv := schema.GroupVersion{Group: "webhook.util.k8s.io", Version: "v1"}
 	gvs := []schema.GroupVersion{gv}
-	_, err := NewGenericWebhook(api.Registry, api.Codecs, "/some/path", gvs, retryBackoff)
+	registry := registered.NewOrDie(gv.String())
+	_, err := NewGenericWebhook(registry, scheme.Codecs, "/some/path", gvs, retryBackoff)
 
 	if err == nil {
 		t.Errorf("expected an error")
@@ -270,7 +272,7 @@ func TestKubeConfigFile(t *testing.T) {
 			if err == nil {
 				defer os.Remove(kubeConfigFile)
 
-				_, err = NewGenericWebhook(api.Registry, api.Codecs, kubeConfigFile, groupVersions, retryBackoff)
+				_, err = NewGenericWebhook(registered.NewOrDie(""), scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff)
 			}
 
 			return err
@@ -293,7 +295,7 @@ func TestKubeConfigFile(t *testing.T) {
 // TestMissingKubeConfigFile ensures that a kube config path to a missing file is handled properly
 func TestMissingKubeConfigFile(t *testing.T) {
 	kubeConfigPath := "/some/missing/path"
-	_, err := NewGenericWebhook(api.Registry, api.Codecs, kubeConfigPath, groupVersions, retryBackoff)
+	_, err := NewGenericWebhook(registered.NewOrDie(""), scheme.Codecs, kubeConfigPath, groupVersions, retryBackoff)
 
 	if err == nil {
 		t.Errorf("creating the webhook should had failed")
@@ -405,7 +407,7 @@ func TestTLSConfig(t *testing.T) {
 
 			defer os.Remove(configFile)
 
-			wh, err := NewGenericWebhook(api.Registry, api.Codecs, configFile, groupVersions, retryBackoff)
+			wh, err := NewGenericWebhook(registered.NewOrDie(""), scheme.Codecs, configFile, groupVersions, retryBackoff)
 
 			if err == nil {
 				err = wh.RestClient.Get().Do().Error()
@@ -497,7 +499,7 @@ func TestWithExponentialBackoff(t *testing.T) {
 
 	defer os.Remove(configFile)
 
-	wh, err := NewGenericWebhook(api.Registry, api.Codecs, configFile, groupVersions, retryBackoff)
+	wh, err := NewGenericWebhook(registered.NewOrDie(""), scheme.Codecs, configFile, groupVersions, retryBackoff)
 
 	if err != nil {
 		t.Fatalf("failed to create the webhook: %v", err)

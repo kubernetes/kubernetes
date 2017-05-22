@@ -26,10 +26,10 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -608,7 +608,7 @@ func BuildPodFullName(name, namespace string) string {
 // Parse the pod full name.
 func ParsePodFullName(podFullName string) (string, string, error) {
 	parts := strings.Split(podFullName, "_")
-	if len(parts) != 2 {
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return "", "", fmt.Errorf("failed to parse the pod full name %q", podFullName)
 	}
 	return parts[0], parts[1], nil

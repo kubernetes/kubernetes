@@ -43,7 +43,7 @@ message PodPreset {
 // PodPresetList is a list of PodPreset objects.
 message PodPresetList {
   // Standard list metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -51,7 +51,7 @@ message PodPresetList {
   repeated PodPreset items = 2;
 }
 
-// PodPresetSpec is a description of a pod injection policy.
+// PodPresetSpec is a description of a pod preset.
 message PodPresetSpec {
   // Selector is a label query over a set of resources, in this case pods.
   // Required.

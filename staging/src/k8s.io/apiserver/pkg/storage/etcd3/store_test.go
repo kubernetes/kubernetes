@@ -35,6 +35,7 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
 	storagetests "k8s.io/apiserver/pkg/storage/tests"
+	"k8s.io/apiserver/pkg/storage/value"
 
 	"github.com/coreos/etcd/integration"
 	"golang.org/x/net/context"
@@ -56,13 +57,19 @@ type prefixTransformer struct {
 	err    error
 }
 
-func (p prefixTransformer) TransformFromStorage(b []byte) ([]byte, bool, error) {
+func (p prefixTransformer) TransformFromStorage(b []byte, ctx value.Context) ([]byte, bool, error) {
+	if ctx == nil {
+		panic("no context provided")
+	}
 	if !bytes.HasPrefix(b, p.prefix) {
 		return nil, false, fmt.Errorf("value does not have expected prefix: %s", string(b))
 	}
 	return bytes.TrimPrefix(b, p.prefix), p.stale, p.err
 }
-func (p prefixTransformer) TransformToStorage(b []byte) ([]byte, error) {
+func (p prefixTransformer) TransformToStorage(b []byte, ctx value.Context) ([]byte, error) {
+	if ctx == nil {
+		panic("no context provided")
+	}
 	if len(b) > 0 {
 		return append(append([]byte{}, p.prefix...), b...), p.err
 	}

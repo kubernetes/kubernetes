@@ -216,7 +216,7 @@ var ignoredResources = map[schema.GroupVersionResource]struct{}{
 	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {},
 	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {},
 	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
-	{Group: "apiregistration.k8s.io", Version: "v1alpha1", Resource: "apiservices"}:            {},
+	{Group: "apiregistration.k8s.io", Version: "v1beta1", Resource: "apiservices"}:             {},
 }
 
 func (gb *GraphBuilder) enqueueChanges(e *event) {
@@ -285,13 +285,13 @@ type ownerRefPair struct {
 // when the number of references is small.
 func referencesDiffs(old []metav1.OwnerReference, new []metav1.OwnerReference) (added []metav1.OwnerReference, removed []metav1.OwnerReference, changed []ownerRefPair) {
 	oldUIDToRef := make(map[string]metav1.OwnerReference)
-	for i := 0; i < len(old); i++ {
-		oldUIDToRef[string(old[i].UID)] = old[i]
+	for _, value := range old {
+		oldUIDToRef[string(value.UID)] = value
 	}
 	oldUIDSet := sets.StringKeySet(oldUIDToRef)
 	newUIDToRef := make(map[string]metav1.OwnerReference)
-	for i := 0; i < len(new); i++ {
-		newUIDToRef[string(new[i].UID)] = new[i]
+	for _, value := range new {
+		newUIDToRef[string(value.UID)] = value
 	}
 	newUIDSet := sets.StringKeySet(newUIDToRef)
 

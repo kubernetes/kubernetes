@@ -37,6 +37,8 @@ import (
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -101,13 +103,19 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 		TLSClientConfig: &tls.Config{},
 	})
 
+	clientset, err := kubernetes.NewForConfig(config.GenericConfig.LoopbackClientConfig)
+	if err != nil {
+		t.Fatalf("unable to create client set due to %v", err)
+	}
+	config.GenericConfig.SharedInformerFactory = informers.NewSharedInformerFactory(clientset, config.GenericConfig.LoopbackClientConfig.Timeout)
+
 	return server, *config, assert.New(t)
 }
 
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdserver, config, assert := setUp(t)
 
-	master, err := config.Complete().New()
+	master, err := config.Complete().New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
@@ -133,7 +141,7 @@ func limitedAPIResourceConfigSource() *serverstorage.ResourceConfig {
 func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdserver, config, assert := setUp(t)
 	config.APIResourceConfigSource = limitedAPIResourceConfigSource()
-	master, err := config.Complete().New()
+	master, err := config.Complete().New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
@@ -205,16 +213,6 @@ func TestGetNodeAddresses(t *testing.T) {
 	addrs, err = addressProvider.externalAddresses()
 	assert.NoError(err, "addresses should not have returned an error.")
 	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
-
-	// Pass case with LegacyHost type IP
-	nodes, _ = fakeNodeClient.List(metav1.ListOptions{})
-	for index := range nodes.Items {
-		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeLegacyHostIP, Address: "127.0.0.2"}}
-		fakeNodeClient.Update(&nodes.Items[index])
-	}
-	addrs, err = addressProvider.externalAddresses()
-	assert.NoError(err, "addresses failback should not have returned an error.")
-	assert.Equal([]string{"127.0.0.2", "127.0.0.2"}, addrs)
 }
 
 func decodeResponse(resp *http.Response, obj interface{}) error {
@@ -236,7 +234,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
+	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
 
 	// /api exists in release-1.1
 	resp, err := http.Get(server.URL + "/api")

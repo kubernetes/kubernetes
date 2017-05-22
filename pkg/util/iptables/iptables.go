@@ -56,8 +56,8 @@ type Interface interface {
 	IsIpv6() bool
 	// Save calls `iptables-save` for table.
 	Save(table Table) ([]byte, error)
-	// SaveAll calls `iptables-save`.
-	SaveAll() ([]byte, error)
+	// SaveInto calls `iptables-save` for table and stores result in a given buffer.
+	SaveInto(table Table, buffer *bytes.Buffer) error
 	// Restore runs `iptables-restore` passing data through []byte.
 	// table is the Table to restore
 	// data should be formatted like the output of Save()
@@ -122,6 +122,8 @@ const MinCheckVersion = "1.4.11"
 const MinWaitVersion = "1.4.20"
 const MinWait2Version = "1.4.22"
 
+const LockfilePath16x = "/run/xtables.lock"
+
 // runner implements Interface in terms of exec("iptables").
 type runner struct {
 	mu              sync.Mutex
@@ -131,17 +133,23 @@ type runner struct {
 	hasCheck        bool
 	waitFlag        []string
 	restoreWaitFlag []string
+	lockfilePath    string
 
 	reloadFuncs []func()
 	signal      chan *godbus.Signal
 }
 
-// New returns a new Interface which will exec iptables.
-func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) Interface {
+// newInternal returns a new Interface which will exec iptables, and allows the
+// caller to change the iptables-restore lockfile path
+func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol, lockfilePath string) Interface {
 	vstring, err := getIPTablesVersionString(exec)
 	if err != nil {
 		glog.Warningf("Error checking iptables version, assuming version at least %s: %v", MinCheckVersion, err)
 		vstring = MinCheckVersion
+	}
+
+	if lockfilePath == "" {
+		lockfilePath = LockfilePath16x
 	}
 
 	runner := &runner{
@@ -151,11 +159,17 @@ func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) In
 		hasCheck:        getIPTablesHasCheckCommand(vstring),
 		waitFlag:        getIPTablesWaitFlag(vstring),
 		restoreWaitFlag: getIPTablesRestoreWaitFlag(exec),
+		lockfilePath:    lockfilePath,
 	}
 	// TODO this needs to be moved to a separate Start() or Run() function so that New() has zero side
 	// effects.
 	runner.connectToFirewallD()
 	return runner
+}
+
+// New returns a new Interface which will exec iptables.
+func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) Interface {
+	return newInternal(exec, dbus, protocol, "")
 }
 
 // Destroy is part of Interface.
@@ -303,14 +317,23 @@ func (runner *runner) Save(table Table) ([]byte, error) {
 	return runner.exec.Command(cmdIPTablesSave, args...).CombinedOutput()
 }
 
-// SaveAll is part of Interface.
-func (runner *runner) SaveAll() ([]byte, error) {
+// SaveInto is part of Interface.
+func (runner *runner) SaveInto(table Table, buffer *bytes.Buffer) error {
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
 	// run and return
-	glog.V(4).Infof("running iptables-save")
-	return runner.exec.Command(cmdIPTablesSave, []string{}...).CombinedOutput()
+	args := []string{"-t", string(table)}
+	glog.V(4).Infof("running iptables-save %v", args)
+	cmd := runner.exec.Command(cmdIPTablesSave, args...)
+	// Since CombinedOutput() doesn't support redirecting it to a buffer,
+	// we need to workaround it by redirecting stdout and stderr to buffer
+	// and explicitly calling Run() [CombinedOutput() underneath itself
+	// creates a new buffer, redirects stdout and stderr to it and also
+	// calls Run()].
+	cmd.SetStdout(buffer)
+	cmd.SetStderr(buffer)
+	return cmd.Run()
 }
 
 // Restore is part of Interface.
@@ -327,6 +350,10 @@ func (runner *runner) RestoreAll(data []byte, flush FlushFlag, counters RestoreC
 	return runner.restoreInternal(args, data, flush, counters)
 }
 
+type iptablesLocker interface {
+	Close()
+}
+
 // restoreInternal is the shared part of Restore/RestoreAll
 func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
 	runner.mu.Lock()
@@ -337,6 +364,17 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 	}
 	if counters {
 		args = append(args, "--counters")
+	}
+
+	// Grab the iptables lock to prevent iptables-restore and iptables
+	// from stepping on each other.  iptables-restore 1.6.2 will have
+	// a --wait option like iptables itself, but that's not widely deployed.
+	if len(runner.restoreWaitFlag) == 0 {
+		locker, err := grabIptablesLocks(runner.lockfilePath)
+		if err != nil {
+			return err
+		}
+		defer locker.Close()
 	}
 
 	// run the command and return the output or an error including the output and error
@@ -364,7 +402,7 @@ func (runner *runner) run(op operation, args []string) ([]byte, error) {
 
 	fullArgs := append(runner.waitFlag, string(op))
 	fullArgs = append(fullArgs, args...)
-	glog.V(4).Infof("running iptables %s %v", string(op), args)
+	glog.V(5).Infof("running iptables %s %v", string(op), args)
 	return runner.exec.Command(iptablesCmd, fullArgs...).CombinedOutput()
 	// Don't log err here - callers might not think it is an error.
 }

@@ -499,7 +499,6 @@ function start-kubelet {
   echo "Using kubelet binary at ${kubelet_bin}"
   local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
   flags+=" --allow-privileged=true"
-  flags+=" --babysit-daemons=true"
   flags+=" --cgroup-root=/"
   flags+=" --cloud-provider=gce"
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
@@ -1201,6 +1200,10 @@ function start-kube-addons {
   fi
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
+
+    # Replace the cluster cidr.
+    local -r calico_file="${dst_dir}/calico-policy-controller/calico-node.yaml"
+    sed -i -e "s@__CLUSTER_CIDR__@${CLUSTER_IP_RANGE}@g" "${calico_file}"
   fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"

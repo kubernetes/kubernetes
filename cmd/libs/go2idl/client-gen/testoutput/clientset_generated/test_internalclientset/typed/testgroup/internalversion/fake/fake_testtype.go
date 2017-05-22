@@ -34,6 +34,8 @@ type FakeTestTypes struct {
 
 var testtypesResource = schema.GroupVersionResource{Group: "testgroup.k8s.io", Version: "", Resource: "testtypes"}
 
+var testtypesKind = schema.GroupVersionKind{Group: "testgroup.k8s.io", Version: "", Kind: "TestType"}
+
 func (c *FakeTestTypes) Create(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), &testgroup.TestType{})
@@ -90,7 +92,7 @@ func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *testgro
 
 func (c *FakeTestTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(testtypesResource, c.ns, opts), &testgroup.TestTypeList{})
+		Invokes(testing.NewListAction(testtypesResource, testtypesKind, c.ns, opts), &testgroup.TestTypeList{})
 
 	if obj == nil {
 		return nil, err

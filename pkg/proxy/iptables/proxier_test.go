@@ -17,6 +17,7 @@ limitations under the License.
 package iptables
 
 import (
+	"bytes"
 	"reflect"
 	"strconv"
 	"testing"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -388,13 +388,18 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		serviceMap:       make(proxyServiceMap),
 		serviceChanges:   newServiceChangeMap(),
 		endpointsMap:     make(proxyEndpointsMap),
-		endpointsChanges: newEndpointsChangeMap(),
+		endpointsChanges: newEndpointsChangeMap(testHostname),
 		iptables:         ipt,
 		clusterCIDR:      "10.0.0.0/24",
 		hostname:         testHostname,
 		portsMap:         make(map[localPort]closeable),
 		portMapper:       &fakePortOpener{[]*localPort{}},
 		healthChecker:    newFakeHealthChecker(),
+		iptablesData:     bytes.NewBuffer(nil),
+		filterChains:     bytes.NewBuffer(nil),
+		filterRules:      bytes.NewBuffer(nil),
+		natChains:        bytes.NewBuffer(nil),
+		natRules:         bytes.NewBuffer(nil),
 	}
 }
 
@@ -579,7 +584,7 @@ func TestClusterIPReject(t *testing.T) {
 		}),
 	)
 	makeEndpointsMap(fp)
-	fp.syncProxyRules(syncReasonForce)
+	fp.syncProxyRules()
 
 	svcChain := string(servicePortChainName(svcPortName.String(), strings.ToLower(string(api.ProtocolTCP))))
 	svcRules := ipt.GetRules(svcChain)
@@ -628,7 +633,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules(syncReasonForce)
+	fp.syncProxyRules()
 
 	epStr := fmt.Sprintf("%s:%d", epIP, svcPort)
 	svcChain := string(servicePortChainName(svcPortName.String(), strings.ToLower(string(api.ProtocolTCP))))
@@ -692,7 +697,7 @@ func TestLoadBalancer(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules(syncReasonForce)
+	fp.syncProxyRules()
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
 	fwChain := string(serviceFirewallChainName(svcPortName.String(), proto))
@@ -749,7 +754,7 @@ func TestNodePort(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules(syncReasonForce)
+	fp.syncProxyRules()
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
 	svcChain := string(servicePortChainName(svcPortName.String(), proto))
@@ -786,7 +791,7 @@ func TestExternalIPsReject(t *testing.T) {
 	)
 	makeEndpointsMap(fp)
 
-	fp.syncProxyRules(syncReasonForce)
+	fp.syncProxyRules()
 
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
 	if !hasJump(kubeSvcRules, iptablestest.Reject, svcExternalIPs, svcPort) {
@@ -819,7 +824,7 @@ func TestNodePortReject(t *testing.T) {
 	)
 	makeEndpointsMap(fp)
 
-	fp.syncProxyRules(syncReasonForce)
+	fp.syncProxyRules()
 
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
 	if !hasJump(kubeSvcRules, iptablestest.Reject, svcIP, svcNodePort) {
@@ -856,7 +861,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			svc.Status.LoadBalancer.Ingress = []api.LoadBalancerIngress{{
 				IP: svcLBIP,
 			}}
-			svc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+			svc.Annotations[api.BetaAnnotationExternalTraffic] = api.AnnotationValueExternalTrafficLocal
 		}),
 	)
 
@@ -882,7 +887,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules(syncReasonForce)
+	fp.syncProxyRules()
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
 	fwChain := string(serviceFirewallChainName(svcPortName.String(), proto))
@@ -947,7 +952,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 				Protocol: api.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
-			svc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
+			svc.Annotations[api.BetaAnnotationExternalTraffic] = api.AnnotationValueExternalTrafficLocal
 		}),
 	)
 
@@ -973,7 +978,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 		}),
 	)
 
-	fp.syncProxyRules(syncReasonForce)
+	fp.syncProxyRules()
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
 	lbChain := string(serviceLBChainName(svcPortName.String(), proto))
@@ -1059,8 +1064,8 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 		}),
 		makeTestService("somewhere", "only-local-load-balancer", func(svc *api.Service) {
 			svc.ObjectMeta.Annotations = map[string]string{
-				service.BetaAnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
-				service.BetaAnnotationHealthCheckNodePort: "345",
+				api.BetaAnnotationExternalTraffic:     api.AnnotationValueExternalTrafficLocal,
+				api.BetaAnnotationHealthCheckNodePort: "345",
 			}
 			svc.Spec.Type = api.ServiceTypeLoadBalancer
 			svc.Spec.ClusterIP = "172.16.55.12"
@@ -1078,7 +1083,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	for i := range services {
 		fp.OnServiceAdd(services[i])
 	}
-	_, hcPorts, staleUDPServices := updateServiceMap(fp.serviceMap, &fp.serviceChanges)
+	hcPorts, staleUDPServices := updateServiceMap(fp.serviceMap, &fp.serviceChanges)
 	if len(fp.serviceMap) != 8 {
 		t.Errorf("expected service map length 8, got %v", fp.serviceMap)
 	}
@@ -1111,7 +1116,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	fp.OnServiceDelete(services[2])
 	fp.OnServiceDelete(services[3])
 
-	_, hcPorts, staleUDPServices = updateServiceMap(fp.serviceMap, &fp.serviceChanges)
+	hcPorts, staleUDPServices = updateServiceMap(fp.serviceMap, &fp.serviceChanges)
 	if len(fp.serviceMap) != 1 {
 		t.Errorf("expected service map length 1, got %v", fp.serviceMap)
 	}
@@ -1147,7 +1152,7 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 	)
 
 	// Headless service should be ignored
-	_, hcPorts, staleUDPServices := updateServiceMap(fp.serviceMap, &fp.serviceChanges)
+	hcPorts, staleUDPServices := updateServiceMap(fp.serviceMap, &fp.serviceChanges)
 	if len(fp.serviceMap) != 0 {
 		t.Errorf("expected service map length 0, got %d", len(fp.serviceMap))
 	}
@@ -1175,7 +1180,7 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 		}),
 	)
 
-	_, hcPorts, staleUDPServices := updateServiceMap(fp.serviceMap, &fp.serviceChanges)
+	hcPorts, staleUDPServices := updateServiceMap(fp.serviceMap, &fp.serviceChanges)
 	if len(fp.serviceMap) != 0 {
 		t.Errorf("expected service map length 0, got %v", fp.serviceMap)
 	}
@@ -1200,8 +1205,8 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	})
 	servicev2 := makeTestService("somewhere", "some-service", func(svc *api.Service) {
 		svc.ObjectMeta.Annotations = map[string]string{
-			service.BetaAnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
-			service.BetaAnnotationHealthCheckNodePort: "345",
+			api.BetaAnnotationExternalTraffic:     api.AnnotationValueExternalTrafficLocal,
+			api.BetaAnnotationHealthCheckNodePort: "345",
 		}
 		svc.Spec.Type = api.ServiceTypeLoadBalancer
 		svc.Spec.ClusterIP = "172.16.55.4"
@@ -1217,10 +1222,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	fp.OnServiceAdd(servicev1)
 
-	syncRequired, hcPorts, staleUDPServices := updateServiceMap(fp.serviceMap, &fp.serviceChanges)
-	if !syncRequired {
-		t.Errorf("expected sync required, got %t", syncRequired)
-	}
+	hcPorts, staleUDPServices := updateServiceMap(fp.serviceMap, &fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -1234,10 +1236,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// Change service to load-balancer
 	fp.OnServiceUpdate(servicev1, servicev2)
-	syncRequired, hcPorts, staleUDPServices = updateServiceMap(fp.serviceMap, &fp.serviceChanges)
-	if !syncRequired {
-		t.Errorf("expected sync required, got %t", syncRequired)
-	}
+	hcPorts, staleUDPServices = updateServiceMap(fp.serviceMap, &fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -1251,10 +1250,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	// No change; make sure the service map stays the same and there are
 	// no health-check changes
 	fp.OnServiceUpdate(servicev2, servicev2)
-	syncRequired, hcPorts, staleUDPServices = updateServiceMap(fp.serviceMap, &fp.serviceChanges)
-	if syncRequired {
-		t.Errorf("not expected sync required, got %t", syncRequired)
-	}
+	hcPorts, staleUDPServices = updateServiceMap(fp.serviceMap, &fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -1267,10 +1263,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// And back to ClusterIP
 	fp.OnServiceUpdate(servicev2, servicev1)
-	syncRequired, hcPorts, staleUDPServices = updateServiceMap(fp.serviceMap, &fp.serviceChanges)
-	if !syncRequired {
-		t.Errorf("expected sync required, got %t", syncRequired)
-	}
+	hcPorts, staleUDPServices = updateServiceMap(fp.serviceMap, &fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -1606,7 +1599,7 @@ func compareEndpointsMaps(t *testing.T, tci int, newMap, expected map[proxy.Serv
 }
 
 func Test_updateEndpointsMap(t *testing.T) {
-	var nodeName = "host"
+	var nodeName = testHostname
 
 	unnamedPort := func(ept *api.Endpoints) {
 		ept.Subsets = []api.EndpointSubset{{
@@ -2392,7 +2385,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				fp.OnEndpointsUpdate(prev, curr)
 			}
 		}
-		_, hcEndpoints, stale := updateEndpointsMap(fp.endpointsMap, &fp.endpointsChanges, fp.hostname)
+		hcEndpoints, stale := updateEndpointsMap(fp.endpointsMap, &fp.endpointsChanges, fp.hostname)
 		newMap := fp.endpointsMap
 		compareEndpointsMaps(t, tci, newMap, tc.expectedResult)
 		if len(stale) != len(tc.expectedStale) {

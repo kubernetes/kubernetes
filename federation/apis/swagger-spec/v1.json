@@ -45,6 +45,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -173,6 +181,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -252,6 +268,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -605,6 +629,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -700,6 +732,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -779,6 +819,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -852,6 +900,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -986,6 +1042,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -1065,6 +1129,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -1418,6 +1490,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -1513,6 +1593,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -1592,6 +1680,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -1665,6 +1761,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -1783,6 +1887,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -1854,6 +1966,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -2167,6 +2287,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -2448,6 +2576,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -2576,6 +2712,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -2655,6 +2799,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -3008,6 +3160,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -3103,6 +3263,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -3182,6 +3350,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -3255,6 +3431,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -3389,6 +3573,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -3468,6 +3660,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -3821,6 +4021,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -3916,6 +4124,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -3989,6 +4205,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -4244,7 +4468,7 @@
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -4283,11 +4507,11 @@
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata"
      },
      "data": {
       "type": "object",
-      "description": "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot."
+      "description": "Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'."
      }
     }
    },
@@ -4352,6 +4576,10 @@
       },
       "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller."
      },
+     "initializers": {
+      "$ref": "v1.Initializers",
+      "description": "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user."
+     },
      "finalizers": {
       "type": "array",
       "items": {
@@ -4398,6 +4626,39 @@
      "blockOwnerDeletion": {
       "type": "boolean",
       "description": "If true, AND if the owner has the \"foregroundDeletion\" finalizer, then the owner cannot be deleted from the key-value store until this reference is removed. Defaults to false. To set this field, a user needs \"delete\" permission of the owner, otherwise 422 (Unprocessable Entity) will be returned."
+     }
+    }
+   },
+   "v1.Initializers": {
+    "id": "v1.Initializers",
+    "description": "Initializers tracks the progress of initialization.",
+    "required": [
+     "pending"
+    ],
+    "properties": {
+     "pending": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Initializer"
+      },
+      "description": "Pending is a list of initializers that must execute in order before this object is visible. When the last pending initializer is removed, and no failing result is set, the initializers struct will be set to nil and the object is considered as initialized and visible to all clients."
+     },
+     "result": {
+      "$ref": "v1.Status",
+      "description": "If result is set with the Failure field, the object will be persisted to storage and then deleted, ensuring that other clients can observe the deletion."
+     }
+    }
+   },
+   "v1.Initializer": {
+    "id": "v1.Initializer",
+    "description": "Initializer is information about an initializer that has not yet completed.",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "name of the process that is responsible for initializing this object."
      }
     }
    },
@@ -4455,6 +4716,10 @@
      "kind": {
       "type": "string",
       "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID of the resource. (when there is a single resource which can be described). More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
      },
      "causes": {
       "type": "array",
@@ -4574,7 +4839,7 @@
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
@@ -4603,7 +4868,7 @@
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata"
      },
      "involvedObject": {
       "$ref": "v1.ObjectReference",
@@ -4646,19 +4911,19 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+      "description": "Kind of the referent. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds"
      },
      "namespace": {
       "type": "string",
-      "description": "Namespace of the referent. More info: http://kubernetes.io/docs/user-guide/namespaces"
+      "description": "Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
      },
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
      },
      "uid": {
       "type": "string",
-      "description": "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
+      "description": "UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids"
      },
      "apiVersion": {
       "type": "string",
@@ -4666,7 +4931,7 @@
      },
      "resourceVersion": {
       "type": "string",
-      "description": "Specific resourceVersion to which this reference is made, if any. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+      "description": "Specific resourceVersion to which this reference is made, if any. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency"
      },
      "fieldPath": {
       "type": "string",
@@ -4705,14 +4970,14 @@
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
       "items": {
        "$ref": "v1.Namespace"
       },
-      "description": "Items is the list of Namespace objects in the list. More info: http://kubernetes.io/docs/user-guide/namespaces"
+      "description": "Items is the list of Namespace objects in the list. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
      }
     }
    },
@@ -4730,15 +4995,15 @@
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.NamespaceSpec",
-      "description": "Spec defines the behavior of the Namespace. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+      "description": "Spec defines the behavior of the Namespace. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1.NamespaceStatus",
-      "description": "Status describes the current status of a Namespace. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+      "description": "Status describes the current status of a Namespace. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -4751,7 +5016,7 @@
       "items": {
        "$ref": "v1.FinalizerName"
       },
-      "description": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers"
+      "description": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/namespaces.md#finalizers"
      }
     }
    },
@@ -4765,7 +5030,7 @@
     "properties": {
      "phase": {
       "type": "string",
-      "description": "Phase is the current lifecycle phase of the namespace. More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#phases"
+      "description": "Phase is the current lifecycle phase of the namespace. More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/namespaces.md#phases"
      }
     }
    },
@@ -4786,14 +5051,14 @@
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
       "items": {
        "$ref": "v1.Secret"
       },
-      "description": "Items is a list of secret objects. More info: http://kubernetes.io/docs/user-guide/secrets"
+      "description": "Items is a list of secret objects. More info: https://kubernetes.io/docs/concepts/configuration/secret"
      }
     }
    },
@@ -4811,11 +5076,11 @@
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata"
      },
      "data": {
       "type": "object",
-      "description": "Data contains the secret data. Each key must be a valid DNS_SUBDOMAIN or leading dot followed by valid DNS_SUBDOMAIN. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4"
+      "description": "Data contains the secret data. Each key must consist of alphanumeric characters, '-', '_' or '.'. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4"
      },
      "stringData": {
       "type": "object",
@@ -4844,7 +5109,7 @@
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
@@ -4869,15 +5134,15 @@
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.ServiceSpec",
-      "description": "Spec defines the behavior of a service. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+      "description": "Spec defines the behavior of a service. https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1.ServiceStatus",
-      "description": "Most recently observed status of the service. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+      "description": "Most recently observed status of the service. Populated by the system. Read-only. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -4890,37 +5155,30 @@
       "items": {
        "$ref": "v1.ServicePort"
       },
-      "description": "The list of ports that are exposed by this service. More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies"
+      "description": "The list of ports that are exposed by this service. More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies"
      },
      "selector": {
       "type": "object",
-      "description": "Route service traffic to pods with label keys and values matching this selector. If empty or not present, the service is assumed to have an external process managing its endpoints, which Kubernetes will not modify. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: http://kubernetes.io/docs/user-guide/services#overview"
+      "description": "Route service traffic to pods with label keys and values matching this selector. If empty or not present, the service is assumed to have an external process managing its endpoints, which Kubernetes will not modify. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: https://kubernetes.io/docs/concepts/services-networking/service/"
      },
      "clusterIP": {
       "type": "string",
-      "description": "clusterIP is the IP address of the service and is usually assigned randomly by the master. If an address is specified manually and is not in use by others, it will be allocated to the service; otherwise, creation of the service will fail. This field can not be changed through updates. Valid values are \"None\", empty string (\"\"), or a valid IP address. \"None\" can be specified for headless services when proxying is not required. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies"
+      "description": "clusterIP is the IP address of the service and is usually assigned randomly by the master. If an address is specified manually and is not in use by others, it will be allocated to the service; otherwise, creation of the service will fail. This field can not be changed through updates. Valid values are \"None\", empty string (\"\"), or a valid IP address. \"None\" can be specified for headless services when proxying is not required. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies"
      },
      "type": {
       "type": "string",
-      "description": "type determines how the Service is exposed. Defaults to ClusterIP. Valid options are ExternalName, ClusterIP, NodePort, and LoadBalancer. \"ExternalName\" maps to the specified externalName. \"ClusterIP\" allocates a cluster-internal IP address for load-balancing to endpoints. Endpoints are determined by the selector or if that is not specified, by manual construction of an Endpoints object. If clusterIP is \"None\", no virtual IP is allocated and the endpoints are published as a set of endpoints rather than a stable IP. \"NodePort\" builds on ClusterIP and allocates a port on every node which routes to the clusterIP. \"LoadBalancer\" builds on NodePort and creates an external load-balancer (if supported in the current cloud) which routes to the clusterIP. More info: http://kubernetes.io/docs/user-guide/services#overview"
+      "description": "type determines how the Service is exposed. Defaults to ClusterIP. Valid options are ExternalName, ClusterIP, NodePort, and LoadBalancer. \"ExternalName\" maps to the specified externalName. \"ClusterIP\" allocates a cluster-internal IP address for load-balancing to endpoints. Endpoints are determined by the selector or if that is not specified, by manual construction of an Endpoints object. If clusterIP is \"None\", no virtual IP is allocated and the endpoints are published as a set of endpoints rather than a stable IP. \"NodePort\" builds on ClusterIP and allocates a port on every node which routes to the clusterIP. \"LoadBalancer\" builds on NodePort and creates an external load-balancer (if supported in the current cloud) which routes to the clusterIP. More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services "
      },
      "externalIPs": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "externalIPs is a list of IP addresses for which nodes in the cluster will also accept traffic for this service.  These IPs are not managed by Kubernetes.  The user is responsible for ensuring that traffic arrives at a node with this IP.  A common example is external load-balancers that are not part of the Kubernetes system.  A previous form of this functionality exists as the deprecatedPublicIPs field.  When using this field, callers should also clear the deprecatedPublicIPs field."
-     },
-     "deprecatedPublicIPs": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      },
-      "description": "deprecatedPublicIPs is deprecated and replaced by the externalIPs field with almost the exact same semantics.  This field is retained in the v1 API for compatibility until at least 8/20/2016.  It will be removed from any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are set, deprecatedPublicIPs is used."
+      "description": "externalIPs is a list of IP addresses for which nodes in the cluster will also accept traffic for this service.  These IPs are not managed by Kubernetes.  The user is responsible for ensuring that traffic arrives at a node with this IP.  A common example is external load-balancers that are not part of the Kubernetes system."
      },
      "sessionAffinity": {
       "type": "string",
-      "description": "Supports \"ClientIP\" and \"None\". Used to maintain session affinity. Enable client IP based session affinity. Must be ClientIP or None. Defaults to None. More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies"
+      "description": "Supports \"ClientIP\" and \"None\". Used to maintain session affinity. Enable client IP based session affinity. Must be ClientIP or None. Defaults to None. More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies"
      },
      "loadBalancerIP": {
       "type": "string",
@@ -4931,11 +5189,20 @@
       "items": {
        "type": "string"
       },
-      "description": "If specified and supported by the platform, this will restrict traffic through the cloud-provider load-balancer will be restricted to the specified client IPs. This field will be ignored if the cloud-provider does not support the feature.\" More info: http://kubernetes.io/docs/user-guide/services-firewalls"
+      "description": "If specified and supported by the platform, this will restrict traffic through the cloud-provider load-balancer will be restricted to the specified client IPs. This field will be ignored if the cloud-provider does not support the feature.\" More info: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/"
      },
      "externalName": {
       "type": "string",
       "description": "externalName is the external reference that kubedns or equivalent will return as a CNAME record for this service. No proxying will be involved. Must be a valid DNS name and requires Type to be ExternalName."
+     },
+     "externalTrafficPolicy": {
+      "type": "string",
+      "description": "externalTrafficPolicy denotes if this Service desires to route external traffic to local endpoints only. This preserves Source IP and avoids a second hop for LoadBalancer and Nodeport type services."
+     },
+     "healthCheckNodePort": {
+      "type": "integer",
+      "format": "int32",
+      "description": "healthCheckNodePort specifies the healthcheck nodePort for the service. If not specified, HealthCheckNodePort is created by the service api backend with the allocated nodePort. Will use user-specified nodePort value if specified by the client. Only effects when Type is set to LoadBalancer and ExternalTrafficPolicy is set to Local."
      }
     }
    },
@@ -4961,12 +5228,12 @@
      },
      "targetPort": {
       "type": "string",
-      "description": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of the 'port' field is used (an identity map). This field is ignored for services with clusterIP=None, and should be omitted or set equal to the 'port' field. More info: http://kubernetes.io/docs/user-guide/services#defining-a-service"
+      "description": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of the 'port' field is used (an identity map). This field is ignored for services with clusterIP=None, and should be omitted or set equal to the 'port' field. More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service"
      },
      "nodePort": {
       "type": "integer",
       "format": "int32",
-      "description": "The port on each node on which this service is exposed when type=NodePort or LoadBalancer. Usually assigned by the system. If specified, it will be allocated to the service if unused or else creation of the service will fail. Default is to auto-allocate a port if the ServiceType of this Service requires one. More info: http://kubernetes.io/docs/user-guide/services#type--nodeport"
+      "description": "The port on each node on which this service is exposed when type=NodePort or LoadBalancer. Usually assigned by the system. If specified, it will be allocated to the service if unused or else creation of the service will fail. Default is to auto-allocate a port if the ServiceType of this Service requires one. More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport"
      }
     }
    },

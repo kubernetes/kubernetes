@@ -108,9 +108,9 @@ func tarAddCOSMounter(tar string) error {
 	return nil
 }
 
-// updateCOSMounterPath updates kubelet flags to set gci mounter path. This will only take effect for
+// updateCOSKubeletFlags updates kubelet flags to set gci mounter path, and enables memcg notifications. This will only take effect for
 // GCI/COS image.
-func updateCOSMounterPath(args, host, workspace string) (string, error) {
+func updateCOSKubeletFlags(args, host, workspace string) (string, error) {
 	// Determine if tests will run on a GCI/COS node.
 	output, err := SSH(host, "cat", "/etc/os-release")
 	if err != nil {
@@ -145,6 +145,7 @@ func updateCOSMounterPath(args, host, workspace string) (string, error) {
 		return args, fmt.Errorf("unabled to chmod 544 GCI/COS mounter script. Err: %v, Output:\n%s", err, output)
 	}
 	// Insert args at beginning of test args, so any values from command line take precedence
+	args = "--kubelet-flags=--experimental-kernel-memcg-notification=true " + args
 	args = fmt.Sprintf("--kubelet-flags=--experimental-mounter-path=%s ", mounterPath) + args
 	return args, nil
 }
@@ -164,7 +165,7 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testA
 	// Kill any running node processes
 	cleanupNodeProcesses(host)
 
-	testArgs, err := updateCOSMounterPath(testArgs, host, workspace)
+	testArgs, err := updateCOSKubeletFlags(testArgs, host, workspace)
 	if err != nil {
 		return "", err
 	}

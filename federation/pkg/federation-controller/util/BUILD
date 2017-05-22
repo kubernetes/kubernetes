@@ -43,6 +43,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
+        "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )
@@ -87,11 +88,13 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//federation/pkg/federation-controller/util/clusterselector:all-srcs",
         "//federation/pkg/federation-controller/util/deletionhelper:all-srcs",
         "//federation/pkg/federation-controller/util/eventsink:all-srcs",
         "//federation/pkg/federation-controller/util/finalizers:all-srcs",
         "//federation/pkg/federation-controller/util/planner:all-srcs",
         "//federation/pkg/federation-controller/util/podanalyzer:all-srcs",
+        "//federation/pkg/federation-controller/util/replicapreferences:all-srcs",
         "//federation/pkg/federation-controller/util/test:all-srcs",
     ],
     tags = ["automanaged"],

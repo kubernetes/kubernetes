@@ -23,26 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-// isResourceGuaranteed returns true if the container's resource requirements are Guaranteed.
-func isResourceGuaranteed(container *v1.Container, resource v1.ResourceName) bool {
-	// A container resource is guaranteed if its request == limit.
-	// If request == limit, the user is very confident of resource consumption.
-	req, hasReq := container.Resources.Requests[resource]
-	limit, hasLimit := container.Resources.Limits[resource]
-	if !hasReq || !hasLimit {
-		return false
-	}
-	return req.Cmp(limit) == 0 && req.Value() != 0
-}
-
-// isResourceBestEffort returns true if the container's resource requirements are best-effort.
-func isResourceBestEffort(container *v1.Container, resource v1.ResourceName) bool {
-	// A container resource is best-effort if its request is unspecified or 0.
-	// If a request is specified, then the user expects some kind of resource guarantee.
-	req, hasReq := container.Resources.Requests[resource]
-	return !hasReq || req.Value() == 0
-}
-
 // GetPodQOS returns the QoS class of a pod.
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
@@ -178,36 +158,5 @@ func InternalGetPodQOS(pod *api.Pod) api.PodQOSClass {
 // QOSList is a set of (resource name, QoS class) pairs.
 type QOSList map[v1.ResourceName]v1.PodQOSClass
 
-// GetQOS returns a mapping of resource name to QoS class of a container
-func GetQOS(container *v1.Container) QOSList {
-	resourceToQOS := QOSList{}
-	for resource := range allResources(container) {
-		switch {
-		case isResourceGuaranteed(container, resource):
-			resourceToQOS[resource] = v1.PodQOSGuaranteed
-		case isResourceBestEffort(container, resource):
-			resourceToQOS[resource] = v1.PodQOSBestEffort
-		default:
-			resourceToQOS[resource] = v1.PodQOSBurstable
-		}
-	}
-	return resourceToQOS
-}
-
 // supportedComputeResources is the list of compute resources for with QoS is supported.
 var supportedQoSComputeResources = sets.NewString(string(v1.ResourceCPU), string(v1.ResourceMemory))
-
-// allResources returns a set of all possible resources whose mapped key value is true if present on the container
-func allResources(container *v1.Container) map[v1.ResourceName]bool {
-	resources := map[v1.ResourceName]bool{}
-	for _, resource := range supportedQoSComputeResources.List() {
-		resources[v1.ResourceName(resource)] = false
-	}
-	for resource := range container.Resources.Requests {
-		resources[resource] = true
-	}
-	for resource := range container.Resources.Limits {
-		resources[resource] = true
-	}
-	return resources
-}

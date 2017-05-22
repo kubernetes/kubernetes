@@ -62,7 +62,6 @@ auth-provider
 auth-provider-arg
 auth-provider-arg
 azure-container-registry-config
-babysit-daemons
 basic-auth-file
 bench-pods
 bench-quiet
@@ -86,7 +85,6 @@ cgroups-per-qos
 chaos-chance
 cidr-allocator-type
 clean-start
-cleanup
 cleanup-iptables
 client-ca-file
 client-certificate
@@ -178,6 +176,7 @@ dns-provider
 dns-provider-config
 dns-zone-name
 dockercfg-path
+docker-disable-shared-pid
 docker-email
 docker-endpoint
 docker-exec-handler
@@ -192,7 +191,6 @@ duration-sec
 e2e-output-dir
 e2e-verify-service-account
 enable-controller-attach-detach
-enable-cri
 enable-custom-metrics
 enable-debugging-handlers
 enable-dynamic-provisioning
@@ -245,7 +243,6 @@ experimental-check-node-capabilities-before-mount
 experimental-cri
 experimental-dockershim
 experimental-dockershim-root-directory
-experimental-docker-enable-shared-pid
 experimental-fail-swap-on
 experimental-kernel-memcg-notification
 experimental-keystone-ca-file
@@ -275,7 +272,6 @@ federation-name
 federation-system-namespace
 federation-upgrade-target
 file-check-frequency
-file_content_in_loop
 file-suffix
 flex-volume-plugin-dir
 forward-services
@@ -304,7 +300,6 @@ google-json-key
 grace-period
 ha-domain
 hairpin-mode
-hard
 hard-pod-affinity-symmetric-weight
 healthz-bind-address
 healthz-port
@@ -426,7 +421,9 @@ large-cluster-size-threshold
 last-release-pr
 leader-elect
 leader-elect-lease-duration
+leader-elect-lock-type
 leader-elect-renew-deadline
+leader-elect-resource-lock
 leader-elect-retry-period
 lease-duration
 leave-stdin-open
@@ -545,6 +542,7 @@ private-mountns
 prom-push-gateway
 protect-kernel-defaults
 proto-import
+provider-id
 proxy-bindall
 proxy-client-cert-file
 proxy-client-key-file
@@ -562,7 +560,6 @@ pv-recycler-minimum-timeout-nfs
 pv-recycler-pod-template-filepath-hostpath
 pv-recycler-pod-template-filepath-nfs
 pv-recycler-timeout-increment-hostpath
-quiet
 read-only-port
 really-crash-for-testing
 reconcile-cidr
@@ -591,13 +588,11 @@ requestheader-username-headers
 required-contexts
 require-kubeconfig
 resolv-conf
-resource
 resource-container
 resource-name
 resource-quota-sync-period
 resource-version
 results-dir
-retry_time
 rkt-api-endpoint
 rkt-path
 rkt-stage1-image
@@ -616,7 +611,6 @@ schedule-pods-here
 scheduler-config
 scheduler-name
 schema-cache-dir
-scopes
 scrape-timeout
 seccomp-profile-root
 secondary-node-eviction-rate
@@ -702,6 +696,7 @@ upgrade-target
 use-kubernetes-cluster-service
 use-kubernetes-version
 use-legacy-policy-config
+use-real-proxier
 use-service-account-credentials
 user-whitelist
 use-service-account-credentials
@@ -709,7 +704,6 @@ use-service-account-credentials
 user-whitelist
 use-service-account-credentials
 use-taint-based-evictions
-verb
 verify-only
 versioned-clientset-package
 viper-config
@@ -722,6 +716,7 @@ watch-cache-sizes
 watch-only
 whitelist-override-label
 windows-line-endings
+write-config-to
 www-prefix
 zone-id
 zone-name

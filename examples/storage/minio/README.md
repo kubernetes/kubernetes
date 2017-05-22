@@ -112,9 +112,7 @@ spec:
       containers:
       - name: minio
         # Pulls the default Minio image from Docker Hub
-        image: minio/minio
-        command:
-        - minio
+        image: minio/minio:latest
         args:
         - server
         - /storage
@@ -261,9 +259,7 @@ spec:
           value: "minio"
         - name: MINIO_SECRET_KEY
           value: "minio123"
-        image: minio/minio
-        command:
-        - minio
+        image: minio/minio:latest
         args:
         - server
         - http://minio-0.minio.default.svc.cluster.local/data
@@ -273,7 +269,7 @@ spec:
         ports:
         - containerPort: 9000
           hostPort: 9000
-        # These volume mounts are persistent. Each pod in the PetSet
+        # These volume mounts are persistent. Each pod in the Statefulset
         # gets a volume mounted based on this field.
         volumeMounts:
         - name: data

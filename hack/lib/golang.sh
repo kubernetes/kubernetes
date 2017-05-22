@@ -30,6 +30,7 @@ kube::golang::server_targets() {
     cmd/kubeadm
     cmd/hyperkube
     vendor/k8s.io/kube-aggregator
+    vendor/k8s.io/kube-apiextensions-server
     plugin/cmd/kube-scheduler
   )
   echo "${targets[@]}"
@@ -266,6 +267,10 @@ kube::golang::set_platform_envs() {
 
   # Do not set CC when building natively on a platform, only if cross-compiling from linux/amd64
   if [[ $(kube::golang::host_platform) == "linux/amd64" ]]; then
+    # We are currently using go 1.8.1, which has significant performance
+    # regression. Until this is fixed in Golang head, we are using patched
+    # version of Go that eliminates this problem.
+    export GOROOT=${K8S_PATCHED_GOROOT:-${GOROOT}}
 
     # Dynamic CGO linking for other server architectures than linux/amd64 goes here
     # If you want to include support for more server platforms than these, add arch-specific gcc names here

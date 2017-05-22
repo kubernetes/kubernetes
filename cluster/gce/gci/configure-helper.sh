@@ -182,11 +182,11 @@ function mount-master-pd {
   chgrp -R etcd "${mount_point}/var/etcd"
 }
 
-# replace_prefixed_line ensures:
+# append_or_replace_prefixed_line ensures:
 # 1. the specified file exists
 # 2. existing lines with the specified ${prefix} are removed
 # 3. a new line with the specified ${prefix}${suffix} is appended
-function replace_prefixed_line {
+function append_or_replace_prefixed_line {
   local -r file="${1:-}"
   local -r prefix="${2:-}"
   local -r suffix="${3:-}"
@@ -287,30 +287,32 @@ function create-master-auth {
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
     if [[ -e "${basic_auth_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
-      sed -i "/,${KUBE_USER},admin,system:masters$/d" "${basic_auth_csv}"
-      # The following is for the legacy form of the password line.
-      sed -i "/,${KUBE_USER},admin$/d" "${basic_auth_csv}"
+      # If METADATA_CLOBBERS_CONFIG is true, we want to rewrite the file
+      # completely, because if we're changing KUBE_USER and KUBE_PASSWORD, we
+      # have nothing to match on.  The file is replaced just below with
+      # append_or_replace_prefixed_line.
+      rm "${basic_auth_csv}"
     fi
-    replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER}," "admin,system:masters"
+    append_or_replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER},"      "admin,system:masters"
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
   fi
   if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
   fi
   if [[ -n "${KUBE_SCHEDULER_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
   fi
   if [[ -n "${KUBELET_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "kubelet,uid:kubelet,system:nodes"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "kubelet,uid:kubelet,system:nodes"
   fi
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
   fi
   if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
@@ -666,7 +668,6 @@ function start-kubelet {
   echo "Using kubelet binary at ${kubelet_bin}"
   local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
   flags+=" --allow-privileged=true"
-  flags+=" --babysit-daemons=true"
   flags+=" --cgroup-root=/"
   flags+=" --cloud-provider=gce"
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
@@ -679,6 +680,7 @@ function start-kubelet {
     flags+=" --port=${KUBELET_PORT}"
   fi
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
+    flags+="${MASTER_KUBELET_TEST_ARGS:-}"
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
     if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
@@ -689,6 +691,7 @@ function start-kubelet {
       flags+=" --pod-cidr=${MASTER_IP_RANGE}"
     fi
   else # For nodes
+    flags+="${NODE_KUBELET_TEST_ARGS:-}"
     flags+=" --enable-debugging-handlers=true"
     flags+=" --api-servers=https://${KUBERNETES_MASTER_NAME}"
     if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
@@ -699,13 +702,19 @@ function start-kubelet {
     flags+=" --anonymous-auth=false --authorization-mode=Webhook --client-ca-file=${CA_CERT_BUNDLE_PATH}"
   fi
   # Network plugin
-  if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
-    if [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
+  if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
+    if [[ "${NETWORK_PROVIDER:-}" == "cni" || "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
       flags+=" --cni-bin-dir=/home/kubernetes/bin"
     else
       flags+=" --network-plugin-dir=/home/kubernetes/bin"
     fi
-    flags+=" --network-plugin=${NETWORK_PROVIDER}"
+    if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
+      # Calico uses CNI always.
+      flags+=" --network-plugin=cni"
+    else
+      # Otherwise use the configured value.
+      flags+=" --network-plugin=${NETWORK_PROVIDER}"
+    fi
   fi
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
     flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
@@ -1417,9 +1426,16 @@ function start-kube-addons {
   fi
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
+
+    # Replace the cluster cidr.
+    local -r calico_file="${dst_dir}/calico-policy-controller/calico-node.yaml"
+    sed -i -e "s@__CLUSTER_CIDR__@${CLUSTER_IP_RANGE}@g" "${calico_file}"
   fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
+  fi
+  if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
+    setup-addon-manifests "addons" "ip-masq-agent"
   fi
 
   # Place addon manager pod manifest.

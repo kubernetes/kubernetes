@@ -76,7 +76,7 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 		return nil, err
 	}
 
-	labels, err := getLabels(params, true, name)
+	labels, err := getLabels(params, name)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func (DeploymentAppsV1Beta1) Generate(genericParams map[string]interface{}) (run
 		return nil, err
 	}
 
-	labels, err := getLabels(params, true, name)
+	labels, err := getLabels(params, name)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (DeploymentAppsV1Beta1) Generate(genericParams map[string]interface{}) (run
 }
 
 // getLabels returns map of labels.
-func getLabels(params map[string]string, defaultRunLabel bool, name string) (map[string]string, error) {
+func getLabels(params map[string]string, name string) (map[string]string, error) {
 	labelString, found := params["labels"]
 	var labels map[string]string
 	var err error
@@ -219,7 +219,7 @@ func getLabels(params map[string]string, defaultRunLabel bool, name string) (map
 		if err != nil {
 			return nil, err
 		}
-	} else if defaultRunLabel {
+	} else {
 		labels = map[string]string{
 			"run": name,
 		}
@@ -330,7 +330,7 @@ func (JobV1) Generate(genericParams map[string]interface{}) (runtime.Object, err
 		return nil, err
 	}
 
-	labels, err := getLabels(params, true, name)
+	labels, err := getLabels(params, name)
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +424,7 @@ func (CronJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.O
 		return nil, err
 	}
 
-	labels, err := getLabels(params, true, name)
+	labels, err := getLabels(params, name)
 	if err != nil {
 		return nil, err
 	}
@@ -637,7 +637,7 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 		return nil, err
 	}
 
-	labels, err := getLabels(params, true, name)
+	labels, err := getLabels(params, name)
 	if err != nil {
 		return nil, err
 	}
@@ -785,7 +785,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 		return nil, err
 	}
 
-	labels, err := getLabels(params, false, name)
+	labels, err := getLabels(params, name)
 	if err != nil {
 		return nil, err
 	}

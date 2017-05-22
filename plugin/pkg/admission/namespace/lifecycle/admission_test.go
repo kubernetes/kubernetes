@@ -24,11 +24,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	core "k8s.io/client-go/testing"
-	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
@@ -48,7 +48,7 @@ func newHandlerForTestWithClock(c clientset.Interface, cacheClock clock.Clock) (
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.Validate(handler)
 	return handler, f, err

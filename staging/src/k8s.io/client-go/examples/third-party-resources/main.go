@@ -18,22 +18,23 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+
+	tprv1 "k8s.io/client-go/examples/third-party-resources/apis/tpr/v1"
+	exampleclient "k8s.io/client-go/examples/third-party-resources/client"
+	examplecontroller "k8s.io/client-go/examples/third-party-resources/controller"
 )
 
 func main() {
@@ -52,83 +53,71 @@ func main() {
 	}
 
 	// initialize third party resource if it does not exist
-	tpr, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Get("example.k8s.io", metav1.GetOptions{})
-	if err != nil {
-		if errors.IsNotFound(err) {
-			tpr := &v1beta1.ThirdPartyResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "example.k8s.io",
-				},
-				Versions: []v1beta1.APIVersion{
-					{Name: "v1"},
-				},
-				Description: "An Example ThirdPartyResource",
-			}
-
-			result, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
-			if err != nil {
-				panic(err)
-			}
-			fmt.Printf("CREATED: %#v\nFROM: %#v\n", result, tpr)
-		} else {
-			panic(err)
-		}
-	} else {
-		fmt.Printf("SKIPPING: already exists %#v\n", tpr)
+	err = exampleclient.CreateTPR(clientset)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		panic(err)
 	}
 
 	// make a new config for our extension's API group, using the first config as a baseline
-	var tprconfig *rest.Config
-	tprconfig = config
-	configureClient(tprconfig)
-
-	tprclient, err := rest.RESTClientFor(tprconfig)
+	exampleClient, exampleScheme, err := exampleclient.NewClient(config)
 	if err != nil {
 		panic(err)
 	}
 
-	var example Example
-
-	err = tprclient.Get().
-		Resource("examples").
-		Namespace(v1.NamespaceDefault).
-		Name("example1").
-		Do().Into(&example)
-
+	// wait until TPR gets processed
+	err = exampleclient.WaitForExampleResource(exampleClient)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// Create an instance of our TPR
-			example := &Example{
-				Metadata: metav1.ObjectMeta{
-					Name: "example1",
-				},
-				Spec: ExampleSpec{
-					Foo: "hello",
-					Bar: true,
-				},
-			}
-
-			var result Example
-			err = tprclient.Post().
-				Resource("examples").
-				Namespace(v1.NamespaceDefault).
-				Body(example).
-				Do().Into(&result)
-
-			if err != nil {
-				panic(err)
-			}
-			fmt.Printf("CREATED: %#v\n", result)
-		} else {
-			panic(err)
-		}
-	} else {
-		fmt.Printf("GET: %#v\n", example)
+		panic(err)
 	}
 
+	// start a controller on instances of our TPR
+	controller := examplecontroller.ExampleController{
+		ExampleClient: exampleClient,
+		ExampleScheme: exampleScheme,
+	}
+
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	go controller.Run(ctx)
+
+	// Create an instance of our TPR
+	example := &tprv1.Example{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "example1",
+		},
+		Spec: tprv1.ExampleSpec{
+			Foo: "hello",
+			Bar: true,
+		},
+		Status: tprv1.ExampleStatus{
+			State:   tprv1.ExampleStateCreated,
+			Message: "Created, not processed yet",
+		},
+	}
+	var result tprv1.Example
+	err = exampleClient.Post().
+		Resource(tprv1.ExampleResourcePlural).
+		Namespace(apiv1.NamespaceDefault).
+		Body(example).
+		Do().Into(&result)
+	if err == nil {
+		fmt.Printf("CREATED: %#v\n", result)
+	} else if apierrors.IsAlreadyExists(err) {
+		fmt.Printf("ALREADY EXISTS: %#v\n", result)
+	} else {
+		panic(err)
+	}
+
+	// Poll until Example object is handled by controller and gets status updated to "Processed"
+	err = exampleclient.WaitForExampleInstanceProcessed(exampleClient, "example1")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Print("PROCESSED\n")
+
 	// Fetch a list of our TPRs
-	exampleList := ExampleList{}
-	err = tprclient.Get().Resource("examples").Do().Into(&exampleList)
+	exampleList := tprv1.ExampleList{}
+	err = exampleClient.Get().Resource(tprv1.ExampleResourcePlural).Do().Into(&exampleList)
 	if err != nil {
 		panic(err)
 	}
@@ -140,28 +129,4 @@ func buildConfig(kubeconfig string) (*rest.Config, error) {
 		return clientcmd.BuildConfigFromFlags("", kubeconfig)
 	}
 	return rest.InClusterConfig()
-}
-
-func configureClient(config *rest.Config) {
-	groupversion := schema.GroupVersion{
-		Group:   "k8s.io",
-		Version: "v1",
-	}
-
-	config.GroupVersion = &groupversion
-	config.APIPath = "/apis"
-	config.ContentType = runtime.ContentTypeJSON
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
-
-	schemeBuilder := runtime.NewSchemeBuilder(
-		func(scheme *runtime.Scheme) error {
-			scheme.AddKnownTypes(
-				groupversion,
-				&Example{},
-				&ExampleList{},
-			)
-			return nil
-		})
-	metav1.AddToGroupVersion(scheme.Scheme, groupversion)
-	schemeBuilder.AddToScheme(scheme.Scheme)
 }

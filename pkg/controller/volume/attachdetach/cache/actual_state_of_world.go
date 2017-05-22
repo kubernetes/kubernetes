@@ -111,6 +111,9 @@ type ActualStateOfWorld interface {
 
 	GetAttachedVolumesPerNode() map[types.NodeName][]operationexecutor.AttachedVolume
 
+	// GetNodesForVolume returns the nodes on which the volume is attached
+	GetNodesForVolume(volumeName v1.UniqueVolumeName) []types.NodeName
+
 	// GetVolumesToReportAttached returns a map containing the set of nodes for
 	// which the VolumesAttached Status field in the Node API object should be
 	// updated. The key in this map is the name of the node to update and the
@@ -424,7 +427,7 @@ func (asw *actualStateOfWorld) removeVolumeFromReportAsAttached(
 			return nil
 		}
 	}
-	return fmt.Errorf("volume %q or node %q does not exist in volumesToReportAsAttached list",
+	return fmt.Errorf("volume %q does not exist in volumesToReportAsAttached list or node %q does not exist in nodesToUpdateStatusFor list",
 		volumeName,
 		nodeName)
 
@@ -579,6 +582,22 @@ func (asw *actualStateOfWorld) GetAttachedVolumesPerNode() map[types.NodeName][]
 	}
 
 	return attachedVolumesPerNode
+}
+
+func (asw *actualStateOfWorld) GetNodesForVolume(volumeName v1.UniqueVolumeName) []types.NodeName {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if !volumeExists || len(volumeObj.nodesAttachedTo) == 0 {
+		return []types.NodeName{}
+	}
+
+	nodes := []types.NodeName{}
+	for k := range volumeObj.nodesAttachedTo {
+		nodes = append(nodes, k)
+	}
+	return nodes
 }
 
 func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][]v1.AttachedVolume {

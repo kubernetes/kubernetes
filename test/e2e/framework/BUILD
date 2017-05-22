@@ -45,7 +45,6 @@ go_library(
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/node:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/api/v1/service:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/apis/authorization/v1beta1:go_default_library",
         "//pkg/apis/batch:go_default_library",
@@ -61,7 +60,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/client/retry:go_default_library",
-        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",
@@ -70,7 +68,7 @@ go_library(
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/node:go_default_library",
         "//pkg/kubectl:go_default_library",
-        "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
+        "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
@@ -132,6 +130,7 @@ go_library(
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
+        "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
     ],
 )
 

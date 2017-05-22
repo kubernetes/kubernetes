@@ -42,7 +42,12 @@ const (
 )
 
 func init() {
-	kubeapiserveradmission.Plugins.Register(pluginName, func(config io.Reader) (admission.Interface, error) {
+	Register(&kubeapiserveradmission.Plugins)
+}
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register(pluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewPlugin(), nil
 	})
 }
@@ -97,6 +102,11 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 	if !ok {
 		return errors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
+
+	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
+		return nil
+	}
+
 	list, err := c.lister.PodPresets(pod.GetNamespace()).List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("listing pod presets failed: %v", err)

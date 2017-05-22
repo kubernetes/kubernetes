@@ -26,7 +26,6 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
-import "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -35,7 +34,7 @@ option go_package = "v1beta1";
 // Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.
 message Cluster {
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -76,12 +75,33 @@ message ClusterCondition {
 // A list of all the kubernetes clusters registered to the federation
 message ClusterList {
   // Standard list metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of Cluster objects.
   repeated Cluster items = 2;
+}
+
+// ClusterSelectorRequirement contains values, a key, and an operator that relates the key and values.
+// The zero value of ClusterSelectorRequirement is invalid.
+// ClusterSelectorRequirement implements both set based match and exact match
+message ClusterSelectorRequirement {
+  // +patchMergeKey=key
+  // +patchStrategy=merge
+  optional string key = 1;
+
+  // The Operator defines how the Key is matched to the Values. One of "in", "notin",
+  // "exists", "!", "=", "!=", "gt" or "lt".
+  optional string operator = 2;
+
+  // An array of string values. If the operator is "in" or "notin",
+  // the values array must be non-empty. If the operator is "exists" or "!",
+  // the values array must be empty. If the operator is "gt" or "lt", the values
+  // array must have a single element, which will be interpreted as an integer.
+  // This array is replaced during a strategic merge patch.
+  // +optional
+  repeated string values = 3;
 }
 
 // ClusterSpec describes the attributes of a kubernetes cluster.

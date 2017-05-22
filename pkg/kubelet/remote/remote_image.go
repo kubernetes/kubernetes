@@ -24,8 +24,8 @@ import (
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 
-	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
 
 // RemoteImageService is a gRPC implementation of internalapi.ImageManagerService.
@@ -126,4 +126,9 @@ func (r *RemoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 	}
 
 	return nil
+}
+
+// ImageFsInfo returns information of the filesystem that is used to store images.
+func (r *RemoteImageService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
+	return nil, fmt.Errorf("not implemented")
 }

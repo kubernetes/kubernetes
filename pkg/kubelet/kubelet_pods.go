@@ -40,13 +40,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
@@ -145,19 +146,23 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 
 			hostPath = filepath.Join(hostPath, mount.SubPath)
 
-			// Create the sub path now because if it's auto-created later when referenced, it may have an
-			// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
-			// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
-			// later auto-create it with the incorrect mode 0750
-			if err := os.MkdirAll(hostPath, perm); err != nil {
-				glog.Errorf("failed to mkdir:%s", hostPath)
-				return nil, err
-			}
+			if subPathExists, err := util.FileExists(hostPath); err != nil {
+				glog.Errorf("Could not determine if subPath %s exists; will not attempt to change its permissions", hostPath)
+			} else if !subPathExists {
+				// Create the sub path now because if it's auto-created later when referenced, it may have an
+				// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
+				// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
+				// later auto-create it with the incorrect mode 0750
+				if err := os.MkdirAll(hostPath, perm); err != nil {
+					glog.Errorf("failed to mkdir:%s", hostPath)
+					return nil, err
+				}
 
-			// chmod the sub path because umask may have prevented us from making the sub path with the same
-			// permissions as the mounter path
-			if err := os.Chmod(hostPath, perm); err != nil {
-				return nil, err
+				// chmod the sub path because umask may have prevented us from making the sub path with the same
+				// permissions as the mounter path
+				if err := os.Chmod(hostPath, perm); err != nil {
+					return nil, err
+				}
 			}
 		}
 
@@ -210,10 +215,6 @@ func makeHostsMount(podDir, podIP, hostName, hostDomainName string, hostAliases 
 // ensureHostsFile ensures that the given host file has an up-to-date ip, host
 // name, and domain name.
 func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string, hostAliases []v1.HostAlias) error {
-	if _, err := os.Stat(fileName); os.IsExist(err) {
-		glog.V(4).Infof("kubernetes-managed etc-hosts file exits. Will not be recreated: %q", fileName)
-		return nil
-	}
 	content := hostsFileContent(hostIP, hostName, hostDomainName, hostAliases)
 	return ioutil.WriteFile(fileName, content, 0644)
 }
@@ -413,7 +414,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container, podIP string) ([]kubecontainer.EnvVar, error) {
 	var result []kubecontainer.EnvVar
 	// Note:  These are added to the docker Config, but are not included in the checksum computed
-	// by dockertools.BuildDockerName(...).  That way, we can still determine whether an
+	// by kubecontainer.HashContainer(...).  That way, we can still determine whether an
 	// v1.Container is already running by its hash. (We don't want to restart a container just
 	// because some service changed.)
 	//

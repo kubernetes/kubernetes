@@ -30,6 +30,7 @@ import zlib
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OWNERS_PATH = os.path.abspath(
     os.path.join(BASE_DIR, '..', 'test', 'test_owners.csv'))
+OWNERS_JSON_PATH = OWNERS_PATH.replace('.csv', '.json')
 GCS_URL_BASE = 'https://storage.googleapis.com/kubernetes-test-history/'
 SKIP_MAINTAINERS = {
     'a-robinson', 'aronchick', 'bgrant0607-nocc', 'david-mcmahon',
@@ -86,8 +87,7 @@ def write_owners(fname, owners):
     with open(fname, 'w') as f:
         out = csv.writer(f, lineterminator='\n')
         out.writerow(['name', 'owner', 'auto-assigned', 'sig'])
-        sort_key = lambda (k, v): (k != 'DEFAULT', k)  # put 'DEFAULT' first.
-        items = sorted(owners.items(), key=sort_key)
+        items = sorted(owners.items())
         for name, (owner, random_assignment, sig) in items:
             out.writerow([name, owner, int(random_assignment), sig])
 
@@ -125,21 +125,61 @@ def detect_github_username():
                      '`git config remote.origin.url` output, run with --user instead')
 
 
+def sig_prefixes(owners):
+    # TODO(rmmh): make sig prefixes the only thing in test_owners!
+    # Precise test names aren't very interesting.
+    owns = []
+
+    for test, (owner, random_assignment, sig) in owners.iteritems():
+        if 'k8s.io/' in test or not sig:
+            continue
+        owns.append([test, sig])
+
+    while True:
+        owns.sort()
+        for name, sig in owns:
+            # try removing the last word in the name, use it if all tests beginning
+            # with this shorter name share the same sig.
+            maybe_prefix = ' '.join(name.split()[:-1])
+            matches = [other_sig == sig for other_name, other_sig in owns if other_name.startswith(maybe_prefix)]
+            if matches and all(matches):
+                owns = [[n, s] for n, s in owns if not n.startswith(maybe_prefix)]
+                owns.append([maybe_prefix, sig])
+                break
+        else:  # iterated completely through owns without any changes
+            break
+
+    sigs = {}
+    for name, sig in owns:
+        sigs.setdefault(sig, []).append(name)
+
+    return json.dumps(sigs, sort_keys=True, indent=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--history', action='store_true', help='Generate test list from result history.')
     parser.add_argument('--user', help='User to assign new tests to (or RANDOM, default: current GitHub user).')
     parser.add_argument('--addonly', action='store_true', help='Only add missing tests, do not change existing.')
     parser.add_argument('--check', action='store_true', help='Exit with a nonzero status if the test list has changed.')
+    parser.add_argument('--print_sig_prefixes', action='store_true', help='Emit SIG prefixes for matching.')
     options = parser.parse_args()
 
     if options.history:
         test_names = get_test_names_from_test_history()
     else:
         test_names = get_test_names_from_local_files()
-    test_names.add('DEFAULT')
     test_names = sorted(test_names)
     owners = load_owners(OWNERS_PATH)
+
+    prefixes = sig_prefixes(owners)
+
+    with open(OWNERS_JSON_PATH, 'w') as f:
+        f.write(prefixes + '\n')
+
+    if options.print_sig_prefixes:
+        print prefixes
+        return
 
     outdated_tests = sorted(set(owners) - set(test_names))
     new_tests = sorted(set(test_names) - set(owners))

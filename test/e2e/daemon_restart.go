@@ -56,15 +56,6 @@ const (
 	UPDATE              = "UPDATE"
 )
 
-// nodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
-// eg: the name returned by framework.GetMasterHost(). This is also not guaranteed to work across
-// cloud providers since it involves ssh.
-func nodeExec(nodeName, cmd string) (framework.SSHResult, error) {
-	result, err := framework.SSH(cmd, fmt.Sprintf("%v:%v", nodeName, sshPort), framework.TestContext.Provider)
-	Expect(err).NotTo(HaveOccurred())
-	return result, err
-}
-
 // restartDaemonConfig is a config to restart a running daemon on a node, and wait till
 // it comes back up. It uses ssh to send a SIGTERM to the daemon.
 type restartDaemonConfig struct {
@@ -100,7 +91,7 @@ func (r *restartDaemonConfig) waitUp() {
 		"curl -s -o /dev/null -I -w \"%%{http_code}\" http://localhost:%v/healthz", r.healthzPort)
 
 	err := wait.Poll(r.pollInterval, r.pollTimeout, func() (bool, error) {
-		result, err := nodeExec(r.nodeName, healthzCheck)
+		result, err := framework.NodeExec(r.nodeName, healthzCheck)
 		framework.ExpectNoError(err)
 		if result.Code == 0 {
 			httpCode, err := strconv.Atoi(result.Stdout)
@@ -120,7 +111,8 @@ func (r *restartDaemonConfig) waitUp() {
 // kill sends a SIGTERM to the daemon
 func (r *restartDaemonConfig) kill() {
 	framework.Logf("Killing %v", r)
-	nodeExec(r.nodeName, fmt.Sprintf("pgrep %v | xargs -I {} sudo kill {}", r.daemonName))
+	_, err := framework.NodeExec(r.nodeName, fmt.Sprintf("pgrep %v | xargs -I {} sudo kill {}", r.daemonName))
+	Expect(err).NotTo(HaveOccurred())
 }
 
 // Restart checks if the daemon is up, kills it, and waits till it comes back up

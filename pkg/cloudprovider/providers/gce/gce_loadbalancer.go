@@ -70,7 +70,7 @@ func newAddressMetricContext(request, region string) *metricContext {
 
 func init() {
 	var err error
-	lbSrcRngsFlag.ipn, err = netsets.ParseIPNets([]string{"130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22", "35.191.0.0/16"}...)
+	lbSrcRngsFlag.ipn, err = netsets.ParseIPNets([]string{"130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22"}...)
 	if err != nil {
 		panic("Incorrect default GCE L7 source ranges")
 	}
@@ -311,9 +311,9 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 	}
 
 	// Ensure health checks are created for this target pool to pass to createTargetPool for health check links
-	// Alternately, if the annotation on the service was removed, we need to recreate the target pool without
-	// health checks. This needs to be prior to the forwarding rule deletion below otherwise it is not possible
-	// to delete just the target pool or http health checks later.
+	// Alternately, if the service has ExternalTrafficPolicy field set from Local to Global, we need to recreate
+	// the target pool without health checks. This needs to be prior to the forwarding rule deletion below otherwise
+	// it is not possible to delete just the target pool or http health checks later.
 	var hcToCreate *compute.HttpHealthCheck
 	hcExisting, err := gce.GetHttpHealthCheck(loadBalancerName)
 	if err != nil && !isHTTPErrorCode(err, http.StatusNotFound) {
@@ -325,7 +325,7 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 			// This logic exists to detect a transition for a pre-existing service and turn on
 			// the tpNeedsUpdate flag to delete/recreate fwdrule/tpool adding the health check
 			// to the target pool.
-			glog.V(2).Infof("Annotation external-traffic=OnlyLocal added to new or pre-existing service")
+			glog.V(2).Infof("ExternalTrafficPolicy field set to Local on new or pre-existing service")
 			tpNeedsUpdate = true
 		}
 		hcToCreate, err = gce.ensureHttpHealthCheck(loadBalancerName, path, healthCheckNodePort)

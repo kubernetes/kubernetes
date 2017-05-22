@@ -113,12 +113,24 @@ var _ = framework.KubeDescribe("SchedulerPriorities [Serial]", func() {
 		createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.6)
 
 		By("Create an RC with the same number of replicas as the schedualble nodes. One pod should be scheduled on each node.")
-		rc := createRC(ns, "scheduler-priority-selector-spreading", int32(len(nodeList.Items)), map[string]string{"name": "scheduler-priority-selector-spreading"}, f, podRequestedResource)
+		config := testutils.RCConfig{
+			Client:         f.ClientSet,
+			InternalClient: f.InternalClientset,
+			Name:           "scheduler-priority-selector-spreading",
+			Namespace:      ns,
+			Image:          framework.GetPauseImageName(f.ClientSet),
+			Replicas:       len(nodeList.Items),
+			CreatedPods:    &[]*v1.Pod{},
+			Labels:         map[string]string{"name": "scheduler-priority-selector-spreading"},
+			CpuRequest:     podRequestedResource.Requests.Cpu().MilliValue(),
+			MemRequest:     podRequestedResource.Requests.Memory().Value(),
+		}
+		Expect(framework.RunRC(config)).NotTo(HaveOccurred())
 		// Cleanup the replication controller when we are done.
 		defer func() {
 			// Resize the replication controller to zero to get rid of pods.
-			if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rc.Name); err != nil {
-				framework.Logf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
+			if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "scheduler-priority-selector-spreading"); err != nil {
+				framework.Logf("Failed to cleanup replication controller %v: %v.", "scheduler-priority-selector-spreading", err)
 			}
 		}()
 		pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, "scheduler-priority-selector-spreading", int32(len(nodeList.Items)))
@@ -137,7 +149,7 @@ var _ = framework.KubeDescribe("SchedulerPriorities [Serial]", func() {
 		}
 		By("Verify the pods were scheduled to each node")
 		if len(nodeList.Items) != len(result) {
-			framework.Failf("Pods are not spread to each node")
+			framework.Failf("Pods are not spread to each node.")
 		}
 	})
 
@@ -276,7 +288,7 @@ var _ = framework.KubeDescribe("SchedulerPriorities [Serial]", func() {
 								LabelSelector: &metav1.LabelSelector{
 									MatchExpressions: []metav1.LabelSelectorRequirement{
 										{
-											Key:      "service",
+											Key:      "security",
 											Operator: metav1.LabelSelectorOpIn,
 											Values:   []string{"S1", "value2"},
 										},
@@ -465,6 +477,11 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 				NodeName: node.Name,
 			}), true, framework.Logf)
 	}
+	for _, node := range nodes {
+		By("Compute Cpu, Mem Fraction after create balanced pods.")
+		computeCpuMemFraction(cs, node, requestedResource)
+
+	}
 }
 
 func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.ResourceRequirements) (float64, float64) {
@@ -493,7 +510,7 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	memFraction := float64(totalRequestedMemResource) / float64(memAllocatableVal)
 
 	framework.Logf("Node: %v, totalRequestedCpuResource: %v, cpuAllocatableMil: %v, cpuFraction: %v", node.Name, totalRequestedCpuResource, cpuAllocatableMil, cpuFraction)
-	framework.Logf("Node: %v, totalRequestedMemResource: %v, memAllocatableVal: %v, memFraction: %v", node.Name, memAllocatableVal, cpuAllocatableMil, memFraction)
+	framework.Logf("Node: %v, totalRequestedMemResource: %v, memAllocatableVal: %v, memFraction: %v", node.Name, totalRequestedMemResource, memAllocatableVal, memFraction)
 
 	return cpuFraction, memFraction
 }

@@ -146,7 +146,7 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 	}
 	constraints["l7-lb-controller"] = framework.ResourceConstraint{
 		CPUConstraint:    0.15,
-		MemoryConstraint: 60 * (1024 * 1024),
+		MemoryConstraint: 75 * (1024 * 1024),
 	}
 	constraints["influxdb"] = framework.ResourceConstraint{
 		CPUConstraint:    2,
@@ -304,6 +304,8 @@ var _ = framework.KubeDescribe("Density", func() {
 	var nodes *v1.NodeList
 	var masters sets.String
 
+	testCaseBaseName := "density"
+
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
 		saturationThreshold := time.Duration((totalPods / MinPodsPerSecondThroughput)) * time.Second
@@ -319,17 +321,25 @@ var _ = framework.KubeDescribe("Density", func() {
 		}
 		framework.Logf("Cluster saturation time: %s", framework.PrettyPrintJSON(saturationData))
 
+		summaries := make([]framework.TestDataSummary, 0, 2)
 		// Verify latency metrics.
-		highLatencyRequests, err := framework.HighLatencyRequests(c)
+		highLatencyRequests, metrics, err := framework.HighLatencyRequests(c)
 		framework.ExpectNoError(err)
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+		if err == nil {
+			summaries = append(summaries, metrics)
+			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+		}
 
 		// Verify scheduler metrics.
 		// TODO: Reset metrics at the beginning of the test.
 		// We should do something similar to how we do it for APIserver.
-		if err = framework.VerifySchedulerLatency(c); err != nil {
-			framework.Logf("Warning: Scheduler latency not calculated, %v", err)
+		latency, err := framework.VerifySchedulerLatency(c)
+		framework.ExpectNoError(err)
+		if err == nil {
+			summaries = append(summaries, latency)
 		}
+
+		framework.PrintSummaries(summaries, testCaseBaseName)
 	})
 
 	options := framework.FrameworkOptions{
@@ -338,7 +348,7 @@ var _ = framework.KubeDescribe("Density", func() {
 	}
 	// Explicitly put here, to delete namespace at the end of the test
 	// (after measuring latency metrics, etc.).
-	f := framework.NewFramework("density", options, nil)
+	f := framework.NewFramework(testCaseBaseName, options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
@@ -718,7 +728,8 @@ var _ = framework.KubeDescribe("Density", func() {
 				framework.PrintLatencies(e2eLag, "worst e2e total latencies")
 
 				// Test whether e2e pod startup time is acceptable.
-				podStartupLatency := framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLag)}
+				podStartupLatency := &framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLag)}
+				f.TestSummaries = append(f.TestSummaries, podStartupLatency)
 				framework.ExpectNoError(framework.VerifyPodStartupLatency(podStartupLatency))
 
 				framework.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)

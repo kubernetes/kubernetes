@@ -32,9 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 
+	"k8s.io/apimachinery/pkg/util/clock"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/api/v1/ref"
-	"k8s.io/client-go/util/clock"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -88,6 +88,11 @@ func (c *FakeNodeHandler) GetUpdatedNodesCopy() []*v1.Node {
 // Core returns fake CoreInterface.
 func (c *FakeNodeHandler) Core() v1core.CoreV1Interface {
 	return &FakeLegacyHandler{c.Clientset.Core(), c}
+}
+
+// CoreV1 returns fake CoreV1Interface
+func (c *FakeNodeHandler) CoreV1() v1core.CoreV1Interface {
+	return &FakeLegacyHandler{c.Clientset.CoreV1(), c}
 }
 
 // Nodes return fake NodeInterfaces.

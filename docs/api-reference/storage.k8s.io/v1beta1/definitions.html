@@ -476,7 +476,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata More info: <a href="https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata">https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_listmeta">v1.ListMeta</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -653,6 +653,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">uid</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UID of the resource. (when there is a single resource which can be described). More info: <a href="http://kubernetes.io/docs/user-guide/identifiers#uids">http://kubernetes.io/docs/user-guide/identifiers#uids</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">causes</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -698,6 +705,81 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the target UID.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_types_uid">types.UID</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_initializers">v1.Initializers</h3>
+<div class="paragraph">
+<p>Initializers tracks the progress of initialization.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pending</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Pending is a list of initializers that must execute in order before this object is visible. When the last pending initializer is removed, and no failing result is set, the initializers struct will be set to nil and the object is considered as initialized and visible to all clients.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_initializer">v1.Initializer</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">result</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If result is set with the Failure field, the object will be persisted to storage and then deleted, ensuring that other clients can observe the deletion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_status">v1.Status</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_initializer">v1.Initializer</h3>
+<div class="paragraph">
+<p>Initializer is information about an initializer that has not yet completed.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the process that is responsible for initializing this object.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -829,7 +911,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Standard object&#8217;s metadata. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard object&#8217;s metadata. More info: <a href="https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata">https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectmeta">v1.ObjectMeta</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1016,6 +1098,15 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_ownerreference">v1.OwnerReference</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">initializers</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven&#8217;t explicitly asked to observe uninitialized objects.<br>
+<br>
+When an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_initializers">v1.Initializers</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -1245,7 +1336,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-03-21 14:23:34 UTC
+Last updated 2017-05-17 22:25:44 UTC
 </div>
 </div>
 </body>

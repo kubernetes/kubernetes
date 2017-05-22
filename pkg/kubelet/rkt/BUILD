@@ -24,7 +24,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",
@@ -58,6 +57,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
+        "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )

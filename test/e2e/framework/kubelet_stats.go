@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
@@ -109,9 +109,13 @@ func GetKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMetrics {
 		kubeletmetrics.PodWorkerStartLatencyKey,
 		kubeletmetrics.PLEGRelistLatencyKey,
 	)
+	return GetKubeletMetrics(ms, latencyMethods)
+}
+
+func GetKubeletMetrics(ms metrics.KubeletMetrics, methods sets.String) KubeletLatencyMetrics {
 	var latencyMetrics KubeletLatencyMetrics
 	for method, samples := range ms {
-		if !latencyMethods.Has(method) {
+		if !methods.Has(method) {
 			continue
 		}
 		for _, sample := range samples {

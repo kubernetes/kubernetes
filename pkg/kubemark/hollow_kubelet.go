@@ -19,7 +19,6 @@ package kubemark
 import (
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
@@ -30,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -52,7 +51,7 @@ func NewHollowKubelet(
 	nodeName string,
 	client *clientset.Clientset,
 	cadvisorInterface cadvisor.Interface,
-	dockerClient dockertools.DockerInterface,
+	dockerClient libdocker.Interface,
 	kubeletPort, kubeletReadOnlyPort int,
 	containerManager cm.ContainerManager,
 	maxPods int, podsPerCore int,
@@ -125,7 +124,6 @@ func GetHollowKubeletConfig(
 	c.Address = "0.0.0.0" /* bind address */
 	c.Port = int32(kubeletPort)
 	c.ReadOnlyPort = int32(kubeletReadOnlyPort)
-	c.MasterServiceNamespace = metav1.NamespaceDefault
 	c.PodManifestPath = manifestFilePath
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second

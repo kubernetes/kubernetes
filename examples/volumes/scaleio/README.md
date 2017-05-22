@@ -211,7 +211,7 @@ sio-small   kubernetes.io/scaleio
 
 ### PVC for the StorageClass
 
-The next step is to define/deploy a `PeristentVolumeClaim` that will use the StorageClass.
+The next step is to define/deploy a `PersistentVolumeClaim` that will use the StorageClass.
 
 File [sc-pvc.yaml](sc-pvc.yaml)
 

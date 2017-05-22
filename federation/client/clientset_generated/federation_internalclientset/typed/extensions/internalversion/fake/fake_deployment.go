@@ -34,6 +34,8 @@ type FakeDeployments struct {
 
 var deploymentsResource = schema.GroupVersionResource{Group: "extensions", Version: "", Resource: "deployments"}
 
+var deploymentsKind = schema.GroupVersionKind{Group: "extensions", Version: "", Kind: "Deployment"}
+
 func (c *FakeDeployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(deploymentsResource, c.ns, deployment), &extensions.Deployment{})
@@ -90,7 +92,7 @@ func (c *FakeDeployments) Get(name string, options v1.GetOptions) (result *exten
 
 func (c *FakeDeployments) List(opts v1.ListOptions) (result *extensions.DeploymentList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(deploymentsResource, c.ns, opts), &extensions.DeploymentList{})
+		Invokes(testing.NewListAction(deploymentsResource, deploymentsKind, c.ns, opts), &extensions.DeploymentList{})
 
 	if obj == nil {
 		return nil, err

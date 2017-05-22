@@ -17,7 +17,9 @@ limitations under the License.
 package gce
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -34,6 +36,8 @@ type gceInstance struct {
 	Disks []*compute.AttachedDisk
 	Type  string
 }
+
+var providerIdRE = regexp.MustCompile(`^` + ProviderName + `://([^/]+)/([^/]+)/([^/]+)$`)
 
 func getProjectAndZone() (string, string, error) {
 	result, err := metadata.Get("instance/zone")
@@ -99,4 +103,15 @@ func GetGCERegion(zone string) (string, error) {
 func isHTTPErrorCode(err error, code int) bool {
 	apiErr, ok := err.(*googleapi.Error)
 	return ok && apiErr.Code == code
+}
+
+// splitProviderID splits a provider's id into core components.
+// A providerID is build out of '${ProviderName}://${project-id}/${zone}/${instance-name}'
+// See cloudprovider.GetInstanceProviderID.
+func splitProviderID(providerID string) (project, zone, instance string, err error) {
+	matches := providerIdRE.FindStringSubmatch(providerID)
+	if len(matches) != 4 {
+		return "", "", "", errors.New("error splitting providerID")
+	}
+	return matches[1], matches[2], matches[3], nil
 }

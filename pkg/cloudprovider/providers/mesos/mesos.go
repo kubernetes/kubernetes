@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -88,6 +89,9 @@ func newMesosCloud(configReader io.Reader) (*MesosCloud, error) {
 		return &MesosCloud{client: cl, config: config}, nil
 	}
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (c *MesosCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 // Implementation of Instances.CurrentNodeName
 func (c *MesosCloud) CurrentNodeName(hostname string) (types.NodeName, error) {
@@ -298,7 +302,6 @@ func (c *MesosCloud) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, e
 		return nil, err
 	}
 	return []v1.NodeAddress{
-		{Type: v1.NodeLegacyHostIP, Address: ip.String()},
 		{Type: v1.NodeInternalIP, Address: ip.String()},
 		{Type: v1.NodeExternalIP, Address: ip.String()},
 	}, nil

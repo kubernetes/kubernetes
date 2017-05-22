@@ -45,6 +45,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -157,6 +165,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -228,6 +244,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -541,6 +565,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -686,7 +718,7 @@
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
@@ -725,7 +757,7 @@
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta1.ClusterSpec",
@@ -798,6 +830,10 @@
       },
       "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller."
      },
+     "initializers": {
+      "$ref": "v1.Initializers",
+      "description": "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user."
+     },
      "finalizers": {
       "type": "array",
       "items": {
@@ -847,109 +883,36 @@
      }
     }
    },
-   "v1beta1.ClusterSpec": {
-    "id": "v1beta1.ClusterSpec",
-    "description": "ClusterSpec describes the attributes of a kubernetes cluster.",
+   "v1.Initializers": {
+    "id": "v1.Initializers",
+    "description": "Initializers tracks the progress of initialization.",
     "required": [
-     "serverAddressByClientCIDRs"
+     "pending"
     ],
     "properties": {
-     "serverAddressByClientCIDRs": {
+     "pending": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.ServerAddressByClientCIDR"
+       "$ref": "v1.Initializer"
       },
-      "description": "A map of client CIDR to server address. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR."
+      "description": "Pending is a list of initializers that must execute in order before this object is visible. When the last pending initializer is removed, and no failing result is set, the initializers struct will be set to nil and the object is considered as initialized and visible to all clients."
      },
-     "secretRef": {
-      "$ref": "v1.LocalObjectReference",
-      "description": "Name of the secret containing kubeconfig to access this cluster. The secret is read from the kubernetes cluster that is hosting federation control plane. Admin needs to ensure that the required secret exists. Secret should be in the same namespace where federation control plane is hosted and it should have kubeconfig in its data with key \"kubeconfig\". This will later be changed to a reference to secret in federation control plane when the federation control plane supports secrets. This can be left empty if the cluster allows insecure access."
+     "result": {
+      "$ref": "v1.Status",
+      "description": "If result is set with the Failure field, the object will be persisted to storage and then deleted, ensuring that other clients can observe the deletion."
      }
     }
    },
-   "v1beta1.ServerAddressByClientCIDR": {
-    "id": "v1beta1.ServerAddressByClientCIDR",
-    "description": "ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.",
+   "v1.Initializer": {
+    "id": "v1.Initializer",
+    "description": "Initializer is information about an initializer that has not yet completed.",
     "required": [
-     "clientCIDR",
-     "serverAddress"
+     "name"
     ],
-    "properties": {
-     "clientCIDR": {
-      "type": "string",
-      "description": "The CIDR with which clients can match their IP to figure out the server address that they should use."
-     },
-     "serverAddress": {
-      "type": "string",
-      "description": "Address of this server, suitable for a client that matches the above CIDR. This can be a hostname, hostname:port, IP or IP:port."
-     }
-    }
-   },
-   "v1.LocalObjectReference": {
-    "id": "v1.LocalObjectReference",
-    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
-     }
-    }
-   },
-   "v1beta1.ClusterStatus": {
-    "id": "v1beta1.ClusterStatus",
-    "description": "ClusterStatus is information about the current status of a cluster updated by cluster controller periodically.",
-    "properties": {
-     "conditions": {
-      "type": "array",
-      "items": {
-       "$ref": "v1beta1.ClusterCondition"
-      },
-      "description": "Conditions is an array of current cluster conditions."
-     },
-     "zones": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      },
-      "description": "Zones is the list of availability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'. These will always be in the same region."
-     },
-     "region": {
-      "type": "string",
-      "description": "Region is the name of the region in which all of the nodes in the cluster exist.  e.g. 'us-east1'."
-     }
-    }
-   },
-   "v1beta1.ClusterCondition": {
-    "id": "v1beta1.ClusterCondition",
-    "description": "ClusterCondition describes current state of a cluster.",
-    "required": [
-     "type",
-     "status"
-    ],
-    "properties": {
-     "type": {
-      "type": "string",
-      "description": "Type of cluster condition, Complete or Failed."
-     },
-     "status": {
-      "type": "string",
-      "description": "Status of the condition, one of True, False, Unknown."
-     },
-     "lastProbeTime": {
-      "type": "string",
-      "description": "Last time the condition was checked."
-     },
-     "lastTransitionTime": {
-      "type": "string",
-      "description": "Last time the condition transit from one status to another."
-     },
-     "reason": {
-      "type": "string",
-      "description": "(brief) reason for the condition's last transition."
-     },
-     "message": {
-      "type": "string",
-      "description": "Human readable message indicating details about last transition."
+      "description": "name of the process that is responsible for initializing this object."
      }
     }
    },
@@ -1008,6 +971,10 @@
       "type": "string",
       "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
+     "uid": {
+      "type": "string",
+      "description": "UID of the resource. (when there is a single resource which can be described). More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
+     },
      "causes": {
       "type": "array",
       "items": {
@@ -1037,6 +1004,112 @@
      "field": {
       "type": "string",
       "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed.  Fields may appear more than once in an array of causes due to fields having multiple errors. Optional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\""
+     }
+    }
+   },
+   "v1beta1.ClusterSpec": {
+    "id": "v1beta1.ClusterSpec",
+    "description": "ClusterSpec describes the attributes of a kubernetes cluster.",
+    "required": [
+     "serverAddressByClientCIDRs"
+    ],
+    "properties": {
+     "serverAddressByClientCIDRs": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.ServerAddressByClientCIDR"
+      },
+      "description": "A map of client CIDR to server address. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR."
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "Name of the secret containing kubeconfig to access this cluster. The secret is read from the kubernetes cluster that is hosting federation control plane. Admin needs to ensure that the required secret exists. Secret should be in the same namespace where federation control plane is hosted and it should have kubeconfig in its data with key \"kubeconfig\". This will later be changed to a reference to secret in federation control plane when the federation control plane supports secrets. This can be left empty if the cluster allows insecure access."
+     }
+    }
+   },
+   "v1beta1.ServerAddressByClientCIDR": {
+    "id": "v1beta1.ServerAddressByClientCIDR",
+    "description": "ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.",
+    "required": [
+     "clientCIDR",
+     "serverAddress"
+    ],
+    "properties": {
+     "clientCIDR": {
+      "type": "string",
+      "description": "The CIDR with which clients can match their IP to figure out the server address that they should use."
+     },
+     "serverAddress": {
+      "type": "string",
+      "description": "Address of this server, suitable for a client that matches the above CIDR. This can be a hostname, hostname:port, IP or IP:port."
+     }
+    }
+   },
+   "v1.LocalObjectReference": {
+    "id": "v1.LocalObjectReference",
+    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
+     }
+    }
+   },
+   "v1beta1.ClusterStatus": {
+    "id": "v1beta1.ClusterStatus",
+    "description": "ClusterStatus is information about the current status of a cluster updated by cluster controller periodically.",
+    "properties": {
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.ClusterCondition"
+      },
+      "description": "Conditions is an array of current cluster conditions."
+     },
+     "zones": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Zones is the list of availability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'. These will always be in the same region."
+     },
+     "region": {
+      "type": "string",
+      "description": "Region is the name of the region in which all of the nodes in the cluster exist.  e.g. 'us-east1'."
+     }
+    }
+   },
+   "v1beta1.ClusterCondition": {
+    "id": "v1beta1.ClusterCondition",
+    "description": "ClusterCondition describes current state of a cluster.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of cluster condition, Complete or Failed."
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the condition, one of True, False, Unknown."
+     },
+     "lastProbeTime": {
+      "type": "string",
+      "description": "Last time the condition was checked."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "description": "Last time the condition transit from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "(brief) reason for the condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "Human readable message indicating details about last transition."
      }
     }
    },

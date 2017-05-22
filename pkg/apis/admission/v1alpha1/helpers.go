@@ -1,0 +1,68 @@
+/*
+Copyright 2017 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package v1alpha1
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/admission"
+	authenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
+)
+
+// NewAdmissionReview returns an AdmissionReview for the provided admission.Attributes
+func NewAdmissionReview(attr admission.Attributes) AdmissionReview {
+	gvk := attr.GetKind()
+	gvr := attr.GetResource()
+	aUserInfo := attr.GetUserInfo()
+	userInfo := authenticationv1.UserInfo{
+		Extra:    make(map[string]authenticationv1.ExtraValue),
+		Groups:   aUserInfo.GetGroups(),
+		UID:      aUserInfo.GetUID(),
+		Username: aUserInfo.GetName(),
+	}
+
+	// Convert the extra information in the user object
+	for key, val := range aUserInfo.GetExtra() {
+		userInfo.Extra[key] = authenticationv1.ExtraValue(val)
+	}
+
+	return AdmissionReview{
+		Spec: AdmissionReviewSpec{
+			Name:      attr.GetName(),
+			Namespace: attr.GetNamespace(),
+			Resource: metav1.GroupVersionResource{
+				Group:    gvr.Group,
+				Resource: gvr.Resource,
+				Version:  gvr.Version,
+			},
+			SubResource: attr.GetSubresource(),
+			Operation:   attr.GetOperation(),
+			Object: runtime.RawExtension{
+				Object: attr.GetObject(),
+			},
+			OldObject: runtime.RawExtension{
+				Object: attr.GetOldObject(),
+			},
+			Kind: metav1.GroupVersionKind{
+				Group:   gvk.Group,
+				Kind:    gvk.Kind,
+				Version: gvk.Version,
+			},
+			UserInfo: userInfo,
+		},
+	}
+}

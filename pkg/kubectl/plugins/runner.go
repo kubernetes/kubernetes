@@ -18,6 +18,7 @@ package plugins
 
 import (
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -33,12 +34,12 @@ type PluginRunner interface {
 // in, out, and err streams, arguments and environment passed to it, and the
 // working directory.
 type RunningContext struct {
-	In         io.Reader
-	Out        io.Writer
-	ErrOut     io.Writer
-	Args       []string
-	Env        []string
-	WorkingDir string
+	In          io.Reader
+	Out         io.Writer
+	ErrOut      io.Writer
+	Args        []string
+	EnvProvider EnvProvider
+	WorkingDir  string
 }
 
 // ExecPluginRunner is a PluginRunner that uses Go's os/exec to run plugins.
@@ -47,7 +48,7 @@ type ExecPluginRunner struct{}
 // Run takes a given plugin and runs it in a given context using os/exec, returning
 // any error found while running.
 func (r *ExecPluginRunner) Run(plugin *Plugin, ctx RunningContext) error {
-	command := strings.Split(plugin.Command, " ")
+	command := strings.Split(os.ExpandEnv(plugin.Command), " ")
 	base := command[0]
 	args := []string{}
 	if len(command) > 1 {
@@ -61,7 +62,11 @@ func (r *ExecPluginRunner) Run(plugin *Plugin, ctx RunningContext) error {
 	cmd.Stdout = ctx.Out
 	cmd.Stderr = ctx.ErrOut
 
-	cmd.Env = ctx.Env
+	env, err := ctx.EnvProvider.Env()
+	if err != nil {
+		return err
+	}
+	cmd.Env = env.Slice()
 	cmd.Dir = ctx.WorkingDir
 
 	glog.V(9).Infof("Running plugin %q as base command %q with args %v", plugin.Name, base, args)

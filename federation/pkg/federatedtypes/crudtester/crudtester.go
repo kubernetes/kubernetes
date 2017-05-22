@@ -163,11 +163,17 @@ func (c *FederatedTypeCRUDTester) CheckDelete(obj pkgruntime.Object, orphanDepen
 	}
 }
 
+// CheckPropagation checks propagation for the crud tester's clients
 func (c *FederatedTypeCRUDTester) CheckPropagation(obj pkgruntime.Object) {
+	c.CheckPropagationForClients(obj, c.clusterClients)
+}
+
+// CheckPropagationForClients checks propagation for the provided clients
+func (c *FederatedTypeCRUDTester) CheckPropagationForClients(obj pkgruntime.Object, clusterClients []clientset.Interface) {
 	namespacedName := c.adapter.NamespacedName(obj)
 
-	c.tl.Logf("Waiting for %s %q in %d clusters", c.kind, namespacedName, len(c.clusterClients))
-	for _, client := range c.clusterClients {
+	c.tl.Logf("Waiting for %s %q in %d clusters", c.kind, namespacedName, len(clusterClients))
+	for _, client := range clusterClients {
 		err := c.waitForResource(client, obj)
 		if err != nil {
 			c.tl.Fatalf("Failed to verify %s %q in a member cluster: %v", c.kind, namespacedName, err)
@@ -193,11 +199,7 @@ func (c *FederatedTypeCRUDTester) waitForResource(client clientset.Interface, ob
 func (c *FederatedTypeCRUDTester) updateFedObject(obj pkgruntime.Object) (pkgruntime.Object, error) {
 	err := wait.PollImmediate(c.waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
 		// Target the metadata for simplicity (it's type-agnostic)
-		meta := c.adapter.ObjectMeta(obj)
-		if meta.Annotations == nil {
-			meta.Annotations = make(map[string]string)
-		}
-		meta.Annotations[AnnotationTestFederationCRUDUpdate] = "updated"
+		federatedtypes.SetAnnotation(c.adapter, obj, AnnotationTestFederationCRUDUpdate, "updated")
 
 		_, err := c.adapter.FedUpdate(obj)
 		if errors.IsConflict(err) {

@@ -40,7 +40,7 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 	return list, fmt.Errorf("OperationNotSupported")
 }
 
-func (rrsets ResourceRecordSets) Get(name string) (dnsprovider.ResourceRecordSet, error) {
+func (rrsets ResourceRecordSets) Get(name string) ([]dnsprovider.ResourceRecordSet, error) {
 	getOpts := &etcdc.GetOptions{
 		Recursive: true,
 	}
@@ -58,33 +58,33 @@ func (rrsets ResourceRecordSets) Get(name string) (dnsprovider.ResourceRecordSet
 		return nil, nil
 	}
 
-	rrset := ResourceRecordSet{name: name, rrdatas: []string{}, rrsets: &rrsets}
-	found := false
+	var list []dnsprovider.ResourceRecordSet
+
 	for _, node := range response.Node.Nodes {
-		found = true
 		service := dnsmsg.Service{}
 		err = json.Unmarshal([]byte(node.Value), &service)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to unmarshall json data, err: %v", err)
 		}
 
-		// assuming all rrdatas in a rrset will have same type
+		rrset := ResourceRecordSet{name: name, rrdatas: []string{}, rrsets: &rrsets}
 		ip := net.ParseIP(service.Host)
 		switch {
 		case ip == nil:
 			rrset.rrsType = rrstype.CNAME
 		case ip.To4() != nil:
 			rrset.rrsType = rrstype.A
+		case ip.To16() != nil:
+			rrset.rrsType = rrstype.AAAA
+		default:
+			// Cannot occur
 		}
 		rrset.rrdatas = append(rrset.rrdatas, service.Host)
 		rrset.ttl = int64(service.TTL)
+		list = append(list, rrset)
 	}
 
-	if !found {
-		return nil, nil
-	}
-
-	return rrset, nil
+	return list, nil
 }
 
 func (rrsets ResourceRecordSets) StartChangeset() dnsprovider.ResourceRecordChangeset {

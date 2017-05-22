@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/volume"
 

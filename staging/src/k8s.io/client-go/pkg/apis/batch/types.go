@@ -27,17 +27,17 @@ import (
 type Job struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Specification of the desired behavior of a job.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 	// +optional
 	Spec JobSpec
 
 	// Current status of a job.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 	// +optional
 	Status JobStatus
 }
@@ -46,7 +46,7 @@ type Job struct {
 type JobList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -58,7 +58,7 @@ type JobList struct {
 type JobTemplate struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
@@ -71,12 +71,12 @@ type JobTemplate struct {
 // JobTemplateSpec describes the data a Job should have when created from a template
 type JobTemplateSpec struct {
 	// Standard object's metadata of the jobs created from this template.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Specification of the desired behavior of the job.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 	// +optional
 	Spec JobSpec
 }
@@ -193,17 +193,17 @@ type JobCondition struct {
 type CronJob struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Specification of the desired behavior of a cron job, including the schedule.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 	// +optional
 	Spec CronJobSpec
 
 	// Current status of a cron job.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 	// +optional
 	Status CronJobStatus
 }
@@ -212,7 +212,7 @@ type CronJob struct {
 type CronJobList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 

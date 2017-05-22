@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/federation/apis/federation"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns"
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
@@ -55,6 +56,8 @@ import (
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+
+	"gopkg.in/gcfg.v1"
 )
 
 const (
@@ -74,7 +77,6 @@ const (
 
 func TestInitFederation(t *testing.T) {
 	cmdErrMsg := ""
-	dnsProvider := "google-clouddns"
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
 		cmdErrMsg = str
 	})
@@ -97,6 +99,7 @@ func TestInitFederation(t *testing.T) {
 		etcdPVCapacity               string
 		etcdPersistence              string
 		expectedErr                  string
+		dnsProvider                  string
 		dnsProviderConfig            string
 		dryRun                       string
 		apiserverArgOverrides        string
@@ -116,6 +119,7 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:        "5Gi",
 			etcdPersistence:       "true",
 			expectedErr:           "",
+			dnsProvider:           util.FedDNSProviderCoreDNS,
 			dnsProviderConfig:     "dns-provider.conf",
 			dryRun:                "",
 			apiserverArgOverrides: "--client-ca-file=override,--log-dir=override",
@@ -210,6 +214,9 @@ func TestInitFederation(t *testing.T) {
 		tmpDirPath := ""
 		buf := bytes.NewBuffer([]byte{})
 
+		if tc.dnsProvider == "" {
+			tc.dnsProvider = "google-clouddns"
+		}
 		if tc.dnsProviderConfig != "" {
 			tmpfile, err := ioutil.TempFile("", tc.dnsProviderConfig)
 			if err != nil {
@@ -227,7 +234,7 @@ func TestInitFederation(t *testing.T) {
 		}
 		defer os.Remove(tmpDirPath)
 
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -237,13 +244,13 @@ func TestInitFederation(t *testing.T) {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
 
-		cmd := NewCmdInit(buf, adminConfig)
+		cmd := NewCmdInit(buf, adminConfig, "image")
 
 		cmd.Flags().Set("kubeconfig", tc.kubeconfigExplicit)
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.image)
-		cmd.Flags().Set("dns-provider", dnsProvider)
+		cmd.Flags().Set("dns-provider", tc.dnsProvider)
 		cmd.Flags().Set("apiserver-arg-overrides", tc.apiserverArgOverrides)
 		cmd.Flags().Set("controllermanager-arg-overrides", tc.cmArgOverrides)
 
@@ -1043,6 +1050,12 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	}
 	if dnsProviderConfig != "" {
 		cm = addDNSProviderConfigTest(cm, cmDNSProviderSecret.Name)
+		if dnsProvider == util.FedDNSProviderCoreDNS {
+			cm, err = addCoreDNSServerAnnotationTest(cm, dnsZoneName, dnsProviderConfig)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	podList := v1.PodList{}
@@ -1539,4 +1552,17 @@ func addDNSProviderConfigTest(dep *v1beta1.Deployment, secretName string) *v1bet
 	dep.Spec.Template.Spec.Containers[0].Command = append(dep.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("--dns-provider-config=%s/%s", dnsProviderConfigMountPath, secretName))
 
 	return dep
+}
+
+// TODO: Reuse the function addCoreDNSServerAnnotation once that function is converted to use versioned objects.
+func addCoreDNSServerAnnotationTest(deployment *v1beta1.Deployment, dnsZoneName, dnsProviderConfig string) (*v1beta1.Deployment, error) {
+	var cfg coredns.Config
+	if err := gcfg.ReadFileInto(&cfg, dnsProviderConfig); err != nil {
+		return nil, err
+	}
+
+	deployment.Annotations[util.FedDNSZoneName] = dnsZoneName
+	deployment.Annotations[util.FedNameServer] = cfg.Global.CoreDNSEndpoints
+	deployment.Annotations[util.FedDNSProvider] = util.FedDNSProviderCoreDNS
+	return deployment, nil
 }

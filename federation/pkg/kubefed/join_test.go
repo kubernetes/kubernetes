@@ -42,10 +42,15 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-// testFederationName is a name to use for the federation in tests. Since the federation
-// name is recovered from the federation itself, this constant is an appropriate
-// functional replica.
-const testFederationName = "test-federation"
+const (
+	// testFederationName is a name to use for the federation in tests. Since the federation
+	// name is recovered from the federation itself, this constant is an appropriate
+	// functional replica.
+	testFederationName = "test-federation"
+
+	zoneName      = "test-dns-zone"
+	coreDNSServer = "11.22.33.44:53"
+)
 
 func TestJoinFederation(t *testing.T) {
 	cmdErrMsg := ""
@@ -69,22 +74,22 @@ func TestJoinFederation(t *testing.T) {
 		kubeconfigExplicit string
 		expectedServer     string
 		expectedErr        string
+		dnsProvider        string
 	}{
 		{
 			cluster:            "syndicate",
 			clusterCtx:         "",
-			secret:             "",
 			server:             "https://10.20.30.40",
 			token:              "badge",
 			kubeconfigGlobal:   fakeKubeFiles[0],
 			kubeconfigExplicit: "",
 			expectedServer:     "https://10.20.30.40",
 			expectedErr:        "",
+			dnsProvider:        util.FedDNSProviderCoreDNS,
 		},
 		{
 			cluster:            "ally",
 			clusterCtx:         "",
-			secret:             "",
 			server:             "ally256.example.com:80",
 			token:              "souvenir",
 			kubeconfigGlobal:   fakeKubeFiles[0],
@@ -95,13 +100,32 @@ func TestJoinFederation(t *testing.T) {
 		{
 			cluster:            "confederate",
 			clusterCtx:         "",
-			secret:             "",
 			server:             "10.8.8.8",
 			token:              "totem",
 			kubeconfigGlobal:   fakeKubeFiles[1],
 			kubeconfigExplicit: fakeKubeFiles[2],
 			expectedServer:     "https://10.8.8.8",
 			expectedErr:        "",
+		},
+		{
+			cluster:            "associate",
+			clusterCtx:         "confederate",
+			server:             "10.8.8.8",
+			token:              "totem",
+			kubeconfigGlobal:   fakeKubeFiles[1],
+			kubeconfigExplicit: fakeKubeFiles[2],
+			expectedServer:     "https://10.8.8.8",
+			expectedErr:        "",
+		},
+		{
+			cluster:            "affiliate",
+			clusterCtx:         "",
+			server:             "https://10.20.30.40",
+			token:              "badge",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			expectedServer:     "https://10.20.30.40",
+			expectedErr:        fmt.Sprintf("error: cluster context %q not found", "affiliate"),
 		},
 		{
 			cluster:            "associate",
@@ -114,17 +138,6 @@ func TestJoinFederation(t *testing.T) {
 			expectedServer:     "https://10.8.8.8",
 			expectedErr:        "",
 		},
-		{
-			cluster:            "affiliate",
-			clusterCtx:         "",
-			secret:             "",
-			server:             "https://10.20.30.40",
-			token:              "badge",
-			kubeconfigGlobal:   fakeKubeFiles[0],
-			kubeconfigExplicit: "",
-			expectedServer:     "https://10.20.30.40",
-			expectedErr:        fmt.Sprintf("error: cluster context %q not found", "affiliate"),
-		},
 	}
 
 	for i, tc := range testCases {
@@ -132,12 +145,12 @@ func TestJoinFederation(t *testing.T) {
 		f := testJoinFederationFactory(tc.cluster, tc.secret, tc.expectedServer)
 		buf := bytes.NewBuffer([]byte{})
 
-		hostFactory, err := fakeJoinHostFactory(tc.cluster, tc.clusterCtx, tc.secret, tc.server, tc.token)
+		hostFactory, err := fakeJoinHostFactory(tc.cluster, tc.clusterCtx, tc.secret, tc.server, tc.token, tc.dnsProvider)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
 
-		targetClusterFactory, err := fakeJoinTargetClusterFactory(tc.cluster, tc.clusterCtx)
+		targetClusterFactory, err := fakeJoinTargetClusterFactory(tc.cluster, tc.clusterCtx, tc.dnsProvider)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -183,9 +196,6 @@ func TestJoinFederation(t *testing.T) {
 }
 
 func testJoinFederationFactory(clusterName, secretName, server string) cmdutil.Factory {
-	if secretName == "" {
-		secretName = clusterName
-	}
 
 	want := fakeCluster(clusterName, secretName, server)
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
@@ -206,6 +216,13 @@ func testJoinFederationFactory(clusterName, secretName, server string) cmdutil.F
 				if err != nil {
 					return nil, err
 				}
+				// If the secret name was generated, test it separately.
+				if secretName == "" {
+					if got.Spec.SecretRef.Name == "" {
+						return nil, fmt.Errorf("expected a generated secret name, got \"\"")
+					}
+					got.Spec.SecretRef.Name = ""
+				}
 				if !apiequality.Semantic.DeepEqual(got, want) {
 					return nil, fmt.Errorf("Unexpected cluster object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
@@ -219,12 +236,9 @@ func testJoinFederationFactory(clusterName, secretName, server string) cmdutil.F
 	return f
 }
 
-func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token string) (cmdutil.Factory, error) {
+func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token, dnsProvider string) (cmdutil.Factory, error) {
 	if clusterCtx == "" {
 		clusterCtx = clusterName
-	}
-	if secretName == "" {
-		secretName = clusterName
 	}
 
 	kubeconfig := clientcmdapi.Config{
@@ -251,13 +265,17 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 		return nil, err
 	}
 
+	placeholderSecretName := secretName
+	if placeholderSecretName == "" {
+		placeholderSecretName = "secretName"
+	}
 	secretObject := v1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
+			Name:      placeholderSecretName,
 			Namespace: util.DefaultFederationSystemNamespace,
 			Annotations: map[string]string{
 				federation.FederationNameAnnotation: testFederationName,
@@ -270,28 +288,26 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 	}
 
 	cmName := "controller-manager"
-	deploymentList := v1beta1.DeploymentList{
+	deployment := v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "DeploymentList",
+			Kind:       "Deployment",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
 		},
-		Items: []v1beta1.Deployment{
-			{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Deployment",
-					APIVersion: testapi.Extensions.GroupVersion().String(),
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      cmName,
-					Namespace: util.DefaultFederationSystemNamespace,
-					Annotations: map[string]string{
-						util.FedDomainMapKey:                fmt.Sprintf("%s=%s", clusterCtx, "test-dns-zone"),
-						federation.FederationNameAnnotation: testFederationName,
-					},
-				},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmName,
+			Namespace: util.DefaultFederationSystemNamespace,
+			Annotations: map[string]string{
+				util.FedDomainMapKey:                fmt.Sprintf("%s=%s", clusterCtx, zoneName),
+				federation.FederationNameAnnotation: testFederationName,
 			},
 		},
 	}
+	if dnsProvider == util.FedDNSProviderCoreDNS {
+		deployment.Annotations[util.FedDNSZoneName] = zoneName
+		deployment.Annotations[util.FedNameServer] = coreDNSServer
+		deployment.Annotations[util.FedDNSProvider] = util.FedDNSProviderCoreDNS
+	}
+	deploymentList := v1beta1.DeploymentList{Items: []v1beta1.Deployment{deployment}}
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	extensionCodec := testapi.Extensions.Codec()
@@ -312,6 +328,15 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 				if err != nil {
 					return nil, err
 				}
+
+				// If the secret name was generated, test it separately.
+				if secretName == "" {
+					if got.Name == "" {
+						return nil, fmt.Errorf("expected a generated secret name, got \"\"")
+					}
+					got.Name = placeholderSecretName
+				}
+
 				if !apiequality.Semantic.DeepEqual(got, secretObject) {
 					return nil, fmt.Errorf("Unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, secretObject))
 				}
@@ -326,12 +351,12 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 	return f, nil
 }
 
-func fakeJoinTargetClusterFactory(clusterName, clusterCtx string) (cmdutil.Factory, error) {
+func fakeJoinTargetClusterFactory(clusterName, clusterCtx, dnsProvider string) (cmdutil.Factory, error) {
 	if clusterCtx == "" {
 		clusterCtx = clusterName
 	}
 
-	configmapObject := v1.ConfigMap{
+	configmapObject := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      util.KubeDnsConfigmapName,
 			Namespace: metav1.NamespaceSystem,
@@ -341,8 +366,16 @@ func fakeJoinTargetClusterFactory(clusterName, clusterCtx string) (cmdutil.Facto
 			},
 		},
 		Data: map[string]string{
-			util.FedDomainMapKey: fmt.Sprintf("%s=%s", clusterCtx, "test-dns-zone"),
+			util.FedDomainMapKey: fmt.Sprintf("%s=%s", clusterCtx, zoneName),
 		},
+	}
+	if dnsProvider == util.FedDNSProviderCoreDNS {
+		annotations := map[string]string{
+			util.FedDNSProvider: util.FedDNSProviderCoreDNS,
+			util.FedDNSZoneName: zoneName,
+			util.FedNameServer:  coreDNSServer,
+		}
+		configmapObject = populateStubDomainsIfRequiredTest(configmapObject, annotations)
 	}
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
@@ -363,10 +396,10 @@ func fakeJoinTargetClusterFactory(clusterName, clusterCtx string) (cmdutil.Facto
 				if err != nil {
 					return nil, err
 				}
-				if !apiequality.Semantic.DeepEqual(got, configmapObject) {
-					return nil, fmt.Errorf("Unexpected configmap object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, configmapObject))
+				if !apiequality.Semantic.DeepEqual(&got, configmapObject) {
+					return nil, fmt.Errorf("Unexpected configmap object\n\tDiff: %s", diff.ObjectGoPrintDiff(&got, configmapObject))
 				}
-				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &configmapObject)}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, configmapObject)}, nil
 			default:
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}
@@ -392,4 +425,17 @@ func fakeCluster(clusterName, secretName, server string) federationapi.Cluster {
 			},
 		},
 	}
+}
+
+// TODO: Reuse the function populateStubDomainsIfRequired once that function is converted to use versioned objects.
+func populateStubDomainsIfRequiredTest(configMap *v1.ConfigMap, annotations map[string]string) *v1.ConfigMap {
+	dnsProvider := annotations[util.FedDNSProvider]
+	dnsZoneName := annotations[util.FedDNSZoneName]
+	nameServer := annotations[util.FedNameServer]
+
+	if dnsProvider != util.FedDNSProviderCoreDNS || dnsZoneName == "" || nameServer == "" {
+		return configMap
+	}
+	configMap.Data[util.KubeDnsStubDomains] = fmt.Sprintf(`{"%s":["%s"]}`, dnsZoneName, nameServer)
+	return configMap
 }

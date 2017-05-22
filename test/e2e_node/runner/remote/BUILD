@@ -25,7 +25,7 @@ go_library(
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/golang.org/x/oauth2:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",
-        "//vendor/google.golang.org/api/compute/v1:go_default_library",
+        "//vendor/google.golang.org/api/compute/v0.beta:go_default_library",
     ],
 )
 

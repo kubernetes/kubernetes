@@ -23,7 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	docker "k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -258,16 +258,16 @@ func containerGCTest(f *framework.Framework, test testRun) {
 
 // Runs containerGCTest using the docker runtime.
 func dockerContainerGCTest(f *framework.Framework, test testRun) {
-	var runtime docker.DockerInterface
+	var runtime libdocker.Interface
 	BeforeEach(func() {
-		runtime = docker.ConnectToDockerOrDie(defaultDockerEndpoint, defaultRuntimeRequestTimeoutDuration, defaultImagePullProgressDeadline)
+		runtime = libdocker.ConnectToDockerOrDie(defaultDockerEndpoint, defaultRuntimeRequestTimeoutDuration, defaultImagePullProgressDeadline)
 	})
 	for _, pod := range test.testPods {
-		// Initialize the getContainerNames function to use the dockertools api
+		// Initialize the getContainerNames function to use the libdocker api
 		thisPrefix := pod.containerPrefix
 		pod.getContainerNames = func() ([]string, error) {
 			relevantContainers := []string{}
-			dockerContainers, err := docker.GetKubeletDockerContainers(runtime, true)
+			dockerContainers, err := libdocker.GetKubeletDockerContainers(runtime, true)
 			if err != nil {
 				return relevantContainers, err
 			}

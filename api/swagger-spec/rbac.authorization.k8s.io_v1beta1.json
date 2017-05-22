@@ -45,6 +45,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -157,6 +165,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -228,6 +244,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -525,6 +549,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -606,6 +638,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -724,6 +764,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -795,6 +843,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -1092,6 +1148,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -1173,6 +1237,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -1307,6 +1379,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -1386,6 +1466,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -1723,6 +1811,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -1818,6 +1914,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -1897,6 +2001,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -1970,6 +2082,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -2104,6 +2224,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -2183,6 +2311,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -2520,6 +2656,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -2615,6 +2759,14 @@
        {
         "type": "boolean",
         "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
         "name": "watch",
         "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
         "required": false,
@@ -2688,6 +2840,14 @@
         "paramType": "query",
         "name": "fieldSelector",
         "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
         "required": false,
         "allowMultiple": false
        },
@@ -2897,6 +3057,10 @@
       },
       "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller."
      },
+     "initializers": {
+      "$ref": "v1.Initializers",
+      "description": "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user."
+     },
      "finalizers": {
       "type": "array",
       "items": {
@@ -2946,52 +3110,36 @@
      }
     }
    },
-   "v1beta1.Subject": {
-    "id": "v1beta1.Subject",
-    "description": "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
+   "v1.Initializers": {
+    "id": "v1.Initializers",
+    "description": "Initializers tracks the progress of initialization.",
     "required": [
-     "kind",
-     "name"
+     "pending"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "Kind of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the Authorizer does not recognized the kind value, the Authorizer should report an error."
+     "pending": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Initializer"
+      },
+      "description": "Pending is a list of initializers that must execute in order before this object is visible. When the last pending initializer is removed, and no failing result is set, the initializers struct will be set to nil and the object is considered as initialized and visible to all clients."
      },
-     "apiGroup": {
-      "type": "string",
-      "description": "APIGroup holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io\" for User and Group subjects."
-     },
-     "name": {
-      "type": "string",
-      "description": "Name of the object being referenced."
-     },
-     "namespace": {
-      "type": "string",
-      "description": "Namespace of the referenced object.  If the object kind is non-namespace, such as \"User\" or \"Group\", and this value is not empty the Authorizer should report an error."
+     "result": {
+      "$ref": "v1.Status",
+      "description": "If result is set with the Failure field, the object will be persisted to storage and then deleted, ensuring that other clients can observe the deletion."
      }
     }
    },
-   "v1beta1.RoleRef": {
-    "id": "v1beta1.RoleRef",
-    "description": "RoleRef contains information that points to the role being used",
+   "v1.Initializer": {
+    "id": "v1.Initializer",
+    "description": "Initializer is information about an initializer that has not yet completed.",
     "required": [
-     "apiGroup",
-     "kind",
      "name"
     ],
     "properties": {
-     "apiGroup": {
-      "type": "string",
-      "description": "APIGroup is the group for the resource being referenced"
-     },
-     "kind": {
-      "type": "string",
-      "description": "Kind is the type of resource being referenced"
-     },
      "name": {
       "type": "string",
-      "description": "Name is the name of resource being referenced"
+      "description": "name of the process that is responsible for initializing this object."
      }
     }
    },
@@ -3050,6 +3198,10 @@
       "type": "string",
       "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
+     "uid": {
+      "type": "string",
+      "description": "UID of the resource. (when there is a single resource which can be described). More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
+     },
      "causes": {
       "type": "array",
       "items": {
@@ -3079,6 +3231,55 @@
      "field": {
       "type": "string",
       "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed.  Fields may appear more than once in an array of causes due to fields having multiple errors. Optional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\""
+     }
+    }
+   },
+   "v1beta1.Subject": {
+    "id": "v1beta1.Subject",
+    "description": "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
+    "required": [
+     "kind",
+     "name"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the Authorizer does not recognized the kind value, the Authorizer should report an error."
+     },
+     "apiGroup": {
+      "type": "string",
+      "description": "APIGroup holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io\" for User and Group subjects."
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the object being referenced."
+     },
+     "namespace": {
+      "type": "string",
+      "description": "Namespace of the referenced object.  If the object kind is non-namespace, such as \"User\" or \"Group\", and this value is not empty the Authorizer should report an error."
+     }
+    }
+   },
+   "v1beta1.RoleRef": {
+    "id": "v1beta1.RoleRef",
+    "description": "RoleRef contains information that points to the role being used",
+    "required": [
+     "apiGroup",
+     "kind",
+     "name"
+    ],
+    "properties": {
+     "apiGroup": {
+      "type": "string",
+      "description": "APIGroup is the group for the resource being referenced"
+     },
+     "kind": {
+      "type": "string",
+      "description": "Kind is the type of resource being referenced"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name is the name of resource being referenced"
      }
     }
    },

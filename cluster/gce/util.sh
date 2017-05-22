@@ -498,15 +498,24 @@ function create-node-template() {
   #                 distinguish an ephemeral failed call from a "not-exists".
   if gcloud compute instance-templates describe "$template_name" --project "${PROJECT}" &>/dev/null; then
     echo "Instance template ${1} already exists; deleting." >&2
-    if ! gcloud compute instance-templates delete "$template_name" --project "${PROJECT}" &>/dev/null; then
+    if ! gcloud compute instance-templates delete "$template_name" --project "${PROJECT}" --quiet &>/dev/null; then
       echo -e "${color_yellow}Failed to delete existing instance template${color_norm}" >&2
       exit 2
     fi
   fi
 
   local gcloud="gcloud"
+
+  local accelerator_args=""
+  # VMs with Accelerators cannot be live migrated.
+  # More details here - https://cloud.google.com/compute/docs/gpus/add-gpus#create-new-gpu-instance
+  if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
+    accelerator_args="--maintenance-policy TERMINATE --restart-on-failure --accelerator ${NODE_ACCELERATORS}"
+    gcloud="gcloud beta"
+  fi
+
   if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
-    gcloud="gcloud alpha"
+    gcloud="gcloud beta"
   fi
 
   local preemptible_minions=""
@@ -539,6 +548,7 @@ function create-node-template() {
       --image-project="${NODE_IMAGE_PROJECT}" \
       --image "${NODE_IMAGE}" \
       --tags "${NODE_TAG}" \
+      ${accelerator_args} \
       ${local_ssds} \
       --region "${REGION}" \
       ${network} \
@@ -735,7 +745,7 @@ function create-subnetwork() {
 
   # Look for the subnet, it must exist and have a secondary range
   # configured.
-  local subnet=$(gcloud alpha compute networks subnets describe \
+  local subnet=$(gcloud beta compute networks subnets describe \
     --project "${PROJECT}" \
     --region ${REGION} \
     ${IP_ALIAS_SUBNETWORK} 2>/dev/null)
@@ -752,7 +762,7 @@ function create-subnetwork() {
     fi
 
     echo "Creating subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
-    gcloud alpha compute networks subnets create \
+    gcloud beta compute networks subnets create \
       ${IP_ALIAS_SUBNETWORK} \
       --description "Automatically generated subnet for ${INSTANCE_PREFIX} cluster. This will be removed on cluster teardown." \
       --project "${PROJECT}" \
@@ -802,11 +812,11 @@ function delete-subnetwork() {
   fi
 
   echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
-  if [[ -n $(gcloud alpha compute networks subnets describe \
+  if [[ -n $(gcloud beta compute networks subnets describe \
         --project "${PROJECT}" \
         --region ${REGION} \
         ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
-    gcloud alpha --quiet compute networks subnets delete \
+    gcloud beta --quiet compute networks subnets delete \
       --project "${PROJECT}" \
       --region ${REGION} \
       ${IP_ALIAS_SUBNETWORK}
@@ -1193,14 +1203,14 @@ function create-cluster-autoscaler-mig-config() {
 
   # Each MIG must have at least one node, so the min number of nodes
   # must be greater or equal to the number of migs.
-  if [[ ${AUTOSCALER_MIN_NODES} < ${NUM_MIGS} ]]; then
+  if [[ ${AUTOSCALER_MIN_NODES} -lt ${NUM_MIGS} ]]; then
     echo "AUTOSCALER_MIN_NODES must be greater or equal ${NUM_MIGS}"
     exit 2
   fi
 
   # Each MIG must have at least one node, so the min number of nodes
   # must be greater or equal to the number of migs.
-  if [[ ${AUTOSCALER_MAX_NODES} < ${NUM_MIGS} ]]; then
+  if [[ ${AUTOSCALER_MAX_NODES} -lt ${NUM_MIGS} ]]; then
     echo "AUTOSCALER_MAX_NODES must be greater or equal ${NUM_MIGS}"
     exit 2
   fi

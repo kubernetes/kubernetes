@@ -84,8 +84,8 @@ var missingResourceError = fmt.Errorf(`You must provide one or more resources by
 Example resource specifications include:
    '-f rsrc.yaml'
    '--filename=rsrc.json'
-   'pods my-pod'
-   'services'`)
+   '<resource> <name>'
+   '<resource>'`)
 
 // TODO: expand this to include other errors.
 func IsUsageError(err error) bool {
