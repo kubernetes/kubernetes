@@ -42,7 +42,7 @@ func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, resource s
 			return nil, err
 		}
 		if !informer.Informer().HasSynced() {
-		       return nil , fmt.Errorf("Informer had not syncd yet")
+			return nil, fmt.Errorf("Informer had not syncd yet")
 		}
 		return informer.Lister().ByNamespace(namespace).List(options.LabelSelector)
 	}
