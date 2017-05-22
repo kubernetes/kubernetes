@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 )
@@ -513,8 +513,8 @@ func (ms *multiSorter) Less(i, j int) bool {
 
 // qosComparator compares pods by QoS (BestEffort < Burstable < Guaranteed)
 func qosComparator(p1, p2 *v1.Pod) int {
-	qosP1 := qos.GetPodQOS(p1)
-	qosP2 := qos.GetPodQOS(p2)
+	qosP1 := v1qos.GetPodQOS(p1)
+	qosP2 := v1qos.GetPodQOS(p2)
 	// its a tie
 	if qosP1 == qosP2 {
 		return 0
