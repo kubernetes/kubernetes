@@ -160,7 +160,7 @@ func (p *testNamer) SetSelfLink(obj runtime.Object, url string) error {
 }
 
 // GenerateLink creates a path and query for a given runtime object that represents the canonical path.
-func (p *testNamer) GenerateLink(ctx request.Context, obj runtime.Object) (uri string, err error) {
+func (p *testNamer) GenerateLink(requestInfo *request.RequestInfo, obj runtime.Object) (uri string, err error) {
 	return "", errors.New("not implemented")
 }
 
