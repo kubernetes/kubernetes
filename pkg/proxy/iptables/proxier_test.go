@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -383,7 +385,7 @@ const testHostname = "test-hostname"
 func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
-	return &Proxier{
+	p := &Proxier{
 		exec:             &exec.FakeExec{},
 		serviceMap:       make(proxyServiceMap),
 		serviceChanges:   newServiceChangeMap(),
@@ -401,6 +403,8 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		natChains:        bytes.NewBuffer(nil),
 		natRules:         bytes.NewBuffer(nil),
 	}
+	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
+	return p
 }
 
 func hasJump(rules []iptablestest.Rule, destChain, destIP string, destPort int) bool {
