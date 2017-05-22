@@ -16,6 +16,7 @@ filegroup(
         "//pkg/api:all-srcs",
         "//pkg/apimachinery/tests:all-srcs",
         "//pkg/apis/abac:all-srcs",
+        "//pkg/apis/admission:all-srcs",
         "//pkg/apis/apps:all-srcs",
         "//pkg/apis/authentication:all-srcs",
         "//pkg/apis/authorization:all-srcs",

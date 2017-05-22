@@ -19,10 +19,10 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
@@ -61,7 +61,7 @@ func NewCmdPlugin(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Co
 	if len(loadedPlugins) > 0 {
 		pluginRunner := f.PluginRunner()
 		for _, p := range loadedPlugins {
-			cmd.AddCommand(NewCmdForPlugin(p, pluginRunner, in, out, err))
+			cmd.AddCommand(NewCmdForPlugin(f, p, pluginRunner, in, out, err))
 		}
 	}
 
@@ -69,28 +69,81 @@ func NewCmdPlugin(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Co
 }
 
 // NewCmdForPlugin creates a command capable of running the provided plugin.
-func NewCmdForPlugin(plugin *plugins.Plugin, runner plugins.PluginRunner, in io.Reader, out, errout io.Writer) *cobra.Command {
+func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.PluginRunner, in io.Reader, out, errout io.Writer) *cobra.Command {
 	if !plugin.IsValid() {
 		return nil
 	}
 
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:     plugin.Name,
 		Short:   plugin.ShortDesc,
 		Long:    templates.LongDesc(plugin.LongDesc),
 		Example: templates.Examples(plugin.Example),
 		Run: func(cmd *cobra.Command, args []string) {
-			ctx := plugins.RunningContext{
-				In:         in,
-				Out:        out,
-				ErrOut:     errout,
-				Args:       args,
-				Env:        os.Environ(),
-				WorkingDir: plugin.Dir,
+			if len(plugin.Command) == 0 {
+				cmdutil.DefaultSubCommandRun(errout)(cmd, args)
+				return
 			}
-			if err := runner.Run(plugin, ctx); err != nil {
+
+			envProvider := &plugins.MultiEnvProvider{
+				&plugins.PluginCallerEnvProvider{},
+				&plugins.OSEnvProvider{},
+				&plugins.PluginDescriptorEnvProvider{
+					Plugin: plugin,
+				},
+				&flagsPluginEnvProvider{
+					cmd: cmd,
+				},
+				&factoryAttrsPluginEnvProvider{
+					factory: f,
+				},
+			}
+
+			runningContext := plugins.RunningContext{
+				In:          in,
+				Out:         out,
+				ErrOut:      errout,
+				Args:        args,
+				EnvProvider: envProvider,
+				WorkingDir:  plugin.Dir,
+			}
+
+			if err := runner.Run(plugin, runningContext); err != nil {
 				cmdutil.CheckErr(err)
 			}
 		},
 	}
+
+	for _, childPlugin := range plugin.Tree {
+		cmd.AddCommand(NewCmdForPlugin(f, childPlugin, runner, in, out, errout))
+	}
+
+	return cmd
+}
+
+type flagsPluginEnvProvider struct {
+	cmd *cobra.Command
+}
+
+func (p *flagsPluginEnvProvider) Env() (plugins.EnvList, error) {
+	prefix := "KUBECTL_PLUGINS_GLOBAL_FLAG_"
+	env := plugins.EnvList{}
+	p.cmd.Flags().VisitAll(func(flag *pflag.Flag) {
+		env = append(env, plugins.FlagToEnv(flag, prefix))
+	})
+	return env, nil
+}
+
+type factoryAttrsPluginEnvProvider struct {
+	factory cmdutil.Factory
+}
+
+func (p *factoryAttrsPluginEnvProvider) Env() (plugins.EnvList, error) {
+	cmdNamespace, _, err := p.factory.DefaultNamespace()
+	if err != nil {
+		return plugins.EnvList{}, err
+	}
+	return plugins.EnvList{
+		plugins.Env{N: "KUBECTL_PLUGINS_CURRENT_NAMESPACE", V: cmdNamespace},
+	}, nil
 }

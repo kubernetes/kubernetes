@@ -841,8 +841,8 @@ func DeploymentComplete(deployment *extensions.Deployment, newStatus *extensions
 
 // DeploymentProgressing reports progress for a deployment. Progress is estimated by comparing the
 // current with the new status of the deployment that the controller is observing. More specifically,
-// when new pods are scaled up or become available, or old pods are scaled down, then we consider the
-// deployment is progressing.
+// when new pods are scaled up or become ready or available, or old pods are scaled down, then we
+// consider the deployment is progressing.
 func DeploymentProgressing(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	oldStatus := deployment.Status
 
@@ -852,6 +852,7 @@ func DeploymentProgressing(deployment *extensions.Deployment, newStatus *extensi
 
 	return (newStatus.UpdatedReplicas > oldStatus.UpdatedReplicas) ||
 		(newStatusOldReplicas < oldStatusOldReplicas) ||
+		newStatus.ReadyReplicas > deployment.Status.ReadyReplicas ||
 		newStatus.AvailableReplicas > deployment.Status.AvailableReplicas
 }
 

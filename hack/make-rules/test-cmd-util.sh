@@ -3789,6 +3789,30 @@ __EOF__
   output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/ kubectl plugin error 2>&1)
   kube::test::if_has_string "${output_message}" 'error: exit status 1'
 
+  # plugin tree
+  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin tree 2>&1)
+  kube::test::if_has_string "${output_message}" 'Plugin with a tree of commands'
+  kube::test::if_has_string "${output_message}" 'child1\s\+The first child of a tree'
+  kube::test::if_has_string "${output_message}" 'child2\s\+The second child of a tree'
+  kube::test::if_has_string "${output_message}" 'child3\s\+The third child of a tree'
+  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin tree child1 --help 2>&1)
+  kube::test::if_has_string "${output_message}" 'The first child of a tree'
+  kube::test::if_has_not_string "${output_message}" 'The second child'
+  kube::test::if_has_not_string "${output_message}" 'child2'
+  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin tree child1 2>&1)
+  kube::test::if_has_string "${output_message}" 'child one'
+  kube::test::if_has_not_string "${output_message}" 'child1'
+  kube::test::if_has_not_string "${output_message}" 'The first child'
+
+  # plugin env
+  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin env 2>&1)
+  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_CURRENT_NAMESPACE'
+  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_CALLER'
+  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_DESCRIPTOR_COMMAND=./env.sh'
+  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_DESCRIPTOR_SHORT_DESC=The plugin envs plugin'
+  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_GLOBAL_FLAG_KUBECONFIG'
+  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_GLOBAL_FLAG_REQUEST_TIMEOUT=0'
+
   #################
   # Impersonation #
   #################

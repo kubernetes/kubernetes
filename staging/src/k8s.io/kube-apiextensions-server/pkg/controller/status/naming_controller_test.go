@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -242,7 +243,7 @@ func TestSync(t *testing.T) {
 
 		c := NamingConditionController{
 			crdLister:        listers.NewCustomResourceDefinitionLister(crdIndexer),
-			crdMutationCache: cache.NewIntegerResourceVersionMutationCache(crdIndexer, crdIndexer),
+			crdMutationCache: cache.NewIntegerResourceVersionMutationCache(crdIndexer, crdIndexer, 60*time.Second, false),
 		}
 		actualNames, actualCondition := c.calculateNames(tc.in)
 

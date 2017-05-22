@@ -109,9 +109,13 @@ func GetKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMetrics {
 		kubeletmetrics.PodWorkerStartLatencyKey,
 		kubeletmetrics.PLEGRelistLatencyKey,
 	)
+	return GetKubeletMetrics(ms, latencyMethods)
+}
+
+func GetKubeletMetrics(ms metrics.KubeletMetrics, methods sets.String) KubeletLatencyMetrics {
 	var latencyMetrics KubeletLatencyMetrics
 	for method, samples := range ms {
-		if !latencyMethods.Has(method) {
+		if !methods.Has(method) {
 			continue
 		}
 		for _, sample := range samples {

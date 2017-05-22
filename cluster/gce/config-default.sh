@@ -124,6 +124,12 @@ ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 # TODO(piosz): remove this in 1.8
 NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
 
+# To avoid running Calico on a node that is not configured appropriately, 
+# label each Node so that the DaemonSet can run the Pods only on ready Nodes.
+if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
+	NODE_LABELS="$NODE_LABELS,projectcalico.org/ds-ready=true"
+fi
+
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
 LOGGING_DESTINATION="${KUBE_LOGGING_DESTINATION:-gcp}" # options: elasticsearch, gcp
