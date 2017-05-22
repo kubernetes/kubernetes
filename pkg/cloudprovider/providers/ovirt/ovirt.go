@@ -27,7 +27,6 @@ import (
 	"net/url"
 	"path"
 	"sort"
-	"strings"
 
 	"gopkg.in/gcfg.v1"
 
@@ -245,8 +244,7 @@ func getInstancesFromXml(body io.Reader) (OVirtInstanceMap, error) {
 	instances := make(OVirtInstanceMap)
 
 	for _, vm := range vmlist.Vm {
-		// Always return only vms that are up and running
-		if vm.Hostname != "" && strings.ToLower(vm.State) == "up" {
+		if vm.Hostname != "" {
 			address := ""
 			if len(vm.Addresses) > 0 {
 				address = vm.Addresses[0].Address

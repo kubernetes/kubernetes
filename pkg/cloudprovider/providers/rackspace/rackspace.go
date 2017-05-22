@@ -287,8 +287,7 @@ func getServerByName(client *gophercloud.ServiceClient, name string) (*osservers
 		return getServerByAddress(client, name)
 	}
 	opts := osservers.ListOpts{
-		Name:   fmt.Sprintf("^%s$", regexp.QuoteMeta(name)),
-		Status: "ACTIVE",
+		Name: fmt.Sprintf("^%s$", regexp.QuoteMeta(name)),
 	}
 	pager := servers.List(client, opts)
 

@@ -608,17 +608,12 @@ func (vs *VSphere) ExternalID(nodeName k8stypes.NodeName) (string, error) {
 		return "", err
 	}
 
-	if mvm.Summary.Runtime.PowerState == ActivePowerState {
-		return vm.InventoryPath, nil
-	}
-
-	if mvm.Summary.Config.Template == false {
-		glog.Warningf("VM %s, is not in %s state", nodeName, ActivePowerState)
-	} else {
+	if mvm.Summary.Config.Template == true {
 		glog.Warningf("VM %s, is a template", nodeName)
+		return "", cloudprovider.InstanceNotFound
 	}
 
-	return "", cloudprovider.InstanceNotFound
+	return vm.InventoryPath, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified Name.

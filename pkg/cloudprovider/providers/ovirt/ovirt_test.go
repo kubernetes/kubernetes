@@ -115,12 +115,12 @@ func TestOVirtCloudXmlParsing(t *testing.T) {
 	if err4 != nil {
 		t.Fatalf("Unexpected error listing instances: %s", err4)
 	}
-	if len(instances4) != 2 {
+	if len(instances4) != 3 {
 		t.Fatalf("Unexpected number of instance(s): %d", len(instances4))
 	}
 
 	names := instances4.ListSortedNames()
-	if names[0] != "host1" || names[1] != "host3" {
+	if names[0] != "host1" || names[1] != "host2" || names[2] != "host3" {
 		t.Fatalf("Unexpected instance(s): %s", instances4)
 	}
 }

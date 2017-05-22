@@ -300,8 +300,7 @@ func foreachServer(client *gophercloud.ServiceClient, opts servers.ListOptsBuild
 
 func getServerByName(client *gophercloud.ServiceClient, name types.NodeName) (*servers.Server, error) {
 	opts := servers.ListOpts{
-		Name:   fmt.Sprintf("^%s$", regexp.QuoteMeta(mapNodeNameToServerName(name))),
-		Status: "ACTIVE",
+		Name: fmt.Sprintf("^%s$", regexp.QuoteMeta(mapNodeNameToServerName(name))),
 	}
 	pager := servers.List(client, opts)
 
