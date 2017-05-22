@@ -240,12 +240,14 @@ type operationNotSupportedCache struct {
 }
 
 // isSupported returns true if the operation is supported
+// thread-safe
 func (o *operationNotSupportedCache) isSupported(key operationKey) bool {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return !o.m[key]
 }
 
+// thread-safe
 func (o *operationNotSupportedCache) setNotSupported(key operationKey) {
 	o.lock.Lock()
 	defer o.lock.Unlock()
@@ -324,6 +326,7 @@ func (d *namespacedResourcesDeleter) finalizeNamespace(namespace *v1.Namespace) 
 // deleteCollection is a helper function that will delete the collection of resources
 // it returns true if the operation was supported on the server.
 // it returns an error if the operation was supported on the server but was unable to complete.
+// thread-safe
 func (d *namespacedResourcesDeleter) deleteCollection(
 	dynamicClient *dynamic.Client, gvr schema.GroupVersionResource,
 	namespace string) (bool, error) {
@@ -368,6 +371,7 @@ func (d *namespacedResourcesDeleter) deleteCollection(
 //  the list of items in the collection (if found)
 //  a boolean if the operation is supported
 //  an error if the operation is supported but could not be completed.
+// thread-safe
 func (d *namespacedResourcesDeleter) listCollection(
 	dynamicClient *dynamic.Client, gvr schema.GroupVersionResource, namespace string) (*unstructured.UnstructuredList, bool, error) {
 	glog.V(5).Infof("namespace controller - listCollection - namespace: %s, gvr: %v", namespace, gvr)
@@ -404,6 +408,7 @@ func (d *namespacedResourcesDeleter) listCollection(
 }
 
 // deleteEachItem is a helper function that will list the collection of resources and delete each item 1 by 1.
+// thread-safe
 func (d *namespacedResourcesDeleter) deleteEachItem(
 	dynamicClient *dynamic.Client, gvr schema.GroupVersionResource, namespace string) error {
 	glog.V(5).Infof("namespace controller - deleteEachItem - namespace: %s, gvr: %v", namespace, gvr)
@@ -416,17 +421,42 @@ func (d *namespacedResourcesDeleter) deleteEachItem(
 		return nil
 	}
 	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
+
+	waitForAllDeletes := sync.WaitGroup{}
+	// make it big enough to handle all results without blocking
+	errorCh := make(chan error, len(unstructuredList.Items))
 	for _, item := range unstructuredList.Items {
-		if err = dynamicClient.Resource(&apiResource, namespace).Delete(item.GetName(), nil); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
-			return err
+		name := item.GetName()
+		waitForAllDeletes.Add(1)
+		go func() {
+			defer waitForAllDeletes.Done()
+
+			if err = dynamicClient.Resource(&apiResource, namespace).Delete(name, nil); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
+				errorCh <- err
+			}
+		}()
+	}
+	// wait for all the deleters to finish
+	waitForAllDeletes.Wait()
+
+	// drain the results
+	for {
+		select {
+		case err := <-errorCh:
+			if err != nil {
+				return err
+			}
+
+		default:
+			return nil
 		}
 	}
-	return nil
 }
 
 // deleteAllContentForGroupVersionResource will use the dynamic client to delete each resource identified in gvr.
 // It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
+// thread-safe
 func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	gvr schema.GroupVersionResource, namespace string,
 	namespaceDeletedAt metav1.Time) (int64, error) {
@@ -440,7 +470,7 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	}
 	glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - estimate - namespace: %s, gvr: %v, estimate: %v", namespace, gvr, estimate)
 
-	// get a client for this group version...
+	// get a client for this group version...  hread-safe
 	dynamicClient, err := d.clientPool.ClientForGroupVersionResource(gvr)
 	if err != nil {
 		glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - unable to get client - namespace: %s, gvr: %v, err: %v", namespace, gvr, err)
@@ -490,8 +520,7 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 // deleteAllContent will use the dynamic client to delete each resource identified in groupVersionResources.
 // It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
-func (d *namespacedResourcesDeleter) deleteAllContent(
-	namespace string, namespaceDeletedAt metav1.Time) (int64, error) {
+func (d *namespacedResourcesDeleter) deleteAllContent(namespace string, namespaceDeletedAt metav1.Time) (int64, error) {
 	estimate := int64(0)
 	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s", namespace)
 	resources, err := d.discoverResourcesFn()
@@ -504,20 +533,52 @@ func (d *namespacedResourcesDeleter) deleteAllContent(
 	if err != nil {
 		return estimate, err
 	}
-	for gvr := range groupVersionResources {
-		gvrEstimate, err := d.deleteAllContentForGroupVersionResource(gvr, namespace, namespaceDeletedAt)
-		if err != nil {
-			return estimate, err
-		}
-		if gvrEstimate > estimate {
-			estimate = gvrEstimate
+
+	waitForAllResources := sync.WaitGroup{}
+	type result struct {
+		err      error
+		estimate int64
+	}
+	// make it big enough to handle all results without blocking
+	resultCh := make(chan result, len(groupVersionResources))
+	for key := range groupVersionResources {
+		gvr := key
+		// delete all the resources concurrently and the let the server sort them out
+		waitForAllResources.Add(1)
+		go func() {
+			defer waitForAllResources.Done()
+
+			gvrEstimate, err := d.deleteAllContentForGroupVersionResource(gvr, namespace, namespaceDeletedAt)
+			resultCh <- result{err: err, estimate: gvrEstimate}
+		}()
+	}
+	// wait for all the deleters to finish
+	waitForAllResources.Wait()
+
+	// drain the results
+doneDraining:
+	for {
+		select {
+		case result := <-resultCh:
+			if result.err != nil {
+				glog.V(4).Infof("namespace controller - deleteAllContent error - namespace: %s, estimate: %v", namespace, estimate)
+				return estimate, result.err
+			}
+			if result.estimate > estimate {
+				estimate = result.estimate
+			}
+
+		default:
+			break doneDraining
 		}
 	}
+
 	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, estimate: %v", namespace, estimate)
 	return estimate, nil
 }
 
 // estimateGrracefulTermination will estimate the graceful termination required for the specific entity in the namespace
+// thread-safe
 func (d *namespacedResourcesDeleter) estimateGracefulTermination(gvr schema.GroupVersionResource, ns string, namespaceDeletedAt metav1.Time) (int64, error) {
 	groupResource := gvr.GroupResource()
 	glog.V(5).Infof("namespace controller - estimateGracefulTermination - group %s, resource: %s", groupResource.Group, groupResource.Resource)
@@ -540,6 +601,7 @@ func (d *namespacedResourcesDeleter) estimateGracefulTermination(gvr schema.Grou
 }
 
 // estimateGracefulTerminationForPods determines the graceful termination period for pods in the namespace
+// thread-safe
 func (d *namespacedResourcesDeleter) estimateGracefulTerminationForPods(ns string) (int64, error) {
 	glog.V(5).Infof("namespace controller - estimateGracefulTerminationForPods - namespace %s", ns)
 	estimate := int64(0)
