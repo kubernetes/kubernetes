@@ -877,8 +877,8 @@ func (m *kubeGenericRuntimeManager) GetNetNS(_ kubecontainer.ContainerID) (strin
 }
 
 // GarbageCollect removes dead containers using the specified container gc policy.
-func (m *kubeGenericRuntimeManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
-	return m.containerGC.GarbageCollect(gcPolicy, allSourcesReady)
+func (m *kubeGenericRuntimeManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
+	return m.containerGC.GarbageCollect(gcPolicy, allSourcesReady, evictNonDeletedPods)
 }
 
 // GetPodContainerID gets pod sandbox ID
