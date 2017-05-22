@@ -881,7 +881,8 @@ func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, w Pre
 	w.Write(LEVEL_2, "Type:\tvSphereVolume (a Persistent Disk resource in vSphere)\n"+
 		"    VolumePath:\t%v\n"+
 		"    FSType:\t%v\n",
-		vsphere.VolumePath, vsphere.FSType)
+		"    StoragePolicyName:\t%v\n",
+		vsphere.VolumePath, vsphere.FSType, vsphere.StoragePolicyName)
 }
 
 func printPhotonPersistentDiskVolumeSource(photon *api.PhotonPersistentDiskVolumeSource, w PrefixWriter) {
