@@ -326,7 +326,6 @@ func TestSchedulerExtender(t *testing.T) {
 		v1.DefaultSchedulerName,
 		clientSet,
 		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
