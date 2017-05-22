@@ -19432,11 +19432,19 @@
      "readOnly": {
       "type": "boolean",
       "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     },
+     "kind": {
+      "$ref": "v1.AzureDataDiskKind",
+      "description": "Expected values Shared: mulitple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared"
      }
     }
    },
    "v1.AzureDataDiskCachingMode": {
     "id": "v1.AzureDataDiskCachingMode",
+    "properties": {}
+   },
+   "v1.AzureDataDiskKind": {
+    "id": "v1.AzureDataDiskKind",
     "properties": {}
    },
    "v1.PhotonPersistentDiskVolumeSource": {

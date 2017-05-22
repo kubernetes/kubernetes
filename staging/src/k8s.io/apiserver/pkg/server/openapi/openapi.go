@@ -17,16 +17,25 @@ limitations under the License.
 package openapi
 
 import (
+	"bytes"
+	"compress/gzip"
+	"crypto/sha512"
+	"encoding/json"
 	"fmt"
+	"gopkg.in/yaml.v2"
+	"mime"
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
+	"github.com/golang/protobuf/proto"
+	"github.com/googleapis/gnostic/OpenAPIv2"
+	"github.com/googleapis/gnostic/compiler"
 
 	"k8s.io/apimachinery/pkg/openapi"
-	"k8s.io/apimachinery/pkg/util/json"
 	genericmux "k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/util/trie"
 )
@@ -34,18 +43,40 @@ import (
 const (
 	OpenAPIVersion  = "2.0"
 	extensionPrefix = "x-kubernetes-"
+
+	JSON_EXT = ".json"
+
+	MIME_JSON = "application/json"
+	// TODO(mehdy): change @68f4ded to a version tag when gnostic add version tags.
+	MIME_PB    = "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf"
+	MIME_PB_GZ = "application/x-gzip"
 )
 
 type openAPI struct {
 	config       *openapi.Config
 	swagger      *spec.Swagger
+	swaggerBytes []byte
+	swaggerPb    []byte
+	swaggerPbGz  []byte
+	lastModified time.Time
 	protocolList []string
 	servePath    string
 	definitions  map[string]openapi.OpenAPIDefinition
 }
 
+func computeEtag(data []byte) string {
+	return fmt.Sprintf("\"%X\"", sha512.Sum512(data))
+}
+
 // RegisterOpenAPIService registers a handler to provides standard OpenAPI specification.
 func RegisterOpenAPIService(servePath string, webServices []*restful.WebService, config *openapi.Config, mux *genericmux.PathRecorderMux) (err error) {
+
+	if !strings.HasSuffix(servePath, JSON_EXT) {
+		return fmt.Errorf("Serving path must ends with \"%s\".", JSON_EXT)
+	}
+
+	servePathBase := servePath[:len(servePath)-len(JSON_EXT)]
+
 	o := openAPI{
 		config:    config,
 		servePath: servePath,
@@ -64,14 +95,38 @@ func RegisterOpenAPIService(servePath string, webServices []*restful.WebService,
 		return err
 	}
 
-	mux.UnlistedHandleFunc(servePath, func(w http.ResponseWriter, r *http.Request) {
-		resp := restful.NewResponse(w)
-		if r.URL.Path != servePath {
-			resp.WriteErrorString(http.StatusNotFound, "Path not found!")
-		}
-		// TODO: we can cache json string and return it here.
-		resp.WriteAsJson(o.swagger)
-	})
+	mime.AddExtensionType(".json", MIME_JSON)
+	mime.AddExtensionType(".pb-v1", MIME_PB)
+	mime.AddExtensionType(".gz", MIME_PB_GZ)
+
+	type fileInfo struct {
+		ext  string
+		data []byte
+	}
+
+	files := []fileInfo{
+		{".json", o.swaggerBytes},
+		{"-2.0.0.json", o.swaggerBytes},
+		{"-2.0.0.pb-v1", o.swaggerPb},
+		{"-2.0.0.pb-v1.gz", o.swaggerPbGz},
+	}
+
+	for _, file := range files {
+		path := servePathBase + file.ext
+		data := file.data
+		etag := computeEtag(file.data)
+		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != path {
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte("Path not found!"))
+				return
+			}
+			w.Header().Set("Etag", etag)
+			// ServeContent will take care of caching using eTag.
+			http.ServeContent(w, r, path, o.lastModified, bytes.NewReader(data))
+		})
+	}
+
 	return nil
 }
 
@@ -107,7 +162,40 @@ func (o *openAPI) init(webServices []*restful.WebService) error {
 			return err
 		}
 	}
+
+	o.swaggerBytes, err = json.MarshalIndent(o.swagger, " ", " ")
+	if err != nil {
+		return err
+	}
+	o.swaggerPb, err = toProtoBinary(o.swaggerBytes)
+	if err != nil {
+		return err
+	}
+	o.swaggerPbGz = toGzip(o.swaggerPb)
+	o.lastModified = time.Now()
+
 	return nil
+}
+
+func toProtoBinary(spec []byte) ([]byte, error) {
+	var info yaml.MapSlice
+	err := yaml.Unmarshal(spec, &info)
+	if err != nil {
+		return nil, err
+	}
+	document, err := openapi_v2.NewDocument(info, compiler.NewContext("$root", nil))
+	if err != nil {
+		return nil, err
+	}
+	return proto.Marshal(document)
+}
+
+func toGzip(data []byte) []byte {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	zw.Write(data)
+	zw.Close()
+	return buf.Bytes()
 }
 
 func getCanonicalizeTypeName(t reflect.Type) string {
@@ -407,7 +495,7 @@ func (o *openAPI) buildParameter(restParam restful.ParameterData, bodySample int
 	case restful.HeaderParameterKind:
 		ret.In = "header"
 	case restful.FormParameterKind:
-		ret.In = "form"
+		ret.In = "formData"
 	default:
 		return ret, fmt.Errorf("unknown restful operation kind : %v", restParam.Kind)
 	}

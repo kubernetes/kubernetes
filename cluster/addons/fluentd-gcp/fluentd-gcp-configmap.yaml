@@ -415,7 +415,7 @@ data:
       </store>
     </match>
 metadata:
-  name: fluentd-gcp-config
+  name: fluentd-gcp-config-v1.0
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile

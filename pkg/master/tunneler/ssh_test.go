@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/util/clock"
+	"k8s.io/apimachinery/pkg/util/clock"
 
 	"github.com/stretchr/testify/assert"
 )

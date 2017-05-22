@@ -71,6 +71,7 @@ import (
 	kubeserver "k8s.io/kubernetes/pkg/kubeapiserver/server"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/tunneler"
+	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/version"
@@ -392,7 +393,12 @@ func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client interna
 
 	// TODO: use a dynamic restmapper. See https://github.com/kubernetes/kubernetes/pull/42615.
 	restMapper := api.Registry.RESTMapper()
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig, restMapper)
+
+	// NOTE: we do not provide informers to the quota registry because admission level decisions
+	// do not require us to open watches for all items tracked by quota.
+	quotaRegistry := quotainstall.NewRegistry(nil, nil)
+
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig, restMapper, quotaRegistry)
 	return pluginInitializer, nil
 }
 

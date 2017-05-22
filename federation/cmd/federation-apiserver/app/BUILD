@@ -49,6 +49,7 @@ go_library(
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
         "//pkg/kubeapiserver/server:go_default_library",
+        "//pkg/quota/install:go_default_library",
         "//pkg/registry/autoscaling/horizontalpodautoscaler/storage:go_default_library",
         "//pkg/registry/batch/job/storage:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
