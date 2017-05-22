@@ -747,6 +747,12 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printStorageOSVolumeSource(volume.VolumeSource.StorageOS, w)
 		case volume.VolumeSource.FC != nil:
 			printFCVolumeSource(volume.VolumeSource.FC, w)
+		case volume.VolumeSource.AzureFile != nil:
+			printAzureFileVolumeSource(volume.VolumeSource.AzureFile, w)
+		case volume.VolumeSource.FlexVolume != nil:
+			printFlexVolumeSource(volume.VolumeSource.FlexVolume, w)
+		case volume.VolumeSource.Flocker != nil:
+			printFlockerVolumeSource(volume.VolumeSource.Flocker, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -976,6 +982,31 @@ func printFCVolumeSource(fc *api.FCVolumeSource, w PrefixWriter) {
 		strings.Join(fc.TargetWWNs, ", "), lun, fc.FSType, fc.ReadOnly)
 }
 
+func printAzureFileVolumeSource(azureFile *api.AzureFileVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tAzureFile (an Azure File Service mount on the host and bind mount to the pod)\n"+
+		"    SecretName:\t%v\n"+
+		"    ShareName:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		azureFile.SecretName, azureFile.ShareName, azureFile.ReadOnly)
+}
+
+func printFlexVolumeSource(flex *api.FlexVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tFlexVolume (a generic volume resource that is provisioned/attached using an exec based plugin)\n"+
+		"    Driver:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    SecretRef:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		"    Options:\t%v\n",
+		flex.Driver, flex.FSType, flex.SecretRef, flex.ReadOnly, flex.Options)
+}
+
+func printFlockerVolumeSource(flocker *api.FlockerVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tFlocker (a Flocker volume mounted by the Flocker agent)\n"+
+		"    DatasetName:\t%v\n"+
+		"    DatasetUUID:\t%v\n",
+		flocker.DatasetName, flocker.DatasetUUID)
+}
+
 type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
@@ -1053,6 +1084,14 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 			printStorageOSPersistentVolumeSource(pv.Spec.StorageOS, w)
 		case pv.Spec.FC != nil:
 			printFCVolumeSource(pv.Spec.FC, w)
+		case pv.Spec.AzureFile != nil:
+			printAzureFileVolumeSource(pv.Spec.AzureFile, w)
+		case pv.Spec.FlexVolume != nil:
+			printFlexVolumeSource(pv.Spec.FlexVolume, w)
+		case pv.Spec.Flocker != nil:
+			printFlockerVolumeSource(pv.Spec.Flocker, w)
+		default:
+			w.Write(LEVEL_1, "<unknown>\n")
 		}
 
 		if events != nil {
