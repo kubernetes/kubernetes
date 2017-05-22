@@ -1077,25 +1077,6 @@ run_save_config_tests() {
   kubectl delete rc  frontend "${kube_flags[@]}"
 }
 
-run_kubectl_using_deprecated_commands_test() {
-  ## `kubectl run-container` should function identical to `kubectl run`, but it
-  ## should also print a deprecation warning.
-  # Pre-Condition: no Job exists
-  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Command
-  output_message=$(kubectl run-container pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}")
-  # Ensure that the user is warned their command is deprecated.
-  kube::test::if_has_string "${output_message}" 'Deprecated'
-  # Post-Condition: Job "pi" is created
-  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
-  # Clean up
-  kubectl delete jobs pi "${kube_flags[@]}"
-  # Post-condition: no pods exist.
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Clean up
-  kubectl delete deployment nginx-apps "${kube_flags[@]}"
-}
-
 run_kubectl_run_tests() {
   ## kubectl run should create deployments or jobs
   # Pre-Condition: no Job exists
@@ -1130,6 +1111,23 @@ run_kubectl_run_tests() {
   kube::test::if_has_string "${output_message}" '2'
   # Clean up
   kubectl delete deployment nginx-apps "${kube_flags[@]}"
+}
+
+run_kubectl_using_deprecated_commands_test() {
+  ## `kubectl run-container` should function identical to `kubectl run`, but it
+  ## should also print a deprecation warning.
+  # Pre-Condition: no Job exists
+  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  output_message=$(kubectl 2>&1 run-container pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(15)' "${kube_flags[@]}")
+  # Ensure that the user is warned their command is deprecated.
+  kube::test::if_has_string "${output_message}" 'deprecated'
+  # Post-Condition: Job "pi" is created
+  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  # Clean up
+  kubectl delete jobs pi "${kube_flags[@]}"
+  # Post-condition: no pods exist.
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 }
 
 run_kubectl_get_tests() {
