@@ -3550,6 +3550,14 @@
      "fsType": {
       "type": "string",
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "storagePolicyName": {
+      "type": "string",
+      "description": "Storage Policy Based Management (SPBM) profile name."
+     },
+     "storagePolicyID": {
+      "type": "string",
+      "description": "Storage Policy Based Management (SPBM) profile ID associated with the StoragePolicyName."
      }
     }
    },
