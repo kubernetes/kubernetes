@@ -51,11 +51,6 @@ type AuthorizationConfig struct {
 	// TTL for caching of unauthorized responses from the webhook server.
 	WebhookCacheUnauthorizedTTL time.Duration
 
-	// Options for RBAC
-
-	// User which can bootstrap role policies
-	RBACSuperUser string
-
 	InformerFactory informers.SharedInformerFactory
 }
 
@@ -150,9 +145,6 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, error) {
 	}
 	if !authorizerMap[modes.ModeWebhook] && config.WebhookConfigFile != "" {
 		return nil, errors.New("Cannot specify --authorization-webhook-config-file without mode Webhook")
-	}
-	if !authorizerMap[modes.ModeRBAC] && config.RBACSuperUser != "" {
-		return nil, errors.New("Cannot specify --authorization-rbac-super-user without mode RBAC")
 	}
 
 	return union.New(authorizers...), nil
