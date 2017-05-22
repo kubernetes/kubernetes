@@ -246,16 +246,19 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		// print the current object
 		if !isWatchOnly {
 			var objsToPrint []runtime.Object
+			writer := printers.GetNewTabWriter(out)
+
 			if isList {
 				objsToPrint, _ = meta.ExtractList(obj)
 			} else {
 				objsToPrint = append(objsToPrint, obj)
 			}
 			for _, objToPrint := range objsToPrint {
-				if err := printer.PrintObj(objToPrint, out); err != nil {
+				if err := printer.PrintObj(objToPrint, writer); err != nil {
 					return fmt.Errorf("unable to output the provided object: %v", err)
 				}
 			}
+			writer.Flush()
 		}
 
 		// print watched changes

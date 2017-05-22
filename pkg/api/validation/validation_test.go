@@ -58,6 +58,24 @@ func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *a
 	}
 }
 
+func testVolumeWithNodeAffinity(t *testing.T, name string, namespace string, affinity *api.NodeAffinity, spec api.PersistentVolumeSpec) *api.PersistentVolume {
+	objMeta := metav1.ObjectMeta{Name: name}
+	if namespace != "" {
+		objMeta.Namespace = namespace
+	}
+
+	objMeta.Annotations = map[string]string{}
+	err := helper.StorageNodeAffinityToAlphaAnnotation(objMeta.Annotations, affinity)
+	if err != nil {
+		t.Fatalf("Failed to get node affinity annotation: %v", err)
+	}
+
+	return &api.PersistentVolume{
+		ObjectMeta: objMeta,
+		Spec:       spec,
+	}
+}
+
 func TestValidatePersistentVolumes(t *testing.T) {
 	scenarios := map[string]struct {
 		isExpectedFailure bool
@@ -213,6 +231,42 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				StorageClassName: "-invalid-",
 			}),
 		},
+		// LocalVolume alpha feature disabled
+		// TODO: remove when no longer alpha
+		"alpha disabled valid local volume": {
+			isExpectedFailure: true,
+			volume: testVolumeWithNodeAffinity(
+				t,
+				"valid-local-volume",
+				"",
+				&api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+						NodeSelectorTerms: []api.NodeSelectorTerm{
+							{
+								MatchExpressions: []api.NodeSelectorRequirement{
+									{
+										Key:      "test-label-key",
+										Operator: api.NodeSelectorOpIn,
+										Values:   []string{"test-label-value"},
+									},
+								},
+							},
+						},
+					},
+				},
+				api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{
+							Path: "/foo",
+						},
+					},
+					StorageClassName: "test-storage-class",
+				}),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -225,6 +279,181 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		}
 	}
 
+}
+
+func TestValidateLocalVolumes(t *testing.T) {
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		volume            *api.PersistentVolume
+	}{
+		"valid local volume": {
+			isExpectedFailure: false,
+			volume: testVolumeWithNodeAffinity(
+				t,
+				"valid-local-volume",
+				"",
+				&api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+						NodeSelectorTerms: []api.NodeSelectorTerm{
+							{
+								MatchExpressions: []api.NodeSelectorRequirement{
+									{
+										Key:      "test-label-key",
+										Operator: api.NodeSelectorOpIn,
+										Values:   []string{"test-label-value"},
+									},
+								},
+							},
+						},
+					},
+				},
+				api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{
+							Path: "/foo",
+						},
+					},
+					StorageClassName: "test-storage-class",
+				}),
+		},
+		"invalid local volume nil annotations": {
+			isExpectedFailure: true,
+			volume: testVolume(
+				"invalid-local-volume-nil-annotations",
+				"",
+				api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{
+							Path: "/foo",
+						},
+					},
+					StorageClassName: "test-storage-class",
+				}),
+		},
+		"invalid local volume empty affinity": {
+			isExpectedFailure: true,
+			volume: testVolumeWithNodeAffinity(
+				t,
+				"invalid-local-volume-empty-affinity",
+				"",
+				&api.NodeAffinity{},
+				api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{
+							Path: "/foo",
+						},
+					},
+					StorageClassName: "test-storage-class",
+				}),
+		},
+		"invalid local volume preferred affinity": {
+			isExpectedFailure: true,
+			volume: testVolumeWithNodeAffinity(
+				t,
+				"invalid-local-volume-preferred-affinity",
+				"",
+				&api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+						NodeSelectorTerms: []api.NodeSelectorTerm{
+							{
+								MatchExpressions: []api.NodeSelectorRequirement{
+									{
+										Key:      "test-label-key",
+										Operator: api.NodeSelectorOpIn,
+										Values:   []string{"test-label-value"},
+									},
+								},
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{
+						{
+							Weight: 10,
+							Preference: api.NodeSelectorTerm{
+								MatchExpressions: []api.NodeSelectorRequirement{
+									{
+										Key:      "test-label-key",
+										Operator: api.NodeSelectorOpIn,
+										Values:   []string{"test-label-value"},
+									},
+								},
+							},
+						},
+					},
+				},
+				api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{
+							Path: "/foo",
+						},
+					},
+					StorageClassName: "test-storage-class",
+				}),
+		},
+		"invalid local volume empty path": {
+			isExpectedFailure: true,
+			volume: testVolumeWithNodeAffinity(
+				t,
+				"invalid-local-volume-empty-path",
+				"",
+				&api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+						NodeSelectorTerms: []api.NodeSelectorTerm{
+							{
+								MatchExpressions: []api.NodeSelectorRequirement{
+									{
+										Key:      "test-label-key",
+										Operator: api.NodeSelectorOpIn,
+										Values:   []string{"test-label-value"},
+									},
+								},
+							},
+						},
+					},
+				},
+				api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{},
+					},
+					StorageClassName: "test-storage-class",
+				}),
+		},
+	}
+
+	err := utilfeature.DefaultFeatureGate.Set("PersistentLocalVolumes=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalPersistentVolumes: %v", err)
+		return
+	}
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolume(scenario.volume)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
 }
 
 func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {

@@ -74,7 +74,7 @@ func (c *FederatedTypeCRUDTester) CheckLifecycle(desiredObject pkgruntime.Object
 	c.CheckDelete(obj, &orphanDependents)
 }
 
-func (c *FederatedTypeCRUDTester) CheckCreate(desiredObject pkgruntime.Object) pkgruntime.Object {
+func (c *FederatedTypeCRUDTester) Create(desiredObject pkgruntime.Object) pkgruntime.Object {
 	namespace := c.adapter.ObjectMeta(desiredObject).Namespace
 	c.tl.Logf("Creating new federated %s in namespace %q", c.kind, namespace)
 
@@ -85,6 +85,12 @@ func (c *FederatedTypeCRUDTester) CheckCreate(desiredObject pkgruntime.Object) p
 
 	namespacedName := c.adapter.NamespacedName(obj)
 	c.tl.Logf("Created new federated %s %q", c.kind, namespacedName)
+
+	return obj
+}
+
+func (c *FederatedTypeCRUDTester) CheckCreate(desiredObject pkgruntime.Object) pkgruntime.Object {
+	obj := c.Create(desiredObject)
 
 	c.CheckPropagation(obj)
 
@@ -165,18 +171,25 @@ func (c *FederatedTypeCRUDTester) CheckDelete(obj pkgruntime.Object, orphanDepen
 
 // CheckPropagation checks propagation for the crud tester's clients
 func (c *FederatedTypeCRUDTester) CheckPropagation(obj pkgruntime.Object) {
-	c.CheckPropagationForClients(obj, c.clusterClients)
+	c.CheckPropagationForClients(obj, c.clusterClients, true)
 }
 
 // CheckPropagationForClients checks propagation for the provided clients
-func (c *FederatedTypeCRUDTester) CheckPropagationForClients(obj pkgruntime.Object, clusterClients []clientset.Interface) {
+func (c *FederatedTypeCRUDTester) CheckPropagationForClients(obj pkgruntime.Object, clusterClients []clientset.Interface, objExpected bool) {
 	namespacedName := c.adapter.NamespacedName(obj)
 
 	c.tl.Logf("Waiting for %s %q in %d clusters", c.kind, namespacedName, len(clusterClients))
 	for _, client := range clusterClients {
 		err := c.waitForResource(client, obj)
-		if err != nil {
+		switch {
+		case err == wait.ErrWaitTimeout:
+			if objExpected {
+				c.tl.Fatalf("Timeout verifying %s %q in a member cluster: %v", c.kind, namespacedName, err)
+			}
+		case err != nil:
 			c.tl.Fatalf("Failed to verify %s %q in a member cluster: %v", c.kind, namespacedName, err)
+		case err == nil && !objExpected:
+			c.tl.Fatalf("Found unexpected object %s %q in a member cluster: %v", c.kind, namespacedName, err)
 		}
 	}
 }

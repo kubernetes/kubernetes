@@ -21,49 +21,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper/qos"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
-
-func getResourceList(cpu, memory string) v1.ResourceList {
-	res := v1.ResourceList{}
-	if cpu != "" {
-		res[v1.ResourceCPU] = resource.MustParse(cpu)
-	}
-	if memory != "" {
-		res[v1.ResourceMemory] = resource.MustParse(memory)
-	}
-	return res
-}
-
-func addResource(rName, value string, rl v1.ResourceList) v1.ResourceList {
-	rl[v1.ResourceName(rName)] = resource.MustParse(value)
-	return rl
-}
-
-func getResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequirements {
-	res := v1.ResourceRequirements{}
-	res.Requests = requests
-	res.Limits = limits
-	return res
-}
-
-func newContainer(name string, requests v1.ResourceList, limits v1.ResourceList) v1.Container {
-	return v1.Container{
-		Name:      name,
-		Resources: getResourceRequirements(requests, limits),
-	}
-}
-
-func newPod(name string, containers []v1.Container) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.PodSpec{
-			Containers: containers,
-		},
-	}
-}
 
 func TestGetPodQOS(t *testing.T) {
 	testCases := []struct {
@@ -173,5 +134,54 @@ func TestGetPodQOS(t *testing.T) {
 		if actual := GetPodQOS(testCase.pod); testCase.expected != actual {
 			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
+
+		// Convert v1.Pod to api.Pod, and then check against `api.helper.GetPodQOS`.
+		pod := api.Pod{}
+		v1.Convert_v1_Pod_To_api_Pod(testCase.pod, &pod, nil)
+
+		if actual := qos.GetPodQOS(&pod); api.PodQOSClass(testCase.expected) != actual {
+			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
+		}
+	}
+}
+
+func getResourceList(cpu, memory string) v1.ResourceList {
+	res := v1.ResourceList{}
+	if cpu != "" {
+		res[v1.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if memory != "" {
+		res[v1.ResourceMemory] = resource.MustParse(memory)
+	}
+	return res
+}
+
+func addResource(rName, value string, rl v1.ResourceList) v1.ResourceList {
+	rl[v1.ResourceName(rName)] = resource.MustParse(value)
+	return rl
+}
+
+func getResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequirements {
+	res := v1.ResourceRequirements{}
+	res.Requests = requests
+	res.Limits = limits
+	return res
+}
+
+func newContainer(name string, requests v1.ResourceList, limits v1.ResourceList) v1.Container {
+	return v1.Container{
+		Name:      name,
+		Resources: getResourceRequirements(requests, limits),
+	}
+}
+
+func newPod(name string, containers []v1.Container) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			Containers: containers,
+		},
 	}
 }

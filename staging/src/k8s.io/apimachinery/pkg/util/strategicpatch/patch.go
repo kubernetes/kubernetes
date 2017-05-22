@@ -505,8 +505,7 @@ func diffListsOfMaps(original, modified []interface{}, t reflect.Type, mergeKey 
 func getMapAndMergeKeyValueByIndex(index int, mergeKey string, listOfMaps []interface{}) (map[string]interface{}, interface{}, error) {
 	m, ok := listOfMaps[index].(map[string]interface{})
 	if !ok {
-		t := reflect.TypeOf(listOfMaps[index])
-		return nil, nil, mergepatch.ErrBadArgType("map[string]interface{}", t.Kind().String())
+		return nil, nil, mergepatch.ErrBadArgType(m, listOfMaps[index])
 	}
 
 	val, ok := m[mergeKey]
@@ -568,7 +567,7 @@ func StrategicMergeMapPatch(original, patch JSONMap, dataStruct interface{}) (JS
 
 func getTagStructType(dataStruct interface{}) (reflect.Type, error) {
 	if dataStruct == nil {
-		return nil, mergepatch.ErrBadArgType("struct", "nil")
+		return nil, mergepatch.ErrBadArgKind(struct{}{}, nil)
 	}
 
 	t := reflect.TypeOf(dataStruct)
@@ -577,7 +576,7 @@ func getTagStructType(dataStruct interface{}) (reflect.Type, error) {
 	}
 
 	if t.Kind() != reflect.Struct {
-		return nil, mergepatch.ErrBadArgType("struct", t.Kind().String())
+		return nil, mergepatch.ErrBadArgKind(struct{}{}, dataStruct)
 	}
 
 	return t, nil
@@ -1419,13 +1418,11 @@ func CreateDeleteDirective(mergeKey string, mergeKeyValue interface{}) map[strin
 func mapTypeAssertion(original, patch interface{}) (map[string]interface{}, map[string]interface{}, error) {
 	typedOriginal, ok := original.(map[string]interface{})
 	if !ok {
-		t := reflect.TypeOf(original)
-		return nil, nil, mergepatch.ErrBadArgType("map[string]interface{}", t.String())
+		return nil, nil, mergepatch.ErrBadArgType(typedOriginal, original)
 	}
 	typedPatch, ok := patch.(map[string]interface{})
 	if !ok {
-		t := reflect.TypeOf(patch)
-		return nil, nil, mergepatch.ErrBadArgType("map[string]interface{}", t.String())
+		return nil, nil, mergepatch.ErrBadArgType(typedPatch, patch)
 	}
 	return typedOriginal, typedPatch, nil
 }
@@ -1433,13 +1430,11 @@ func mapTypeAssertion(original, patch interface{}) (map[string]interface{}, map[
 func sliceTypeAssertion(original, patch interface{}) ([]interface{}, []interface{}, error) {
 	typedOriginal, ok := original.([]interface{})
 	if !ok {
-		t := reflect.TypeOf(original)
-		return nil, nil, mergepatch.ErrBadArgType("[]interface{}", t.String())
+		return nil, nil, mergepatch.ErrBadArgType(typedOriginal, original)
 	}
 	typedPatch, ok := patch.([]interface{})
 	if !ok {
-		t := reflect.TypeOf(patch)
-		return nil, nil, mergepatch.ErrBadArgType("[]interface{}", t.String())
+		return nil, nil, mergepatch.ErrBadArgType(typedPatch, patch)
 	}
 	return typedOriginal, typedPatch, nil
 }

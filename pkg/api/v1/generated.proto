@@ -1440,6 +1440,14 @@ message LocalObjectReference {
   optional string name = 1;
 }
 
+// Local represents directly-attached storage with node affinity
+message LocalVolumeSource {
+  // The full path to the volume on the node
+  // For alpha, this path must be a directory
+  // Once block as a source is supported, then this path can point to a block device
+  optional string path = 1;
+}
+
 // Represents an NFS mount that lasts the lifetime of a pod.
 // NFS volumes do not support ownership management or SELinux relabeling.
 message NFSVolumeSource {
@@ -2202,6 +2210,10 @@ message PersistentVolumeSource {
   // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
   // +optional
   optional ScaleIOVolumeSource scaleIO = 19;
+
+  // Local represents directly-attached storage with node affinity
+  // +optional
+  optional LocalVolumeSource local = 20;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
