@@ -37,6 +37,7 @@ import (
 const (
 	bashCompletionFunc = `# call kubectl get $1,
 __kubectl_override_flag_list=(kubeconfig cluster user context namespace server)
+declare -A __override_short_flag_to_long_mapping=( ["n"]="namespace" )
 __kubectl_override_flags()
 {
     local ${__kubectl_override_flag_list[*]} two_word_of of
@@ -46,6 +47,16 @@ __kubectl_override_flags()
             two_word_of=
             continue
         fi
+        for short_flag in "${!__override_short_flag_to_long_mapping[@]}"; do
+            case "${w}" in
+                -${short_flag}=*)
+                    eval "${__override_short_flag_to_long_mapping[${short_flag}]}=\"${w}\""
+                    ;;
+                -${short_flag})
+                    two_word_of="${__override_short_flag_to_long_mapping[${short_flag}]}"
+                    ;;
+            esac
+        done
         for of in "${__kubectl_override_flag_list[@]}"; do
             case "${w}" in
                 --${of}=*)
