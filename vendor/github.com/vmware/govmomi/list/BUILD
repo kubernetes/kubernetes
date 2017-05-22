@@ -12,7 +12,6 @@ go_library(
     srcs = [
         "lister.go",
         "path.go",
-        "recurser.go",
     ],
     tags = ["automanaged"],
     deps = [
