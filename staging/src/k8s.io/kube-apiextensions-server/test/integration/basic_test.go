@@ -379,3 +379,139 @@ func TestPreserveInt(t *testing.T) {
 		t.Errorf("Expected %v, got %v, %v", `9223372036854775807, 1000000`, num1, num2)
 	}
 }
+
+func TestCrossNamespaceListWatch(t *testing.T) {
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
+	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := ""
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
+	initialList, err := noxuResourceClient.List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := 0, len(initialList.(*unstructured.UnstructuredList).Items); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	initialListListMeta, err := meta.ListAccessor(initialList)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxuWatch, err := noxuResourceClient.Watch(metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer noxuWatch.Stop()
+
+	instances := make(map[string]*unstructured.Unstructured)
+	ns1 := "namespace-1"
+	noxuNamespacedResourceClient1 := NewNamespacedCustomResourceClient(ns1, noxuVersionClient, noxuDefinition)
+	instances[ns1] = createInstanceWithNamespaceHelper(t, ns1, "foo1", noxuNamespacedResourceClient1, noxuDefinition)
+	noxuNamespacesWatch1, err := noxuNamespacedResourceClient1.Watch(metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
+	defer noxuNamespacesWatch1.Stop()
+
+	ns2 := "namespace-2"
+	noxuNamespacedResourceClient2 := NewNamespacedCustomResourceClient(ns2, noxuVersionClient, noxuDefinition)
+	instances[ns2] = createInstanceWithNamespaceHelper(t, ns2, "foo2", noxuNamespacedResourceClient2, noxuDefinition)
+	noxuNamespacesWatch2, err := noxuNamespacedResourceClient2.Watch(metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
+	defer noxuNamespacesWatch2.Stop()
+
+	createdList, err := noxuResourceClient.List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if e, a := 2, len(createdList.(*unstructured.UnstructuredList).Items); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	for _, a := range createdList.(*unstructured.UnstructuredList).Items {
+		if e := instances[a.GetNamespace()]; !reflect.DeepEqual(e, &a) {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
+
+	addEvents := 0
+	for addEvents < 2 {
+		select {
+		case watchEvent := <-noxuWatch.ResultChan():
+			if e, a := watch.Added, watchEvent.Type; e != a {
+				t.Fatalf("expected %v, got %v", e, a)
+			}
+			createdObjectMeta, err := meta.Accessor(watchEvent.Object)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(createdObjectMeta.GetUID()) == 0 {
+				t.Errorf("missing uuid: %#v", watchEvent.Object)
+			}
+			createdTypeMeta, err := meta.TypeAccessor(watchEvent.Object)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if e, a := noxuDefinition.Spec.Group+"/"+noxuDefinition.Spec.Version, createdTypeMeta.GetAPIVersion(); e != a {
+				t.Errorf("expected %v, got %v", e, a)
+			}
+			if e, a := noxuDefinition.Spec.Names.Kind, createdTypeMeta.GetKind(); e != a {
+				t.Errorf("expected %v, got %v", e, a)
+			}
+			delete(instances, createdObjectMeta.GetNamespace())
+			addEvents++
+		case <-time.After(5 * time.Second):
+			t.Fatalf("missing watch event")
+		}
+	}
+	if e, a := 0, len(instances); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	checkNamespacesWatchHelper(t, ns1, noxuNamespacesWatch1)
+	checkNamespacesWatchHelper(t, ns2, noxuNamespacesWatch2)
+}
+
+func createInstanceWithNamespaceHelper(t *testing.T, ns string, name string, noxuNamespacedResourceClient *dynamic.ResourceClient, noxuDefinition *apiextensionsv1alpha1.CustomResourceDefinition) *unstructured.Unstructured {
+	createdInstance, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns, name), noxuNamespacedResourceClient, noxuDefinition)
+	if err != nil {
+		t.Fatalf("unable to create noxu Instance:%v", err)
+	}
+	return createdInstance
+}
+
+func checkNamespacesWatchHelper(t *testing.T, ns string, namespacedwatch watch.Interface) {
+	namespacedAddEvent := 0
+	for namespacedAddEvent < 2 {
+		select {
+		case watchEvent := <-namespacedwatch.ResultChan():
+			// Check that the namespaced watch only has one result
+			if namespacedAddEvent > 0 {
+				t.Fatalf("extra watch event")
+			}
+			if e, a := watch.Added, watchEvent.Type; e != a {
+				t.Fatalf("expected %v, got %v", e, a)
+			}
+			createdObjectMeta, err := meta.Accessor(watchEvent.Object)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if e, a := ns, createdObjectMeta.GetNamespace(); e != a {
+				t.Errorf("expected %v, got %v", e, a)
+			}
+		case <-time.After(5 * time.Second):
+			if namespacedAddEvent != 1 {
+				t.Fatalf("missing watch event")
+			}
+		}
+		namespacedAddEvent++
+	}
+}
