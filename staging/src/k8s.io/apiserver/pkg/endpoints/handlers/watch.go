@@ -30,6 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/wsstream"
 
@@ -88,6 +89,14 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 		mediaType += ";stream=watch"
 	}
 
+	namespace, _, err := scope.Namer.Name(req)
+	if err != nil {
+		scope.err(fmt.Errorf("unexpected error from Namer.Name: %v", err), w, req)
+		return
+	}
+	ctx := scope.ContextFunc(req)
+	ctx = request.WithNamespace(ctx, namespace)
+
 	server := &WatchServer{
 		Watching: watcher,
 		Scope:    scope,
@@ -98,7 +107,7 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 		Encoder:         encoder,
 		EmbeddedEncoder: embeddedEncoder,
 		Fixup: func(obj runtime.Object) {
-			if err := setSelfLink(obj, req, scope.Namer); err != nil {
+			if err := setSelfLink(obj, ctx, scope.Namer); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to set link for object %v: %v", reflect.TypeOf(obj), err))
 			}
 		},
