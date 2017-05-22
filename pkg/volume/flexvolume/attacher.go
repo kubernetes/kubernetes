@@ -33,6 +33,7 @@ var _ volume.Attacher = &flexVolumeAttacher{}
 
 // Attach is part of the volume.Attacher interface
 func (a *flexVolumeAttacher) Attach(spec *volume.Spec, hostName types.NodeName) (string, error) {
+
 	call := a.plugin.NewDriverCall(attachCmd)
 	call.AppendSpec(spec, a.plugin.host, nil)
 	call.Append(string(hostName))
