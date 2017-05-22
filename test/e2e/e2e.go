@@ -95,6 +95,7 @@ func setupProviderConfig() error {
 			framework.Logf("Couldn't open cloud provider configuration %s: %#v",
 				cloudConfig.ConfigFile, err)
 		}
+		defer config.Close()
 		cloudConfig.Provider, err = azure.NewCloud(config)
 	}
 
