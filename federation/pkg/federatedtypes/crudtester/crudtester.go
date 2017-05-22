@@ -24,6 +24,7 @@ import (
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
+	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
@@ -198,8 +199,16 @@ func (c *FederatedTypeCRUDTester) waitForResource(client clientset.Interface, ob
 	namespacedName := c.adapter.NamespacedName(obj)
 	err := wait.PollImmediate(c.waitInterval, c.clusterWaitTimeout, func() (bool, error) {
 		clusterObj, err := c.adapter.ClusterGet(client, namespacedName)
-		if err == nil && c.adapter.Equivalent(clusterObj, obj) {
-			return true, nil
+		if err == nil {
+			// Controllers which need additional reconcile split the objects;
+			// The spec of the fed object and local objects need not be same, thus.
+			if c.adapter.ImplementsReconcilePlugin() &&
+				fedutil.ObjectMetaEquivalent(*(c.adapter.ObjectMeta(obj)),
+					*(c.adapter.ObjectMeta(clusterObj))) {
+				return true, nil
+			} else if c.adapter.Equivalent(clusterObj, obj) {
+				return true, nil
+			}
 		}
 		if errors.IsNotFound(err) {
 			return false, nil

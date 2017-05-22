@@ -60,7 +60,10 @@ func (f *FederationFixture) SetUp(t *testing.T) {
 	t.Logf("Starting a federation of %d clusters", f.DesiredClusterCount)
 
 	f.APIFixture = &FederationAPIFixture{}
-	f.APIFixture.SetUp(t)
+	runOptions := GetRunOptions()
+	// Enable all apis features for test.
+	runOptions.APIEnablement.RuntimeConfig.Set("api/all=true")
+	f.APIFixture.SetUpWithRunOptions(t, runOptions)
 
 	f.stopChan = make(chan struct{})
 	monitorPeriod := 1 * time.Second
