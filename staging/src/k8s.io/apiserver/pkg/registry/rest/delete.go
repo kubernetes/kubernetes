@@ -126,6 +126,7 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx genericapirequest.Context, ob
 	now := metav1.NewTime(metav1.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
 	objectMeta.SetDeletionTimestamp(&now)
 	objectMeta.SetDeletionGracePeriodSeconds(options.GracePeriodSeconds)
+	objectMeta.SetDeletionReason(options.Reason)
 	// If it's the first graceful deletion we are going to set the DeletionTimestamp to non-nil.
 	// Controllers of the object that's being deleted shouldn't take any nontrivial actions, hence its behavior changes.
 	// Thus we need to bump object's Generation (if set). This handles generation bump during graceful deletion.

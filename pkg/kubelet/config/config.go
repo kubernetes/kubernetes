@@ -437,6 +437,7 @@ func podsDifferSemantically(existing, ref *v1.Pod) bool {
 		reflect.DeepEqual(existing.Labels, ref.Labels) &&
 		reflect.DeepEqual(existing.DeletionTimestamp, ref.DeletionTimestamp) &&
 		reflect.DeepEqual(existing.DeletionGracePeriodSeconds, ref.DeletionGracePeriodSeconds) &&
+		reflect.DeepEqual(existing.DeletionReason, ref.DeletionReason) &&
 		isAnnotationMapEqual(existing.Annotations, ref.Annotations) {
 		return false
 	}
@@ -475,6 +476,7 @@ func checkAndUpdatePod(existing, ref *v1.Pod) (needUpdate, needReconcile, needGr
 	existing.Labels = ref.Labels
 	existing.DeletionTimestamp = ref.DeletionTimestamp
 	existing.DeletionGracePeriodSeconds = ref.DeletionGracePeriodSeconds
+	existing.DeletionReason = ref.DeletionReason
 	existing.Status = ref.Status
 	updateAnnotations(existing, ref)
 

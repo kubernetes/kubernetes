@@ -240,6 +240,12 @@ type ObjectMeta struct {
 	// This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
+
+	// The reason for the deletion of an API Object. Its purpose is to provide
+	// an extra generic signal to watchers of API Objects during the graceful
+	// termination process.
+	// +optional
+	DeletionReason string `json:"deletionReason,omitempty" protobuf:"bytes,17,opt,name=deletionReason"`
 }
 
 // Initializers tracks the progress of initialization.
@@ -412,6 +418,11 @@ type DeleteOptions struct {
 	// metadata.finalizers and the resource-specific default policy.
 	// +optional
 	PropagationPolicy *DeletionPropagation `json:"propagationPolicy,omitempty" protobuf:"varint,4,opt,name=propagationPolicy"`
+
+	// The reason for the deletion of an API Object that undergoes graceful
+	// termination upon deletion.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.

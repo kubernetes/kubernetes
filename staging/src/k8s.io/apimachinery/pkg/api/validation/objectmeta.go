@@ -279,6 +279,9 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 		if oldMeta.GetDeletionGracePeriodSeconds() != nil && newMeta.GetDeletionGracePeriodSeconds() == nil {
 			newMeta.SetDeletionGracePeriodSeconds(oldMeta.GetDeletionGracePeriodSeconds())
 		}
+		if oldMeta.GetDeletionReason() != "" && newMeta.GetDeletionReason() == "" {
+			newMeta.SetDeletionReason(oldMeta.GetDeletionReason())
+		}
 	}
 
 	// TODO: needs to check if newMeta==nil && oldMeta !=nil after the repair logic is removed.
