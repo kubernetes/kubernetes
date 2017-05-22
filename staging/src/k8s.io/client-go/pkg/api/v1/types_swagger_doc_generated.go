@@ -1986,9 +1986,11 @@ func (VolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_VsphereVirtualDiskVolumeSource = map[string]string{
-	"":           "Represents a vSphere volume resource.",
-	"volumePath": "Path that identifies vSphere volume vmdk",
-	"fsType":     "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"":                  "Represents a vSphere volume resource.",
+	"volumePath":        "Path that identifies vSphere volume vmdk",
+	"fsType":            "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"storagePolicyName": "Storage Policy Based Management (SPBM) profile name.",
+	"storagePolicyID":   "Storage Policy Based Management (SPBM) profile ID associated with the StoragePolicyName.",
 }
 
 func (VsphereVirtualDiskVolumeSource) SwaggerDoc() map[string]string {
