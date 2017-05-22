@@ -134,9 +134,20 @@ fi
 # file and the one provided with --host is ignored.
 # Add path for things like running kubectl binary.
 export PATH=$(dirname "${e2e_test}"):"${PATH}"
+
+# Run ginkgo without color escape codes if the output is not a terminal
+# or if the terminal does not support color. Note: this variable must
+# to be referenced without quotes as we want the empty string value
+# to not count as a command line argument.
+GINKGO_NOCOLOR=
+if ! test -t 1 || ( which tput >/dev/null && test `tput colors` -le 0 ); then
+  GINKGO_NOCOLOR="--ginkgo.noColor"
+fi
+
 "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
   --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" \
+  ${GINKGO_NOCOLOR} \
   --host="${KUBE_MASTER_URL}" \
   --provider="${KUBERNETES_PROVIDER}" \
   --gce-project="${PROJECT:-}" \
