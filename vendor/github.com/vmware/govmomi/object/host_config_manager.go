@@ -105,6 +105,22 @@ func (m HostConfigManager) VsanSystem(ctx context.Context) (*HostVsanSystem, err
 	return NewHostVsanSystem(m.c, *h.ConfigManager.VsanSystem), nil
 }
 
+func (m HostConfigManager) VsanInternalSystem(ctx context.Context) (*HostVsanInternalSystem, error) {
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.vsanInternalSystem"}, &h)
+	if err != nil {
+		return nil, err
+	}
+
+	// Added in 5.5
+	if h.ConfigManager.VsanInternalSystem == nil {
+		return nil, ErrNotSupported
+	}
+
+	return NewHostVsanInternalSystem(m.c, *h.ConfigManager.VsanInternalSystem), nil
+}
+
 func (m HostConfigManager) AccountManager(ctx context.Context) (*HostAccountManager, error) {
 	var h mo.HostSystem
 

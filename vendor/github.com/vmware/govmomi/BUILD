@@ -34,6 +34,7 @@ filegroup(
         "//vendor/github.com/vmware/govmomi/find:all-srcs",
         "//vendor/github.com/vmware/govmomi/list:all-srcs",
         "//vendor/github.com/vmware/govmomi/object:all-srcs",
+        "//vendor/github.com/vmware/govmomi/pbm:all-srcs",
         "//vendor/github.com/vmware/govmomi/property:all-srcs",
         "//vendor/github.com/vmware/govmomi/session:all-srcs",
         "//vendor/github.com/vmware/govmomi/task:all-srcs",
