@@ -240,6 +240,7 @@ type TestFactory struct {
 	Err                error
 	Command            string
 	TmpDir             string
+	CategoryExpander   resource.CategoryExpander
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -620,6 +621,13 @@ func (f *fakeAPIFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, 
 
 	cacheDir := filepath.Join(f.tf.TmpDir, ".kube", "cache", "discovery")
 	return cmdutil.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
+}
+
+func (f *fakeAPIFactory) CategoryExpander() resource.CategoryExpander {
+	if f.tf.CategoryExpander != nil {
+		return f.tf.CategoryExpander
+	}
+	return f.Factory.CategoryExpander()
 }
 
 func (f *fakeAPIFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
