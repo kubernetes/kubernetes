@@ -22,7 +22,7 @@
         "containers": [
           {
             "name": "webserver",
-            "image": "gcr.io/google_containers/nettest:1.8",
+            "image": "gcr.io/google_containers/nettest:1.9",
             "imagePullPolicy": "Always",
             "args": [
               "-service=nettest",
