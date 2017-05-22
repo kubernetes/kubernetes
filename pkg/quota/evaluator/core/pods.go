@@ -28,11 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper/qos"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 )
@@ -257,7 +257,7 @@ func PodUsageFunc(obj runtime.Object) (api.ResourceList, error) {
 }
 
 func isBestEffort(pod *api.Pod) bool {
-	return qos.InternalGetPodQOS(pod) == api.PodQOSBestEffort
+	return qos.GetPodQOS(pod) == api.PodQOSBestEffort
 }
 
 func isTerminating(pod *api.Pod) bool {
