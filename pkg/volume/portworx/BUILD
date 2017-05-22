@@ -32,6 +32,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -43,7 +44,6 @@ go_library(
         "//vendor/github.com/libopenstorage/openstorage/api/client:go_default_library",
         "//vendor/github.com/libopenstorage/openstorage/api/client/volume:go_default_library",
         "//vendor/github.com/libopenstorage/openstorage/api/spec:go_default_library",
-        "//vendor/github.com/libopenstorage/openstorage/volume:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
