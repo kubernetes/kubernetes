@@ -431,7 +431,7 @@ func (f *FakeRuntime) GetPodContainerID(pod *Pod) (ContainerID, error) {
 	return ContainerID{}, f.Err
 }
 
-func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) error {
+func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {
 	f.Lock()
 	defer f.Unlock()
 
