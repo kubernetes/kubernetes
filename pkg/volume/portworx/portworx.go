@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -315,11 +314,6 @@ func (c *portworxVolumeUnmounter) TearDown() error {
 // resource was the last reference to that disk on the kubelet.
 func (c *portworxVolumeUnmounter) TearDownAt(dir string) error {
 	glog.V(4).Infof("Portworx Volume TearDown of %s", dir)
-	// Unmount the bind mount inside the pod
-	if err := util.UnmountPath(dir, c.mounter); err != nil {
-		return err
-	}
-
 	// Call Portworx Unmount for Portworx's book-keeping.
 	if err := c.manager.UnmountVolume(c, dir); err != nil {
 		return err
