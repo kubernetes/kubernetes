@@ -89,13 +89,12 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 		mediaType += ";stream=watch"
 	}
 
-	namespace, _, err := scope.Namer.Name(req)
-	if err != nil {
-		scope.err(fmt.Errorf("unexpected error from Namer.Name: %v", err), w, req)
+	ctx := scope.ContextFunc(req)
+	requestInfo, ok := request.RequestInfoFrom(ctx)
+	if !ok {
+		scope.err(fmt.Errorf("missing requestInfo"), w, req)
 		return
 	}
-	ctx := scope.ContextFunc(req)
-	ctx = request.WithNamespace(ctx, namespace)
 
 	server := &WatchServer{
 		Watching: watcher,
@@ -107,7 +106,7 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 		Encoder:         encoder,
 		EmbeddedEncoder: embeddedEncoder,
 		Fixup: func(obj runtime.Object) {
-			if err := setSelfLink(obj, ctx, scope.Namer); err != nil {
+			if err := setSelfLink(obj, requestInfo, scope.Namer); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to set link for object %v: %v", reflect.TypeOf(obj), err))
 			}
 		},
