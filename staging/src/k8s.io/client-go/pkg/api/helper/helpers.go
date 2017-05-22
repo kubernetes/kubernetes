@@ -594,3 +594,29 @@ func PersistentVolumeClaimHasClass(claim *api.PersistentVolumeClaim) bool {
 
 	return false
 }
+
+// GetStorageNodeAffinityFromAnnotation gets the json serialized data from PersistentVolume.Annotations
+// and converts it to the NodeAffinity type in api.
+// TODO: update when storage node affinity graduates to beta
+func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*api.NodeAffinity, error) {
+	if len(annotations) > 0 && annotations[api.AlphaStorageNodeAffinityAnnotation] != "" {
+		var affinity api.NodeAffinity
+		err := json.Unmarshal([]byte(annotations[api.AlphaStorageNodeAffinityAnnotation]), &affinity)
+		if err != nil {
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
+}
+
+// Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
+// TODO: update when storage node affinity graduates to beta
+func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *api.NodeAffinity) error {
+	json, err := json.Marshal(*affinity)
+	if err != nil {
+		return err
+	}
+	annotations[api.AlphaStorageNodeAffinityAnnotation] = string(json)
+	return nil
+}

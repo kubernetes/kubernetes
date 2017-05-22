@@ -18966,6 +18966,10 @@
       "$ref": "v1.ScaleIOVolumeSource",
       "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
      },
+     "local": {
+      "$ref": "v1.LocalVolumeSource",
+      "description": "Local represents directly-attached storage with node affinity"
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -19533,6 +19537,19 @@
      "readOnly": {
       "type": "boolean",
       "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
+   "v1.LocalVolumeSource": {
+    "id": "v1.LocalVolumeSource",
+    "description": "Local represents directly-attached storage with node affinity",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "The full path to the volume on the node For alpha, this path must be a directory Once block as a source is supported, then this path can point to a block device"
      }
     }
    },
