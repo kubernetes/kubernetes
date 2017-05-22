@@ -30,12 +30,12 @@ func (g *DirectedAcyclicGraph) From(n graph.Node) []graph.Node {
 	}
 
 	fid := n.ID()
-	nodes := make([]graph.Node, 0, len(g.UndirectedGraph.edges[n.ID()]))
-	for _, edge := range g.UndirectedGraph.edges[n.ID()] {
+	nodes := make([]graph.Node, 0, g.UndirectedGraph.edges[n.ID()].Len())
+	g.UndirectedGraph.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
 		if edge.From().ID() == fid {
 			nodes = append(nodes, g.UndirectedGraph.nodes[edge.To().ID()])
 		}
-	}
+	})
 	return nodes
 }
 
@@ -44,13 +44,13 @@ func (g *DirectedAcyclicGraph) VisitFrom(n graph.Node, visitor func(neighbor gra
 		return
 	}
 	fid := n.ID()
-	for _, edge := range g.UndirectedGraph.edges[n.ID()] {
+	g.UndirectedGraph.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
 		if edge.From().ID() == fid {
 			if !visitor(g.UndirectedGraph.nodes[edge.To().ID()]) {
 				return
 			}
 		}
-	}
+	})
 }
 
 func (g *DirectedAcyclicGraph) To(n graph.Node) []graph.Node {
@@ -59,12 +59,12 @@ func (g *DirectedAcyclicGraph) To(n graph.Node) []graph.Node {
 	}
 
 	tid := n.ID()
-	nodes := make([]graph.Node, 0, len(g.UndirectedGraph.edges[n.ID()]))
-	for _, edge := range g.UndirectedGraph.edges[n.ID()] {
+	nodes := make([]graph.Node, 0, g.UndirectedGraph.edges[n.ID()].Len())
+	g.UndirectedGraph.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
 		if edge.To().ID() == tid {
 			nodes = append(nodes, g.UndirectedGraph.nodes[edge.From().ID()])
 		}
-	}
+	})
 	return nodes
 }
 
@@ -73,11 +73,11 @@ func (g *DirectedAcyclicGraph) VisitTo(n graph.Node, visitor func(neighbor graph
 		return
 	}
 	tid := n.ID()
-	for _, edge := range g.UndirectedGraph.edges[n.ID()] {
+	g.UndirectedGraph.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
 		if edge.To().ID() == tid {
 			if !visitor(g.UndirectedGraph.nodes[edge.From().ID()]) {
 				return
 			}
 		}
-	}
+	})
 }

@@ -15,7 +15,7 @@ import (
 // UndirectedGraph implements a generalized undirected graph.
 type UndirectedGraph struct {
 	nodes map[int]graph.Node
-	edges map[int]map[int]graph.Edge
+	edges map[int]edgeHolder
 
 	self, absent float64
 
@@ -28,7 +28,7 @@ type UndirectedGraph struct {
 func NewUndirectedGraph(self, absent float64) *UndirectedGraph {
 	return &UndirectedGraph{
 		nodes: make(map[int]graph.Node),
-		edges: make(map[int]map[int]graph.Edge),
+		edges: make(map[int]edgeHolder),
 
 		self:   self,
 		absent: absent,
@@ -66,7 +66,7 @@ func (g *UndirectedGraph) AddNode(n graph.Node) {
 		panic(fmt.Sprintf("simple: node ID collision: %d", n.ID()))
 	}
 	g.nodes[n.ID()] = n
-	g.edges[n.ID()] = make(map[int]graph.Edge)
+	g.edges[n.ID()] = &sliceEdgeHolder{self: n.ID()}
 
 	g.freeIDs.Remove(n.ID())
 	g.usedIDs.Insert(n.ID())
@@ -80,9 +80,9 @@ func (g *UndirectedGraph) RemoveNode(n graph.Node) {
 	}
 	delete(g.nodes, n.ID())
 
-	for from := range g.edges[n.ID()] {
-		delete(g.edges[from], n.ID())
-	}
+	g.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
+		g.edges[neighbor] = g.edges[neighbor].Delete(n.ID())
+	})
 	delete(g.edges, n.ID())
 
 	g.freeIDs.Insert(n.ID())
@@ -111,8 +111,8 @@ func (g *UndirectedGraph) SetEdge(e graph.Edge) {
 		g.AddNode(to)
 	}
 
-	g.edges[fid][tid] = e
-	g.edges[tid][fid] = e
+	g.edges[fid] = g.edges[fid].Set(tid, e)
+	g.edges[tid] = g.edges[tid].Set(fid, e)
 }
 
 // RemoveEdge removes e from the graph, leaving the terminal nodes. If the edge does not exist
@@ -126,8 +126,8 @@ func (g *UndirectedGraph) RemoveEdge(e graph.Edge) {
 		return
 	}
 
-	delete(g.edges[from.ID()], to.ID())
-	delete(g.edges[to.ID()], from.ID())
+	g.edges[from.ID()] = g.edges[from.ID()].Delete(to.ID())
+	g.edges[to.ID()] = g.edges[to.ID()].Delete(from.ID())
 }
 
 // Node returns the node in the graph with the given ID.
@@ -159,16 +159,16 @@ func (g *UndirectedGraph) Edges() []graph.Edge {
 
 	seen := make(map[[2]int]struct{})
 	for _, u := range g.edges {
-		for _, e := range u {
+		u.Visit(func(neighbor int, e graph.Edge) {
 			uid := e.From().ID()
 			vid := e.To().ID()
 			if _, ok := seen[[2]int{uid, vid}]; ok {
-				continue
+				return
 			}
 			seen[[2]int{uid, vid}] = struct{}{}
 			seen[[2]int{vid, uid}] = struct{}{}
 			edges = append(edges, e)
-		}
+		})
 	}
 
 	return edges
@@ -180,19 +180,19 @@ func (g *UndirectedGraph) From(n graph.Node) []graph.Node {
 		return nil
 	}
 
-	nodes := make([]graph.Node, len(g.edges[n.ID()]))
+	nodes := make([]graph.Node, g.edges[n.ID()].Len())
 	i := 0
-	for from := range g.edges[n.ID()] {
-		nodes[i] = g.nodes[from]
+	g.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
+		nodes[i] = g.nodes[neighbor]
 		i++
-	}
+	})
 
 	return nodes
 }
 
 // HasEdgeBetween returns whether an edge exists between nodes x and y.
 func (g *UndirectedGraph) HasEdgeBetween(x, y graph.Node) bool {
-	_, ok := g.edges[x.ID()][y.ID()]
+	_, ok := g.edges[x.ID()].Get(y.ID())
 	return ok
 }
 
@@ -210,7 +210,8 @@ func (g *UndirectedGraph) EdgeBetween(x, y graph.Node) graph.Edge {
 		return nil
 	}
 
-	return g.edges[x.ID()][y.ID()]
+	edge, _ := g.edges[x.ID()].Get(y.ID())
+	return edge
 }
 
 // Weight returns the weight for the edge between x and y if Edge(x, y) returns a non-nil Edge.
@@ -224,7 +225,7 @@ func (g *UndirectedGraph) Weight(x, y graph.Node) (w float64, ok bool) {
 		return g.self, true
 	}
 	if n, ok := g.edges[xid]; ok {
-		if e, ok := n[yid]; ok {
+		if e, ok := n.Get(yid); ok {
 			return e.Weight(), true
 		}
 	}
@@ -237,5 +238,5 @@ func (g *UndirectedGraph) Degree(n graph.Node) int {
 		return 0
 	}
 
-	return len(g.edges[n.ID()])
+	return g.edges[n.ID()].Len()
 }
