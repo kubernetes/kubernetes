@@ -145,6 +145,10 @@
       ```
 
       [Download example](vsphere-volume-pvc.yaml?raw=true)
+      
+      **Note**: In the above example volume size - 2GB is specified using binary SI - Gi.
+      If unit is not specified, default will be Gi.
+      For example ```storage: 2``` will generate a request to provision 2 GB Volume.
 
       Creating the persistent volume claim:
 
