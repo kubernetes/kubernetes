@@ -64,6 +64,21 @@ func TestStatusUpdates(t *testing.T) {
 	}
 }
 
+func TestDeploymentStrategyUpdates(t *testing.T) {
+	old := newDeployment(map[string]string{"test": "label"}, map[string]string{"test": "annotation"})
+	old.Spec.Strategy = *newDeploymentStrategy(extensions.RollingUpdateDeploymentStrategyType)
+	obj := newDeployment(map[string]string{"test": "label"}, map[string]string{"test": "annotation"})
+	obj.Spec.Strategy = *newDeploymentStrategy(extensions.RollingUpdateDeploymentStrategyType)
+	resetDeploymentStrategyType(obj, extensions.RecreateDeploymentStrategyType)
+	expected := newDeployment(map[string]string{"test": "label"}, map[string]string{"test": "annotation"})
+	expected.Spec.Strategy = *newDeploymentStrategy(extensions.RecreateDeploymentStrategyType)
+
+	deploymentStrategy{}.PrepareForUpdate(api.NewContext(), obj, old)
+	if !reflect.DeepEqual(expected.Spec, obj.Spec) {
+		t.Errorf("Unexpected object mismatch! Expected:\n%#v\ngot:\n%#v", expected, obj)
+	}
+}
+
 func newDeployment(labels, annotations map[string]string) *extensions.Deployment {
 	return &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -88,4 +103,18 @@ func newDeployment(labels, annotations map[string]string) *extensions.Deployment
 			},
 		},
 	}
+}
+
+func newDeploymentStrategy(strategyType extensions.DeploymentStrategyType) *extensions.DeploymentStrategy {
+	strategy := &extensions.DeploymentStrategy{
+		Type: strategyType,
+	}
+	if strategyType == extensions.RollingUpdateDeploymentStrategyType {
+		strategy.RollingUpdate = &extensions.RollingUpdateDeployment{}
+	}
+	return strategy
+}
+
+func resetDeploymentStrategyType(deployment *extensions.Deployment, strategyType extensions.DeploymentStrategyType) {
+	deployment.Spec.Strategy.Type = strategyType
 }

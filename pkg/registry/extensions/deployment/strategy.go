@@ -83,6 +83,12 @@ func (deploymentStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, o
 	oldDeployment := old.(*extensions.Deployment)
 	newDeployment.Status = oldDeployment.Status
 
+	if newDeployment.Spec.Strategy.Type == extensions.RecreateDeploymentStrategyType {
+		if newDeployment.Spec.Strategy.RollingUpdate != nil {
+			newDeployment.Spec.Strategy.RollingUpdate = nil
+		}
+	}
+
 	// Spec updates bump the generation so that we can distinguish between
 	// scaling events and template changes, annotation updates bump the generation
 	// because annotations are copied from deployments to their replica sets.
