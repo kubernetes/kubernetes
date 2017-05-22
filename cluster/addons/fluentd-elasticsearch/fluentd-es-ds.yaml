@@ -21,6 +21,7 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      serviceAccountName: fluentd-es
       containers:
       - name: fluentd-es
         image: gcr.io/google_containers/fluentd-elasticsearch:1.22
