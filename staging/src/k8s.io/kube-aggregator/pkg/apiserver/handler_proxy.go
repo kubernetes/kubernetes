@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"sync/atomic"
@@ -24,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -110,21 +112,14 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	location.Path = req.URL.Path
 	location.RawQuery = req.URL.Query().Encode()
 
-	// make a new request object with the updated location and the body we already have
-	newReq, err := http.NewRequest(req.Method, location.String(), req.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	mergeHeader(newReq.Header, req.Header)
-	newReq.ContentLength = req.ContentLength
-	// Copy the TransferEncoding is for future-proofing. Currently Go only supports "chunked" and
-	// it can determine the TransferEncoding based on ContentLength and the Body.
-	newReq.TransferEncoding = req.TransferEncoding
+	// WithContext creates a shallow clone of the request with the new context.
+	newReq := req.WithContext(context.Background())
+	newReq.Header = utilnet.CloneHeader(req.Header)
+	newReq.URL = location
 
 	upgrade := false
 	// we need to wrap the roundtripper in another roundtripper which will apply the front proxy headers
-	proxyRoundTripper, upgrade, err = maybeWrapForConnectionUpgrades(handlingInfo.restConfig, proxyRoundTripper, req)
+	proxyRoundTripper, upgrade, err := maybeWrapForConnectionUpgrades(handlingInfo.restConfig, proxyRoundTripper, req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -161,14 +156,6 @@ func maybeWrapForConnectionUpgrades(restConfig *restclient.Config, rt http.Round
 	}
 
 	return wrappedRT, true, nil
-}
-
-func mergeHeader(dst, src http.Header) {
-	for k, vv := range src {
-		for _, v := range vv {
-			dst.Add(k, v)
-		}
-	}
 }
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.

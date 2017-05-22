@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"errors"
 	"io"
 	"math/rand"
@@ -156,17 +157,10 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	location.RawQuery = values.Encode()
 
-	newReq, err := http.NewRequest(req.Method, location.String(), req.Body)
-	if err != nil {
-		httpCode = responsewriters.ErrorNegotiated(ctx, err, r.Serializer, gv, w, req)
-		return
-	}
-	httpCode = http.StatusOK
-	newReq.Header = req.Header
-	newReq.ContentLength = req.ContentLength
-	// Copy the TransferEncoding is for future-proofing. Currently Go only supports "chunked" and
-	// it can determine the TransferEncoding based on ContentLength and the Body.
-	newReq.TransferEncoding = req.TransferEncoding
+	// WithContext creates a shallow clone of the request with the new context.
+	newReq := req.WithContext(context.Background())
+	newReq.Header = net.CloneHeader(req.Header)
+	newReq.URL = location
 
 	// TODO convert this entire proxy to an UpgradeAwareProxy similar to
 	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
@@ -224,6 +218,10 @@ func (r *ProxyHandler) tryUpgrade(ctx request.Context, w http.ResponseWriter, re
 	if !httpstream.IsUpgradeRequest(req) {
 		return false
 	}
+	// Only append X-Forwarded-For in the upgrade path, since httputil.NewSingleHostReverseProxy
+	// handles this in the non-upgrade path.
+	net.AppendForwardedForHeader(newReq)
+
 	backendConn, err := proxyutil.DialURL(location, transport)
 	if err != nil {
 		responsewriters.ErrorNegotiated(ctx, err, r.Serializer, gv, w, req)
