@@ -280,6 +280,26 @@ func init() {
 			eventsRule(),
 		},
 	})
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "bootstrap-signer"},
+		Rules: []rbac.PolicyRule{
+			// TODO: restrict these to the appropriate namespaces.  This would
+			// be be `kube-public` for the configmap and `kube-system` for the
+			// secrets.
+			rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
+			eventsRule(),
+		},
+	})
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "token-cleaner"},
+		Rules: []rbac.PolicyRule{
+			// TODO: restrict these to the appropriate namespaces.  This would
+			// be `kube-system`.
+			rbac.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
+			eventsRule(),
+		},
+	})
 }
 
 // ControllerRoles returns the cluster roles used by controllers
