@@ -133,6 +133,7 @@ func autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *StatefulSet
 	}
 	out.VolumeClaimTemplates = *(*[]api.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
 	out.ServiceName = in.ServiceName
+	out.PodManagementPolicy = apps.PodManagementPolicyType(in.PodManagementPolicy)
 	return nil
 }
 
@@ -146,6 +147,7 @@ func autoConvert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.Statef
 	}
 	out.VolumeClaimTemplates = *(*[]api_v1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
 	out.ServiceName = in.ServiceName
+	out.PodManagementPolicy = PodManagementPolicyType(in.PodManagementPolicy)
 	return nil
 }
 

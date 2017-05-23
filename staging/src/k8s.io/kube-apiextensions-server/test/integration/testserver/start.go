@@ -76,7 +76,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 		return nil, err
 	}
 
-	customResourceDefinitionRESTOptionsGetter := extensionsapiserver.CustomResourceDefinitionRESTOptionsGetter{
+	customResourceDefinitionRESTOptionsGetter := extensionsapiserver.CRDRESTOptionsGetter{
 		StorageConfig:           options.RecommendedOptions.Etcd.StorageConfig,
 		StoragePrefix:           options.RecommendedOptions.Etcd.StorageConfig.Prefix,
 		EnableWatchCache:        options.RecommendedOptions.Etcd.EnableWatchCache,
@@ -88,8 +88,8 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	customResourceDefinitionRESTOptionsGetter.StorageConfig.Copier = extensionsapiserver.UnstructuredCopier{}
 
 	config := &extensionsapiserver.Config{
-		GenericConfig:                             genericConfig,
-		CustomResourceDefinitionRESTOptionsGetter: customResourceDefinitionRESTOptionsGetter,
+		GenericConfig:        genericConfig,
+		CRDRESTOptionsGetter: customResourceDefinitionRESTOptionsGetter,
 	}
 
 	return config, nil

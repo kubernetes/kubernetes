@@ -86,6 +86,7 @@ go_library(
         "networking.go",
         "networking_perf.go",
         "nodeoutofdisk.go",
+        "nvidia-gpus.go",
         "pod_gc.go",
         "podpreset.go",
         "pods.go",

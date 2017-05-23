@@ -302,6 +302,10 @@ current-context: kubemark-context")
   metrics_mem_per_node=4
   metrics_mem=$((200 + ${metrics_mem_per_node}*${NUM_NODES:-10}))
   sed -i'' -e "s/{{METRICS_MEM}}/${metrics_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
+  metrics_cpu_per_node_numerator=${NUM_NODES:-10}
+  metrics_cpu_per_node_denumerator=2
+  metrics_cpu=$((80 + metrics_cpu_per_node_numerator / metrics_cpu_per_node_denumerator))
+  sed -i'' -e "s/{{METRICS_CPU}}/${metrics_cpu}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
   eventer_mem_per_node=500
   eventer_mem=$((200 * 1024 + ${eventer_mem_per_node}*${NUM_NODES:-10}))
   sed -i'' -e "s/{{EVENTER_MEM}}/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"

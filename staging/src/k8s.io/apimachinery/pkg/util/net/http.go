@@ -150,13 +150,13 @@ func GetHTTPClient(req *http.Request) string {
 	return "unknown"
 }
 
-// Extracts and returns the clients IP from the given request.
-// Looks at X-Forwarded-For header, X-Real-Ip header and request.RemoteAddr in that order.
-// Returns nil if none of them are set or is set to an invalid value.
-func GetClientIP(req *http.Request) net.IP {
+// SourceIPs splits the comma separated X-Forwarded-For header or returns the X-Real-Ip header or req.RemoteAddr,
+// in that order, ignoring invalid IPs. It returns nil if all of these are empty or invalid.
+func SourceIPs(req *http.Request) []net.IP {
 	hdr := req.Header
 	// First check the X-Forwarded-For header for requests via proxy.
 	hdrForwardedFor := hdr.Get("X-Forwarded-For")
+	forwardedForIPs := []net.IP{}
 	if hdrForwardedFor != "" {
 		// X-Forwarded-For can be a csv of IPs in case of multiple proxies.
 		// Use the first valid one.
@@ -164,9 +164,12 @@ func GetClientIP(req *http.Request) net.IP {
 		for _, part := range parts {
 			ip := net.ParseIP(strings.TrimSpace(part))
 			if ip != nil {
-				return ip
+				forwardedForIPs = append(forwardedForIPs, ip)
 			}
 		}
+	}
+	if len(forwardedForIPs) > 0 {
+		return forwardedForIPs
 	}
 
 	// Try the X-Real-Ip header.
@@ -174,7 +177,7 @@ func GetClientIP(req *http.Request) net.IP {
 	if hdrRealIp != "" {
 		ip := net.ParseIP(hdrRealIp)
 		if ip != nil {
-			return ip
+			return []net.IP{ip}
 		}
 	}
 
@@ -182,11 +185,28 @@ func GetClientIP(req *http.Request) net.IP {
 	// Remote Address in Go's HTTP server is in the form host:port so we need to split that first.
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err == nil {
-		return net.ParseIP(host)
+		if remoteIP := net.ParseIP(host); remoteIP != nil {
+			return []net.IP{remoteIP}
+		}
 	}
 
 	// Fallback if Remote Address was just IP.
-	return net.ParseIP(req.RemoteAddr)
+	if remoteIP := net.ParseIP(req.RemoteAddr); remoteIP != nil {
+		return []net.IP{remoteIP}
+	}
+
+	return nil
+}
+
+// Extracts and returns the clients IP from the given request.
+// Looks at X-Forwarded-For header, X-Real-Ip header and request.RemoteAddr in that order.
+// Returns nil if none of them are set or is set to an invalid value.
+func GetClientIP(req *http.Request) net.IP {
+	ips := SourceIPs(req)
+	if len(ips) == 0 {
+		return nil
+	}
+	return ips[0]
 }
 
 var defaultProxyFuncPointer = fmt.Sprintf("%p", http.ProxyFromEnvironment)

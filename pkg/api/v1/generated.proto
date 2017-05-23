@@ -4012,6 +4012,14 @@ message VsphereVirtualDiskVolumeSource {
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // +optional
   optional string fsType = 2;
+
+  // Storage Policy Based Management (SPBM) profile name.
+  // +optional
+  optional string storagePolicyName = 3;
+
+  // Storage Policy Based Management (SPBM) profile ID associated with the StoragePolicyName.
+  // +optional
+  optional string storagePolicyID = 4;
 }
 
 // The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)

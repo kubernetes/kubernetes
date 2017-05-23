@@ -52,9 +52,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/admission"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplefuzzer "k8s.io/apiserver/pkg/apis/example/fuzzer"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/audit"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -256,25 +258,25 @@ type defaultAPIServer struct {
 
 // uses the default settings
 func handle(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, admissionControl, selfLinker)
+	return handleInternal(storage, admissionControl, selfLinker, nil)
 }
 
 // tests with a deny admission controller
 func handleDeny(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, alwaysDeny{}, selfLinker)
+	return handleInternal(storage, alwaysDeny{}, selfLinker, nil)
 }
 
 // tests using the new namespace scope mechanism
 func handleNamespaced(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, admissionControl, selfLinker)
+	return handleInternal(storage, admissionControl, selfLinker, nil)
 }
 
 // tests using a custom self linker
 func handleLinker(storage map[string]rest.Storage, selfLinker runtime.SelfLinker) http.Handler {
-	return handleInternal(storage, admissionControl, selfLinker)
+	return handleInternal(storage, admissionControl, selfLinker, nil)
 }
 
-func handleInternal(storage map[string]rest.Storage, admissionControl admission.Interface, selfLinker runtime.SelfLinker) http.Handler {
+func handleInternal(storage map[string]rest.Storage, admissionControl admission.Interface, selfLinker runtime.SelfLinker, auditSink audit.Sink) http.Handler {
 	container := restful.NewContainer()
 	container.Router(restful.CurlyRouter{})
 	mux := container.ServeMux
@@ -332,7 +334,11 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		}
 	}
 
-	handler := genericapifilters.WithRequestInfo(mux, testRequestInfoResolver(), requestContextMapper)
+	handler := genericapifilters.WithAudit(mux, requestContextMapper, auditSink, auditinternal.NewConstantPolicy(auditinternal.LevelRequestResponse), func(r *http.Request, requestInfo *request.RequestInfo) bool {
+		// simplified long-running check
+		return requestInfo.Verb == "watch" || requestInfo.Verb == "proxy"
+	})
+	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver(), requestContextMapper)
 	handler = request.WithRequestContext(handler, requestContextMapper)
 
 	return &defaultAPIServer{handler, container}
@@ -1088,7 +1094,7 @@ func TestList(t *testing.T) {
 			namespace:   testCase.namespace,
 			expectedSet: testCase.selfLink,
 		}
-		var handler = handleInternal(storage, admissionControl, selfLinker)
+		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
 		server := httptest.NewServer(handler)
 		defer server.Close()
 
@@ -1768,7 +1774,7 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 		namespace:   "foo",
 	}
 	storage["simple"] = &simpleStorage
-	handler := handleInternal(storage, admissionControl, selfLinker)
+	handler := handleInternal(storage, admissionControl, selfLinker, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -3166,7 +3172,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 		namespace:   "other",
 		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo/bar",
 	}
-	handler := handleInternal(map[string]rest.Storage{"foo": &storage}, alwaysDeny{}, selfLinker)
+	handler := handleInternal(map[string]rest.Storage{"foo": &storage}, alwaysDeny{}, selfLinker, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -3248,7 +3254,7 @@ func (obj *UnregisteredAPIObject) GetObjectKind() schema.ObjectKind {
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		responsewriters.WriteObjectNegotiated(codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
+		responsewriters.WriteObjectNegotiated(request.NewContext(), codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
 	}))
 	defer server.Close()
 	// We send a 200 status code before we encode the object, so we expect OK, but there will

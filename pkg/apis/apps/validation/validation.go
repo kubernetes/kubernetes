@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,6 +66,14 @@ func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, select
 // ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
 func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	switch spec.PodManagementPolicy {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("podManagementPolicy"), ""))
+	case apps.OrderedReadyPodManagement, apps.ParallelPodManagement:
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("podManagementPolicy"), spec.PodManagementPolicy, fmt.Sprintf("must be '%s' or '%s'", apps.OrderedReadyPodManagement, apps.ParallelPodManagement)))
+	}
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	if spec.Selector == nil {

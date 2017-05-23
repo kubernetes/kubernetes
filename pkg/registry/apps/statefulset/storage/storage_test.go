@@ -58,7 +58,8 @@ func validNewStatefulSet() *apps.StatefulSet {
 			Labels:    map[string]string{"a": "b"},
 		},
 		Spec: apps.StatefulSetSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},

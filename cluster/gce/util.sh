@@ -38,27 +38,36 @@ else
 fi
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
-  # If the master image is not set, we use the latest GCI image.
-  # Otherwise, we respect whatever is set by the user.
-  MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}
-  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
+    DEFAULT_GCI_PROJECT=google-containers
+    if [[ "${GCI_VERSION}" == "cos"* ]]; then
+        DEFAULT_GCI_PROJECT=cos-cloud
+    fi
+    MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
+    # If the master image is not set, we use the latest GCI image.
+    # Otherwise, we respect whatever is set by the user.
+    MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}
 elif [[ "${MASTER_OS_DISTRIBUTION}" == "debian" ]]; then
-  MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${CVM_VERSION}}
-  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
+    MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${CVM_VERSION}}
+    MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 fi
 
 # Sets node image based on the specified os distro. Currently this function only
 # supports gci and debian.
 function set-node-image() {
-  if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
-    # If the node image is not set, we use the latest GCI image.
-    # Otherwise, we respect whatever is set by the user.
-    NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
-    NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
-  elif [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
-    NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
-    NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
-  fi
+    if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
+        DEFAULT_GCI_PROJECT=google-containers
+        if [[ "${GCI_VERSION}" == "cos"* ]]; then
+            DEFAULT_GCI_PROJECT=cos-cloud
+        fi
+
+        # If the node image is not set, we use the latest GCI image.
+        # Otherwise, we respect whatever is set by the user.
+        NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
+        NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-${DEFAULT_GCI_PROJECT}}
+    elif [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
+        NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
+        NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
+    fi
 }
 
 set-node-image

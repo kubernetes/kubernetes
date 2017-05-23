@@ -287,7 +287,7 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	if err := thirdparty.InstallREST(m.genericAPIServer.Handler.GoRestfulContainer); err != nil {
 		glog.Errorf("Unable to setup thirdparty api: %v", err)
 	}
-	m.genericAPIServer.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(api.Codecs, apiGroup).WebService())
+	m.genericAPIServer.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(api.Codecs, apiGroup, m.genericAPIServer.RequestContextMapper()).WebService())
 
 	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedatastore.REST), apiGroup)
 	api.Registry.AddThirdPartyAPIGroupVersions(schema.GroupVersion{Group: group, Version: rsrc.Versions[0].Name})

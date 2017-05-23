@@ -1061,6 +1061,10 @@ function start-kube-apiserver {
     params+=" --audit-log-maxsize=2000000000"
   fi
 
+  if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
+    params+=" --enable-logs-handler=false"
+  fi
+
   local admission_controller_config_mount=""
   local admission_controller_config_volume=""
   local image_policy_webhook_config_mount=""
@@ -1605,4 +1609,5 @@ else
 fi
 reset-motd
 prepare-mounter-rootfs
+modprobe configs
 echo "Done for the configuration for kubernetes"

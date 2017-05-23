@@ -47,7 +47,7 @@ func WithMaxInFlightLimit(
 	nonMutatingLimit int,
 	mutatingLimit int,
 	requestContextMapper genericapirequest.RequestContextMapper,
-	longRunningRequestCheck LongRunningRequestCheck,
+	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 ) http.Handler {
 	if nonMutatingLimit == 0 && mutatingLimit == 0 {
 		return handler

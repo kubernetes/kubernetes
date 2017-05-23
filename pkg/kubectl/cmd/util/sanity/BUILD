@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
 

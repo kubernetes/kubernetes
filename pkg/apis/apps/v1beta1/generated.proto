@@ -27,7 +27,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/apis/extensions/v1beta1/generated.proto";
+import "k8s.io/kubernetes/pkg/apis/policy/v1beta1/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
@@ -294,7 +294,7 @@ message StatefulSetList {
 
 // A StatefulSetSpec is the specification of a StatefulSet.
 message StatefulSetSpec {
-  // Replicas is the desired number of replicas of the given Template.
+  // replicas is the desired number of replicas of the given Template.
   // These are replicas in the sense that they are instantiations of the
   // same Template, but individual replicas also have a consistent identity.
   // If unspecified, defaults to 1.
@@ -302,19 +302,19 @@ message StatefulSetSpec {
   // +optional
   optional int32 replicas = 1;
 
-  // Selector is a label query over pods that should match the replica count.
+  // selector is a label query over pods that should match the replica count.
   // If empty, defaulted to labels on the pod template.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
-  // Template is the object that describes the pod that will be created if
+  // template is the object that describes the pod that will be created if
   // insufficient replicas are detected. Each pod stamped out by the StatefulSet
   // will fulfill this Template, but have a unique identity from the rest
   // of the StatefulSet.
   optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 3;
 
-  // VolumeClaimTemplates is a list of claims that pods are allowed to reference.
+  // volumeClaimTemplates is a list of claims that pods are allowed to reference.
   // The StatefulSet controller is responsible for mapping network identities to
   // claims in a way that maintains the identity of a pod. Every claim in
   // this list must have at least one matching (by name) volumeMount in one
@@ -324,21 +324,32 @@ message StatefulSetSpec {
   // +optional
   repeated k8s.io.kubernetes.pkg.api.v1.PersistentVolumeClaim volumeClaimTemplates = 4;
 
-  // ServiceName is the name of the service that governs this StatefulSet.
+  // serviceName is the name of the service that governs this StatefulSet.
   // This service must exist before the StatefulSet, and is responsible for
   // the network identity of the set. Pods get DNS/hostnames that follow the
   // pattern: pod-specific-string.serviceName.default.svc.cluster.local
   // where "pod-specific-string" is managed by the StatefulSet controller.
   optional string serviceName = 5;
+
+  // podManagementPolicy controls how pods are created during initial scale up,
+  // when replacing pods on nodes, or when scaling down. The default policy is
+  // `OrderedReady`, where pods are created in increasing order (pod-0, then
+  // pod-1, etc) and the controller will wait until each pod is ready before
+  // continuing. When scaling down, the pods are removed in the opposite order.
+  // The alternative policy is `Parallel` which will create pods in parallel
+  // to match the desired scale without waiting, and on scale down will delete
+  // all pods at once.
+  // +optional
+  optional string podManagementPolicy = 6;
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
 message StatefulSetStatus {
-  // most recent generation observed by this StatefulSet.
+  // observedGeneration is the most recent generation observed by this StatefulSet.
   // +optional
   optional int64 observedGeneration = 1;
 
-  // Replicas is the number of actual replicas.
+  // replicas is the number of actual replicas.
   optional int32 replicas = 2;
 }
 

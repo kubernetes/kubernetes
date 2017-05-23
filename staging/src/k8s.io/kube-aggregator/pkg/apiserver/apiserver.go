@@ -172,6 +172,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	apisHandler := &apisHandler{
 		codecs: Codecs,
 		lister: s.lister,
+		mapper: s.contextMapper,
 	}
 	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.PostGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
@@ -242,10 +243,11 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService, de
 	// it's time to register the group aggregation endpoint
 	groupPath := "/apis/" + apiService.Spec.Group
 	groupDiscoveryHandler := &apiGroupHandler{
-		codecs:    Codecs,
-		groupName: apiService.Spec.Group,
-		lister:    s.lister,
-		delegate:  s.delegateHandler,
+		codecs:        Codecs,
+		groupName:     apiService.Spec.Group,
+		lister:        s.lister,
+		delegate:      s.delegateHandler,
+		contextMapper: s.contextMapper,
 	}
 	// aggregation is protected
 	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle(groupPath, groupDiscoveryHandler)

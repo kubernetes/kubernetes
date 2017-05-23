@@ -774,6 +774,7 @@ func TestDescribeStorageClass(t *testing.T) {
 }
 
 func TestDescribePodDisruptionBudget(t *testing.T) {
+	minAvailable := intstr.FromInt(22)
 	f := fake.NewSimpleClientset(&policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:         "ns1",
@@ -781,7 +782,7 @@ func TestDescribePodDisruptionBudget(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
-			MinAvailable: intstr.FromInt(22),
+			MinAvailable: &minAvailable,
 		},
 		Status: policy.PodDisruptionBudgetStatus{
 			PodDisruptionsAllowed: 5,

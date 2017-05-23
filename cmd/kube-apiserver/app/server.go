@@ -104,43 +104,66 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, sharedInformers)
+
+	// kubeAPIServer is at the base for now.  This ensures that CustomResourceDefinitions trump TPRs
+	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers)
 	if err != nil {
 		return err
-	}
-
-	// run the insecure server now, don't block.  It doesn't have any aggregator goodies since authentication wouldn't work
-	if insecureServingOptions != nil {
-		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(kubeAPIServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig)
-		if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, stopCh); err != nil {
-			return err
-		}
 	}
 
 	// if we're starting up a hacked up version of this API server for a weird test case,
 	// just start the API server as is because clients don't get built correctly when you do this
 	if len(os.Getenv("KUBE_API_VERSIONS")) > 0 {
+		if insecureServingOptions != nil {
+			insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(kubeAPIServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig)
+			if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, stopCh); err != nil {
+				return err
+			}
+		}
+
 		return kubeAPIServer.GenericAPIServer.PrepareRun().Run(stopCh)
 	}
 
 	// otherwise go down the normal path of standing the aggregator up in front of the API server
 	// this wires up openapi
 	kubeAPIServer.GenericAPIServer.PrepareRun()
+
+	// TPRs are enabled and not yet beta, since this these are the successor, they fall under the same enablement rule
+	// Subsequent API servers in between here and kube-apiserver will need to be gated.
+	// These come first so that if someone registers both a TPR and a CRD, the CRD is preferred.
+	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, runOptions)
+	if err != nil {
+		return err
+	}
+	apiExtensionsServer, err := createAPIExtensionsServer(apiExtensionsConfig, kubeAPIServer.GenericAPIServer)
+	if err != nil {
+		return err
+	}
+
+	// aggregator comes last in the chain
 	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, runOptions)
 	if err != nil {
 		return err
 	}
-	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers)
+	aggregatorServer, err := createAggregatorServer(aggregatorConfig, apiExtensionsServer.GenericAPIServer, sharedInformers, apiExtensionsServer.Informers)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return err
 	}
+
+	if insecureServingOptions != nil {
+		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(aggregatorServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig)
+		if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, stopCh); err != nil {
+			return err
+		}
+	}
+
 	return aggregatorServer.GenericAPIServer.PrepareRun().Run(stopCh)
 }
 
 // CreateKubeAPIServer creates and wires a workable kube-apiserver
-func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, sharedInformers informers.SharedInformerFactory) (*master.Master, error) {
-	kubeAPIServer, err := kubeAPIServerConfig.Complete().New(genericapiserver.EmptyDelegate)
+func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, delegateAPIServer genericapiserver.DelegationTarget, sharedInformers informers.SharedInformerFactory) (*master.Master, error) {
+	kubeAPIServer, err := kubeAPIServerConfig.Complete().New(delegateAPIServer)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +287,7 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions) (*master.Config, inf
 		EventTTL:                s.EventTTL,
 		KubeletClientConfig:     s.KubeletConfig,
 		EnableUISupport:         true,
-		EnableLogsSupport:       true,
+		EnableLogsSupport:       s.EnableLogsHandler,
 		ProxyTransport:          proxyTransport,
 
 		Tunneler: nodeTunneler,

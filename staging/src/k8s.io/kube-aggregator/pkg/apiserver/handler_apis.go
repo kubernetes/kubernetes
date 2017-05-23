@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"errors"
 	"net/http"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/request"
 
 	apiregistrationapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	apiregistrationv1beta1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
@@ -36,6 +38,7 @@ import (
 type apisHandler struct {
 	codecs serializer.CodecFactory
 	lister listers.APIServiceLister
+	mapper request.RequestContextMapper
 }
 
 var discoveryGroup = metav1.APIGroup{
@@ -53,6 +56,12 @@ var discoveryGroup = metav1.APIGroup{
 }
 
 func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	ctx, ok := r.mapper.Get(req)
+	if !ok {
+		responsewriters.InternalError(w, req, errors.New("no context found for request"))
+		return
+	}
+
 	discoveryGroupList := &metav1.APIGroupList{
 		// always add OUR api group to the list first.  Since we'll never have a registered APIService for it
 		// and since this is the crux of the API, having this first will give our names priority.  It's good to be king.
@@ -76,7 +85,7 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	responsewriters.WriteObjectNegotiated(r.codecs, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroupList)
+	responsewriters.WriteObjectNegotiated(ctx, r.codecs, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroupList)
 }
 
 // convertToDiscoveryAPIGroup takes apiservices in a single group and returns a discovery compatible object.
@@ -115,8 +124,9 @@ func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService) *m
 
 // apiGroupHandler serves the `/apis/<group>` endpoint.
 type apiGroupHandler struct {
-	codecs    serializer.CodecFactory
-	groupName string
+	codecs        serializer.CodecFactory
+	groupName     string
+	contextMapper request.RequestContextMapper
 
 	lister listers.APIServiceLister
 
@@ -124,6 +134,12 @@ type apiGroupHandler struct {
 }
 
 func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	ctx, ok := r.contextMapper.Get(req)
+	if !ok {
+		responsewriters.InternalError(w, req, errors.New("no context found for request"))
+		return
+	}
+
 	apiServices, err := r.lister.List(labels.Everything())
 	if statusErr, ok := err.(*apierrors.StatusError); ok && err != nil {
 		responsewriters.WriteRawJSON(int(statusErr.Status().Code), statusErr.Status(), w)
@@ -151,5 +167,5 @@ func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "", http.StatusNotFound)
 		return
 	}
-	responsewriters.WriteObjectNegotiated(r.codecs, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroup)
+	responsewriters.WriteObjectNegotiated(ctx, r.codecs, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroup)
 }

@@ -234,7 +234,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(genericapirequest.WithRequestContext(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux, master.GenericAPIServer.RequestContextMapper()))
 
 	// /api exists in release-1.1
 	resp, err := http.Get(server.URL + "/api")

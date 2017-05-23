@@ -198,6 +198,7 @@ enable-garbage-collector
 enable-garbage-collector
 enable-garbage-collector
 enable-hostpath-provisioner
+enable-logs-handler
 enable-server
 enable-swagger-ui
 enable-taint-manager
@@ -207,6 +208,7 @@ etcd-cafile
 etcd-certfile
 etcd-config
 etcd-keyfile
+etcd-image
 etcd-metrics-scrape-uri
 etcd-metrics-scrape-uri
 etcd-mutation-timeout
@@ -456,6 +458,7 @@ max-outgoing-burst
 max-outgoing-qps
 max-pods
 max-requests-inflight
+max-unavailable
 mesos-authentication-principal
 mesos-authentication-provider
 mesos-authentication-secret-file
