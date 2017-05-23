@@ -200,7 +200,7 @@ func newPDB() *v1beta1.PodDisruptionBudget {
 			Name: "test-pdb",
 		},
 		Spec: v1beta1.PodDisruptionBudgetSpec{
-			MinAvailable: intstr.IntOrString{
+			MinAvailable: &intstr.IntOrString{
 				Type:   intstr.Int,
 				IntVal: 0,
 			},

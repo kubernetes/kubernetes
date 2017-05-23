@@ -2881,7 +2881,13 @@ func describePodDisruptionBudget(pdb *policy.PodDisruptionBudget, events *api.Ev
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pdb.Name)
-		w.Write(LEVEL_0, "Min available:\t%s\n", pdb.Spec.MinAvailable.String())
+
+		if pdb.Spec.MinAvailable != nil {
+			w.Write(LEVEL_0, "Min available:\t%s\n", pdb.Spec.MinAvailable.String())
+		} else if pdb.Spec.MaxUnavailable != nil {
+			w.Write(LEVEL_0, "Max unavailable:\t%s\n", pdb.Spec.MaxUnavailable.String())
+		}
+
 		if pdb.Spec.Selector != nil {
 			w.Write(LEVEL_0, "Selector:\t%s\n", metav1.FormatLabelSelector(pdb.Spec.Selector))
 		} else {
