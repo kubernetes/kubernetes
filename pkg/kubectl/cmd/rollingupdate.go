@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/golang/glog"
@@ -79,9 +78,7 @@ func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	cmd := &cobra.Command{
-		Use: "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
-		// rollingupdate is deprecated.
-		Aliases: []string{"rollingupdate"},
+		Use:     "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
 		Short:   i18n.T("Perform a rolling update of the given ReplicationController"),
 		Long:    rollingUpdateLong,
 		Example: rollingUpdateExample,
@@ -143,9 +140,6 @@ func validateArguments(cmd *cobra.Command, filenames, args []string) error {
 }
 
 func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
-	if len(os.Args) > 1 && os.Args[1] == "rollingupdate" {
-		printDeprecationWarning("rolling-update", "rollingupdate")
-	}
 	err := validateArguments(cmd, options.Filenames, args)
 	if err != nil {
 		return err
