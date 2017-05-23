@@ -89,15 +89,21 @@ func DeepCopy_v1alpha1_Event(in interface{}, out interface{}, c *conversion.Clon
 				*out = newVal.(*v1.Status)
 			}
 		}
-		if newVal, err := c.DeepCopy(&in.RequestObject); err != nil {
-			return err
-		} else {
-			out.RequestObject = *newVal.(*runtime.RawExtension)
+		if in.RequestObject != nil {
+			in, out := &in.RequestObject, &out.RequestObject
+			if newVal, err := c.DeepCopy(*in); err != nil {
+				return err
+			} else {
+				*out = newVal.(*runtime.Unknown)
+			}
 		}
-		if newVal, err := c.DeepCopy(&in.ResponseObject); err != nil {
-			return err
-		} else {
-			out.ResponseObject = *newVal.(*runtime.RawExtension)
+		if in.ResponseObject != nil {
+			in, out := &in.ResponseObject, &out.ResponseObject
+			if newVal, err := c.DeepCopy(*in); err != nil {
+				return err
+			} else {
+				*out = newVal.(*runtime.Unknown)
+			}
 		}
 		return nil
 	}
