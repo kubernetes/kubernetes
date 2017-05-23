@@ -51,6 +51,7 @@ func createPodDisruptionBudget(storage *REST, pdb policy.PodDisruptionBudget, t 
 }
 
 func validNewPodDisruptionBudget() *policy.PodDisruptionBudget {
+	minAvailable := intstr.FromInt(7)
 	return &policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
@@ -59,7 +60,7 @@ func validNewPodDisruptionBudget() *policy.PodDisruptionBudget {
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
-			MinAvailable: intstr.FromInt(7),
+			MinAvailable: &minAvailable,
 		},
 		Status: policy.PodDisruptionBudgetStatus{},
 	}
@@ -98,10 +99,11 @@ func TestStatusUpdate(t *testing.T) {
 	}
 	obtainedPdb := obj.(*policy.PodDisruptionBudget)
 
+	minAvailable := intstr.FromInt(8)
 	update := policy.PodDisruptionBudget{
 		ObjectMeta: obtainedPdb.ObjectMeta,
 		Spec: policy.PodDisruptionBudgetSpec{
-			MinAvailable: intstr.FromInt(8),
+			MinAvailable: &minAvailable,
 		},
 		Status: policy.PodDisruptionBudgetStatus{
 			ExpectedPods: 8,

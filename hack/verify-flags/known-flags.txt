@@ -457,6 +457,7 @@ max-outgoing-burst
 max-outgoing-qps
 max-pods
 max-requests-inflight
+max-unavailable
 mesos-authentication-principal
 mesos-authentication-provider
 mesos-authentication-secret-file

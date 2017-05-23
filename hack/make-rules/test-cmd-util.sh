@@ -431,15 +431,28 @@ run_pod_tests() {
   # Post-condition: configmap exists and has expected values
   kube::test::get_object_assert 'configmap/test-configmap --namespace=test-kubectl-describe-pod' "{{$id_field}}" 'test-configmap'
 
-  ### Create a pod disruption budget
+  ### Create a pod disruption budget with minAvailable
   # Command
-  kubectl create pdb test-pdb --selector=app=rails --min-available=2 --namespace=test-kubectl-describe-pod
+  kubectl create pdb test-pdb-1 --selector=app=rails --min-available=2 --namespace=test-kubectl-describe-pod
   # Post-condition: pdb exists and has expected values
-  kube::test::get_object_assert 'pdb/test-pdb --namespace=test-kubectl-describe-pod' "{{$pdb_min_available}}" '2'
+  kube::test::get_object_assert 'pdb/test-pdb-1 --namespace=test-kubectl-describe-pod' "{{$pdb_min_available}}" '2'
   # Command
   kubectl create pdb test-pdb-2 --selector=app=rails --min-available=50% --namespace=test-kubectl-describe-pod
   # Post-condition: pdb exists and has expected values
   kube::test::get_object_assert 'pdb/test-pdb-2 --namespace=test-kubectl-describe-pod' "{{$pdb_min_available}}" '50%'
+
+  ### Create a pod disruption budget with maxUnavailable
+  # Command
+  kubectl create pdb test-pdb-3 --selector=app=rails --max-unavailable=2 --namespace=test-kubectl-describe-pod
+  # Post-condition: pdb exists and has expected values
+  kube::test::get_object_assert 'pdb/test-pdb-3 --namespace=test-kubectl-describe-pod' "{{$pdb_max_unavailable}}" '2'
+  # Command
+  kubectl create pdb test-pdb-4 --selector=app=rails --max-unavailable=50% --namespace=test-kubectl-describe-pod
+  # Post-condition: pdb exists and has expected values
+  kube::test::get_object_assert 'pdb/test-pdb-4 --namespace=test-kubectl-describe-pod' "{{$pdb_max_unavailable}}" '50%'
+
+  ### Fail creating a pod disruption budget if both maxUnavailable and minAvailable specified
+  ! kubectl create pdb test-pdb --selector=app=rails --min-available=2 --max-unavailable=3 --namespace=test-kubectl-describe-pod
 
   # Create a pod that consumes secret, configmap, and downward API keys as envs
   kube::test::get_object_assert 'pods --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -453,7 +466,7 @@ run_pod_tests() {
   kubectl delete pod env-test-pod --namespace=test-kubectl-describe-pod
   kubectl delete secret test-secret --namespace=test-kubectl-describe-pod
   kubectl delete configmap test-configmap --namespace=test-kubectl-describe-pod
-  kubectl delete pdb/test-pdb pdb/test-pdb-2 --namespace=test-kubectl-describe-pod
+  kubectl delete pdb/test-pdb-1 pdb/test-pdb-2 pdb/test-pdb-3 pdb/test-pdb-4 --namespace=test-kubectl-describe-pod
   kubectl delete namespace test-kubectl-describe-pod
 
   ### Create two PODs
@@ -2990,6 +3003,7 @@ runTests() {
   deployment_second_image_field="(index .spec.template.spec.containers 1).image"
   change_cause_annotation='.*kubernetes.io/change-cause.*'
   pdb_min_available=".spec.minAvailable"
+  pdb_max_unavailable=".spec.maxUnavailable"
   template_generation_field=".spec.templateGeneration"
 
   # Make sure "default" namespace exists.
