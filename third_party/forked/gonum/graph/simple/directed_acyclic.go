@@ -39,6 +39,20 @@ func (g *DirectedAcyclicGraph) From(n graph.Node) []graph.Node {
 	return nodes
 }
 
+func (g *DirectedAcyclicGraph) VisitFrom(n graph.Node, visitor func(neighbor graph.Node) (shouldContinue bool)) {
+	if !g.Has(n) {
+		return
+	}
+	fid := n.ID()
+	for _, edge := range g.UndirectedGraph.edges[n.ID()] {
+		if edge.From().ID() == fid {
+			if !visitor(g.UndirectedGraph.nodes[edge.To().ID()]) {
+				return
+			}
+		}
+	}
+}
+
 func (g *DirectedAcyclicGraph) To(n graph.Node) []graph.Node {
 	if !g.Has(n) {
 		return nil
@@ -52,4 +66,18 @@ func (g *DirectedAcyclicGraph) To(n graph.Node) []graph.Node {
 		}
 	}
 	return nodes
+}
+
+func (g *DirectedAcyclicGraph) VisitTo(n graph.Node, visitor func(neighbor graph.Node) (shouldContinue bool)) {
+	if !g.Has(n) {
+		return
+	}
+	tid := n.ID()
+	for _, edge := range g.UndirectedGraph.edges[n.ID()] {
+		if edge.To().ID() == tid {
+			if !visitor(g.UndirectedGraph.nodes[edge.From().ID()]) {
+				return
+			}
+		}
+	}
 }
