@@ -395,13 +395,21 @@ func Convert_api_PodStatusResult_To_v1_PodStatusResult(in *api.PodStatusResult, 
 
 func Convert_v1_PodStatusResult_To_api_PodStatusResult(in *PodStatusResult, out *api.PodStatusResult, s conversion.Scope) error {
 	// TODO: sometime after we move init container to stable, remove these conversions
-	// If there is a beta annotation, copy to alpha key.
-	// See commit log for PR #31026 for why we do this.
-	if valueBeta, okBeta := in.Annotations[PodInitContainerStatusesBetaAnnotationKey]; okBeta {
-		in.Annotations[PodInitContainerStatusesAnnotationKey] = valueBeta
+	// We need to decide which key to use: alpha or beta.
+	// If we chose to copy beta-key value to alpha-key, then a v1.3 kubelet will set the alpha
+	// and 1.4 apiserver will clobber the alpha value with the beta value.  If we try to pick
+	// alpha when beta is empty, you still have a problem because after a roundtrip, the alpha and beta are both
+	// set and the 1.3 kubelet will send the beta annotation back the next time, since it doesn't know it is special.
+	// So we did this the other way around (alpha trumping beta).  The Kubelet puts the status into the internal struct.
+	// Then, the internal struct gets converted to the v1 struct with 1.3 conversion code in kubelet. That code copies the internal
+	// status into just the alpha field. So, when it goes over the wire, it may have conflicting alpha and beta annotations.
+	// But, when it reaches the 1.4 apiserver, the json gets round-tripped before going to storage. So, the alpha key trumps
+	// the beta key, and the right status is stored.
+	if valueAlpha, okAlpha := in.Annotations[PodInitContainerStatusesAnnotationKey]; okAlpha {
+		in.Annotations[PodInitContainerStatusesBetaAnnotationKey] = valueAlpha
 	}
 	// Move the annotation to the internal repr. field
-	if value, ok := in.Annotations[PodInitContainerStatusesAnnotationKey]; ok {
+	if value, ok := in.Annotations[PodInitContainerStatusesBetaAnnotationKey]; ok {
 		var values []ContainerStatus
 		if err := json.Unmarshal([]byte(value), &values); err != nil {
 			return err
