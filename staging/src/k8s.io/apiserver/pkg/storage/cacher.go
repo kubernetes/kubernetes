@@ -850,18 +850,28 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 		return
 	}
 
-	object, err := c.copier.Copy(event.Object)
-	if err != nil {
-		glog.Errorf("unexpected copy error: %v", err)
-		return
-	}
 	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:
+		object, err := c.copier.Copy(event.Object)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
+			return
+		}
 		watchEvent = watch.Event{Type: watch.Added, Object: object}
 	case curObjPasses && oldObjPasses:
+		object, err := c.copier.Copy(event.Object)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
+			return
+		}
 		watchEvent = watch.Event{Type: watch.Modified, Object: object}
 	case !curObjPasses && oldObjPasses:
+		object, err := c.copier.Copy(event.PrevObject)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
+			return
+		}
 		watchEvent = watch.Event{Type: watch.Deleted, Object: object}
 	}
 
