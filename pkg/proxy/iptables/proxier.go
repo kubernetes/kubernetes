@@ -1095,6 +1095,20 @@ func (proxier *Proxier) syncProxyRules() {
 	// Accumulate the set of local ports that we will be holding open once this update is complete
 	replacementPortsMap := map[localPort]closeable{}
 
+	// We are creating those slices ones here to avoid memory reallocations
+	// in every loop. Note that reuse the memory, instead of doing:
+	//   slice = <some new slice>
+	// you should always do one of the below:
+	//   slice = slice[:0] // and then append to it
+	//   slice = append(slice[:0], ...)
+	endpoints := make([]*endpointsInfo, 0)
+	endpointChains := make([]utiliptables.Chain, 0)
+	// To avoid growing this slice, we arbitrarily set its size to 64,
+	// there is never more than that many arguments for a single line.
+	// Note that even if we go over 64, it will still be correct - it
+	// is just for efficiency, not correctness.
+	args := make([]string, 64)
+
 	// Build rules for each service.
 	for svcName, svcInfo := range proxier.serviceMap {
 		protocol := strings.ToLower(string(svcInfo.protocol))
@@ -1127,13 +1141,13 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture the clusterIP.
-		args := []string{
+		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcNameString),
 			"-m", protocol, "-p", protocol,
 			"-d", fmt.Sprintf("%s/32", svcInfo.clusterIP.String()),
 			"--dport", strconv.Itoa(svcInfo.port),
-		}
+		)
 		if proxier.masqueradeAll {
 			writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 		}
@@ -1177,13 +1191,13 @@ func (proxier *Proxier) syncProxyRules() {
 					replacementPortsMap[lp] = socket
 				}
 			} // We're holding the port, so it's OK to install iptables rules.
-			args := []string{
+			args = append(args[:0],
 				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcNameString),
 				"-m", protocol, "-p", protocol,
 				"-d", fmt.Sprintf("%s/32", externalIP),
 				"--dport", strconv.Itoa(svcInfo.port),
-			}
+			)
 			// We have to SNAT packets to external IPs.
 			writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 
@@ -1229,20 +1243,20 @@ func (proxier *Proxier) syncProxyRules() {
 				// This currently works for loadbalancers that preserves source ips.
 				// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
 
-				args := []string{
+				args = append(args[:0],
 					"-A", string(kubeServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
 					"-m", protocol, "-p", protocol,
 					"-d", fmt.Sprintf("%s/32", ingress.IP),
 					"--dport", strconv.Itoa(svcInfo.port),
-				}
+				)
 				// jump to service firewall chain
 				writeLine(proxier.natRules, append(args, "-j", string(fwChain))...)
 
-				args = []string{
+				args = append(args[:0],
 					"-A", string(fwChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
-				}
+				)
 
 				// Each source match rule in the FW chain may jump to either the SVC or the XLB chain
 				chosenChain := svcXlbChain
@@ -1308,12 +1322,12 @@ func (proxier *Proxier) syncProxyRules() {
 				replacementPortsMap[lp] = socket
 			} // We're holding the port, so it's OK to install iptables rules.
 
-			args := []string{
+			args = append(args[:0],
 				"-A", string(kubeNodePortsChain),
 				"-m", "comment", "--comment", svcNameString,
 				"-m", protocol, "-p", protocol,
 				"--dport", strconv.Itoa(svcInfo.nodePort),
-			}
+			)
 			if !svcInfo.onlyNodeLocalEndpoints {
 				// Nodeports need SNAT, unless they're local.
 				writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
@@ -1359,10 +1373,11 @@ func (proxier *Proxier) syncProxyRules() {
 		// Generate the per-endpoint chains.  We do this in multiple passes so we
 		// can group rules together.
 		// These two slices parallel each other - keep in sync
-		endpoints := make([]*endpointsInfo, 0)
-		endpointChains := make([]utiliptables.Chain, 0)
+		endpoints = endpoints[:0]
+		endpointChains = endpointChains[:0]
 		for _, ep := range proxier.endpointsMap[svcName] {
 			endpoints = append(endpoints, ep)
+			// TODO: This should be precomputed.
 			endpointChain := servicePortEndpointChainName(svcNameString, protocol, ep.endpoint)
 			endpointChains = append(endpointChains, endpointChain)
 
@@ -1391,10 +1406,10 @@ func (proxier *Proxier) syncProxyRules() {
 		n := len(endpointChains)
 		for i, endpointChain := range endpointChains {
 			// Balancing rules in the per-service chain.
-			args := []string{
+			args = append(args[:0], []string{
 				"-A", string(svcChain),
 				"-m", "comment", "--comment", svcNameString,
-			}
+			}...)
 			if i < (n - 1) {
 				// Each rule is a probabilistic match.
 				args = append(args,
@@ -1407,10 +1422,10 @@ func (proxier *Proxier) syncProxyRules() {
 			writeLine(proxier.natRules, args...)
 
 			// Rules in the per-endpoint chain.
-			args = []string{
+			args = append(args[:0],
 				"-A", string(endpointChain),
 				"-m", "comment", "--comment", svcNameString,
-			}
+			)
 			// Handle traffic that loops back to the originator with SNAT.
 			writeLine(proxier.natRules, append(args,
 				"-s", fmt.Sprintf("%s/32", endpoints[i].IPPart()),
@@ -1444,36 +1459,36 @@ func (proxier *Proxier) syncProxyRules() {
 		// Service's ClusterIP instead. This happens whether or not we have local
 		// endpoints; only if clusterCIDR is specified
 		if len(proxier.clusterCIDR) > 0 {
-			args = []string{
+			args = append(args[:0],
 				"-A", string(svcXlbChain),
 				"-m", "comment", "--comment",
-				"\"Redirect pods trying to reach external loadbalancer VIP to clusterIP\"",
+				`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
 				"-s", proxier.clusterCIDR,
 				"-j", string(svcChain),
-			}
+			)
 			writeLine(proxier.natRules, args...)
 		}
 
 		numLocalEndpoints := len(localEndpointChains)
 		if numLocalEndpoints == 0 {
 			// Blackhole all traffic since there are no local endpoints
-			args := []string{
+			args = append(args[:0],
 				"-A", string(svcXlbChain),
 				"-m", "comment", "--comment",
 				fmt.Sprintf(`"%s has no local endpoints"`, svcNameString),
 				"-j",
 				string(KubeMarkDropChain),
-			}
+			)
 			writeLine(proxier.natRules, args...)
 		} else {
 			// Setup probability filter rules only over local endpoints
 			for i, endpointChain := range localEndpointChains {
 				// Balancing rules in the per-service chain.
-				args := []string{
+				args = append(args[:0],
 					"-A", string(svcXlbChain),
 					"-m", "comment", "--comment",
 					fmt.Sprintf(`"Balancing rule %d for %s"`, i, svcNameString),
-				}
+				)
 				if i < (numLocalEndpoints - 1) {
 					// Each rule is a probabilistic match.
 					args = append(args,
