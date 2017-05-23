@@ -10,7 +10,10 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["undirected_test.go"],
+    srcs = [
+        "directed_acyclic_test.go",
+        "undirected_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = ["//third_party/forked/gonum/graph:go_default_library"],
@@ -19,6 +22,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "directed_acyclic.go",
         "simple.go",
         "undirected.go",
     ],
