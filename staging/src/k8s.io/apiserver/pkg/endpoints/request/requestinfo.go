@@ -33,6 +33,8 @@ type RequestInfo struct {
 	// Verb is the kube verb associated with the request for API requests, not the http verb.  This includes things like list and watch.
 	// for non-resource requests, this is the lowercase http verb
 	Verb string
+	// ReadOnly is true if Verb is "get", "list" or "watch"
+	ReadOnly bool
 
 	APIPrefix  string
 	APIGroup   string
@@ -50,21 +52,29 @@ type RequestInfo struct {
 	Parts []string
 }
 
-// specialVerbs contains just strings which are used in REST paths for special actions that don't fall under the normal
-// CRUDdy GET/POST/PUT/DELETE actions on REST objects.
-// TODO: find a way to keep this up to date automatically.  Maybe dynamically populate list as handlers added to
-// master's Mux.
-var specialVerbs = sets.NewString("proxy", "redirect", "watch")
+var (
+	ReadWriteVerbs = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
+	ReadVerbs      = []string{"get", "list", "watch"}
 
-// specialVerbsNoSubresources contains root verbs which do not allow subresources
-var specialVerbsNoSubresources = sets.NewString("proxy", "redirect")
+	readWriteMap = sets.NewString(ReadWriteVerbs...)
+	readMap      = sets.NewString(ReadVerbs...)
 
-// namespaceSubresources contains subresources of namespace
-// this list allows the parser to distinguish between a namespace subresource, and a namespaced resource
-var namespaceSubresources = sets.NewString("status", "finalize")
+	// specialVerbs contains just strings which are used in REST paths for special actions that don't fall under the normal
+	// CRUDdy GET/POST/PUT/DELETE actions on REST objects.
+	// TODO: find a way to keep this up to date automatically.  Maybe dynamically populate list as handlers added to
+	// master's Mux.
+	specialVerbs = sets.NewString("proxy", "redirect", "watch")
 
-// NamespaceSubResourcesForTest exports namespaceSubresources for testing in pkg/master/master_test.go, so we never drift
-var NamespaceSubResourcesForTest = sets.NewString(namespaceSubresources.List()...)
+	// specialVerbsNoSubresources contains root verbs which do not allow subresources
+	specialVerbsNoSubresources = sets.NewString("proxy", "redirect")
+
+	// namespaceSubresources contains subresources of namespace
+	// this list allows the parser to distinguish between a namespace subresource, and a namespaced resource
+	namespaceSubresources = sets.NewString("status", "finalize")
+
+	// NamespaceSubResourcesForTest exports namespaceSubresources for testing in pkg/master/master_test.go, so we never drift
+	NamespaceSubResourcesForTest = sets.NewString(namespaceSubresources.List()...)
+)
 
 type RequestInfoFactory struct {
 	APIPrefixes          sets.String // without leading and trailing slashes
@@ -209,6 +219,8 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "delete" {
 		requestInfo.Verb = "deletecollection"
 	}
+
+	requestInfo.ReadOnly = readMap.Has(requestInfo.Verb)
 
 	return &requestInfo, nil
 }
