@@ -456,8 +456,7 @@ func TestApplyObjectOutput(t *testing.T) {
 	}
 
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
-	tf.CommandPrinter = &printers.YAMLPrinter{}
-	tf.GenericPrinter = true
+	tf.Printer = &printers.YAMLPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
