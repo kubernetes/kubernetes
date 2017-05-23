@@ -191,6 +191,7 @@ filegroup(
         "//pkg/kubectl/resource:all-srcs",
         "//pkg/kubectl/testing:all-srcs",
         "//pkg/kubectl/util:all-srcs",
+        "//pkg/kubectl/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

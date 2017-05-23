@@ -42,10 +42,10 @@ func readPod(filename string) ([]byte, error) {
 }
 
 func readSwaggerFile() ([]byte, error) {
-	return readSwaggerApiFile(testapi.Default)
+	return readSwaggerAPIFile(testapi.Default)
 }
 
-func readSwaggerApiFile(group testapi.TestGroup) ([]byte, error) {
+func readSwaggerAPIFile(group testapi.TestGroup) ([]byte, error) {
 	// TODO: Figure out a better way of finding these files
 	var pathToSwaggerSpec string
 	if group.GroupVersion().Group == "" {
@@ -102,7 +102,7 @@ func loadSchemaForTest() (Schema, error) {
 }
 
 func loadSchemaForTestWithFactory(group testapi.TestGroup, factory Schema) (Schema, error) {
-	data, err := readSwaggerApiFile(group)
+	data, err := readSwaggerAPIFile(group)
 	if err != nil {
 		return nil, err
 	}
@@ -187,15 +187,15 @@ func TestValidateDifferentApiVersions(t *testing.T) {
 	}
 	err = schema.ValidateBytes(bytes)
 	if err == nil {
-		t.Error(fmt.Errorf("Expected error when validating different api version and no delegate exists."))
+		t.Error(fmt.Errorf("expected error when validating different api version and no delegate exists"))
 	}
 	f, err := NewFactory()
 	if err != nil {
-		t.Error(fmt.Errorf("Failed to create Schema factory %v.", err))
+		t.Error(fmt.Errorf("failed to create Schema factory %v", err))
 	}
 	err = f.ValidateBytes(bytes)
 	if err != nil {
-		t.Error(fmt.Errorf("Failed to validate object with multiple ApiGroups: %v.", err))
+		t.Error(fmt.Errorf("failed to validate object with multiple ApiGroups: %v", err))
 	}
 }
 
@@ -377,10 +377,12 @@ func TestValidateDuplicateLabelsPassCases(t *testing.T) {
 	}
 }
 
+// AlwaysInvalidSchema is always invalid.
 type AlwaysInvalidSchema struct{}
 
+// ValidateBytes always fails to validate.
 func (AlwaysInvalidSchema) ValidateBytes([]byte) error {
-	return fmt.Errorf("Always invalid!")
+	return fmt.Errorf("always invalid")
 }
 
 func TestConjunctiveSchema(t *testing.T) {
