@@ -25,15 +25,15 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
@@ -45,11 +45,10 @@ import (
 
 var cloner = conversion.NewCloner()
 
-// This controller finalizes the CRD by deleting all the CRs associated with it.
+// CRDFinalizer is a controller that finalizes the CRD by deleting all the CRs associated with it.
 type CRDFinalizer struct {
-	crdClient client.CustomResourceDefinitionsGetter
-	// clientPool is a dynamic client used to delete the individual instances
-	clientPool dynamic.ClientPool
+	crdClient      client.CustomResourceDefinitionsGetter
+	crClientGetter CRClientGetter
 
 	crdLister listers.CustomResourceDefinitionLister
 	crdSynced cache.InformerSynced
@@ -60,17 +59,31 @@ type CRDFinalizer struct {
 	queue workqueue.RateLimitingInterface
 }
 
+// ListerCollectionDeleter combines rest.Lister and rest.CollectionDeleter.
+type ListerCollectionDeleter interface {
+	rest.Lister
+	rest.CollectionDeleter
+}
+
+// CRClientGetter knows how to get a ListerCollectionDeleter for a given CRD UID.
+type CRClientGetter interface {
+	// GetCustomResourceListerCollectionDeleter gets the ListerCollectionDeleter for the given CRD
+	// UID.
+	GetCustomResourceListerCollectionDeleter(uid types.UID) ListerCollectionDeleter
+}
+
+// NewCRDFinalizer creates a new CRDFinalizer.
 func NewCRDFinalizer(
 	crdInformer informers.CustomResourceDefinitionInformer,
 	crdClient client.CustomResourceDefinitionsGetter,
-	clientPool dynamic.ClientPool,
+	crClientGetter CRClientGetter,
 ) *CRDFinalizer {
 	c := &CRDFinalizer{
-		crdClient:  crdClient,
-		clientPool: clientPool,
-		crdLister:  crdInformer.Lister(),
-		crdSynced:  crdInformer.Informer().HasSynced,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "CustomResourceDefinition-CRDFinalizer"),
+		crdClient:      crdClient,
+		crdLister:      crdInformer.Lister(),
+		crdSynced:      crdInformer.Informer().HasSynced,
+		crClientGetter: crClientGetter,
+		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "CustomResourceDefinition-CRDFinalizer"),
 	}
 
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -114,7 +127,7 @@ func (c *CRDFinalizer) sync(key string) error {
 		return err
 	}
 
-	// Its possible for a naming conflict to have removed this resource from the API after instances were created.
+	// It's possible for a naming conflict to have removed this resource from the API after instances were created.
 	// For now we will cowardly stop finalizing.  If we don't go through the REST API, weird things may happen:
 	// no audit trail, no admission checks or side effects, finalization would probably still work but defaulting
 	// would be missed.  It would be a mess.
@@ -135,22 +148,15 @@ func (c *CRDFinalizer) sync(key string) error {
 		return fmt.Errorf("cannot proceed with deletion because of %v condition", apiextensions.NameConflict)
 	}
 
-	// Now we can start deleting items.  We should use the REST API to ensure that all normal admission runs.
-	// Since we control the endpoints, we know that delete collection works.
-	crClient, err := c.clientPool.ClientForGroupVersionResource(schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Status.AcceptedNames.Plural})
-	if err != nil {
-		return err
+	// Now we can start deleting items. While it would be ideal to use a REST API client, doing so
+	// could incorrectly delete a ThirdPartyResource with the same URL as the CustomResource, so we go
+	// directly to the storage instead. Since we control the storage, we know that delete collection works.
+	crClient := c.crClientGetter.GetCustomResourceListerCollectionDeleter(crd.UID)
+	if crClient == nil {
+		return fmt.Errorf("unable to find a custom resource client for %s.%s", crd.Status.AcceptedNames.Plural, crd.Spec.Group)
 	}
-	crAPIResource := &metav1.APIResource{
-		Name:         crd.Status.AcceptedNames.Plural,
-		SingularName: crd.Status.AcceptedNames.Singular,
-		Namespaced:   crd.Spec.Scope == apiextensions.NamespaceScoped,
-		Kind:         crd.Status.AcceptedNames.Kind,
-		Verbs:        metav1.Verbs([]string{"deletecollection", "list"}),
-		ShortNames:   crd.Status.AcceptedNames.ShortNames,
-	}
-	crResourceClient := crClient.Resource(crAPIResource, "" /* namespace all */)
-	allResources, err := crResourceClient.List(metav1.ListOptions{})
+	ctx := genericapirequest.NewContext()
+	allResources, err := crClient.List(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -168,7 +174,8 @@ func (c *CRDFinalizer) sync(key string) error {
 		}
 		// don't retry deleting the same namespace
 		deletedNamespaces.Insert(metadata.GetNamespace())
-		if err := crClient.Resource(crAPIResource, metadata.GetNamespace()).DeleteCollection(nil, metav1.ListOptions{}); err != nil {
+		nsCtx := genericapirequest.WithNamespace(ctx, metadata.GetNamespace())
+		if _, err := crClient.DeleteCollection(nsCtx, nil, nil); err != nil {
 			deleteErrors = append(deleteErrors, err)
 			continue
 		}
@@ -191,7 +198,7 @@ func (c *CRDFinalizer) sync(key string) error {
 	// TODO not all servers are synchronized on caches.  It is possible for a stale one to still be creating things.
 	// Once we have a mechanism for servers to indicate their states, we should check that for concurrence.
 	listErr := wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
-		listObj, err := crResourceClient.List(metav1.ListOptions{})
+		listObj, err := crClient.List(ctx, nil)
 		if err != nil {
 			return false, err
 		}

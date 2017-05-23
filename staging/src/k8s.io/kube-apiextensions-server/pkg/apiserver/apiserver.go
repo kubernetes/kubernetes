@@ -31,7 +31,6 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/client-go/dynamic"
 
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/install"
@@ -165,7 +164,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	finalizingController := finalizer.NewCRDFinalizer(
 		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
 		crdClient,
-		dynamic.NewDynamicClientPool(s.GenericAPIServer.LoopbackClientConfig))
+		crdHandler,
+	)
 
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
 		s.Informers.Start(context.StopCh)
