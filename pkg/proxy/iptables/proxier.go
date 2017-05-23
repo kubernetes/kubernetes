@@ -527,11 +527,12 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	}
 
 	// Flush and remove all of our chains.
-	if iptablesSaveRaw, err := ipt.Save(utiliptables.TableNAT); err != nil {
+	iptablesData := bytes.NewBuffer(nil)
+	if err := ipt.SaveInto(utiliptables.TableNAT, iptablesData); err != nil {
 		glog.Errorf("Failed to execute iptables-save for %s: %v", utiliptables.TableNAT, err)
 		encounteredError = true
 	} else {
-		existingNATChains := utiliptables.GetChainLines(utiliptables.TableNAT, iptablesSaveRaw)
+		existingNATChains := utiliptables.GetChainLines(utiliptables.TableNAT, iptablesData.Bytes())
 		natChains := bytes.NewBuffer(nil)
 		natRules := bytes.NewBuffer(nil)
 		writeLine(natChains, "*nat")
