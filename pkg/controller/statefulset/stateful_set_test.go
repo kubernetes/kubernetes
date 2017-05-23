@@ -640,7 +640,7 @@ func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetControl
 		pod = getPodAtOrdinal(pods, ord)
 		ssc.updatePod(&prev, pod)
 		fakeWorker(ssc)
-		if err := assertInvariants(set, spc); err != nil {
+		if err := assertMonotonicInvariants(set, spc); err != nil {
 			return err
 		}
 		if obj, _, err := spc.setsIndexer.Get(set); err != nil {
@@ -650,7 +650,7 @@ func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetControl
 		}
 
 	}
-	return assertInvariants(set, spc)
+	return assertMonotonicInvariants(set, spc)
 }
 
 func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
@@ -692,5 +692,5 @@ func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetContr
 			set = obj.(*apps.StatefulSet)
 		}
 	}
-	return assertInvariants(set, spc)
+	return assertMonotonicInvariants(set, spc)
 }

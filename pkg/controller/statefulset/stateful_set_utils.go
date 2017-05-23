@@ -227,6 +227,11 @@ func isHealthy(pod *v1.Pod) bool {
 	return isRunningAndReady(pod) && !isTerminating(pod)
 }
 
+// allowsBurst is true if the alpha burst annotation is set.
+func allowsBurst(set *apps.StatefulSet) bool {
+	return set.Spec.PodManagementPolicy == apps.ParallelPodManagement
+}
+
 // newControllerRef returns an ControllerRef pointing to a given StatefulSet.
 func newControllerRef(set *apps.StatefulSet) *metav1.OwnerReference {
 	blockOwnerDeletion := true
