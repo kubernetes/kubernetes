@@ -80,8 +80,9 @@ func defaultClientConfigForVersion(version *schema.GroupVersion) *restclient.Con
 }
 
 type testPrinter struct {
-	Objects []runtime.Object
-	Err     error
+	Objects        []runtime.Object
+	Err            error
+	GenericPrinter bool
 }
 
 func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
@@ -97,6 +98,10 @@ func (t *testPrinter) HandledResources() []string {
 
 func (t *testPrinter) AfterPrint(output io.Writer, res string) error {
 	return nil
+}
+
+func (t *testPrinter) IsGeneric() bool {
+	return t.GenericPrinter
 }
 
 type testDescriber struct {

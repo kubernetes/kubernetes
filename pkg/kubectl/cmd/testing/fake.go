@@ -221,13 +221,11 @@ type TestFactory struct {
 	UnstructuredClient kubectl.RESTClient
 	Describer          printers.Describer
 	Printer            printers.ResourcePrinter
-	CommandPrinter     printers.ResourcePrinter
 	Validator          validation.Schema
 	Namespace          string
 	ClientConfig       *restclient.Config
 	Err                error
 	Command            string
-	GenericPrinter     bool
 	TmpDir             string
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -338,8 +336,8 @@ func (f *FakeFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
 	return f.tf.Describer, f.tf.Err
 }
 
-func (f *FakeFactory) PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error) {
-	return f.tf.CommandPrinter, f.tf.GenericPrinter, f.tf.Err
+func (f *FakeFactory) PrinterForCommand(cmd *cobra.Command, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+	return f.tf.Printer, f.tf.Err
 }
 
 func (f *FakeFactory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
@@ -619,8 +617,8 @@ func (f *fakeAPIFactory) UnstructuredClientForMapping(m *meta.RESTMapping) (reso
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
-func (f *fakeAPIFactory) PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error) {
-	return f.tf.CommandPrinter, f.tf.GenericPrinter, f.tf.Err
+func (f *fakeAPIFactory) PrinterForCommand(cmd *cobra.Command, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+	return f.tf.Printer, f.tf.Err
 }
 
 func (f *fakeAPIFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
