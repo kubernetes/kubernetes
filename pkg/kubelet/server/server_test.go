@@ -1143,6 +1143,26 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 	<-conn.CloseChan()
 }
 
+func locationEqualOrHasQuery(original, redirected string) bool {
+	// As per Issues:
+	// * https://github.com/kubernetes/kubernetes/issues/46282
+	// * https://github.com/golang/go/issues/17841
+	// Go1.9's http.ServeMux now sets the query string on redirects
+	// therefore a plain comparison of original and redirected,
+	// expecting the old behavior will fail the tests.
+	// This function helps ensure that the old and
+	// new behaviors are both accounted for in tests.
+	if !strings.HasPrefix(redirected, original) {
+		return false
+	}
+	rest := strings.TrimPrefix(redirected, original)
+	// The remaining cases can be:
+	// 1. original and redirected are equal so no string left i.e ''
+	// 2. '/' is the leading character in the remainder i.e `/?foo=bar` or `/`
+	// 3. '?' is the leading character in the remainder i.e `?foo=bar`
+	return rest == "" || rest[0] == '/' || rest[0] == '?'
+}
+
 func testExecAttach(t *testing.T, verb string) {
 	tests := []struct {
 		stdin              bool
@@ -1323,8 +1343,9 @@ func testExecAttach(t *testing.T, verb string) {
 			t.Fatalf("%d: response status: expected %v, got %v", i, e, a)
 		}
 
-		if e, a := test.responseLocation, resp.Header.Get("Location"); e != a {
-			t.Errorf("%d: response location: expected %v, got %v", i, e, a)
+		want, got := test.responseLocation, resp.Header.Get("Location")
+		if !locationEqualOrHasQuery(want, got) {
+			t.Errorf("%d: response location: expected %v to be approximately equal to %v", i, want, got)
 		}
 
 		if test.responseStatusCode != http.StatusSwitchingProtocols {
