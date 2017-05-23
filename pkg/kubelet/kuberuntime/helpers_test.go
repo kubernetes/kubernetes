@@ -22,6 +22,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	runtimetesting "k8s.io/kubernetes/pkg/kubelet/api/testing"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 func TestStableKey(t *testing.T) {
@@ -45,4 +48,37 @@ func TestStableKey(t *testing.T) {
 	container.Image = "foo/image:v2"
 	newKey := getStableKey(pod, container)
 	assert.NotEqual(t, oldKey, newKey)
+}
+
+func TestToKubeContainer(t *testing.T) {
+	c := &runtimeapi.Container{
+		Id: "test-id",
+		Metadata: &runtimeapi.ContainerMetadata{
+			Name:    "test-name",
+			Attempt: 1,
+		},
+		Image:    &runtimeapi.ImageSpec{Image: "test-image"},
+		ImageRef: "test-image-ref",
+		State:    runtimeapi.ContainerState_CONTAINER_RUNNING,
+		Annotations: map[string]string{
+			containerHashLabel: "1234",
+		},
+	}
+	expect := &kubecontainer.Container{
+		ID: kubecontainer.ContainerID{
+			Type: runtimetesting.FakeRuntimeName,
+			ID:   "test-id",
+		},
+		Name:    "test-name",
+		ImageID: "test-image-ref",
+		Image:   "test-image",
+		Hash:    uint64(0x1234),
+		State:   kubecontainer.ContainerStateRunning,
+	}
+
+	_, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+	got, err := m.toKubeContainer(c)
+	assert.NoError(t, err)
+	assert.Equal(t, expect, got)
 }
