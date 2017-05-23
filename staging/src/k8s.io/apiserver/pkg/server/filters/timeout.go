@@ -35,7 +35,7 @@ const globalTimeout = time.Minute
 var errConnKilled = fmt.Errorf("kill connection/stream")
 
 // WithTimeoutForNonLongRunningRequests times out non-long-running requests after the time given by globalTimeout.
-func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMapper apirequest.RequestContextMapper, longRunning LongRunningRequestCheck) http.Handler {
+func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMapper apirequest.RequestContextMapper, longRunning apirequest.LongRunningRequestCheck) http.Handler {
 	if longRunning == nil {
 		return handler
 	}

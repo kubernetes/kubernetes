@@ -150,7 +150,7 @@ type Config struct {
 	// request has to wait.
 	MaxMutatingRequestsInFlight int
 	// Predicate which is true for paths of long-running http requests
-	LongRunningFunc genericfilters.LongRunningRequestCheck
+	LongRunningFunc apirequest.LongRunningRequestCheck
 
 	//===========================================================================
 	// values below here are targets for removal

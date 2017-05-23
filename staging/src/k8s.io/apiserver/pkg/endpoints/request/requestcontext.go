@@ -24,6 +24,9 @@ import (
 	"github.com/golang/glog"
 )
 
+// LongRunningRequestCheck is a predicate which is true for long-running http requests.
+type LongRunningRequestCheck func(r *http.Request, requestInfo *RequestInfo) bool
+
 // RequestContextMapper keeps track of the context associated with a particular request
 type RequestContextMapper interface {
 	// Get returns the context associated with the given request (if any), and true if the request has an associated context, and false if it does not.
