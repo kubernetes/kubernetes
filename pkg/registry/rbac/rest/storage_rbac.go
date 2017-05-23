@@ -147,8 +147,11 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 			return false, nil
 		}
 
+		pspEnabled := true
+		rbacPolicy := bootstrappolicy.GetPolicy(pspEnabled)
 		// ensure bootstrap roles are created or reconciled
-		for _, clusterRole := range append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...) {
+		for _, clusterRole := range append(rbacPolicy.ClusterRoles, rbacPolicy.ControllerRoles...) {
+			glog.Warningf("Bootstrap ctrl, Quintin: creating clusterrole: \n%v\n", clusterRole)
 			opts := reconciliation.ReconcileRoleOptions{
 				Role:    reconciliation.ClusterRoleRuleOwner{ClusterRole: &clusterRole},
 				Client:  reconciliation.ClusterRoleModifier{Client: clientset.ClusterRoles()},
@@ -176,7 +179,7 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 		}
 
 		// ensure bootstrap rolebindings are created or reconciled
-		for _, clusterRoleBinding := range append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...) {
+		for _, clusterRoleBinding := range append(rbacPolicy.ClusterRoleBindings, rbacPolicy.ControllerRoleBindings...) {
 			opts := reconciliation.ReconcileRoleBindingOptions{
 				RoleBinding: reconciliation.ClusterRoleBindingAdapter{ClusterRoleBinding: &clusterRoleBinding},
 				Client:      reconciliation.ClusterRoleBindingClientAdapter{Client: clientset.ClusterRoleBindings()},

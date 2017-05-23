@@ -436,12 +436,13 @@ func (r *requestAttributeBuilder) New() authorizer.AttributesRecord {
 
 func BenchmarkAuthorize(b *testing.B) {
 	bootstrapRoles := []rbac.ClusterRole{}
-	bootstrapRoles = append(bootstrapRoles, bootstrappolicy.ControllerRoles()...)
-	bootstrapRoles = append(bootstrapRoles, bootstrappolicy.ClusterRoles()...)
+	policy := bootstrappolicy.GetPolicy(false)
+	bootstrapRoles = append(bootstrapRoles, policy.ControllerRoles...)
+	bootstrapRoles = append(bootstrapRoles, policy.ClusterRoles...)
 
 	bootstrapBindings := []rbac.ClusterRoleBinding{}
-	bootstrapBindings = append(bootstrapBindings, bootstrappolicy.ClusterRoleBindings()...)
-	bootstrapBindings = append(bootstrapBindings, bootstrappolicy.ControllerRoleBindings()...)
+	bootstrapBindings = append(bootstrapBindings, policy.ClusterRoleBindings...)
+	bootstrapBindings = append(bootstrapBindings, policy.ControllerRoleBindings...)
 
 	clusterRoles := []*rbac.ClusterRole{}
 	for i := range bootstrapRoles {

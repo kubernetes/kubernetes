@@ -18,6 +18,7 @@ package bootstrappolicy
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/golang/glog"
 
@@ -69,7 +70,7 @@ func addNamespaceRoleBinding(namespace string, roleBinding rbac.RoleBinding) {
 	namespaceRoleBindings[namespace] = existingRoleBindings
 }
 
-func init() {
+func initNamespaceRoles() {
 	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
 		// role for finding authentication config info for starting a server
 		ObjectMeta: metav1.ObjectMeta{Name: "extension-apiserver-authentication-reader"},
@@ -112,12 +113,22 @@ func init() {
 
 }
 
+var (
+	namespaceOnce sync.Once
+)
+
 // NamespaceRoles returns a map of namespace to slice of roles to create
 func NamespaceRoles() map[string][]rbac.Role {
+	namespaceOnce.Do(func() {
+		initNamespaceRoles()
+	})
 	return namespaceRoles
 }
 
 // NamespaceRoleBindings returns a map of namespace to slice of roles to create
 func NamespaceRoleBindings() map[string][]rbac.RoleBinding {
+	namespaceOnce.Do(func() {
+		initNamespaceRoles()
+	})
 	return namespaceRoleBindings
 }

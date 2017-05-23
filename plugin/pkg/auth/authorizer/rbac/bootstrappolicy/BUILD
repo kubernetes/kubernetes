@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "controller_policy.go",
+        "factory.go",
         "namespace_policy.go",
         "policy.go",
     ],

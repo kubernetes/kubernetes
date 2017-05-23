@@ -1,12 +1,15 @@
 apiVersion: extensions/v1beta1
 kind: PodSecurityPolicy
 metadata:
+  name: privileged
   annotations:
     kubernetes.io/description: 'privileged allows access to all privileged and host
       features and the ability to run as any user, any group, any fsGroup, and with
       any SELinux context.'
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
   creationTimestamp: 2016-05-06T19:28:58Z
-  name: privileged
 spec:
   privileged: true
   defaultAddCapabilities: null

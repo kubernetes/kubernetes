@@ -39,6 +39,10 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
+var (
+	pspEnabledTest = true
+)
+
 // semanticRoles is a few enumerated roles for which the relationships are well established
 // and we want to maintain symmetric roles
 type semanticRoles struct {
@@ -65,7 +69,7 @@ func getSemanticRoles(roles []rbac.ClusterRole) semanticRoles {
 
 // Some roles should always cover others
 func TestCovers(t *testing.T) {
-	semanticRoles := getSemanticRoles(bootstrappolicy.ClusterRoles())
+	semanticRoles := getSemanticRoles(bootstrappolicy.GetPolicy(pspEnabledTest).ClusterRoles)
 
 	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.edit.Rules); !covers {
 		t.Errorf("failed to cover: %#v", miss)
@@ -87,7 +91,7 @@ var additionalAdminPowers = []rbac.PolicyRule{
 }
 
 func TestAdminEditRelationship(t *testing.T) {
-	semanticRoles := getSemanticRoles(bootstrappolicy.ClusterRoles())
+	semanticRoles := getSemanticRoles(bootstrappolicy.GetPolicy(pspEnabledTest).ClusterRoles)
 
 	// confirm that the edit role doesn't already have extra powers
 	for _, rule := range additionalAdminPowers {
@@ -125,7 +129,7 @@ var ungettableResources = []rbac.PolicyRule{
 
 func TestEditViewRelationship(t *testing.T) {
 	readVerbs := sets.NewString(bootstrappolicy.Read...)
-	semanticRoles := getSemanticRoles(bootstrappolicy.ClusterRoles())
+	semanticRoles := getSemanticRoles(bootstrappolicy.GetPolicy(pspEnabledTest).ClusterRoles)
 
 	// modify the edit role rules to make then read-only for comparison against view role rules
 	for i := range semanticRoles.edit.Rules {
@@ -213,7 +217,7 @@ func TestBootstrapClusterRoles(t *testing.T) {
 	list := &api.List{}
 	names := sets.NewString()
 	roles := map[string]runtime.Object{}
-	bootstrapRoles := bootstrappolicy.ClusterRoles()
+	bootstrapRoles := bootstrappolicy.GetPolicy(pspEnabledTest).ClusterRoles
 	for i := range bootstrapRoles {
 		role := bootstrapRoles[i]
 		names.Insert(role.Name)
@@ -245,7 +249,7 @@ func TestBootstrapControllerRoles(t *testing.T) {
 	list := &api.List{}
 	names := sets.NewString()
 	roles := map[string]runtime.Object{}
-	bootstrapRoles := bootstrappolicy.ControllerRoles()
+	bootstrapRoles := bootstrappolicy.GetPolicy(pspEnabledTest).ControllerRoles
 	for i := range bootstrapRoles {
 		role := bootstrapRoles[i]
 		names.Insert(role.Name)
@@ -261,7 +265,7 @@ func TestBootstrapControllerRoleBindings(t *testing.T) {
 	list := &api.List{}
 	names := sets.NewString()
 	roleBindings := map[string]runtime.Object{}
-	bootstrapRoleBindings := bootstrappolicy.ControllerRoleBindings()
+	bootstrapRoleBindings := bootstrappolicy.GetPolicy(pspEnabledTest).ControllerRoleBindings
 	for i := range bootstrapRoleBindings {
 		roleBinding := bootstrapRoleBindings[i]
 		names.Insert(roleBinding.Name)
@@ -311,7 +315,7 @@ func testObjects(t *testing.T, list *api.List, fixtureFilename string) {
 }
 
 func TestClusterRoleLabel(t *testing.T) {
-	roles := bootstrappolicy.ClusterRoles()
+	roles := bootstrappolicy.GetPolicy(pspEnabledTest).ClusterRoles
 	for i := range roles {
 		role := roles[i]
 		accessor, err := meta.Accessor(&role)
