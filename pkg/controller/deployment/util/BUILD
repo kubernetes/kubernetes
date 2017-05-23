@@ -28,7 +28,6 @@ go_library(
         "//pkg/client/listers/extensions/v1beta1:go_default_library",
         "//pkg/client/retry:go_default_library",
         "//pkg/controller:go_default_library",
-        "//pkg/util/hash:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -48,7 +47,6 @@ go_test(
     srcs = [
         "deployment_util_test.go",
         "hash_test.go",
-        "pod_util_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],

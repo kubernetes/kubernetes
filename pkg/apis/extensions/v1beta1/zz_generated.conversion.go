@@ -21,8 +21,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	unsafe "unsafe"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -30,6 +28,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -353,6 +352,7 @@ func autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSet
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.TemplateGeneration = in.TemplateGeneration
+	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
 	return nil
 }
 
@@ -371,6 +371,7 @@ func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extension
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.TemplateGeneration = in.TemplateGeneration
+	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
 	return nil
 }
 
@@ -388,6 +389,7 @@ func autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *Daemo
 	out.UpdatedNumberScheduled = in.UpdatedNumberScheduled
 	out.NumberAvailable = in.NumberAvailable
 	out.NumberUnavailable = in.NumberUnavailable
+	out.CollisionCount = (*int64)(unsafe.Pointer(in.CollisionCount))
 	return nil
 }
 
@@ -405,6 +407,7 @@ func autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *exten
 	out.UpdatedNumberScheduled = in.UpdatedNumberScheduled
 	out.NumberAvailable = in.NumberAvailable
 	out.NumberUnavailable = in.NumberUnavailable
+	out.CollisionCount = (*int64)(unsafe.Pointer(in.CollisionCount))
 	return nil
 }
 

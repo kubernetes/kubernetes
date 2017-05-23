@@ -12964,6 +12964,11 @@
       "type": "integer",
       "format": "int32"
      },
+     "revisionHistoryLimit": {
+      "description": "The number of old history to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
+      "type": "integer",
+      "format": "int32"
+     },
      "selector": {
       "description": "A label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
@@ -12973,7 +12978,7 @@
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec"
      },
      "templateGeneration": {
-      "description": "A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation.",
+      "description": "DEPRECATED. A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation.",
       "type": "integer",
       "format": "int64"
      },
@@ -12992,6 +12997,11 @@
      "numberReady"
     ],
     "properties": {
+     "collisionCount": {
+      "description": "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+      "type": "integer",
+      "format": "int64"
+     },
      "currentNumberScheduled": {
       "description": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
       "type": "integer",
