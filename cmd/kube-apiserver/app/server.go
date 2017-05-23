@@ -105,8 +105,18 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		return err
 	}
 
-	// kubeAPIServer is at the base for now.  This ensures that CustomResourceDefinitions trump TPRs
-	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers)
+	// TPRs are enabled and not yet beta, since this these are the successor, they fall under the same enablement rule
+	// Subsequent API servers in between here and kube-apiserver will need to be gated.
+	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, runOptions)
+	if err != nil {
+		return err
+	}
+	apiExtensionsServer, err := createAPIExtensionsServer(apiExtensionsConfig, genericapiserver.EmptyDelegate)
+	if err != nil {
+		return err
+	}
+
+	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, apiExtensionsServer.GenericAPIServer, sharedInformers)
 	if err != nil {
 		return err
 	}
@@ -128,24 +138,12 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// this wires up openapi
 	kubeAPIServer.GenericAPIServer.PrepareRun()
 
-	// TPRs are enabled and not yet beta, since this these are the successor, they fall under the same enablement rule
-	// Subsequent API servers in between here and kube-apiserver will need to be gated.
-	// These come first so that if someone registers both a TPR and a CRD, the CRD is preferred.
-	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, runOptions)
-	if err != nil {
-		return err
-	}
-	apiExtensionsServer, err := createAPIExtensionsServer(apiExtensionsConfig, kubeAPIServer.GenericAPIServer)
-	if err != nil {
-		return err
-	}
-
 	// aggregator comes last in the chain
 	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, runOptions)
 	if err != nil {
 		return err
 	}
-	aggregatorServer, err := createAggregatorServer(aggregatorConfig, apiExtensionsServer.GenericAPIServer, sharedInformers, apiExtensionsServer.Informers)
+	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers, apiExtensionsServer.Informers)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return err

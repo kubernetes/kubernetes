@@ -30,6 +30,28 @@
       ]
      }
     ]
+   },
+   {
+    "path": "/apis/{var}",
+    "description": "get available API versions",
+    "operations": [
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "ignored endpoint registered for infrastructure handling",
+      "nickname": "getIgnored",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "var",
+        "description": "ignored variable for infrastructure handling",
+        "required": true,
+        "allowMultiple": false
+       }
+      ]
+     }
+    ]
    }
   ],
   "models": {

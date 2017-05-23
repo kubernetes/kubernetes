@@ -69,7 +69,7 @@ func decodeResponse(t *testing.T, resp *http.Response, obj interface{}) error {
 }
 
 func getGroupList(t *testing.T, server *httptest.Server) (*metav1.APIGroupList, error) {
-	resp, err := http.Get(server.URL)
+	resp, err := http.Get(server.URL + "/apis")
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func getGroupList(t *testing.T, server *httptest.Server) (*metav1.APIGroupList, 
 
 func TestDiscoveryAtAPIS(t *testing.T) {
 	mapper := request.NewRequestContextMapper()
-	handler := NewRootAPIsHandler(DefaultAddresses{DefaultAddress: "192.168.1.1"}, codecs, mapper)
+	handler := NewRootAPIsHandler(http.NotFoundHandler(), DefaultAddresses{DefaultAddress: "192.168.1.1"}, codecs, mapper)
 
 	server := httptest.NewServer(request.WithRequestContext(handler, mapper))
 	groupList, err := getGroupList(t, server)
@@ -136,7 +136,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 
 func TestDiscoveryOrdering(t *testing.T) {
 	mapper := request.NewRequestContextMapper()
-	handler := NewRootAPIsHandler(DefaultAddresses{DefaultAddress: "192.168.1.1"}, codecs, mapper)
+	handler := NewRootAPIsHandler(http.NotFoundHandler(), DefaultAddresses{DefaultAddress: "192.168.1.1"}, codecs, mapper)
 
 	server := httptest.NewServer(request.WithRequestContext(handler, mapper))
 	groupList, err := getGroupList(t, server)
