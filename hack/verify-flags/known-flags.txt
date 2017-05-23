@@ -198,6 +198,7 @@ enable-garbage-collector
 enable-garbage-collector
 enable-garbage-collector
 enable-hostpath-provisioner
+enable-logs-handler
 enable-server
 enable-swagger-ui
 enable-taint-manager
