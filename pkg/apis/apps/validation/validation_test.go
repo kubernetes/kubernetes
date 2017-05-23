@@ -242,6 +242,33 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			},
 		},
 	}
+	changedContainersAndAffinityPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: api.PodSpec{
+				RestartPolicy:  api.RestartPolicyAlways,
+				DNSPolicy:      api.DNSClusterFirst,
+				Containers:     []api.Container{{Name: "xyz", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				InitContainers: []api.Container{{Name: "def", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Affinity: &api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution:  &api.NodeSelector{},
+						PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{{Weight: 100}},
+					},
+					PodAffinity: &api.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution:  []api.PodAffinityTerm{},
+						PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{},
+					},
+					PodAntiAffinity: &api.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution:  []api.PodAffinityTerm{},
+						PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{},
+					},
+				},
+			},
+		},
+	}
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -276,6 +303,24 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				},
 			},
 		},
+		{
+			//updates to any field of Spec.Replicas and Template.Spec.Containers/InitContainers/Affinity
+			old: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: validPodTemplate.Template,
+				},
+			},
+			update: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					Replicas: 1,
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: changedContainersAndAffinityPodTemplate.Template,
+				},
+			},
+		},
 	}
 	for _, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
@@ -302,7 +347,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				},
 			},
 		},
-		"updates to a field other than spec.Replicas": {
+		"updates to a field other than Spec.Replicas and Template.Spec.Containers/InitContainers/Affinity": {
 			old: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
