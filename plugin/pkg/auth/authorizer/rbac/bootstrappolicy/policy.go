@@ -244,6 +244,9 @@ func ClusterRoles() []rbac.ClusterRole {
 				// Used to create a certificatesigningrequest for a node-specific client certificate, and watch
 				// for it to be signed. This allows the kubelet to rotate it's own certificate.
 				rbac.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
+
+				// Used to drain node
+				rbac.NewRule("get").Groups(extensions).Resources("daemonsets").RuleOrDie(),
 			},
 		},
 		{
