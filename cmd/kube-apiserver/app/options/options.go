@@ -26,7 +26,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -79,7 +78,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		InsecureServing:      kubeoptions.NewInsecureServingOptions(),
 		Audit:                genericoptions.NewAuditLogOptions(),
 		Features:             genericoptions.NewFeatureOptions(),
-		Admission:            genericoptions.NewAdmissionOptions(&kubeapiserveradmission.Plugins),
+		Admission:            genericoptions.NewAdmissionOptions(),
 		Authentication:       kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
 		Authorization:        kubeoptions.NewBuiltInAuthorizationOptions(),
 		CloudProvider:        kubeoptions.NewCloudProviderOptions(),
