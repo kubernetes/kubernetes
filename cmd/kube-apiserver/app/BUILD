@@ -66,6 +66,7 @@ go_library(
         "//plugin/pkg/admission/securitycontext/scdeny:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",
         "//plugin/pkg/admission/storageclass/default:go_default_library",
+        "//plugin/pkg/admission/webhook:go_default_library",
         "//plugin/pkg/auth/authenticator/token/bootstrap:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
