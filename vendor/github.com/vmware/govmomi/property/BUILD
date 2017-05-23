@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "collector.go",
+        "filter.go",
         "wait.go",
     ],
     tags = ["automanaged"],
