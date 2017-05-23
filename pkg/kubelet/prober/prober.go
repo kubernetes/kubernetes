@@ -100,12 +100,12 @@ func (pb *prober) probe(probeType probeType, pod *v1.Pod, status v1.PodStatus, c
 		if err != nil {
 			glog.V(1).Infof("%s probe for %q errored: %v", probeType, ctrName, err)
 			if hasRef {
-				pb.recorder.Eventf(ref, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
+				pb.recorder.Eventf(events.ToObjectReference(ref), v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
 			}
 		} else { // result != probe.Success
 			glog.V(1).Infof("%s probe for %q failed (%v): %s", probeType, ctrName, result, output)
 			if hasRef {
-				pb.recorder.Eventf(ref, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+				pb.recorder.Eventf(events.ToObjectReference(ref), v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
 			}
 		}
 		return results.Failure, err
