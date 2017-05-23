@@ -457,9 +457,9 @@ func TestEtcdStorage(t *testing.T) {
 }
 
 func getPrefixFromConfig(t *testing.T, config *extensionsapiserver.Config) string {
-	extensionsOptionsGetter, ok := config.CustomResourceDefinitionRESTOptionsGetter.(extensionsapiserver.CustomResourceDefinitionRESTOptionsGetter)
+	extensionsOptionsGetter, ok := config.CRDRESTOptionsGetter.(extensionsapiserver.CRDRESTOptionsGetter)
 	if !ok {
-		t.Fatal("can't obtain etcd prefix: unable to cast config.CustomResourceDefinitionRESTOptionsGetter to extensionsapiserver.CustomResourceDefinitionRESTOptionsGetter")
+		t.Fatal("can't obtain etcd prefix: unable to cast config.CRDRESTOptionsGetter to extensionsapiserver.CRDRESTOptionsGetter")
 	}
 	return extensionsOptionsGetter.StoragePrefix
 }

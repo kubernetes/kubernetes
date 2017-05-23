@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "aggregator.go",
+        "apiextensions.go",
         "plugins.go",
         "server.go",
     ],
@@ -91,6 +92,9 @@ go_library(
         "//vendor/k8s.io/kube-aggregator/pkg/apiserver:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/controllers/autoregister:go_default_library",
+        "//vendor/k8s.io/kube-apiextensions-server/pkg/apiserver:go_default_library",
+        "//vendor/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion:go_default_library",
+        "//vendor/k8s.io/kube-apiextensions-server/pkg/cmd/server:go_default_library",
     ],
 )
 
