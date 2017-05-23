@@ -50,6 +50,12 @@ type defaultStatefulSetControl struct {
 	podControl StatefulPodControlInterface
 }
 
+// UpdateStatefulSet executes the core logic loop for a stateful set, applying the predictable and
+// consistent monotonic update strategy by default - scale up proceeds in ordinal order, no new pod
+// is created while any pod is unhealthy, and pods are terminated in descending order. The burst
+// strategy allows these constraints to be relaxed - pods will be created and deleted eagerly and
+// in no particular order. Clients using the burst strategy should be careful to ensure they
+// understand the consistency implications of having unpredictable numbers of pods available.
 func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error {
 	replicaCount := int(*set.Spec.Replicas)
 	// slice that will contain all Pods such that 0 <= getOrdinal(pod) < set.Spec.Replicas
@@ -118,6 +124,8 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		return nil
 	}
 
+	monotonic := !allowsBurst(set)
+
 	// Examine each replica with respect to its ordinal
 	for i := range replicas {
 		// delete and recreate failed pods
@@ -128,23 +136,29 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 			}
 			replicas[i] = newStatefulSetPod(set, i)
 		}
-		// If we find a Pod that has not been created we create the Pod immediately and return
+		// If we find a Pod that has not been created we create the Pod
 		if !isCreated(replicas[i]) {
-			return ssc.podControl.CreateStatefulPod(set, replicas[i])
+			if err := ssc.podControl.CreateStatefulPod(set, replicas[i]); err != nil {
+				return err
+			}
+			// if the set does not allow bursting, return immediately
+			if monotonic {
+				return nil
+			}
+			// pod created, no more work possible for this round
+			continue
 		}
 		// If we find a Pod that is currently terminating, we must wait until graceful deletion
-		// completes before we continue to make  progress.
-		if isTerminating(replicas[i]) {
-			glog.V(2).Infof("StatefulSet %s is waiting for Pod %s to Terminate",
-				set.Name, replicas[i].Name)
+		// completes before we continue to make progress.
+		if isTerminating(replicas[i]) && monotonic {
+			glog.V(2).Infof("StatefulSet %s is waiting for Pod %s to Terminate", set.Name, replicas[i].Name)
 			return nil
 		}
 		// If we have a Pod that has been created but is not running and ready we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Running and Ready.
-		if !isRunningAndReady(replicas[i]) {
-			glog.V(2).Infof("StatefulSet %s is waiting for Pod %s to be Running and Ready",
-				set.Name, replicas[i].Name)
+		if !isRunningAndReady(replicas[i]) && monotonic {
+			glog.V(2).Infof("StatefulSet %s is waiting for Pod %s to be Running and Ready", set.Name, replicas[i].Name)
 			return nil
 		}
 		// Enforce the StatefulSet invariants
@@ -166,13 +180,18 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 	// We will wait for all predecessors to be Running and Ready prior to attempting a deletion.
 	// We will terminate Pods in a monotonically decreasing order over [len(pods),set.Spec.Replicas).
 	// Note that we do not resurrect Pods in this interval.
-	if unhealthy > 0 {
+	if unhealthy > 0 && monotonic {
 		glog.V(2).Infof("StatefulSet %s is waiting on %d Pods", set.Name, unhealthy)
 		return nil
 	}
-	if target := len(condemned) - 1; target >= 0 {
+	for target := len(condemned) - 1; target >= 0; target-- {
 		glog.V(2).Infof("StatefulSet %s terminating Pod %s", set.Name, condemned[target])
-		return ssc.podControl.DeleteStatefulPod(set, condemned[target])
+		if err := ssc.podControl.DeleteStatefulPod(set, condemned[target]); err != nil {
+			return err
+		}
+		if monotonic {
+			return nil
+		}
 	}
 	return nil
 }

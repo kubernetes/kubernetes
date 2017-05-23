@@ -95,9 +95,24 @@ type StatefulSet struct {
 	Status StatefulSetStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// PodManagementPolicyType defines the policy for creating pods under a stateful set.
+type PodManagementPolicyType string
+
+const (
+	// OrderedReadyPodManagement will create pods in strictly increasing order on
+	// scale up and strictly decreasing order on scale down, progressing only when
+	// the previous pod is ready or terminated. At most one pod will be changed
+	// at any time.
+	OrderedReadyPodManagement PodManagementPolicyType = "OrderedReady"
+	// ParallelPodManagement will create and delete pods as soon as the stateful set
+	// replica count is changed, and will not wait for pods to be ready or complete
+	// termination.
+	ParallelPodManagement = "Parallel"
+)
+
 // A StatefulSetSpec is the specification of a StatefulSet.
 type StatefulSetSpec struct {
-	// Replicas is the desired number of replicas of the given Template.
+	// replicas is the desired number of replicas of the given Template.
 	// These are replicas in the sense that they are instantiations of the
 	// same Template, but individual replicas also have a consistent identity.
 	// If unspecified, defaults to 1.
@@ -105,19 +120,19 @@ type StatefulSetSpec struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 
-	// Selector is a label query over pods that should match the replica count.
+	// selector is a label query over pods that should match the replica count.
 	// If empty, defaulted to labels on the pod template.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
-	// Template is the object that describes the pod that will be created if
+	// template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. Each pod stamped out by the StatefulSet
 	// will fulfill this Template, but have a unique identity from the rest
 	// of the StatefulSet.
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
 
-	// VolumeClaimTemplates is a list of claims that pods are allowed to reference.
+	// volumeClaimTemplates is a list of claims that pods are allowed to reference.
 	// The StatefulSet controller is responsible for mapping network identities to
 	// claims in a way that maintains the identity of a pod. Every claim in
 	// this list must have at least one matching (by name) volumeMount in one
@@ -127,21 +142,32 @@ type StatefulSetSpec struct {
 	// +optional
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty" protobuf:"bytes,4,rep,name=volumeClaimTemplates"`
 
-	// ServiceName is the name of the service that governs this StatefulSet.
+	// serviceName is the name of the service that governs this StatefulSet.
 	// This service must exist before the StatefulSet, and is responsible for
 	// the network identity of the set. Pods get DNS/hostnames that follow the
 	// pattern: pod-specific-string.serviceName.default.svc.cluster.local
 	// where "pod-specific-string" is managed by the StatefulSet controller.
 	ServiceName string `json:"serviceName" protobuf:"bytes,5,opt,name=serviceName"`
+
+	// podManagementPolicy controls how pods are created during initial scale up,
+	// when replacing pods on nodes, or when scaling down. The default policy is
+	// `OrderedReady`, where pods are created in increasing order (pod-0, then
+	// pod-1, etc) and the controller will wait until each pod is ready before
+	// continuing. When scaling down, the pods are removed in the opposite order.
+	// The alternative policy is `Parallel` which will create pods in parallel
+	// to match the desired scale without waiting, and on scale down will delete
+	// all pods at once.
+	// +optional
+	PodManagementPolicy PodManagementPolicyType `json:"podManagementPolicy,omitempty" protobuf:"bytes,6,opt,name=podManagementPolicy,casttype=PodManagementPolicyType"`
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
 type StatefulSetStatus struct {
-	// most recent generation observed by this StatefulSet.
+	// observedGeneration is the most recent generation observed by this StatefulSet.
 	// +optional
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
 
-	// Replicas is the number of actual replicas.
+	// replicas is the number of actual replicas.
 	Replicas int32 `json:"replicas" protobuf:"varint,2,opt,name=replicas"`
 }
 
