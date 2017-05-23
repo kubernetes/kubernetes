@@ -87,6 +87,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/controller/garbagecollector/memcachediscovery:all-srcs",
         "//pkg/controller/garbagecollector/metaonly:all-srcs",
     ],
     tags = ["automanaged"],

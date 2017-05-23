@@ -19,6 +19,7 @@ package garbagecollector
 import (
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -27,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -69,9 +71,16 @@ type event struct {
 // items to the attemptToDelete and attemptToOrphan.
 type GraphBuilder struct {
 	restMapper meta.RESTMapper
+
 	// each monitor list/watches a resource, the results are funneled to the
 	// dependencyGraphBuilder
-	monitors []cache.Controller
+	monitors    monitors
+	monitorLock sync.Mutex
+	// globalStop is also protected by monitorLock. If it is nil, it
+	// indicates that Run() has not been called yet. If it is non-nil, then
+	// when closed it indicates everything should shut down.
+	globalStop <-chan struct{}
+
 	// metaOnlyClientPool uses a special codec, which removes fields except for
 	// apiVersion, kind, and metadata during decoding.
 	metaOnlyClientPool dynamic.ClientPool
@@ -91,6 +100,45 @@ type GraphBuilder struct {
 	// be non-existent are added to the cached.
 	absentOwnerCache *UIDCache
 }
+
+type stopMux struct {
+	// if either globalStop or localStop is closed, outputStop will be closed.
+	globalStop <-chan struct{}
+	localStop  chan struct{}
+	outputStop chan struct{}
+}
+
+func newStopMux(stop <-chan struct{}) *stopMux {
+	sm := &stopMux{
+		globalStop: stop,
+		localStop:  make(chan struct{}),
+		outputStop: make(chan struct{}),
+	}
+	go sm.stopper()
+	return sm
+}
+
+func (sm *stopMux) stopper() {
+	defer close(sm.outputStop)
+	select {
+	case <-sm.globalStop:
+	case <-sm.localStop:
+	}
+}
+
+type monitorSingle struct {
+	monitor cache.Controller
+	stopper *stopMux
+}
+
+// Run is intended to be called in a goroutine. Multiple calls of this is an
+// error.
+func (m *monitorSingle) Run(stopCh <-chan struct{}) {
+	m.stopper = newStopMux(stopCh)
+	m.monitor.Run(m.stopper.outputStop)
+}
+
+type monitors map[schema.GroupVersionResource]*monitorSingle
 
 func listWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
@@ -170,30 +218,60 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 	return monitor, nil
 }
 
-func (gb *GraphBuilder) monitorsForResources(resources map[schema.GroupVersionResource]struct{}) error {
+// syncMonitors starts or stops monitors as necessary. It will return any error
+// encountered, but will make an attempt to start a monitor for each resource
+// instead of immediately exiting on an error. It may be called before or after Run.
+func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]struct{}) error {
+	gb.monitorLock.Lock()
+	defer gb.monitorLock.Unlock()
+
+	toRemove := gb.monitors
+	if toRemove == nil {
+		toRemove = monitors{}
+	}
+	current := monitors{}
+	errs := []error{}
 	for resource := range resources {
 		if _, ok := ignoredResources[resource]; ok {
-			glog.V(5).Infof("ignore resource %#v", resource)
+			continue
+		}
+		if m, ok := toRemove[resource]; ok {
+			current[resource] = m
+			delete(toRemove, resource)
 			continue
 		}
 		kind, err := gb.restMapper.KindFor(resource)
 		if err != nil {
-			nonCoreMsg := fmt.Sprintf(nonCoreMessage, resource)
-			utilruntime.HandleError(fmt.Errorf("%v. %s", err, nonCoreMsg))
+			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %v", resource, err))
 			continue
 		}
-		monitor, err := gb.controllerFor(resource, kind)
+		m, err := gb.controllerFor(resource, kind)
 		if err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
+			continue
 		}
-		gb.monitors = append(gb.monitors, monitor)
+		monitor := &monitorSingle{monitor: m}
+		if gb.globalStop != nil {
+			monitor.Run(gb.globalStop)
+		}
+		current[resource] = monitor
 	}
-	return nil
+	gb.monitors = current
+
+	for _, monitor := range toRemove {
+		if monitor.stopper != nil {
+			close(monitor.stopper.localStop)
+		}
+		// TODO: remove all resources of this type from the graph?
+	}
+
+	// NewAggregate returns nil if errs is 0-length
+	return utilerrors.NewAggregate(errs)
 }
 
 func (gb *GraphBuilder) HasSynced() bool {
 	for _, monitor := range gb.monitors {
-		if !monitor.HasSynced() {
+		if !monitor.monitor.HasSynced() {
 			return false
 		}
 	}
@@ -201,6 +279,10 @@ func (gb *GraphBuilder) HasSynced() bool {
 }
 
 func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
+	gb.monitorLock.Lock()
+	defer gb.monitorLock.Unlock()
+	gb.globalStop = stopCh
+
 	for _, monitor := range gb.monitors {
 		go monitor.Run(stopCh)
 	}
