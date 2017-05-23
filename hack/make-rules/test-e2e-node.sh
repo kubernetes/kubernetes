@@ -73,9 +73,9 @@ if [ $remote = true ] ; then
   gubernator=${GUBERNATOR:-"false"}
   image_config_file=${IMAGE_CONFIG_FILE:-""}
   if [[ $hosts == "" && $images == "" && $image_config_file == "" ]]; then
-    image_project=${IMAGE_PROJECT:-"google-containers"}
+    image_project=${IMAGE_PROJECT:-"cos-cloud"}
     gci_image=$(gcloud compute images list --project $image_project \
-    --no-standard-images --regexp="gci-dev.*" --format="table[no-heading](name)")
+    --no-standard-images --regexp="cos-beta.*" --format="table[no-heading](name)")
     images=$gci_image
     metadata="user-data<${KUBE_ROOT}/test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
   fi

@@ -50,21 +50,21 @@ images:
       - 'resource tracking for 105 pods per node \[Benchmark\]'
   gci-resource1:
     image: cos-beta-59-9460-20-0
-    project: google-containers
+    project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 0 pods per node \[Benchmark\]'
   gci-resource2:
     image: cos-beta-59-9460-20-0
-    project: google-containers
+    project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 35 pods per node \[Benchmark\]'
   gci-resource3:
     image: cos-beta-59-9460-20-0
-    project: google-containers
+    project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
