@@ -38,6 +38,12 @@ message PartialObjectMetadata {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 }
 
+// PartialObjectMetadataList contains a list of objects containing only their metadata
+message PartialObjectMetadataList {
+  // items contains each of the included items.
+  repeated PartialObjectMetadata items = 1;
+}
+
 // TableOptions are used when a Table is requested by the caller.
 message TableOptions {
   // includeObject decides whether to include each object along with its columnar information.
