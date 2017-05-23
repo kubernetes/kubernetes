@@ -65,24 +65,26 @@ var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
 var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
 const (
-	glusterfsPluginName         = "kubernetes.io/glusterfs"
-	volPrefix                   = "vol_"
-	dynamicEpSvcPrefix          = "glusterfs-dynamic-"
-	replicaCount                = 3
-	durabilityType              = "replicate"
-	secretKeyName               = "key" // key name used in secret
-	gciGlusterMountBinariesPath = "/sbin/mount.glusterfs"
-	defaultGidMin               = 2000
-	defaultGidMax               = math.MaxInt32
+	glusterfsPluginName            = "kubernetes.io/glusterfs"
+	volPrefix                      = "vol_"
+	dynamicEpSvcPrefix             = "glusterfs-dynamic-"
+	replicaCount                   = 3
+	durabilityType                 = "replicate"
+	secretKeyName                  = "key" // key name used in secret
+	gciLinuxGlusterMountBinaryPath = "/sbin/mount.glusterfs"
+	defaultGidMin                  = 2000
+	defaultGidMax                  = math.MaxInt32
 	// absoluteGidMin/Max are currently the same as the
 	// default values, but they play a different role and
 	// could take a different value. Only thing we need is:
 	// absGidMin <= defGidMin <= defGidMax <= absGidMax
-	absoluteGidMin = 2000
-	absoluteGidMax = math.MaxInt32
-	heketiAnn      = "heketi-dynamic-provisioner"
-	glusterTypeAnn = "gluster.org/type"
-	glusterDescAnn = "Gluster: Dynamically provisioned PV"
+	absoluteGidMin          = 2000
+	absoluteGidMax          = math.MaxInt32
+	heketiAnn               = "heketi-dynamic-provisioner"
+	glusterTypeAnn          = "gluster.org/type"
+	glusterDescAnn          = "Gluster: Dynamically provisioned PV"
+	linuxGlusterMountBinary = "mount.glusterfs"
+	autoUnmountBinaryVer    = "3.11"
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -290,8 +292,8 @@ func (b *glusterfsMounter) CanMount() error {
 	exe := exec.New()
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exe.Command("/bin/ls", gciGlusterMountBinariesPath).CombinedOutput(); err != nil {
-			return fmt.Errorf("Required binary %s is missing", gciGlusterMountBinariesPath)
+		if _, err := exe.Command("/bin/ls", gciLinuxGlusterMountBinaryPath).CombinedOutput(); err != nil {
+			return fmt.Errorf("Required binary %s is missing", gciLinuxGlusterMountBinaryPath)
 		}
 	}
 	return nil
@@ -376,13 +378,58 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 		}
 
 	}
-
 	options = append(options, "backup-volfile-servers="+dstrings.Join(addrlist[:], ":"))
+
+	//fetch client version.
+	mountBinaryVerStr := ""
+	mountStr := ""
+
+	cmdOut, err := b.exe.Command(linuxGlusterMountBinary, "-V").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Failed to get binary %s version", linuxGlusterMountBinary)
+	}
+	//cmdOut will be filled as shown below.
+	/*
+			[root@]# mount.glusterfs -V
+			glusterfs 3.10.1
+			Repository revision: git://git.gluster.org/glusterfs.git
+			Copyright (c) 2006-2016 Red Hat, Inc. <https://www.gluster.org/>
+			GlusterFS comes with ABSOLUTELY NO WARRANTY.
+		    .........
+	*/
+
+	parseStr := string(cmdOut)
+	if parseStr != "" {
+
+		//Store the version line from parseStr
+		mountStrSlice := dstrings.Split(parseStr, "\n")
+		if len(mountStrSlice) > 0 {
+			mountStr = mountStrSlice[0]
+		}
+		if mountStr != "" {
+
+			// Get the [binary, version]  slice.
+			mountBinaryVerSlice := dstrings.Split(mountStr, " ")
+			if len(mountBinaryVerSlice) >= 2 {
+
+				// Get the 'version' string in mountBinaryVerStr
+				mountBinaryVerStr = mountBinaryVerSlice[1]
+			}
+
+		}
+	}
+
+	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+
+	for i := len(mountOptions) - 1; i >= 0; i-- {
+		if mountOptions[i] == "auto_unmount" && mountBinaryVerStr != "" && mountBinaryVerStr < autoUnmountBinaryVer {
+			mountOptions = append(mountOptions[:i], mountOptions[i+1:]...)
+		}
+	}
 
 	// Avoid mount storm, pick a host randomly.
 	// Iterate all hosts until mount succeeds.
 	for _, ip := range addrlist {
-		mountOptions := volume.JoinMountOptions(b.mountOptions, options)
 		errs = b.mounter.Mount(ip+":"+b.path, dir, "glusterfs", mountOptions)
 		if errs == nil {
 			glog.Infof("glusterfs: successfully mounted %s", dir)
@@ -819,6 +866,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		"kubernetes.io/createdby":           heketiAnn,
 		glusterTypeAnn:                      "file",
 		"Description":                       glusterDescAnn,
+		v1.MountOptionAnnotation:            "auto_unmount",
 	}
 
 	pv.Spec.Capacity = v1.ResourceList{
