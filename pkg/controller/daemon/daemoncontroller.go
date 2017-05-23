@@ -425,11 +425,28 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 	}
 }
 
+func compareConditions(oldConditions, curConditions []v1.NodeCondition) bool {
+	if len(oldConditions) != len(curConditions) {
+		return false
+	}
+	for i := range oldConditions {
+		old := oldConditions[i]
+		cur := curConditions[i]
+		if old.Type != cur.Type || old.Status != cur.Status {
+			return false
+		}
+	}
+	return true
+}
+
 func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 	oldNode := old.(*v1.Node)
 	curNode := cur.(*v1.Node)
-	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) && reflect.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints) {
-		// If node labels and taints didn't change, we can ignore this update.
+	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) &&
+		reflect.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints) &&
+		reflect.DeepEqual(oldNode.Status.Allocatable, curNode.Status.Allocatable) &&
+		compareConditions(oldNode.Status.Conditions, curNode.Status.Conditions) {
+		// If node labels, taints, allocatable and conditions didn't change, we can ignore this update.
 		return
 	}
 	dsList, err := dsc.dsLister.List(labels.Everything())
