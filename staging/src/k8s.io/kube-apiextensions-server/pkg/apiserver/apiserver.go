@@ -74,11 +74,14 @@ func init() {
 type Config struct {
 	GenericConfig *genericapiserver.Config
 
-	CustomResourceDefinitionRESTOptionsGetter genericregistry.RESTOptionsGetter
+	CRDRESTOptionsGetter genericregistry.RESTOptionsGetter
 }
 
 type CustomResourceDefinitions struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
+
+	// provided for easier embedding
+	Informers internalinformers.SharedInformerFactory
 }
 
 type completedConfig struct {
@@ -105,7 +108,7 @@ func (c *Config) SkipComplete() completedConfig {
 
 // New returns a new instance of CustomResourceDefinitions from the given config.
 func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*CustomResourceDefinitions, error) {
-	genericServer, err := c.Config.GenericConfig.SkipComplete().New(genericapiserver.EmptyDelegate) // completion is done in Complete, no need for a second time
+	genericServer, err := c.Config.GenericConfig.SkipComplete().New(delegationTarget) // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
 	}
@@ -126,11 +129,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
-	customResourceDefinitionClient, err := internalclientset.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
+	crdClient, err := internalclientset.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		return nil, err
 	}
-	customResourceDefinitionInformers := internalinformers.NewSharedInformerFactory(customResourceDefinitionClient, 5*time.Minute)
+	s.Informers = internalinformers.NewSharedInformerFactory(crdClient, 5*time.Minute)
 
 	delegateHandler := delegationTarget.UnprotectedHandler()
 	if delegateHandler == nil {
@@ -145,31 +148,31 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		discovery: map[string]*discovery.APIGroupHandler{},
 		delegate:  delegateHandler,
 	}
-	customResourceDefinitionHandler := NewCustomResourceDefinitionHandler(
+	crdHandler := NewCustomResourceDefinitionHandler(
 		versionDiscoveryHandler,
 		groupDiscoveryHandler,
 		s.GenericAPIServer.RequestContextMapper(),
-		customResourceDefinitionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions().Lister(),
+		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions().Lister(),
 		delegateHandler,
-		c.CustomResourceDefinitionRESTOptionsGetter,
+		c.CRDRESTOptionsGetter,
 		c.GenericConfig.AdmissionControl,
 	)
-	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle("/apis", customResourceDefinitionHandler)
-	s.GenericAPIServer.Handler.PostGoRestfulMux.HandlePrefix("/apis/", customResourceDefinitionHandler)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle("/apis", crdHandler)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.HandlePrefix("/apis/", crdHandler)
 
-	customResourceDefinitionController := NewDiscoveryController(customResourceDefinitionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
-	namingController := status.NewNamingConditionController(customResourceDefinitionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(), customResourceDefinitionClient)
+	crdController := NewDiscoveryController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
+	namingController := status.NewNamingConditionController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient)
 	finalizingController := finalizer.NewCRDFinalizer(
-		customResourceDefinitionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
-		customResourceDefinitionClient,
+		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
+		crdClient,
 		dynamic.NewDynamicClientPool(s.GenericAPIServer.LoopbackClientConfig))
 
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
-		customResourceDefinitionInformers.Start(context.StopCh)
+		s.Informers.Start(context.StopCh)
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
-		go customResourceDefinitionController.Run(context.StopCh)
+		go crdController.Run(context.StopCh)
 		go namingController.Run(context.StopCh)
 		go finalizingController.Run(5, context.StopCh)
 		return nil

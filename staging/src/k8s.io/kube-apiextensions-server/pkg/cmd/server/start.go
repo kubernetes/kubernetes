@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
@@ -95,22 +96,26 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		return nil, err
 	}
 
-	customResourceDefinitionRESTOptionsGetter := apiserver.CustomResourceDefinitionRESTOptionsGetter{
-		StorageConfig:           o.RecommendedOptions.Etcd.StorageConfig,
-		StoragePrefix:           o.RecommendedOptions.Etcd.StorageConfig.Prefix,
-		EnableWatchCache:        o.RecommendedOptions.Etcd.EnableWatchCache,
-		DefaultWatchCacheSize:   o.RecommendedOptions.Etcd.DefaultWatchCacheSize,
-		EnableGarbageCollection: o.RecommendedOptions.Etcd.EnableGarbageCollection,
-		DeleteCollectionWorkers: o.RecommendedOptions.Etcd.DeleteCollectionWorkers,
-	}
-	customResourceDefinitionRESTOptionsGetter.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
-	customResourceDefinitionRESTOptionsGetter.StorageConfig.Copier = apiserver.UnstructuredCopier{}
-
 	config := &apiserver.Config{
-		GenericConfig:                             serverConfig,
-		CustomResourceDefinitionRESTOptionsGetter: customResourceDefinitionRESTOptionsGetter,
+		GenericConfig:        serverConfig,
+		CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
 	}
 	return config, nil
+}
+
+func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregistry.RESTOptionsGetter {
+	ret := apiserver.CRDRESTOptionsGetter{
+		StorageConfig:           etcdOptions.StorageConfig,
+		StoragePrefix:           etcdOptions.StorageConfig.Prefix,
+		EnableWatchCache:        etcdOptions.EnableWatchCache,
+		DefaultWatchCacheSize:   etcdOptions.DefaultWatchCacheSize,
+		EnableGarbageCollection: etcdOptions.EnableGarbageCollection,
+		DeleteCollectionWorkers: etcdOptions.DeleteCollectionWorkers,
+	}
+	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	ret.StorageConfig.Copier = apiserver.UnstructuredCopier{}
+
+	return ret
 }
 
 func (o CustomResourceDefinitionsServerOptions) RunCustomResourceDefinitionsServer(stopCh <-chan struct{}) error {
