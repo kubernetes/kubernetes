@@ -45,6 +45,7 @@ import (
 
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
 	listers "k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/internalversion"
+	"k8s.io/kube-apiextensions-server/pkg/controller/finalizer"
 	"k8s.io/kube-apiextensions-server/pkg/registry/customresource"
 )
 
@@ -243,6 +244,17 @@ func (r *crdHandler) removeDeadStorage() {
 	defer r.customStorageLock.Unlock()
 
 	r.customStorage.Store(storageMap)
+}
+
+// GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter for
+// the given uid, or nil if one does not exist.
+func (r *crdHandler) GetCustomResourceListerCollectionDeleter(uid types.UID) finalizer.ListerCollectionDeleter {
+	storageMap := r.customStorage.Load().(crdStorageMap)
+	ret, ok := storageMap[uid]
+	if !ok {
+		return nil
+	}
+	return ret.storage
 }
 
 func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefinition) *crdInfo {
