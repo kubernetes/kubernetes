@@ -48,7 +48,8 @@ go-bindata -nometadata -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
 	"examples/..." \
 	"test/e2e/testing-manifests/..." \
 	"test/images/..." \
-	"test/fixtures/..."
+	"test/fixtures/..." \
+	"cluster/gce/gci/nvidia-gpus/..."
 
 gofmt -s -w "${BINDATA_OUTPUT}.tmp"
 
