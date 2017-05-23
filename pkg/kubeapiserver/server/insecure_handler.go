@@ -35,7 +35,7 @@ import (
 // InsecureServingInfo *ServingInfo
 
 func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
-	handler := genericapifilters.WithAudit(apiHandler, c.RequestContextMapper, c.AuditWriter)
+	handler := genericapifilters.WithAudit(apiHandler, c.RequestContextMapper, c.AuditBackend, c.AuditPolicy, c.LongRunningFunc)
 	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, insecureSuperuser{}, nil)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithPanicRecovery(handler)

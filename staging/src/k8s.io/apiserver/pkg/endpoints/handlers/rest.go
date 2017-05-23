@@ -42,6 +42,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -72,7 +73,8 @@ type RequestScope struct {
 }
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
-	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+	ctx := scope.ContextFunc(req)
+	responsewriters.ErrorNegotiated(ctx, err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
 }
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -111,8 +113,9 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 			scope.err(err, w, req)
 			return
 		}
+
 		trace.Step("About to write a response")
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		responsewriters.WriteObject(ctx, http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
@@ -231,7 +234,8 @@ type responder struct {
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	responsewriters.WriteObject(statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.w, r.req)
+	ctx := r.scope.ContextFunc(r.req)
+	responsewriters.WriteObject(ctx, statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.w, r.req)
 }
 
 func (r *responder) Error(err error) {
@@ -339,7 +343,8 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				return
 			}
 		}
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+
+		responsewriters.WriteObject(ctx, http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
 }
@@ -400,6 +405,9 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 		trace.Step("Conversion done")
 
+		ae := request.AuditEventFrom(ctx)
+		audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
+
 		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := request.UserFrom(ctx)
 
@@ -435,7 +443,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 		trace.Step("Self-link added")
 
-		responsewriters.WriteObject(http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		responsewriters.WriteObject(ctx, http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
@@ -495,6 +503,9 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
+		ae := request.AuditEventFrom(ctx)
+		audit.LogRequestPatch(ae, patchJS)
+
 		s, ok := runtime.SerializerInfoForMediaType(scope.Serializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
 		if !ok {
 			scope.err(fmt.Errorf("no serializer defined for JSON"), w, req)
@@ -532,7 +543,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		responsewriters.WriteObject(ctx, http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 
 }
@@ -818,6 +829,9 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 		trace.Step("Conversion done")
 
+		ae := request.AuditEventFrom(ctx)
+		audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
+
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
 			scope.err(err, w, req)
 			return
@@ -859,7 +873,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if wasCreated {
 			status = http.StatusCreated
 		}
-		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		responsewriters.WriteObject(ctx, status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
@@ -906,6 +920,9 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), w, req)
 					return
 				}
+
+				ae := request.AuditEventFrom(ctx)
+				audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
 			} else {
 				if values := req.URL.Query(); len(values) > 0 {
 					if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, options); err != nil {
@@ -974,7 +991,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				}
 			}
 		}
-		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+
+		responsewriters.WriteObject(ctx, status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
@@ -1046,6 +1064,9 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), w, req)
 					return
 				}
+
+				ae := request.AuditEventFrom(ctx)
+				audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
 			}
 		}
 
@@ -1076,7 +1097,8 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 				}
 			}
 		}
-		responsewriters.WriteObjectNegotiated(scope.Serializer, scope.Kind.GroupVersion(), w, req, http.StatusOK, result)
+
+		responsewriters.WriteObjectNegotiated(ctx, scope.Serializer, scope.Kind.GroupVersion(), w, req, http.StatusOK, result)
 	}
 }
 
