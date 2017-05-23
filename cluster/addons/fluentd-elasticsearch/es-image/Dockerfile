@@ -37,9 +37,6 @@ RUN set -x \
     && tar xf elasticsearch-$ELASTICSEARCH_VERSION.tar.gz -C /elasticsearch --strip-components=1 \
     && rm elasticsearch-$ELASTICSEARCH_VERSION.tar.gz
 
-RUN mkdir -p /elasticsearch/config/templates
-COPY template-k8s-logstash.json /elasticsearch/config/templates/template-k8s-logstash.json
-
 COPY config /elasticsearch/config
 
 COPY run.sh /
