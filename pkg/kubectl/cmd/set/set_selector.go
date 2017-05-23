@@ -44,6 +44,7 @@ type SelectorOptions struct {
 	all         bool
 	record      bool
 	changeCause string
+	output      string
 
 	resources []string
 	selector  *metav1.LabelSelector
@@ -106,6 +107,7 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	o.all = cmdutil.GetFlagBool(cmd, "all")
 	o.record = cmdutil.GetRecordFlag(cmd)
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+	o.output = cmdutil.GetFlagString(cmd, "output")
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -194,7 +196,12 @@ func (o *SelectorOptions) RunSelector() error {
 		}
 
 		info.Refresh(patched, true)
-		cmdutil.PrintSuccess(o.mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "selector updated")
+
+		shortOutput := o.output == "name"
+		if len(o.output) > 0 && !shortOutput {
+			return o.PrintObject(info.Object)
+		}
+		cmdutil.PrintSuccess(o.mapper, shortOutput, o.out, info.Mapping.Resource, info.Name, o.dryrun, "selector updated")
 		return nil
 	})
 }
