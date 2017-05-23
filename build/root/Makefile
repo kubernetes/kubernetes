@@ -153,7 +153,7 @@ define CHECK_TEST_HELP_INFO
 # Example:
 #   make check
 #   make test
-#   make check WHAT=pkg/kubelet GOFLAGS=-v
+#   make check WHAT=./pkg/kubelet GOFLAGS=-v
 endef
 .PHONY: check test
 ifeq ($(PRINT_HELP),y)
@@ -333,7 +333,7 @@ define VET_HELP_INFO
 #
 # Example:
 #   make vet
-#   make vet WHAT=pkg/kubelet
+#   make vet WHAT=./pkg/kubelet
 endef
 .PHONY: vet
 ifeq ($(PRINT_HELP),y)
