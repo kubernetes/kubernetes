@@ -237,7 +237,7 @@ func (i *initFederation) Complete(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("%s should be passed only with '%s=NodePort'", apiserverPortFlag, apiserverServiceTypeFlag)
 		}
 	}
-	if i.options.apiServerNodePortsPort < 0 {
+	if i.options.apiServerNodePortsPort < 0 || i.options.apiServerNodePortsPort > 65535 {
 		return fmt.Errorf("Please provide a valid port number for %s", apiserverPortFlag)
 	}
 
@@ -461,7 +461,7 @@ func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcN
 			Port:       443,
 			TargetPort: intstr.FromString(apiServerSecurePortName),
 	}
-	if apiserverServiceType == v1.ServiceTypeNodePort {
+	if apiserverServiceType == v1.ServiceTypeNodePort && apiserverPort > 0 {
 		port.NodePort = apiserverPort
 	}
 	svc := &api.Service{
