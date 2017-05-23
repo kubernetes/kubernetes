@@ -23,6 +23,7 @@ import (
 	"net/http"
 	rt "runtime"
 	"sort"
+	"strings"
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
@@ -37,27 +38,45 @@ import (
 )
 
 // APIServerHandlers holds the different http.Handlers used by the API server.
-// This includes the full handler chain, the gorestful handler (used for the API) which falls through to the postGoRestful handler
-// and the postGoRestful handler (which can contain a fallthrough of its own)
+// This includes the full handler chain, the director (which chooses between gorestful and nonGoRestful,
+// the gorestful handler (used for the API) which falls through to the nonGoRestful handler on unregistered paths,
+// and the nonGoRestful handler (which can contain a fallthrough of its own)
+// FullHandlerChain -> Director -> {GoRestfulContainer,NonGoRestfulMux} based on inspection of registered web services
 type APIServerHandler struct {
 	// FullHandlerChain is the one that is eventually served with.  It should include the full filter
-	// chain and then call the GoRestfulContainer.
+	// chain and then call the Director.
 	FullHandlerChain http.Handler
-	// The registered APIs
+	// The registered APIs.  InstallAPIs uses this.  Other servers probably shouldn't access this directly.
 	GoRestfulContainer *restful.Container
-	// PostGoRestfulMux is the final HTTP handler in the chain.
+	// NonGoRestfulMux is the final HTTP handler in the chain.
 	// It comes after all filters and the API handling
-	PostGoRestfulMux *mux.PathRecorderMux
+	// This is where other servers can attach handler to various parts of the chain.
+	NonGoRestfulMux *mux.PathRecorderMux
+
+	// Director is here so that we can properly handle fall through and proxy cases.
+	// This looks a bit bonkers, but here's what's happening.  We need to have /apis handling registered in gorestful in order to have
+	// swagger generated for compatibility.  Doing that with `/apis` as a webservice, means that it forcibly 404s (no defaulting allowed)
+	// all requests which are not /apis or /apis/.  We need those calls to fall through behind goresful for proper delegation.  Trying to
+	// register for a pattern which includes everything behind it doesn't work because gorestful negotiates for verbs and content encoding
+	// and all those things go crazy when gorestful really just needs to pass through.  In addition, openapi enforces unique verb constraints
+	// which we don't fit into and it still muddies up swagger.  Trying to switch the webservices into a route doesn't work because the
+	//  containing webservice faces all the same problems listed above.
+	// This leads to the crazy thing done here.  Our mux does what we need, so we'll place it in front of gorestful.  It will introspect to
+	// decide if the the route is likely to be handled by goresful and route there if needed.  Otherwise, it goes to PostGoRestful mux in
+	// order to handle "normal" paths and delegation. Hopefully no API consumers will ever have to deal with this level of detail.  I think
+	// we should consider completely removing gorestful.
+	// Other servers should only use this opaquely to delegate to an API server.
+	Director http.Handler
 }
 
 // HandlerChainBuilderFn is used to wrap the GoRestfulContainer handler using the provided handler chain.
 // It is normally used to apply filtering like authentication and authorization
 type HandlerChainBuilderFn func(apiHandler http.Handler) http.Handler
 
-func NewAPIServerHandler(contextMapper request.RequestContextMapper, s runtime.NegotiatedSerializer, handlerChainBuilder HandlerChainBuilderFn, notFoundHandler http.Handler) *APIServerHandler {
-	postGoRestfulMux := genericmux.NewPathRecorderMux()
+func NewAPIServerHandler(name string, contextMapper request.RequestContextMapper, s runtime.NegotiatedSerializer, handlerChainBuilder HandlerChainBuilderFn, notFoundHandler http.Handler) *APIServerHandler {
+	nonGoRestfulMux := genericmux.NewPathRecorderMux(name)
 	if notFoundHandler != nil {
-		postGoRestfulMux.NotFoundHandler(notFoundHandler)
+		nonGoRestfulMux.NotFoundHandler(notFoundHandler)
 	}
 
 	gorestfulContainer := restful.NewContainer()
@@ -74,14 +93,17 @@ func NewAPIServerHandler(contextMapper request.RequestContextMapper, s runtime.N
 		serviceErrorHandler(ctx, s, serviceErr, request, response)
 	})
 
-	// register the defaultHandler for everything.  This will allow an unhandled request to fall through to another handler instead of
-	// ending up with a forced 404
-	gorestfulContainer.Handle("/", postGoRestfulMux)
+	director := director{
+		name:               name,
+		goRestfulContainer: gorestfulContainer,
+		nonGoRestfulMux:    nonGoRestfulMux,
+	}
 
 	return &APIServerHandler{
-		FullHandlerChain:   handlerChainBuilder(gorestfulContainer.ServeMux),
+		FullHandlerChain:   handlerChainBuilder(director),
 		GoRestfulContainer: gorestfulContainer,
-		PostGoRestfulMux:   postGoRestfulMux,
+		NonGoRestfulMux:    nonGoRestfulMux,
+		Director:           director,
 	}
 }
 
@@ -92,10 +114,51 @@ func (a *APIServerHandler) ListedPaths() []string {
 	for _, ws := range a.GoRestfulContainer.RegisteredWebServices() {
 		handledPaths = append(handledPaths, ws.RootPath())
 	}
-	handledPaths = append(handledPaths, a.PostGoRestfulMux.ListedPaths()...)
+	handledPaths = append(handledPaths, a.NonGoRestfulMux.ListedPaths()...)
 	sort.Strings(handledPaths)
 
 	return handledPaths
+}
+
+type director struct {
+	name               string
+	goRestfulContainer *restful.Container
+	nonGoRestfulMux    *mux.PathRecorderMux
+}
+
+func (d director) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	path := req.URL.Path
+
+	// check to see if our webservices want to claim this path
+	for _, ws := range d.goRestfulContainer.RegisteredWebServices() {
+		switch {
+		case ws.RootPath() == "/apis":
+			// if we are exactly /apis or /apis/, then we need special handling in loop.
+			// normally these are passed to the nonGoRestfulMux, but if discovery is enabled, it will go directly.
+			// We can't rely on a prefix match since /apis matches everything (see the big comment on Director above)
+			if path == "/apis" || path == "/apis/" {
+				glog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
+				// don't use servemux here because gorestful servemuxes get messed up when removing webservices
+				// TODO fix gorestful, remove TPRs, or stop using gorestful
+				d.goRestfulContainer.Dispatch(w, req)
+				return
+			}
+
+		case strings.HasPrefix(path, ws.RootPath()):
+			// ensure an exact match or a path boundary match
+			if len(path) == len(ws.RootPath()) || path[len(ws.RootPath())] == '/' {
+				glog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
+				// don't use servemux here because gorestful servemuxes get messed up when removing webservices
+				// TODO fix gorestful, remove TPRs, or stop using gorestful
+				d.goRestfulContainer.Dispatch(w, req)
+				return
+			}
+		}
+	}
+
+	// if we didn't find a match, then we just skip gorestful altogether
+	glog.V(5).Infof("%v: %v %q satisfied by nonGoRestful", d.name, req.Method, path)
+	d.nonGoRestfulMux.ServeHTTP(w, req)
 }
 
 //TODO: Unify with RecoverPanics?

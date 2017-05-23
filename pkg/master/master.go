@@ -211,13 +211,13 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
 
-	s, err := c.Config.GenericConfig.SkipComplete().New(delegationTarget) // completion is done in Complete, no need for a second time
+	s, err := c.Config.GenericConfig.SkipComplete().New("kube-apiserver", delegationTarget) // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
 	}
 
 	if c.EnableUISupport {
-		routes.UIRedirect{}.Install(s.Handler.PostGoRestfulMux)
+		routes.UIRedirect{}.Install(s.Handler.NonGoRestfulMux)
 	}
 	if c.EnableLogsSupport {
 		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
