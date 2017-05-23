@@ -54,11 +54,6 @@ var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
 var ErrNoAddressFound = errors.New("No address found for host")
 
-const (
-	MiB = 1024 * 1024
-	GB  = 1000 * 1000 * 1000
-)
-
 // encoding.TextUnmarshaler interface for time.Duration
 type MyDuration struct {
 	time.Duration
@@ -132,6 +127,8 @@ type Config struct {
 }
 
 func init() {
+	RegisterMetrics()
+
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		cfg, err := readConfig(config)
 		if err != nil {
