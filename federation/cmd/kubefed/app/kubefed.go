@@ -28,13 +28,16 @@ import (
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 )
 
-const hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
+const (
+	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
+	defaultEtcdImage   = "gcr.io/google_containers/etcd:3.0.17"
+)
 
 func Run() error {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	defaultImage := fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
-	cmd := kubefed.NewKubeFedCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, defaultImage)
+	defaultServerImage := fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
+	cmd := kubefed.NewKubeFedCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, defaultServerImage, defaultEtcdImage)
 	return cmd.Execute()
 }

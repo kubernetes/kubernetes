@@ -31,7 +31,7 @@ import (
 )
 
 // NewKubeFedCommand creates the `kubefed` command and its nested children.
-func NewKubeFedCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer, defaultImage string) *cobra.Command {
+func NewKubeFedCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer, defaultServerImage, defaultEtcdImage string) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubefed",
@@ -53,7 +53,7 @@ func NewKubeFedCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer, defa
 		{
 			Message: "Basic Commands:",
 			Commands: []*cobra.Command{
-				kubefedinit.NewCmdInit(out, util.NewAdminConfig(clientcmd.NewDefaultPathOptions()), defaultImage),
+				kubefedinit.NewCmdInit(out, util.NewAdminConfig(clientcmd.NewDefaultPathOptions()), defaultServerImage, defaultEtcdImage),
 				NewCmdJoin(f, out, util.NewAdminConfig(clientcmd.NewDefaultPathOptions())),
 				NewCmdUnjoin(f, out, err, util.NewAdminConfig(clientcmd.NewDefaultPathOptions())),
 			},
