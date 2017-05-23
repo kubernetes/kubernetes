@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates
@@ -47,6 +48,11 @@ type CMServer struct {
 
 // NewCMServer creates a new CMServer with a default config.
 func NewCMServer() *CMServer {
+	gcIgnoredResources := make([]componentconfig.GroupResource, 0, len(garbagecollector.DefaultIgnoredResources()))
+	for r := range garbagecollector.DefaultIgnoredResources() {
+		gcIgnoredResources = append(gcIgnoredResources, componentconfig.GroupResource{Group: r.Group, Resource: r.Resource})
+	}
+
 	s := CMServer{
 		KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
 			Controllers:                                     []string{"*"},
@@ -103,6 +109,7 @@ func NewCMServer() *CMServer {
 			ControllerStartInterval:               metav1.Duration{Duration: 0 * time.Second},
 			EnableGarbageCollector:                true,
 			ConcurrentGCSyncs:                     20,
+			GCIgnoredResources:                    gcIgnoredResources,
 			ClusterSigningCertFile:                "/etc/kubernetes/ca/ca.pem",
 			ClusterSigningKeyFile:                 "/etc/kubernetes/ca/ca.key",
 			ReconcilerSyncLoopPeriod:              metav1.Duration{Duration: 60 * time.Second},
