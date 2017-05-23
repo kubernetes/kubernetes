@@ -73,6 +73,7 @@ filegroup(
         "//examples/guestbook-go:all-srcs",
         "//examples/https-nginx:all-srcs",
         "//examples/sharing-clusters:all-srcs",
+        "//examples/volumes/local_storage/local-discovery-app:all-srcs",
     ],
     tags = ["automanaged"],
 )

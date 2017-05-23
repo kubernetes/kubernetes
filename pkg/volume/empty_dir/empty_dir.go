@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -254,8 +255,37 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return nil
 	}
 
-	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
-	return ed.mounter.Mount("tmpfs", dir, "tmpfs", nil /* options */)
+	memoryLimits, err := ed.getMemoryLimits()
+	if err != nil {
+		return err
+	}
+	var options []string
+	// Linux system default is 50% of capacity.
+	if memoryLimits > 0 {
+		options = []string{fmt.Sprintf("size=%d", memoryLimits)}
+	}
+	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v with options %v", ed.pod.UID, ed.volName, options)
+	return ed.mounter.Mount("tmpfs", dir, "tmpfs", options)
+}
+
+func (ed *emptyDir) getMemoryLimits() (int64, error) {
+	if string(qos.GetPodQOS(ed.pod)) == "Guaranteed" {
+		_, limits, err := v1.PodRequestsAndLimits(ed.pod)
+		if err != nil {
+			return 0, err
+		}
+		val := limits[v1.ResourceMemory]
+		return (&val).Value(), nil
+	}
+	// For all other QOS class use allocatable as limit.
+	allocatable, err := ed.plugin.host.GetNodeAllocatable()
+	if err != nil {
+		return 0, err
+	}
+	if val, exists := allocatable[v1.ResourceMemory]; exists {
+		return val.Value(), nil
+	}
+	return 0, nil
 }
 
 // setupDir creates the directory with the specified SELinux context and
