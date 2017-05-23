@@ -39,8 +39,9 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL", func() {
 		gclLogsProvider, err := newGclLogsProvider(f)
 		framework.ExpectNoError(err, "Failed to create GCL logs provider")
 
-		err = gclLogsProvider.EnsureWorking()
-		framework.ExpectNoError(err, "GCL is not working")
+		err = gclLogsProvider.Init()
+		defer gclLogsProvider.Cleanup()
+		framework.ExpectNoError(err, "Failed to init GCL logs provider")
 
 		err = ensureSingleFluentdOnEachNode(f, gclLogsProvider.FluentdApplicationName())
 		framework.ExpectNoError(err, "Fluentd deployed incorrectly")
