@@ -1805,9 +1805,11 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			glog.V(4).Infof("SyncLoop (housekeeping, skipped): sources aren't ready yet.")
 		} else {
 			glog.V(4).Infof("SyncLoop (housekeeping)")
-			if err := handler.HandlePodCleanups(); err != nil {
-				glog.Errorf("Failed cleaning pods: %v", err)
-			}
+			go func() {
+				if err := handler.HandlePodCleanups(); err != nil {
+					glog.Errorf("Failed cleaning pods: %v", err)
+				}
+			}()
 		}
 	}
 	kl.syncLoopMonitor.Store(kl.clock.Now())
