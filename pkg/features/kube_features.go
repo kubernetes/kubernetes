@@ -108,6 +108,12 @@ const (
 	//
 	// New local storage types to support local storage capacity isolation
 	LocalStorageCapacityIsolation utilfeature.Feature = "LocalStorageCapacityIsolation"
+
+	// owner: @verb
+	// alpha: v1.8
+	//
+	// Allows running a "debug container" in a pod namespaces to troubleshoot a running pod.
+	DebugContainers utilfeature.Feature = "DebugContainers"
 )
 
 func init() {
@@ -130,6 +136,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
 	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
 	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha},
+	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
