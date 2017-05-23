@@ -536,6 +536,9 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 				}
 			}
 		}
+		if gpu := requests.NvidiaGPU().Value(); gpu > result.nvidiaGPU {
+			result.nvidiaGPU = gpu
+		}
 	}
 	return &result
 }
