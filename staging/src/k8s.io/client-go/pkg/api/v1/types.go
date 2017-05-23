@@ -1118,6 +1118,12 @@ type VsphereVirtualDiskVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	// Storage Policy Based Management (SPBM) profile name.
+	// +optional
+	StoragePolicyName string `json:"storagePolicyName,omitempty" protobuf:"bytes,3,opt,name=storagePolicyName"`
+	// Storage Policy Based Management (SPBM) profile ID associated with the StoragePolicyName.
+	// +optional
+	StoragePolicyID string `json:"storagePolicyID,omitempty" protobuf:"bytes,4,opt,name=storagePolicyID"`
 }
 
 // Represents a Photon Controller persistent disk resource.

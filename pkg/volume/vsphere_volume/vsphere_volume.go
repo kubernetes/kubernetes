@@ -152,7 +152,7 @@ func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath str
 // Abstract interface to disk operations.
 type vdManager interface {
 	// Creates a volume
-	CreateVolume(provisioner *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeGB int, fstype string, err error)
+	CreateVolume(provisioner *vsphereVolumeProvisioner) (volSpec *VolumeSpec, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *vsphereVolumeDeleter) error
 }
@@ -344,13 +344,13 @@ func (plugin *vsphereVolumePlugin) newProvisionerInternal(options volume.VolumeO
 }
 
 func (v *vsphereVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
-	vmDiskPath, sizeKB, fstype, err := v.manager.CreateVolume(v)
+	volSpec, err := v.manager.CreateVolume(v)
 	if err != nil {
 		return nil, err
 	}
 
-	if fstype == "" {
-		fstype = "ext4"
+	if volSpec.Fstype == "" {
+		volSpec.Fstype = "ext4"
 	}
 
 	pv := &v1.PersistentVolume{
@@ -365,12 +365,14 @@ func (v *vsphereVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			PersistentVolumeReclaimPolicy: v.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   v.options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dKi", sizeKB)),
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dKi", volSpec.Size)),
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
-					VolumePath: vmDiskPath,
-					FSType:     fstype,
+					VolumePath:        volSpec.Path,
+					FSType:            volSpec.Fstype,
+					StoragePolicyName: volSpec.StoragePolicyName,
+					StoragePolicyID:   volSpec.StoragePolicyID,
 				},
 			},
 		},
