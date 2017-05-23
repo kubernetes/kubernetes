@@ -40,6 +40,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/apis/admission/install:all-srcs",
         "//pkg/apis/admission/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
