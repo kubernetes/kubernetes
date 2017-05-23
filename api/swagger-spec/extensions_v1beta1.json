@@ -9627,6 +9627,10 @@
      "servicePort": {
       "type": "string",
       "description": "Specifies the port of the referenced service."
+     },
+     "controllerOptions": {
+      "type": "object",
+      "description": "Controller-specific options. See controller documentation for details."
      }
     }
    },

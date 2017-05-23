@@ -98,6 +98,12 @@ func SetDefaults_Deployment(obj *Deployment) {
 	}
 }
 
+func SetDefaults_IngressBackend(obj *IngressBackend) {
+	if obj.ControllerOptions == nil {
+		obj.ControllerOptions = make(map[string]string)
+	}
+}
+
 func SetDefaults_ReplicaSet(obj *ReplicaSet) {
 	labels := obj.Spec.Template.Labels
 

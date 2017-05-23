@@ -705,6 +705,10 @@ type IngressBackend struct {
 
 	// Specifies the port of the referenced service.
 	ServicePort intstr.IntOrString
+
+	// Controller-specific options. See controller documentation for details.
+	// +optional
+	ControllerOptions map[string]string
 }
 
 // +genclient=true

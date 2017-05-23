@@ -710,6 +710,10 @@ type IngressBackend struct {
 
 	// Specifies the port of the referenced service.
 	ServicePort intstr.IntOrString `json:"servicePort" protobuf:"bytes,2,opt,name=servicePort"`
+
+	// Controller-specific options. See controller documentation for details.
+	// +optional
+	ControllerOptions map[string]string `json:"controllerOptions,omitempty" protobuf:"bytes,3,rep,name=controllerOptions"`
 }
 
 // +genclient=true

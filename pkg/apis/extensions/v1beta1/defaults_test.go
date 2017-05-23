@@ -302,6 +302,72 @@ func TestSetDefaultDeployment(t *testing.T) {
 	}
 }
 
+func TestSetDefaultIngress(t *testing.T) {
+	tests := []struct {
+		original *Ingress
+		expected *Ingress
+	}{
+		{
+			original: &Ingress{
+				Spec: IngressSpec{
+					Backend: &IngressBackend{},
+					TLS:     []IngressTLS{},
+					Rules:   []IngressRule{},
+				},
+			},
+			expected: &Ingress{
+				Spec: IngressSpec{
+					Backend: &IngressBackend{
+						ServiceName:       "",
+						ServicePort:       intstr.FromInt(0),
+						ControllerOptions: map[string]string{},
+					},
+					TLS:   []IngressTLS{},
+					Rules: []IngressRule{},
+				},
+			},
+		},
+		{
+			original: &Ingress{
+				Spec: IngressSpec{
+					Backend: &IngressBackend{
+						ControllerOptions: map[string]string{
+							"foo": "bar",
+						},
+					},
+				},
+			},
+			expected: &Ingress{
+				Spec: IngressSpec{
+					Backend: &IngressBackend{
+						ServiceName: "",
+						ServicePort: intstr.FromInt(0),
+						ControllerOptions: map[string]string{
+							"foo": "bar",
+						},
+					},
+					TLS:   []IngressTLS{},
+					Rules: []IngressRule{},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		original := test.original
+		expected := test.expected
+		obj2 := roundTrip(t, runtime.Object(original))
+		got, ok := obj2.(*Ingress)
+		if !ok {
+			t.Errorf("unexpected object: %v", got)
+			t.FailNow()
+		}
+		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
+			t.Errorf("object mismatch!\nexpected:\n\t%+v\ngot:\n\t%+v", expected.Spec, got.Spec)
+		}
+	}
+}
+
 func TestSetDefaultReplicaSet(t *testing.T) {
 	tests := []struct {
 		rs             *ReplicaSet

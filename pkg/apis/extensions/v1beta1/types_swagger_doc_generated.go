@@ -263,9 +263,10 @@ func (Ingress) SwaggerDoc() map[string]string {
 }
 
 var map_IngressBackend = map[string]string{
-	"":            "IngressBackend describes all endpoints for a given service and port.",
-	"serviceName": "Specifies the name of the referenced service.",
-	"servicePort": "Specifies the port of the referenced service.",
+	"":                  "IngressBackend describes all endpoints for a given service and port.",
+	"serviceName":       "Specifies the name of the referenced service.",
+	"servicePort":       "Specifies the port of the referenced service.",
+	"controllerOptions": "Controller-specific options. See controller documentation for details.",
 }
 
 func (IngressBackend) SwaggerDoc() map[string]string {
