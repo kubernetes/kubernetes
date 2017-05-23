@@ -427,7 +427,7 @@ EOF
 
 function create-kubelet-kubeconfig {
   echo "Creating kubelet kubeconfig file"
-  cat <<EOF >/var/lib/kubelet/kubeconfig
+  cat <<EOF >/var/lib/kubelet/bootstrap-kubeconfig
 apiVersion: v1
 kind: Config
 users:
@@ -439,6 +439,7 @@ clusters:
 - name: local
   cluster:
     certificate-authority: ${CA_CERT_BUNDLE_PATH}
+    server: https://${KUBERNETES_MASTER_NAME}
 contexts:
 - context:
     cluster: local
@@ -689,7 +690,11 @@ function start-kubelet {
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
     if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
-      flags+=" --api-servers=https://${KUBELET_APISERVER}"
+      #TODO(mikedanese): allow static pods to start before creating a client
+      #flags+=" --experimental-bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
+      #flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
+      flags+=" --kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
+      flags+=" --require-kubeconfig"
       flags+=" --register-schedulable=false"
     else
       # Standalone mode (not widely used?)
@@ -698,7 +703,9 @@ function start-kubelet {
   else # For nodes
     flags+="${NODE_KUBELET_TEST_ARGS:-}"
     flags+=" --enable-debugging-handlers=true"
-    flags+=" --api-servers=https://${KUBERNETES_MASTER_NAME}"
+    flags+=" --experimental-bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
+    flags+=" --require-kubeconfig"
+    flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
     if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "hairpin-veth" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
