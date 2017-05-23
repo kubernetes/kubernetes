@@ -19,6 +19,7 @@ package admission
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/golang/glog"
@@ -145,6 +146,15 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 	if len(matchedPolicies) == 0 && !c.failOnNoPolicies {
 		return nil
 	}
+
+	// Sort by priority, then by name
+	sort.Slice(matchedPolicies, func(i, j int) bool {
+		if matchedPolicies[i].Spec.Priority != matchedPolicies[j].Spec.Priority {
+			// The higher the priority, the earlier in the list it should go
+			return matchedPolicies[i].Spec.Priority > matchedPolicies[j].Spec.Priority
+		}
+		return strings.Compare(matchedPolicies[i].Name, matchedPolicies[j].Name) < 0
+	})
 
 	providers, errs := c.createProvidersFromPolicies(matchedPolicies, pod.Namespace)
 	logProviders(pod, providers, errs)

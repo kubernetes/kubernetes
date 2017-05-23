@@ -205,6 +205,15 @@ func TestAdmitPrivileged(t *testing.T) {
 	privilegedPSP.Name = "priv"
 	privilegedPSP.Spec.Privileged = true
 
+	privilegedPSP2 := restrictivePSP()
+	privilegedPSP2.Name = "priv2"
+	privilegedPSP2.Spec.Privileged = true
+
+	privilegedPSPPrioritized := restrictivePSP()
+	privilegedPSPPrioritized.Name = "priv3"
+	privilegedPSPPrioritized.Spec.Privileged = true
+	privilegedPSPPrioritized.Spec.Priority = 10
+
 	tests := map[string]struct {
 		pod          *kapi.Pod
 		psps         []*extensions.PodSecurityPolicy
@@ -237,6 +246,20 @@ func TestAdmitPrivileged(t *testing.T) {
 			shouldPass:   true,
 			expectedPriv: true,
 			expectedPSP:  privilegedPSP.Name,
+		},
+		"pod allowed by multiple sorts by name": {
+			pod:          createPodWithPriv(true),
+			psps:         []*extensions.PodSecurityPolicy{privilegedPSP2, privilegedPSP},
+			shouldPass:   true,
+			expectedPriv: true,
+			expectedPSP:  privilegedPSP.Name,
+		},
+		"pod allowed by multiple sorts by priority": {
+			pod:          createPodWithPriv(true),
+			psps:         []*extensions.PodSecurityPolicy{privilegedPSP2, privilegedPSPPrioritized, privilegedPSP},
+			shouldPass:   true,
+			expectedPriv: true,
+			expectedPSP:  privilegedPSPPrioritized.Name,
 		},
 	}
 

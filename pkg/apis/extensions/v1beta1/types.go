@@ -903,6 +903,12 @@ type PodSecurityPolicySpec struct {
 	// will not be forced to.
 	// +optional
 	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,14,opt,name=readOnlyRootFilesystem"`
+
+	// Priority determines which PodSecurityPolicy is used when more than one allow a particular pod.
+	// Higher priorities take precedence. PodSecurityPolicies with the same priority order themselves by name.
+	// PodSecurityPolicies without an explicit priority have an effective priority of 0.
+	// +optional
+	Priority int32 `json:"priority" protobuf:"varint,15,opt,name=priority"`
 }
 
 // FS Type gives strong typing to different file systems that are used by volumes.
