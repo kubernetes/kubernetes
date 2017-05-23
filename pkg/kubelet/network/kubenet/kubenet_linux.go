@@ -482,7 +482,7 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 
 	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
 		// This is to prevent returning error when TearDownPod is called twice on the same pod. This helps to reduce event pollution.
-		if podIP != "" {
+		if podIP != "" || strings.Contains(err.Error(), "no such file or directory") {
 			glog.Warningf("Failed to delete container from kubenet: %v", err)
 		} else {
 			errList = append(errList, err)
