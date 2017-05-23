@@ -945,3 +945,64 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateClusterConfigMapIfNeeded(t *testing.T) {
+	existingCM := &api.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterInfoConfigMapName,
+			Namespace: metav1.NamespaceDefault,
+		},
+		Data: map[string]string{clusterID: "abc123"},
+	}
+
+	master := Controller{}
+	master.ClusterID = "xyz-567"
+	fakeClient := fake.NewSimpleClientset(existingCM)
+	master.ConfigMapsClient = fakeClient.Core()
+
+	err := master.CreateClusterConfigMapIfNeeded()
+	if err != nil {
+		t.Errorf("unexpected error (%s)", err)
+	}
+
+	for _, action := range fakeClient.Actions() {
+		if action.GetVerb() == "create" {
+			t.Errorf("unexpected cluster-info configmap created")
+		}
+	}
+	if master.ClusterID != "abc123" {
+		t.Errorf("unexpected cluster id value")
+	}
+
+	emptyCM := &api.ConfigMap{}
+	fakeClient = fake.NewSimpleClientset(emptyCM)
+	master.ClusterID = ""
+	master.ConfigMapsClient = fakeClient.Core()
+	err = master.CreateClusterConfigMapIfNeeded()
+	if err != nil {
+		t.Errorf("unexpected error (%s)", err)
+	}
+
+	if len(fakeClient.Actions()) != 2 {
+		t.Errorf("missing expected action ('GET' and 'CREATE' on configmap expected)")
+	}
+	if master.ClusterID == "" {
+		t.Errorf("missing cluster id value")
+	}
+
+	emptyCM = &api.ConfigMap{}
+	fakeClient = fake.NewSimpleClientset(emptyCM)
+	master.ClusterID = "existing-id"
+	master.ConfigMapsClient = fakeClient.Core()
+	err = master.CreateClusterConfigMapIfNeeded()
+	if err != nil {
+		t.Errorf("unexpected error (%s)", err)
+	}
+
+	if len(fakeClient.Actions()) != 2 {
+		t.Errorf("missing expected action ('GET' and 'CREATE' on configmap expected)")
+	}
+	if master.ClusterID != "existing-id" {
+		t.Errorf("existing cluster-id overwritten")
+	}
+}
