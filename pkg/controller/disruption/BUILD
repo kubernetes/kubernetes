@@ -56,6 +56,7 @@ go_test(
         "//pkg/apis/policy/v1beta1:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/controller:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
