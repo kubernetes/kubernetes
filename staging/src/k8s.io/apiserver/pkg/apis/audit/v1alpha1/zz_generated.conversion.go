@@ -60,6 +60,7 @@ func autoConvert_v1alpha1_Event_To_audit_Event(in *Event, out *audit.Event, s co
 	out.Level = audit.Level(in.Level)
 	out.Timestamp = in.Timestamp
 	out.AuditID = types.UID(in.AuditID)
+	out.Stage = audit.Stage(in.Stage)
 	out.RequestURI = in.RequestURI
 	out.Verb = in.Verb
 	// TODO: Inefficient conversion - can we improve it?
@@ -70,14 +71,8 @@ func autoConvert_v1alpha1_Event_To_audit_Event(in *Event, out *audit.Event, s co
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
 	out.ObjectRef = (*audit.ObjectReference)(unsafe.Pointer(in.ObjectRef))
 	out.ResponseStatus = (*v1.Status)(unsafe.Pointer(in.ResponseStatus))
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.RequestObject, &out.RequestObject, 0); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ResponseObject, &out.ResponseObject, 0); err != nil {
-		return err
-	}
+	out.RequestObject = (*runtime.Unknown)(unsafe.Pointer(in.RequestObject))
+	out.ResponseObject = (*runtime.Unknown)(unsafe.Pointer(in.ResponseObject))
 	return nil
 }
 
@@ -91,6 +86,7 @@ func autoConvert_audit_Event_To_v1alpha1_Event(in *audit.Event, out *Event, s co
 	out.Level = Level(in.Level)
 	out.Timestamp = in.Timestamp
 	out.AuditID = types.UID(in.AuditID)
+	out.Stage = Stage(in.Stage)
 	out.RequestURI = in.RequestURI
 	out.Verb = in.Verb
 	// TODO: Inefficient conversion - can we improve it?
@@ -101,14 +97,8 @@ func autoConvert_audit_Event_To_v1alpha1_Event(in *audit.Event, out *Event, s co
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
 	out.ObjectRef = (*ObjectReference)(unsafe.Pointer(in.ObjectRef))
 	out.ResponseStatus = (*v1.Status)(unsafe.Pointer(in.ResponseStatus))
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.RequestObject, &out.RequestObject, 0); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ResponseObject, &out.ResponseObject, 0); err != nil {
-		return err
-	}
+	out.RequestObject = (*runtime.Unknown)(unsafe.Pointer(in.RequestObject))
+	out.ResponseObject = (*runtime.Unknown)(unsafe.Pointer(in.ResponseObject))
 	return nil
 }
 
@@ -119,17 +109,7 @@ func Convert_audit_Event_To_v1alpha1_Event(in *audit.Event, out *Event, s conver
 
 func autoConvert_v1alpha1_EventList_To_audit_EventList(in *EventList, out *audit.EventList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]audit.Event, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_Event_To_audit_Event(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]audit.Event)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -140,16 +120,10 @@ func Convert_v1alpha1_EventList_To_audit_EventList(in *EventList, out *audit.Eve
 
 func autoConvert_audit_EventList_To_v1alpha1_EventList(in *audit.EventList, out *EventList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]Event, len(*in))
-		for i := range *in {
-			if err := Convert_audit_Event_To_v1alpha1_Event(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
+	if in.Items == nil {
 		out.Items = make([]Event, 0)
+	} else {
+		out.Items = *(*[]Event)(unsafe.Pointer(&in.Items))
 	}
 	return nil
 }
@@ -188,6 +162,7 @@ func autoConvert_v1alpha1_ObjectReference_To_audit_ObjectReference(in *ObjectRef
 	out.UID = types.UID(in.UID)
 	out.APIVersion = in.APIVersion
 	out.ResourceVersion = in.ResourceVersion
+	out.Subresource = in.Subresource
 	return nil
 }
 
@@ -203,6 +178,7 @@ func autoConvert_audit_ObjectReference_To_v1alpha1_ObjectReference(in *audit.Obj
 	out.UID = types.UID(in.UID)
 	out.APIVersion = in.APIVersion
 	out.ResourceVersion = in.ResourceVersion
+	out.Subresource = in.Subresource
 	return nil
 }
 
