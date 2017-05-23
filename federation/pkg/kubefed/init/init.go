@@ -84,6 +84,7 @@ const (
 
 	apiserverServiceTypeFlag      = "api-server-service-type"
 	apiserverAdvertiseAddressFlag = "api-server-advertise-address"
+	apiserverPortFlag             = "api-server-port"
 
 	dnsProviderSecretName = "federation-dns-provider.conf"
 
@@ -147,6 +148,7 @@ type initFederationOptions struct {
 	apiServerServiceTypeString       string
 	apiServerServiceType             v1.ServiceType
 	apiServerAdvertiseAddress        string
+	apiServerNodePortsPort           int32
 	apiServerEnableHTTPBasicAuth     bool
 	apiServerEnableTokenAuth         bool
 }
@@ -163,6 +165,7 @@ func (o *initFederationOptions) Bind(flags *pflag.FlagSet, defaultImage string) 
 	flags.StringVar(&o.controllerManagerOverridesString, "controllermanager-arg-overrides", "", "comma separated list of federation-controller-manager arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
 	flags.StringVar(&o.apiServerServiceTypeString, apiserverServiceTypeFlag, string(v1.ServiceTypeLoadBalancer), "The type of service to create for federation API server. Options: 'LoadBalancer' (default), 'NodePort'.")
 	flags.StringVar(&o.apiServerAdvertiseAddress, apiserverAdvertiseAddressFlag, "", "Preferred address to advertise api server nodeport service. Valid only if '"+apiserverServiceTypeFlag+"=NodePort'.")
+	flags.Int32Var(&o.apiServerNodePortsPort, apiserverPortFlag , 0, "Preferred port to use for api server nodeport service (0 for random port assignment). Valid only if '"+apiserverServiceTypeFlag+"=NodePort'.")
 	flags.BoolVar(&o.apiServerEnableHTTPBasicAuth, "apiserver-enable-basic-auth", false, "Enables HTTP Basic authentication for the federation-apiserver. Defaults to false.")
 	flags.BoolVar(&o.apiServerEnableTokenAuth, "apiserver-enable-token-auth", false, "Enables token authentication for the federation-apiserver. Defaults to false.")
 }
@@ -229,6 +232,15 @@ func (i *initFederation) Complete(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if i.options.apiServerNodePortsPort != 0 {
+		if i.options.apiServerServiceType != v1.ServiceTypeNodePort {
+			return fmt.Errorf("%s should be passed only with '%s=NodePort'", apiserverPortFlag, apiserverServiceTypeFlag)
+		}
+	}
+	if i.options.apiServerNodePortsPort < 0 {
+		return fmt.Errorf("Please provide a valid port number for %s", apiserverPortFlag)
+	}
+
 	i.options.apiServerOverrides, err = marshallOverrides(i.options.apiServerOverridesString)
 	if err != nil {
 		return fmt.Errorf("error marshalling --apiserver-arg-overrides: %v", err)
@@ -292,7 +304,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 
 	fmt.Fprint(cmdOut, "Creating federation control plane service...")
 	glog.V(4).Info("Creating federation control plane service")
-	svc, ips, hostnames, err := createService(cmdOut, hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.commonOptions.Name, i.options.apiServerAdvertiseAddress, i.options.apiServerServiceType, i.options.dryRun)
+	svc, ips, hostnames, err := createService(cmdOut, hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.commonOptions.Name, i.options.apiServerAdvertiseAddress, i.options.apiServerNodePortsPort, i.options.apiServerServiceType, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -442,7 +454,16 @@ func createNamespace(clientset client.Interface, federationName, namespace strin
 	return clientset.Core().Namespaces().Create(ns)
 }
 
-func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcName, federationName, apiserverAdvertiseAddress string, apiserverServiceType v1.ServiceType, dryRun bool) (*api.Service, []string, []string, error) {
+func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcName, federationName, apiserverAdvertiseAddress string, apiserverPort int32, apiserverServiceType v1.ServiceType, dryRun bool) (*api.Service, []string, []string, error) {
+	port := api.ServicePort {
+			Name:       "https",
+			Protocol:   "TCP",
+			Port:       443,
+			TargetPort: intstr.FromString(apiServerSecurePortName),
+	}
+	if apiserverServiceType == v1.ServiceTypeNodePort {
+		port.NodePort = apiserverPort
+	}
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        svcName,
@@ -453,14 +474,7 @@ func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcN
 		Spec: api.ServiceSpec{
 			Type:     api.ServiceType(apiserverServiceType),
 			Selector: apiserverSvcSelector,
-			Ports: []api.ServicePort{
-				{
-					Name:       "https",
-					Protocol:   "TCP",
-					Port:       443,
-					TargetPort: intstr.FromString(apiServerSecurePortName),
-				},
-			},
+			Ports: []api.ServicePort{port},
 		},
 	}
 
@@ -470,6 +484,9 @@ func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcN
 
 	var err error
 	svc, err = clientset.Core().Services(namespace).Create(svc)
+	if err != nil {
+		return svc, nil, nil, err
+	}
 
 	ips := []string{}
 	hostnames := []string{}
