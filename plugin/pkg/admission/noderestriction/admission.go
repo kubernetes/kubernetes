@@ -34,8 +34,9 @@ const (
 	PluginName = "NodeRestriction"
 )
 
-func init() {
-	kubeapiserveradmission.Plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewPlugin(nodeidentifier.NewDefaultNodeIdentifier(), false), nil
 	})
 }

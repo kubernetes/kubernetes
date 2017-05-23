@@ -41,10 +41,6 @@ const (
 	pluginName       = "PodPreset"
 )
 
-func init() {
-	Register(&kubeapiserveradmission.Plugins)
-}
-
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(pluginName, func(config io.Reader) (admission.Interface, error) {

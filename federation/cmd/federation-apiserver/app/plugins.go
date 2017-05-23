@@ -21,11 +21,20 @@ package app
 // given binary target.
 import (
 	// Cloud providers
+	"k8s.io/apiserver/pkg/admission"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Admission policies
-	_ "k8s.io/kubernetes/plugin/pkg/admission/admit"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/deny"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/gc"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
+	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+	"k8s.io/kubernetes/plugin/pkg/admission/deny"
+	"k8s.io/kubernetes/plugin/pkg/admission/gc"
+	"k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
 )
+
+// registerAllAdmissionPlugins registers all admission plugins
+func registerAllAdmissionPlugins(plugins *admission.Plugins) {
+	admit.Register(plugins)
+	deny.Register(plugins)
+	gc.Register(plugins)
+	lifecycle.Register(plugins)
+}

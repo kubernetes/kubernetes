@@ -85,6 +85,8 @@ func Run(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 // NonBlockingRun runs the specified APIServer and configures it to
 // stop with the given channel.
 func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
+	// register all admission plugins
+	registerAllAdmissionPlugins(s.Admission.Plugins)
 	// set defaults
 	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing); err != nil {
 		return err

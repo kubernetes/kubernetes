@@ -35,9 +35,9 @@ type AdmissionOptions struct {
 }
 
 // NewAdmissionOptions creates a new instance of AdmissionOptions
-func NewAdmissionOptions(plugins *admission.Plugins) *AdmissionOptions {
+func NewAdmissionOptions() *AdmissionOptions {
 	return &AdmissionOptions{
-		Plugins:     plugins,
+		Plugins:     &admission.Plugins{},
 		PluginNames: []string{},
 	}
 }
