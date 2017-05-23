@@ -123,8 +123,8 @@ func (c *NamingConditionController) calculateNamesAndConditions(in *apiextension
 	// Get the names that have already been claimed
 	allResources, allKinds := c.getAcceptedNamesForGroup(in.Spec.Group)
 
-	nameConflictCondition := apiextensions.CustomResourceDefinitionCondition{
-		Type:   apiextensions.NameConflict,
+	namesAcceptedCondition := apiextensions.CustomResourceDefinitionCondition{
+		Type:   apiextensions.NamesAccepted,
 		Status: apiextensions.ConditionUnknown,
 	}
 
@@ -135,16 +135,16 @@ func (c *NamingConditionController) calculateNamesAndConditions(in *apiextension
 	// Check each name for mismatches.  If there's a mismatch between spec and status, then try to deconflict.
 	// Continue on errors so that the status is the best match possible
 	if err := equalToAcceptedOrFresh(requestedNames.Plural, acceptedNames.Plural, allResources); err != nil {
-		nameConflictCondition.Status = apiextensions.ConditionTrue
-		nameConflictCondition.Reason = "Plural"
-		nameConflictCondition.Message = err.Error()
+		namesAcceptedCondition.Status = apiextensions.ConditionFalse
+		namesAcceptedCondition.Reason = "PluralConflict"
+		namesAcceptedCondition.Message = err.Error()
 	} else {
 		newNames.Plural = requestedNames.Plural
 	}
 	if err := equalToAcceptedOrFresh(requestedNames.Singular, acceptedNames.Singular, allResources); err != nil {
-		nameConflictCondition.Status = apiextensions.ConditionTrue
-		nameConflictCondition.Reason = "Singular"
-		nameConflictCondition.Message = err.Error()
+		namesAcceptedCondition.Status = apiextensions.ConditionFalse
+		namesAcceptedCondition.Reason = "SingularConflict"
+		namesAcceptedCondition.Message = err.Error()
 	} else {
 		newNames.Singular = requestedNames.Singular
 	}
@@ -162,34 +162,34 @@ func (c *NamingConditionController) calculateNamesAndConditions(in *apiextension
 
 		}
 		if err := utilerrors.NewAggregate(errs); err != nil {
-			nameConflictCondition.Status = apiextensions.ConditionTrue
-			nameConflictCondition.Reason = "ShortNames"
-			nameConflictCondition.Message = err.Error()
+			namesAcceptedCondition.Status = apiextensions.ConditionFalse
+			namesAcceptedCondition.Reason = "ShortNamesConflict"
+			namesAcceptedCondition.Message = err.Error()
 		} else {
 			newNames.ShortNames = requestedNames.ShortNames
 		}
 	}
 
 	if err := equalToAcceptedOrFresh(requestedNames.Kind, acceptedNames.Kind, allKinds); err != nil {
-		nameConflictCondition.Status = apiextensions.ConditionTrue
-		nameConflictCondition.Reason = "Kind"
-		nameConflictCondition.Message = err.Error()
+		namesAcceptedCondition.Status = apiextensions.ConditionFalse
+		namesAcceptedCondition.Reason = "KindConflict"
+		namesAcceptedCondition.Message = err.Error()
 	} else {
 		newNames.Kind = requestedNames.Kind
 	}
 	if err := equalToAcceptedOrFresh(requestedNames.ListKind, acceptedNames.ListKind, allKinds); err != nil {
-		nameConflictCondition.Status = apiextensions.ConditionTrue
-		nameConflictCondition.Reason = "ListKind"
-		nameConflictCondition.Message = err.Error()
+		namesAcceptedCondition.Status = apiextensions.ConditionFalse
+		namesAcceptedCondition.Reason = "ListKindConflict"
+		namesAcceptedCondition.Message = err.Error()
 	} else {
 		newNames.ListKind = requestedNames.ListKind
 	}
 
 	// if we haven't changed the condition, then our names must be good.
-	if nameConflictCondition.Status == apiextensions.ConditionUnknown {
-		nameConflictCondition.Status = apiextensions.ConditionFalse
-		nameConflictCondition.Reason = "NoConflicts"
-		nameConflictCondition.Message = "no conflicts found"
+	if namesAcceptedCondition.Status == apiextensions.ConditionUnknown {
+		namesAcceptedCondition.Status = apiextensions.ConditionTrue
+		namesAcceptedCondition.Reason = "NoConflicts"
+		namesAcceptedCondition.Message = "no conflicts found"
 	}
 
 	// set EstablishedCondition to true if all names are accepted. Never set it back to false.
@@ -203,7 +203,7 @@ func (c *NamingConditionController) calculateNamesAndConditions(in *apiextension
 	if old := apiextensions.FindCRDCondition(in, apiextensions.Established); old != nil {
 		establishedCondition = *old
 	}
-	if establishedCondition.Status != apiextensions.ConditionTrue && nameConflictCondition.Status == apiextensions.ConditionFalse {
+	if establishedCondition.Status != apiextensions.ConditionTrue && namesAcceptedCondition.Status == apiextensions.ConditionTrue {
 		establishedCondition = apiextensions.CustomResourceDefinitionCondition{
 			Type:               apiextensions.Established,
 			Status:             apiextensions.ConditionTrue,
@@ -213,7 +213,7 @@ func (c *NamingConditionController) calculateNamesAndConditions(in *apiextension
 		}
 	}
 
-	return newNames, nameConflictCondition, establishedCondition
+	return newNames, namesAcceptedCondition, establishedCondition
 }
 
 func equalToAcceptedOrFresh(requestedName, acceptedName string, usedNames sets.String) error {
@@ -238,9 +238,9 @@ func (c *NamingConditionController) sync(key string) error {
 
 	acceptedNames, namingCondition, establishedCondition := c.calculateNamesAndConditions(inCustomResourceDefinition)
 
-	// nothing to do if accepted names and NameConflict condition didn't change
+	// nothing to do if accepted names and NamesAccepted condition didn't change
 	if reflect.DeepEqual(inCustomResourceDefinition.Status.AcceptedNames, acceptedNames) &&
-		apiextensions.IsCRDConditionEquivalent(&namingCondition, apiextensions.FindCRDCondition(inCustomResourceDefinition, apiextensions.NameConflict)) &&
+		apiextensions.IsCRDConditionEquivalent(&namingCondition, apiextensions.FindCRDCondition(inCustomResourceDefinition, apiextensions.NamesAccepted)) &&
 		apiextensions.IsCRDConditionEquivalent(&establishedCondition, apiextensions.FindCRDCondition(inCustomResourceDefinition, apiextensions.Established)) {
 		return nil
 	}
