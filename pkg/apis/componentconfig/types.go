@@ -691,6 +691,13 @@ type LeaderElectionConfiguration struct {
 	ResourceLock string
 }
 
+type GroupResource struct {
+	// group is the group portion of the GroupResource.
+	Group string
+	// resource is the resource portion of the GroupResource.
+	Resource string
+}
+
 type KubeControllerManagerConfiguration struct {
 	metav1.TypeMeta
 
@@ -877,6 +884,8 @@ type KubeControllerManagerConfiguration struct {
 	// concurrentGCSyncs is the number of garbage collector workers that are
 	// allowed to sync concurrently.
 	ConcurrentGCSyncs int32
+	// gcIgnoredResources is the list of GroupResources that garbage collection should ignore.
+	GCIgnoredResources []GroupResource
 	// nodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
 	NodeEvictionRate float32
 	// secondaryNodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is unhealty

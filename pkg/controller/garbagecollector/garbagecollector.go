@@ -78,6 +78,7 @@ func NewGarbageCollector(
 	clientPool dynamic.ClientPool,
 	mapper meta.RESTMapper,
 	deletableResources map[schema.GroupVersionResource]struct{},
+	ignoredResources map[schema.GroupResource]struct{},
 	sharedInformers informers.SharedInformerFactory,
 ) (*GarbageCollector, error) {
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
@@ -103,6 +104,7 @@ func NewGarbageCollector(
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
 		sharedInformers:  sharedInformers,
+		ignoredResources: ignoredResources,
 	}
 	if err := gb.monitorsForResources(deletableResources); err != nil {
 		return nil, err
