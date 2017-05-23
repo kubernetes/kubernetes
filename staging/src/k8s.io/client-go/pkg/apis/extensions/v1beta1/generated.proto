@@ -123,10 +123,17 @@ message DaemonSetSpec {
   // +optional
   optional int32 minReadySeconds = 4;
 
+  // DEPRECATED.
   // A sequence number representing a specific generation of the template.
   // Populated by the system. It can be set only during the creation.
   // +optional
   optional int64 templateGeneration = 5;
+
+  // The number of old history to retain to allow rollback.
+  // This is a pointer to distinguish between explicit zero and not specified.
+  // Defaults to 10.
+  // +optional
+  optional int32 revisionHistoryLimit = 6;
 }
 
 // DaemonSetStatus represents the current status of a daemon set.
@@ -169,6 +176,12 @@ message DaemonSetStatus {
   // (ready for at least spec.minReadySeconds)
   // +optional
   optional int32 numberUnavailable = 8;
+
+  // Count of hash collisions for the DaemonSet. The DaemonSet controller
+  // uses this field as a collision avoidance mechanism when it needs to
+  // create the name for the newest ControllerRevision.
+  // +optional
+  optional int64 collisionCount = 9;
 }
 
 message DaemonSetUpdateStrategy {
@@ -180,7 +193,7 @@ message DaemonSetUpdateStrategy {
   // Rolling update config params. Present only if type = "RollingUpdate".
   // ---
   // TODO: Update this to follow our convention for oneOf, whatever we decide it
-  // to be. Same as DeploymentStrategy.RollingUpdate.
+  // to be. Same as Deployment `strategy.rollingUpdate`.
   // See https://github.com/kubernetes/kubernetes/issues/35345
   // +optional
   optional RollingUpdateDaemonSet rollingUpdate = 2;

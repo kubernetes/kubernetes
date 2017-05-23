@@ -7117,7 +7117,12 @@
      "templateGeneration": {
       "type": "integer",
       "format": "int64",
-      "description": "A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation."
+      "description": "DEPRECATED. A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation."
+     },
+     "revisionHistoryLimit": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of old history to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10."
      }
     }
    },
@@ -9159,6 +9164,11 @@
       "type": "integer",
       "format": "int32",
       "description": "The number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least spec.minReadySeconds)"
+     },
+     "collisionCount": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision."
      }
     }
    },
