@@ -51,6 +51,7 @@ type DrainOptions struct {
 	restClient         *restclient.RESTClient
 	Factory            cmdutil.Factory
 	Force              bool
+	IgnoreNotFound     bool
 	GracePeriodSeconds int
 	IgnoreDaemonsets   bool
 	Timeout            time.Duration
@@ -184,6 +185,7 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&options.Force, "force", false, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
+	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", false, "Ignore \"resource not found\" error when no matching controller is found.")
 	cmd.Flags().BoolVar(&options.IgnoreDaemonsets, "ignore-daemonsets", false, "Ignore DaemonSet-managed pods.")
 	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", false, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
@@ -266,20 +268,27 @@ func (o *DrainOptions) deleteOrEvictPodsSimple() error {
 	return err
 }
 
-func (o *DrainOptions) getController(sr *api.SerializedReference) (interface{}, error) {
+func (o *DrainOptions) getController(sr *api.SerializedReference) error {
+	var err error
 	switch sr.Reference.Kind {
 	case "ReplicationController":
-		return o.client.Core().ReplicationControllers(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		_, err = o.client.Core().ReplicationControllers(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
 	case "DaemonSet":
-		return o.client.Extensions().DaemonSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		_, err = o.client.Extensions().DaemonSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
 	case "Job":
-		return o.client.Batch().Jobs(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		_, err = o.client.Batch().Jobs(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
 	case "ReplicaSet":
-		return o.client.Extensions().ReplicaSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		_, err = o.client.Extensions().ReplicaSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
 	case "StatefulSet":
-		return o.client.Apps().StatefulSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		_, err = o.client.Apps().StatefulSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+	default:
+		return fmt.Errorf("Unknown controller kind %q", sr.Reference.Kind)
 	}
-	return nil, fmt.Errorf("Unknown controller kind %q", sr.Reference.Kind)
+	if err != nil && o.IgnoreNotFound && apierrors.IsNotFound(err) {
+		fmt.Fprintf(o.ErrOut, "WARNING: ignoring error: %v\n", err)
+		err = nil
+	}
+	return err
 }
 
 func (o *DrainOptions) getPodCreator(pod api.Pod) (*api.SerializedReference, error) {
@@ -295,8 +304,7 @@ func (o *DrainOptions) getPodCreator(pod api.Pod) (*api.SerializedReference, err
 	// We assume the only reason for an error is because the controller is
 	// gone/missing, not for any other cause.  TODO(mml): something more
 	// sophisticated than this
-	_, err := o.getController(sr)
-	if err != nil {
+	if err := o.getController(sr); err != nil {
 		return nil, err
 	}
 	return sr, nil
