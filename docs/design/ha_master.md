@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/ha_master.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/ha_master.md)

@@ -61,7 +61,7 @@ var (
 
 		JSON and YAML formats are accepted.
 
-		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`))
+		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes.github.io/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`))
 
 	patchExample = templates.Examples(i18n.T(`
 		# Partially update a node using strategic merge patch
