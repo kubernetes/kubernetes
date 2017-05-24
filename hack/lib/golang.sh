@@ -334,11 +334,13 @@ EOF
 
   local go_version
   go_version=($(go version))
-  if [[ "${go_version[2]}" < "go1.8" && "${go_version[2]}" != "devel" ]]; then
+  local minimum_go_version
+  minimum_go_version=go1.8.3
+  if [[ "${go_version[2]}" < "${minimum_go_version}" && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
-Kubernetes requires go version 1.8 or greater.
-Please install Go version 1.8 or later.
+Kubernetes requires ${minimum_go_version} or greater.
+Please install ${minimum_go_version} or later.
 EOF
     return 2
   fi
