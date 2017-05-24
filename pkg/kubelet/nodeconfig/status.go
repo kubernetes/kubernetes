@@ -47,15 +47,18 @@ func (cc *NodeConfigController) setConfigOK(effect, cause string, status apiv1.C
 // syncConfigOK attempts to sync `cc.configOK` with the Node object for this Kubelet.
 // If syncing fails, an error is logged.
 func (cc *NodeConfigController) syncConfigOK() {
-	if cc.configOK == nil {
-		infof("ConfigOK condition was nil, skipping sync")
+	if cc.client == nil {
+		infof("client was nil, skipping ConfigOK sync")
+		return
+	} else if cc.configOK == nil {
+		infof("ConfigOK condition was nil, skipping ConfigOK sync")
 		return
 	}
 
 	// get the Node so we can check the current condition
-	node, err := cc.client.CoreV1().Nodes().Get(cc.nodename, metav1.GetOptions{})
+	node, err := cc.client.CoreV1().Nodes().Get(cc.nodeName, metav1.GetOptions{})
 	if err != nil {
-		errorf("could not get Node %q, will not sync ConfigOK condition, error: %v", cc.nodename, err)
+		errorf("could not get Node %q, will not sync ConfigOK condition, error: %v", cc.nodeName, err)
 		return
 	}
 
@@ -77,7 +80,7 @@ func (cc *NodeConfigController) syncConfigOK() {
 	patch := []byte(fmt.Sprintf(`{"status":{"conditions":%s}}`, data))
 
 	// update the conditions list on the Node object
-	_, err = cc.client.CoreV1().Nodes().PatchStatus(cc.nodename, patch)
+	_, err = cc.client.CoreV1().Nodes().PatchStatus(cc.nodeName, patch)
 	if err != nil {
 		errorf("could not update ConfigOK condition, error: %v", err)
 	}

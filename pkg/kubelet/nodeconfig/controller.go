@@ -53,8 +53,8 @@ type NodeConfigController struct {
 	// client is the clientset for talking to the apiserver.
 	client clientset.Interface
 
-	// nodename is the name of the Node object we should monitor for config
-	nodename string
+	// nodeName is the name of the Node object we should monitor for config
+	nodeName string
 
 	// configOK is the current ConfigOK node condition, which will be reported in the Node.status.conditions
 	configOK *apiv1.NodeCondition
@@ -62,12 +62,12 @@ type NodeConfigController struct {
 
 // NewNodeConfigController constructs a new NodeConfigController object and returns it.
 // If the client is nil, dynamic configuration (watching the API server) will not be used.
-func NewNodeConfigController(client clientset.Interface, nodename string, configDir string, defaultConfig *ccv1a1.KubeletConfiguration) *NodeConfigController {
+func NewNodeConfigController(client clientset.Interface, nodeName string, configDir string, defaultConfig *ccv1a1.KubeletConfiguration) *NodeConfigController {
 	return &NodeConfigController{
 		configDir:     configDir,
 		defaultConfig: defaultConfig,
 		client:        client,
-		nodename:      nodename,
+		nodeName:      nodeName,
 	}
 }
 
@@ -119,10 +119,10 @@ func (cc *NodeConfigController) Run() (finalConfig *ccv1a1.KubeletConfiguration,
 	}
 
 	// check the Node and download any new config
-	node, err := cc.client.CoreV1().Nodes().Get(cc.nodename, metav1.GetOptions{})
+	node, err := cc.client.CoreV1().Nodes().Get(cc.nodeName, metav1.GetOptions{})
 	if err != nil {
 		// we don't roll back here because it's possible the Node isn't registered yet
-		errorf("couldn't get Node %q during initialization, error: %v", cc.nodename, err)
+		errorf("couldn't get Node %q during initialization, error: %v", cc.nodeName, err)
 	} else {
 		_, cause, err := cc.syncNodeConfig(node)
 		if err != nil {
@@ -215,44 +215,43 @@ func (cc *NodeConfigController) initSync() {
 	if cc.client != nil {
 		infof("starting sync loop")
 		go func() {
-			fieldselector := fmt.Sprintf("metadata.name=%s", cc.nodename)
+			fieldselector := fmt.Sprintf("metadata.name=%s", cc.nodeName)
 
 			// Add some randomness to resync period, which can help avoid controllers falling into lock-step
 			minResyncPeriod := 30 * time.Second
 			factor := rand.Float64() + 1
 			resyncPeriod := time.Duration(float64(minResyncPeriod.Nanoseconds()) * factor)
 
-			_, ctl := cache.NewInformer(
-				&cache.ListWatch{
-					ListFunc: func(options metav1.ListOptions) (kuberuntime.Object, error) {
-						return cc.client.Core().Nodes().List(metav1.ListOptions{
-							FieldSelector: fieldselector,
-						})
-					},
-					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-						return cc.client.Core().Nodes().Watch(metav1.ListOptions{
-							FieldSelector:   fieldselector,
-							ResourceVersion: options.ResourceVersion,
-						})
-					},
+			lw := &cache.ListWatch{
+				ListFunc: func(options metav1.ListOptions) (kuberuntime.Object, error) {
+					return cc.client.Core().Nodes().List(metav1.ListOptions{
+						FieldSelector: fieldselector,
+					})
 				},
-				&apiv1.Node{},
-				resyncPeriod,
-				cache.ResourceEventHandlerFuncs{
-					AddFunc: func(n interface{}) {
-						cc.onAddNodeEvent(n)
-					},
-					UpdateFunc: func(old interface{}, nw interface{}) {
-						cc.onWatchNodeEvent(nw)
-					},
-					DeleteFunc: func(n interface{}) {
-						return // do nothing, the node is probably being torn down
-					},
-				})
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return cc.client.Core().Nodes().Watch(metav1.ListOptions{
+						FieldSelector:   fieldselector,
+						ResourceVersion: options.ResourceVersion,
+					})
+				},
+			}
 
-			// since the Kubelet exits once it detects new config, no need to expose the stop channel
+			handler := cache.ResourceEventHandlerFuncs{
+				AddFunc: func(n interface{}) {
+					cc.onAddNodeEvent(n)
+				},
+				UpdateFunc: func(old interface{}, nw interface{}) {
+					cc.onWatchNodeEvent(nw)
+				},
+				DeleteFunc: func(n interface{}) {
+					return // do nothing, the node is probably being torn down
+				},
+			}
+
+			informer := cache.NewSharedInformer(lw, &apiv1.Node{}, resyncPeriod)
+			informer.AddEventHandler(handler)
 			stop := make(chan struct{})
-			ctl.Run(stop)
+			informer.Run(stop)
 			return
 		}()
 	}

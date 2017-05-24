@@ -26,6 +26,8 @@ import (
 	ccv1a1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 )
 
+const configMapConfigKey = "kubelet"
+
 // parsable is for parsing a KubeletConfiguration out of a config object
 type parsable interface {
 	parse() (*ccv1a1.KubeletConfiguration, error)
@@ -41,26 +43,25 @@ type parsableConfigMap struct {
 // If parsing succeeds, returns a KubeletConfiguration.
 // It is recommended that you validate any returned configuration before using it.
 func (p *parsableConfigMap) parse() (*ccv1a1.KubeletConfiguration, error) {
+	const emptyCfgErr = "configuration was empty, but some parameters are required"
 	if len(p.cm.Data) == 0 {
-		return nil, fmt.Errorf("configuration was empty, but some parameters are required")
+		return nil, fmt.Errorf(emptyCfgErr)
 	}
 
-	// TODO(mtaufen): Once the KubeletConfiguration type is decomposed (#44252), allow multiple keys to contain configuration.
-	// Since we presently only expect one key, the for loop is a convenient way to express "take any value in the map".
-	var data []byte
-	for _, v := range p.cm.Data {
-		data = []byte(v)
-		break
+	// TODO(mtaufen): Once the KubeletConfiguration type is decomposed
+	v, ok := p.cm.Data[configMapConfigKey]
+	if !ok {
+		return nil, fmt.Errorf("key %q not found in ConfigMap", configMapConfigKey)
+	} else if len(v) == 0 {
+		return nil, fmt.Errorf(emptyCfgErr)
 	}
-	if len(data) == 0 {
-		return nil, fmt.Errorf("configuration was empty, but some parameters are required")
-	}
-	jdata, err := yaml.ToJSON(data)
+
+	j, err := yaml.ToJSON([]byte(v))
 	if err != nil {
 		return nil, err
 	}
 	kc := &ccv1a1.KubeletConfiguration{}
-	if err := json.Unmarshal(jdata, kc); err != nil {
+	if err := json.Unmarshal(j, kc); err != nil {
 		return nil, err
 	}
 

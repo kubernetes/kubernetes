@@ -254,7 +254,7 @@ func makeKubeletConfigMap(kubeCfg *componentconfig.KubeletConfiguration) *v1.Con
 
 	cmap := &v1.ConfigMap{
 		Data: map[string]string{
-			"kubelet.config": string(bytes),
+			"kubelet": string(bytes),
 		},
 	}
 

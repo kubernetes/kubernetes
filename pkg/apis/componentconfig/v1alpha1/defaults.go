@@ -200,7 +200,6 @@ func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {
 }
 
 func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
-
 	// pointer because the zeroDuration is valid - if you want to skip the trial period
 	if obj.ConfigTrialDuration == nil {
 		obj.ConfigTrialDuration = &metav1.Duration{Duration: 10 * time.Minute}

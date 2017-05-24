@@ -273,30 +273,9 @@ func curNodeIdentifier(s *options.KubeletServer, kd *kubelet.KubeletDeps) (strin
 	return hostname, nil
 }
 
-func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
-	// TODO: this should be replaced by a --standalone flag
-	standaloneMode := (len(s.APIServerList) == 0 && !s.RequireKubeConfig)
-
-	if s.ExitOnLockContention && s.LockFilePath == "" {
-		return errors.New("cannot exit on lock file contention: no lock file specified")
-	}
-
-	done := make(chan struct{})
-	if s.LockFilePath != "" {
-		glog.Infof("acquiring file lock on %q", s.LockFilePath)
-		if err := flock.Acquire(s.LockFilePath); err != nil {
-			return fmt.Errorf("unable to acquire file lock on %q: %v", s.LockFilePath, err)
-		}
-		if s.ExitOnLockContention {
-			glog.Infof("watching for inotify events for: %v", s.LockFilePath)
-			if err := watchForLockfileContention(s.LockFilePath, done); err != nil {
-				return err
-			}
-		}
-	}
-
+func initConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps, standaloneMode bool) error {
 	// Set feature gates based on the value in KubeletConfiguration
-	err = utilfeature.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+	err := utilfeature.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
 		return err
 	}
@@ -378,6 +357,38 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		if err := validateConfig(s); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
+	// TODO: this should be replaced by a --standalone flag
+	standaloneMode := (len(s.APIServerList) == 0 && !s.RequireKubeConfig)
+
+	if s.ExitOnLockContention && s.LockFilePath == "" {
+		return errors.New("cannot exit on lock file contention: no lock file specified")
+	}
+
+	done := make(chan struct{})
+	if s.LockFilePath != "" {
+		glog.Infof("acquiring file lock on %q", s.LockFilePath)
+		if err := flock.Acquire(s.LockFilePath); err != nil {
+			return fmt.Errorf("unable to acquire file lock on %q: %v", s.LockFilePath, err)
+		}
+		if s.ExitOnLockContention {
+			glog.Infof("watching for inotify events for: %v", s.LockFilePath)
+			if err := watchForLockfileContention(s.LockFilePath, done); err != nil {
+				return err
+			}
+		}
+	}
+
+	// TODO(mtaufen): Move bootstrap kubeconfig logic to before dynamic config init.
+	// Only want the bare-minimum stuff to get a client here.
+
+	err = initConfig(s, kubeDeps, standaloneMode)
+	if err != nil {
+		return err
 	}
 
 	if kubeDeps == nil {
