@@ -148,6 +148,11 @@ type serviceInfo struct {
 	loadBalancerSourceRanges []string
 	onlyNodeLocalEndpoints   bool
 	healthCheckNodePort      int
+	// The following fields are computed and stored for performance reasons.
+	serviceNameString        string
+	servicePortChainName     utiliptables.Chain
+	serviceFirewallChainName utiliptables.Chain
+	serviceLBChainName       utiliptables.Chain
 }
 
 // internal struct for endpoints information
@@ -213,6 +218,13 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 			info.healthCheckNodePort = int(p)
 		}
 	}
+
+	// Store the following for performance reasons.
+	protocol := strings.ToLower(string(info.protocol))
+	info.serviceNameString = svcPortName.String()
+	info.servicePortChainName = servicePortChainName(info.serviceNameString, protocol)
+	info.serviceFirewallChainName = serviceFirewallChainName(info.serviceNameString, protocol)
+	info.serviceLBChainName = serviceLBChainName(info.serviceNameString, protocol)
 
 	return info
 }
@@ -1124,14 +1136,13 @@ func (proxier *Proxier) syncProxyRules() {
 	args := make([]string, 64)
 
 	// Build rules for each service.
+	var svcNameString string
 	for svcName, svcInfo := range proxier.serviceMap {
 		protocol := strings.ToLower(string(svcInfo.protocol))
-		// Precompute svcNameString; with many services the many calls
-		// to ServicePortName.String() show up in CPU profiles.
-		svcNameString := svcName.String()
+		svcNameString = svcInfo.serviceNameString
 
 		// Create the per-service chain, retaining counters if possible.
-		svcChain := servicePortChainName(svcNameString, protocol)
+		svcChain := svcInfo.servicePortChainName
 		if chain, ok := existingNATChains[svcChain]; ok {
 			writeLine(proxier.natChains, chain)
 		} else {
@@ -1139,7 +1150,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		activeNATChains[svcChain] = true
 
-		svcXlbChain := serviceLBChainName(svcNameString, protocol)
+		svcXlbChain := svcInfo.serviceLBChainName
 		if svcInfo.onlyNodeLocalEndpoints {
 			// Only for services request OnlyLocal traffic
 			// create the per-service LB chain, retaining counters if possible.
@@ -1243,10 +1254,10 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
+		fwChain := svcInfo.serviceFirewallChainName
 		for _, ingress := range svcInfo.loadBalancerStatus.Ingress {
 			if ingress.IP != "" {
 				// create service firewall chain
-				fwChain := serviceFirewallChainName(svcNameString, protocol)
 				if chain, ok := existingNATChains[fwChain]; ok {
 					writeLine(proxier.natChains, chain)
 				} else {
