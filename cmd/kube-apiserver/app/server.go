@@ -50,6 +50,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
+	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -494,6 +495,16 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 
 		servers := strings.Split(tokens[1], ";")
 		storageFactory.SetEtcdLocation(groupResource, servers)
+	}
+
+	if s.Etcd.EncryptionProviderConfigFilepath != "" {
+		transformerOverrides, err := encryptionconfig.GetTransformerOverrides(s.Etcd.EncryptionProviderConfigFilepath)
+		if err != nil {
+			return nil, err
+		}
+		for groupResource, transformer := range transformerOverrides {
+			storageFactory.SetTransformer(groupResource, transformer)
+		}
 	}
 
 	return storageFactory, nil
