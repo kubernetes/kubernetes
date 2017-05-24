@@ -128,6 +128,7 @@ func TestProxyHandler(t *testing.T) {
 			expectedHeaders: map[string][]string{
 				"X-Forwarded-Proto": {"https"},
 				"X-Forwarded-Uri":   {"/request/path"},
+				"X-Forwarded-For":   {"127.0.0.1"},
 				"X-Remote-User":     {"username"},
 				"User-Agent":        {"Go-http-client/1.1"},
 				"Accept-Encoding":   {"gzip"},
