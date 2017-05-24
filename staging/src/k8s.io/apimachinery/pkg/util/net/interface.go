@@ -43,6 +43,7 @@ type Route struct {
 	// TODO: add more fields here if needed
 }
 
+// getRoutes obtains the IPv4 routes, and filters out non-default routes.
 func getRoutes(input io.Reader) ([]Route, error) {
 	routes := []Route{}
 	if input == nil {
@@ -59,24 +60,30 @@ func getRoutes(input io.Reader) ([]Route, error) {
 			continue
 		}
 		fields := strings.Fields(line)
-		routes = append(routes, Route{})
-		route := &routes[len(routes)-1]
-		route.Interface = fields[0]
-		ip, err := parseIP(fields[1])
+		dest, err := parseHexToIPv4(fields[1])
 		if err != nil {
 			return nil, err
 		}
-		route.Destination = ip
-		ip, err = parseIP(fields[2])
+		gw, err := parseHexToIPv4(fields[2])
 		if err != nil {
 			return nil, err
 		}
-		route.Gateway = ip
+		if !dest.Equal(net.IPv4zero) {
+			continue
+		}
+		routes = append(routes, Route{
+			Interface:   fields[0],
+			Destination: dest,
+			Gateway:     gw,
+		})
 	}
 	return routes, nil
 }
 
-func parseIP(str string) (net.IP, error) {
+// parseHexToIPv4 takes the hex IP address string from route file and converts it
+// from little endian to big endian for creation of a net.IP address.
+// a net.IP, using big endian ordering.
+func parseHexToIPv4(str string) (net.IP, error) {
 	if str == "" {
 		return nil, fmt.Errorf("input is nil")
 	}
@@ -84,12 +91,10 @@ func parseIP(str string) (net.IP, error) {
 	if err != nil {
 		return nil, err
 	}
-	//TODO add ipv6 support
 	if len(bytes) != net.IPv4len {
-		return nil, fmt.Errorf("only IPv4 is supported")
+		return nil, fmt.Errorf("invalid IPv4 address in route")
 	}
-	bytes[0], bytes[1], bytes[2], bytes[3] = bytes[3], bytes[2], bytes[1], bytes[0]
-	return net.IP(bytes), nil
+	return net.IP([]byte{bytes[3], bytes[2], bytes[1], bytes[0]}), nil
 }
 
 func isInterfaceUp(intf *net.Interface) bool {
@@ -107,10 +112,18 @@ func isLoopbackOrPointToPoint(intf *net.Interface) bool {
 	return intf.Flags&(net.FlagLoopback|net.FlagPointToPoint) != 0
 }
 
-//getFinalIP method receives all the IP addrs of a Interface
-//and returns a nil if the address is Loopback, Ipv6, link-local or nil.
-//It returns a valid IPv4 if an Ipv4 address is found in the array.
-func getFinalIP(addrs []net.Addr) (net.IP, error) {
+func inFamily(ip net.IP, expectedFamily AddressFamily) bool {
+	ipFamily := familyIPv4
+	if ip.To4() == nil {
+		ipFamily = familyIPv6
+	}
+	return ipFamily == expectedFamily
+}
+
+// getMatchingGlobalIP method checks all the IP addresses of a Interface looking
+// for a valid non-loopback/link-local address of the requested family and returns
+// it, if found.
+func getMatchingGlobalIP(addrs []net.Addr, family AddressFamily) (net.IP, error) {
 	if len(addrs) > 0 {
 		for i := range addrs {
 			glog.V(4).Infof("Checking addr  %s.", addrs[i].String())
@@ -118,17 +131,15 @@ func getFinalIP(addrs []net.Addr) (net.IP, error) {
 			if err != nil {
 				return nil, err
 			}
-			//Only IPv4
-			//TODO : add IPv6 support
-			if ip.To4() != nil {
-				if !ip.IsLoopback() && !ip.IsLinkLocalMulticast() && !ip.IsLinkLocalUnicast() {
+			if inFamily(ip, family) {
+				if ip.IsGlobalUnicast() {
 					glog.V(4).Infof("IP found %v", ip)
 					return ip, nil
 				} else {
-					glog.V(4).Infof("Loopback/link-local found %v", ip)
+					glog.V(4).Infof("non-global IP found %v", ip)
 				}
 			} else {
-				glog.V(4).Infof("%v is not a valid IPv4 address", ip)
+				glog.V(4).Infof("%v is not an IPv%d address", ip, int(family))
 			}
 
 		}
@@ -136,7 +147,7 @@ func getFinalIP(addrs []net.Addr) (net.IP, error) {
 	return nil, nil
 }
 
-func getIPFromInterface(intfName string, nw networkInterfacer) (net.IP, error) {
+func getIPFromInterface(intfName string, forFamily AddressFamily, nw networkInterfacer) (net.IP, error) {
 	intf, err := nw.InterfaceByName(intfName)
 	if err != nil {
 		return nil, err
@@ -147,16 +158,15 @@ func getIPFromInterface(intfName string, nw networkInterfacer) (net.IP, error) {
 			return nil, err
 		}
 		glog.V(4).Infof("Interface %q has %d addresses :%v.", intfName, len(addrs), addrs)
-		finalIP, err := getFinalIP(addrs)
+		matchingIP, err := getMatchingGlobalIP(addrs, forFamily)
 		if err != nil {
 			return nil, err
 		}
-		if finalIP != nil {
-			glog.V(4).Infof("valid IPv4 address for interface %q found as %v.", intfName, finalIP)
-			return finalIP, nil
+		if matchingIP != nil {
+			glog.V(4).Infof("Found valid IPv%d address %v for interface %q.", int(forFamily), matchingIP, intfName)
+			return matchingIP, nil
 		}
 	}
-
 	return nil, nil
 }
 
@@ -268,27 +278,30 @@ func chooseHostInterfaceFromRoute(inFile io.Reader, nw networkInterfacer) (net.I
 	if err != nil {
 		return nil, err
 	}
-	zero := net.IP{0, 0, 0, 0}
-	var finalIP net.IP
-	for i := range routes {
-		//find interface with gateway
-		if routes[i].Destination.Equal(zero) {
-			glog.V(4).Infof("Default route transits interface %q", routes[i].Interface)
-			finalIP, err := getIPFromInterface(routes[i].Interface, nw)
+	if len(routes) == 0 {
+		return nil, fmt.Errorf("No default routes.")
+	}
+	// TODO: append IPv6 routes for processing - currently only have IPv4 routes
+	for _, family := range []AddressFamily{familyIPv4, familyIPv6} {
+		glog.V(4).Infof("Looking for default routes with IPv%d addresses", uint(family))
+		for _, route := range routes {
+			// TODO: When have IPv6 routes, filter here to speed up processing
+			// if route.Family != family {
+			// 	continue
+			// }
+			glog.V(4).Infof("Default route transits interface %q", route.Interface)
+			finalIP, err := getIPFromInterface(route.Interface, family, nw)
 			if err != nil {
 				return nil, err
 			}
 			if finalIP != nil {
-				glog.V(4).Infof("Choosing IP %v ", finalIP)
+				glog.V(4).Infof("Found active IP %v ", finalIP)
 				return finalIP, nil
 			}
 		}
 	}
-	glog.V(4).Infof("No valid IP found")
-	if finalIP == nil {
-		return nil, fmt.Errorf("Unable to select an IP.")
-	}
-	return nil, nil
+	glog.V(4).Infof("No active IP found by looking at default routes")
+	return nil, fmt.Errorf("unable to select an IP from default routes.")
 }
 
 // If bind-address is usable, return it directly
