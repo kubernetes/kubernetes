@@ -13,7 +13,6 @@ go_library(
     srcs = ["gc_admission.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/kubeapiserver/admission:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

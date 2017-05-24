@@ -38,10 +38,6 @@ const (
 	PluginName = "DefaultStorageClass"
 )
 
-func init() {
-	Register(&kubeapiserveradmission.Plugins)
-}
-
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
