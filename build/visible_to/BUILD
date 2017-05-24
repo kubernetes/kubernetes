@@ -352,6 +352,14 @@ package_group(
     ],
 )
 
+package_group(
+    name = "pkg_kubectl_util_CONSUMERS",
+    packages = [
+        "//pkg/kubectl",
+        "//pkg/kubectl/cmd",
+    ],
+)
+
 # Added by ./hack/verify-bazel.sh; should be excluded from
 # that script since it makes no sense here.
 filegroup(
