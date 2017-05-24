@@ -143,8 +143,7 @@ type Store struct {
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated and before it is decorated, optional.
 	AfterUpdate ObjectFunc
-	// DeleteStrategy implements resource-specific behavior during deletion,
-	// optional.
+	// DeleteStrategy implements resource-specific behavior during deletion.
 	DeleteStrategy rest.RESTDeleteStrategy
 	// AfterDelete implements a further operation to run after a resource is
 	// deleted and before it is decorated, optional.
@@ -1136,6 +1135,10 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		isNamespaced = e.UpdateStrategy.NamespaceScoped()
 	default:
 		return fmt.Errorf("store for %s must have CreateStrategy or UpdateStrategy set", e.QualifiedResource.String())
+	}
+
+	if e.DeleteStrategy == nil {
+		return fmt.Errorf("store for %s must have DeleteStrategy set", e.QualifiedResource.String())
 	}
 
 	if options.RESTOptions == nil {
