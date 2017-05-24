@@ -32,7 +32,7 @@ type FakeRoles struct {
 	ns   string
 }
 
-var rolesResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Resource: "roles"}
+var rolesResource = schema.GroupVersionResource{Group: v1alpha1.GroupName, Version: "v1alpha1", Resource: "roles"}
 
 var rolesKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "Role"}
 

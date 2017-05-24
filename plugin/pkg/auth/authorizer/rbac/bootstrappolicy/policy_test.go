@@ -82,8 +82,8 @@ func TestCovers(t *testing.T) {
 // one resource per rule to make the "does not already contain" check easy
 var additionalAdminPowers = []rbac.PolicyRule{
 	rbac.NewRule("create").Groups("authorization.k8s.io").Resources("localsubjectaccessreviews").RuleOrDie(),
-	rbac.NewRule(bootstrappolicy.ReadWrite...).Groups("rbac.authorization.k8s.io").Resources("rolebindings").RuleOrDie(),
-	rbac.NewRule(bootstrappolicy.ReadWrite...).Groups("rbac.authorization.k8s.io").Resources("roles").RuleOrDie(),
+	rbac.NewRule(bootstrappolicy.ReadWrite...).Groups(rbac.GroupName).Resources("rolebindings").RuleOrDie(),
+	rbac.NewRule(bootstrappolicy.ReadWrite...).Groups(rbac.GroupName).Resources("roles").RuleOrDie(),
 }
 
 func TestAdminEditRelationship(t *testing.T) {

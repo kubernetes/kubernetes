@@ -31,7 +31,7 @@ type FakeClusterRoles struct {
 	Fake *FakeRbacV1alpha1
 }
 
-var clusterrolesResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Resource: "clusterroles"}
+var clusterrolesResource = schema.GroupVersionResource{Group: v1alpha1.GroupName, Version: "v1alpha1", Resource: "clusterroles"}
 
 var clusterrolesKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRole"}
 

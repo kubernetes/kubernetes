@@ -814,7 +814,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 			},
 		},
 		RoleRef: rbacv1beta1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
+			APIGroup: rbacv1beta1.GroupName,
 			Kind:     "Role",
 			Name:     "federation-system:federation-controller-manager",
 		},

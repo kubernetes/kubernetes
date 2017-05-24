@@ -311,13 +311,13 @@ func TestRBAC(t *testing.T) {
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "create-rolebindings"},
 						Rules: []rbacapi.PolicyRule{
-							rbacapi.NewRule("create").Groups("rbac.authorization.k8s.io").Resources("rolebindings").RuleOrDie(),
+							rbacapi.NewRule("create").Groups(rbacapi.GroupName).Resources("rolebindings").RuleOrDie(),
 						},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "bind-any-clusterrole"},
 						Rules: []rbacapi.PolicyRule{
-							rbacapi.NewRule("bind").Groups("rbac.authorization.k8s.io").Resources("clusterroles").RuleOrDie(),
+							rbacapi.NewRule("bind").Groups(rbacapi.GroupName).Resources("clusterroles").RuleOrDie(),
 						},
 					},
 				},
@@ -389,23 +389,23 @@ func TestRBAC(t *testing.T) {
 				{"job-writer-namespace", "GET", "batch", "jobs", "job-namespace", "pi", "", http.StatusOK},
 
 				// cannot bind role anywhere
-				{"user-with-no-permissions", "POST", "rbac.authorization.k8s.io", "rolebindings", "job-namespace", "", writeJobsRoleBinding, http.StatusForbidden},
+				{"user-with-no-permissions", "POST", rbacapi.GroupName, "rolebindings", "job-namespace", "", writeJobsRoleBinding, http.StatusForbidden},
 				// can only bind role in namespace where they have explicit bind permission
-				{"any-rolebinding-writer-namespace", "POST", "rbac.authorization.k8s.io", "rolebindings", "forbidden-namespace", "", writeJobsRoleBinding, http.StatusForbidden},
+				{"any-rolebinding-writer-namespace", "POST", rbacapi.GroupName, "rolebindings", "forbidden-namespace", "", writeJobsRoleBinding, http.StatusForbidden},
 				// can only bind role in namespace where they have covering permissions
-				{"job-writer-namespace", "POST", "rbac.authorization.k8s.io", "rolebindings", "forbidden-namespace", "", writeJobsRoleBinding, http.StatusForbidden},
-				{"job-writer-namespace", "POST", "rbac.authorization.k8s.io", "rolebindings", "job-namespace", "", writeJobsRoleBinding, http.StatusCreated},
-				{superUser, "DELETE", "rbac.authorization.k8s.io", "rolebindings", "job-namespace", "pi", "", http.StatusOK},
+				{"job-writer-namespace", "POST", rbacapi.GroupName, "rolebindings", "forbidden-namespace", "", writeJobsRoleBinding, http.StatusForbidden},
+				{"job-writer-namespace", "POST", rbacapi.GroupName, "rolebindings", "job-namespace", "", writeJobsRoleBinding, http.StatusCreated},
+				{superUser, "DELETE", rbacapi.GroupName, "rolebindings", "job-namespace", "pi", "", http.StatusOK},
 				// can bind role in any namespace where they have covering permissions
-				{"job-writer", "POST", "rbac.authorization.k8s.io", "rolebindings", "forbidden-namespace", "", writeJobsRoleBinding, http.StatusCreated},
-				{superUser, "DELETE", "rbac.authorization.k8s.io", "rolebindings", "forbidden-namespace", "pi", "", http.StatusOK},
+				{"job-writer", "POST", rbacapi.GroupName, "rolebindings", "forbidden-namespace", "", writeJobsRoleBinding, http.StatusCreated},
+				{superUser, "DELETE", rbacapi.GroupName, "rolebindings", "forbidden-namespace", "pi", "", http.StatusOK},
 				// cannot bind role because they don't have covering permissions
-				{"nonescalating-rolebinding-writer", "POST", "rbac.authorization.k8s.io", "rolebindings", "job-namespace", "", writeJobsRoleBinding, http.StatusForbidden},
+				{"nonescalating-rolebinding-writer", "POST", rbacapi.GroupName, "rolebindings", "job-namespace", "", writeJobsRoleBinding, http.StatusForbidden},
 				// can bind role because they have explicit bind permission
-				{"any-rolebinding-writer", "POST", "rbac.authorization.k8s.io", "rolebindings", "job-namespace", "", writeJobsRoleBinding, http.StatusCreated},
-				{superUser, "DELETE", "rbac.authorization.k8s.io", "rolebindings", "job-namespace", "pi", "", http.StatusOK},
-				{"any-rolebinding-writer-namespace", "POST", "rbac.authorization.k8s.io", "rolebindings", "job-namespace", "", writeJobsRoleBinding, http.StatusCreated},
-				{superUser, "DELETE", "rbac.authorization.k8s.io", "rolebindings", "job-namespace", "pi", "", http.StatusOK},
+				{"any-rolebinding-writer", "POST", rbacapi.GroupName, "rolebindings", "job-namespace", "", writeJobsRoleBinding, http.StatusCreated},
+				{superUser, "DELETE", rbacapi.GroupName, "rolebindings", "job-namespace", "pi", "", http.StatusOK},
+				{"any-rolebinding-writer-namespace", "POST", rbacapi.GroupName, "rolebindings", "job-namespace", "", writeJobsRoleBinding, http.StatusCreated},
+				{superUser, "DELETE", rbacapi.GroupName, "rolebindings", "job-namespace", "pi", "", http.StatusOK},
 			},
 		},
 	}

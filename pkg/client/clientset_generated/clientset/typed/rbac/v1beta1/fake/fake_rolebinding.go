@@ -32,7 +32,7 @@ type FakeRoleBindings struct {
 	ns   string
 }
 
-var rolebindingsResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "rolebindings"}
+var rolebindingsResource = schema.GroupVersionResource{Group: v1beta1.GroupName, Version: "v1beta1", Resource: "rolebindings"}
 
 var rolebindingsKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBinding"}
 

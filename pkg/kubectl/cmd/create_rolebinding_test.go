@@ -34,7 +34,7 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
-var groupVersion = schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1alpha1"}
+var groupVersion = schema.GroupVersion{Group: rbac.GroupName, Version: "v1alpha1"}
 
 func TestCreateRoleBinding(t *testing.T) {
 	expectBinding := &rbac.RoleBinding{
@@ -49,12 +49,12 @@ func TestCreateRoleBinding(t *testing.T) {
 		Subjects: []rbac.Subject{
 			{
 				Kind:     rbac.UserKind,
-				APIGroup: "rbac.authorization.k8s.io",
+				APIGroup: rbac.GroupName,
 				Name:     "fake-user",
 			},
 			{
 				Kind:     rbac.GroupKind,
-				APIGroup: "rbac.authorization.k8s.io",
+				APIGroup: rbac.GroupName,
 				Name:     "fake-group",
 			},
 			{
