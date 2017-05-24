@@ -42,7 +42,6 @@ const (
 	certificatesGroup   = "certificates.k8s.io"
 	extensionsGroup     = "extensions"
 	policyGroup         = "policy"
-	rbacGroup           = "rbac.authorization.k8s.io"
 	storageGroup        = "storage.k8s.io"
 )
 
@@ -140,7 +139,7 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				// additional admin powers
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("localsubjectaccessreviews").RuleOrDie(),
-				rbac.NewRule(ReadWrite...).Groups(rbacGroup).Resources("roles", "rolebindings").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(rbac.GroupName).Resources("roles", "rolebindings").RuleOrDie(),
 			},
 		},
 		{
