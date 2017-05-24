@@ -193,13 +193,12 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, tar
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
 				Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
 					cmd, config.HostTestContainerPod.Name, stdout, err)
-				continue
-			}
-
-			for _, hostName := range output["responses"] {
-				trimmed := strings.TrimSpace(hostName)
-				if trimmed != "" {
-					eps.Insert(trimmed)
+			} else {
+				for _, hostName := range output["responses"] {
+					trimmed := strings.TrimSpace(hostName)
+					if trimmed != "" {
+						eps.Insert(trimmed)
+					}
 				}
 			}
 		}
