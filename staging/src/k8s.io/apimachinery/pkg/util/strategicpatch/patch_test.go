@@ -266,11 +266,11 @@ func TestSortMergeLists(t *testing.T) {
 	}
 
 	for _, c := range tc.TestCases {
-		original := testObjectToJSONOrFail(t, c.Original, c.Description)
-		sorted := testObjectToJSONOrFail(t, c.Sorted, c.Description)
-		if !reflect.DeepEqual(original, sorted) {
+		got := sortJsonOrFail(t, testObjectToJSONOrFail(t, c.Original), c.Description)
+		expected := testObjectToJSONOrFail(t, c.Sorted)
+		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("error in test case: %s\ncannot sort object:\n%s\nexpected:\n%s\ngot:\n%s\n",
-				c.Description, mergepatch.ToYAMLOrError(c.Original), mergepatch.ToYAMLOrError(c.Sorted), jsonToYAMLOrError(original))
+				c.Description, mergepatch.ToYAMLOrError(c.Original), mergepatch.ToYAMLOrError(c.Sorted), jsonToYAMLOrError(got))
 		}
 	}
 }
@@ -2068,10 +2068,10 @@ func twoWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]
 	if expectedResult == nil {
 		expectedResult = c.Modified
 	}
-	return testObjectToJSONOrFail(t, c.Original, c.Description),
-		testObjectToJSONOrFail(t, c.TwoWay, c.Description),
-		testObjectToJSONOrFail(t, c.Modified, c.Description),
-		testObjectToJSONOrFail(t, expectedResult, c.Description)
+	return sortJsonOrFail(t, testObjectToJSONOrFail(t, c.Original), c.Description),
+		sortJsonOrFail(t, testObjectToJSONOrFail(t, c.TwoWay), c.Description),
+		sortJsonOrFail(t, testObjectToJSONOrFail(t, c.Modified), c.Description),
+		sortJsonOrFail(t, testObjectToJSONOrFail(t, expectedResult), c.Description)
 }
 
 func twoWayRawTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchRawTestCase) ([]byte, []byte, []byte, []byte) {
@@ -2168,11 +2168,11 @@ func testThreeWayPatchForRawTestCase(t *testing.T, c StrategicMergePatchRawTestC
 }
 
 func threeWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]byte, []byte, []byte, []byte, []byte) {
-	return testObjectToJSONOrFail(t, c.Original, c.Description),
-		testObjectToJSONOrFail(t, c.Modified, c.Description),
-		testObjectToJSONOrFail(t, c.Current, c.Description),
-		testObjectToJSONOrFail(t, c.ThreeWay, c.Description),
-		testObjectToJSONOrFail(t, c.Result, c.Description)
+	return sortJsonOrFail(t, testObjectToJSONOrFail(t, c.Original), c.Description),
+		sortJsonOrFail(t, testObjectToJSONOrFail(t, c.Modified), c.Description),
+		sortJsonOrFail(t, testObjectToJSONOrFail(t, c.Current), c.Description),
+		sortJsonOrFail(t, testObjectToJSONOrFail(t, c.ThreeWay), c.Description),
+		sortJsonOrFail(t, testObjectToJSONOrFail(t, c.Result), c.Description)
 }
 
 func threeWayRawTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchRawTestCase) ([]byte, []byte, []byte, []byte, []byte) {
@@ -2222,7 +2222,7 @@ func testPatchApplication(t *testing.T, original, patch, expected []byte, descri
 	}
 }
 
-func testObjectToJSONOrFail(t *testing.T, o map[string]interface{}, description string) []byte {
+func testObjectToJSONOrFail(t *testing.T, o map[string]interface{}) []byte {
 	if o == nil {
 		return nil
 	}
@@ -2231,7 +2231,13 @@ func testObjectToJSONOrFail(t *testing.T, o map[string]interface{}, description 
 	if err != nil {
 		t.Error(err)
 	}
+	return j
+}
 
+func sortJsonOrFail(t *testing.T, j []byte, description string) []byte {
+	if j == nil {
+		return nil
+	}
 	r, err := sortMergeListsByName(j, mergeItem)
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot sort object:\n%s\n", err, description, j)
