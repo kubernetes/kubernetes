@@ -495,7 +495,7 @@ kube::util::ensure_clean_working_dir() {
 # Ensure that the given godep version is installed and in the path
 kube::util::ensure_godep_version() {
   GODEP_VERSION=${1:-"v79"}
-  if [[ "$(godep version)" == *"godep ${GODEP_VERSION}"* ]]; then
+  if [[ "$(godep version 2>/dev/null)" == *"godep ${GODEP_VERSION}"* ]]; then
     return
   fi
 
@@ -504,7 +504,7 @@ kube::util::ensure_godep_version() {
 
   GOPATH="${KUBE_TEMP}/go" go get -d -u github.com/tools/godep 2>/dev/null
   pushd "${KUBE_TEMP}/go/src/github.com/tools/godep" >/dev/null
-    git checkout "${GODEP_VERSION}"
+    git checkout -q "${GODEP_VERSION}"
     GOPATH="${KUBE_TEMP}/go" go install .
   popd >/dev/null
 
