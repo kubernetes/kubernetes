@@ -56,11 +56,11 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	proxyHandlerTraceID := rand.Int63()
 
 	var verb string
-	var apiResource string
+	var apiResource, subresource string
 	var httpCode int
 	reqStart := time.Now()
 	defer func() {
-		metrics.Monitor(&verb, &apiResource,
+		metrics.Monitor(&verb, &apiResource, &subresource,
 			net.GetHTTPClient(req),
 			w.Header().Get("Content-Type"),
 			httpCode, reqStart)
@@ -85,7 +85,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	verb = requestInfo.Verb
-	namespace, resource, parts := requestInfo.Namespace, requestInfo.Resource, requestInfo.Parts
+	namespace, resource, subresource, parts := requestInfo.Namespace, requestInfo.Resource, requestInfo.Subresource, requestInfo.Parts
 
 	ctx = request.WithNamespace(ctx, namespace)
 	if len(parts) < 2 {
