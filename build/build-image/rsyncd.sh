@@ -77,7 +77,7 @@ port = 8730
   secrets file = ${SECRETS}
   read only = false
   path = ${VOLUME}
-  filter = - /.make/ - /.git/ - /_tmp/
+  filter = - /.make/ - /_tmp/
 EOF
 
 exec /usr/bin/rsync --no-detach --daemon --config="${CONFFILE}" "$@"
