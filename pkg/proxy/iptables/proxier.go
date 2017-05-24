@@ -156,6 +156,14 @@ type endpointsInfo struct {
 	isLocal  bool
 }
 
+// Returns just the IP part of the endpoint.
+func (e *endpointsInfo) IPPart() string {
+	if index := strings.Index(e.endpoint, ":"); index != -1 {
+		return e.endpoint[0:index]
+	}
+	return e.endpoint
+}
+
 func (e *endpointsInfo) String() string {
 	return fmt.Sprintf("%v", *e)
 }
@@ -751,8 +759,7 @@ func getLocalIPs(endpointsMap proxyEndpointsMap) map[types.NamespacedName]sets.S
 				if localIPs[nsn] == nil {
 					localIPs[nsn] = sets.NewString()
 				}
-				ip := strings.Split(ep.endpoint, ":")[0] // just the IP part
-				localIPs[nsn].Insert(ip)
+				localIPs[nsn].Insert(ep.IPPart()) // just the IP part
 			}
 		}
 	}
@@ -873,6 +880,13 @@ type endpointServicePair struct {
 	servicePortName proxy.ServicePortName
 }
 
+func (esp *endpointServicePair) IPPart() string {
+	if index := strings.Index(esp.endpoint, ":"); index != -1 {
+		return esp.endpoint[0:index]
+	}
+	return esp.endpoint
+}
+
 const noConnectionToDelete = "0 flow entries have been deleted"
 
 // After a UDP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
@@ -881,7 +895,7 @@ const noConnectionToDelete = "0 flow entries have been deleted"
 func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServicePair]bool) {
 	for epSvcPair := range connectionMap {
 		if svcInfo, ok := proxier.serviceMap[epSvcPair.servicePortName]; ok && svcInfo.protocol == api.ProtocolUDP {
-			endpointIP := strings.Split(epSvcPair.endpoint, ":")[0]
+			endpointIP := epSvcPair.endpoint[0:strings.Index(epSvcPair.endpoint, ":")]
 			glog.V(2).Infof("Deleting connection tracking state for service IP %s, endpoint IP %s", svcInfo.clusterIP.String(), endpointIP)
 			err := utilproxy.ExecConntrackTool(proxier.exec, "-D", "--orig-dst", svcInfo.clusterIP.String(), "--dst-nat", endpointIP, "-p", "udp")
 			if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
@@ -1371,7 +1385,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			// Handle traffic that loops back to the originator with SNAT.
 			writeLine(proxier.natRules, append(args,
-				"-s", fmt.Sprintf("%s/32", strings.Split(endpoints[i].endpoint, ":")[0]),
+				"-s", fmt.Sprintf("%s/32", endpoints[i].IPPart()),
 				"-j", string(KubeMarkMasqChain))...)
 			// Update client-affinity lists.
 			if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
