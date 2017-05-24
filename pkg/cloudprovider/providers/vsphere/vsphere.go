@@ -225,6 +225,7 @@ func readConfig(config io.Reader) (VSphereConfig, error) {
 }
 
 func init() {
+	registerMetrics()
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		cfg, err := readConfig(config)
 		if err != nil {
@@ -746,141 +747,150 @@ func cleanUpController(ctx context.Context, newSCSIController types.BaseVirtualD
 
 // Attaches given virtual disk volume to the compute running kubelet.
 func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyID string, nodeName k8stypes.NodeName) (diskID string, diskUUID string, err error) {
-	var newSCSIController types.BaseVirtualDevice
+	attachDiskInternal := func(vmDiskPath string, storagePolicyID string, nodeName k8stypes.NodeName) (diskID string, diskUUID string, err error) {
+		var newSCSIController types.BaseVirtualDevice
 
-	// Create context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+		// Create context
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	// Ensure client is logged in and session is valid
-	err = vSphereLogin(ctx, vs)
-	if err != nil {
-		glog.Errorf("Failed to login into vCenter - %v", err)
-		return "", "", err
-	}
-
-	// Find virtual machine to attach disk to
-	var vSphereInstance string
-	if nodeName == "" {
-		vSphereInstance = vs.localInstanceID
-		nodeName = vmNameToNodeName(vSphereInstance)
-	} else {
-		vSphereInstance = nodeNameToVMName(nodeName)
-	}
-
-	// Get VM device list
-	vm, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
-	if err != nil {
-		return "", "", err
-	}
-
-	attached, err := checkDiskAttached(vmDiskPath, vmDevices, dc, vs.client)
-	if err != nil {
-		return "", "", err
-	}
-	if attached {
-		diskID, _ = getVirtualDiskID(vmDiskPath, vmDevices, dc, vs.client)
-		diskUUID, _ = getVirtualDiskUUIDByPath(vmDiskPath, dc, vs.client)
-		return diskID, diskUUID, nil
-	}
-
-	var diskControllerType = vs.cfg.Disk.SCSIControllerType
-	// find SCSI controller of particular type from VM devices
-	scsiControllersOfRequiredType := getSCSIControllersOfType(vmDevices, diskControllerType)
-	scsiController := getAvailableSCSIController(scsiControllersOfRequiredType)
-	newSCSICreated := false
-	if scsiController == nil {
-		newSCSIController, err = createAndAttachSCSIControllerToVM(ctx, vm, diskControllerType)
+		// Ensure client is logged in and session is valid
+		err = vSphereLogin(ctx, vs)
 		if err != nil {
-			glog.Errorf("Failed to create SCSI controller for VM :%q with err: %+v", vm.Name(), err)
+			glog.Errorf("Failed to login into vCenter - %v", err)
 			return "", "", err
 		}
 
-		// Get VM device list
-		_, vmDevices, _, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
-		if err != nil {
-			glog.Errorf("cannot get vmDevices for VM err=%s", err)
-			return "", "", fmt.Errorf("cannot get vmDevices for VM err=%s", err)
+		// Find virtual machine to attach disk to
+		var vSphereInstance string
+		if nodeName == "" {
+			vSphereInstance = vs.localInstanceID
+			nodeName = vmNameToNodeName(vSphereInstance)
+		} else {
+			vSphereInstance = nodeNameToVMName(nodeName)
 		}
 
+		// Get VM device list
+		vm, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
+		if err != nil {
+			return "", "", err
+		}
+
+		attached, err := checkDiskAttached(vmDiskPath, vmDevices, dc, vs.client)
+		if err != nil {
+			return "", "", err
+		}
+		if attached {
+			diskID, _ = getVirtualDiskID(vmDiskPath, vmDevices, dc, vs.client)
+			diskUUID, _ = getVirtualDiskUUIDByPath(vmDiskPath, dc, vs.client)
+			return diskID, diskUUID, nil
+		}
+
+		var diskControllerType = vs.cfg.Disk.SCSIControllerType
+		// find SCSI controller of particular type from VM devices
 		scsiControllersOfRequiredType := getSCSIControllersOfType(vmDevices, diskControllerType)
 		scsiController := getAvailableSCSIController(scsiControllersOfRequiredType)
+		newSCSICreated := false
 		if scsiController == nil {
-			glog.Errorf("cannot find SCSI controller in VM")
-			// attempt clean up of scsi controller
-			cleanUpController(ctx, newSCSIController, vmDevices, vm)
-			return "", "", fmt.Errorf("cannot find SCSI controller in VM")
-		}
-		newSCSICreated = true
-	}
+			newSCSIController, err = createAndAttachSCSIControllerToVM(ctx, vm, diskControllerType)
+			if err != nil {
+				glog.Errorf("Failed to create SCSI controller for VM :%q with err: %+v", vm.Name(), err)
+				return "", "", err
+			}
 
-	// Create a new finder
-	f := find.NewFinder(vs.client.Client, true)
-	// Set data center
-	f.SetDatacenter(dc)
+			// Get VM device list
+			_, vmDevices, _, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
+			if err != nil {
+				glog.Errorf("cannot get vmDevices for VM err=%s", err)
+				return "", "", fmt.Errorf("cannot get vmDevices for VM err=%s", err)
+			}
 
-	datastorePathObj := new(object.DatastorePath)
-	isSuccess := datastorePathObj.FromString(vmDiskPath)
-	if !isSuccess {
-		glog.Errorf("Failed to parse vmDiskPath: %+q", vmDiskPath)
-		return "", "", errors.New("Failed to parse vmDiskPath")
-	}
-	ds, err := f.Datastore(ctx, datastorePathObj.Datastore)
-	if err != nil {
-		glog.Errorf("Failed while searching for datastore %+q. err %s", datastorePathObj.Datastore, err)
-		return "", "", err
-	}
-	vmDiskPath = removeClusterFromVDiskPath(vmDiskPath)
-	disk := vmDevices.CreateDisk(scsiController, ds.Reference(), vmDiskPath)
-	unitNumber, err := getNextUnitNumber(vmDevices, scsiController)
-	if err != nil {
-		glog.Errorf("cannot attach disk to VM, limit reached - %v.", err)
-		return "", "", err
-	}
-	*disk.UnitNumber = unitNumber
+			scsiControllersOfRequiredType := getSCSIControllersOfType(vmDevices, diskControllerType)
+			scsiController := getAvailableSCSIController(scsiControllersOfRequiredType)
+			if scsiController == nil {
+				glog.Errorf("cannot find SCSI controller in VM")
+				// attempt clean up of scsi controller
+				cleanUpController(ctx, newSCSIController, vmDevices, vm)
+				return "", "", fmt.Errorf("cannot find SCSI controller in VM")
+			}
+			newSCSICreated = true
+		}
 
-	backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
-	backing.DiskMode = string(types.VirtualDiskModeIndependent_persistent)
+		// Create a new finder
+		f := find.NewFinder(vs.client.Client, true)
+		// Set data center
+		f.SetDatacenter(dc)
 
-	virtualMachineConfigSpec := types.VirtualMachineConfigSpec{}
-	deviceConfigSpec := &types.VirtualDeviceConfigSpec{
-		Device:    disk,
-		Operation: types.VirtualDeviceConfigSpecOperationAdd,
-	}
-	// Configure the disk with the SPBM profile only if ProfileID is not empty.
-	if storagePolicyID != "" {
-		profileSpec := &types.VirtualMachineDefinedProfileSpec{
-			ProfileId: storagePolicyID,
+		datastorePathObj := new(object.DatastorePath)
+		isSuccess := datastorePathObj.FromString(vmDiskPath)
+		if !isSuccess {
+			glog.Errorf("Failed to parse vmDiskPath: %+q", vmDiskPath)
+			return "", "", errors.New("Failed to parse vmDiskPath")
 		}
-		deviceConfigSpec.Profile = append(deviceConfigSpec.Profile, profileSpec)
-	}
-	virtualMachineConfigSpec.DeviceChange = append(virtualMachineConfigSpec.DeviceChange, deviceConfigSpec)
-	task, err := vm.Reconfigure(ctx, virtualMachineConfigSpec)
-	if err != nil {
-		glog.Errorf("Failed to attach the disk with storagePolicy: %+q with err - %v", storagePolicyID, err)
-		if newSCSICreated {
-			cleanUpController(ctx, newSCSIController, vmDevices, vm)
+		ds, err := f.Datastore(ctx, datastorePathObj.Datastore)
+		if err != nil {
+			glog.Errorf("Failed while searching for datastore %+q. err %s", datastorePathObj.Datastore, err)
+			return "", "", err
 		}
-		return "", "", err
-	}
-	err = task.Wait(ctx)
-	if err != nil {
-		glog.Errorf("Failed to attach the disk with storagePolicy: %+q with err - %v", storagePolicyID, err)
-		if newSCSICreated {
-			cleanUpController(ctx, newSCSIController, vmDevices, vm)
+		vmDiskPath = removeClusterFromVDiskPath(vmDiskPath)
+		disk := vmDevices.CreateDisk(scsiController, ds.Reference(), vmDiskPath)
+		unitNumber, err := getNextUnitNumber(vmDevices, scsiController)
+		if err != nil {
+			glog.Errorf("cannot attach disk to VM, limit reached - %v.", err)
+			return "", "", err
 		}
-		return "", "", err
-	}
+		*disk.UnitNumber = unitNumber
 
-	deviceName, diskUUID, err := getVMDiskInfo(ctx, vm, disk)
-	if err != nil {
-		if newSCSICreated {
-			cleanUpController(ctx, newSCSIController, vmDevices, vm)
+		backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
+		backing.DiskMode = string(types.VirtualDiskModeIndependent_persistent)
+
+		virtualMachineConfigSpec := types.VirtualMachineConfigSpec{}
+		deviceConfigSpec := &types.VirtualDeviceConfigSpec{
+			Device:    disk,
+			Operation: types.VirtualDeviceConfigSpecOperationAdd,
 		}
-		vs.DetachDisk(deviceName, nodeName)
-		return "", "", err
+		// Configure the disk with the SPBM profile only if ProfileID is not empty.
+		if storagePolicyID != "" {
+			profileSpec := &types.VirtualMachineDefinedProfileSpec{
+				ProfileId: storagePolicyID,
+			}
+			deviceConfigSpec.Profile = append(deviceConfigSpec.Profile, profileSpec)
+		}
+		virtualMachineConfigSpec.DeviceChange = append(virtualMachineConfigSpec.DeviceChange, deviceConfigSpec)
+		requestTime := time.Now()
+		task, err := vm.Reconfigure(ctx, virtualMachineConfigSpec)
+		if err != nil {
+			recordvSphereMetric(api_attachvolume, requestTime, err)
+			glog.Errorf("Failed to attach the disk with storagePolicy: %+q with err - %v", storagePolicyID, err)
+			if newSCSICreated {
+				cleanUpController(ctx, newSCSIController, vmDevices, vm)
+			}
+			return "", "", err
+		}
+		err = task.Wait(ctx)
+		recordvSphereMetric(api_attachvolume, requestTime, err)
+		if err != nil {
+			glog.Errorf("Failed to attach the disk with storagePolicy: %+q with err - %v", storagePolicyID, err)
+			if newSCSICreated {
+				cleanUpController(ctx, newSCSIController, vmDevices, vm)
+			}
+			return "", "", err
+		}
+
+		deviceName, diskUUID, err := getVMDiskInfo(ctx, vm, disk)
+		if err != nil {
+			if newSCSICreated {
+				cleanUpController(ctx, newSCSIController, vmDevices, vm)
+			}
+			vs.DetachDisk(deviceName, nodeName)
+			return "", "", err
+		}
+		return deviceName, diskUUID, nil
 	}
-	return deviceName, diskUUID, nil
+	requestTime := time.Now()
+	diskID, diskUUID, err = attachDiskInternal(vmDiskPath, storagePolicyID, nodeName)
+	recordvSphereMetric(operation_attachvolume, requestTime, err)
+	return diskID, diskUUID, err
 }
 
 func getVMDiskInfo(ctx context.Context, vm *object.VirtualMachine, disk *types.VirtualDisk) (string, string, error) {
@@ -981,109 +991,121 @@ func getAvailableSCSIController(scsiControllers []*types.VirtualController) *typ
 
 // DiskIsAttached returns if disk is attached to the VM using controllers supported by the plugin.
 func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (bool, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	diskIsAttachedInternal := func(volPath string, nodeName k8stypes.NodeName) (bool, error) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	// Ensure client is logged in and session is valid
-	err := vSphereLogin(ctx, vs)
-	if err != nil {
-		glog.Errorf("Failed to login into vCenter - %v", err)
-		return false, err
+		// Ensure client is logged in and session is valid
+		err := vSphereLogin(ctx, vs)
+		if err != nil {
+			glog.Errorf("Failed to login into vCenter - %v", err)
+			return false, err
+		}
+
+		// Find VM to detach disk from
+		var vSphereInstance string
+		if nodeName == "" {
+			vSphereInstance = vs.localInstanceID
+			nodeName = vmNameToNodeName(vSphereInstance)
+		} else {
+			vSphereInstance = nodeNameToVMName(nodeName)
+		}
+
+		nodeExist, err := vs.NodeExists(nodeName)
+		if err != nil {
+			glog.Errorf("Failed to check whether node exist. err: %s.", err)
+			return false, err
+		}
+
+		if !nodeExist {
+			glog.Errorf("DiskIsAttached failed to determine whether disk %q is still attached: node %q does not exist",
+				volPath,
+				vSphereInstance)
+			return false, fmt.Errorf("DiskIsAttached failed to determine whether disk %q is still attached: node %q does not exist",
+				volPath,
+				vSphereInstance)
+		}
+
+		// Get VM device list
+		_, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
+		if err != nil {
+			glog.Errorf("Failed to get VM devices for VM %#q. err: %s", vSphereInstance, err)
+			return false, err
+		}
+
+		attached, err := checkDiskAttached(volPath, vmDevices, dc, vs.client)
+		return attached, err
 	}
-
-	// Find VM to detach disk from
-	var vSphereInstance string
-	if nodeName == "" {
-		vSphereInstance = vs.localInstanceID
-		nodeName = vmNameToNodeName(vSphereInstance)
-	} else {
-		vSphereInstance = nodeNameToVMName(nodeName)
-	}
-
-	nodeExist, err := vs.NodeExists(nodeName)
-	if err != nil {
-		glog.Errorf("Failed to check whether node exist. err: %s.", err)
-		return false, err
-	}
-
-	if !nodeExist {
-		glog.Errorf("DiskIsAttached failed to determine whether disk %q is still attached: node %q does not exist",
-			volPath,
-			vSphereInstance)
-		return false, fmt.Errorf("DiskIsAttached failed to determine whether disk %q is still attached: node %q does not exist",
-			volPath,
-			vSphereInstance)
-	}
-
-	// Get VM device list
-	_, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
-	if err != nil {
-		glog.Errorf("Failed to get VM devices for VM %#q. err: %s", vSphereInstance, err)
-		return false, err
-	}
-
-	attached, err := checkDiskAttached(volPath, vmDevices, dc, vs.client)
-	return attached, err
+	requestTime := time.Now()
+	isAttached, err := diskIsAttachedInternal(volPath, nodeName)
+	recordvSphereMetric(operation_diskIsAttached, requestTime, err)
+	return isAttached, err
 }
 
 // DisksAreAttached returns if disks are attached to the VM using controllers supported by the plugin.
 func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName k8stypes.NodeName) (map[string]bool, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	disksAreAttachedInternal := func(volPaths []string, nodeName k8stypes.NodeName) (map[string]bool, error) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	// Create vSphere client
-	err := vSphereLogin(ctx, vs)
-	if err != nil {
-		glog.Errorf("Failed to login into vCenter, err: %v", err)
-		return nil, err
-	}
-
-	// Find VM to detach disk from
-	var vSphereInstance string
-	if nodeName == "" {
-		vSphereInstance = vs.localInstanceID
-		nodeName = vmNameToNodeName(vSphereInstance)
-	} else {
-		vSphereInstance = nodeNameToVMName(nodeName)
-	}
-
-	nodeExist, err := vs.NodeExists(nodeName)
-
-	if err != nil {
-		glog.Errorf("Failed to check whether node exist. err: %s.", err)
-		return nil, err
-	}
-
-	if !nodeExist {
-		glog.Errorf("DisksAreAttached failed to determine whether disks %v are still attached: node %q does not exist",
-			volPaths,
-			vSphereInstance)
-		return nil, fmt.Errorf("DisksAreAttached failed to determine whether disks %v are still attached: node %q does not exist",
-			volPaths,
-			vSphereInstance)
-	}
-
-	// Get VM device list
-	_, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
-	if err != nil {
-		glog.Errorf("Failed to get VM devices for VM %#q. err: %s", vSphereInstance, err)
-		return nil, err
-	}
-
-	attached := make(map[string]bool)
-	for _, volPath := range volPaths {
-		result, err := checkDiskAttached(volPath, vmDevices, dc, vs.client)
-		if err == nil {
-			if result {
-				attached[volPath] = true
-			} else {
-				attached[volPath] = false
-			}
-		} else {
+		// Create vSphere client
+		err := vSphereLogin(ctx, vs)
+		if err != nil {
+			glog.Errorf("Failed to login into vCenter, err: %v", err)
 			return nil, err
 		}
+
+		// Find VM to detach disk from
+		var vSphereInstance string
+		if nodeName == "" {
+			vSphereInstance = vs.localInstanceID
+			nodeName = vmNameToNodeName(vSphereInstance)
+		} else {
+			vSphereInstance = nodeNameToVMName(nodeName)
+		}
+
+		nodeExist, err := vs.NodeExists(nodeName)
+
+		if err != nil {
+			glog.Errorf("Failed to check whether node exist. err: %s.", err)
+			return nil, err
+		}
+
+		if !nodeExist {
+			glog.Errorf("DisksAreAttached failed to determine whether disks %v are still attached: node %q does not exist",
+				volPaths,
+				vSphereInstance)
+			return nil, fmt.Errorf("DisksAreAttached failed to determine whether disks %v are still attached: node %q does not exist",
+				volPaths,
+				vSphereInstance)
+		}
+
+		// Get VM device list
+		_, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
+		if err != nil {
+			glog.Errorf("Failed to get VM devices for VM %#q. err: %s", vSphereInstance, err)
+			return nil, err
+		}
+
+		attached := make(map[string]bool)
+		for _, volPath := range volPaths {
+			result, err := checkDiskAttached(volPath, vmDevices, dc, vs.client)
+			if err == nil {
+				if result {
+					attached[volPath] = true
+				} else {
+					attached[volPath] = false
+				}
+			} else {
+				return nil, err
+			}
+		}
+		return attached, nil
 	}
-	return attached, nil
+	requestTime := time.Now()
+	attached, err := disksAreAttachedInternal(volPaths, nodeName)
+	recordvSphereMetric(operation_disksAreAttached, requestTime, err)
+	return attached, err
 }
 
 func checkDiskAttached(volPath string, vmdevices object.VirtualDeviceList, dc *object.Datacenter, client *govmomi.Client) (bool, error) {
@@ -1206,283 +1228,309 @@ func getVirtualDiskID(volPath string, vmDevices object.VirtualDeviceList, dc *ob
 
 // DetachDisk detaches given virtual disk volume from the compute running kubelet.
 func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error {
-	// Create context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	detachDiskInternal := func(volPath string, nodeName k8stypes.NodeName) error {
+		// Create context
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	// Ensure client is logged in and session is valid
-	err := vSphereLogin(ctx, vs)
-	if err != nil {
-		glog.Errorf("Failed to login into vCenter - %v", err)
-		return err
+		// Ensure client is logged in and session is valid
+		err := vSphereLogin(ctx, vs)
+		if err != nil {
+			glog.Errorf("Failed to login into vCenter - %v", err)
+			return err
+		}
+
+		// Find virtual machine to attach disk to
+		var vSphereInstance string
+		if nodeName == "" {
+			vSphereInstance = vs.localInstanceID
+			nodeName = vmNameToNodeName(vSphereInstance)
+		} else {
+			vSphereInstance = nodeNameToVMName(nodeName)
+		}
+
+		vm, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
+
+		if err != nil {
+			return err
+		}
+		volPath = removeClusterFromVDiskPath(volPath)
+		diskID, err := getVirtualDiskID(volPath, vmDevices, dc, vs.client)
+		if err != nil {
+			glog.Warningf("disk ID not found for %v ", volPath)
+			return err
+		}
+
+		// Gets virtual disk device
+		device := vmDevices.Find(diskID)
+		if device == nil {
+			return fmt.Errorf("device '%s' not found", diskID)
+		}
+
+		// Detach disk from VM
+		requestTime := time.Now()
+		err = vm.RemoveDevice(ctx, true, device)
+		recordvSphereMetric(api_detachvolume, requestTime, err)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
-
-	// Find virtual machine to attach disk to
-	var vSphereInstance string
-	if nodeName == "" {
-		vSphereInstance = vs.localInstanceID
-		nodeName = vmNameToNodeName(vSphereInstance)
-	} else {
-		vSphereInstance = nodeNameToVMName(nodeName)
-	}
-
-	vm, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
-
-	if err != nil {
-		return err
-	}
-	volPath = removeClusterFromVDiskPath(volPath)
-	diskID, err := getVirtualDiskID(volPath, vmDevices, dc, vs.client)
-	if err != nil {
-		glog.Warningf("disk ID not found for %v ", volPath)
-		return err
-	}
-
-	// Gets virtual disk device
-	device := vmDevices.Find(diskID)
-	if device == nil {
-		return fmt.Errorf("device '%s' not found", diskID)
-	}
-
-	// Detach disk from VM
-	err = vm.RemoveDevice(ctx, true, device)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	requestTime := time.Now()
+	err := detachDiskInternal(volPath, nodeName)
+	recordvSphereMetric(operation_detachvolume, requestTime, nil)
+	return err
 }
 
 // CreateVolume creates a volume of given size (in KiB).
 func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions) (volumePath string, err error) {
+	createVolumeInternal := func(volumeOptions *VolumeOptions) (volumePath string, err error) {
+		var datastore string
+		var destVolPath string
 
-	var datastore string
-	var destVolPath string
-
-	// Default datastore is the datastore in the vSphere config file that is used initialize vSphere cloud provider.
-	if volumeOptions.Datastore == "" {
-		datastore = vs.cfg.Global.Datastore
-	} else {
-		datastore = volumeOptions.Datastore
-	}
-
-	// Default diskformat as 'thin'
-	if volumeOptions.DiskFormat == "" {
-		volumeOptions.DiskFormat = ThinDiskType
-	}
-
-	if _, ok := diskFormatValidType[volumeOptions.DiskFormat]; !ok {
-		return "", fmt.Errorf("Cannot create disk. Error diskformat %+q."+
-			" Valid options are %s.", volumeOptions.DiskFormat, DiskformatValidOptions)
-	}
-
-	// Create context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Ensure client is logged in and session is valid
-	err = vSphereLogin(ctx, vs)
-	if err != nil {
-		glog.Errorf("Failed to login into vCenter - %v", err)
-		return "", err
-	}
-
-	// Create a new finder
-	f := find.NewFinder(vs.client.Client, true)
-
-	// Fetch and set data center
-	dc, err := f.Datacenter(ctx, vs.cfg.Global.Datacenter)
-	f.SetDatacenter(dc)
-
-	if volumeOptions.StoragePolicyName != "" {
-		// Get the pbm client
-		pbmClient, err := pbm.NewClient(ctx, vs.client.Client)
-		if err != nil {
-			return "", err
-		}
-		volumeOptions.StoragePolicyID, err = pbmClient.ProfileIDByName(ctx, volumeOptions.StoragePolicyName)
-		if err != nil {
-			return "", err
-		}
-
-		compatibilityResult, err := vs.GetPlacementCompatibilityResult(ctx, pbmClient, volumeOptions.StoragePolicyID)
-		if err != nil {
-			return "", err
-		}
-		if len(compatibilityResult) < 1 {
-			return "", fmt.Errorf("There are no compatible datastores that satisfy the storage policy: %+q requirements", volumeOptions.StoragePolicyID)
-		}
-
-		if volumeOptions.Datastore != "" {
-			ok, nonCompatibleDsref := vs.IsUserSpecifiedDatastoreNonCompatible(ctx, compatibilityResult, volumeOptions.Datastore)
-			if ok {
-				faultMsg := GetNonCompatibleDatastoreFaultMsg(compatibilityResult, *nonCompatibleDsref)
-				return "", fmt.Errorf("User specified datastore: %q is not compatible with the storagePolicy: %q. Failed with faults: %+q", volumeOptions.Datastore, volumeOptions.StoragePolicyName, faultMsg)
-			}
+		// Default datastore is the datastore in the vSphere config file that is used initialize vSphere cloud provider.
+		if volumeOptions.Datastore == "" {
+			datastore = vs.cfg.Global.Datastore
 		} else {
-			dsMoList, err := vs.GetCompatibleDatastoresMo(ctx, compatibilityResult)
+			datastore = volumeOptions.Datastore
+		}
+
+		// Default diskformat as 'thin'
+		if volumeOptions.DiskFormat == "" {
+			volumeOptions.DiskFormat = ThinDiskType
+		}
+
+		if _, ok := diskFormatValidType[volumeOptions.DiskFormat]; !ok {
+			return "", fmt.Errorf("Cannot create disk. Error diskformat %+q."+
+				" Valid options are %s.", volumeOptions.DiskFormat, DiskformatValidOptions)
+		}
+
+		// Create context
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Ensure client is logged in and session is valid
+		err = vSphereLogin(ctx, vs)
+		if err != nil {
+			glog.Errorf("Failed to login into vCenter - %v", err)
+			return "", err
+		}
+
+		// Create a new finder
+		f := find.NewFinder(vs.client.Client, true)
+
+		// Fetch and set data center
+		dc, err := f.Datacenter(ctx, vs.cfg.Global.Datacenter)
+		f.SetDatacenter(dc)
+
+		if volumeOptions.StoragePolicyName != "" {
+			// Get the pbm client
+			pbmClient, err := pbm.NewClient(ctx, vs.client.Client)
 			if err != nil {
 				return "", err
 			}
-			dsMo := GetMostFreeDatastore(dsMoList)
-			datastore = dsMo.Info.GetDatastoreInfo().Name
+			volumeOptions.StoragePolicyID, err = pbmClient.ProfileIDByName(ctx, volumeOptions.StoragePolicyName)
+			if err != nil {
+				recordvSphereMetric(operation_createvolume_with_policy, time.Time{}, err)
+				return "", err
+			}
+
+			compatibilityResult, err := vs.GetPlacementCompatibilityResult(ctx, pbmClient, volumeOptions.StoragePolicyID)
+			if err != nil {
+				return "", err
+			}
+			if len(compatibilityResult) < 1 {
+				return "", fmt.Errorf("There are no compatible datastores that satisfy the storage policy: %+q requirements", volumeOptions.StoragePolicyID)
+			}
+
+			if volumeOptions.Datastore != "" {
+				ok, nonCompatibleDsref := vs.IsUserSpecifiedDatastoreNonCompatible(ctx, compatibilityResult, volumeOptions.Datastore)
+				if ok {
+					faultMsg := GetNonCompatibleDatastoreFaultMsg(compatibilityResult, *nonCompatibleDsref)
+					return "", fmt.Errorf("User specified datastore: %q is not compatible with the storagePolicy: %q. Failed with faults: %+q", volumeOptions.Datastore, volumeOptions.StoragePolicyName, faultMsg)
+				}
+			} else {
+				dsMoList, err := vs.GetCompatibleDatastoresMo(ctx, compatibilityResult)
+				if err != nil {
+					recordvSphereMetric(operation_createvolume_with_raw_vsan_policy, time.Time{}, err)
+					return "", err
+				}
+				dsMo := GetMostFreeDatastore(dsMoList)
+				datastore = dsMo.Info.GetDatastoreInfo().Name
+			}
 		}
+		ds, err := f.Datastore(ctx, datastore)
+		if err != nil {
+			glog.Errorf("Failed while searching for datastore %+q. err %s", datastore, err)
+			return "", err
+		}
+
+		if volumeOptions.VSANStorageProfileData != "" {
+			// Check if the datastore is VSAN if any capability requirements are specified.
+			// VSphere cloud provider now only supports VSAN capabilities requirements
+			ok, err := checkIfDatastoreTypeIsVSAN(vs.client, ds)
+			if err != nil {
+				return "", fmt.Errorf("Failed while determining whether the datastore: %q"+
+					" is VSAN or not.", datastore)
+			}
+			if !ok {
+				return "", fmt.Errorf("The specified datastore: %q is not a VSAN datastore."+
+					" The policy parameters will work only with VSAN Datastore."+
+					" So, please specify a valid VSAN datastore in Storage class definition.", datastore)
+			}
+		}
+		// Create a disk with the VSAN storage capabilities specified in the volumeOptions.VSANStorageProfileData.
+		// This is achieved by following steps:
+		// 1. Create dummy VM if not already present.
+		// 2. Add a new disk to the VM by performing VM reconfigure.
+		// 3. Detach the new disk from the dummy VM.
+		// 4. Delete the dummy VM.
+		if volumeOptions.VSANStorageProfileData != "" || volumeOptions.StoragePolicyName != "" {
+			// Acquire a read lock to ensure multiple PVC requests can be processed simultaneously.
+			cleanUpDummyVMLock.RLock()
+			defer cleanUpDummyVMLock.RUnlock()
+
+			// Create a new background routine that will delete any dummy VM's that are left stale.
+			// This routine will get executed for every 5 minutes and gets initiated only once in its entire lifetime.
+			cleanUpRoutineInitLock.Lock()
+			if !cleanUpRoutineInitialized {
+				go vs.cleanUpDummyVMs(DummyVMPrefixName)
+				cleanUpRoutineInitialized = true
+			}
+			cleanUpRoutineInitLock.Unlock()
+
+			// Check if the VM exists in kubernetes cluster folder.
+			// The kubernetes cluster folder - vs.cfg.Global.WorkingDir is where all the nodes in the kubernetes cluster are created.
+			dummyVMFullName := DummyVMPrefixName + "-" + volumeOptions.Name
+			vmRegex := vs.cfg.Global.WorkingDir + dummyVMFullName
+			dummyVM, err := f.VirtualMachine(ctx, vmRegex)
+			if err != nil {
+				// 1. Create a dummy VM and return the VM reference.
+				dummyVM, err = vs.createDummyVM(ctx, dc, ds, dummyVMFullName)
+				if err != nil {
+					return "", err
+				}
+			}
+
+			// 2. Reconfigure the VM to attach the disk with the VSAN policy configured.
+			vmDiskPath, err := vs.createVirtualDiskWithPolicy(ctx, dc, ds, dummyVM, volumeOptions)
+			fileAlreadyExist := false
+			if err != nil {
+				vmDiskPath = filepath.Clean(ds.Path(VolDir)) + "/" + volumeOptions.Name + ".vmdk"
+				errorMessage := fmt.Sprintf("Cannot complete the operation because the file or folder %s already exists", vmDiskPath)
+				if errorMessage == err.Error() {
+					//Skip error and continue to detach the disk as the disk was already created on the datastore.
+					fileAlreadyExist = true
+					glog.V(1).Infof("File: %v already exists", vmDiskPath)
+				} else {
+					glog.Errorf("Failed to attach the disk to VM: %q with err: %+v", dummyVMFullName, err)
+					return "", err
+				}
+			}
+
+			dummyVMNodeName := vmNameToNodeName(dummyVMFullName)
+			// 3. Detach the disk from the dummy VM.
+			err = vs.DetachDisk(vmDiskPath, dummyVMNodeName)
+			if err != nil {
+				if DiskNotFoundErrMsg == err.Error() && fileAlreadyExist {
+					// Skip error if disk was already detached from the dummy VM but still present on the datastore.
+					glog.V(1).Infof("File: %v is already detached", vmDiskPath)
+				} else {
+					glog.Errorf("Failed to detach the disk: %q from VM: %q with err: %+v", vmDiskPath, dummyVMFullName, err)
+					return "", fmt.Errorf("Failed to create the volume: %q with err: %+v", volumeOptions.Name, err)
+				}
+			}
+
+			// 4. Delete the dummy VM
+			err = deleteVM(ctx, dummyVM)
+			if err != nil {
+				return "", fmt.Errorf("Failed to destroy the vm: %q with err: %+v", dummyVMFullName, err)
+			}
+			destVolPath = vmDiskPath
+		} else {
+			// Create a virtual disk directly if no VSAN storage capabilities are specified by the user.
+			destVolPath, err = createVirtualDisk(ctx, vs.client, dc, ds, volumeOptions)
+			if err != nil {
+				return "", fmt.Errorf("Failed to create the virtual disk having name: %+q with err: %+v", destVolPath, err)
+			}
+		}
+
+		if filepath.Base(datastore) != datastore {
+			// If Datastore is within cluster, add cluster path to the destVolPath
+			destVolPath = strings.Replace(destVolPath, filepath.Base(datastore), datastore, 1)
+		}
+		glog.V(1).Infof("VM Disk path is %+q", destVolPath)
+		return destVolPath, nil
 	}
-	ds, err := f.Datastore(ctx, datastore)
+	requestTime := time.Now()
+	volumePath, err = createVolumeInternal(volumeOptions)
+	recordCreateVolumeMetric(volumeOptions, requestTime, err)
 	if err != nil {
-		glog.Errorf("Failed while searching for datastore %+q. err %s", datastore, err)
 		return "", err
 	}
-
-	if volumeOptions.VSANStorageProfileData != "" {
-		// Check if the datastore is VSAN if any capability requirements are specified.
-		// VSphere cloud provider now only supports VSAN capabilities requirements
-		ok, err := checkIfDatastoreTypeIsVSAN(vs.client, ds)
-		if err != nil {
-			return "", fmt.Errorf("Failed while determining whether the datastore: %q"+
-				" is VSAN or not.", datastore)
-		}
-		if !ok {
-			return "", fmt.Errorf("The specified datastore: %q is not a VSAN datastore."+
-				" The policy parameters will work only with VSAN Datastore."+
-				" So, please specify a valid VSAN datastore in Storage class definition.", datastore)
-		}
-	}
-	// Create a disk with the VSAN storage capabilities specified in the volumeOptions.VSANStorageProfileData.
-	// This is achieved by following steps:
-	// 1. Create dummy VM if not already present.
-	// 2. Add a new disk to the VM by performing VM reconfigure.
-	// 3. Detach the new disk from the dummy VM.
-	// 4. Delete the dummy VM.
-	if volumeOptions.VSANStorageProfileData != "" || volumeOptions.StoragePolicyName != "" {
-		// Acquire a read lock to ensure multiple PVC requests can be processed simultaneously.
-		cleanUpDummyVMLock.RLock()
-		defer cleanUpDummyVMLock.RUnlock()
-
-		// Create a new background routine that will delete any dummy VM's that are left stale.
-		// This routine will get executed for every 5 minutes and gets initiated only once in its entire lifetime.
-		cleanUpRoutineInitLock.Lock()
-		if !cleanUpRoutineInitialized {
-			go vs.cleanUpDummyVMs(DummyVMPrefixName)
-			cleanUpRoutineInitialized = true
-		}
-		cleanUpRoutineInitLock.Unlock()
-
-		// Check if the VM exists in kubernetes cluster folder.
-		// The kubernetes cluster folder - vs.cfg.Global.WorkingDir is where all the nodes in the kubernetes cluster are created.
-		dummyVMFullName := DummyVMPrefixName + "-" + volumeOptions.Name
-		vmRegex := vs.cfg.Global.WorkingDir + dummyVMFullName
-		dummyVM, err := f.VirtualMachine(ctx, vmRegex)
-		if err != nil {
-			// 1. Create a dummy VM and return the VM reference.
-			dummyVM, err = vs.createDummyVM(ctx, dc, ds, dummyVMFullName)
-			if err != nil {
-				return "", err
-			}
-		}
-
-		// 2. Reconfigure the VM to attach the disk with the VSAN policy configured.
-		vmDiskPath, err := vs.createVirtualDiskWithPolicy(ctx, dc, ds, dummyVM, volumeOptions)
-		fileAlreadyExist := false
-		if err != nil {
-			vmDiskPath = filepath.Clean(ds.Path(VolDir)) + "/" + volumeOptions.Name + ".vmdk"
-			errorMessage := fmt.Sprintf("Cannot complete the operation because the file or folder %s already exists", vmDiskPath)
-			if errorMessage == err.Error() {
-				//Skip error and continue to detach the disk as the disk was already created on the datastore.
-				fileAlreadyExist = true
-				glog.V(1).Infof("File: %v already exists", vmDiskPath)
-			} else {
-				glog.Errorf("Failed to attach the disk to VM: %q with err: %+v", dummyVMFullName, err)
-				return "", err
-			}
-		}
-
-		dummyVMNodeName := vmNameToNodeName(dummyVMFullName)
-		// 3. Detach the disk from the dummy VM.
-		err = vs.DetachDisk(vmDiskPath, dummyVMNodeName)
-		if err != nil {
-			if DiskNotFoundErrMsg == err.Error() && fileAlreadyExist {
-				// Skip error if disk was already detached from the dummy VM but still present on the datastore.
-				glog.V(1).Infof("File: %v is already detached", vmDiskPath)
-			} else {
-				glog.Errorf("Failed to detach the disk: %q from VM: %q with err: %+v", vmDiskPath, dummyVMFullName, err)
-				return "", fmt.Errorf("Failed to create the volume: %q with err: %+v", volumeOptions.Name, err)
-			}
-		}
-
-		// 4. Delete the dummy VM
-		err = deleteVM(ctx, dummyVM)
-		if err != nil {
-			return "", fmt.Errorf("Failed to destroy the vm: %q with err: %+v", dummyVMFullName, err)
-		}
-		destVolPath = vmDiskPath
-	} else {
-		// Create a virtual disk directly if no VSAN storage capabilities are specified by the user.
-		destVolPath, err = createVirtualDisk(ctx, vs.client, dc, ds, volumeOptions)
-		if err != nil {
-			return "", fmt.Errorf("Failed to create the virtual disk having name: %+q with err: %+v", destVolPath, err)
-		}
-	}
-
-	if filepath.Base(datastore) != datastore {
-		// If Datastore is within cluster, add cluster path to the destVolPath
-		destVolPath = strings.Replace(destVolPath, filepath.Base(datastore), datastore, 1)
-	}
-	glog.V(1).Infof("VM Disk path is %+q", destVolPath)
-	return destVolPath, nil
+	return volumePath, nil
 }
 
 // DeleteVolume deletes a volume given volume name.
 // Also, deletes the folder where the volume resides.
 func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
-	// Create context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	deleteVolumeInternal := func(vmDiskPath string) error {
+		// Create context
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	// Ensure client is logged in and session is valid
-	err := vSphereLogin(ctx, vs)
-	if err != nil {
-		glog.Errorf("Failed to login into vCenter - %v", err)
-		return err
-	}
-
-	// Create a new finder
-	f := find.NewFinder(vs.client.Client, true)
-
-	// Fetch and set data center
-	dc, err := f.Datacenter(ctx, vs.cfg.Global.Datacenter)
-	f.SetDatacenter(dc)
-
-	// Create a virtual disk manager
-	virtualDiskManager := object.NewVirtualDiskManager(vs.client.Client)
-
-	if filepath.Ext(vmDiskPath) != ".vmdk" {
-		vmDiskPath += ".vmdk"
-	}
-
-	// Get the vmDisk Name
-	diskNameWithExt := path.Base(vmDiskPath)
-	diskName := strings.TrimSuffix(diskNameWithExt, filepath.Ext(diskNameWithExt))
-
-	// Search for the dummyVM if present and delete it.
-	dummyVMFullName := DummyVMPrefixName + "-" + diskName
-	vmRegex := vs.cfg.Global.WorkingDir + dummyVMFullName
-	dummyVM, err := f.VirtualMachine(ctx, vmRegex)
-	if err == nil {
-		err = deleteVM(ctx, dummyVM)
+		// Ensure client is logged in and session is valid
+		err := vSphereLogin(ctx, vs)
 		if err != nil {
-			return fmt.Errorf("Failed to destroy the vm: %q with err: %+v", dummyVMFullName, err)
+			glog.Errorf("Failed to login into vCenter - %v", err)
+			return err
 		}
-	}
 
-	// Delete virtual disk
-	vmDiskPath = removeClusterFromVDiskPath(vmDiskPath)
-	task, err := virtualDiskManager.DeleteVirtualDisk(ctx, vmDiskPath, dc)
-	if err != nil {
+		// Create a new finder
+		f := find.NewFinder(vs.client.Client, true)
+
+		// Fetch and set data center
+		dc, err := f.Datacenter(ctx, vs.cfg.Global.Datacenter)
+		f.SetDatacenter(dc)
+
+		// Create a virtual disk manager
+		virtualDiskManager := object.NewVirtualDiskManager(vs.client.Client)
+
+		if filepath.Ext(vmDiskPath) != ".vmdk" {
+			vmDiskPath += ".vmdk"
+		}
+
+		// Get the vmDisk Name
+		diskNameWithExt := path.Base(vmDiskPath)
+		diskName := strings.TrimSuffix(diskNameWithExt, filepath.Ext(diskNameWithExt))
+
+		// Search for the dummyVM if present and delete it.
+		dummyVMFullName := DummyVMPrefixName + "-" + diskName
+		vmRegex := vs.cfg.Global.WorkingDir + dummyVMFullName
+		dummyVM, err := f.VirtualMachine(ctx, vmRegex)
+		if err == nil {
+			err = deleteVM(ctx, dummyVM)
+			if err != nil {
+				return fmt.Errorf("Failed to destroy the vm: %q with err: %+v", dummyVMFullName, err)
+			}
+		}
+
+		// Delete virtual disk
+		vmDiskPath = removeClusterFromVDiskPath(vmDiskPath)
+		requestTime := time.Now()
+		task, err := virtualDiskManager.DeleteVirtualDisk(ctx, vmDiskPath, dc)
+		if err != nil {
+			recordvSphereMetric(api_deletevolume, requestTime, err)
+			return err
+		}
+		err = task.Wait(ctx)
+		recordvSphereMetric(api_deletevolume, requestTime, err)
 		return err
 	}
-
-	return task.Wait(ctx)
+	requestTime := time.Now()
+	err := deleteVolumeInternal(vmDiskPath)
+	recordvSphereMetric(operation_deletevolume, requestTime, err)
+	return err
 }
 
 // NodeExists checks if the node with given nodeName exist.
@@ -1802,11 +1850,15 @@ func createVirtualDisk(ctx context.Context, c *govmomi.Client, dc *object.Datace
 	}
 
 	// Create virtual disk
+	requestTime := time.Now()
 	task, err := virtualDiskManager.CreateVirtualDisk(ctx, vmDiskPath, dc, vmDiskSpec)
 	if err != nil {
+		recordvSphereMetric(api_createvolume, requestTime, err)
 		return "", err
 	}
-	return vmDiskPath, task.Wait(ctx)
+	err = task.Wait(ctx)
+	recordvSphereMetric(api_createvolume, requestTime, err)
+	return vmDiskPath, err
 }
 
 // Check if the provided datastore is VSAN
