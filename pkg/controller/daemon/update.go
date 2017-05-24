@@ -104,7 +104,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *extensions.DaemonSet) (cur
 		}
 		// Compare histories with ds to separate cur and old history
 		found := false
-		found, err = match(ds, history)
+		found, err = Match(&ds.Spec.Template, history)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -295,10 +295,10 @@ func (dsc *DaemonSetsController) controlledHistories(ds *extensions.DaemonSet) (
 	return result, nil
 }
 
-// match check if ds template is semantically equal to the template stored in history
-func match(ds *extensions.DaemonSet, history *apps.ControllerRevision) (bool, error) {
-	template, err := decodeHistory(history)
-	return apiequality.Semantic.DeepEqual(&ds.Spec.Template, template), err
+// Match check if ds template is semantically equal to the template stored in history
+func Match(template *v1.PodTemplateSpec, history *apps.ControllerRevision) (bool, error) {
+	t, err := decodeHistory(history)
+	return apiequality.Semantic.DeepEqual(template, t), err
 }
 
 func decodeHistory(history *apps.ControllerRevision) (*v1.PodTemplateSpec, error) {
@@ -343,7 +343,7 @@ func (dsc *DaemonSetsController) snapshot(ds *extensions.DaemonSet, revision int
 			return nil, getErr
 		}
 		// Check if we already created it
-		done, err := match(ds, existedHistory)
+		done, err := Match(&ds.Spec.Template, existedHistory)
 		if err != nil {
 			return nil, err
 		}

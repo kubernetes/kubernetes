@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -260,8 +261,18 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 
 		By("Make sure all daemon pods have correct template generation 1")
+		templateGeneration := "1"
 		err = checkDaemonPodsTemplateGeneration(c, ns, label, "1")
 		Expect(err).NotTo(HaveOccurred())
+
+		// Check history and labels
+		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		first := curHistory(listDaemonHistories(c, ns, label), &ds.Spec.Template)
+		firstHash := ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
+		Expect(first.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).To(Equal(firstHash))
+		Expect(first.Revision).To(Equal(int64(1)))
+		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash, templateGeneration)
 
 		By("Update daemon pods image.")
 		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, redisImage)
@@ -274,12 +285,21 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Make sure all daemon pods have correct template generation 1")
-		err = checkDaemonPodsTemplateGeneration(c, ns, label, "1")
+		err = checkDaemonPodsTemplateGeneration(c, ns, label, templateGeneration)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods are still running on every node of the cluster.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
+
+		// Check history and labels
+		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		cur := curHistory(listDaemonHistories(c, ns, label), &ds.Spec.Template)
+		curHash := ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
+		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).To(Equal(curHash))
+		Expect(cur.Revision).To(Equal(int64(2)))
+		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash, templateGeneration)
 	})
 
 	It("Should update pod when spec was updated and update strategy is RollingUpdate", func() {
@@ -302,23 +322,42 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		err = checkDaemonPodsTemplateGeneration(c, ns, label, fmt.Sprint(templateGeneration))
 		Expect(err).NotTo(HaveOccurred())
 
+		// Check history and labels
+		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		cur := curHistory(listDaemonHistories(c, ns, label), &ds.Spec.Template)
+		hash := ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
+		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).To(Equal(hash))
+		Expect(cur.Revision).To(Equal(int64(1)))
+		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash, fmt.Sprint(templateGeneration))
+
 		By("Update daemon pods image.")
 		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, redisImage)
 		ds, err = c.Extensions().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration + 1))
+		templateGeneration++
+		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration))
 
 		By("Check that daemon pods images are updated.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImageAndAvailability(c, ds, redisImage, 1))
 		Expect(err).NotTo(HaveOccurred())
 
-		By(fmt.Sprintf("Make sure all daemon pods have correct template generation %d", templateGeneration+1))
-		err = checkDaemonPodsTemplateGeneration(c, ns, label, fmt.Sprint(templateGeneration+1))
+		By(fmt.Sprintf("Make sure all daemon pods have correct template generation %d", templateGeneration))
+		err = checkDaemonPodsTemplateGeneration(c, ns, label, fmt.Sprint(templateGeneration))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods are still running on every node of the cluster.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
+
+		// Check history and labels
+		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		cur = curHistory(listDaemonHistories(c, ns, label), &ds.Spec.Template)
+		hash = ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
+		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).To(Equal(hash))
+		Expect(cur.Revision).To(Equal(int64(2)))
+		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash, fmt.Sprint(templateGeneration))
 	})
 
 	It("Should adopt or recreate existing pods when creating a RollingUpdate DaemonSet with matching or mismatching templateGeneration", func() {
@@ -697,4 +736,45 @@ func checkDaemonSetPodsName(c clientset.Interface, ns, prefix string, label map[
 		}
 	}
 	return nil
+}
+
+func checkDaemonSetPodsLabels(podList *v1.PodList, hash, templateGeneration string) {
+	for _, pod := range podList.Items {
+		podHash := pod.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
+		podTemplate := pod.Labels[extensions.DaemonSetTemplateGenerationKey]
+		Expect(len(podHash)).To(BeNumerically(">", 0))
+		if len(hash) > 0 {
+			Expect(podHash).To(Equal(hash))
+		}
+		Expect(len(podTemplate)).To(BeNumerically(">", 0))
+		Expect(podTemplate).To(Equal(templateGeneration))
+	}
+}
+
+func listDaemonHistories(c clientset.Interface, ns string, label map[string]string) *apps.ControllerRevisionList {
+	selector := labels.Set(label).AsSelector()
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	historyList, err := c.Apps().ControllerRevisions(ns).List(options)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(len(historyList.Items)).To(BeNumerically(">", 0))
+	return historyList
+}
+
+func curHistory(historyList *apps.ControllerRevisionList, template *v1.PodTemplateSpec) *apps.ControllerRevision {
+	var curHistory *apps.ControllerRevision
+	foundCurHistories := 0
+	for i := range historyList.Items {
+		history := &historyList.Items[i]
+		// Every history should have the hash label
+		Expect(len(history.Labels[extensions.DefaultDaemonSetUniqueLabelKey])).To(BeNumerically(">", 0))
+		match, err := daemon.Match(template, history)
+		Expect(err).NotTo(HaveOccurred())
+		if match {
+			curHistory = history
+			foundCurHistories++
+		}
+	}
+	Expect(foundCurHistories).To(Equal(1))
+	Expect(curHistory).NotTo(BeNil())
+	return curHistory
 }
