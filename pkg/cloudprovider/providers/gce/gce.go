@@ -84,6 +84,7 @@ type GCECloud struct {
 	localZone                string   // The zone in which we are running
 	managedZones             []string // List of zones we are spanning (for multi-AZ clusters, primarily when running on master)
 	networkURL               string
+	subnetworkURL            string
 	nodeTags                 []string // List of tags to use on firewall rules for load balancers
 	nodeInstancePrefix       string   // If non-"", an advisory prefix for all nodes in the cluster
 	useMetadataServer        bool
@@ -96,6 +97,7 @@ type Config struct {
 		TokenBody          string   `gcfg:"token-body"`
 		ProjectID          string   `gcfg:"project-id"`
 		NetworkName        string   `gcfg:"network-name"`
+		SubnetworkName     string   `gcfg:"subnetwork-name"`
 		NodeTags           []string `gcfg:"node-tags"`
 		NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
 		Multizone          bool     `gcfg:"multizone"`
@@ -132,6 +134,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 		return nil, err
 	}
 	networkURL := gceNetworkURL(projectID, networkName)
+	subnetworkURL := ""
 
 	// By default, Kubernetes clusters only run against one zone
 	managedZones := []string{zone}
@@ -156,6 +159,13 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 				networkURL = gceNetworkURL(cfg.Global.ProjectID, cfg.Global.NetworkName)
 			}
 		}
+		if cfg.Global.SubnetworkName != "" {
+			if strings.Contains(cfg.Global.SubnetworkName, "/") {
+				subnetworkURL = cfg.Global.SubnetworkName
+			} else {
+				subnetworkURL = gceSubnetworkURL(cfg.Global.ProjectID, region, cfg.Global.SubnetworkName)
+			}
+		}
 		if cfg.Global.TokenURL != "" {
 			tokenSource = NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
 		}
@@ -166,15 +176,15 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 		}
 	}
 
-	return CreateGCECloud(projectID, region, zone, managedZones, networkURL, nodeTags,
-		nodeInstancePrefix, tokenSource, true /* useMetadataServer */)
+	return CreateGCECloud(projectID, region, zone, managedZones, networkURL, subnetworkURL,
+		nodeTags, nodeInstancePrefix, tokenSource, true /* useMetadataServer */)
 }
 
 // Creates a GCECloud object using the specified parameters.
 // If no networkUrl is specified, loads networkName via rest call.
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
-func CreateGCECloud(projectID, region, zone string, managedZones []string, networkURL string, nodeTags []string,
+func CreateGCECloud(projectID, region, zone string, managedZones []string, networkURL, subnetworkURL string, nodeTags []string,
 	nodeInstancePrefix string, tokenSource oauth2.TokenSource, useMetadataServer bool) (*GCECloud, error) {
 
 	client, err := newOauthClient(tokenSource)
@@ -227,6 +237,7 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		localZone:                zone,
 		managedZones:             managedZones,
 		networkURL:               networkURL,
+		subnetworkURL:            subnetworkURL,
 		nodeTags:                 nodeTags,
 		nodeInstancePrefix:       nodeInstancePrefix,
 		useMetadataServer:        useMetadataServer,
@@ -285,6 +296,10 @@ var _ cloudprovider.Interface = (*GCECloud)(nil)
 
 func gceNetworkURL(project, network string) string {
 	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", project, network)
+}
+
+func gceSubnetworkURL(project, region, subnetwork string) string {
+	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/subnetworks/%s", project, region, subnetwork)
 }
 
 func getNetworkNameViaMetadata() (string, error) {
