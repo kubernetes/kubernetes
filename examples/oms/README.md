@@ -2,7 +2,7 @@
 
 The [Microsoft Operations Management Suite (OMS)](https://www.microsoft.com/en-us/cloud-platform/operations-management-suite) is a software-as-a-service offering from Microsoft that allows Enterprise IT to manage any hybrid cloud.
 
-This example will create a DeamonSet to deploy the OMS Linux agents running as containers to every node in the Kubernetes cluster.
+This example will create a DaemonSet to deploy the OMS Linux agents running as containers to every node in the Kubernetes cluster.
 
 ### Supported Linux Operating Systems & Docker
 - Docker 1.10 thru 1.12.1
