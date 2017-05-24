@@ -48,7 +48,11 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
-const ProviderName = "openstack"
+const (
+	ProviderName = "openstack"
+	Keystone_v2  = "v2.0"
+	Keystone_v3  = "v3"
+)
 
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
@@ -231,17 +235,28 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 		provider.HTTPClient.Transport = netutil.SetOldTransportDefaults(&http.Transport{TLSClientConfig: config})
 
 	}
-	if cfg.Global.TrustId != "" {
+
+	authUrl := cfg.Global.AuthUrl
+	keystone_version := "Unknow Keystone Version"
+	if strings.Contains(authUrl, Keystone_v2) {
+		keystone_version = Keystone_v2
+	} else if strings.Contains(authUrl, Keystone_v3) {
+		keystone_version = Keystone_v3
+	}
+
+	switch keystone_version {
+	case Keystone_v2:
+		err = openstack.Authenticate(provider, cfg.toAuthOptions())
+	case Keystone_v3:
 		opts := cfg.toAuth3Options()
 		authOptsExt := trusts.AuthOptsExt{
 			TrustID:            cfg.Global.TrustId,
 			AuthOptionsBuilder: &opts,
 		}
 		err = openstack.AuthenticateV3(provider, authOptsExt, gophercloud.EndpointOpts{})
-	} else {
-		err = openstack.Authenticate(provider, cfg.toAuthOptions())
+	default:
+		err = fmt.Errorf("Unknow keystone version in authUrl %s, expected %s or %s.", cfg.Global.AuthUrl, Keystone_v2, Keystone_v3)
 	}
-
 	if err != nil {
 		return nil, err
 	}
