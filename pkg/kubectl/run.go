@@ -52,6 +52,7 @@ func (DeploymentV1Beta1) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -141,6 +142,7 @@ func (DeploymentAppsV1Beta1) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -306,6 +308,7 @@ func (JobV1) ParamNames() []GeneratorParam {
 		{"requests", false},
 		{"limits", false},
 		{"restart", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -400,6 +403,7 @@ func (CronJobV2Alpha1) ParamNames() []GeneratorParam {
 		{"limits", false},
 		{"restart", false},
 		{"schedule", true},
+		{"serviceaccount", false},
 	}
 }
 
@@ -498,6 +502,7 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -603,6 +608,7 @@ func makePodSpec(params map[string]string, name string) (*v1.PodSpec, error) {
 	}
 
 	spec := v1.PodSpec{
+		ServiceAccountName: params["serviceaccount"],
 		Containers: []v1.Container{
 			{
 				Name:      name,
@@ -761,6 +767,7 @@ func (BasicPod) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -821,6 +828,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 			Labels: labels,
 		},
 		Spec: v1.PodSpec{
+			ServiceAccountName: params["serviceaccount"],
 			Containers: []v1.Container{
 				{
 					Name:            name,
