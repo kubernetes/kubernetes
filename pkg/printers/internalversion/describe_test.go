@@ -646,6 +646,14 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 				},
 			},
 		},
+		"ceph": {
+			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					CephFS: &api.CephFSVolumeSource{},
+				},
+			},
+		},
 		"rbd": {
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
