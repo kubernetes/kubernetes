@@ -177,6 +177,9 @@ func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, delegateAPIServer g
 
 // CreateKubeAPIServerConfig creates all the resources for running the API server, but runs none of them
 func CreateKubeAPIServerConfig(s *options.ServerRunOptions) (*master.Config, informers.SharedInformerFactory, *kubeserver.InsecureServingInfo, error) {
+	// register all admission plugins
+	registerAllAdmissionPlugins(s.Admission.Plugins)
+
 	// set defaults in the options before trying to create the generic config
 	if err := defaultOptions(s); err != nil {
 		return nil, nil, nil, err
