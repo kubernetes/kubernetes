@@ -2540,6 +2540,9 @@ func nodeNames(nodes []*v1.Node) sets.String {
 	return ret
 }
 
+// InitializeLoadBalancer provides the load balancer with an interface which lists all cached services
+func (c *Cloud) InitializeLoadBalancer(lister cloudprovider.ServiceLister) {}
+
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
 func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	annotations := apiService.Annotations

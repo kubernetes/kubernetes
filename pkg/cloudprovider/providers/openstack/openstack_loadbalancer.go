@@ -555,6 +555,9 @@ func stringInArray(x string, list []string) bool {
 	return false
 }
 
+// InitializeLoadBalancer provides the load balancer with an interface which lists all cached services
+func (lbaas *LbaasV2) InitializeLoadBalancer(lister cloudprovider.ServiceLister) {}
+
 func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	loadbalancer, err := getLoadbalancerByName(lbaas.network, loadBalancerName)
@@ -1202,6 +1205,9 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 
 	return nil
 }
+
+// InitializeLoadBalancer provides the load balancer with an interface which lists all cached services
+func (lb *LbaasV1) InitializeLoadBalancer(lister cloudprovider.ServiceLister) {}
 
 func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)

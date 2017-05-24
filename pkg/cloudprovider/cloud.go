@@ -79,8 +79,14 @@ func GetInstanceProviderID(cloud Interface, nodeName types.NodeName) (string, er
 	return cloud.ProviderName() + "://" + instanceID, nil
 }
 
+type ServiceLister interface {
+	List() []*v1.Service
+}
+
 // LoadBalancer is an abstract, pluggable interface for load balancers.
 type LoadBalancer interface {
+	// InitializeLoadBalancer provides the load balancer with an interface which lists all services
+	InitializeLoadBalancer(lister ServiceLister)
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.

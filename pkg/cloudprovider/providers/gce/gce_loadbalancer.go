@@ -78,6 +78,9 @@ func init() {
 	flag.Var(&lbSrcRngsFlag, "cloud-provider-gce-lb-src-cidrs", "CIDRS opened in GCE firewall for LB traffic proxy & health checks")
 }
 
+// InitializeLoadBalancer provides the load balancer with an interface which lists all cached services
+func (gce *GCECloud) InitializeLoadBalancer(lister cloudprovider.ServiceLister) {}
+
 // String is the method to format the flag's value, part of the flag.Value interface.
 func (c *cidrs) String() string {
 	return strings.Join(c.ipn.StringSlice(), ",")

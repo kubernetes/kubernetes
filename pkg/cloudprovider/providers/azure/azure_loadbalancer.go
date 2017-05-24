@@ -35,6 +35,9 @@ import (
 // ServiceAnnotationLoadBalancerInternal is the annotation used on the service
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/azure-load-balancer-internal"
 
+// InitializeLoadBalancer provides the load balancer with an interface which lists all cached services
+func (az *Cloud) InitializeLoadBalancer(lister cloudprovider.ServiceLister) {}
+
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
