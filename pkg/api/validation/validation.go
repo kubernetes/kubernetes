@@ -2709,6 +2709,9 @@ func ValidateService(service *api.Service) field.ErrorList {
 		if service.Spec.ClusterIP != "" {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIP"), service.Spec.ClusterIP, "must be empty for ExternalName services"))
 		}
+		if len(service.Spec.Ports) > 0 {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("ports"), service.Spec.Ports, "must be empty for ExternalName services"))
+		}
 		if len(service.Spec.ExternalName) > 0 {
 			allErrs = append(allErrs, ValidateDNS1123Subdomain(service.Spec.ExternalName, specPath.Child("externalName"))...)
 		} else {

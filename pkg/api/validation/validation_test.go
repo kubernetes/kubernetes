@@ -6011,6 +6011,7 @@ func TestValidateService(t *testing.T) {
 				s.Spec.Type = api.ServiceTypeExternalName
 				s.Spec.ClusterIP = ""
 				s.Spec.ExternalName = "foo.bar.example.com"
+				s.Spec.Ports = make([]api.ServicePort, 0)
 			},
 			numErrs: 0,
 		},
@@ -6020,6 +6021,7 @@ func TestValidateService(t *testing.T) {
 				s.Spec.Type = api.ServiceTypeExternalName
 				s.Spec.ClusterIP = "1.2.3.4"
 				s.Spec.ExternalName = "foo.bar.example.com"
+				s.Spec.Ports = make([]api.ServicePort, 0)
 			},
 			numErrs: 1,
 		},
@@ -6029,6 +6031,7 @@ func TestValidateService(t *testing.T) {
 				s.Spec.Type = api.ServiceTypeExternalName
 				s.Spec.ClusterIP = "None"
 				s.Spec.ExternalName = "foo.bar.example.com"
+				s.Spec.Ports = make([]api.ServicePort, 0)
 			},
 			numErrs: 1,
 		},
@@ -6038,6 +6041,7 @@ func TestValidateService(t *testing.T) {
 				s.Spec.Type = api.ServiceTypeExternalName
 				s.Spec.ClusterIP = ""
 				s.Spec.ExternalName = "-123"
+				s.Spec.Ports = make([]api.ServicePort, 0)
 			},
 			numErrs: 1,
 		},
