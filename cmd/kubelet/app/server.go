@@ -348,11 +348,14 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 		// when you run the controller, either you get back a valid config to use, or the Kubelet crashes because
 		// something was fatally wrong with the configuration. Non-fatal errors will be logged, but not returned from Run().
-		kcToUse := ncc.Run()
+		kcToUse, err := ncc.Run()
+		if err != nil {
+			return fmt.Errorf("failed to determine a valid configuration, error: %v", err)
+		}
 
 		// Update s (KubeletServer) to any new config
 		kcToUseInternal := componentconfig.KubeletConfiguration{}
-		err := api.Scheme.Convert(kcToUse, &kcToUseInternal, nil)
+		err = api.Scheme.Convert(kcToUse, &kcToUseInternal, nil)
 		if err != nil {
 			return err
 		}

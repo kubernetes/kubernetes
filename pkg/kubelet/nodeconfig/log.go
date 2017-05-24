@@ -32,7 +32,9 @@ func fatalf(format string, args ...interface{}) {
 	} else {
 		s = format
 	}
-	glog.FatalDepth(1, fmt.Sprintf(nodeconfigLogFmt, s))
+	msg := fmt.Sprintf(nodeconfigLogFmt, s)
+	glog.ErrorDepth(1, msg)
+	panic(fmt.Errorf(msg))
 }
 
 func errorf(format string, args ...interface{}) {

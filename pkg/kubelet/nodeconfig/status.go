@@ -28,9 +28,9 @@ import (
 const configOKType = "ConfigOK"
 
 // fatalSyncConfigOK attempts to sync a ConfigOK status describing a fatal error.
-// You should generally crash the Kubelet, e.g. call fatalf("error"), after calling fatalSyncConfigOK.
+// It is typical to call fatalf after fatalSyncConfigOK.
 func (cc *NodeConfigController) fatalSyncConfigOK(cause string) {
-	cc.setConfigOK("Kubelet will crash-loop until resolved", cause, apiv1.ConditionFalse)
+	cc.setConfigOK("fatal-class error occurred while resolving config", cause, apiv1.ConditionFalse)
 	cc.syncConfigOK()
 }
 

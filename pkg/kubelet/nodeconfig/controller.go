@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"runtime"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,11 +75,17 @@ func NewNodeConfigController(client clientset.Interface, nodename string, config
 // If a valid configuration is found as a result of these operations, that configuration is returned.
 // If a valid configuration cannot be found, a fatal error occurs, preventing the Kubelet from continuing with invalid configuration.
 // Run must be called synchronously during Kubelet startup, before any KubeletConfiguration is used.
-func (cc *NodeConfigController) Run() *ccv1a1.KubeletConfiguration {
+func (cc *NodeConfigController) Run() (finalConfig *ccv1a1.KubeletConfiguration, fatalErr error) {
 	var curUID string
 
 	// defer updating status and starting the sync loop until the end of Run
 	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+			fatalErr = r.(error)
+		}
 		cc.syncConfigOK()
 		cc.initSync()
 	}()
@@ -104,9 +111,11 @@ func (cc *NodeConfigController) Run() *ccv1a1.KubeletConfiguration {
 	// if the client is nil, skip dynamic config and just return the (now validated) init or default configuration
 	if cc.client == nil {
 		if cc.initConfig != nil {
-			return cc.initConfig
+			finalConfig = cc.initConfig
+			return
 		}
-		return cc.defaultConfig
+		finalConfig = cc.defaultConfig
+		return
 	}
 
 	// check the Node and download any new config
@@ -122,7 +131,8 @@ func (cc *NodeConfigController) Run() *ccv1a1.KubeletConfiguration {
 			// the sync loop will check again after its full-resync interval
 			msg := "failed to sync, desired config unclear"
 			errorf("%s, error: %v", msg, err)
-			return cc.lkgRollback(fmt.Sprintf("%s, cause: %s", msg, cause), apiv1.ConditionUnknown)
+			finalConfig = cc.lkgRollback(fmt.Sprintf("%s, cause: %s", msg, cause), apiv1.ConditionUnknown)
+			return
 		}
 	}
 
@@ -134,17 +144,20 @@ func (cc *NodeConfigController) Run() *ccv1a1.KubeletConfiguration {
 		if cc.initConfig != nil {
 			cc.setConfigOK("using current (init)",
 				"current is set to the local default, and an init config was provided", apiv1.ConditionTrue)
-			return cc.initConfig
+			finalConfig = cc.initConfig
+			return
 		}
 		cc.setConfigOK("using current (default)",
 			"current is set to the local default, and no init config was provided", apiv1.ConditionTrue)
-		return cc.defaultConfig
+		finalConfig = cc.defaultConfig
+		return
 	} // Assert: we will not use the init or default configurations, unless we roll back to lkg; curUID is a real UID
 
 	// check whether the current config is marked bad
 	if bad, entry := cc.isBadConfig(curUID); bad {
 		infof("current config %q was marked bad for reason %q at time %q", curUID, entry.reason, entry.time)
-		return cc.lkgRollback(entry.reason, apiv1.ConditionFalse)
+		finalConfig = cc.lkgRollback(entry.reason, apiv1.ConditionFalse)
+		return
 	}
 
 	// TODO(mtaufen): consider re-verifying integrity and re-attempting download when a load/verify/parse/validate
@@ -156,30 +169,35 @@ func (cc *NodeConfigController) Run() *ccv1a1.KubeletConfiguration {
 	if err != nil {
 		// TODO(mtaufen): rollback and mark bad for now, but this could reasonably be handled by re-attempting a download,
 		// it probably indicates some sort of corruption
-		return cc.badRollback(curUID, fmt.Sprintf("failed to load current (UID: %q)", curUID), fmt.Sprintf("error: %v", err))
+		finalConfig = cc.badRollback(curUID, fmt.Sprintf("failed to load current (UID: %q)", curUID), fmt.Sprintf("error: %v", err))
+		return
 	}
 
 	// verify the integrity of the configuration we just loaded
 	toParse, err := toVerify.verify()
 	if err != nil {
-		return cc.badRollback(curUID, fmt.Sprintf("failed to verify current (UID: %q)", curUID), fmt.Sprintf("error: %v", err))
+		finalConfig = cc.badRollback(curUID, fmt.Sprintf("failed to verify current (UID: %q)", curUID), fmt.Sprintf("error: %v", err))
+		return
 	}
 
 	// parse the configuration we just loaded into a KubeletConfiguration
 	cur, err := toParse.parse()
 	if err != nil {
-		return cc.badRollback(curUID, fmt.Sprintf("failed to parse current (UID: %q)", curUID), fmt.Sprintf("error: %v", err))
+		finalConfig = cc.badRollback(curUID, fmt.Sprintf("failed to parse current (UID: %q)", curUID), fmt.Sprintf("error: %v", err))
+		return
 	}
 
 	// validate current config
 	if err := validateConfig(cur); err != nil {
-		return cc.badRollback(curUID, fmt.Sprintf("failed to validate current (UID: %q)", curUID), fmt.Sprintf("error: %v", err))
+		finalConfig = cc.badRollback(curUID, fmt.Sprintf("failed to validate current (UID: %q)", curUID), fmt.Sprintf("error: %v", err))
+		return
 	}
 
 	// check for crash loops if we're still in the trial period
 	if cc.curInTrial(cur.ConfigTrialDuration.Duration) {
 		if cc.crashLooping(*cur.CrashLoopThreshold) {
-			return cc.badRollback(curUID, fmt.Sprintf("current failed trial period due to crash loop (UID %q)", curUID), "")
+			finalConfig = cc.badRollback(curUID, fmt.Sprintf("current failed trial period due to crash loop (UID %q)", curUID), "")
+			return
 		}
 	} else if !cc.curIsLkg() {
 		// when the trial period is over, the current config becomes the last-known-good
@@ -188,8 +206,8 @@ func (cc *NodeConfigController) Run() *ccv1a1.KubeletConfiguration {
 
 	// update the status to note that we will use the current config
 	cc.setConfigOK(fmt.Sprintf("using current (UID: %q)", curUID), "passed all checks", apiv1.ConditionTrue)
-
-	return cur
+	finalConfig = cur
+	return
 }
 
 // initSync launches the sync loop that watches the API server for new configuration
@@ -243,6 +261,15 @@ func (cc *NodeConfigController) initSync() {
 // onAddEvent syncs any status that was set before the Node was registered,
 // then calls onWatchNodeEvent to complete event handling.
 func (cc *NodeConfigController) onAddNodeEvent(n interface{}) {
+	defer func() {
+		// catch controller-level panics, the actual cause of controller-level
+		// fatal-class errors will have already been logged by fatalf (see log.go)
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+		}
+	}()
 	cc.syncConfigOK()
 	cc.onWatchNodeEvent(n)
 }
@@ -250,6 +277,16 @@ func (cc *NodeConfigController) onAddNodeEvent(n interface{}) {
 // onWatchNodeEvent checks for new config and downloads it if necessary.
 // If filesystem issues prevent proper operation of syncNodeConfig, a fatal error occurs.
 func (cc *NodeConfigController) onWatchNodeEvent(n interface{}) {
+	defer func() {
+		// catch controller-level panics, the actual cause of controller-level
+		// fatal-class errors will have already been logged by fatalf (see log.go)
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+		}
+	}()
+
 	node, ok := n.(*apiv1.Node)
 	if !ok {
 		errorf("failed to cast watched object to Node, couldn't handle event")
