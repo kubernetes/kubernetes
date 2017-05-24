@@ -73,12 +73,14 @@ func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatedClient(options 
 
 // NewKeystoneAuthenticator returns a password authenticator that validates credentials using openstack keystone
 func NewKeystoneAuthenticator(authURL string, caFile string) (*KeystoneAuthenticator, error) {
-	if !strings.HasPrefix(authURL, "https") {
-		return nil, errors.New("Auth URL should be secure and start with https")
-	}
 	if authURL == "" {
 		return nil, errors.New("Auth URL is empty")
 	}
+	
+	if !strings.HasPrefix(authURL, "https") {
+		return nil, errors.New("Auth URL should be secure and start with https")
+	}
+	
 	if caFile != "" {
 		roots, err := certutil.NewPool(caFile)
 		if err != nil {
