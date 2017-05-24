@@ -18,8 +18,10 @@ package certificates
 
 import (
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
@@ -37,7 +39,7 @@ func TestCertificateController(t *testing.T) {
 	}
 
 	client := fake.NewSimpleClientset(csr)
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(csr), controller.NoResyncPeriodFunc())
 
 	handler := func(csr *certificates.CertificateSigningRequest) error {
 		csr.Status.Conditions = append(csr.Status.Conditions, certificates.CertificateSigningRequestCondition{
@@ -64,21 +66,19 @@ func TestCertificateController(t *testing.T) {
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	go informerFactory.Start(stopCh)
+	informerFactory.Start(stopCh)
+	informerFactory.WaitForCacheSync(stopCh)
+	wait.PollUntil(10*time.Millisecond, func() (bool, error) {
+		return controller.queue.Len() >= 1, nil
+	}, stopCh)
 
 	controller.processNextWorkItem()
 
 	actions := client.Actions()
-	if len(actions) != 3 {
-		t.Errorf("expected 3 actions")
+	if len(actions) != 1 {
+		t.Errorf("expected 1 actions")
 	}
-	if a := actions[0]; !a.Matches("list", "certificatesigningrequests") {
-		t.Errorf("unexpected action: %#v", a)
-	}
-	if a := actions[1]; !a.Matches("watch", "certificatesigningrequests") {
-		t.Errorf("unexpected action: %#v", a)
-	}
-	if a := actions[2]; !a.Matches("update", "certificatesigningrequests") ||
+	if a := actions[0]; !a.Matches("update", "certificatesigningrequests") ||
 		a.GetSubresource() != "approval" {
 		t.Errorf("unexpected action: %#v", a)
 	}
