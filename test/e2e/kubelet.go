@@ -137,19 +137,20 @@ var _ = framework.KubeDescribe("kubelet", func() {
 
 	BeforeEach(func() {
 		c = f.ClientSet
+		// Use node labels to restrict the pods to be assigned only to the
+		// nodes we observe initially.
+		nodeLabels = make(map[string]string)
+		nodeLabels["kubelet_cleanup"] = "true"
+
 		nodes := framework.GetReadySchedulableNodesOrDie(c)
 		numNodes = len(nodes.Items)
 		nodeNames = sets.NewString()
 		// If there are a lot of nodes, we don't want to use all of them
 		// (if there are 1000 nodes in the cluster, starting 10 pods/node
 		// will take ~10 minutes today). And there is also deletion phase.
-		//
-		// Instead, we choose at most 10 nodes and will constraint pods
-		// that we are creating to be scheduled only on that nodes.
+		// Instead, we choose at most 10 nodes.
 		if numNodes > maxNodesToCheck {
 			numNodes = maxNodesToCheck
-			nodeLabels = make(map[string]string)
-			nodeLabels["kubelet_cleanup"] = "true"
 		}
 		for i := 0; i < numNodes; i++ {
 			nodeNames.Insert(nodes.Items[i].Name)

@@ -71,6 +71,7 @@ pkg/apis/authentication.k8s.io/install
 pkg/apis/authentication/install
 pkg/apis/authorization/install
 pkg/apis/autoscaling/install
+pkg/apis/autoscaling/v1
 pkg/apis/batch/install
 pkg/apis/batch/v1
 pkg/apis/batch/v2alpha1

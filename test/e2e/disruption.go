@@ -43,9 +43,6 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 	var cs *kubernetes.Clientset
 
 	BeforeEach(func() {
-		// skip on GKE since alpha features are disabled
-		framework.SkipIfProviderIs("gke")
-
 		cs = f.StagingClient
 		ns = f.Namespace.Name
 	})

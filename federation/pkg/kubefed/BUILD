@@ -63,5 +63,6 @@ go_test(
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//vendor:k8s.io/client-go/pkg/util/diff",
     ],
 )

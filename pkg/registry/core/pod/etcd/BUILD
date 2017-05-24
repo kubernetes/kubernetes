@@ -26,6 +26,7 @@ go_library(
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion:go_default_library",
+        "//pkg/client/retry:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
@@ -35,6 +36,7 @@ go_library(
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/storage:go_default_library",
+        "//pkg/util/wait:go_default_library",
     ],
 )
 

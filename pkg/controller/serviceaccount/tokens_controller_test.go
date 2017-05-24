@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -68,7 +69,7 @@ func tokenSecretReferences() []api.ObjectReference {
 
 // addTokenSecretReference adds a reference to the ServiceAccountToken that will be created
 func addTokenSecretReference(refs []api.ObjectReference) []api.ObjectReference {
-	return addNamedTokenSecretReference(refs, "default-token-fplln")
+	return addNamedTokenSecretReference(refs, "default-token-p7w9c")
 }
 
 // addNamedTokenSecretReference adds a reference to the named ServiceAccountToken
@@ -115,7 +116,7 @@ func opaqueSecret() *api.Secret {
 // createdTokenSecret returns the ServiceAccountToken secret posted when creating a new token secret.
 // Named "default-token-fplln", since that is the first generated name after rand.Seed(1)
 func createdTokenSecret(overrideName ...string) *api.Secret {
-	return namedCreatedTokenSecret("default-token-fplln")
+	return namedCreatedTokenSecret("default-token-p7w9c")
 }
 
 // namedTokenSecret returns the ServiceAccountToken secret posted when creating a new token secret with the given name.
@@ -258,12 +259,12 @@ func TestTokenCreation(t *testing.T) {
 
 				// Attempt 2
 				core.NewGetAction(unversioned.GroupVersionResource{Resource: "serviceaccounts"}, api.NamespaceDefault, "default"),
-				core.NewCreateAction(unversioned.GroupVersionResource{Resource: "secrets"}, api.NamespaceDefault, namedCreatedTokenSecret("default-token-gziey")),
+				core.NewCreateAction(unversioned.GroupVersionResource{Resource: "secrets"}, api.NamespaceDefault, namedCreatedTokenSecret("default-token-x50vb")),
 
 				// Attempt 3
 				core.NewGetAction(unversioned.GroupVersionResource{Resource: "serviceaccounts"}, api.NamespaceDefault, "default"),
-				core.NewCreateAction(unversioned.GroupVersionResource{Resource: "secrets"}, api.NamespaceDefault, namedCreatedTokenSecret("default-token-oh43e")),
-				core.NewUpdateAction(unversioned.GroupVersionResource{Resource: "serviceaccounts"}, api.NamespaceDefault, serviceAccount(addNamedTokenSecretReference(emptySecretReferences(), "default-token-oh43e"))),
+				core.NewCreateAction(unversioned.GroupVersionResource{Resource: "secrets"}, api.NamespaceDefault, namedCreatedTokenSecret("default-token-scq98")),
+				core.NewUpdateAction(unversioned.GroupVersionResource{Resource: "serviceaccounts"}, api.NamespaceDefault, serviceAccount(addNamedTokenSecretReference(emptySecretReferences(), "default-token-scq98"))),
 			},
 		},
 		"new serviceaccount with no secrets encountering unending create error": {
@@ -287,10 +288,10 @@ func TestTokenCreation(t *testing.T) {
 				core.NewCreateAction(unversioned.GroupVersionResource{Resource: "secrets"}, api.NamespaceDefault, createdTokenSecret()),
 				// Retry 1
 				core.NewGetAction(unversioned.GroupVersionResource{Resource: "serviceaccounts"}, api.NamespaceDefault, "default"),
-				core.NewCreateAction(unversioned.GroupVersionResource{Resource: "secrets"}, api.NamespaceDefault, namedCreatedTokenSecret("default-token-gziey")),
+				core.NewCreateAction(unversioned.GroupVersionResource{Resource: "secrets"}, api.NamespaceDefault, namedCreatedTokenSecret("default-token-x50vb")),
 				// Retry 2
 				core.NewGetAction(unversioned.GroupVersionResource{Resource: "serviceaccounts"}, api.NamespaceDefault, "default"),
-				core.NewCreateAction(unversioned.GroupVersionResource{Resource: "secrets"}, api.NamespaceDefault, namedCreatedTokenSecret("default-token-oh43e")),
+				core.NewCreateAction(unversioned.GroupVersionResource{Resource: "secrets"}, api.NamespaceDefault, namedCreatedTokenSecret("default-token-scq98")),
 			},
 		},
 		"new serviceaccount with missing secrets": {
@@ -651,7 +652,7 @@ func TestTokenCreation(t *testing.T) {
 
 			expectedAction := tc.ExpectedActions[i]
 			if !reflect.DeepEqual(expectedAction, action) {
-				t.Errorf("%s: Expected\n\t%#v\ngot\n\t%#v", k, expectedAction, action)
+				t.Errorf("%s:\nExpected:\n%s\ngot:\n%s", k, spew.Sdump(expectedAction), spew.Sdump(action))
 				continue
 			}
 		}

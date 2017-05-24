@@ -32,6 +32,9 @@ gcloud compute instances delete "${MASTER_NAME}" \
 gcloud compute disks delete "${MASTER_NAME}-pd" \
     ${GCLOUD_COMMON_ARGS} || true
 
+gcloud compute disks delete "${MASTER_NAME}-event-pd" \
+    ${GCLOUD_COMMON_ARGS} &> /dev/null || true
+
 gcloud compute addresses delete "${MASTER_NAME}-ip" \
     --project "${PROJECT}" \
     --region "${REGION}" \

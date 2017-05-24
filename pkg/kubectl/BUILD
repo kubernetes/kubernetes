@@ -46,7 +46,6 @@ go_library(
         "sorted_resource_name_list.go",
         "sorting_printer.go",
         "stop.go",
-        "version.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -102,7 +101,6 @@ go_library(
         "//pkg/util/uuid:go_default_library",
         "//pkg/util/validation:go_default_library",
         "//pkg/util/wait:go_default_library",
-        "//pkg/version:go_default_library",
         "//pkg/watch:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/ghodss/yaml",

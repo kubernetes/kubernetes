@@ -307,7 +307,7 @@ type KubeletConfiguration struct {
 	// +optional
 	SystemCgroups string `json:"systemCgroups,omitempty"`
 	// CgroupRoot is the root cgroup to use for pods.
-	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
+	// If ExperimentalCgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
 	// +optional
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
 	// containerRuntime is the container runtime to use.
@@ -424,6 +424,9 @@ type KubeletConfiguration struct {
 	// Comma-delimited list of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.
 	// +optional
 	EvictionMinimumReclaim string `json:"evictionMinimumReclaim,omitempty"`
+	// If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
+	// +optional
+	ExperimentalKernelMemcgNotification bool `json:"experimentalKernelMemcgNotification"`
 	// Maximum number of pods per core. Cannot exceed MaxPods
 	PodsPerCore int32 `json:"podsPerCore"`
 	// enableControllerAttachDetach enables the Attach/Detach controller to

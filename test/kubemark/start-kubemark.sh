@@ -28,6 +28,15 @@ ${APISERVER_TEST_ARGS}
 --storage-backend=${STORAGE_BACKEND}
 --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}"
 EOF
+if [ -z "${CUSTOM_ADMISSION_PLUGINS:-}" ]; then
+ cat >> "${RESOURCE_DIRECTORY}/apiserver_flags" <<EOF
+--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
+EOF
+else
+  cat >> "${RESOURCE_DIRECTORY}/apiserver_flags" <<EOF
+--admission-control=${CUSTOM_ADMISSION_PLUGINS}
+EOF
+fi
 sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/apiserver_flags"
 
   cat > "${RESOURCE_DIRECTORY}/scheduler_flags" <<EOF
@@ -81,6 +90,13 @@ run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
   --type "${MASTER_DISK_TYPE}" \
   --size "${MASTER_DISK_SIZE}"
 
+if [ "${EVENT_PD:-false}" == "true" ]; then
+  run-gcloud-compute-with-retries disks create "${MASTER_NAME}-event-pd" \
+    ${GCLOUD_COMMON_ARGS} \
+    --type "${MASTER_DISK_TYPE}" \
+    --size "${MASTER_DISK_SIZE}"
+fi
+
 run-gcloud-compute-with-retries addresses create "${MASTER_NAME}-ip" \
   --project "${PROJECT}" \
   --region "${REGION}" -q
@@ -99,6 +115,14 @@ run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
   --scopes "storage-ro,compute-rw,logging-write" \
   --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
   --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
+
+if [ "${EVENT_PD:-false}" == "true" ]; then
+  echo "Attaching ${MASTER_NAME}-event-pd to ${MASTER_NAME}"
+  run-gcloud-compute-with-retries instances attach-disk "${MASTER_NAME}" \
+  ${GCLOUD_COMMON_ARGS} \
+  --disk "${MASTER_NAME}-event-pd" \
+  --device-name="master-event-pd"
+fi
 
 run-gcloud-compute-with-retries firewall-rules create "${INSTANCE_PREFIX}-kubemark-master-https" \
   --project "${PROJECT}" \
@@ -144,11 +168,12 @@ gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${RESOURCE_DIRECTORY}/apiserver_flags" \
   "${RESOURCE_DIRECTORY}/scheduler_flags" \
   "${RESOURCE_DIRECTORY}/controllers_flags" \
-  "${MASTER_NAME}":~
+  "root@${MASTER_NAME}":/
+
 
 gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
-  --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && \
-             sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0} ${ETCD_IMAGE:-}"
+  --command="sudo chmod a+x /configure-kubectl.sh && sudo chmod a+x /start-kubemark-master.sh && \
+             sudo /start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0} ${EVENT_PD:-false} ${ETCD_IMAGE:-}"
 
 # create kubeconfig for Kubelet:
 KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
@@ -277,5 +302,6 @@ until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
 done
 echo ""
 
+echo "Master IP: ${MASTER_IP}"
 echo "Password to kubemark master: ${password}"
 echo "Kubeconfig for kubemark master is written in ${LOCAL_KUBECONFIG}"

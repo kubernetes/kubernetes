@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"testing"
 
+	"k8s.io/client-go/pkg/util/diff"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
@@ -52,6 +53,8 @@ func TestJoinFederation(t *testing.T) {
 
 	testCases := []struct {
 		cluster            string
+		clusterCtx         string
+		secret             string
 		server             string
 		token              string
 		kubeconfigGlobal   string
@@ -61,6 +64,8 @@ func TestJoinFederation(t *testing.T) {
 	}{
 		{
 			cluster:            "syndicate",
+			clusterCtx:         "",
+			secret:             "",
 			server:             "https://10.20.30.40",
 			token:              "badge",
 			kubeconfigGlobal:   fakeKubeFiles[0],
@@ -70,6 +75,8 @@ func TestJoinFederation(t *testing.T) {
 		},
 		{
 			cluster:            "ally",
+			clusterCtx:         "",
+			secret:             "",
 			server:             "ally256.example.com:80",
 			token:              "souvenir",
 			kubeconfigGlobal:   fakeKubeFiles[0],
@@ -79,6 +86,19 @@ func TestJoinFederation(t *testing.T) {
 		},
 		{
 			cluster:            "confederate",
+			clusterCtx:         "",
+			secret:             "",
+			server:             "10.8.8.8",
+			token:              "totem",
+			kubeconfigGlobal:   fakeKubeFiles[1],
+			kubeconfigExplicit: fakeKubeFiles[2],
+			expectedServer:     "https://10.8.8.8",
+			expectedErr:        "",
+		},
+		{
+			cluster:            "associate",
+			clusterCtx:         "confederate",
+			secret:             "confidential",
 			server:             "10.8.8.8",
 			token:              "totem",
 			kubeconfigGlobal:   fakeKubeFiles[1],
@@ -88,6 +108,8 @@ func TestJoinFederation(t *testing.T) {
 		},
 		{
 			cluster:            "affiliate",
+			clusterCtx:         "",
+			secret:             "",
 			server:             "https://10.20.30.40",
 			token:              "badge",
 			kubeconfigGlobal:   fakeKubeFiles[0],
@@ -99,10 +121,10 @@ func TestJoinFederation(t *testing.T) {
 
 	for i, tc := range testCases {
 		cmdErrMsg = ""
-		f := testJoinFederationFactory(tc.cluster, tc.expectedServer)
+		f := testJoinFederationFactory(tc.cluster, tc.secret, tc.expectedServer)
 		buf := bytes.NewBuffer([]byte{})
 
-		hostFactory, err := fakeJoinHostFactory(tc.cluster, tc.server, tc.token)
+		hostFactory, err := fakeJoinHostFactory(tc.cluster, tc.clusterCtx, tc.secret, tc.server, tc.token)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -115,7 +137,14 @@ func TestJoinFederation(t *testing.T) {
 		cmd := NewCmdJoin(f, buf, adminConfig)
 
 		cmd.Flags().Set("kubeconfig", tc.kubeconfigExplicit)
-		cmd.Flags().Set("host", "substrate")
+		cmd.Flags().Set("host-cluster-context", "substrate")
+		if tc.clusterCtx != "" {
+			cmd.Flags().Set("cluster-context", tc.clusterCtx)
+		}
+		if tc.secret != "" {
+			cmd.Flags().Set("secret-name", tc.secret)
+		}
+
 		cmd.Run(cmd, []string{tc.cluster})
 
 		if tc.expectedErr == "" {
@@ -136,8 +165,12 @@ func TestJoinFederation(t *testing.T) {
 	}
 }
 
-func testJoinFederationFactory(name, server string) cmdutil.Factory {
-	want := fakeCluster(name, server)
+func testJoinFederationFactory(clusterName, secretName, server string) cmdutil.Factory {
+	if secretName == "" {
+		secretName = clusterName
+	}
+
+	want := fakeCluster(clusterName, secretName, server)
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	codec := testapi.Federation.Codec()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
@@ -156,7 +189,7 @@ func testJoinFederationFactory(name, server string) cmdutil.Factory {
 					return nil, err
 				}
 				if !api.Semantic.DeepEqual(got, want) {
-					return nil, fmt.Errorf("unexpected cluster object\n\tgot: %#v\n\twant: %#v", got, want)
+					return nil, fmt.Errorf("Unexpected cluster object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &want)}, nil
 			default:
@@ -168,25 +201,32 @@ func testJoinFederationFactory(name, server string) cmdutil.Factory {
 	return f
 }
 
-func fakeJoinHostFactory(name, server, token string) (cmdutil.Factory, error) {
+func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token string) (cmdutil.Factory, error) {
+	if clusterCtx == "" {
+		clusterCtx = clusterName
+	}
+	if secretName == "" {
+		secretName = clusterName
+	}
+
 	kubeconfig := clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
-			name: {
+			clusterCtx: {
 				Server: server,
 			},
 		},
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			name: {
+			clusterCtx: {
 				Token: token,
 			},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
-			name: {
-				Cluster:  name,
-				AuthInfo: name,
+			clusterCtx: {
+				Cluster:  clusterCtx,
+				AuthInfo: clusterCtx,
 			},
 		},
-		CurrentContext: name,
+		CurrentContext: clusterCtx,
 	}
 	configBytes, err := clientcmd.Write(kubeconfig)
 	if err != nil {
@@ -198,7 +238,7 @@ func fakeJoinHostFactory(name, server, token string) (cmdutil.Factory, error) {
 			APIVersion: "v1",
 		},
 		ObjectMeta: v1.ObjectMeta{
-			Name:      name,
+			Name:      secretName,
 			Namespace: util.DefaultFederationSystemNamespace,
 		},
 		Data: map[string][]byte{
@@ -224,7 +264,7 @@ func fakeJoinHostFactory(name, server, token string) (cmdutil.Factory, error) {
 					return nil, err
 				}
 				if !api.Semantic.DeepEqual(got, secretObject) {
-					return nil, fmt.Errorf("Unexpected secret object\n\tgot: %#v\n\twant: %#v", got, secretObject)
+					return nil, fmt.Errorf("Unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, secretObject))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &secretObject)}, nil
 			default:
@@ -235,10 +275,10 @@ func fakeJoinHostFactory(name, server, token string) (cmdutil.Factory, error) {
 	return f, nil
 }
 
-func fakeCluster(name, server string) federationapi.Cluster {
+func fakeCluster(clusterName, secretName, server string) federationapi.Cluster {
 	return federationapi.Cluster{
 		ObjectMeta: v1.ObjectMeta{
-			Name: name,
+			Name: clusterName,
 		},
 		Spec: federationapi.ClusterSpec{
 			ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
@@ -248,7 +288,7 @@ func fakeCluster(name, server string) federationapi.Cluster {
 				},
 			},
 			SecretRef: &v1.LocalObjectReference{
-				Name: name,
+				Name: secretName,
 			},
 		},
 	}

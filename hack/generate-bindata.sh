@@ -29,10 +29,12 @@ if [[ ! -d "${KUBE_ROOT}/examples" ]]; then
 	exit 1
 fi
 
+# kube::golang::build_kube_toolchain installs the vendored go-bindata in
+# $GOPATH/bin, so make sure that's explicitly part of our $PATH.
+export PATH="${GOPATH}/bin:${PATH}"
+
 if ! which go-bindata &>/dev/null ; then
-	echo "Cannot find go-bindata. Install with"
-	echo "  go get -u github.com/jteeuwen/go-bindata/go-bindata"
-	echo "  and make sure GOBIN is in the system PATH"
+	echo "Cannot find go-bindata."
 	exit 5
 fi
 

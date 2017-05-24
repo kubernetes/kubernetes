@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package config
 
-import (
-	"fmt"
-	"io"
+// nopSync does no synchronization, used when the DNS server is
+// started without a ConfigMap configured.
+type nopSync struct {
+	config *Config
+}
 
-	"k8s.io/kubernetes/pkg/version"
-)
+var _ Sync = (*nopSync)(nil)
 
-func GetClientVersion(w io.Writer) {
-	fmt.Fprintf(w, "Client Version: %#v\n", version.Get())
+func NewNopSync(config *Config) Sync {
+	return &nopSync{config: config}
+}
+
+func (sync *nopSync) Once() (*Config, error) {
+	return sync.config, nil
+}
+
+func (sync *nopSync) Periodic() <-chan *Config {
+	return make(chan *Config)
 }

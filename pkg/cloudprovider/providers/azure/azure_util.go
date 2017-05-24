@@ -151,9 +151,12 @@ func getPrimaryIPConfig(nic network.Interface) (*network.InterfaceIPConfiguratio
 		return &((*nic.Properties.IPConfigurations)[0]), nil
 	}
 
-	// we're here because we either have multiple ipconfigs and can't determine the primary:
-	//   https://github.com/Azure/azure-rest-api-specs/issues/305
-	// or somehow we had zero ipconfigs
+	for _, ref := range *nic.Properties.IPConfigurations {
+		if *ref.Properties.Primary {
+			return &ref, nil
+		}
+	}
+
 	return nil, fmt.Errorf("failed to determine the determine primary ipconfig. nicname=%q", *nic.Name)
 }
 

@@ -401,9 +401,10 @@ func (daemonsetcontroller *DaemonSetController) reconcileDaemonSet(namespace str
 			return
 		}
 
+		// Do not modify. Otherwise make a deep copy.
 		desiredDaemonSet := &extensionsv1.DaemonSet{
-			ObjectMeta: util.CopyObjectMeta(baseDaemonSet.ObjectMeta),
-			Spec:       baseDaemonSet.Spec,
+			ObjectMeta: util.DeepCopyRelevantObjectMeta(baseDaemonSet.ObjectMeta),
+			Spec:       util.DeepCopyApiTypeOrPanic(baseDaemonSet.Spec).(extensionsv1.DaemonSetSpec),
 		}
 
 		if !found {

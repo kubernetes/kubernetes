@@ -619,6 +619,10 @@ func (m *MetadataRESTStorage) ProducesMIMETypes(method string) []string {
 	return m.types
 }
 
+func (m *MetadataRESTStorage) ProducesObject(verb string) interface{} {
+	return nil
+}
+
 var _ rest.StorageMetadata = &MetadataRESTStorage{}
 
 type GetWithOptionsRESTStorage struct {

@@ -107,7 +107,7 @@ func (p *petSyncer) Sync(pet *pcb) error {
 	}
 	// if pet failed - we need to remove old one because of consistent naming
 	if exists && realPet.pod.Status.Phase == api.PodFailed {
-		glog.V(4).Infof("Delete evicted pod %v", realPet.pod.Name)
+		glog.V(2).Infof("Deleting evicted pod %v/%v", realPet.pod.Namespace, realPet.pod.Name)
 		if err := p.petClient.Delete(realPet); err != nil {
 			return err
 		}
@@ -156,7 +156,7 @@ func (p *petSyncer) Delete(pet *pcb) error {
 	// The returned error will force a requeue.
 	p.blockingPet = realPet
 	if !p.isDying(realPet.pod) {
-		glog.V(4).Infof("StatefulSet %v deleting pet %v", pet.parent.Name, pet.pod.Name)
+		glog.V(2).Infof("StatefulSet %v deleting pet %v/%v", pet.parent.Name, pet.pod.Namespace, pet.pod.Name)
 		return p.petClient.Delete(pet)
 	}
 	glog.V(4).Infof("StatefulSet %v waiting on pet %v to die in %v", pet.parent.Name, realPet.pod.Name, realPet.pod.DeletionTimestamp)

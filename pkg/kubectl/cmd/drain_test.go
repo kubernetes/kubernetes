@@ -683,7 +683,7 @@ func TestDeletePods(t *testing.T) {
 		o.mapper, _ = f.Object()
 		o.out = os.Stdout
 		_, pods := createPods(false)
-		pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, test.getPodFn)
+		pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, false, test.getPodFn)
 
 		if test.expectError {
 			if err == nil {

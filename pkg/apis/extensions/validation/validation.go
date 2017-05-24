@@ -68,6 +68,9 @@ func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) field.ErrorL
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&obj.ObjectMeta, false, ValidateThirdPartyResourceName, field.NewPath("metadata"))...)
 
 	versions := sets.String{}
+	if len(obj.Versions) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("versions"), "must specify at least one version"))
+	}
 	for ix := range obj.Versions {
 		version := &obj.Versions[ix]
 		if len(version.Name) == 0 {

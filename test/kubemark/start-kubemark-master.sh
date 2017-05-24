@@ -16,10 +16,25 @@
 
 # TODO: figure out how to get etcd tag from some real configuration and put it here.
 
+function write_supervisor_conf() {
+	local name=$1
+	local exec_command=$2
+	cat >>"/etc/supervisor/conf.d/${name}.conf" <<EOF
+[program:${name}]
+command=${exec_command}
+stderr_logfile=/var/log/${name}.log
+stdout_logfile=/var/log/${name}.log
+autorestart=true
+startretries=1000000
+EOF
+}
+
 EVENT_STORE_IP=$1
 EVENT_STORE_URL="http://${EVENT_STORE_IP}:4002"
 NUM_NODES=$2
-KUBEMARK_ETCD_IMAGE=$3
+EVENT_PD=$3
+# KUBEMARK_ETCD_IMAGE may be empty so it has to be kept as a last argument
+KUBEMARK_ETCD_IMAGE=$4
 if [[ -z "${KUBEMARK_ETCD_IMAGE}" ]]; then
   # Default etcd version.
   KUBEMARK_ETCD_IMAGE="2.2.1"
@@ -33,17 +48,18 @@ function retry() {
 }
 
 function mount-master-pd() {
-	if [[ ! -e /dev/disk/by-id/google-master-pd ]]; then
-		echo "Can't find master-pd. Skipping mount."
+	local -r pd_name=$1
+	local -r mount_point=$2
+	if [[ ! -e "/dev/disk/by-id/${pd_name}" ]]; then
+		echo "Can't find ${pd_name}. Skipping mount."
 		return
 	fi
-	device_info=$(ls -l "/dev/disk/by-id/google-master-pd")
-	relative_path=${device_info##* }
+	device_info=$(ls -l "/dev/disk/by-id/${pd_name}")
+	local relative_path=${device_info##* }
 	pd_device="/dev/disk/by-id/${relative_path}"
 
 	echo "Mounting master-pd"
-	local -r pd_path="/dev/disk/by-id/google-master-pd"
-	local -r mount_point="/mnt/disks/master-pd"
+	local -r pd_path="/dev/disk/by-id/${pd_name}"
 	# Format and mount the disk, create directories on it for all of the master's
 	# persistent data, and link them to where they're used.
 	mkdir -p "${mount_point}"
@@ -57,24 +73,28 @@ function mount-master-pd() {
 	echo "Mounting '${pd_path}' at '${mount_point}'"
 	mount -o discard,defaults "${pd_path}" "${mount_point}"
 	echo "Mounted master-pd '${pd_path}' at '${mount_point}'"
-
-	# Contains all the data stored in etcd.
-	mkdir -m 700 -p "${mount_point}/var/etcd"
-	ln -s -f "${mount_point}/var/etcd" /var/etcd
-	mkdir -p /etc/srv
-	# Contains the dynamically generated apiserver auth certs and keys.
-	mkdir -p "${mount_point}/srv/kubernetes"
-	ln -s -f "${mount_point}/srv/kubernetes" /etc/srv/kubernetes
-	# Directory for kube-apiserver to store SSH key (if necessary).
-	mkdir -p "${mount_point}/srv/sshproxy"
-	ln -s -f "${mount_point}/srv/sshproxy" /etc/srv/sshproxy
-
-	if ! id etcd &>/dev/null; then
-		useradd -s /sbin/nologin -d /var/etcd etcd
-	fi
 }
 
-mount-master-pd
+main_etcd_mount_point="/mnt/disks/master-pd"
+mount-master-pd "google-master-pd" "${main_etcd_mount_point}"
+# Contains all the data stored in etcd.
+mkdir -m 700 -p "${main_etcd_mount_point}/var/etcd"
+ln -s -f "${main_etcd_mount_point}/var/etcd" /var/etcd
+mkdir -p /etc/srv
+# Contains the dynamically generated apiserver auth certs and keys.
+mkdir -p "${main_etcd_mount_point}/srv/kubernetes"
+ln -s -f "${main_etcd_mount_point}/srv/kubernetes" /etc/srv/kubernetes
+# Directory for kube-apiserver to store SSH key (if necessary).
+mkdir -p "${main_etcd_mount_point}/srv/sshproxy"
+ln -s -f "${main_etcd_mount_point}/srv/sshproxy" /etc/srv/sshproxy
+
+if [ "${EVENT_PD:-false}" == "true" ]; then
+	event_etcd_mount_point="/mnt/disks/master-event-pd"
+	mount-master-pd "google-master-event-pd" "${event_etcd_mount_point}"
+	# Contains all the data stored in event etcd.
+	mkdir -m 700 -p "${event_etcd_mount_point}/var/etcd/events"
+	ln -s -f "${event_etcd_mount_point}/var/etcd/events" /var/etcd/events
+fi
 
 ETCD_QUOTA_BYTES=""
 if [ "${KUBEMARK_ETCD_VERSION:0:2}" == "3." ]; then
@@ -87,7 +107,7 @@ fi
 if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
 	# Retry starting etcd to avoid pulling image errors.
 	retry sudo docker run --net=host \
-		-v /var/etcd/data-events:/var/etcd/data -v /var/log:/var/log -d \
+		-v /var/etcd/events/data:/var/etcd/data -v /var/log:/var/log -d \
 		gcr.io/google_containers/etcd:${KUBEMARK_ETCD_IMAGE} /bin/sh -c "/usr/local/bin/etcd \
 		--listen-peer-urls http://127.0.0.1:2381 \
 		--advertise-client-urls=http://127.0.0.1:4002 \
@@ -104,15 +124,13 @@ retry sudo docker run --net=host \
 	--listen-client-urls=http://0.0.0.0:2379 \
 	--data-dir=/var/etcd/data ${ETCD_QUOTA_BYTES} 1>> /var/log/etcd.log 2>&1"
 
-# Increase the allowed number of open file descriptors
-ulimit -n 65536
+ulimit_command='bash -c "ulimit -n 65536;'
 
+cd /
 tar xzf kubernetes-server-linux-amd64.tar.gz
 
-kubernetes/server/bin/kube-scheduler --master=127.0.0.1:8080 $(cat scheduler_flags) &> /var/log/kube-scheduler.log &
-
-kubernetes/server/bin/kube-apiserver \
-	--insecure-bind-address=0.0.0.0 \
+write_supervisor_conf "kube-scheduler" "${ulimit_command} /kubernetes/server/bin/kube-scheduler --master=127.0.0.1:8080 $(cat /scheduler_flags | tr '\n' ' ')\""
+write_supervisor_conf "kube-apiserver" "${ulimit_command} /kubernetes/server/bin/kube-apiserver --insecure-bind-address=0.0.0.0 \
 	--etcd-servers=http://127.0.0.1:2379 \
 	--etcd-servers-overrides=/events#${EVENT_STORE_URL} \
 	--tls-cert-file=/srv/kubernetes/server.cert \
@@ -122,14 +140,16 @@ kubernetes/server/bin/kube-apiserver \
 	--secure-port=443 \
 	--basic-auth-file=/srv/kubernetes/basic_auth.csv \
 	--target-ram-mb=$((${NUM_NODES} * 60)) \
-	$(cat apiserver_flags) &> /var/log/kube-apiserver.log &
-
-# kube-contoller-manager now needs running kube-api server to actually start
-until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do
-	sleep 1
-done
-kubernetes/server/bin/kube-controller-manager \
+	$(cat /apiserver_flags | tr '\n' ' ')\""
+write_supervisor_conf "kube-contoller-manager" "${ulimit_command} /kubernetes/server/bin/kube-controller-manager \
   --master=127.0.0.1:8080 \
   --service-account-private-key-file=/srv/kubernetes/server.key \
   --root-ca-file=/srv/kubernetes/ca.crt \
-  $(cat controllers_flags) &> /var/log/kube-controller-manager.log &
+  $(cat /controllers_flags | tr '\n' ' ')\""
+
+supervisorctl reread
+supervisorctl update
+
+until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do
+	sleep 1
+done

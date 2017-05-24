@@ -129,10 +129,18 @@ func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
 	}
 }
 
+func isPodTerminated(pod *api.Pod) bool {
+	return pod.Status.Phase == api.PodFailed || pod.Status.Phase == api.PodSucceeded
+}
+
 // Iterate through all pods and add to desired state of world if they don't
 // exist but should
 func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 	for _, pod := range dswp.podManager.GetPods() {
+		if isPodTerminated(pod) {
+			// Do not (re)add volumes for terminated pods
+			continue
+		}
 		dswp.processPodVolumes(pod)
 	}
 }
@@ -144,9 +152,18 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 
 	runningPodsFetched := false
 	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
-		if _, podExists :=
-			dswp.podManager.GetPodByUID(volumeToMount.Pod.UID); podExists {
-			continue
+		pod, podExists := dswp.podManager.GetPodByUID(volumeToMount.Pod.UID)
+		if podExists {
+			// Skip running pods
+			if !isPodTerminated(pod) {
+				continue
+			}
+			// Skip non-memory backed volumes belonging to terminated pods
+			volume := volumeToMount.VolumeSpec.Volume
+			if (volume.EmptyDir == nil || volume.EmptyDir.Medium != api.StorageMediumMemory) &&
+				volume.ConfigMap == nil && volume.Secret == nil {
+				continue
+			}
 		}
 
 		// Once a pod has been deleted from kubelet pod manager, do not delete

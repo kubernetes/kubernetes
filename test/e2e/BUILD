@@ -31,6 +31,7 @@ go_library(
         "disruption.go",
         "dns.go",
         "dns_autoscaling.go",
+        "dns_configmap.go",
         "e2e.go",
         "empty.go",
         "empty_dir_wrapper.go",
@@ -148,6 +149,8 @@ go_library(
         "//pkg/controller/petset:go_default_library",
         "//pkg/controller/replicaset:go_default_library",
         "//pkg/controller/replication:go_default_library",
+        "//pkg/conversion:go_default_library",
+        "//pkg/dns/federation:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
@@ -210,7 +213,10 @@ go_library(
     ],
 )
 
-go_test(
+# this is a private library until we can support building the
+# test binary
+# TODO(mikedanese): fix @io_bazelbuild/rules_go
+go_library(
     name = "go_default_test",
     srcs = [
         "e2e_test.go",
@@ -218,6 +224,7 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
+    visibility = ["//visibility:private"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",

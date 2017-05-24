@@ -119,12 +119,19 @@ func (plugin *photonPersistentDiskPlugin) newUnmounterInternal(volName string, p
 		}}, nil
 }
 
-func (plugin *photonPersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *photonPersistentDiskPlugin) ConstructVolumeSpec(volumeSpecName, mountPath string) (*volume.Spec, error) {
+	mounter := plugin.host.GetMounter()
+	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
+	pdID, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	if err != nil {
+		return nil, err
+	}
+
 	photonPersistentDisk := &api.Volume{
-		Name: volumeName,
+		Name: volumeSpecName,
 		VolumeSource: api.VolumeSource{
 			PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{
-				PdID: volumeName,
+				PdID: pdID,
 			},
 		},
 	}
@@ -283,7 +290,7 @@ func (c *photonPersistentDiskUnmounter) TearDownAt(dir string) error {
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
-	return path.Join(host.GetPluginDir(photonPersistentDiskPluginName), "mounts", devName)
+	return path.Join(host.GetPluginDir(photonPersistentDiskPluginName), mount.MountsInGlobalPDPath, devName)
 }
 
 func (ppd *photonPersistentDisk) GetPath() string {

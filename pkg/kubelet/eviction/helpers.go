@@ -848,16 +848,21 @@ func getStarvedResources(thresholds []Threshold) []api.ResourceName {
 }
 
 // isSoftEviction returns true if the thresholds met for the starved resource are only soft thresholds
-func isSoftEviction(thresholds []Threshold, starvedResource api.ResourceName) bool {
+func isSoftEvictionThresholds(thresholds []Threshold, starvedResource api.ResourceName) bool {
 	for _, threshold := range thresholds {
 		if resourceToCheck := signalToResource[threshold.Signal]; resourceToCheck != starvedResource {
 			continue
 		}
-		if threshold.GracePeriod == time.Duration(0) {
+		if isHardEvictionThreshold(threshold) {
 			return false
 		}
 	}
 	return true
+}
+
+// isSoftEviction returns true if the thresholds met for the starved resource are only soft thresholds
+func isHardEvictionThreshold(threshold Threshold) bool {
+	return threshold.GracePeriod == time.Duration(0)
 }
 
 // buildResourceToRankFunc returns ranking functions associated with resources

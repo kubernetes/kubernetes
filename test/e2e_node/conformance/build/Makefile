@@ -56,5 +56,9 @@ endif
 
 push: build
 	gcloud docker push ${REGISTRY}/node-test-${ARCH}:${VERSION}
+ifeq ($(ARCH),amd64)
+	docker tag ${REGISTRY}/node-test-${ARCH}:${VERSION} ${REGISTRY}/node-test:${VERSION}
+	gcloud docker -- push ${REGISTRY}/node-test:${VERSION}
+endif
 
 .PHONY: all

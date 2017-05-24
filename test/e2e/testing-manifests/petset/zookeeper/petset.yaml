@@ -10,7 +10,6 @@ spec:
       labels:
         app: zk
       annotations:
-        pod.alpha.kubernetes.io/initialized: "true"
         pod.alpha.kubernetes.io/init-containers: '[
             {
                 "name": "install",
@@ -61,7 +60,6 @@ spec:
             }
         ]'
     spec:
-      terminationGracePeriodSeconds: 0
       containers:
       - name: zk
         image: java:openjdk-8-jre

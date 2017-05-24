@@ -19,7 +19,6 @@ package cronjob
 import (
 	"encoding/json"
 	"fmt"
-	"hash/adler32"
 	"time"
 
 	"github.com/golang/glog"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -200,10 +198,9 @@ func getJobFromTemplate(sj *batch.CronJob, scheduledTime time.Time) (*batch.Job,
 	return job, nil
 }
 
-func getTimeHash(scheduledTime time.Time) uint32 {
-	timeHasher := adler32.New()
-	hashutil.DeepHashObject(timeHasher, scheduledTime)
-	return timeHasher.Sum32()
+// Return Unix Epoch Time
+func getTimeHash(scheduledTime time.Time) int64 {
+	return scheduledTime.Unix()
 }
 
 // makeCreatedByRefJson makes a json string with an object reference for use in "created-by" annotation value

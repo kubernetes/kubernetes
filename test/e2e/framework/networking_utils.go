@@ -269,8 +269,33 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 func (config *NetworkingTestConfig) GetSelfURL(path string, expected string) {
 	cmd := fmt.Sprintf("curl -q -s --connect-timeout 1 http://localhost:10249%s", path)
 	By(fmt.Sprintf("Getting kube-proxy self URL %s", path))
-	stdout := RunHostCmdOrDie(config.Namespace, config.HostTestContainerPod.Name, cmd)
-	Expect(strings.Contains(stdout, expected)).To(BeTrue())
+
+	// These are arbitrary timeouts. The curl command should pass on first try,
+	// unless kubeproxy is starved/bootstrapping/restarting etc.
+	const retryInterval = 1 * time.Second
+	const retryTimeout = 30 * time.Second
+	podName := config.HostTestContainerPod.Name
+	var msg string
+	if pollErr := wait.PollImmediate(retryInterval, retryTimeout, func() (bool, error) {
+		stdout, err := RunHostCmd(config.Namespace, podName, cmd)
+		if err != nil {
+			msg = fmt.Sprintf("failed executing cmd %v in %v/%v: %v", cmd, config.Namespace, podName, err)
+			Logf(msg)
+			return false, nil
+		}
+		if !strings.Contains(stdout, expected) {
+			msg = fmt.Sprintf("successfully executed %v in %v/%v, but output '%v' doesn't contain expected string '%v'", cmd, config.Namespace, podName, stdout, expected)
+			Logf(msg)
+			return false, nil
+		}
+		return true, nil
+	}); pollErr != nil {
+		Logf("\nOutput of kubectl describe pod %v/%v:\n", config.Namespace, podName)
+		desc, _ := RunKubectl(
+			"describe", "pod", podName, fmt.Sprintf("--namespace=%v", config.Namespace))
+		Logf("%s", desc)
+		Failf("Timed out in %v: %v", retryTimeout, msg)
+	}
 }
 
 func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node string) *api.Pod {

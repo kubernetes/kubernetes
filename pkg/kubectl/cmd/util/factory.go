@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/swagger"
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -343,6 +344,9 @@ func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) 
 		return nil, err
 	}
 	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
+	if len(cfg.AccessKey) > 0 {
+		cacheDir = defaultDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), "1.5.0")
+	}
 	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
 }
 
@@ -384,18 +388,6 @@ func (f *factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, er
 	}
 	if err != nil {
 		return nil, nil, err
-	}
-
-	// Register unknown APIs as third party for now to make
-	// validation happy. TODO perhaps make a dynamic schema
-	// validator to avoid this.
-	for _, group := range groupResources {
-		for _, version := range group.Group.Versions {
-			gv := unversioned.GroupVersion{Group: group.Group.Name, Version: version.Version}
-			if !registered.IsRegisteredVersion(gv) {
-				registered.AddThirdPartyAPIGroupVersions(gv)
-			}
-		}
 	}
 
 	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
@@ -725,7 +717,12 @@ func (f *factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer,
 }
 
 func (f *factory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
-	if validate {
+	restConfig, err := f.clientConfig.ClientConfig()
+	if err != nil {
+		glog.V(6).Info("get restConfig error")
+		return validation.NullSchema{}, nil
+	}
+	if len(restConfig.AccessKey) == 0 && validate {
 		clientConfig, err := f.clients.ClientConfigForVersion(nil)
 		if err != nil {
 			return nil, err
@@ -1148,10 +1145,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		return err
 	}
 	if ok := registered.IsEnabledVersion(gvk.GroupVersion()); !ok {
-		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), registered.EnabledVersions())
-	}
-	if registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
-		// Don't attempt to validate third party objects
+		// if we don't have this in our scheme, just skip validation because its an object we don't recognize
 		return nil
 	}
 
@@ -1346,4 +1340,8 @@ func computeDiscoverCacheDir(parentDir, host string) string {
 	safeHost := overlyCautiousIllegalFileCharacters.ReplaceAllString(schemelessHost, "_")
 
 	return filepath.Join(parentDir, safeHost)
+}
+
+func defaultDiscoverCacheDir(parentDir, version string) string {
+	return filepath.Join(parentDir, "demo")
 }

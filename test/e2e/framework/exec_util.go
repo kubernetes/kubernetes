@@ -30,40 +30,80 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// ExecCommandInContainer execute a command in the specified container.
-// Pass in stdin, tty if needed in the future.
-func (f *Framework) ExecCommandInContainer(podName, containerName string, cmd ...string) string {
-	stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
-	Logf("Exec stderr: %q", stderr)
-	Expect(err).NotTo(HaveOccurred(), "fail to execute command")
-	return stdout
+// ExecOptions passed to ExecWithOptions
+type ExecOptions struct {
+	Command []string
+
+	Namespace     string
+	PodName       string
+	ContainerName string
+
+	Stdin         io.Reader
+	CaptureStdout bool
+	CaptureStderr bool
+	// If false, whitespace in std{err,out} will be removed.
+	PreserveWhitespace bool
 }
 
-// ExecCommandInContainerWithFullOutput executes a command in the specified container and return stdout, stderr and error
-func (f *Framework) ExecCommandInContainerWithFullOutput(podName, containerName string, cmd ...string) (string, string, error) {
-	Logf("Exec running '%s'", strings.Join(cmd, " "))
+// ExecWithOptions executes a command in the specified container,
+// returning stdout, stderr and error. `options` allowed for
+// additional parameters to be passed.
+func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error) {
+	Logf("ExecWithOptions %+v", options)
+
 	config, err := LoadConfig()
 	Expect(err).NotTo(HaveOccurred(), "failed to load restclient config")
-	var stdout, stderr bytes.Buffer
-	var stdin io.Reader
-	tty := false
+
+	const tty = false
+
 	req := f.ClientSet.Core().RESTClient().Post().
 		Resource("pods").
-		Name(podName).
-		Namespace(f.Namespace.Name).
+		Name(options.PodName).
+		Namespace(options.Namespace).
 		SubResource("exec").
-		Param("container", containerName)
+		Param("container", options.ContainerName)
 	req.VersionedParams(&api.PodExecOptions{
-		Container: containerName,
-		Command:   cmd,
-		Stdin:     stdin != nil,
-		Stdout:    true,
-		Stderr:    true,
+		Container: options.ContainerName,
+		Command:   options.Command,
+		Stdin:     options.Stdin != nil,
+		Stdout:    options.CaptureStdout,
+		Stderr:    options.CaptureStderr,
 		TTY:       tty,
 	}, api.ParameterCodec)
 
-	err = execute("POST", req.URL(), config, stdin, &stdout, &stderr, tty)
+	var stdout, stderr bytes.Buffer
+	err = execute("POST", req.URL(), config, options.Stdin, &stdout, &stderr, tty)
+
+	if options.PreserveWhitespace {
+		return stdout.String(), stderr.String(), err
+	}
 	return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), err
+}
+
+// ExecCommandInContainerWithFullOutput executes a command in the
+// specified container and return stdout, stderr and error
+func (f *Framework) ExecCommandInContainerWithFullOutput(podName, containerName string, cmd ...string) (string, string, error) {
+	return f.ExecWithOptions(ExecOptions{
+		Command:       cmd,
+		Namespace:     f.Namespace.Name,
+		PodName:       podName,
+		ContainerName: containerName,
+
+		Stdin:              nil,
+		CaptureStdout:      true,
+		CaptureStderr:      true,
+		PreserveWhitespace: false,
+	})
+}
+
+// ExecCommandInContainer executes a command in the specified container.
+func (f *Framework) ExecCommandInContainer(podName, containerName string, cmd ...string) string {
+	stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
+	Logf("Exec stderr: %q", stderr)
+	Expect(err).NotTo(HaveOccurred(),
+		"failed to execute command in pod %v, container %v: %v",
+		podName, containerName, err)
+	return stdout
 }
 
 func (f *Framework) ExecShellInContainer(podName, containerName string, cmd string) string {

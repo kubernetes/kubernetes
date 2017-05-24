@@ -562,9 +562,10 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 			return statusError, err
 		}
 
+		// The object can be modified.
 		lrs := &extensionsv1.ReplicaSet{
-			ObjectMeta: fedutil.CopyObjectMeta(frs.ObjectMeta),
-			Spec:       frs.Spec,
+			ObjectMeta: fedutil.DeepCopyRelevantObjectMeta(frs.ObjectMeta),
+			Spec:       fedutil.DeepCopyApiTypeOrPanic(frs.Spec).(extensionsv1.ReplicaSetSpec),
 		}
 		specReplicas := int32(replicas)
 		lrs.Spec.Replicas = &specReplicas
@@ -595,10 +596,12 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 			}
 			fedStatus.Replicas += currentLrs.Status.Replicas
 			fedStatus.FullyLabeledReplicas += currentLrs.Status.FullyLabeledReplicas
-			// leave the replicaset even the replicas dropped to 0
+			fedStatus.ReadyReplicas += currentLrs.Status.ReadyReplicas
+			fedStatus.AvailableReplicas += currentLrs.Status.AvailableReplicas
 		}
 	}
-	if fedStatus.Replicas != frs.Status.Replicas || fedStatus.FullyLabeledReplicas != frs.Status.FullyLabeledReplicas {
+	if fedStatus.Replicas != frs.Status.Replicas || fedStatus.FullyLabeledReplicas != frs.Status.FullyLabeledReplicas ||
+		fedStatus.ReadyReplicas != frs.Status.ReadyReplicas || fedStatus.AvailableReplicas != frs.Status.AvailableReplicas {
 		frs.Status = fedStatus
 		_, err = frsc.fedClient.Extensions().ReplicaSets(frs.Namespace).UpdateStatus(frs)
 		if err != nil {

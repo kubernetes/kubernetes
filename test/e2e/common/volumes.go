@@ -353,7 +353,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	var namespace *api.Namespace
 
 	BeforeEach(func() {
-		if !isTestEnabled() {
+		if !isTestEnabled(f.ClientSet) {
 			framework.Skipf("NFS tests are not supported for this distro")
 		}
 		namespace = f.Namespace
@@ -468,24 +468,32 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	})
 })
 
-func isTestEnabled() bool {
-	// TODO(timstclair): Pass this through the image setup rather than hardcoding.
-	if strings.Contains(framework.TestContext.NodeName, "-gci-dev-") {
-		gciVersionRe := regexp.MustCompile("-gci-dev-([0-9]+)-")
-		matches := gciVersionRe.FindStringSubmatch(framework.TestContext.NodeName)
-		if len(matches) == 2 {
-			version, err := strconv.Atoi(matches[1])
-			if err != nil {
-				glog.Errorf("Error parsing GCI version from NodeName %q: %v", framework.TestContext.NodeName, err)
-				return false
+func isTestEnabled(c clientset.Interface) bool {
+	// Enable the test on node e2e if the node image is GCI.
+	nodeName := framework.TestContext.NodeName
+	if nodeName != "" {
+		if strings.Contains(nodeName, "-gci-dev-") {
+			gciVersionRe := regexp.MustCompile("-gci-dev-([0-9]+)-")
+			matches := gciVersionRe.FindStringSubmatch(framework.TestContext.NodeName)
+			if len(matches) == 2 {
+				version, err := strconv.Atoi(matches[1])
+				if err != nil {
+					glog.Errorf("Error parsing GCI version from NodeName %q: %v", nodeName, err)
+					return false
+				}
+				return version >= 54
 			}
-			return version >= 54
 		}
 		return false
 	}
-	// Disable tests for containvm
-	if strings.Contains(framework.TestContext.NodeName, "-containervm-") {
-		//return true
+
+	// For cluster e2e test, because nodeName is empty, retrieve the node objects from api server
+	// and check their images. Only run NFSv4 and GlusterFS if nodes are using GCI image for now.
+	nodes := framework.GetReadySchedulableNodesOrDie(c)
+	for _, node := range nodes.Items {
+		if !strings.Contains(node.Status.NodeInfo.OSImage, "Google Container-VM") {
+			return false
+		}
 	}
-	return false
+	return true
 }

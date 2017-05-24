@@ -354,12 +354,6 @@ func TestLabelForResourceFromFile(t *testing.T) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {
-				case "/version":
-					resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-					if err != nil {
-						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-					}
-					return resp, nil
 				case "/namespaces/test/replicationcontrollers/cassandra":
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
 				default:
@@ -381,7 +375,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(f, buf)
@@ -443,12 +437,6 @@ func TestLabelMultipleObjects(t *testing.T) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {
-				case "/version":
-					resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-					if err != nil {
-						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-					}
-					return resp, nil
 				case "/namespaces/test/pods":
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
 				default:
@@ -472,7 +460,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(f, buf)

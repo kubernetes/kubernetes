@@ -31,6 +31,11 @@ type Config struct {
 	Username string
 	Password string
 
+	AccessKey   string
+	SecretKey   string
+	RegionID    string
+	ClusterUUID string
+
 	// Bearer token for authentication
 	BearerToken string
 
@@ -58,6 +63,10 @@ func (c *Config) HasCA() bool {
 // HasBasicAuth returns whether the configuration has basic authentication or not.
 func (c *Config) HasBasicAuth() bool {
 	return len(c.Username) != 0
+}
+
+func (c *Config) HasCCEAuth() bool {
+	return len(c.AccessKey) != 0
 }
 
 // HasTokenAuth returns whether the configuration has token authentication or not.

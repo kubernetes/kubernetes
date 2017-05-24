@@ -105,7 +105,7 @@ func (c *Repair) runOnce() error {
 	// the service collection. The caching layer keeps per-collection RVs,
 	// and this is proper, since in theory the collections could be hosted
 	// in separate etcd (or even non-etcd) instances.
-	list, err := c.registry.ListServices(ctx, nil)
+	list, err := c.registry.ListServices(ctx, &api.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}

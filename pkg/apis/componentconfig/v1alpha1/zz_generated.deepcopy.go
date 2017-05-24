@@ -403,6 +403,13 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 		out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
 		out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
+		if in.ExperimentalKernelMemcgNotification != nil {
+			in, out := &in.ExperimentalKernelMemcgNotification, &out.ExperimentalKernelMemcgNotification
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.ExperimentalKernelMemcgNotification = nil
+		}
 		out.PodsPerCore = in.PodsPerCore
 		if in.EnableControllerAttachDetach != nil {
 			in, out := &in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach

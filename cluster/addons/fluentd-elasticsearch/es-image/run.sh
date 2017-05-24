@@ -22,4 +22,6 @@ export MINIMUM_MASTER_NODES=${MINIMUM_MASTER_NODES:-2}
 
 /elasticsearch_logging_discovery >> /elasticsearch/config/elasticsearch.yml
 
-/elasticsearch/bin/elasticsearch
+chown -R elasticsearch:elasticsearch /data
+
+/bin/su -c /elasticsearch/bin/elasticsearch elasticsearch

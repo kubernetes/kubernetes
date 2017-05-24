@@ -721,7 +721,7 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 // 	The pod has all information necessary to check affinity, the pod's label selector is sufficient to calculate
 // 	the match.
 // Otherwise:
-// 	Create an "implicit selector" which gaurantees pods will land on nodes with similar values
+// 	Create an "implicit selector" which guarantees pods will land on nodes with similar values
 // 	for the affinity labels.
 //
 // 	To do this, we "reverse engineer" a selector by introspecting existing pods running under the same service+namespace.
@@ -730,8 +730,8 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 // 		- L is not defined in the pod itself already.
 // 		- and SOME pod, from a service, in the same namespace, ALREADY scheduled onto a node, has a matching value.
 //
-// WARNING: This Predicate is NOT gauranteed to work if some of the predicateMetadata data isn't precomputed...
-// For that reason it is not exported, i.e. it is highlhy coupled to the implementation of the FitPredicate construction.
+// WARNING: This Predicate is NOT guaranteed to work if some of the predicateMetadata data isn't precomputed...
+// For that reason it is not exported, i.e. it is highly coupled to the implementation of the FitPredicate construction.
 func (s *ServiceAffinity) checkServiceAffinity(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	var services []*api.Service
 	var pods []*api.Pod
@@ -1087,7 +1087,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *api.Pod, nod
 			return false
 		}
 		if !termMatches {
-			// If the requirement matches a pod's own labels ane namespace, and there are
+			// If the requirement matches a pod's own labels are namespace, and there are
 			// no other such pods, then disregard the requirement. This is necessary to
 			// not block forever because the first pod of the collection can't be scheduled.
 			match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, pod, &term)
@@ -1192,7 +1192,7 @@ func CheckNodeMemoryPressurePredicate(pod *api.Pod, meta interface{}, nodeInfo *
 		return true, nil, nil
 	}
 
-	// is node under presure?
+	// is node under pressure?
 	for _, cond := range node.Status.Conditions {
 		if cond.Type == api.NodeMemoryPressure && cond.Status == api.ConditionTrue {
 			return false, []algorithm.PredicateFailureReason{ErrNodeUnderMemoryPressure}, nil
@@ -1210,7 +1210,7 @@ func CheckNodeDiskPressurePredicate(pod *api.Pod, meta interface{}, nodeInfo *sc
 		return false, nil, fmt.Errorf("node not found")
 	}
 
-	// is node under presure?
+	// is node under pressure?
 	for _, cond := range node.Status.Conditions {
 		if cond.Type == api.NodeDiskPressure && cond.Status == api.ConditionTrue {
 			return false, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}, nil

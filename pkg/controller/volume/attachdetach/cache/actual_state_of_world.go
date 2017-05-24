@@ -116,6 +116,9 @@ type ActualStateOfWorld interface {
 	// since volumes should be removed from this list as soon a detach operation
 	// is considered, before the detach operation is triggered).
 	GetVolumesToReportAttached() map[types.NodeName][]api.AttachedVolume
+
+	// GetNodesToUpdateStatusFor returns the map of nodeNames to nodeToUpdateStatusFor
+	GetNodesToUpdateStatusFor() map[types.NodeName]nodeToUpdateStatusFor
 }
 
 // AttachedVolume represents a volume that is attached to a node.
@@ -457,6 +460,7 @@ func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeN
 			"Failed to set statusUpdateNeeded to needed %t because nodeName=%q  does not exist",
 			needed,
 			nodeName)
+		return
 	}
 
 	nodeToUpdate.statusUpdateNeeded = needed
@@ -589,6 +593,10 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][
 	}
 
 	return volumesToReportAttached
+}
+
+func (asw *actualStateOfWorld) GetNodesToUpdateStatusFor() map[types.NodeName]nodeToUpdateStatusFor {
+	return asw.nodesToUpdateStatusFor
 }
 
 func getAttachedVolume(

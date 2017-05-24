@@ -138,7 +138,7 @@ type serviceInfo struct {
 	nodePort                 int
 	loadBalancerStatus       api.LoadBalancerStatus
 	sessionAffinityType      api.ServiceAffinity
-	stickyMaxAgeSeconds      int
+	stickyMaxAgeMinutes      int
 	externalIPs              []string
 	loadBalancerSourceRanges []string
 	onlyNodeLocalEndpoints   bool
@@ -155,7 +155,7 @@ type endpointsInfo struct {
 func newServiceInfo(service proxy.ServicePortName) *serviceInfo {
 	return &serviceInfo{
 		sessionAffinityType: api.ServiceAffinityNone, // default
-		stickyMaxAgeSeconds: 180,                     // TODO: paramaterize this in the API.
+		stickyMaxAgeMinutes: 180,                     // TODO: paramaterize this in the API.
 	}
 }
 
@@ -248,6 +248,10 @@ func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec ut
 	if nodeIP == nil {
 		glog.Warningf("invalid nodeIP, initialize kube-proxy with 127.0.0.1 as nodeIP")
 		nodeIP = net.ParseIP("127.0.0.1")
+	}
+
+	if len(clusterCIDR) == 0 {
+		glog.Warningf("clusterCIDR not specified, unable to distinguish between internal and external traffic")
 	}
 
 	go healthcheck.Run()
@@ -382,6 +386,9 @@ func (proxier *Proxier) sameConfig(info *serviceInfo, service *api.Service, port
 	}
 	onlyNodeLocalEndpoints := apiservice.NeedsHealthCheck(service) && featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly()
 	if info.onlyNodeLocalEndpoints != onlyNodeLocalEndpoints {
+		return false
+	}
+	if !reflect.DeepEqual(info.loadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges) {
 		return false
 	}
 	return true
@@ -1161,7 +1168,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-A", string(svcChain),
 					"-m", "comment", "--comment", svcName.String(),
 					"-m", "recent", "--name", string(endpointChain),
-					"--rcheck", "--seconds", fmt.Sprintf("%d", svcInfo.stickyMaxAgeSeconds), "--reap",
+					"--rcheck", "--seconds", fmt.Sprintf("%d", svcInfo.stickyMaxAgeMinutes*60), "--reap",
 					"-j", string(endpointChain))
 			}
 		}
@@ -1221,13 +1228,17 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		// First rule in the chain redirects all pod -> external vip traffic to the
 		// Service's ClusterIP instead. This happens whether or not we have local
-		// endpoints.
-		args = []string{
-			"-A", string(svcXlbChain),
-			"-m", "comment", "--comment",
-			fmt.Sprintf(`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`),
+		// endpoints; only if clusterCIDR is specified
+		if len(proxier.clusterCIDR) > 0 {
+			args = []string{
+				"-A", string(svcXlbChain),
+				"-m", "comment", "--comment",
+				fmt.Sprintf(`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`),
+				"-s", proxier.clusterCIDR,
+				"-j", string(svcChain),
+			}
+			writeLine(natRules, args...)
 		}
-		writeLine(natRules, append(args, "-s", proxier.clusterCIDR, "-j", string(svcChain))...)
 
 		numLocalEndpoints := len(localEndpointChains)
 		if numLocalEndpoints == 0 {
@@ -1300,7 +1311,7 @@ func (proxier *Proxier) syncProxyRules() {
 	glog.V(3).Infof("Restoring iptables rules: %s", lines)
 	err = proxier.iptables.RestoreAll(lines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		glog.Errorf("Failed to execute iptables-restore: %v", err)
+		glog.Errorf("Failed to execute iptables-restore: %v\nRules:\n%s", err, lines)
 		// Revert new local ports.
 		revertPorts(replacementPortsMap, proxier.portsMap)
 		return

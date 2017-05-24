@@ -616,6 +616,43 @@ func TestStoreDelete(t *testing.T) {
 	}
 }
 
+// TestGracefulStoreCanDeleteIfExistingGracePeriodZero tests recovery from
+// race condition where the graceful delete is unable to complete
+// in prior operation, but the pod remains with deletion timestamp
+// and grace period set to 0.
+func TestGracefulStoreCanDeleteIfExistingGracePeriodZero(t *testing.T) {
+	deletionTimestamp := unversioned.NewTime(time.Now())
+	deletionGracePeriodSeconds := int64(0)
+	initialGeneration := int64(1)
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:                       "foo",
+			Generation:                 initialGeneration,
+			DeletionGracePeriodSeconds: &deletionGracePeriodSeconds,
+			DeletionTimestamp:          &deletionTimestamp,
+		},
+		Spec: api.PodSpec{NodeName: "machine"},
+	}
+
+	testContext := api.WithNamespace(api.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	registry.EnableGarbageCollection = false
+	defaultDeleteStrategy := testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
+	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+	defer destroyFunc()
+
+	graceful, gracefulPending, err := rest.BeforeDelete(registry.DeleteStrategy, testContext, pod, api.NewDeleteOptions(0))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if graceful {
+		t.Fatalf("graceful should be false if object has DeletionTimestamp and DeletionGracePeriodSeconds is 0")
+	}
+	if gracefulPending {
+		t.Fatalf("gracefulPending should be false if object has DeletionTimestamp and DeletionGracePeriodSeconds is 0")
+	}
+}
+
 func TestGracefulStoreHandleFinalizers(t *testing.T) {
 	initialGeneration := int64(1)
 	podWithFinalizer := &api.Pod{

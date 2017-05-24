@@ -22,6 +22,7 @@ import (
 	"regexp"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/volume"
@@ -244,7 +245,11 @@ func (r *hostPathRecycler) GetPath() string {
 // Recycle blocks until the pod has completed or any error occurs.
 // HostPath recycling only works in single node clusters and is meant for testing purposes only.
 func (r *hostPathRecycler) Recycle() error {
-	pod := r.config.RecyclerPodTemplate
+	templateClone, err := conversion.NewCloner().DeepCopy(r.config.RecyclerPodTemplate)
+	if err != nil {
+		return err
+	}
+	pod := templateClone.(*api.Pod)
 	// overrides
 	pod.Spec.ActiveDeadlineSeconds = &r.timeout
 	pod.Spec.Volumes[0].VolumeSource = api.VolumeSource{

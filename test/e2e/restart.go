@@ -32,17 +32,17 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func isRestartNeverMirrorPod(p *api.Pod) bool {
+func isNotRestartAlwaysMirrorPod(p *api.Pod) bool {
 	if !kubepod.IsMirrorPod(p) {
 		return false
 	}
-	return p.Spec.RestartPolicy == api.RestartPolicyNever
+	return p.Spec.RestartPolicy != api.RestartPolicyAlways
 }
 
 func filterIrrelevantPods(pods []*api.Pod) []*api.Pod {
 	var results []*api.Pod
 	for _, p := range pods {
-		if isRestartNeverMirrorPod(p) {
+		if isNotRestartAlwaysMirrorPod(p) {
 			// Mirror pods with restart policy == Never will not get
 			// recreated if they are deleted after the pods have
 			// terminated. For now, we discount such pods.

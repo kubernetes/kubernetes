@@ -29,7 +29,7 @@ The criteria for inclusion are as follows:
 specification, whereas there are countless different systems for definition workflows of dependent actions (e.g. Celery et al.).
    * The API object is expected to be generally useful to greater than 50% of the Kubernetes users.  This is to ensure that we don't build up a collection of niche APIs
 that users rarely need.
-   * There is general consensus in the Kubernetes community that the API object is in the "Kubernetes layer".  See ["What is Kubernetes?"](whatisk8s.md) for a detailed
+   * There is general consensus in the Kubernetes community that the API object is in the "Kubernetes layer".  See ["What is Kubernetes?"](http://kubernetes.io/docs/whatisk8s/) for a detailed
 explanation of what we believe the "Kubernetes layer" to be.
 
 Of course for every set of rules, we need to ensure that we are not hamstrung or limited by slavish devotion to those rules. Thus we also introduce two exceptions

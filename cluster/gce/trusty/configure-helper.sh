@@ -599,6 +599,9 @@ start_kube_apiserver() {
   if [ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]; then
     params="${params} --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
+  if [ -n "${ETCD_QUORUM_READ:-}" ]; then
+    params="${params} --etcd-quorum-read=${ETCD_QUORUM_READ}"
+  fi
 
   local admission_controller_config_mount=""
   local admission_controller_config_volume=""
@@ -628,7 +631,7 @@ start_kube_apiserver() {
     params="${params} --advertise-address=${vm_external_ip}"
     params="${params} --ssh-user=${PROXY_SSH_USER}"
     params="${params} --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
-  else [ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]
+  elif [ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]; then
     params="${params} --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
   fi
   readonly kube_apiserver_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)

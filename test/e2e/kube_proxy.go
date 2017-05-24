@@ -180,7 +180,8 @@ var _ = framework.KubeDescribe("Network", func() {
 			fmt.Sprintf(
 				"sudo cat /proc/net/ip_conntrack "+
 					"| grep 'CLOSE_WAIT.*dst=%v.*dport=%v' "+
-					"| awk '{print $3}'",
+					"| tail -n 1"+
+					"| awk '{print $3}' ",
 				serverNodeInfo.nodeIp,
 				testDaemonTcpPort),
 			framework.TestContext.Provider,
@@ -193,7 +194,7 @@ var _ = framework.KubeDescribe("Network", func() {
 		// These must be synchronized from the default values set in
 		// pkg/apis/../defaults.go ConntrackTCPCloseWaitTimeout. The
 		// current defaults are hidden in the initialization code.
-		const epsilonSeconds = 10
+		const epsilonSeconds = 60
 		const expectedTimeoutSeconds = 60 * 60
 
 		framework.Logf("conntrack entry timeout was: %v, expected: %v",

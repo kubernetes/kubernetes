@@ -37,3 +37,16 @@ go_library(
         "//vendor:github.com/ugorji/go/codec",
     ],
 )
+
+go_test(
+    name = "go_default_xtest",
+    srcs = ["defaults_test.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/install:go_default_library",
+        "//pkg/apis/autoscaling/install:go_default_library",
+        "//pkg/apis/autoscaling/v1:go_default_library",
+        "//pkg/runtime:go_default_library",
+    ],
+)

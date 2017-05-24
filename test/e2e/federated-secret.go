@@ -55,16 +55,17 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.ClientSet)
+			// Delete all secrets.
+			nsName := f.FederationNamespace.Name
+			deleteAllSecretsOrFail(f.FederationClientset_1_5, nsName)
 			unregisterClusters(clusters, f)
+
 		})
 
 		It("should be created and deleted successfully", func() {
 			framework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			secret := createSecretOrFail(f.FederationClientset_1_5, nsName)
-			defer func() { // Cleanup
-				deleteSecretOrFail(f.FederationClientset_1_5, nsName, secret.Name, true)
-			}()
 			// wait for secret shards being created
 			waitForSecretShardsOrFail(nsName, secret, clusters)
 			secret = updateSecretOrFail(f.FederationClientset_1_5, nsName, secret.Name)
@@ -74,23 +75,42 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 		It("should be deleted from underlying clusters when OrphanDependents is false", func() {
 			framework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
-			verifyCascadingDeletion(f.FederationClientset_1_5, clusters, false, nsName)
+			orphanDependents := false
+			verifyCascadingDeletionForSecret(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
 			By(fmt.Sprintf("Verified that secrets were deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
 			framework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
-			verifyCascadingDeletion(f.FederationClientset_1_5, clusters, true, nsName)
+			orphanDependents := true
+			verifyCascadingDeletionForSecret(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			By(fmt.Sprintf("Verified that secrets were not deleted from underlying clusters"))
+		})
+
+		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
+			framework.SkipUnlessFederated(f.ClientSet)
+			nsName := f.FederationNamespace.Name
+			verifyCascadingDeletionForSecret(f.FederationClientset_1_5, clusters, nil, nsName)
 			By(fmt.Sprintf("Verified that secrets were not deleted from underlying clusters"))
 		})
 	})
 })
 
-// Verifies that secrets are deleted from underlying clusters when orphan dependents is false
-// and they are not deleted when orphan dependents is true.
-func verifyCascadingDeletion(clientset *fedclientset.Clientset,
-	clusters map[string]*cluster, orphanDependents bool, nsName string) {
+// deleteAllSecretsOrFail deletes all secrets in the given namespace name.
+func deleteAllSecretsOrFail(clientset *fedclientset.Clientset, nsName string) {
+	SecretList, err := clientset.Core().Secrets(nsName).List(v1.ListOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	orphanDependents := false
+	for _, Secret := range SecretList.Items {
+		deleteSecretOrFail(clientset, nsName, Secret.Name, &orphanDependents)
+	}
+}
+
+// verifyCascadingDeletionForSecret verifies that secrets are deleted from
+// underlying clusters when orphan dependents is false and they are not
+// deleted when orphan dependents is true.
+func verifyCascadingDeletionForSecret(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
 	secret := createSecretOrFail(clientset, nsName)
 	secretName := secret.Name
 	// Check subclusters if the secret was created there.
@@ -104,7 +124,6 @@ func verifyCascadingDeletion(clientset *fedclientset.Clientset,
 				}
 				return false, nil
 			}
-
 		}
 		return true, nil
 	})
@@ -115,11 +134,13 @@ func verifyCascadingDeletion(clientset *fedclientset.Clientset,
 
 	By(fmt.Sprintf("Verifying secrets %s in underlying clusters", secretName))
 	errMessages := []string{}
+	// secret should be present in underlying clusters unless orphanDependents is false.
+	shouldExist := orphanDependents == nil || *orphanDependents == true
 	for clusterName, clusterClientset := range clusters {
 		_, err := clusterClientset.Core().Secrets(nsName).Get(secretName)
-		if orphanDependents && errors.IsNotFound(err) {
+		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for secret %s in cluster %s, expected secret to exist", secretName, clusterName))
-		} else if !orphanDependents && (err == nil || !errors.IsNotFound(err)) {
+		} else if !shouldExist && !errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for secret %s in cluster %s, got error: %v", secretName, clusterName, err))
 		}
 	}
@@ -146,9 +167,9 @@ func createSecretOrFail(clientset *fedclientset.Clientset, nsName string) *v1.Se
 	return secret
 }
 
-func deleteSecretOrFail(clientset *fedclientset.Clientset, nsName string, secretName string, orphanDependents bool) {
+func deleteSecretOrFail(clientset *fedclientset.Clientset, nsName string, secretName string, orphanDependents *bool) {
 	By(fmt.Sprintf("Deleting secret %q in namespace %q", secretName, nsName))
-	err := clientset.Core().Secrets(nsName).Delete(secretName, &v1.DeleteOptions{OrphanDependents: &orphanDependents})
+	err := clientset.Core().Secrets(nsName).Delete(secretName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting secret %q in namespace %q", secretName, nsName)
 
 	// Wait for the secret to be deleted.

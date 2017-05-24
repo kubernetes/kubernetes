@@ -20,13 +20,14 @@ import (
 	"reflect"
 
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // Copies cluster-independent, user provided data from the given ObjectMeta struct. If in
 // the future the ObjectMeta structure is expanded then any field that is not populated
 // by the api server should be included here.
-func CopyObjectMeta(obj api_v1.ObjectMeta) api_v1.ObjectMeta {
+func copyObjectMeta(obj api_v1.ObjectMeta) api_v1.ObjectMeta {
 	return api_v1.ObjectMeta{
 		Name:        obj.Name,
 		Namespace:   obj.Namespace,
@@ -38,8 +39,8 @@ func CopyObjectMeta(obj api_v1.ObjectMeta) api_v1.ObjectMeta {
 // Deep copies cluster-independent, user provided data from the given ObjectMeta struct. If in
 // the future the ObjectMeta structure is expanded then any field that is not populated
 // by the api server should be included here.
-func DeepCopyObjectMeta(obj api_v1.ObjectMeta) api_v1.ObjectMeta {
-	copyMeta := CopyObjectMeta(obj)
+func DeepCopyRelevantObjectMeta(obj api_v1.ObjectMeta) api_v1.ObjectMeta {
+	copyMeta := copyObjectMeta(obj)
 	if obj.Labels != nil {
 		copyMeta.Labels = make(map[string]string)
 		for key, val := range obj.Labels {
@@ -82,4 +83,12 @@ func ObjectMetaAndSpecEquivalent(a, b runtime.Object) bool {
 	specA := reflect.ValueOf(a).Elem().FieldByName("Spec").Interface()
 	specB := reflect.ValueOf(b).Elem().FieldByName("Spec").Interface()
 	return ObjectMetaEquivalent(objectMetaA, objectMetaB) && reflect.DeepEqual(specA, specB)
+}
+
+func DeepCopyApiTypeOrPanic(item interface{}) interface{} {
+	result, err := conversion.NewCloner().DeepCopy(item)
+	if err != nil {
+		panic(err)
+	}
+	return result
 }

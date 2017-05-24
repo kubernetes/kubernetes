@@ -41,12 +41,8 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 	// memory pressure reduction, even if we time out while waiting.
 	Context("", func() {
 		AfterEach(func() {
-			glog.Infof("Summary of node events during the memory eviction test:")
-			err := framework.ListNamespaceEvents(f.ClientSet, f.Namespace.Name)
-			framework.ExpectNoError(err)
-			glog.Infof("Summary of pod events during the memory eviction test:")
-			err = framework.ListNamespaceEvents(f.ClientSet, "")
-			framework.ExpectNoError(err)
+			logNodeEvents(f)
+			logPodEvents(f)
 		})
 
 		Context("when there is memory pressure", func() {

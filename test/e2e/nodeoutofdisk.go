@@ -65,7 +65,7 @@ const (
 // 7. Observe that the pod in pending status schedules on that node.
 //
 // Flaky issue #20015.  We have no clear path for how to test this functionality in a non-flaky way.
-var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive] [Feature:OutOfDisk]", func() {
+var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", func() {
 	var c clientset.Interface
 	var unfilledNodeName, recoveredNodeName string
 	f := framework.NewDefaultFramework("node-outofdisk")

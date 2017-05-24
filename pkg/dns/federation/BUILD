@@ -12,14 +12,15 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["bucket.go"],
+    srcs = ["federation.go"],
     tags = ["automanaged"],
+    deps = ["//pkg/util/validation:go_default_library"],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["bucket_test.go"],
+    srcs = ["federation_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [],
+    deps = ["//vendor:github.com/stretchr/testify/assert"],
 )

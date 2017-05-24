@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 )
 
@@ -62,12 +63,8 @@ func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.
 				return
 			}
 
-			err := options.run()
-			if err != nil {
-				fmt.Fprintf(out, "%v\n", err)
-			} else {
-				fmt.Fprintf(out, "property %q set.\n", options.propertyName)
-			}
+			cmdutil.CheckErr(options.run())
+			fmt.Fprintf(out, "Property %q set.\n", options.propertyName)
 		},
 	}
 

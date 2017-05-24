@@ -200,8 +200,9 @@ var _ = framework.KubeDescribe("Job", func() {
 			// the job stabilized and won't be synced until modification or full
 			// resync happens, we don't want to wait for the latter so we force
 			// sync modifying it
-			job.Spec.Parallelism = &completions
-			job, err = updateJob(f.ClientSet, f.Namespace.Name, job)
+			_, err = framework.UpdateJobWithRetries(f.ClientSet, f.Namespace.Name, job.Name, func(update *batch.Job) {
+				update.Spec.Parallelism = &completions
+			})
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForJobFail(f.ClientSet, f.Namespace.Name, job.Name, jobTimeout)
 		}

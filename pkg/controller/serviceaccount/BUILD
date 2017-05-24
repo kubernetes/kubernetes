@@ -68,6 +68,7 @@ go_test(
         "//pkg/runtime:go_default_library",
         "//pkg/util/rand:go_default_library",
         "//pkg/util/sets:go_default_library",
+        "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/golang/glog",
     ],
 )

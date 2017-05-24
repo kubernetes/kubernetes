@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
+	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/test/utils"
 
 	"github.com/golang/glog"
@@ -61,6 +62,8 @@ func NewHollowKubelet(
 	// -----------------
 	// Injected objects
 	// -----------------
+	volumePlugins := empty_dir.ProbeVolumePlugins()
+	volumePlugins = append(volumePlugins, secret.ProbeVolumePlugins()...)
 	d := &kubelet.KubeletDeps{
 		KubeClient:        client,
 		DockerClient:      dockerClient,
@@ -68,7 +71,7 @@ func NewHollowKubelet(
 		Cloud:             nil,
 		OSInterface:       &containertest.FakeOS{},
 		ContainerManager:  containerManager,
-		VolumePlugins:     empty_dir.ProbeVolumePlugins(),
+		VolumePlugins:     volumePlugins,
 		TLSOptions:        nil,
 		OOMAdjuster:       oom.NewFakeOOMAdjuster(),
 		Writer:            &kubeio.StdWriter{},

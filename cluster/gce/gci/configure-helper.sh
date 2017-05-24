@@ -409,9 +409,22 @@ function assemble-docker-flags {
   fi
 
   echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
-  # If using a network plugin, we need to explicitly restart docker daemon, because
-  # kubelet will not do it.
+
   if [[ "${use_net_plugin}" == "true" ]]; then
+    # If using a network plugin, extend the docker configuration to always remove
+    # the network checkpoint to avoid corrupt checkpoints.
+    # (https://github.com/docker/docker/issues/18283).
+    echo "Extend the default docker.service configuration"
+    mkdir -p /etc/systemd/system/docker.service.d
+    cat <<EOF >/etc/systemd/system/docker.service.d/01network.conf
+[Service]
+ExecStartPre=/bin/sh -x -c "rm -rf /var/lib/docker/network"
+EOF
+
+    systemctl daemon-reload
+
+    # If using a network plugin, we need to explicitly restart docker daemon, because
+    # kubelet will not do it.
     echo "Docker command line is updated. Restart docker to pick it up"
     systemctl restart docker
   fi
@@ -772,6 +785,9 @@ function start-kube-apiserver {
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
+  if [[ -n "${ETCD_QUORUM_READ:-}" ]]; then
+    params+=" --etcd-quorum-read=${ETCD_QUORUM_READ}"
+  fi
 
   local admission_controller_config_mount=""
   local admission_controller_config_volume=""
@@ -804,7 +820,7 @@ function start-kube-apiserver {
     params+=" --advertise-address=${vm_external_ip}"
     params+=" --ssh-user=${PROXY_SSH_USER}"
     params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
-  else [ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]
+  elif [ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]; then
     params="${params} --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
   fi
 

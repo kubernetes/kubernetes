@@ -293,7 +293,7 @@ func (b *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, volume string) string {
-	return path.Join(host.GetPluginDir(azureDataDiskPluginName), "mounts", volume)
+	return path.Join(host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, volume)
 }
 
 func (azure *azureDisk) GetPath() string {

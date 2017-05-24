@@ -55,6 +55,11 @@ func (r *LogREST) ProducesMIMETypes(verb string) []string {
 	}
 }
 
+// LogREST implements StorageMetadata, return string as the generating object
+func (r *LogREST) ProducesObject(verb string) interface{} {
+	return ""
+}
+
 // Get retrieves a runtime.Object that will stream the contents of the pod log
 func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtime.Object, error) {
 	logOpts, ok := opts.(*api.PodLogOptions)

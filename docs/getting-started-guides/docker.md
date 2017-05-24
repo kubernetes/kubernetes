@@ -1,4 +1,4 @@
-This file has moved to: http://kubernetes.github.io/docs/getting-started-guides/docker/
+This file has moved to: https://github.com/kubernetes/kubernetes/blob/master/docs/devel/local-cluster/docker.md
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

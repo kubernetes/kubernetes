@@ -73,6 +73,7 @@ clientset-path
 cloud-config
 cloud-provider
 cluster-cidr
+cluster-context
 cluster-dns
 cluster-domain
 cluster-ip
@@ -91,6 +92,8 @@ concurrent-replicaset-syncs
 concurrent-resource-quota-syncs
 concurrent-serviceaccount-token-syncs
 concurrent-service-syncs
+config-map
+config-map-namespace
 config-sync-period
 configure-cloud-routes
 conntrack-max
@@ -105,6 +108,7 @@ container-port
 container-runtime
 container-runtime-endpoint
 contain-pod-resources
+contention-profiling
 controller-start-interval
 cors-allowed-origins
 cpu-cfs-quota
@@ -196,6 +200,7 @@ experimental-nvidia-gpus
 experimental-prefix
 experimental-cri
 experimental-check-node-capabilities-before-mount
+experimental-kernel-memcg-notification
 external-etcd-cafile
 external-etcd-certfile
 external-etcd-endpoints
@@ -317,6 +322,7 @@ kubelet-client-certificate
 kubelet-client-key
 kubelet-docker-endpoint
 kubelet-enable-debugging-handlers
+kubelet-flags
 kubelet-host-network-sources
 kubelet-https
 kubelet-kubeconfig
@@ -346,7 +352,6 @@ long-running-request-regexp
 low-diskspace-threshold-mb
 make-iptables-util-chains
 make-symlinks
-manifest-path
 manifest-url
 manifest-url-header
 masquerade-all
@@ -506,6 +511,7 @@ schema-cache-dir
 scopes
 seccomp-profile-root
 secondary-node-eviction-rate
+secret-name
 secure-port
 serialize-image-pulls
 server-start-timeout
@@ -594,6 +600,7 @@ watch-only
 whitelist-override-label
 windows-line-endings
 www-prefix
+zone-id
 zone-name
 garbage-collector-enabled
 viper-config

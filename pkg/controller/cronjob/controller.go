@@ -231,6 +231,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 			}
 			errList := []error{}
 			for _, pod := range podList.Items {
+				glog.V(2).Infof("CronJob controller is deleting Pod %v/%v", pod.Namespace, pod.Name)
 				if err := pc.DeletePod(pod.Namespace, pod.Name); err != nil {
 					// ignores the error when the pod isn't found
 					if !errors.IsNotFound(err) {

@@ -10,7 +10,6 @@ spec:
       labels:
         app: redis
       annotations:
-        pod.alpha.kubernetes.io/initialized: "true"
         pod.alpha.kubernetes.io/init-containers: '[
             {
                 "name": "install",
@@ -57,7 +56,6 @@ spec:
             }
         ]'
     spec:
-      terminationGracePeriodSeconds: 0
       containers:
       - name: redis
         image: debian:jessie

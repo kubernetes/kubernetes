@@ -1094,6 +1094,25 @@ func Test_OneVolumeTwoNodes_TwoDevicePaths(t *testing.T) {
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName2, string(volumeName), node2Name, devicePath2, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 }
 
+// Test_SetNodeStatusUpdateNeededError expects the map nodesToUpdateStatusFor
+// to be empty if the SetNodeStatusUpdateNeeded is called on a node that
+// does not exist in the actual state of the world
+func Test_SetNodeStatusUpdateNeededError(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld(volumePluginMgr)
+	nodeName := types.NodeName("node-1")
+
+	// Act
+	asw.SetNodeStatusUpdateNeeded(nodeName)
+
+	// Assert
+	nodesToUpdateStatusFor := asw.GetNodesToUpdateStatusFor()
+	if len(nodesToUpdateStatusFor) != 0 {
+		t.Fatalf("nodesToUpdateStatusFor should be empty as nodeName does not exist")
+	}
+}
+
 func verifyAttachedVolume(
 	t *testing.T,
 	attachedVolumes []AttachedVolume,

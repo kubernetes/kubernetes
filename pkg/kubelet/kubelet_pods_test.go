@@ -1494,3 +1494,32 @@ func TestHasHostNamespace(t *testing.T) {
 		}
 	}
 }
+
+func TestTruncatePodHostname(t *testing.T) {
+	for c, test := range map[string]struct {
+		input  string
+		output string
+	}{
+		"valid hostname": {
+			input:  "test.pod.hostname",
+			output: "test.pod.hostname",
+		},
+		"too long hostname": {
+			input:  "1234567.1234567.1234567.1234567.1234567.1234567.1234567.1234567.1234567.", // 8*9=72 chars
+			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.1234567",          //8*8-1=63 chars
+		},
+		"hostname end with .": {
+			input:  "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456.1234567.", // 8*9-1=71 chars
+			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456",          //8*8-2=62 chars
+		},
+		"hostname end with -": {
+			input:  "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456-1234567.", // 8*9-1=71 chars
+			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456",          //8*8-2=62 chars
+		},
+	} {
+		t.Logf("TestCase: %q", c)
+		output, err := truncatePodHostnameIfNeeded("test-pod", test.input)
+		assert.NoError(t, err)
+		assert.Equal(t, test.output, output)
+	}
+}

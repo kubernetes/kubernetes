@@ -20,6 +20,7 @@ if [[ ! -z "${1:-}" ]]; then
   export KUBE_GCE_ZONE="${1}"
 fi
 export KUBE_REPLICATE_EXISTING_MASTER=true
+export MULTIZONE=true
 
 source "${KUBE_ROOT}/hack/e2e-internal/e2e-up.sh"
 

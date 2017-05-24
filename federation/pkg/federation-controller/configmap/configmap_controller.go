@@ -269,8 +269,9 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 			return
 		}
 
+		// Do not modify data.
 		desiredConfigMap := &api_v1.ConfigMap{
-			ObjectMeta: util.CopyObjectMeta(baseConfigMap.ObjectMeta),
+			ObjectMeta: util.DeepCopyRelevantObjectMeta(baseConfigMap.ObjectMeta),
 			Data:       baseConfigMap.Data,
 		}
 

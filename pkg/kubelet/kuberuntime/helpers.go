@@ -146,19 +146,24 @@ func getContainerSpec(pod *api.Pod, containerName string) *api.Container {
 	return nil
 }
 
-// getImageUID gets uid that will run the command(s) from image.
-func (m *kubeGenericRuntimeManager) getImageUser(image string) (string, error) {
+// getImageUser gets uid or user name that will run the command(s) from image. The function
+// guarantees that only one of them is set.
+func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, *string, error) {
 	imageStatus, err := m.imageService.ImageStatus(&runtimeApi.ImageSpec{Image: &image})
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 
-	user := imageStatus.GetUser()
-	// kuberuntime treats empty user as root.
-	if user == "" {
-		return "0", nil
+	if imageStatus != nil && imageStatus.Uid != nil {
+		// If uid is set, return uid.
+		return imageStatus.Uid, nil, nil
 	}
-	return user, nil
+	if imageStatus != nil && imageStatus.Username != nil {
+		// If uid is not set, but user name is set, return user name.
+		return nil, imageStatus.Username, nil
+	}
+	// If non of them is set, treat it as root.
+	return new(int64), nil, nil
 }
 
 // isContainerFailed returns true if container has exited and exitcode is not zero.

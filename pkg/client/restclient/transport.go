@@ -88,6 +88,10 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 		},
 		Username:    c.Username,
 		Password:    c.Password,
+		AccessKey:   c.AccessKey,
+		SecretKey:   c.SecretKey,
+		RegionID:    c.RegionID,
+		ClusterUUID: c.ClusterUUID,
 		BearerToken: c.BearerToken,
 		Impersonate: c.Impersonate,
 	}, nil
