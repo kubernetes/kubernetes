@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/leaderelection:go_default_library",
+        "//pkg/controller/garbagecollector:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package certificates
+// Package signer implements a CA signer that uses keys stored on local disk.
+package signer
 
 import (
 	"crypto"
@@ -23,7 +24,10 @@ import (
 	"io/ioutil"
 	"os"
 
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	capi "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	certificatesinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/certificates/v1beta1"
+	"k8s.io/kubernetes/pkg/controller/certificates"
 
 	"github.com/cloudflare/cfssl/config"
 	"github.com/cloudflare/cfssl/helpers"
@@ -39,13 +43,30 @@ var onlySigningPolicy = &config.Signing{
 	},
 }
 
-type CFSSLSigner struct {
+func NewCSRSigningController(
+	client clientset.Interface,
+	csrInformer certificatesinformers.CertificateSigningRequestInformer,
+	caFile, caKeyFile string,
+) (*certificates.CertificateController, error) {
+	signer, err := newCFSSLSigner(caFile, caKeyFile, client)
+	if err != nil {
+		return nil, err
+	}
+	return certificates.NewCertificateController(
+		client,
+		csrInformer,
+		signer.handle,
+	)
+}
+
+type cfsslSigner struct {
 	ca      *x509.Certificate
 	priv    crypto.Signer
 	sigAlgo x509.SignatureAlgorithm
+	client  clientset.Interface
 }
 
-func NewCFSSLSigner(caFile, caKeyFile string) (*CFSSLSigner, error) {
+func newCFSSLSigner(caFile, caKeyFile string, client clientset.Interface) (*cfsslSigner, error) {
 	ca, err := ioutil.ReadFile(caFile)
 	if err != nil {
 		return nil, err
@@ -70,14 +91,30 @@ func NewCFSSLSigner(caFile, caKeyFile string) (*CFSSLSigner, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Malformed private key %v", err)
 	}
-	return &CFSSLSigner{
+	return &cfsslSigner{
 		priv:    priv,
 		ca:      parsedCa,
 		sigAlgo: signer.DefaultSigAlgo(priv),
+		client:  client,
 	}, nil
 }
 
-func (cs *CFSSLSigner) Sign(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
+func (s *cfsslSigner) handle(csr *capi.CertificateSigningRequest) error {
+	if !certificates.IsCertificateRequestApproved(csr) {
+		return nil
+	}
+	csr, err := s.sign(csr)
+	if err != nil {
+		return fmt.Errorf("error auto signing csr: %v", err)
+	}
+	_, err = s.client.Certificates().CertificateSigningRequests().UpdateStatus(csr)
+	if err != nil {
+		return fmt.Errorf("error updating signature for csr: %v", err)
+	}
+	return nil
+}
+
+func (s *cfsslSigner) sign(csr *capi.CertificateSigningRequest) (*capi.CertificateSigningRequest, error) {
 	var usages []string
 	for _, usage := range csr.Spec.Usages {
 		usages = append(usages, string(usage))
@@ -89,12 +126,12 @@ func (cs *CFSSLSigner) Sign(csr *certificates.CertificateSigningRequest) (*certi
 			ExpiryString: "8760h",
 		},
 	}
-	s, err := local.NewSigner(cs.priv, cs.ca, cs.sigAlgo, policy)
+	cfs, err := local.NewSigner(s.priv, s.ca, s.sigAlgo, policy)
 	if err != nil {
 		return nil, err
 	}
 
-	csr.Status.Certificate, err = s.Sign(signer.SignRequest{
+	csr.Status.Certificate, err = cfs.Sign(signer.SignRequest{
 		Request: string(csr.Spec.Request),
 	})
 	if err != nil {

@@ -26,7 +26,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 var (
@@ -38,10 +37,6 @@ var (
 		"Indicates the tolerationSeconds of the toleration for unreachable:NoExecute"+
 			" that is added by default to every pod that does not already have such a toleration.")
 )
-
-func init() {
-	Register(&kubeapiserveradmission.Plugins)
-}
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {

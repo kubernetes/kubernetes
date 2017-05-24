@@ -178,7 +178,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("failed to get supported resources from server: %v", err)
 	}
-	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, preferredResources)
+	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"get", "list", "watch", "patch", "update", "delete"}}, preferredResources)
 	deletableGroupVersionResources, err := discovery.GroupVersionResources(deletableResources)
 	if err != nil {
 		return true, fmt.Errorf("Failed to parse resources from server: %v", err)
@@ -189,7 +189,20 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig = dynamic.ContentConfig()
 	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
-	garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, deletableGroupVersionResources, ctx.InformerFactory)
+
+	ignoredResources := make(map[schema.GroupResource]struct{})
+	for _, r := range ctx.Options.GCIgnoredResources {
+		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
+	}
+
+	garbageCollector, err := garbagecollector.NewGarbageCollector(
+		metaOnlyClientPool,
+		clientPool,
+		restMapper,
+		deletableGroupVersionResources,
+		ignoredResources,
+		ctx.InformerFactory,
+	)
 	if err != nil {
 		return true, fmt.Errorf("Failed to start the generic garbage collector: %v", err)
 	}

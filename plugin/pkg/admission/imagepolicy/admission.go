@@ -39,7 +39,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 
 	// install the clientgo image policy API for use with api registry
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
@@ -48,10 +47,6 @@ import (
 var (
 	groupVersions = []schema.GroupVersion{v1alpha1.SchemeGroupVersion}
 )
-
-func init() {
-	Register(&kubeapiserveradmission.Plugins)
-}
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
