@@ -31,6 +31,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	pluginlog "k8s.io/apiserver/plugin/pkg/audit/log"
@@ -321,9 +322,10 @@ func TestAudit(t *testing.T) {
 	} {
 		var buf bytes.Buffer
 		backend := pluginlog.NewBackend(&buf)
+		policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse)
 		handler := WithAudit(http.HandlerFunc(test.handler), &fakeRequestContextMapper{
 			user: &user.DefaultInfo{Name: "admin"},
-		}, backend, auditinternal.NewConstantPolicy(auditinternal.LevelRequestResponse), func(r *http.Request, ri *request.RequestInfo) bool {
+		}, backend, policyChecker, func(r *http.Request, ri *request.RequestInfo) bool {
 			// simplified long-running check
 			return ri.Verb == "watch"
 		})
@@ -386,7 +388,8 @@ func (*fakeRequestContextMapper) Update(req *http.Request, context request.Conte
 }
 
 func TestAuditNoPanicOnNilUser(t *testing.T) {
-	handler := WithAudit(&fakeHTTPHandler{}, &fakeRequestContextMapper{}, &fakeAuditSink{}, auditinternal.NewConstantPolicy(auditinternal.LevelRequestResponse), nil)
+	policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse)
+	handler := WithAudit(&fakeHTTPHandler{}, &fakeRequestContextMapper{}, &fakeAuditSink{}, policyChecker, nil)
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	handler.ServeHTTP(httptest.NewRecorder(), req)

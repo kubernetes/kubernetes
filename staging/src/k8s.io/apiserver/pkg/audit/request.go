@@ -40,21 +40,14 @@ import (
 	authenticationv1 "k8s.io/client-go/pkg/apis/authentication/v1"
 )
 
-// NewEventFromRequest generates an audit event for the request.
-func NewEventFromRequest(req *http.Request, policy *auditinternal.Policy, attribs authorizer.Attributes) (*auditinternal.Event, error) {
+func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
 	ev := &auditinternal.Event{
 		Timestamp:  metav1.NewTime(time.Now()),
 		Verb:       attribs.GetVerb(),
 		RequestURI: req.URL.RequestURI(),
 	}
 
-	// set the level
-	ev.Level = auditinternal.LevelNone
-	if policy != nil && len(policy.Rules) > 0 {
-		// This is just a hack to get through the test without setting a high level by default.
-		// TODO(audit): add the policy evalutation here
-		ev.Level = policy.Rules[0].Level
-	}
+	ev.Level = level
 
 	// prefer the id from the headers. If not available, create a new one.
 	// TODO(audit): do we want to forbid the header for non-front-proxy users?

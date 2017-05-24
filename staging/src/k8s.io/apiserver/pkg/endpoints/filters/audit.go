@@ -19,16 +19,16 @@ package filters
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
-
-	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -49,8 +49,8 @@ import (
 // 2. the response line containing:
 //    - the unique id from 1
 //    - response code
-func WithAudit(handler http.Handler, requestContextMapper request.RequestContextMapper, sink audit.Sink, policy *auditinternal.Policy, longRunningCheck request.LongRunningRequestCheck) http.Handler {
-	if sink == nil {
+func WithAudit(handler http.Handler, requestContextMapper request.RequestContextMapper, sink audit.Sink, policy policy.Checker, longRunningCheck request.LongRunningRequestCheck) http.Handler {
+	if sink == nil || policy == nil {
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -67,7 +67,13 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 			return
 		}
 
-		ev, err := audit.NewEventFromRequest(req, policy, attribs)
+		level := policy.Level(attribs)
+		if level == auditinternal.LevelNone {
+			// Don't audit.
+			handler.ServeHTTP(w, req)
+		}
+
+		ev, err := audit.NewEventFromRequest(req, level, attribs)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to complete audit event from request: %v", err))
 			responsewriters.InternalError(w, req, errors.New("failed to update context"))
