@@ -814,7 +814,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 // summary. Returned booleans are:
 // * wantToRun:
 //     Returns true when a user would expect a pod to run on this node and ignores conditions
-//     such as OutOfDisk or insufficent resource that would cause a daemonset pod not to schedule.
+//     such as OutOfDisk or insufficient resource that would cause a daemonset pod not to schedule.
 //     This is primarily used to populate daemonset status.
 // * shouldSchedule:
 //     Returns true when a daemonset should be scheduled to a node if a daemonset pod is not already
