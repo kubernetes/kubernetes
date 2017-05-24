@@ -94,10 +94,11 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 
 	if attribs.IsResourceRequest() {
 		ev.ObjectRef = &auditinternal.ObjectReference{
-			Namespace:  attribs.GetNamespace(),
-			Name:       attribs.GetName(),
-			Resource:   attribs.GetResource(),
-			APIVersion: attribs.GetAPIGroup() + "/" + attribs.GetAPIVersion(),
+			Namespace:   attribs.GetNamespace(),
+			Name:        attribs.GetName(),
+			Resource:    attribs.GetResource(),
+			Subresource: attribs.GetSubresource(),
+			APIVersion:  attribs.GetAPIGroup() + "/" + attribs.GetAPIVersion(),
 		}
 	}
 
