@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
@@ -44,17 +44,15 @@ func (policyUndefinedError) Error() string {
 type policyEngineQuery struct {
 	client       *rest.RESTClient
 	retryBackoff time.Duration
-	user         user.Info
 	obj          runtime.Object
 	gvk          schema.GroupVersionKind
 }
 
 // newPolicyEngineQuery returns a policyEngineQuery that can be executed.
-func newPolicyEngineQuery(client *rest.RESTClient, retryBackoff time.Duration, user user.Info, obj runtime.Object, gvk schema.GroupVersionKind) *policyEngineQuery {
+func newPolicyEngineQuery(client *rest.RESTClient, retryBackoff time.Duration, obj runtime.Object, gvk schema.GroupVersionKind) *policyEngineQuery {
 	return &policyEngineQuery{
 		client:       client,
 		retryBackoff: retryBackoff,
-		user:         user,
 		obj:          obj,
 		gvk:          gvk,
 	}
@@ -65,20 +63,8 @@ func newPolicyEngineQuery(client *rest.RESTClient, retryBackoff time.Duration, u
 // non-nil and contains the result of policy evaluation.
 func (query *policyEngineQuery) Do() (decision *policyDecision, err error) {
 
-	raw, err := convertObject(query.obj, query.gvk.GroupVersion())
+	bs, err := query.encode()
 	if err != nil {
-		return nil, err
-	}
-
-	body := policyEngineInput{}
-	body.Input.Resource = raw
-	body.Input.User.Name = query.user.GetName()
-	body.Input.User.Groups = query.user.GetGroups()
-	body.Input.User.UID = query.user.GetUID()
-	body.Input.User.Extra = query.user.GetExtra()
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(&body); err != nil {
 		return nil, err
 	}
 
@@ -86,60 +72,23 @@ func (query *policyEngineQuery) Do() (decision *policyDecision, err error) {
 
 	err = webhook.WithExponentialBackoff(query.retryBackoff, func() error {
 		result = query.client.Post().
-			SetHeader("Content-Type", "application/json").
-			Body(&buf).
+			Body(bs).
 			Do()
 		return result.Error()
 	})
 
 	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, policyUndefinedError{}
+		}
 		return nil, err
 	}
 
 	return decodeResult(result)
 }
 
-// TODO(tsandall): review the request type as well as SerDes
-
-// policyEngineInput represents the input data provided to the policy engine when
-// executing a policy query.
-type policyEngineInput struct {
-	Input struct {
-		Resource interface{} `json:"resource"`
-		User     struct {
-			Name   string              `json:"name"`
-			UID    string              `json:"uid"`
-			Groups []string            `json:"groups"`
-			Extra  map[string][]string `json:"extra"`
-		} `json:"user"`
-	} `json:"input"`
-}
-
-// policyEngineResponse represents the policy engine's response to a policy
-// query.
-type policyEngineResponse struct {
-	Result *policyDecision `json:"result,omitempty"`
-}
-
-// policyDecision represents a response from the policy engine.
-type policyDecision struct {
-	Errors   []string `json:"errors,omitempty"`
-	Resource struct {
-		Metadata struct {
-			Annotations map[string]string `json:"annotations,omitempty"`
-		} `json:"metadata,omitempty"`
-	} `json:"resource,omitempty"`
-}
-
-// Error returns an error if the policy raised an error.
-func (d *policyDecision) Error() error {
-	if len(d.Errors) == 0 {
-		return nil
-	}
-	return fmt.Errorf("reason(s): %v", strings.Join(d.Errors, "; "))
-}
-
-func convertObject(obj runtime.Object, gv schema.GroupVersion) (interface{}, error) {
+// encode returns the encoded version of the query's runtime.Object.
+func (query *policyEngineQuery) encode() ([]byte, error) {
 
 	var info runtime.SerializerInfo
 	infos := api.Codecs.SupportedMediaTypes()
@@ -154,18 +103,28 @@ func convertObject(obj runtime.Object, gv schema.GroupVersion) (interface{}, err
 		return nil, fmt.Errorf("serialization not supported")
 	}
 
-	codec := api.Codecs.EncoderForVersion(info.Serializer, gv)
+	codec := api.Codecs.EncoderForVersion(info.Serializer, query.gvk.GroupVersion())
+
 	var buf bytes.Buffer
-	if err := codec.Encode(obj, &buf); err != nil {
+	if err := codec.Encode(query.obj, &buf); err != nil {
 		return nil, err
 	}
 
-	var result interface{}
-	if err := json.NewDecoder(&buf).Decode(&result); err != nil {
-		return nil, err
-	}
+	return buf.Bytes(), nil
+}
 
-	return result, nil
+// policyDecision represents a response from the policy engine.
+type policyDecision struct {
+	Errors      []string          `json:"errors,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// Error returns an error if the policy raised an error.
+func (d *policyDecision) Error() error {
+	if len(d.Errors) == 0 {
+		return nil
+	}
+	return fmt.Errorf("reason(s): %v", strings.Join(d.Errors, "; "))
 }
 
 func decodeResult(result rest.Result) (*policyDecision, error) {
@@ -176,15 +135,11 @@ func decodeResult(result rest.Result) (*policyDecision, error) {
 	}
 
 	buf := bytes.NewBuffer(bs)
-	var response policyEngineResponse
+	var decision policyDecision
 
-	if err := json.NewDecoder(buf).Decode(&response); err != nil {
+	if err := json.NewDecoder(buf).Decode(&decision); err != nil {
 		return nil, err
 	}
 
-	if response.Result == nil {
-		return nil, policyUndefinedError{}
-	}
-
-	return response.Result, nil
+	return &decision, nil
 }

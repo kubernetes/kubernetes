@@ -21,22 +21,22 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestMergeAnnotations(t *testing.T) {
-
 	tests := []struct {
-		input       *api.Pod
+		note        string
+		input       *v1.Pod
 		annotations string
 		expected    string
 	}{
-		{&api.Pod{}, `{"foo": "bar"}`, `{"foo": "bar"}`},
-		{&api.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}, `{"foo": "bar"}`, `{"foo": "bar"}`},
-		{&api.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"foo": "baz"}}}, `{"foo": "bar"}`, `{"foo": "bar"}`},
-		{&api.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"baz": "qux"}}}, `{"foo": "bar"}`, `{"baz": "qux", "foo": "bar"}`},
+		{"nil annotations", &v1.Pod{}, `{"foo": "bar"}`, `{"foo": "bar"}`},
+		{"empty annotations", &v1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}, `{"foo": "bar"}`, `{"foo": "bar"}`},
+		{"existing annotation", &v1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"foo": "baz"}}}, `{"foo": "bar"}`, `{"foo": "bar"}`},
+		{"different annotation", &v1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"baz": "qux"}}}, `{"foo": "bar"}`, `{"baz": "qux", "foo": "bar"}`},
 	}
 
 	for _, tc := range tests {
@@ -53,10 +53,13 @@ func TestMergeAnnotations(t *testing.T) {
 			panic(err)
 		}
 
-		mergeAnnotations(tc.input, annotations)
+		err := mergeAnnotations(tc.input, annotations)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
 
 		if !reflect.DeepEqual(tc.input.ObjectMeta.Annotations, expected) {
-			t.Errorf("Expected annotations to equal %v but got: %v", expected, tc.input.ObjectMeta.Annotations)
+			t.Errorf("%v: Expected annotations to equal %v but got: %v", tc.note, expected, tc.input.ObjectMeta.Annotations)
 		}
 	}
 

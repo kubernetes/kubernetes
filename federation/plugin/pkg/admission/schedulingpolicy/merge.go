@@ -17,79 +17,27 @@ limitations under the License.
 package schedulingpolicy
 
 import (
-	"reflect"
-	"strings"
-
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func mergeAnnotations(obj runtime.Object, annotations map[string]string) {
-
+func mergeAnnotations(obj runtime.Object, annotations map[string]string) error {
 	if len(annotations) == 0 {
-		return
+		return nil
 	}
 
-	val := reflect.Indirect(reflect.ValueOf(obj))
-	annotationsFld, ok := getAnnotationsField(val)
-	if !ok {
-		return
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
 	}
 
-	orig := annotationsFld.Interface()
-	if orig == nil {
-		orig = map[string]string{}
-	}
-
-	origMap := orig.(map[string]string)
-
-	for k := range origMap {
+	orig := accessor.GetAnnotations()
+	for k := range orig {
 		if _, ok := annotations[k]; !ok {
-			annotations[k] = origMap[k]
+			annotations[k] = orig[k]
 		}
 	}
 
-	annotationsFld.Set(reflect.ValueOf(annotations))
-}
-
-func getAnnotationsField(val reflect.Value) (reflect.Value, bool) {
-	metadataFld, ok := getFieldByName(val, "ObjectMeta")
-	if !ok {
-		return reflect.Value{}, false
-	}
-	return getFieldByJSONTag(metadataFld, "annotations")
-}
-
-func getFieldByName(obj reflect.Value, field string) (val reflect.Value, ok bool) {
-
-	if obj.Kind() == reflect.Ptr {
-		obj = reflect.Indirect(obj)
-	}
-
-	val = obj.FieldByName(field)
-	if val.IsValid() {
-		return val, true
-	}
-
-	return reflect.Value{}, false
-}
-
-func getFieldByJSONTag(obj reflect.Value, field string) (val reflect.Value, ok bool) {
-
-	tpe := obj.Type()
-
-	if obj.Kind() == reflect.Ptr {
-		obj = reflect.Indirect(obj)
-		tpe = obj.Type()
-	}
-
-	for i := 0; i < tpe.NumField(); i++ {
-		fld := tpe.Field(i)
-		for _, s := range strings.Split(fld.Tag.Get("json"), ",") {
-			if s == field {
-				return obj.FieldByName(fld.Name), true
-			}
-		}
-	}
-
-	return reflect.Zero(tpe), false
+	accessor.SetAnnotations(annotations)
+	return nil
 }

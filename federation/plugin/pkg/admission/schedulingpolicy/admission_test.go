@@ -40,7 +40,6 @@ import (
 )
 
 func TestNewAdmissionController(t *testing.T) {
-
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatalf("Unexpected error while creating temporary file: %v", err)
@@ -118,6 +117,16 @@ current-context: default
 				`, p),
 			false,
 		},
+		{
+			"a valid config with failOpenIfPolicyDoesNotExist",
+			fmt.Sprintf(`
+				{
+					"kubeconfig": %q,
+					"failOpenIfPolicyDoesNotExist": true
+				}
+				`, p),
+			false,
+		},
 	}
 
 	for _, tc := range tests {
@@ -139,49 +148,54 @@ current-context: default
 }
 
 func TestAdmitQueryPayload(t *testing.T) {
-
-	var body policyEngineInput
+	var body interface{}
 
 	serve := func(w http.ResponseWriter, r *http.Request) {
-
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("Unexpected error reading admission payload: %v", err)
 		}
 
-		w.Write([]byte(`
-		{
-			"result": {}
-		}
-		`))
-
+		// No errors or annotations.
+		w.Write([]byte(`{}`))
 	}
 
-	controller, err := newControllerWithTestServer(serve, true)
+	controller, err := newControllerWithTestServer(serve, true, false)
 	if err != nil {
 		t.Fatalf("Unexpected error while creating test admission controller/server: %v", err)
 	}
 
-	attrs := makeAdmissionRecord(makeReplicaSet())
+	rs := makeReplicaSet()
+	rs.Spec.MinReadySeconds = 100
+	attrs := makeAdmissionRecord(rs)
 	err = controller.Admit(attrs)
 
 	if err != nil {
 		t.Fatalf("Unexpected error from admission controller: %v", err)
 	}
 
-	name := body.Input.Resource.(map[string]interface{})["metadata"].(map[string]interface{})["name"].(string)
-	expected := "myapp"
-	if name != expected {
-		t.Fatalf("Expected replicaset.metadata.name to be %v but got: %v", expected, name)
+	obj := body.(map[string]interface{})
+	metadata := obj["metadata"].(map[string]interface{})
+	spec := obj["spec"].(map[string]interface{})
+	name := metadata["name"].(string)
+	minReadySeconds := spec["minReadySeconds"].(float64)
+
+	expectedName := "myapp"
+	if name != expectedName {
+		t.Fatalf("Expected replicaset.metadata.name to be %v but got: %v", expectedName, name)
+	}
+
+	expectedMinReadySeconds := float64(100)
+	if minReadySeconds != expectedMinReadySeconds {
+		t.Fatalf("Expected replicaset.spec.minReadySeconds to be %v but got: %v", expectedMinReadySeconds, minReadySeconds)
 	}
 }
 
 func TestAdmitFailInternal(t *testing.T) {
-
 	serve := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	}
 
-	controller, err := newControllerWithTestServer(serve, false)
+	controller, err := newControllerWithTestServer(serve, false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error while creating test admission controller/server: %v", err)
 	}
@@ -201,11 +215,11 @@ func TestAdmitFailInternal(t *testing.T) {
 	}
 }
 
-func TestAdmitFailOpen(t *testing.T) {
+func TestAdmitPolicyDoesNotExist(t *testing.T) {
 
 	controller, err := newControllerWithTestServer(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	}, false)
+		w.WriteHeader(404)
+	}, false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error while creating test admission controller/server: %v", err)
 	}
@@ -218,8 +232,23 @@ func TestAdmitFailOpen(t *testing.T) {
 	}
 }
 
-func TestAdmitFailClosed(t *testing.T) {
+func TestAdmitFailOpen(t *testing.T) {
 
+	controller, err := newControllerWithTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+	}, false, true)
+	if err != nil {
+		t.Fatalf("Unexpected error while creating test admission controller/server: %v", err)
+	}
+
+	attrs := makeAdmissionRecord(makeReplicaSet())
+	err = controller.Admit(attrs)
+
+	if err != nil {
+		t.Fatalf("Expected admission controller to fail open but got error: %v", err)
+	}
+}
+func TestAdmitFailClosed(t *testing.T) {
 	tests := []struct {
 		note       string
 		statusCode int
@@ -227,8 +256,8 @@ func TestAdmitFailClosed(t *testing.T) {
 	}{
 		{"server error", 500, ""},
 		{"unmarshal error", 200, "{"},
-		{"undefined result", 200, `{}`},
-		{"policy errors", 200, `{"result": {"errors": ["conflicting replica-set-preferences"]}}`},
+		{"undefined result", 404, ``},
+		{"policy errors", 200, `{"errors": ["conflicting replica-set-preferences"]}`},
 	}
 
 	for _, tc := range tests {
@@ -240,7 +269,7 @@ func TestAdmitFailClosed(t *testing.T) {
 			}
 		}
 
-		controller, err := newControllerWithTestServer(serve, true)
+		controller, err := newControllerWithTestServer(serve, true, false)
 
 		if err != nil {
 			t.Errorf("%v: Unexpected error while creating test admission controller/server: %v", tc.note, err)
@@ -258,13 +287,12 @@ func TestAdmitFailClosed(t *testing.T) {
 }
 
 func TestAdmitRetries(t *testing.T) {
-
 	var numQueries int
 
 	controller, err := newControllerWithTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		numQueries++
-	}, true)
+	}, true, false)
 
 	if err != nil {
 		t.Fatalf("Unexpected error while creating test admission controller/server: %v", err)
@@ -282,22 +310,15 @@ func TestAdmitRetries(t *testing.T) {
 }
 
 func TestAdmitSuccessWithAnnotationMerge(t *testing.T) {
-
 	controller, err := newControllerWithTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`
 		{
-			"result": {
-				"resource": {
-					"metadata": {
-						"annotations": {
-							"foo": "bar-2"
-						}
-					}
-				}
+			"annotations": {
+				"foo": "bar-2"
 			}
 		}
 		`))
-	}, true)
+	}, true, false)
 	if err != nil {
 		t.Fatalf("Unexpected error while creating test admission controller/server: %v", err)
 	}
@@ -324,8 +345,7 @@ func TestAdmitSuccessWithAnnotationMerge(t *testing.T) {
 	}
 }
 
-func newControllerWithTestServer(f func(w http.ResponseWriter, r *http.Request), failClosed bool) (*admissionController, error) {
-
+func newControllerWithTestServer(f func(w http.ResponseWriter, r *http.Request), policiesExist, failOpen bool) (*admissionController, error) {
 	server, err := newTestServer(f)
 	if err != nil {
 		return nil, err
@@ -338,7 +358,7 @@ func newControllerWithTestServer(f func(w http.ResponseWriter, r *http.Request),
 
 	defer os.Remove(kubeConfigFile)
 
-	configFile, err := makeAdmissionControlConfigFile(kubeConfigFile)
+	configFile, err := makeAdmissionControlConfigFile(kubeConfigFile, failOpen)
 	if err != nil {
 		return nil, err
 	}
@@ -357,14 +377,18 @@ func newControllerWithTestServer(f func(w http.ResponseWriter, r *http.Request),
 
 	mockClient := &fake.Clientset{}
 
-	if failClosed {
-		mockClient.AddReactor("list", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
-			if action.GetNamespace() == policyConfigMapNamespace {
-				return true, &api.ConfigMapList{Items: []api.ConfigMap{{}}}, nil
-			}
-			return true, nil, nil
-		})
+	var items []api.ConfigMap
+
+	if policiesExist {
+		items = append(items, api.ConfigMap{})
 	}
+
+	mockClient.AddReactor("list", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+		if action.GetNamespace() == policyConfigMapNamespace {
+			return true, &api.ConfigMapList{Items: items}, nil
+		}
+		return true, nil, nil
+	})
 
 	controller.SetInternalKubeClientSet(mockClient)
 
@@ -377,8 +401,7 @@ func newTestServer(f func(w http.ResponseWriter, r *http.Request)) (*httptest.Se
 	return server, nil
 }
 
-func makeAdmissionControlConfigFile(kubeConfigFile string) (string, error) {
-
+func makeAdmissionControlConfigFile(kubeConfigFile string, failOpen bool) (string, error) {
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return "", err
@@ -389,15 +412,18 @@ func makeAdmissionControlConfigFile(kubeConfigFile string) (string, error) {
 	configFileTmpl := `
 kubeconfig: {{ .KubeConfigFile }}
 retryBackoff: {{ .RetryBackoff }}
+failOpenIfPolicyDoesNotExist: {{ .FailOpen }}
 `
 	type configFileTemplateInput struct {
 		KubeConfigFile string
 		RetryBackoff   int
+		FailOpen       bool
 	}
 
 	input := configFileTemplateInput{
 		KubeConfigFile: kubeConfigFile,
 		RetryBackoff:   1,
+		FailOpen:       failOpen,
 	}
 
 	tmpl, err := template.New("scheduling-policy-config").Parse(configFileTmpl)
@@ -413,7 +439,6 @@ retryBackoff: {{ .RetryBackoff }}
 }
 
 func makeKubeConfigFile(baseURL, path string) (string, error) {
-
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return "", err
@@ -470,9 +495,7 @@ func makeReplicaSet() *extensionsv1.ReplicaSet {
 			APIVersion: "extensions/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "myapp",
-			Namespace: "default",
-			SelfLink:  "/api/v1/namespaces/default/replicasets/myapp",
+			Name: "myapp",
 		},
 		Spec: extensionsv1.ReplicaSetSpec{},
 	}
