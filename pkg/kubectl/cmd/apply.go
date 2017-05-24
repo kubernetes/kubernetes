@@ -341,7 +341,8 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 	if err != nil {
 		return err
 	}
-	if count == 0 {
+	// Allow pruning even if no objects passed
+	if count == 0 && !options.Prune {
 		return fmt.Errorf("no objects passed to apply")
 	}
 

@@ -933,7 +933,9 @@ run_kubectl_apply_tests() {
   kubectl apply --all --prune -f hack/testdata/prune
   kube::test::get_object_assert 'pods a' "{{${id_field}}}" 'a'
   kube::test::get_object_assert 'pods b' "{{${id_field}}}" 'b'
-  kubectl delete pod/a pod/b
+  # should cleanup with apply --prune
+  echo "" | kubectl apply -f - -l prune-group=true --prune
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
   ## kubectl apply --prune should fallback to delete for non reapable types
   kubectl apply --all --prune -f hack/testdata/prune-reap/a.yml 2>&1 "${kube_flags[@]}"
