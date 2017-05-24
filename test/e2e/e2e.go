@@ -77,7 +77,9 @@ func setupProviderConfig() error {
 		if !framework.TestContext.CloudConfig.MultiZone {
 			managedZones = []string{zone}
 		}
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID,
+			region, zone, managedZones, "" /* networkUrl */, "" /* subnetworkUrl */, nil, /* nodeTags */
+			"" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
 		}
