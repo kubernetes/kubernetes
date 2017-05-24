@@ -17,171 +17,81 @@ limitations under the License.
 package webhook
 
 import (
-	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"regexp"
+	"net/url"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/tools/clientcmd/api/v1"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/admission/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 )
 
-const (
-	errAdmitPrefix = `pods "my-pod" is forbidden: `
-)
-
-var (
-	requestCount int
-	testRoot     string
-	testServer   *httptest.Server
-)
-
-type genericAdmissionWebhookTest struct {
-	test   string
-	config *GenericAdmissionWebhookConfig
-	value  interface{}
+type fakeHookSource struct {
+	hooks []admissionregistration.ExternalAdmissionHook
+	err   error
 }
 
-func TestMain(m *testing.M) {
-	tmpRoot, err := ioutil.TempDir("", "")
-
-	if err != nil {
-		killTests(err)
+func (f *fakeHookSource) List() ([]admissionregistration.ExternalAdmissionHook, error) {
+	if f.err != nil {
+		return nil, f.err
 	}
-
-	testRoot = tmpRoot
-
-	// Cleanup
-	defer os.RemoveAll(testRoot)
-
-	// Create the test webhook server
-	cert, err := tls.X509KeyPair(clientCert, clientKey)
-
-	if err != nil {
-		killTests(err)
-	}
-
-	rootCAs := x509.NewCertPool()
-
-	rootCAs.AppendCertsFromPEM(caCert)
-
-	testServer = httptest.NewUnstartedServer(http.HandlerFunc(webhookHandler))
-
-	testServer.TLS = &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		ClientCAs:    rootCAs,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-	}
-
-	// Create the test webhook server
-	testServer.StartTLS()
-
-	// Cleanup
-	defer testServer.Close()
-
-	// Create an invalid and valid Kubernetes configuration file
-	var kubeConfig bytes.Buffer
-
-	err = json.NewEncoder(&kubeConfig).Encode(v1.Config{
-		Clusters: []v1.NamedCluster{
-			{
-				Cluster: v1.Cluster{
-					Server: testServer.URL,
-					CertificateAuthorityData: caCert,
-				},
-			},
-		},
-		AuthInfos: []v1.NamedAuthInfo{
-			{
-				AuthInfo: v1.AuthInfo{
-					ClientCertificateData: clientCert,
-					ClientKeyData:         clientKey,
-				},
-			},
-		},
-	})
-
-	if err != nil {
-		killTests(err)
-	}
-
-	// The files needed on disk for the webhook tests
-	files := map[string][]byte{
-		"ca.pem":         caCert,
-		"client.pem":     clientCert,
-		"client-key.pem": clientKey,
-		"kube-config":    kubeConfig.Bytes(),
-	}
-
-	// Write the certificate files to disk or fail
-	for fileName, fileData := range files {
-		if err := ioutil.WriteFile(filepath.Join(testRoot, fileName), fileData, 0400); err != nil {
-			killTests(err)
-		}
-	}
-
-	// Run the tests
-	m.Run()
+	return f.hooks, nil
 }
 
-// TestNewGenericAdmissionWebhook tests that NewGenericAdmissionWebhook works as expected
-func TestNewGenericAdmissionWebhook(t *testing.T) {
-	tests := []genericAdmissionWebhookTest{
-		genericAdmissionWebhookTest{
-			test:   "Empty webhook config",
-			config: &GenericAdmissionWebhookConfig{},
-			value:  fmt.Errorf("kubeConfigFile is required"),
-		},
-		genericAdmissionWebhookTest{
-			test: "Broken webhook config",
-			config: &GenericAdmissionWebhookConfig{
-				KubeConfigFile: filepath.Join(testRoot, "kube-config.missing"),
-				Rules: []Rule{
-					Rule{
-						Type: Skip,
-					},
-				},
-			},
-			value: fmt.Errorf("stat .*kube-config.missing.*"),
-		},
-		genericAdmissionWebhookTest{
-			test: "Valid webhook config",
-			config: &GenericAdmissionWebhookConfig{
-				KubeConfigFile: filepath.Join(testRoot, "kube-config"),
-				Rules: []Rule{
-					Rule{
-						Type: Skip,
-					},
-				},
-			},
-			value: nil,
-		},
-	}
+type fakeServiceResolver struct {
+	base url.URL
+}
 
-	for _, tt := range tests {
-		_, err := NewGenericAdmissionWebhook(tt.config)
-
-		checkForError(t, tt.test, tt.value, err)
+func (f fakeServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+	if namespace == "failResolve" {
+		return nil, fmt.Errorf("couldn't resolve service location")
 	}
+	u := f.base
+	u.Path = name
+	return &u, nil
 }
 
 // TestAdmit tests that GenericAdmissionWebhook#Admit works as expected
 func TestAdmit(t *testing.T) {
-	configWithFailAction := makeGoodConfig()
+	// Create the test webhook server
+	sCert, err := tls.X509KeyPair(serverCert, serverKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootCAs := x509.NewCertPool()
+	rootCAs.AppendCertsFromPEM(caCert)
+	testServer := httptest.NewUnstartedServer(http.HandlerFunc(webhookHandler))
+	testServer.TLS = &tls.Config{
+		Certificates: []tls.Certificate{sCert},
+		ClientCAs:    rootCAs,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	}
+	testServer.StartTLS()
+	defer testServer.Close()
+	serverURL, err := url.ParseRequestURI(testServer.URL)
+	if err != nil {
+		t.Fatalf("this should never happen? %v", err)
+	}
+	wh, err := NewGenericAdmissionWebhook()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wh.serviceResolver = fakeServiceResolver{*serverURL}
+	wh.clientCert = clientCert
+	wh.clientKey = clientKey
+
+	// Set up a test object for the call
 	kind := api.Kind("Pod").WithVersion("v1")
 	name := "my-pod"
 	namespace := "webhook-test"
@@ -209,161 +119,145 @@ func TestAdmit(t *testing.T) {
 		UID:  "webhook-test",
 	}
 
-	configWithFailAction.Rules[0].FailAction = Allow
+	type test struct {
+		hookSource    fakeHookSource
+		expectAllow   bool
+		errorContains string
+	}
+	ccfg := func(result string) admissionregistration.AdmissionHookClientConfig {
+		return admissionregistration.AdmissionHookClientConfig{
+			Service: admissionregistration.ServiceReference{
+				Name: result,
+			},
+			CABundle: caCert,
+		}
+	}
+	matchEverythingRules := []admissionregistration.RuleWithOperations{{
+		Operations: []admissionregistration.OperationType{admissionregistration.OperationAll},
+		Rule: admissionregistration.Rule{
+			APIGroups:   []string{"*"},
+			APIVersions: []string{"*"},
+			Resources:   []string{"*/*"},
+		},
+	}}
 
-	tests := []genericAdmissionWebhookTest{
-		genericAdmissionWebhookTest{
-			test: "No matching rule",
-			config: &GenericAdmissionWebhookConfig{
-				KubeConfigFile: filepath.Join(testRoot, "kube-config"),
-				Rules: []Rule{
-					Rule{
-						Operations: []admission.Operation{
-							admission.Create,
-						},
-						Type: Send,
-					},
-				},
+	table := map[string]test{
+		"no match": {
+			hookSource: fakeHookSource{
+				hooks: []admissionregistration.ExternalAdmissionHook{{
+					Name:         "nomatch",
+					ClientConfig: ccfg("disallow"),
+					Rules: []admissionregistration.RuleWithOperations{{
+						Operations: []admissionregistration.OperationType{admissionregistration.Create},
+					}},
+				}},
 			},
-			value: nil,
+			expectAllow: true,
 		},
-		genericAdmissionWebhookTest{
-			test: "Matching rule skips",
-			config: &GenericAdmissionWebhookConfig{
-				KubeConfigFile: filepath.Join(testRoot, "kube-config"),
-				Rules: []Rule{
-					Rule{
-						Operations: []admission.Operation{
-							admission.Update,
-						},
-						Type: Skip,
-					},
-				},
+		"match & allow": {
+			hookSource: fakeHookSource{
+				hooks: []admissionregistration.ExternalAdmissionHook{{
+					Name:         "allow",
+					ClientConfig: ccfg("allow"),
+					Rules:        matchEverythingRules,
+				}},
 			},
-			value: nil,
+			expectAllow: true,
 		},
-		genericAdmissionWebhookTest{
-			test:   "Matching rule sends (webhook internal server error)",
-			config: makeGoodConfig(),
-			value:  fmt.Errorf(`%san error on the server ("webhook internal server error") has prevented the request from succeeding`, errAdmitPrefix),
+		"match & disallow": {
+			hookSource: fakeHookSource{
+				hooks: []admissionregistration.ExternalAdmissionHook{{
+					Name:         "disallow",
+					ClientConfig: ccfg("disallow"),
+					Rules:        matchEverythingRules,
+				}},
+			},
+			errorContains: "without explanation",
 		},
-		genericAdmissionWebhookTest{
-			test:   "Matching rule sends (webhook unsuccessful response)",
-			config: makeGoodConfig(),
-			value:  fmt.Errorf("%serror contacting webhook: 101", errAdmitPrefix),
+		"match & disallow ii": {
+			hookSource: fakeHookSource{
+				hooks: []admissionregistration.ExternalAdmissionHook{{
+					Name:         "disallowReason",
+					ClientConfig: ccfg("disallowReason"),
+					Rules:        matchEverythingRules,
+				}},
+			},
+			errorContains: "you shall not pass",
 		},
-		genericAdmissionWebhookTest{
-			test:   "Matching rule sends (webhook unmarshallable response)",
-			config: makeGoodConfig(),
-			value:  fmt.Errorf("%scouldn't get version/kind; json parse error: json: cannot unmarshal string into Go value of type struct.*", errAdmitPrefix),
-		},
-		genericAdmissionWebhookTest{
-			test:   "Matching rule sends (webhook error but allowed via fail action)",
-			config: configWithFailAction,
-			value:  nil,
-		},
-		genericAdmissionWebhookTest{
-			test:   "Matching rule sends (webhook request denied without reason)",
-			config: makeGoodConfig(),
-			value:  fmt.Errorf("%swebhook backend denied the request", errAdmitPrefix),
-		},
-		genericAdmissionWebhookTest{
-			test:   "Matching rule sends (webhook request denied with reason)",
-			config: makeGoodConfig(),
-			value:  fmt.Errorf("%swebhook backend denied the request: you shall not pass", errAdmitPrefix),
-		},
-		genericAdmissionWebhookTest{
-			test:   "Matching rule sends (webhook request allowed)",
-			config: makeGoodConfig(),
-			value:  nil,
+		"match & fail (but allow because fail open)": {
+			hookSource: fakeHookSource{
+				hooks: []admissionregistration.ExternalAdmissionHook{{
+					Name:         "internalErr A",
+					ClientConfig: ccfg("internalErr"),
+					Rules:        matchEverythingRules,
+				}, {
+					Name:         "invalidReq B",
+					ClientConfig: ccfg("invalidReq"),
+					Rules:        matchEverythingRules,
+				}, {
+					Name:         "invalidResp C",
+					ClientConfig: ccfg("invalidResp"),
+					Rules:        matchEverythingRules,
+				}},
+			},
+			expectAllow: true,
 		},
 	}
 
-	for _, tt := range tests {
-		wh, err := NewGenericAdmissionWebhook(tt.config)
+	for name, tt := range table {
+		wh.hookSource = &tt.hookSource
 
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tt.test, err)
-		} else {
-			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
-
-			checkForError(t, tt.test, tt.value, err)
+		err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
+		if tt.expectAllow != (err == nil) {
+			t.Errorf("%q: expected allowed=%v, but got err=%v", name, tt.expectAllow, err)
 		}
-	}
-}
-
-func checkForError(t *testing.T, test string, expected, actual interface{}) {
-	aErr, _ := actual.(error)
-	eErr, _ := expected.(error)
-
-	if eErr != nil {
-		if aErr == nil {
-			t.Errorf("%s: expected an error", test)
-		} else if eErr.Error() != aErr.Error() && !regexp.MustCompile(eErr.Error()).MatchString(aErr.Error()) {
-			t.Errorf("%s: unexpected error message to match:\n  Expected: %s\n  Actual:   %s", test, eErr.Error(), aErr.Error())
+		// ErrWebhookRejected is not an error for our purposes
+		if tt.errorContains != "" {
+			if err == nil || !strings.Contains(err.Error(), tt.errorContains) {
+				t.Errorf("%q: expected an error saying %q, but got %v", name, tt.errorContains, err)
+			}
 		}
-	} else {
-		if aErr != nil {
-			t.Errorf("%s: unexpected error: %v", test, aErr)
-		}
-	}
-}
-
-func killTests(err error) {
-	panic(fmt.Sprintf("Unable to bootstrap tests: %v", err))
-}
-
-func makeGoodConfig() *GenericAdmissionWebhookConfig {
-	return &GenericAdmissionWebhookConfig{
-		KubeConfigFile: filepath.Join(testRoot, "kube-config"),
-		Rules: []Rule{
-			Rule{
-				Operations: []admission.Operation{
-					admission.Update,
-				},
-				Type: Send,
-			},
-		},
 	}
 }
 
 func webhookHandler(w http.ResponseWriter, r *http.Request) {
-	requestCount++
-
-	switch requestCount {
-	case 1, 4:
+	fmt.Printf("got req: %v\n", r.URL.Path)
+	switch r.URL.Path {
+	case "/internalErr":
 		http.Error(w, "webhook internal server error", http.StatusInternalServerError)
 		return
-	case 2:
+	case "/invalidReq":
 		w.WriteHeader(http.StatusSwitchingProtocols)
 		w.Write([]byte("webhook invalid request"))
 		return
-	case 3:
+	case "/invalidResp":
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("webhook invalid response"))
-	case 5:
+	case "/disallow":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{
 			Status: v1alpha1.AdmissionReviewStatus{
 				Allowed: false,
 			},
 		})
-	case 6:
+	case "/disallowReason":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{
 			Status: v1alpha1.AdmissionReviewStatus{
 				Allowed: false,
 				Result: &metav1.Status{
-					Reason: "you shall not pass",
+					Message: "you shall not pass",
 				},
 			},
 		})
-	case 7:
+	case "/allow":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{
 			Status: v1alpha1.AdmissionReviewStatus{
 				Allowed: true,
 			},
 		})
+	default:
+		http.NotFound(w, r)
 	}
 }

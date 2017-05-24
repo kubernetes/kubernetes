@@ -39,7 +39,7 @@ func TestCreateDeployment(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(&bytes.Buffer{}),
+				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
 			}, nil
 		}),
 	}

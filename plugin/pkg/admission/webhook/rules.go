@@ -17,46 +17,31 @@ limitations under the License.
 // Package webhook checks a webhook for configured operation admission
 package webhook
 
-import "k8s.io/apiserver/pkg/admission"
+import (
+	"strings"
 
-func indexOf(items []string, requested string) int {
-	for i, item := range items {
-		if item == requested {
-			return i
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+)
+
+type RuleMatcher struct {
+	Rule admissionregistration.RuleWithOperations
+	Attr admission.Attributes
+}
+
+func (r *RuleMatcher) Matches() bool {
+	return r.operation() &&
+		r.group() &&
+		r.version() &&
+		r.resource()
+}
+
+func exactOrWildcard(items []string, requested string) bool {
+	for _, item := range items {
+		if item == "*" {
+			return true
 		}
-	}
-
-	return -1
-}
-
-// APIGroupMatches returns if the admission.Attributes matches the rule's API groups
-func APIGroupMatches(rule Rule, attr admission.Attributes) bool {
-	if len(rule.APIGroups) == 0 {
-		return true
-	}
-
-	return indexOf(rule.APIGroups, attr.GetResource().Group) > -1
-}
-
-// Matches returns if the admission.Attributes matches the rule
-func Matches(rule Rule, attr admission.Attributes) bool {
-	return APIGroupMatches(rule, attr) &&
-		NamespaceMatches(rule, attr) &&
-		OperationMatches(rule, attr) &&
-		ResourceMatches(rule, attr) &&
-		ResourceNamesMatches(rule, attr)
-}
-
-// OperationMatches returns if the admission.Attributes matches the rule's operation
-func OperationMatches(rule Rule, attr admission.Attributes) bool {
-	if len(rule.Operations) == 0 {
-		return true
-	}
-
-	aOp := attr.GetOperation()
-
-	for _, rOp := range rule.Operations {
-		if aOp == rOp {
+		if item == requested {
 			return true
 		}
 	}
@@ -64,35 +49,46 @@ func OperationMatches(rule Rule, attr admission.Attributes) bool {
 	return false
 }
 
-// NamespaceMatches returns if the admission.Attributes matches the rule's namespaces
-func NamespaceMatches(rule Rule, attr admission.Attributes) bool {
-	if len(rule.Namespaces) == 0 {
-		return true
-	}
-
-	return indexOf(rule.Namespaces, attr.GetNamespace()) > -1
+func (r *RuleMatcher) group() bool {
+	return exactOrWildcard(r.Rule.APIGroups, r.Attr.GetResource().Group)
 }
 
-// ResourceMatches returns if the admission.Attributes matches the rule's resource (and optional subresource)
-func ResourceMatches(rule Rule, attr admission.Attributes) bool {
-	if len(rule.Resources) == 0 {
-		return true
-	}
-
-	resource := attr.GetResource().Resource
-
-	if len(attr.GetSubresource()) > 0 {
-		resource = attr.GetResource().Resource + "/" + attr.GetSubresource()
-	}
-
-	return indexOf(rule.Resources, resource) > -1
+func (r *RuleMatcher) version() bool {
+	return exactOrWildcard(r.Rule.APIVersions, r.Attr.GetResource().Version)
 }
 
-// ResourceNamesMatches returns if the admission.Attributes matches the rule's resource names
-func ResourceNamesMatches(rule Rule, attr admission.Attributes) bool {
-	if len(rule.ResourceNames) == 0 {
-		return true
+func (r *RuleMatcher) operation() bool {
+	attrOp := r.Attr.GetOperation()
+	for _, op := range r.Rule.Operations {
+		if op == admissionregistration.OperationAll {
+			return true
+		}
+		// The constants are the same such that this is a valid cast (and this
+		// is tested).
+		if op == admissionregistration.OperationType(attrOp) {
+			return true
+		}
 	}
+	return false
+}
 
-	return indexOf(rule.ResourceNames, attr.GetName()) > -1
+func splitResource(resSub string) (res, sub string) {
+	parts := strings.SplitN(resSub, "/", 2)
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+	return parts[0], ""
+}
+
+func (r *RuleMatcher) resource() bool {
+	opRes, opSub := r.Attr.GetResource().Resource, r.Attr.GetSubresource()
+	for _, res := range r.Rule.Resources {
+		res, sub := splitResource(res)
+		resMatch := res == "*" || res == opRes
+		subMatch := sub == "*" || sub == opSub
+		if resMatch && subMatch {
+			return true
+		}
+	}
+	return false
 }

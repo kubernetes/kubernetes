@@ -17,293 +17,284 @@ limitations under the License.
 package webhook
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/client-go/pkg/api"
+	adreg "k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
 type ruleTest struct {
-	test             string
-	rule             Rule
-	attrAPIGroup     string
-	attrNamespace    string
-	attrOperation    admission.Operation
-	attrResource     string
-	attrResourceName string
-	attrSubResource  string
-	shouldMatch      bool
+	rule    adreg.RuleWithOperations
+	match   []admission.Attributes
+	noMatch []admission.Attributes
+}
+type tests map[string]ruleTest
+
+func a(group, version, resource, subresource, name string, operation admission.Operation) admission.Attributes {
+	return admission.NewAttributesRecord(
+		nil, nil,
+		schema.GroupVersionKind{Group: group, Version: version, Kind: "k" + resource},
+		"ns", name,
+		schema.GroupVersionResource{Group: group, Version: version, Resource: resource}, subresource,
+		operation,
+		nil,
+	)
 }
 
-func TestAPIGroupMatches(t *testing.T) {
-	tests := []ruleTest{
-		ruleTest{
-			test:        "apiGroups empty match",
-			rule:        Rule{},
-			shouldMatch: true,
-		},
-		ruleTest{
-			test: "apiGroup match",
-			rule: Rule{
-				APIGroups: []string{"my-group"},
+func attrList(a ...admission.Attributes) []admission.Attributes {
+	return a
+}
+
+func TestGroup(t *testing.T) {
+	table := tests{
+		"wildcard": {
+			rule: adreg.RuleWithOperations{
+				Rule: adreg.Rule{
+					APIGroups: []string{"*"},
+				},
 			},
-			attrAPIGroup: "my-group",
-			shouldMatch:  true,
+			match: attrList(
+				a("g", "v", "r", "", "name", admission.Create),
+			),
 		},
-		ruleTest{
-			test: "apiGroup mismatch",
-			rule: Rule{
-				APIGroups: []string{"my-group"},
+		"exact": {
+			rule: adreg.RuleWithOperations{
+				Rule: adreg.Rule{
+					APIGroups: []string{"g1", "g2"},
+				},
 			},
-			attrAPIGroup: "your-group",
-			shouldMatch:  false,
+			match: attrList(
+				a("g1", "v", "r", "", "name", admission.Create),
+				a("g2", "v2", "r3", "", "name", admission.Create),
+			),
+			noMatch: attrList(
+				a("g3", "v", "r", "", "name", admission.Create),
+				a("g4", "v", "r", "", "name", admission.Create),
+			),
 		},
 	}
 
-	runTests(t, "apiGroups", tests)
-}
-
-func TestMatches(t *testing.T) {
-	tests := []ruleTest{
-		ruleTest{
-			test:        "empty rule matches",
-			rule:        Rule{},
-			shouldMatch: true,
-		},
-		ruleTest{
-			test: "all properties match",
-			rule: Rule{
-				APIGroups:     []string{"my-group"},
-				Namespaces:    []string{"my-ns"},
-				Operations:    []admission.Operation{admission.Create},
-				ResourceNames: []string{"my-name"},
-				Resources:     []string{"pods/status"},
-			},
-			shouldMatch:      true,
-			attrAPIGroup:     "my-group",
-			attrNamespace:    "my-ns",
-			attrOperation:    admission.Create,
-			attrResource:     "pods",
-			attrResourceName: "my-name",
-			attrSubResource:  "status",
-		},
-		ruleTest{
-			test: "no properties match",
-			rule: Rule{
-				APIGroups:     []string{"my-group"},
-				Namespaces:    []string{"my-ns"},
-				Operations:    []admission.Operation{admission.Create},
-				ResourceNames: []string{"my-name"},
-				Resources:     []string{"pods/status"},
-			},
-			shouldMatch:      false,
-			attrAPIGroup:     "your-group",
-			attrNamespace:    "your-ns",
-			attrOperation:    admission.Delete,
-			attrResource:     "secrets",
-			attrResourceName: "your-name",
-		},
-	}
-
-	runTests(t, "", tests)
-}
-
-func TestNamespaceMatches(t *testing.T) {
-	tests := []ruleTest{
-		ruleTest{
-			test:        "namespaces empty match",
-			rule:        Rule{},
-			shouldMatch: true,
-		},
-		ruleTest{
-			test: "namespace match",
-			rule: Rule{
-				Namespaces: []string{"my-ns"},
-			},
-			attrNamespace: "my-ns",
-			shouldMatch:   true,
-		},
-		ruleTest{
-			test: "namespace mismatch",
-			rule: Rule{
-				Namespaces: []string{"my-ns"},
-			},
-			attrNamespace: "your-ns",
-			shouldMatch:   false,
-		},
-	}
-
-	runTests(t, "namespaces", tests)
-}
-
-func TestOperationMatches(t *testing.T) {
-	tests := []ruleTest{
-		ruleTest{
-			test:        "operations empty match",
-			rule:        Rule{},
-			shouldMatch: true,
-		},
-		ruleTest{
-			test: "operation match",
-			rule: Rule{
-				Operations: []admission.Operation{admission.Create},
-			},
-			attrOperation: admission.Create,
-			shouldMatch:   true,
-		},
-		ruleTest{
-			test: "operation mismatch",
-			rule: Rule{
-				Operations: []admission.Operation{admission.Create},
-			},
-			attrOperation: admission.Delete,
-			shouldMatch:   false,
-		},
-	}
-
-	runTests(t, "operations", tests)
-}
-
-func TestResourceMatches(t *testing.T) {
-	tests := []ruleTest{
-		ruleTest{
-			test:        "resources empty match",
-			rule:        Rule{},
-			shouldMatch: true,
-		},
-		ruleTest{
-			test: "resource match",
-			rule: Rule{
-				Resources: []string{"pods"},
-			},
-			attrResource: "pods",
-			shouldMatch:  true,
-		},
-		ruleTest{
-			test: "resource mismatch",
-			rule: Rule{
-				Resources: []string{"pods"},
-			},
-			attrResource: "secrets",
-			shouldMatch:  false,
-		},
-		ruleTest{
-			test: "resource with subresource match",
-			rule: Rule{
-				Resources: []string{"pods/status"},
-			},
-			attrResource:    "pods",
-			attrSubResource: "status",
-			shouldMatch:     true,
-		},
-		ruleTest{
-			test: "resource with subresource mismatch",
-			rule: Rule{
-				Resources: []string{"pods"},
-			},
-			attrResource:    "pods",
-			attrSubResource: "status",
-			shouldMatch:     false,
-		},
-	}
-
-	runTests(t, "resources", tests)
-}
-
-func TestResourceNameMatches(t *testing.T) {
-	tests := []ruleTest{
-		ruleTest{
-			test:        "resourceNames empty match",
-			rule:        Rule{},
-			shouldMatch: true,
-		},
-		ruleTest{
-			test: "resourceName match",
-			rule: Rule{
-				ResourceNames: []string{"my-name"},
-			},
-			attrResourceName: "my-name",
-			shouldMatch:      true,
-		},
-		ruleTest{
-			test: "resourceName mismatch",
-			rule: Rule{
-				ResourceNames: []string{"my-name"},
-			},
-			attrResourceName: "your-name",
-			shouldMatch:      false,
-		},
-	}
-
-	runTests(t, "resourceNames", tests)
-}
-
-func runTests(t *testing.T, prop string, tests []ruleTest) {
-	for _, tt := range tests {
-		if tt.attrResource == "" {
-			tt.attrResource = "pods"
-		}
-
-		res := api.Resource(tt.attrResource).WithVersion("version")
-
-		if tt.attrAPIGroup != "" {
-			res.Group = tt.attrAPIGroup
-		}
-
-		attr := admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), tt.attrNamespace, tt.attrResourceName, res, tt.attrSubResource, tt.attrOperation, nil)
-		var attrVal string
-		var ruleVal []string
-		var matches bool
-
-		switch prop {
-		case "":
-			matches = Matches(tt.rule, attr)
-		case "apiGroups":
-			attrVal = tt.attrAPIGroup
-			matches = APIGroupMatches(tt.rule, attr)
-			ruleVal = tt.rule.APIGroups
-		case "namespaces":
-			attrVal = tt.attrNamespace
-			matches = NamespaceMatches(tt.rule, attr)
-			ruleVal = tt.rule.Namespaces
-		case "operations":
-			attrVal = string(tt.attrOperation)
-			matches = OperationMatches(tt.rule, attr)
-			ruleVal = make([]string, len(tt.rule.Operations))
-
-			for _, rOp := range tt.rule.Operations {
-				ruleVal = append(ruleVal, string(rOp))
+	for name, tt := range table {
+		for _, m := range tt.match {
+			r := RuleMatcher{tt.rule, m}
+			if !r.group() {
+				t.Errorf("%v: expected match %#v", name, m)
 			}
-		case "resources":
-			attrVal = tt.attrResource
-			matches = ResourceMatches(tt.rule, attr)
-			ruleVal = tt.rule.Resources
-		case "resourceNames":
-			attrVal = tt.attrResourceName
-			matches = ResourceNamesMatches(tt.rule, attr)
-			ruleVal = tt.rule.ResourceNames
-		default:
-			t.Errorf("Unexpected test property: %s", prop)
 		}
-
-		if matches && !tt.shouldMatch {
-			if prop == "" {
-				testError(t, tt.test, "Expected match")
-			} else {
-				testError(t, tt.test, fmt.Sprintf("Expected %s rule property not to match %s against one of the following: %s", prop, attrVal, strings.Join(ruleVal, ", ")))
-			}
-		} else if !matches && tt.shouldMatch {
-			if prop == "" {
-				testError(t, tt.test, "Unexpected match")
-			} else {
-				testError(t, tt.test, fmt.Sprintf("Expected %s rule property to match %s against one of the following: %s", prop, attrVal, strings.Join(ruleVal, ", ")))
+		for _, m := range tt.noMatch {
+			r := RuleMatcher{tt.rule, m}
+			if r.group() {
+				t.Errorf("%v: expected no match %#v", name, m)
 			}
 		}
 	}
 }
 
-func testError(t *testing.T, name, msg string) {
-	t.Errorf("test failed (%s): %s", name, msg)
+func TestVersion(t *testing.T) {
+	table := tests{
+		"wildcard": {
+			rule: adreg.RuleWithOperations{
+				Rule: adreg.Rule{
+					APIVersions: []string{"*"},
+				},
+			},
+			match: attrList(
+				a("g", "v", "r", "", "name", admission.Create),
+			),
+		},
+		"exact": {
+			rule: adreg.RuleWithOperations{
+				Rule: adreg.Rule{
+					APIVersions: []string{"v1", "v2"},
+				},
+			},
+			match: attrList(
+				a("g1", "v1", "r", "", "name", admission.Create),
+				a("g2", "v2", "r", "", "name", admission.Create),
+			),
+			noMatch: attrList(
+				a("g1", "v3", "r", "", "name", admission.Create),
+				a("g2", "v4", "r", "", "name", admission.Create),
+			),
+		},
+	}
+	for name, tt := range table {
+		for _, m := range tt.match {
+			r := RuleMatcher{tt.rule, m}
+			if !r.version() {
+				t.Errorf("%v: expected match %#v", name, m)
+			}
+		}
+		for _, m := range tt.noMatch {
+			r := RuleMatcher{tt.rule, m}
+			if r.version() {
+				t.Errorf("%v: expected no match %#v", name, m)
+			}
+		}
+	}
+}
+
+func TestOperation(t *testing.T) {
+	table := tests{
+		"wildcard": {
+			rule: adreg.RuleWithOperations{Operations: []adreg.OperationType{adreg.OperationAll}},
+			match: attrList(
+				a("g", "v", "r", "", "name", admission.Create),
+				a("g", "v", "r", "", "name", admission.Update),
+				a("g", "v", "r", "", "name", admission.Delete),
+				a("g", "v", "r", "", "name", admission.Connect),
+			),
+		},
+		"create": {
+			rule: adreg.RuleWithOperations{Operations: []adreg.OperationType{adreg.Create}},
+			match: attrList(
+				a("g", "v", "r", "", "name", admission.Create),
+			),
+			noMatch: attrList(
+				a("g", "v", "r", "", "name", admission.Update),
+				a("g", "v", "r", "", "name", admission.Delete),
+				a("g", "v", "r", "", "name", admission.Connect),
+			),
+		},
+		"update": {
+			rule: adreg.RuleWithOperations{Operations: []adreg.OperationType{adreg.Update}},
+			match: attrList(
+				a("g", "v", "r", "", "name", admission.Update),
+			),
+			noMatch: attrList(
+				a("g", "v", "r", "", "name", admission.Create),
+				a("g", "v", "r", "", "name", admission.Delete),
+				a("g", "v", "r", "", "name", admission.Connect),
+			),
+		},
+		"delete": {
+			rule: adreg.RuleWithOperations{Operations: []adreg.OperationType{adreg.Delete}},
+			match: attrList(
+				a("g", "v", "r", "", "name", admission.Delete),
+			),
+			noMatch: attrList(
+				a("g", "v", "r", "", "name", admission.Create),
+				a("g", "v", "r", "", "name", admission.Update),
+				a("g", "v", "r", "", "name", admission.Connect),
+			),
+		},
+		"connect": {
+			rule: adreg.RuleWithOperations{Operations: []adreg.OperationType{adreg.Connect}},
+			match: attrList(
+				a("g", "v", "r", "", "name", admission.Connect),
+			),
+			noMatch: attrList(
+				a("g", "v", "r", "", "name", admission.Create),
+				a("g", "v", "r", "", "name", admission.Update),
+				a("g", "v", "r", "", "name", admission.Delete),
+			),
+		},
+		"multiple": {
+			rule: adreg.RuleWithOperations{Operations: []adreg.OperationType{adreg.Update, adreg.Delete}},
+			match: attrList(
+				a("g", "v", "r", "", "name", admission.Update),
+				a("g", "v", "r", "", "name", admission.Delete),
+			),
+			noMatch: attrList(
+				a("g", "v", "r", "", "name", admission.Create),
+				a("g", "v", "r", "", "name", admission.Connect),
+			),
+		},
+	}
+	for name, tt := range table {
+		for _, m := range tt.match {
+			r := RuleMatcher{tt.rule, m}
+			if !r.operation() {
+				t.Errorf("%v: expected match %#v", name, m)
+			}
+		}
+		for _, m := range tt.noMatch {
+			r := RuleMatcher{tt.rule, m}
+			if r.operation() {
+				t.Errorf("%v: expected no match %#v", name, m)
+			}
+		}
+	}
+}
+
+func TestResource(t *testing.T) {
+	table := tests{
+		"no subresources": {
+			rule: adreg.RuleWithOperations{
+				Rule: adreg.Rule{
+					Resources: []string{"*"},
+				},
+			},
+			match: attrList(
+				a("g", "v", "r", "", "name", admission.Create),
+				a("2", "v", "r2", "", "name", admission.Create),
+			),
+			noMatch: attrList(
+				a("g", "v", "r", "exec", "name", admission.Create),
+				a("2", "v", "r2", "proxy", "name", admission.Create),
+			),
+		},
+		"r & subresources": {
+			rule: adreg.RuleWithOperations{
+				Rule: adreg.Rule{
+					Resources: []string{"r/*"},
+				},
+			},
+			match: attrList(
+				a("g", "v", "r", "", "name", admission.Create),
+				a("g", "v", "r", "exec", "name", admission.Create),
+			),
+			noMatch: attrList(
+				a("2", "v", "r2", "", "name", admission.Create),
+				a("2", "v", "r2", "proxy", "name", admission.Create),
+			),
+		},
+		"r & subresources or r2": {
+			rule: adreg.RuleWithOperations{
+				Rule: adreg.Rule{
+					Resources: []string{"r/*", "r2"},
+				},
+			},
+			match: attrList(
+				a("g", "v", "r", "", "name", admission.Create),
+				a("g", "v", "r", "exec", "name", admission.Create),
+				a("2", "v", "r2", "", "name", admission.Create),
+			),
+			noMatch: attrList(
+				a("2", "v", "r2", "proxy", "name", admission.Create),
+			),
+		},
+		"proxy or exec": {
+			rule: adreg.RuleWithOperations{
+				Rule: adreg.Rule{
+					Resources: []string{"*/proxy", "*/exec"},
+				},
+			},
+			match: attrList(
+				a("g", "v", "r", "exec", "name", admission.Create),
+				a("2", "v", "r2", "proxy", "name", admission.Create),
+				a("2", "v", "r3", "proxy", "name", admission.Create),
+			),
+			noMatch: attrList(
+				a("g", "v", "r", "", "name", admission.Create),
+				a("2", "v", "r2", "", "name", admission.Create),
+				a("2", "v", "r4", "scale", "name", admission.Create),
+			),
+		},
+	}
+	for name, tt := range table {
+		for _, m := range tt.match {
+			r := RuleMatcher{tt.rule, m}
+			if !r.resource() {
+				t.Errorf("%v: expected match %#v", name, m)
+			}
+		}
+		for _, m := range tt.noMatch {
+			r := RuleMatcher{tt.rule, m}
+			if r.resource() {
+				t.Errorf("%v: expected no match %#v", name, m)
+			}
+		}
+	}
 }
