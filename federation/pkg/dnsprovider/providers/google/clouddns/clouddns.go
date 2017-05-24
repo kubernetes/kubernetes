@@ -101,16 +101,34 @@ func CreateInterface(projectID string, tokenSource oauth2.TokenSource) (*Interfa
 	return newInterfaceWithStub(projectID, internal.NewService(service)), nil
 }
 
+// getZoneIdMapFromZones takes multiple zones as slice and returns a map with zone names as
+// keys and zone id's arranged in slice as values. If multiple zones are passed with same
+// name then the zone id's are assigned incrementally starting from 0.
+func getZoneIdMapFromZones(zones []string) map[string][]uint64 {
+	zoneIdMap := make(map[string][]uint64)
+	for _, zoneName := range zones {
+		zoneIds := zoneIdMap[zoneName]
+		zoneIds = append(zoneIds, uint64(len(zoneIds)))
+		zoneIdMap[zoneName] = zoneIds
+	}
+	return zoneIdMap
+}
+
 // NewFakeInterface returns a fake clouddns interface, useful for unit testing purposes.
-func NewFakeInterface() (dnsprovider.Interface, error) {
+func NewFakeInterface(zones []string) (dnsprovider.Interface, error) {
 	service := stubs.NewService()
 	interface_ := newInterfaceWithStub("", service)
-	zones := service.ManagedZones_
-	// Add a fake zone to test against.
-	zone := &stubs.ManagedZone{Name_: "example.com", Rrsets: []stubs.ResourceRecordSet{}, Id_: 1}
-	call := zones.Create(interface_.project(), zone)
-	if _, err := call.Do(); err != nil {
-		return nil, err
+	zonesService := service.ManagedZones_
+	// Add fake zones to test against.
+	zoneIdMap := getZoneIdMapFromZones(zones)
+	for zoneName, zoneIds := range zoneIdMap {
+		for _, zoneId := range zoneIds {
+			zone := &stubs.ManagedZone{Name_: zoneName, Rrsets: []stubs.ResourceRecordSet{}, Id_: zoneId}
+			call := zonesService.Create(interface_.project(), zone)
+			if _, err := call.Do(); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return interface_, nil
 }

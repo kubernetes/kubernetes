@@ -27,11 +27,11 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/tests"
 )
 
-func newTestInterface() (dnsprovider.Interface, error) {
+func newTestInterface(zones []string) (dnsprovider.Interface, error) {
 	// Use this to test the real cloud service - insert appropriate project-id.  Default token source will be used.  See
 	// https://github.com/golang/oauth2/blob/master/google/default.go for details.
 	// return dnsprovider.GetDnsProvider(ProviderName, strings.NewReader("\n[global]\nproject-id = federation0-cluster00"))
-	return NewFakeInterface() // Use this to stub out the entire cloud service
+	return NewFakeInterface(zones) // Use this to stub out the entire cloud service
 }
 
 var interface_ dnsprovider.Interface
@@ -39,7 +39,7 @@ var interface_ dnsprovider.Interface
 func TestMain(m *testing.M) {
 	flag.Parse()
 	var err error
-	interface_, err = newTestInterface()
+	interface_, err = newTestInterface([]string{"example.com"})
 	if err != nil {
 		fmt.Printf("Error creating interface: %v", err)
 		os.Exit(1)
@@ -128,7 +128,7 @@ func TestZonesID(t *testing.T) {
 	zone := firstZone(t)
 
 	zoneID := zone.ID()
-	if zoneID != "1" {
+	if zoneID != "0" {
 		t.Fatalf("Unexpected zone id: %q", zoneID)
 	}
 }
