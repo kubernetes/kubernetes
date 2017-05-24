@@ -43,7 +43,39 @@ func gvkToMetadataOnlyObject(gvk schema.GroupVersionKind) runtime.Object {
 	}
 }
 
-func NewMetadataCodecFactory() serializer.CodecFactory {
+type MetadataCodecFactory struct {
+	serializer.CodecFactory
+}
+
+type metaDecoder struct {
+	delegate runtime.Decoder
+	gv runtime.GroupVersioner
+}
+func (m MetaDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	if into == nil {
+		m.gv.
+	}
+}
+
+// EncoderForVersion returns an encoder that ensures objects being written to the provided
+// serializer are in the provided group version.
+func (f *MetadataCodecFactory) EncoderForVersion(serializer runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
+	return versioning.DirectEncoder{
+		Version:     version,
+		Encoder:     serializer,
+		ObjectTyper: everythingTyper{f.CodecFactory.scheme},
+	}
+}
+
+// DecoderForVersion returns a decoder that ensures objects being read by the provided
+// serializer are in the provided group version by default.
+func (f *MetadataCodecFactory) DecoderToVersion(serializer runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
+	return versioning.DirectDecoder{
+		Decoder: serializer,
+	}
+}
+
+func NewMetadataCodecFactory() *MetadataCodecFactory {
 	// populating another scheme from api.Scheme, registering every kind with
 	// MetadataOnlyObject (or MetadataOnlyObjectList).
 	scheme := runtime.NewScheme()
@@ -60,7 +92,10 @@ func NewMetadataCodecFactory() serializer.CodecFactory {
 		scheme.AddKnownTypeWithName(kind, metaOnlyObject)
 	}
 	scheme.AddUnversionedTypes(api.Unversioned, &metav1.Status{})
-	return serializer.NewCodecFactory(scheme)
+	mcf := MetadataCodecFactory{
+		CodecFactory: serializer.NewCodecFactory(scheme)
+	}
+	return &mcf
 }
 
 // String converts a MetadataOnlyObject to a human-readable string.

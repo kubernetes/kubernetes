@@ -130,6 +130,8 @@ func (d *Client) Fresh() bool {
 func (d *Client) Invalidate() {
 	d.lock.Lock()
 	defer d.lock.Unlock()
+	glog.Infof("aoeuaoeuaoeu")
+	defer glog.Infof("xoeuaoeuaoeu")
 	gl, err := d.delegate.ServerGroups()
 	if err != nil || len(gl.Groups) == 0 {
 		glog.V(2).Infof("Error getting current server API group list, will keep using cached value. (%v)", err)
@@ -150,6 +152,7 @@ func (d *Client) Invalidate() {
 				}
 			}
 			rl[v.GroupVersion] = r
+			glog.Infof("  aoeu - %v %#v", v.GroupVersion, r)
 		}
 	}
 

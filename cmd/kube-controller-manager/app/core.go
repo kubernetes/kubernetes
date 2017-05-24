@@ -24,11 +24,9 @@ import (
 	"fmt"
 	"time"
 
-	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/api"
@@ -38,8 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
-	"k8s.io/kubernetes/pkg/controller/garbagecollector/memcachediscovery"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
+	gcsetup "k8s.io/kubernetes/pkg/controller/garbagecollector/setup"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -175,31 +173,15 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	}
 
 	gcClientset := ctx.ClientBuilder.ClientOrDie("generic-garbage-collector")
-	getDeletableResources := func() (map[schema.GroupVersionResource]struct{}, error) {
-		preferredResources, err := gcClientset.Discovery().ServerPreferredResources()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get supported resources from server: %v", err)
-		}
-		deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, preferredResources)
-		deletableGroupVersionResources, err := discovery.GroupVersionResources(deletableResources)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to parse resources from server: %v", err)
-		}
-		return deletableGroupVersionResources, nil
-	}
 
-	restMapper := discovery.NewDeferredDiscoveryRESTMapper(
-		memcachediscovery.NewClient(gcClientset.Discovery()),
-		meta.InterfacesForUnstructured,
-	)
-	restMapper.Reset()
+	restMapper, syncThread := gcsetup.RESTMapper(gcClientset.Discovery(), 30*time.Second)
 
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
 	metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig = dynamic.ContentConfig()
 	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
-	deletableResources, err := getDeletableResources()
+	deletableResources, err := gcsetup.GetDeletableResources(gcClientset.Discovery())
 	if err != nil {
 		return true, err
 	}
@@ -209,26 +191,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	}
 
 	// Refresh discovery information periodically. Start/stop monitors.
-	go func() {
-		t := time.NewTicker(30 * time.Second)
-		defer t.Stop()
-		for {
-			select {
-			case <-t.C:
-				restMapper.Reset()
-			case <-ctx.Stop:
-				return
-			}
-			deletableResources, err := getDeletableResources()
-			if err != nil {
-				utilruntime.HandleError(err)
-				continue
-			}
-			if err := garbageCollector.SyncResourceMonitors(deletableResources); err != nil {
-				utilruntime.HandleError(err)
-			}
-		}
-	}()
+	go syncThread(garbageCollector, ctx.Stop)
 
 	workers := int(ctx.Options.ConcurrentGCSyncs)
 	go garbageCollector.Run(workers, ctx.Stop)

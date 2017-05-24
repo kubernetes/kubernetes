@@ -29,20 +29,24 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
+	gcsetup "k8s.io/kubernetes/pkg/controller/garbagecollector/setup"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+
+	exampletprv1 "k8s.io/client-go/examples/third-party-resources/apis/tpr/v1"
+	exampleclient "k8s.io/client-go/examples/third-party-resources/client"
 )
 
 func getForegroundOptions() *metav1.DeleteOptions {
@@ -123,7 +127,8 @@ func newOwnerRC(name, namespace string) *v1.ReplicationController {
 	}
 }
 
-func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *garbagecollector.GarbageCollector, clientset.Interface) {
+// if workerCount > 0, will start the GC, otherwise it's up to the caller to Run() the GC.
+func setup(t *testing.T, workerCount int) (*httptest.Server, framework.CloseFunc, *garbagecollector.GarbageCollector, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.EnableCoreControllers = false
 	_, s, closeFn := framework.RunAMaster(masterConfig)
@@ -132,32 +137,38 @@ func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *garbagecollect
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
-	preferredResources, err := clientSet.Discovery().ServerPreferredResources()
+
+	restMapper, syncThread := gcsetup.RESTMapper(clientSet.Discovery(), 10*time.Second)
+	deletableResources, err := gcsetup.GetDeletableResources(clientSet.Discovery())
 	if err != nil {
-		t.Fatalf("Failed to get supported resources from server: %v", err)
-	}
-	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, preferredResources)
-	deletableGroupVersionResources, err := discovery.GroupVersionResources(deletableResources)
-	if err != nil {
-		t.Fatalf("Failed to parse supported resources from server: %v", err)
+		t.Fatalf("unable to get deletable resources: %v", err)
 	}
 	config := &restclient.Config{Host: s.URL}
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
-	metaOnlyClientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+	metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
-	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	gc, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), deletableGroupVersionResources)
+	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
+	gc, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, deletableResources)
 	if err != nil {
 		t.Fatalf("Failed to create garbage collector")
 	}
-	return s, closeFn, gc, clientSet
+	if workerCount <= 0 {
+		return s, closeFn, gc, clientSet
+	}
+	stopCh := make(chan struct{})
+	go gc.Run(workerCount, stopCh)
+	go syncThread(gc, stopCh)
+	return s, func() {
+		close(stopCh)
+		closeFn()
+	}, gc, clientSet
 }
 
 // This test simulates the cascading deletion.
 func TestCascadingDeletion(t *testing.T) {
 	glog.V(6).Infof("TestCascadingDeletion starts")
 	defer glog.V(6).Infof("TestCascadingDeletion ends")
-	s, closeFn, gc, clientSet := setup(t)
+	s, closeFn, gc, clientSet := setup(t, 0)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("gc-cascading-deletion", s, t)
@@ -245,7 +256,7 @@ func TestCascadingDeletion(t *testing.T) {
 // This test simulates the case where an object is created with an owner that
 // doesn't exist. It verifies the GC will delete such an object.
 func TestCreateWithNonExistentOwner(t *testing.T) {
-	s, closeFn, gc, clientSet := setup(t)
+	s, closeFn, gc, clientSet := setup(t, 0)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("gc-non-existing-owner", s, t)
@@ -273,6 +284,99 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	// wait for the garbage collector to delete the pod
 	if err := integration.WaitForPodToDisappear(podClient, garbageCollectedPodName, 5*time.Second, 30*time.Second); err != nil {
 		t.Fatalf("expect pod %s to be garbage collected, got err= %v", garbageCollectedPodName, err)
+	}
+}
+
+func TestDeleteUnknownResource(t *testing.T) {
+	s, closeFn, _, clientSet := setup(t, 1)
+	defer closeFn()
+
+	ns := framework.CreateTestingNamespace("gc-delete-unknown-res", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	scheme := runtime.NewScheme()
+	if err := exampletprv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	config := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{
+		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: serializer.NewCodecFactory(scheme)},
+	}}
+
+	t.Logf("Creating TPR %q", exampletprv1.ExampleResourcePlural)
+	tprDef := &v1beta1.ThirdPartyResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "example." + exampletprv1.GroupName,
+		},
+		Versions: []v1beta1.APIVersion{
+			{Name: exampletprv1.SchemeGroupVersion.Version},
+		},
+		Description: "An Example ThirdPartyResource",
+	}
+	if _, err := clientSet.ExtensionsV1beta1().ThirdPartyResources().Create(tprDef); err != nil {
+		t.Fatalf("unexpected error creating the ThirdPartyResource: %v", err)
+	}
+	defer clientSet.ExtensionsV1beta1().ThirdPartyResources().Delete(tprDef.ObjectMeta.Name, nil)
+	exampleClient, _, err := exampleclient.NewClient(config)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	t.Logf("Waiting for TPR %q to show up", exampletprv1.ExampleResourcePlural)
+	if err := exampleclient.WaitForExampleResource(exampleClient); err != nil {
+		t.Fatalf("TPR examples did not show up: %v", err)
+	}
+	t.Logf("TPR %q is active", exampletprv1.ExampleResourcePlural)
+
+	// Create an instance of our TPR
+	t.Logf("Creating instance of TPR %q", exampletprv1.ExampleResourcePlural)
+	example := &exampletprv1.Example{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "example1",
+			OwnerReferences: []metav1.OwnerReference{{
+				UID:        "doesn't exist",
+				APIVersion: "tpr.client-go.k8s.io/v1",
+				Kind:       "Example",
+				Name:       "no name",
+			}},
+		},
+		Spec: exampletprv1.ExampleSpec{
+			Foo: "hello",
+			Bar: true,
+		},
+		Status: exampletprv1.ExampleStatus{
+			State:   exampletprv1.ExampleStateCreated,
+			Message: "Created, not processed yet",
+		},
+	}
+	var result exampletprv1.Example
+	err = exampleClient.Post().
+		Resource(exampletprv1.ExampleResourcePlural).
+		Namespace(ns.Name).
+		Body(example).
+		Do().Into(&result)
+	if err != nil {
+		t.Fatalf("Failed to create an instance of TPR: %v", err)
+	}
+
+	err = wait.PollImmediate(5*time.Second, 90*time.Second, func() (bool, error) {
+		err := exampleClient.Get().
+			Resource(exampletprv1.ExampleResourcePlural).
+			Namespace(ns.Name).
+			Do().Into(&result)
+		if err == nil {
+			return false, nil
+		} else {
+			if errors.IsNotFound(err) {
+				return true, nil
+			} else {
+				return false, err
+			}
+		}
+	})
+
+	if err != nil {
+		t.Errorf("tpr was never garbage collected: %v", err)
 	}
 }
 
@@ -341,7 +445,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 // e2e tests that put more stress.
 func TestStressingCascadingDeletion(t *testing.T) {
 	t.Logf("starts garbage collector stress test")
-	s, closeFn, gc, clientSet := setup(t)
+	s, closeFn, gc, clientSet := setup(t, 0)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("gc-stressing-cascading-deletion", s, t)
@@ -402,7 +506,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 }
 
 func TestOrphaning(t *testing.T) {
-	s, closeFn, gc, clientSet := setup(t)
+	s, closeFn, gc, clientSet := setup(t, 0)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("gc-orphaning", s, t)
@@ -473,7 +577,7 @@ func TestOrphaning(t *testing.T) {
 }
 
 func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
-	s, closeFn, gc, clientSet := setup(t)
+	s, closeFn, gc, clientSet := setup(t, 0)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("gc-foreground1", s, t)
@@ -535,7 +639,7 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 }
 
 func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
-	s, closeFn, gc, clientSet := setup(t)
+	s, closeFn, gc, clientSet := setup(t, 0)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("gc-foreground2", s, t)
@@ -603,7 +707,7 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 }
 
 func TestBlockingOwnerRefDoesBlock(t *testing.T) {
-	s, closeFn, gc, clientSet := setup(t)
+	s, closeFn, gc, clientSet := setup(t, 0)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("gc-foreground3", s, t)

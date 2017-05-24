@@ -168,6 +168,7 @@ func listWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *
 func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, error) {
 	// TODO: consider store in one storage.
 	glog.V(5).Infof("create storage for resource %s", resource)
+	glog.Infof("aoeuaoeuaoeua create storage for resource %s", resource)
 	client, err := gb.metaOnlyClientPool.ClientForGroupVersionKind(kind)
 	if err != nil {
 		return nil, err
