@@ -219,11 +219,6 @@ type KubeletConfiguration struct {
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization
-	// podInfraContainerImage is the image whose network/ipc namespaces
-	// containers in each pod will use.
-	PodInfraContainerImage string
-	// dockerEndpoint is the path to the docker endpoint to communicate with.
-	DockerEndpoint string
 	// rootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
 	RootDirectory string
@@ -316,22 +311,6 @@ type KubeletConfiguration struct {
 	LowDiskSpaceThresholdMB int32
 	// How frequently to calculate and cache volume disk usage for all pods
 	VolumeStatsAggPeriod metav1.Duration
-	// networkPluginName is the name of the network plugin to be invoked for
-	// various events in kubelet/pod lifecycle
-	NetworkPluginName string
-	// networkPluginMTU is the MTU to be passed to the network plugin,
-	// and overrides the default MTU for cases where it cannot be automatically
-	// computed (such as IPSEC).
-	NetworkPluginMTU int32
-	// networkPluginDir is the full path of the directory in which to search
-	// for network plugins (and, for backwards-compat, CNI config files)
-	NetworkPluginDir string
-	// CNIConfDir is the full path of the directory in which to search for
-	// CNI config files
-	CNIConfDir string
-	// CNIBinDir is the full path of the directory in which to search for
-	// CNI plugin binaries
-	CNIBinDir string
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string
@@ -374,23 +353,8 @@ type KubeletConfiguration struct {
 	// requests - pull, logs, exec and attach.
 	// +optional
 	RuntimeRequestTimeout metav1.Duration
-	// If no pulling progress is made before the deadline imagePullProgressDeadline,
-	// the image pulling will be cancelled. Defaults to 1m0s.
-	// +optional
-	ImagePullProgressDeadline metav1.Duration
-	// rktPath is the path of rkt binary. Leave empty to use the first rkt in
-	// $PATH.
-	// +optional
-	RktPath string
 	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
 	ExperimentalMounterPath string
-	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
-	// +optional
-	RktAPIEndpoint string
-	// rktStage1Image is the image to use as stage1. Local paths and
-	// http/https URLs are supported.
-	// +optional
-	RktStage1Image string
 	// lockFilePath is the path that kubelet will use to as a lock file.
 	// It uses this file as a lock to synchronize with other kubelet processes
 	// that may be running.
@@ -411,10 +375,6 @@ type KubeletConfiguration struct {
 	HairpinMode string
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32
-	// dockerExecHandlerName is the handler to use when executing a command
-	// in a container. Valid values are 'native' and 'nsenter'. Defaults to
-	// 'native'.
-	DockerExecHandlerName string
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string
@@ -509,9 +469,6 @@ type KubeletConfiguration struct {
 	// featureGates is a string of comma-separated key=value pairs that describe feature
 	// gates for alpha/experimental features.
 	FeatureGates string
-	// Enable dockershim only mode.
-	// +optional
-	ExperimentalDockershim bool
 	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	ExperimentalFailSwapOn bool
@@ -522,11 +479,6 @@ type KubeletConfiguration struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool
-	// This flag, if set, disables use of a shared PID namespace for pods running in the docker CRI runtime.
-	// A shared PID namespace is the only option in non-docker runtimes and is required by the CRI. The ability to
-	// disable it for docker will be removed unless a compelling use case is discovered with widespread use.
-	// TODO: Remove once we no longer support disabling shared PID namespace (https://issues.k8s.io/41938)
-	DockerDisableSharedPID bool
 
 	/* following flags are meant for Node Allocatable */
 

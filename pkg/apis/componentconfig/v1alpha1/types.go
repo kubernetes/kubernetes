@@ -293,11 +293,6 @@ type KubeletConfiguration struct {
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization `json:"authorization"`
-	// podInfraContainerImage is the image whose network/ipc namespaces
-	// containers in each pod will use.
-	PodInfraContainerImage string `json:"podInfraContainerImage"`
-	// dockerEndpoint is the path to the docker endpoint to communicate with.
-	DockerEndpoint string `json:"dockerEndpoint"`
 	// rootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
 	RootDirectory string `json:"rootDirectory"`
@@ -391,22 +386,6 @@ type KubeletConfiguration struct {
 	LowDiskSpaceThresholdMB int32 `json:"lowDiskSpaceThresholdMB"`
 	// How frequently to calculate and cache volume disk usage for all pods
 	VolumeStatsAggPeriod metav1.Duration `json:"volumeStatsAggPeriod"`
-	// networkPluginName is the name of the network plugin to be invoked for
-	// various events in kubelet/pod lifecycle
-	NetworkPluginName string `json:"networkPluginName"`
-	// networkPluginDir is the full path of the directory in which to search
-	// for network plugins (and, for backwards-compat, CNI config files)
-	NetworkPluginDir string `json:"networkPluginDir"`
-	// CNIConfDir is the full path of the directory in which to search for
-	// CNI config files
-	CNIConfDir string `json:"cniConfDir"`
-	// CNIBinDir is the full path of the directory in which to search for
-	// CNI plugin binaries
-	CNIBinDir string `json:"cniBinDir"`
-	// networkPluginMTU is the MTU to be passed to the network plugin,
-	// and overrides the default MTU for cases where it cannot be automatically
-	// computed (such as IPSEC).
-	NetworkPluginMTU int32 `json:"networkPluginMTU"`
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string `json:"volumePluginDir"`
@@ -442,20 +421,9 @@ type KubeletConfiguration struct {
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	RuntimeRequestTimeout metav1.Duration `json:"runtimeRequestTimeout"`
-	// If no pulling progress is made before the deadline imagePullProgressDeadline,
-	// the image pulling will be cancelled. Defaults to 1m0s.
-	ImagePullProgressDeadline metav1.Duration `json:"imagePullProgressDeadline,omitempty"`
-	// rktPath is the  path of rkt binary. Leave empty to use the first rkt in
-	// $PATH.
-	RktPath string `json:"rktPath"`
 	// experimentalMounterPath is the path to mounter binary. If not set, kubelet will attempt to use mount
 	// binary that is available via $PATH,
 	ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"`
-	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
-	RktAPIEndpoint string `json:"rktAPIEndpoint"`
-	// rktStage1Image is the image to use as stage1. Local paths and
-	// http/https URLs are supported.
-	RktStage1Image string `json:"rktStage1Image"`
 	// lockFilePath is the path that kubelet will use to as a lock file.
 	// It uses this file as a lock to synchronize with other kubelet processes
 	// that may be running.
@@ -476,10 +444,6 @@ type KubeletConfiguration struct {
 	HairpinMode string `json:"hairpinMode"`
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32 `json:"maxPods"`
-	// dockerExecHandlerName is the handler to use when executing a command
-	// in a container. Valid values are 'native' and 'nsenter'. Defaults to
-	// 'native'.
-	DockerExecHandlerName string `json:"dockerExecHandlerName"`
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string `json:"podCIDR"`
@@ -567,9 +531,6 @@ type KubeletConfiguration struct {
 	// featureGates is a string of comma-separated key=value pairs that describe feature
 	// gates for alpha/experimental features.
 	FeatureGates string `json:"featureGates,omitempty"`
-	// Enable dockershim only mode.
-	// +optional
-	ExperimentalDockershim *bool `json:"experimentalDockershim,omitempty"`
 	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	ExperimentalFailSwapOn bool `json:"experimentalFailSwapOn,omitempty"`
@@ -580,8 +541,6 @@ type KubeletConfiguration struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool `json:"keepTerminatedPodVolumes,omitempty"`
-	// This flag, if set, disables use of a shared PID namespace for pods run by the docker CRI runtime.
-	DockerDisableSharedPID *bool `json:"dockerDisableSharedPID,omitempty"`
 
 	/* following flags are meant for Node Allocatable */
 
