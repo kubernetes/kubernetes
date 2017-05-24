@@ -14,7 +14,7 @@ $ make keys secret KEY=/tmp/nginx.key CERT=/tmp/nginx.crt SECRET=/tmp/secret.jso
 
 ### Create a https nginx application running in a kubernetes cluster
 
-You need a [running kubernetes cluster](../../docs/getting-started-guides/) for this to work.
+You need a [running kubernetes cluster](https://kubernetes.io/docs/setup/pick-right-solution/) for this to work.
 
 Create a secret and a configmap.
 
@@ -122,7 +122,7 @@ $ curl https://104.198.1.26:30028 -k
 ...
 ```
 
-For more information on how to run this in a kubernetes cluster, please see the [user-guide](../../docs/user-guide/connecting-applications.md).
+For more information on how to run this in a kubernetes cluster, please see the [user-guide](https://kubernetes.io/docs/concepts/services-networking/connect-applications-service/).
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/https-nginx/README.md?pixel)]()
