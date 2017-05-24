@@ -85,8 +85,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	foundVersion := false
 	foundGroup := false
 	for _, crd := range crds {
-		// if we can't definitively determine that our names are good, don't serve it
-		if !apiextensions.IsCRDConditionFalse(crd, apiextensions.NameConflict) {
+		if !apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
 			continue
 		}
 

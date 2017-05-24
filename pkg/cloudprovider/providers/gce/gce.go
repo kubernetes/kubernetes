@@ -79,6 +79,8 @@ type GCECloud struct {
 	service                  *compute.Service
 	serviceBeta              *computebeta.Service
 	containerService         *container.Service
+	clientBuilder            controller.ControllerClientBuilder
+	ClusterId                ClusterId
 	projectID                string
 	region                   string
 	localZone                string   // The zone in which we are running
@@ -234,8 +236,12 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 	}, nil
 }
 
-// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (gce *GCECloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+// Initialize takes in a clientBuilder and spawns a goroutine for watching the clusterid configmap.
+// This must be called before utilizing the funcs of gce.ClusterId
+func (gce *GCECloud) Initialize(clientBuilder controller.ControllerClientBuilder) {
+	gce.clientBuilder = clientBuilder
+	go gce.watchClusterId()
+}
 
 // LoadBalancer returns an implementation of LoadBalancer for Google Compute Engine.
 func (gce *GCECloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {

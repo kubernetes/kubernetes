@@ -70,8 +70,13 @@ const (
 type CustomResourceDefinitionConditionType string
 
 const (
-	// NameConflict means the names chosen for this CustomResourceDefinition conflict with others in the group.
-	NameConflict CustomResourceDefinitionConditionType = "NameConflict"
+	// Established means that the resource has become active. A resource is established when all names are
+	// accepted without a conflict for the first time. A resource stays established until deleted, even during
+	// a later NamesAccepted due to changed names. Note that not all names can be changed.
+	Established CustomResourceDefinitionConditionType = "Established"
+	// NamesAccepted means the names chosen for this CustomResourceDefinition do not conflict with others in
+	// the group and are therefore accepted.
+	NamesAccepted CustomResourceDefinitionConditionType = "NamesAccepted"
 	// Terminating means that the CustomResourceDefinition has been deleted and is cleaning up.
 	Terminating CustomResourceDefinitionConditionType = "Terminating"
 )

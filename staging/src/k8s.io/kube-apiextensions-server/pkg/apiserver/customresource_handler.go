@@ -143,8 +143,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
-	// if we can't definitively determine that our names are good, delegate
-	if !apiextensions.IsCRDConditionFalse(crd, apiextensions.NameConflict) {
+	if !apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
 		r.delegate.ServeHTTP(w, req)
 	}
 	if len(requestInfo.Subresource) > 0 {

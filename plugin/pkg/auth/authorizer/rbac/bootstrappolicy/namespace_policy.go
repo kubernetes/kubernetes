@@ -86,6 +86,13 @@ func init() {
 		},
 	})
 	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
+		// role for the cloud providers to access/create kube-system configmaps
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "cloud-provider"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("create", "get", "list", "watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
+		},
+	})
+	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
 		// role for the token-cleaner to be able to remove secrets, but only in kube-system
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "token-cleaner"},
 		Rules: []rbac.PolicyRule{
@@ -95,6 +102,8 @@ func init() {
 	})
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
 		rbac.NewRoleBinding(saRolePrefix+"bootstrap-signer", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "bootstrap-signer").BindingOrDie())
+	addNamespaceRoleBinding(metav1.NamespaceSystem,
+		rbac.NewRoleBinding(saRolePrefix+"cloud-provider", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "cloud-provider").BindingOrDie())
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
 		rbac.NewRoleBinding(saRolePrefix+"token-cleaner", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "token-cleaner").BindingOrDie())
 

@@ -103,6 +103,9 @@ func SetInitContainersStatusesAnnotations(pod *v1.Pod) error {
 		}
 		pod.Annotations[v1.PodInitContainerStatusesAnnotationKey] = string(value)
 		pod.Annotations[v1.PodInitContainerStatusesBetaAnnotationKey] = string(value)
+	} else {
+		delete(pod.Annotations, v1.PodInitContainerStatusesAnnotationKey)
+		delete(pod.Annotations, v1.PodInitContainerStatusesBetaAnnotationKey)
 	}
 	return nil
 }
