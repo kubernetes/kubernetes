@@ -154,6 +154,11 @@ type serviceInfo struct {
 type endpointsInfo struct {
 	endpoint string // TODO: should be an endpointString type
 	isLocal  bool
+	// The following fields we lazily compute and store here for performance
+	// reasons. If the protocol is the same as you expect it to be, then the
+	// chainName can be reused, otherwise it should be recomputed.
+	protocol  string
+	chainName utiliptables.Chain
 }
 
 // Returns just the IP part of the endpoint.
@@ -162,6 +167,15 @@ func (e *endpointsInfo) IPPart() string {
 		return e.endpoint[0:index]
 	}
 	return e.endpoint
+}
+
+// Returns the endpoint chain name for a given endpointsInfo.
+func (e *endpointsInfo) endpointChain(svcNameString, protocol string) utiliptables.Chain {
+	if e.protocol != protocol {
+		e.protocol = protocol
+		e.chainName = servicePortEndpointChainName(svcNameString, protocol, e.endpoint)
+	}
+	return e.chainName
 }
 
 func (e *endpointsInfo) String() string {
@@ -1375,10 +1389,10 @@ func (proxier *Proxier) syncProxyRules() {
 		// These two slices parallel each other - keep in sync
 		endpoints = endpoints[:0]
 		endpointChains = endpointChains[:0]
+		var endpointChain utiliptables.Chain
 		for _, ep := range proxier.endpointsMap[svcName] {
 			endpoints = append(endpoints, ep)
-			// TODO: This should be precomputed.
-			endpointChain := servicePortEndpointChainName(svcNameString, protocol, ep.endpoint)
+			endpointChain = ep.endpointChain(svcNameString, protocol)
 			endpointChains = append(endpointChains, endpointChain)
 
 			// Create the endpoint chain, retaining counters if possible.
