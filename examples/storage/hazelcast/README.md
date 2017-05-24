@@ -84,6 +84,7 @@ spec:
       labels: 
         name: hazelcast
     spec: 
+      serviceAccountName: hazelcast
       containers: 
       - name: hazelcast
         image: quay.io/pires/hazelcast-kubernetes:0.8.0
@@ -108,6 +109,12 @@ Last but not least, we set `DNS_DOMAIN` environment variable according to your K
 Create this controller:
 
 ```sh
+# create a service account to run the hazelcast pods
+$ kubectl create -f examples/storage/hazelcast/hazelcast-serviceaccount.yaml
+
+# create a rolebinding to give API permissions to the service account
+$ kubectl create -f examples/storage/hazelcast/hazelcast-rolebinding.yaml
+
 $ kubectl create -f examples/storage/hazelcast/hazelcast-deployment.yaml
 ```
 
@@ -217,8 +224,10 @@ Members [4] {
 For those of you who are impatient, here is the summary of the commands we ran in this tutorial.
 
 ```sh
-kubectl create -f service.yaml
-kubectl create -f deployment.yaml
+kubectl create -f hazelcast-serviceaccount.yaml
+kubectl create -f hazelcast-rolebinding.yaml
+kubectl create -f hazelcast-service.yaml
+kubectl create -f hazelcast-deployment.yaml
 kubectl scale deployment hazelcast --replicas 2
 kubectl scale deployment hazelcast --replicas 4
 ```

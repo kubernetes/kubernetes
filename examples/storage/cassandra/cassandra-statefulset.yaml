@@ -10,6 +10,7 @@ spec:
       labels:
         app: cassandra
     spec:
+      serviceAccountName: cassandra
       containers:
       - name: cassandra
         image: gcr.io/google-samples/cassandra:v12

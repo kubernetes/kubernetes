@@ -17,6 +17,7 @@ spec:
       labels:
         app: cassandra
     spec:
+      serviceAccountName: cassandra
       containers:
         - command:
             - /run.sh

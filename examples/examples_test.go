@@ -40,6 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	expvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
+	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/registry/batch/job"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -62,6 +64,11 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = validation.ValidateService(t)
+	case *api.ServiceAccount:
+		if t.Namespace == "" {
+			t.Namespace = metav1.NamespaceDefault
+		}
+		errors = validation.ValidateServiceAccount(t)
 	case *api.ServiceList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)
@@ -137,6 +144,11 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = appsvalidation.ValidateStatefulSet(t)
+	case *rbac.RoleBinding:
+		if t.Namespace == "" {
+			t.Namespace = metav1.NamespaceDefault
+		}
+		errors = rbacvalidation.ValidateRoleBinding(t)
 	default:
 		errors = field.ErrorList{}
 		errors = append(errors, field.InternalError(field.NewPath(""), fmt.Errorf("no validation defined for %#v", obj)))
@@ -222,10 +234,12 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"rbd-with-secret": &api.Pod{},
 		},
 		"../examples/storage/cassandra": {
-			"cassandra-daemonset":   &extensions.DaemonSet{},
-			"cassandra-controller":  &api.ReplicationController{},
-			"cassandra-service":     &api.Service{},
-			"cassandra-statefulset": &apps.StatefulSet{},
+			"cassandra-daemonset":      &extensions.DaemonSet{},
+			"cassandra-controller":     &api.ReplicationController{},
+			"cassandra-service":        &api.Service{},
+			"cassandra-statefulset":    &apps.StatefulSet{},
+			"cassandra-serviceaccount": &api.ServiceAccount{},
+			"cassandra-rolebinding":    &rbac.RoleBinding{},
 		},
 		"../examples/cluster-dns": {
 			"dns-backend-rc":      &api.ReplicationController{},
@@ -243,8 +257,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"pod": &api.Pod{},
 		},
 		"../examples/storage/hazelcast": {
-			"hazelcast-deployment": &extensions.Deployment{},
-			"hazelcast-service":    &api.Service{},
+			"hazelcast-deployment":     &extensions.Deployment{},
+			"hazelcast-service":        &api.Service{},
+			"hazelcast-serviceaccount": &api.ServiceAccount{},
+			"hazelcast-rolebinding":    &rbac.RoleBinding{},
 		},
 		"../examples/meteor": {
 			"meteor-controller": &api.ReplicationController{},
@@ -292,6 +308,8 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"admin-service":  &api.Service{},
 			"driver-service": &api.Service{},
 			"rc":             &api.ReplicationController{},
+			"serviceaccount": &api.ServiceAccount{},
+			"rolebinding":    &rbac.RoleBinding{},
 		},
 		"../examples/spark": {
 			"namespace-spark-cluster":   &api.Namespace{},

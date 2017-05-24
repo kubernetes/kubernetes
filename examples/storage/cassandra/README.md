@@ -25,13 +25,15 @@ help implement the application.  In particular, in this instance, a custom
 Cassandra `SeedProvider` is used to enable Cassandra to dynamically discover
 new Cassandra nodes as they join the cluster.
 
-This example also uses some of the core components of Kubernetes:
+This example also uses some of the components of Kubernetes:
 
 - [_Pods_](../../../docs/user-guide/pods.md)
 - [ _Services_](../../../docs/user-guide/services.md)
 - [_Replication Controllers_](../../../docs/user-guide/replication-controller.md)
 - [_Stateful Sets_](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
 - [_Daemon Sets_](../../../docs/admin/daemons.md)
+- [_Service Accounts_](http://kubernetes.io/docs/user-guide/service-accounts/)
+- [_Role-Based Access Control_](http://kubernetes.io/docs/admin/authorization/rbac/)
 
 ## Prerequisites
 
@@ -68,6 +70,12 @@ here are the steps:
 # StatefulSet
 #
 
+# create a service account to run the cassandra pods
+kubectl create -f examples/storage/cassandra/cassandra-serviceaccount.yaml
+
+# create a rolebinding to give API permissions to the service account
+kubectl create -f examples/storage/cassandra/cassandra-rolebinding.yaml
+
 # create a service to track all cassandra statefulset nodes
 kubectl create -f examples/storage/cassandra/cassandra-service.yaml
 
@@ -83,10 +91,17 @@ grace=$(kubectl get po cassandra-0 --template '{{.spec.terminationGracePeriodSec
   && echo "Sleeping $grace" \
   && sleep $grace \
   && kubectl delete pvc -l app=cassandra
+kubectl delete serviceaccount,rolebinding -l app=cassandra
 
 #
 # Resource Controller Example
 #
+
+# create a service account to run the cassandra pods
+kubectl create -f examples/storage/cassandra/cassandra-serviceaccount.yaml
+
+# create a rolebinding to give API permissions to the service account
+kubectl create -f examples/storage/cassandra/cassandra-rolebinding.yaml
 
 # create a replication controller to replicate cassandra nodes
 kubectl create -f examples/storage/cassandra/cassandra-controller.yaml
@@ -99,16 +114,25 @@ kubectl scale rc cassandra --replicas=4
 
 # delete the replication controller
 kubectl delete rc cassandra
+kubectl delete serviceaccount,rolebinding -l app=cassandra
 
 #
-# Create a DaemonSet to place a cassandra node on each kubernetes node
+# DaemonSet Example
 #
 
+# create a service account to run the cassandra pods
+kubectl create -f examples/storage/cassandra/cassandra-serviceaccount.yaml
+
+# create a rolebinding to give API permissions to the service account
+kubectl create -f examples/storage/cassandra/cassandra-rolebinding.yaml
+
+# create a DaemonSet to place a cassandra node on each kubernetes node
 kubectl create -f examples/storage/cassandra/cassandra-daemonset.yaml --validate=false
 
 # resource cleanup
 kubectl delete service -l app=cassandra
 kubectl delete daemonset cassandra
+kubectl delete serviceaccount,rolebinding -l app=cassandra
 ```
 
 ## Step 1: Create a Cassandra Headless Service
@@ -284,6 +308,12 @@ parameters:
 Create the Cassandra StatefulSet as follows:
 
 ```console
+# create a service account to run the cassandra pods
+$ kubectl create -f examples/storage/cassandra/cassandra-serviceaccount.yaml
+
+# create a rolebinding to give API permissions to the service account
+$ kubectl create -f examples/storage/cassandra/cassandra-rolebinding.yaml
+
 $ kubectl create -f examples/storage/cassandra/cassandra-statefulset.yaml
 ```
 
@@ -519,6 +549,11 @@ case 2 initially.  We'll scale up to more shortly.
 Create the Replication Controller:
 
 ```console
+# create a service account to run the cassandra pods
+$ kubectl create -f examples/storage/cassandra/cassandra-serviceaccount.yaml
+
+# create a rolebinding to give API permissions to the service account
+$ kubectl create -f examples/storage/cassandra/cassandra-rolebinding.yaml
 
 $ kubectl create -f examples/storage/cassandra/cassandra-controller.yaml
 
@@ -747,6 +782,11 @@ pod relationship.
 Create this DaemonSet:
 
 ```console
+# create a service account to run the cassandra pods
+$ kubectl create -f examples/storage/cassandra/cassandra-serviceaccount.yaml
+
+# create a rolebinding to give API permissions to the service account
+$ kubectl create -f examples/storage/cassandra/cassandra-rolebinding.yaml
 
 $ kubectl create -f examples/storage/cassandra/cassandra-daemonset.yaml
 

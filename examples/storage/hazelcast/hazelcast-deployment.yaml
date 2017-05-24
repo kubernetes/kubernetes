@@ -10,6 +10,7 @@ spec:
       labels: 
         name: hazelcast
     spec: 
+      serviceAccountName: hazelcast
       containers: 
       - name: hazelcast
         image: quay.io/pires/hazelcast-kubernetes:3.8_1

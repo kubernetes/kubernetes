@@ -45,6 +45,8 @@ go_test(
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
+        "//pkg/apis/rbac:go_default_library",
+        "//pkg/apis/rbac/validation:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/registry/batch/job:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
