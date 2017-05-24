@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os/exec"
 	"strings"
 	"sync"
@@ -90,7 +89,7 @@ var execCommand = exec.Command
 // }
 //
 type gcpAuthProvider struct {
-	tokenSource oauth2.TokenSource
+	tokenSource restclient.BearerTokenSource
 	persister   restclient.AuthProviderConfigPersister
 }
 
@@ -123,13 +122,9 @@ func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restcli
 	return &gcpAuthProvider{cts, persister}, nil
 }
 
-func (g *gcpAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
-	return &oauth2.Transport{
-		Source: g.tokenSource,
-		Base:   rt,
-	}
+func (g *gcpAuthProvider) BearerTokenSource() restclient.BearerTokenSource {
+	return g.tokenSource
 }
-
 func (g *gcpAuthProvider) Login() error { return nil }
 
 type cachedTokenSource struct {
@@ -158,24 +153,27 @@ func newCachedTokenSource(accessToken, expiry string, persister restclient.AuthP
 	}, nil
 }
 
-func (t *cachedTokenSource) Token() (*oauth2.Token, error) {
+func (t *cachedTokenSource) Token() (string, error) {
 	tok := t.cachedToken()
 	if tok.Valid() && !tok.Expiry.IsZero() {
-		return tok, nil
+		return tok.AccessToken, nil
 	}
 	tok, err := t.source.Token()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	cache := t.update(tok)
 	if t.persister != nil {
 		if err := t.persister.Persist(cache); err != nil {
 			glog.V(4).Infof("Failed to persist token: %v", err)
+			return "", err
 		}
 	}
-	return tok, nil
+	return tok.AccessToken, nil
 }
-
+func (t *cachedTokenSource) Refresh() (bool, error) {
+	return false, nil
+}
 func (t *cachedTokenSource) cachedToken() *oauth2.Token {
 	t.lk.Lock()
 	defer t.lk.Unlock()

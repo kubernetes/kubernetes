@@ -270,7 +270,7 @@ func TestNewOIDCAuthProvider(t *testing.T) {
 		provider.client = tt.client
 		provider.now = func() time.Time { return t0 }
 
-		if _, err := provider.idToken(); err != nil {
+		if _, err := provider.Token(); err != nil {
 			if !tt.wantTokenErr {
 				t.Errorf("%s: failed to get id token: %v", tt.name, err)
 			}

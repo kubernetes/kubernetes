@@ -18,7 +18,6 @@ package rest
 
 import (
 	"fmt"
-	"net/http"
 	"sync"
 
 	"github.com/golang/glog"
@@ -27,12 +26,11 @@ import (
 )
 
 type AuthProvider interface {
-	// WrapTransport allows the plugin to create a modified RoundTripper that
-	// attaches authorization headers (or other info) to requests.
-	WrapTransport(http.RoundTripper) http.RoundTripper
 	// Login allows the plugin to initialize its configuration. It must not
 	// require direct user interaction.
 	Login() error
+	//used to manage the tokens
+	BearerTokenSource() BearerTokenSource
 }
 
 // Factory generates an AuthProvider plugin.

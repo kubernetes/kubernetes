@@ -58,25 +58,20 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 
 // TransportConfig converts a client config to an appropriate transport config.
 func (c *Config) TransportConfig() (*transport.Config, error) {
-	wt := c.WrapTransport
-	if c.AuthProvider != nil {
-		provider, err := GetAuthProvider(c.Host, c.AuthProvider, c.AuthConfigPersister)
-		if err != nil {
-			return nil, err
-		}
-		if wt != nil {
-			previousWT := wt
-			wt = func(rt http.RoundTripper) http.RoundTripper {
-				return provider.WrapTransport(previousWT(rt))
+	if c.BearerTokenSource == nil {
+		if c.AuthProvider != nil {
+			provider, err := GetAuthProvider(c.Host, c.AuthProvider, c.AuthConfigPersister)
+			if err != nil {
+				return nil, err
 			}
-		} else {
-			wt = provider.WrapTransport
+			c.BearerTokenSource = provider.BearerTokenSource()
 		}
 	}
+
 	return &transport.Config{
 		UserAgent:     c.UserAgent,
 		Transport:     c.Transport,
-		WrapTransport: wt,
+		WrapTransport: c.WrapTransport,
 		TLS: transport.TLSConfig{
 			Insecure:   c.Insecure,
 			ServerName: c.ServerName,
@@ -95,5 +90,6 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			Groups:   c.Impersonate.Groups,
 			Extra:    c.Impersonate.Extra,
 		},
+		TokenSource: c.BearerTokenSource,
 	}, nil
 }

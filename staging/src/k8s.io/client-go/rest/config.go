@@ -113,6 +113,24 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+
+	// BearerTokenSource for managing the token, if it's not nil, will use this to wrap the http request,
+	// if it's nil, and "AuthProvider" is not nil, we will generate one by "AuthProvider" configuration, so
+	// you can use this to manage and dynamic refresh the token.
+	BearerTokenSource BearerTokenSource
+}
+
+// BearerTokenSource for managing the token
+type BearerTokenSource interface {
+
+	// Token returns a bearer token for HTTP requests. Implementations may rotate the token
+	// returned by this method, for example, refreshing expired tokens.
+	Token() (string, error)
+
+	// Refresh is called when the REST client experiences a 401, which implies that the token is invalid
+	// or has expired. Implementations that do rotation automatically should return (false, nil) indicating
+	// the request should not be retried.
+	Refresh() (retry bool, err error)
 }
 
 // ImpersonationConfig has all the available impersonation options

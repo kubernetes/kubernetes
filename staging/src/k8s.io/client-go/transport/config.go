@@ -48,6 +48,16 @@ type Config struct {
 	// config may layer other RoundTrippers on top of the returned
 	// RoundTripper.
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
+
+	//TokenSource is used to mange the tokens
+	TokenSource BearerTokenSource
+}
+
+// BearerTokenSource is used to generate a token
+type BearerTokenSource interface {
+
+	// Token returns a bearer token for HTTP requests. Implementations may rotate the token
+	Token() (string, error)
 }
 
 // ImpersonationConfig has all the available impersonation options
@@ -68,6 +78,11 @@ func (c *Config) HasCA() bool {
 // HasBasicAuth returns whether the configuration has basic authentication or not.
 func (c *Config) HasBasicAuth() bool {
 	return len(c.Username) != 0
+}
+
+//
+func (c *Config) HasTokenSource() bool {
+	return c.TokenSource != nil
 }
 
 // HasTokenAuth returns whether the configuration has token authentication or not.

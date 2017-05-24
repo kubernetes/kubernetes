@@ -36,10 +36,9 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 	if config.WrapTransport != nil {
 		rt = config.WrapTransport(rt)
 	}
-
 	rt = DebugWrappers(rt)
-
 	// Set authentication wrappers
+	// TODO decide the priority here
 	switch {
 	case config.HasBasicAuth() && config.HasTokenAuth():
 		return nil, fmt.Errorf("username/password or bearer token may be set, but not both")
@@ -47,6 +46,8 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 		rt = NewBearerAuthRoundTripper(config.BearerToken, rt)
 	case config.HasBasicAuth():
 		rt = NewBasicAuthRoundTripper(config.Username, config.Password, rt)
+	case config.HasTokenSource():
+		rt = NewTokenSourceRoundTripper(config.TokenSource, rt)
 	}
 	if len(config.UserAgent) > 0 {
 		rt = NewUserAgentRoundTripper(config.UserAgent, rt)
@@ -421,4 +422,28 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 
 func (rt *debuggingRoundTripper) WrappedRoundTripper() http.RoundTripper {
 	return rt.delegatedRoundTripper
+}
+
+type tokenSourceRoundTripper struct {
+	wrapped     http.RoundTripper
+	tokenSource BearerTokenSource
+}
+
+func NewTokenSourceRoundTripper(tokenSource BearerTokenSource, wrapped http.RoundTripper) http.RoundTripper {
+	return &tokenSourceRoundTripper{wrapped, tokenSource}
+}
+
+func (r *tokenSourceRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if len(req.Header.Get("Authorization")) != 0 {
+		return r.wrapped.RoundTrip(req)
+	}
+	token, err := r.tokenSource.Token()
+	if err != nil {
+		return nil, err
+	}
+	// shallow copy of the struct
+	r2 := utilnet.CloneRequest(req)
+	r2.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	return r.wrapped.RoundTrip(r2)
 }

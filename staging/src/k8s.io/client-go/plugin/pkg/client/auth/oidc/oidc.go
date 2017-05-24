@@ -194,51 +194,13 @@ type oidcAuthProvider struct {
 	persister restclient.AuthProviderConfigPersister
 }
 
-func (p *oidcAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
-	return &roundTripper{
-		wrapped:  rt,
-		provider: p,
-	}
-}
-
 func (p *oidcAuthProvider) Login() error {
 	return errors.New("not yet implemented")
 }
-
-type OIDCClient interface {
-	refreshToken(rt string) (oauth2.TokenResponse, error)
-	verifyJWT(jwt *jose.JWT) error
+func (p *oidcAuthProvider) BearerTokenSource() restclient.BearerTokenSource {
+	return p
 }
-
-type roundTripper struct {
-	provider *oidcAuthProvider
-	wrapped  http.RoundTripper
-}
-
-func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if len(req.Header.Get("Authorization")) != 0 {
-		return r.wrapped.RoundTrip(req)
-	}
-	token, err := r.provider.idToken()
-	if err != nil {
-		return nil, err
-	}
-
-	// shallow copy of the struct
-	r2 := new(http.Request)
-	*r2 = *req
-	// deep copy of the Header so we don't modify the original
-	// request's Header (as per RoundTripper contract).
-	r2.Header = make(http.Header)
-	for k, s := range req.Header {
-		r2.Header[k] = s
-	}
-	r2.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-
-	return r.wrapped.RoundTrip(r2)
-}
-
-func (p *oidcAuthProvider) idToken() (string, error) {
+func (p *oidcAuthProvider) Token() (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -291,6 +253,15 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 	p.cfg = newCfg
 
 	return tokens.IDToken, nil
+}
+
+func (p *oidcAuthProvider) Refresh() (bool, error) {
+	return false, nil
+}
+
+type OIDCClient interface {
+	refreshToken(rt string) (oauth2.TokenResponse, error)
+	verifyJWT(jwt *jose.JWT) error
 }
 
 // oidcClient is the real implementation of the OIDCClient interface, which is
