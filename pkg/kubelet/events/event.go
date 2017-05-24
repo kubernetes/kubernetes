@@ -81,9 +81,10 @@ const (
 	FailedValidation = "FailedValidation"
 
 	// Lifecycle hooks
-	FailedPostStartHook   = "FailedPostStartHook"
-	FailedPreStopHook     = "FailedPreStopHook"
-	UnfinishedPreStopHook = "UnfinishedPreStopHook"
+	FailedPostStartHook         = "FailedPostStartHook"
+	FailedPreStopHook           = "FailedPreStopHook"
+	UnfinishedPreStopHook       = "UnfinishedPreStopHook"
+	FailedRetryUntilSuccessHook = "FailedRetryUntilSuccessHook"
 )
 
 // ToObjectReference takes an old style object reference and converts it to a client-go one

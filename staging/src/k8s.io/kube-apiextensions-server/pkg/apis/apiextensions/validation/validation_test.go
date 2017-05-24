@@ -29,11 +29,17 @@ type validationMatch struct {
 	errorType field.ErrorType
 }
 
-func required(path *field.Path) validationMatch {
-	return validationMatch{path: path, errorType: field.ErrorTypeRequired}
+func required(path ...string) validationMatch {
+	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeRequired}
 }
-func invalid(path *field.Path) validationMatch {
-	return validationMatch{path: path, errorType: field.ErrorTypeInvalid}
+func invalid(path ...string) validationMatch {
+	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeInvalid}
+}
+func unsupported(path ...string) validationMatch {
+	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeNotSupported}
+}
+func immutable(path ...string) validationMatch {
+	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeInvalid}
 }
 
 func (v validationMatch) matches(err *field.Error) bool {
@@ -58,7 +64,12 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				},
 			},
 			errors: []validationMatch{
-				invalid(field.NewPath("metadata", "name")),
+				invalid("metadata", "name"),
+				required("spec", "version"),
+				required("spec", "scope"),
+				required("spec", "names", "singular"),
+				required("spec", "names", "kind"),
+				required("spec", "names", "listKind"),
 			},
 		},
 		{
@@ -67,13 +78,14 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
 			},
 			errors: []validationMatch{
-				required(field.NewPath("spec", "group")),
-				required(field.NewPath("spec", "version")),
-				{path: field.NewPath("spec", "scope"), errorType: field.ErrorTypeNotSupported},
-				required(field.NewPath("spec", "names", "plural")),
-				required(field.NewPath("spec", "names", "singular")),
-				required(field.NewPath("spec", "names", "kind")),
-				required(field.NewPath("spec", "names", "listKind")),
+				invalid("metadata", "name"),
+				required("spec", "group"),
+				required("spec", "version"),
+				required("spec", "scope"),
+				required("spec", "names", "plural"),
+				required("spec", "names", "singular"),
+				required("spec", "names", "kind"),
+				required("spec", "names", "listKind"),
 			},
 		},
 		{
@@ -101,17 +113,20 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				},
 			},
 			errors: []validationMatch{
-				invalid(field.NewPath("spec", "group")),
-				invalid(field.NewPath("spec", "version")),
-				{path: field.NewPath("spec", "scope"), errorType: field.ErrorTypeNotSupported},
-				invalid(field.NewPath("spec", "names", "plural")),
-				invalid(field.NewPath("spec", "names", "singular")),
-				invalid(field.NewPath("spec", "names", "kind")),
-				invalid(field.NewPath("spec", "names", "listKind")),
-				invalid(field.NewPath("status", "acceptedNames", "plural")),
-				invalid(field.NewPath("status", "acceptedNames", "singular")),
-				invalid(field.NewPath("status", "acceptedNames", "kind")),
-				invalid(field.NewPath("status", "acceptedNames", "listKind")),
+				invalid("metadata", "name"),
+				invalid("spec", "group"),
+				invalid("spec", "version"),
+				unsupported("spec", "scope"),
+				invalid("spec", "names", "plural"),
+				invalid("spec", "names", "singular"),
+				invalid("spec", "names", "kind"),
+				invalid("spec", "names", "listKind"), // invalid format
+				invalid("spec", "names", "listKind"), // kind == listKind
+				invalid("status", "acceptedNames", "plural"),
+				invalid("status", "acceptedNames", "singular"),
+				invalid("status", "acceptedNames", "kind"),
+				invalid("status", "acceptedNames", "listKind"), // invalid format
+				invalid("status", "acceptedNames", "listKind"), // kind == listKind
 			},
 		},
 		{
@@ -138,27 +153,307 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				},
 			},
 			errors: []validationMatch{
-				invalid(field.NewPath("spec", "group")),
-				invalid(field.NewPath("spec", "names", "listKind")),
-				invalid(field.NewPath("status", "acceptedNames", "listKind")),
+				invalid("metadata", "name"),
+				invalid("spec", "group"),
+				required("spec", "scope"),
+				invalid("spec", "names", "listKind"),
+				invalid("status", "acceptedNames", "listKind"),
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		errs := ValidateCustomResourceDefinition(tc.resource)
+		seenErrs := make([]bool, len(errs))
 
 		for _, expectedError := range tc.errors {
 			found := false
-			for _, err := range errs {
-				if expectedError.matches(err) {
+			for i, err := range errs {
+				if expectedError.matches(err) && !seenErrs[i] {
 					found = true
+					seenErrs[i] = true
 					break
 				}
 			}
 
 			if !found {
 				t.Errorf("%s: expected %v at %v, got %v", tc.name, expectedError.errorType, expectedError.path.String(), errs)
+			}
+		}
+
+		for i, seen := range seenErrs {
+			if !seen {
+				t.Errorf("%s: unexpected error: %v", tc.name, errs[i])
+			}
+		}
+	}
+}
+
+func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
+	tests := []struct {
+		name     string
+		old      *apiextensions.CustomResourceDefinition
+		resource *apiextensions.CustomResourceDefinition
+		errors   []validationMatch
+	}{
+		{
+			name: "unchanged",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Scope:   apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Scope:   apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+			},
+			errors: []validationMatch{},
+		},
+		{
+			name: "unchanged-established",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Scope:   apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionTrue},
+					},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Scope:   apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+			},
+			errors: []validationMatch{},
+		},
+		{
+			name: "changes",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Scope:   apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionFalse},
+					},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "abc.com",
+					Version: "version2",
+					Scope:   apiextensions.ResourceScope("Namespaced"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural2",
+						Singular: "singular2",
+						Kind:     "kind2",
+						ListKind: "listkind2",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural2",
+						Singular: "singular2",
+						Kind:     "kind2",
+						ListKind: "listkind2",
+					},
+				},
+			},
+			errors: []validationMatch{
+				immutable("spec", "group"),
+				immutable("spec", "names", "plural"),
+			},
+		},
+		{
+			name: "changes-established",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Scope:   apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionTrue},
+					},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "abc.com",
+					Version: "version2",
+					Scope:   apiextensions.ResourceScope("Namespaced"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural2",
+						Singular: "singular2",
+						Kind:     "kind2",
+						ListKind: "listkind2",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural2",
+						Singular: "singular2",
+						Kind:     "kind2",
+						ListKind: "listkind2",
+					},
+				},
+			},
+			errors: []validationMatch{
+				immutable("spec", "group"),
+				immutable("spec", "version"),
+				immutable("spec", "scope"),
+				immutable("spec", "names", "kind"),
+				immutable("spec", "names", "plural"),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		errs := ValidateCustomResourceDefinitionUpdate(tc.resource, tc.old)
+		seenErrs := make([]bool, len(errs))
+
+		for _, expectedError := range tc.errors {
+			found := false
+			for i, err := range errs {
+				if expectedError.matches(err) && !seenErrs[i] {
+					found = true
+					seenErrs[i] = true
+					break
+				}
+			}
+
+			if !found {
+				t.Errorf("%s: expected %v at %v, got %v", tc.name, expectedError.errorType, expectedError.path.String(), errs)
+			}
+		}
+
+		for i, seen := range seenErrs {
+			if !seen {
+				t.Errorf("%s: unexpected error: %v", tc.name, errs[i])
 			}
 		}
 	}

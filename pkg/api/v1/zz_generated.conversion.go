@@ -1901,6 +1901,7 @@ func Convert_api_KeyToPath_To_v1_KeyToPath(in *api.KeyToPath, out *KeyToPath, s 
 func autoConvert_v1_Lifecycle_To_api_Lifecycle(in *Lifecycle, out *api.Lifecycle, s conversion.Scope) error {
 	out.PostStart = (*api.Handler)(unsafe.Pointer(in.PostStart))
 	out.PreStop = (*api.Handler)(unsafe.Pointer(in.PreStop))
+	out.RetryUntilSuccess = (*api.Handler)(unsafe.Pointer(in.RetryUntilSuccess))
 	return nil
 }
 
@@ -1912,6 +1913,7 @@ func Convert_v1_Lifecycle_To_api_Lifecycle(in *Lifecycle, out *api.Lifecycle, s 
 func autoConvert_api_Lifecycle_To_v1_Lifecycle(in *api.Lifecycle, out *Lifecycle, s conversion.Scope) error {
 	out.PostStart = (*Handler)(unsafe.Pointer(in.PostStart))
 	out.PreStop = (*Handler)(unsafe.Pointer(in.PreStop))
+	out.RetryUntilSuccess = (*Handler)(unsafe.Pointer(in.RetryUntilSuccess))
 	return nil
 }
 

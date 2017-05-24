@@ -1819,6 +1819,14 @@ type Lifecycle struct {
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
 	PreStop *Handler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
+	// RetryUntilSuccess is called immediately before a container is terminated.
+	// The container is terminated after the handler completes.
+	// The reason for termination is passed to the handler.
+	// Regardless of the outcome of the handler, the container is eventually terminated.
+	// Other management of the container blocks until the hook completes.
+	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
+	// +optional
+	RetryUntilSuccess *Handler `json:"retryUntilSuccess,omitempty" protobuf:"bytes,3,opt,name=retryUntilSuccess"`
 }
 
 type ConditionStatus string
