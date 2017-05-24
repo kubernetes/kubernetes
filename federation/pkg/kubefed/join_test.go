@@ -475,7 +475,7 @@ func fakeJoinTargetClusterFactory(clusterName, clusterCtx, dnsProvider, tmpDirPa
 		},
 	}
 
-	roleName := util.ClusterRoleName(saName)
+	roleName := util.ClusterRoleName(testFederationName, saName)
 	clusterRole := rbacv1beta1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      roleName,
@@ -595,7 +595,7 @@ func fakeCluster(clusterName, secretName, server string, isRBACAPIAvailable bool
 		saName := serviceAccountName(clusterName)
 		annotations := map[string]string{
 			kubectl.ServiceAccountNameAnnotation: saName,
-			kubectl.ClusterRoleNameAnnotation:    util.ClusterRoleName(saName),
+			kubectl.ClusterRoleNameAnnotation:    util.ClusterRoleName(testFederationName, saName),
 		}
 		cluster.ObjectMeta.SetAnnotations(annotations)
 	}

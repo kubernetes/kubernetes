@@ -593,7 +593,7 @@ func createServiceAccount(clusterClientset internalclientset.Interface, namespac
 // service account identified by saName to access all resources in all namespaces
 // in the cluster associated with clusterClientset.
 func createClusterRoleBinding(clusterClientset internalclientset.Interface, saName, namespace, federationName, joiningClusterName string, dryRun bool) (*rbac.ClusterRoleBinding, error) {
-	roleName := util.ClusterRoleName(saName)
+	roleName := util.ClusterRoleName(federationName, saName)
 	role := &rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      roleName,
