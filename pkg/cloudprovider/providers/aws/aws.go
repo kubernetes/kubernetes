@@ -287,11 +287,14 @@ const (
 
 // VolumeOptions specifies capacity and tags for a volume.
 type VolumeOptions struct {
-	CapacityGB       int
-	Tags             map[string]string
-	PVCName          string
-	VolumeType       string
-	AvailabilityZone string
+	CapacityGB        int
+	Tags              map[string]string
+	PVCName           string
+	VolumeType        string
+	ZonePresent       bool
+	ZonesPresent      bool
+	AvailabilityZone  string
+	AvailabilityZones string
 	// IOPSPerGB x CapacityGB will give total IOPS of the volume to create.
 	// Calculated total IOPS will be capped at MaxTotalIOPS.
 	IOPSPerGB int
@@ -1675,9 +1678,22 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 		return "", fmt.Errorf("error querying for all zones: %v", err)
 	}
 
-	createAZ := volumeOptions.AvailabilityZone
-	if createAZ == "" {
+	var createAZ string
+	if !volumeOptions.ZonePresent && !volumeOptions.ZonesPresent {
 		createAZ = volume.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
+	}
+	if !volumeOptions.ZonePresent && volumeOptions.ZonesPresent {
+		if adminSetOfZones, err := volume.ZonesToSet(volumeOptions.AvailabilityZones); err != nil {
+			return "", err
+		} else {
+			createAZ = volume.ChooseZoneForVolume(adminSetOfZones, volumeOptions.PVCName)
+		}
+	}
+	if volumeOptions.ZonePresent && !volumeOptions.ZonesPresent {
+		if err := volume.ValidateZone(volumeOptions.AvailabilityZone); err != nil {
+			return "", err
+		}
+		createAZ = volumeOptions.AvailabilityZone
 	}
 
 	var createType string
