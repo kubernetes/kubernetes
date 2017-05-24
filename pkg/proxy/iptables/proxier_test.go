@@ -658,14 +658,14 @@ func TestNodePortReject(t *testing.T) {
 	svcIP := net.IPv4(10, 20, 30, 41)
 
 	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "p80"}
-	svcInfo := newFakeServiceInfo(svc, svcIP, 80, api.ProtocolTCP, false)
+	svcInfo := newFakeServiceInfo(svc, svcIP, api.ProtocolTCP, false)
 	svcInfo.nodePort = 3001
 	fp.serviceMap[svc] = svcInfo
 
 	fp.syncProxyRules()
 
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
-	if !hasJump(kubeSvcRules, iptablestest.Reject, svcIP.String(), 3001) {
+	if !hasJump(kubeSvcRules, iptablestest.Reject, svcIP.String(), "3001") {
 		errorf(fmt.Sprintf("Failed to find a %v rule for service %v with no endpoints", iptablestest.Reject, svcName), kubeSvcRules, t)
 	}
 }
