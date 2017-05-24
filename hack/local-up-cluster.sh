@@ -33,8 +33,10 @@ POD_MANIFEST_PATH=${POD_MANIFEST_PATH:-"/var/run/kubernetes/static-pods"}
 KUBELET_FLAGS=${KUBELET_FLAGS:-""}
 # Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
-# Place the binaries required by NET_PLUGIN in this directory, eg: "/home/kubernetes/bin".
-NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
+# Place the config files and binaries required by NET_PLUGIN in these directory,
+# eg: "/etc/cni/net.d" for config files, and "/opt/cni/bin" for binaries.
+CNI_CONF_DIR=${CNI_CONF_DIR:-""}
+CNI_BIN_DIR=${CNI_BIN_DIR:-""}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 # if enabled, must set CGROUP_ROOT
@@ -625,9 +627,14 @@ function start_kubelet {
         auth_args="${auth_args} --client-ca-file=${CLIENT_CA_FILE}"
       fi
 
-      net_plugin_dir_args=""
-      if [[ -n "${NET_PLUGIN_DIR}" ]]; then
-        net_plugin_dir_args="--network-plugin-dir=${NET_PLUGIN_DIR}"
+      cni_conf_dir_args=""
+      if [[ -n "${CNI_CONF_DIR}" ]]; then
+        cni_conf_dir_args="--cni-conf-dir=${CNI_CONF_DIR}"
+      fi
+
+      cni_bin_dir_args=""
+      if [[ -n "${CNI_BIN_DIR}" ]]; then
+        cni_bin_dir_args="--cni-bin-dir=${CNI_BIN_DIR}"
       fi
 
       container_runtime_endpoint_args=""
@@ -664,7 +671,8 @@ function start_kubelet {
         --pod-manifest-path="${POD_MANIFEST_PATH}" \
         ${auth_args} \
         ${dns_args} \
-        ${net_plugin_dir_args} \
+        ${cni_conf_dir_args} \
+        ${cni_bin_dir_args} \
         ${net_plugin_args} \
         ${container_runtime_endpoint_args} \
         ${image_service_endpoint_args} \

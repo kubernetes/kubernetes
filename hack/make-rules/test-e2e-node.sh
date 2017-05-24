@@ -148,7 +148,7 @@ else
 
   # Do not use any network plugin by default. User could override the flags with
   # test_args.
-  test_args='--kubelet-flags="--network-plugin= --network-plugin-dir=" '$test_args
+  test_args='--kubelet-flags="--network-plugin= --cni-bin-dir=" '$test_args
 
   # Runtime flags
   test_args='--kubelet-flags="--container-runtime='$runtime'" '$test_args

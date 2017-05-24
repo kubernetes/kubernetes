@@ -708,11 +708,7 @@ function start-kubelet {
   fi
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
-    if [[ "${NETWORK_PROVIDER:-}" == "cni" || "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
-      flags+=" --cni-bin-dir=/home/kubernetes/bin"
-    else
-      flags+=" --network-plugin-dir=/home/kubernetes/bin"
-    fi
+    flags+=" --cni-bin-dir=/home/kubernetes/bin"
     if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
       # Calico uses CNI always.
       flags+=" --network-plugin=cni"
