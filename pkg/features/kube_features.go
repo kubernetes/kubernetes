@@ -44,13 +44,6 @@ const (
 	// alpha: v1.4
 	DynamicKubeletConfig utilfeature.Feature = "DynamicKubeletConfig"
 
-	// owner: timstclair
-	// alpha: v1.5
-	//
-	// StreamingProxyRedirects controls whether the apiserver should intercept (and follow)
-	// redirects from the backend (Kubelet) for streaming requests (exec/attach/port-forward).
-	StreamingProxyRedirects utilfeature.Feature = genericfeatures.StreamingProxyRedirects
-
 	// owner: @pweil-
 	// alpha: v1.5
 	//
@@ -117,5 +110,5 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
+	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.GA},
 }

@@ -43,8 +43,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/proxy"
 )
 
@@ -402,8 +400,6 @@ func TestProxyUpgrade(t *testing.T) {
 		},
 	}
 
-	// Enable StreamingProxyRedirects for test.
-	utilfeature.DefaultFeatureGate.Set(string(features.StreamingProxyRedirects) + "=true")
 	for k, tc := range testcases {
 		for _, redirect := range []bool{false, true} {
 			tcName := k
