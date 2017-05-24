@@ -329,6 +329,16 @@ func TestResultIntoWithErrReturnsErr(t *testing.T) {
 	}
 }
 
+func TestResultIntoWithNoBodyReturnsErr(t *testing.T) {
+	res := Result{
+		body:    []byte{},
+		decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+	}
+	if err := res.Into(&v1.Pod{}); err == nil || !strings.Contains(err.Error(), "0-length") {
+		t.Errorf("should have complained about 0 length body")
+	}
+}
+
 func TestURLTemplate(t *testing.T) {
 	uri, _ := url.Parse("http://localhost")
 	r := NewRequest(nil, "POST", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil)

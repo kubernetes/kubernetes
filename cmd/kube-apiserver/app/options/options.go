@@ -214,10 +214,18 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"e.g., setting empty UID in update request to its existing value. This flag can be turned off "+
 		"after we fix all the clients that send malformed updates.")
 
-	fs.StringVar(&s.ProxyClientCertFile, "proxy-client-cert-file", s.ProxyClientCertFile,
-		"client certificate used to prove the identity of the aggragator or kube-apiserver when it proxies requests to a user api-server")
-	fs.StringVar(&s.ProxyClientKeyFile, "proxy-client-key-file", s.ProxyClientKeyFile,
-		"client certificate key used to prove the identity of the aggragator or kube-apiserver when it proxies requests to a user api-server")
+	fs.StringVar(&s.ProxyClientCertFile, "proxy-client-cert-file", s.ProxyClientCertFile, ""+
+		"Client certificate used to prove the identity of the aggregator or kube-apiserver "+
+		"when it must call out during a request. This includes proxying requests to a user "+
+		"api-server and calling out to webhook admission plugins. It is expected that this "+
+		"cert includes a signature from the CA in the --requestheader-client-ca-file flag. "+
+		"That CA is published in the 'extension-apiserver-authentication' configmap in "+
+		"the kube-system namespace. Components recieving calls from kube-aggregator should "+
+		"use that CA to perform their half of the mutual TLS verification.")
+	fs.StringVar(&s.ProxyClientKeyFile, "proxy-client-key-file", s.ProxyClientKeyFile, ""+
+		"Private key for the client certificate used to prove the identity of the aggregator or kube-apiserver "+
+		"when it must call out during a request. This includes proxying requests to a user "+
+		"api-server and calling out to webhook admission plugins.")
 
 	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
 		"Turns on aggregator routing requests to endoints IP rather than cluster IP.")

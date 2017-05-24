@@ -381,6 +381,10 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	// k8s.io/kubernetes/pkg/apis/policy/v1beta1
 	gvr("policy", "v1beta1", "evictions"), // not stored in etcd, deals with evicting kapiv1.Pod
 	// --
+
+	// k8s.io/kubernetes/pkg/apis/admission/v1alpha1
+	gvr("admission.k8s.io", "v1alpha1", "admissionreviews"), // not stored in etcd, call out to webhooks.
+	// --
 )
 
 // Only add kinds to this list when there is no mapping from GVK to GVR (and thus there is no way to create the object)

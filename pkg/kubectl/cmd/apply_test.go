@@ -987,9 +987,8 @@ func TestRunApplySetLastApplied(t *testing.T) {
 		if buf.String() != test.expectedOut {
 			t.Fatalf("%s: unexpected output: %s\nexpected: %s", test.name, buf.String(), test.expectedOut)
 		}
-
 	}
-
+	cmdutil.BehaviorOnFatal(func(str string, code int) {})
 }
 
 func checkPatchString(t *testing.T, req *http.Request) {
