@@ -169,18 +169,6 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 	}, nil
 }
 
-func getKubeClient(s *options.KubeletServer) (*clientset.Clientset, error) {
-	clientConfig, err := CreateAPIServerClientConfig(s)
-	if err == nil {
-		kubeClient, err := clientset.NewForConfig(clientConfig)
-		if err != nil {
-			return nil, err
-		}
-		return kubeClient, nil
-	}
-	return nil, err
-}
-
 // Run runs the specified KubeletServer with the given KubeletDeps.  This should never exit.
 // The kubeDeps argument may be nil - if so, it is initialized from the settings on KubeletServer.
 // Otherwise, the caller is assumed to have set up the KubeletDeps object and a default one will
@@ -239,41 +227,7 @@ func validateConfig(s *options.KubeletServer) error {
 	return nil
 }
 
-// makeEventRecorder sets up kubeDeps.Recorder if its nil. Its a no-op otherwise.
-func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, nodeName types.NodeName) {
-	if kubeDeps.Recorder != nil {
-		return
-	}
-	eventBroadcaster := record.NewBroadcaster()
-	kubeDeps.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: componentKubelet, Host: string(nodeName)})
-	eventBroadcaster.StartLogging(glog.V(3).Infof)
-	if kubeDeps.EventClient != nil {
-		glog.V(4).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
-	} else {
-		glog.Warning("No api server defined - no events will be sent to API server.")
-	}
-}
-
-// Returns the most likely identifer for the current Node
-func curNodeIdentifier(s *options.KubeletServer, kd *kubelet.KubeletDeps) (string, error) {
-	hostname := nodeutil.GetHostname(s.HostnameOverride)
-	if kd != nil && kd.Cloud != nil {
-		instances, ok := kd.Cloud.Instances()
-		if !ok {
-			err := fmt.Errorf("failed to get instances from cloud provider, can't determine nodename")
-			return "", err
-		}
-		nodename, err := instances.CurrentNodeName(hostname)
-		if err != nil {
-			return "", fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
-		}
-		return string(nodename), nil
-	}
-	return hostname, nil
-}
-
-func initConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps, standaloneMode bool) error {
+func initNodeConfigController(s *options.KubeletServer, client clientset.Interface, nodeName string, standaloneMode bool) error {
 	// Set feature gates based on the value in KubeletConfiguration
 	err := utilfeature.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
@@ -311,15 +265,7 @@ func initConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps, standal
 
 		var ncc *nodeconfig.NodeConfigController
 		if useDynamicConfig {
-			client, err := getKubeClient(s)
-			if err != nil {
-				return err
-			}
-			nodeID, err := curNodeIdentifier(s, kubeDeps)
-			if err != nil {
-				return err
-			}
-			ncc = nodeconfig.NewNodeConfigController(client, nodeID, nodeConfigDir, flagCfg)
+			ncc = nodeconfig.NewNodeConfigController(client, nodeName, nodeConfigDir, flagCfg)
 		} else {
 			// pass a nil client to disable fetching configuration dynamically
 			ncc = nodeconfig.NewNodeConfigController(nil, "", nodeConfigDir, flagCfg)
@@ -361,6 +307,22 @@ func initConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps, standal
 	return nil
 }
 
+// makeEventRecorder sets up kubeDeps.Recorder if its nil. Its a no-op otherwise.
+func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, nodeName types.NodeName) {
+	if kubeDeps.Recorder != nil {
+		return
+	}
+	eventBroadcaster := record.NewBroadcaster()
+	kubeDeps.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: componentKubelet, Host: string(nodeName)})
+	eventBroadcaster.StartLogging(glog.V(3).Infof)
+	if kubeDeps.EventClient != nil {
+		glog.V(4).Infof("Sending events to api server.")
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
+	} else {
+		glog.Warning("No api server defined - no events will be sent to API server.")
+	}
+}
+
 func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	// TODO: this should be replaced by a --standalone flag
 	standaloneMode := (len(s.APIServerList) == 0 && !s.RequireKubeConfig)
@@ -383,84 +345,81 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		}
 	}
 
-	// TODO(mtaufen): Move bootstrap kubeconfig logic to before dynamic config init.
-	// Only want the bare-minimum stuff to get a client here.
-
-	err = initConfig(s, kubeDeps, standaloneMode)
-	if err != nil {
-		return err
-	}
-
+	// Spin up the NodeConfigController with whatever client we can get this early
+	var nodeName types.NodeName
 	if kubeDeps == nil {
-		var kubeClient clientset.Interface
-		var eventClient v1core.EventsGetter
-		var externalKubeClient clientgoclientset.Interface
-		var cloud cloudprovider.Interface
-
-		if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != componentconfigv1alpha1.AutoDetectCloudProvider {
-			cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-			if err != nil {
-				return err
-			}
-			if cloud == nil {
-				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-			} else {
-				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-			}
-		}
-
-		nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+		// Determine the cloud provider and nodeName based on the configuration that was passed in via defaults and flags.
+		// Once the config controller has had a chance to return a more up-to-date configuration, these will be regenerated.
+		cloud, err := getCloud(s)
 		if err != nil {
 			return err
 		}
-
+		nodeName, err = getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+		if err != nil {
+			return err
+		}
+		// bootstrap kubeconfig may be necessary to get a client
 		if s.BootstrapKubeconfig != "" {
 			if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
 				return err
 			}
 		}
+		// Get a client and a cloud based on the configuration that was passed in via defaults and flags.
+		// Once the config controller has had a chance to return a more up-to-date configuration, these will be regenerated.
+		kubeClient, _, _, err := getClients(s, standaloneMode)
+		if err != nil {
+			return err
+		}
+		// Ensure that `s` contains an up-to-date, valid KubeletConfiguration
+		err = initNodeConfigController(s, kubeClient, string(nodeName), standaloneMode)
+		if err != nil {
+			return err
+		}
+	} else {
+		nodeName, err = getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+		if err != nil {
+			return err
+		}
+		// Ensure that `s` contains an up-to-date, valid KubeletConfiguration
+		err := initNodeConfigController(s, kubeDeps.KubeClient, string(nodeName), standaloneMode)
+		if err != nil {
+			return err
+		}
+	}
 
-		clientConfig, err := CreateAPIServerClientConfig(s)
-		if err == nil {
-			kubeClient, err = clientset.NewForConfig(clientConfig)
-			if err != nil {
-				glog.Warningf("New kubeClient from clientConfig error: %v", err)
-			}
-			externalKubeClient, err = clientgoclientset.NewForConfig(clientConfig)
-			if err != nil {
-				glog.Warningf("New kubeClient from clientConfig error: %v", err)
-			}
-			// make a separate client for events
-			eventClientConfig := *clientConfig
-			eventClientConfig.QPS = float32(s.EventRecordQPS)
-			eventClientConfig.Burst = int(s.EventBurst)
-			eventClient, err = clientgoclientset.NewForConfig(&eventClientConfig)
-			if err != nil {
-				glog.Warningf("Failed to create API Server client: %v", err)
-			}
-		} else {
-			if s.RequireKubeConfig {
-				return fmt.Errorf("invalid kubeconfig: %v", err)
-			}
-			if standaloneMode {
-				glog.Warningf("No API client: %v", err)
+	// Continue setting the rest of things up now that we have a valid configuration,
+	// if kubeDeps isn't overriding, the kubeClient will be regenerated using the most recent config
+	if kubeDeps == nil {
+		cloud, err := getCloud(s)
+		if err != nil {
+			return err
+		}
+		nodeName, err = getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+		if err != nil {
+			return err
+		}
+		if s.BootstrapKubeconfig != "" {
+			if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
+				return err
 			}
 		}
-
+		kubeClient, externalKubeClient, eventClient, err := getClients(s, standaloneMode)
+		if err != nil {
+			return err
+		}
 		kubeDeps, err = UnsecuredKubeletDeps(s)
 		if err != nil {
 			return err
 		}
-
 		kubeDeps.Cloud = cloud
 		kubeDeps.KubeClient = kubeClient
 		kubeDeps.ExternalKubeClient = externalKubeClient
 		kubeDeps.EventClient = eventClient
-	}
-
-	nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
-	if err != nil {
-		return err
+	} else {
+		nodeName, err = getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+		if err != nil {
+			return err
+		}
 	}
 
 	if kubeDeps.Auth == nil {
@@ -570,6 +529,48 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 	<-done
 	return nil
+}
+
+func getCloud(s *options.KubeletServer) (cloud cloudprovider.Interface, err error) {
+	if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != componentconfigv1alpha1.AutoDetectCloudProvider {
+		cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+		if err != nil {
+			return
+		}
+		if cloud == nil {
+			glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+		} else {
+			glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+		}
+	}
+	return
+}
+
+func getClients(s *options.KubeletServer, standaloneMode bool) (kubeClient clientset.Interface, externalKubeClient clientgoclientset.Interface, eventClient v1core.EventsGetter, retErr error) {
+	clientConfig, err := CreateAPIServerClientConfig(s)
+	if err == nil {
+		kubeClient, err = clientset.NewForConfig(clientConfig)
+		if err != nil {
+			glog.Warningf("New kubeClient from clientConfig error: %v", err)
+		}
+		externalKubeClient, err = clientgoclientset.NewForConfig(clientConfig)
+		if err != nil {
+			glog.Warningf("New kubeClient from clientConfig error: %v", err)
+		}
+		// make a separate client for events
+		eventClientConfig := *clientConfig
+		eventClientConfig.QPS = float32(s.EventRecordQPS)
+		eventClientConfig.Burst = int(s.EventBurst)
+		eventClient, err = clientgoclientset.NewForConfig(&eventClientConfig)
+		if err != nil {
+			glog.Warningf("Failed to create API Server client: %v", err)
+		}
+	} else if s.RequireKubeConfig {
+		retErr = fmt.Errorf("invalid kubeconfig: %v", err)
+	} else if standaloneMode {
+		glog.Warningf("No API client: %v", err)
+	}
+	return
 }
 
 // getNodeName returns the node name according to the cloud provider
