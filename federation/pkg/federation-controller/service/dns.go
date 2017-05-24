@@ -333,28 +333,23 @@ func findRrset(list []dnsprovider.ResourceRecordSet, rrset dnsprovider.ResourceR
    non-nil error is also returned (possibly along with a partially complete list of resolved endpoints.
 */
 func getResolvedEndpoints(endpoints []string) ([]string, error) {
-	resolvedEndpoints := make([]string, 0, len(endpoints))
+	resolvedEndpoints := sets.String{}
 	for _, endpoint := range endpoints {
 		if net.ParseIP(endpoint) == nil {
 			// It's not a valid IP address, so assume it's a DNS name, and try to resolve it,
 			// replacing its DNS name with its IP addresses in expandedEndpoints
 			ipAddrs, err := net.LookupHost(endpoint)
 			if err != nil {
-				return resolvedEndpoints, err
+				return resolvedEndpoints.List(), err
 			}
-			resolvedEndpoints = append(resolvedEndpoints, ipAddrs...)
+			for _, ip := range ipAddrs {
+				resolvedEndpoints = resolvedEndpoints.Union(sets.NewString(ip))
+			}
 		} else {
-			resolvedEndpoints = append(resolvedEndpoints, endpoint)
+			resolvedEndpoints = resolvedEndpoints.Union(sets.NewString(endpoint))
 		}
 	}
-	deduped := sets.String{}
-
-	for _, endpoint := range resolvedEndpoints {
-		if !deduped.Has(endpoint) {
-			deduped.Insert(endpoint)
-		}
-	}
-	return deduped.List(), nil
+	return resolvedEndpoints.List(), nil
 }
 
 /* ensureDNSRrsets ensures (idempotently, and with minimum mutations) that all of the DNS resource record sets for dnsName are consistent with endpoints.
