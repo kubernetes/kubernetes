@@ -388,7 +388,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 	elems := make([]*elemForDecode, 0, len(getResp.Kvs))
 	for _, kv := range getResp.Kvs {
-		data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(key))
+		data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(kv.Key))
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("unable to transform key %q: %v", key, err))
 			continue

@@ -58,7 +58,7 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 	}
 	transformer := c.Transformer
 	if transformer == nil {
-		transformer = value.IdentityTransformer
+		transformer = value.NewMutableTransformer(value.IdentityTransformer)
 	}
 	if c.Quorum {
 		return etcd3.New(client, c.Codec, c.Prefix, transformer), destroyFunc, nil

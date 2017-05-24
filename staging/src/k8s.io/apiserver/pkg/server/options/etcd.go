@@ -30,7 +30,8 @@ import (
 )
 
 type EtcdOptions struct {
-	StorageConfig storagebackend.Config
+	StorageConfig                    storagebackend.Config
+	EncryptionProviderConfigFilepath string
 
 	EtcdServersOverrides []string
 
@@ -109,6 +110,9 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.StorageConfig.Quorum, "etcd-quorum-read", s.StorageConfig.Quorum,
 		"If true, enable quorum read.")
+
+	fs.StringVar(&s.EncryptionProviderConfigFilepath, "experimental-encryption-provider-config", s.EncryptionProviderConfigFilepath,
+		"The file containing configuration for encryption providers to be used for storing secrets in etcd")
 }
 
 func (s *EtcdOptions) ApplyTo(c *server.Config) error {
