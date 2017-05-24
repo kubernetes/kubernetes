@@ -87,6 +87,9 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 			return
 		}
 
+		ev.Stage = auditinternal.StageRequestReceived
+		sink.ProcessEvents(ev)
+
 		// intercept the status code
 		longRunning := false
 		var longRunningSink audit.Sink
@@ -115,6 +118,7 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 				}
 			}
 
+			ev.Stage = auditinternal.StageResponseComplete
 			sink.ProcessEvents(ev)
 		}()
 		handler.ServeHTTP(respWriter, req)
@@ -152,17 +156,15 @@ type auditResponseWriter struct {
 
 func (a *auditResponseWriter) processCode(code int) {
 	a.once.Do(func() {
-		if a.sink != nil {
-			a.sink.ProcessEvents(a.event)
-		}
-
-		// for now we use the ResponseStatus as marker that it's the first or second event
-		// of a long running request. As soon as we have such a field in the event, we can
-		// change this.
 		if a.event.ResponseStatus == nil {
 			a.event.ResponseStatus = &metav1.Status{}
 		}
 		a.event.ResponseStatus.Code = int32(code)
+		a.event.Stage = auditinternal.StageResponseStarted
+
+		if a.sink != nil {
+			a.sink.ProcessEvents(a.event)
+		}
 	})
 }
 
