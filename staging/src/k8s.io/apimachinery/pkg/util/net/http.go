@@ -209,6 +209,21 @@ func GetClientIP(req *http.Request) net.IP {
 	return ips[0]
 }
 
+// Prepares the X-Forwarded-For header for another forwarding hop by appending the previous sender's
+// IP address to the X-Forwarded-For chain.
+func AppendForwardedForHeader(req *http.Request) {
+	// Copied from net/http/httputil/reverseproxy.go:
+	if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+		// If we aren't the first proxy retain prior
+		// X-Forwarded-For information as a comma+space
+		// separated list and fold multiple headers into one.
+		if prior, ok := req.Header["X-Forwarded-For"]; ok {
+			clientIP = strings.Join(prior, ", ") + ", " + clientIP
+		}
+		req.Header.Set("X-Forwarded-For", clientIP)
+	}
+}
+
 var defaultProxyFuncPointer = fmt.Sprintf("%p", http.ProxyFromEnvironment)
 
 // isDefault checks to see if the transportProxierFunc is pointing to the default one
