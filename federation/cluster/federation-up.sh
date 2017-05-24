@@ -90,7 +90,7 @@ function init() {
       --dns-zone-name="${DNS_ZONE_NAME}" \
       --dns-provider="${DNS_PROVIDER}" \
       --image="${kube_registry}/hyperkube-amd64:${kube_version}" \
-      --apiserver-arg-overrides="--storage-backend=etcd2" \
+      --apiserver-arg-overrides="--storage-backend=etcd2,--runtime-config=api/all=true" \
       --apiserver-enable-basic-auth=true \
       --apiserver-enable-token-auth=true \
       --apiserver-arg-overrides="--v=4" \
