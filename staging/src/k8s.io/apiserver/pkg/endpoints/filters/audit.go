@@ -91,11 +91,10 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 		sink.ProcessEvents(ev)
 
 		// intercept the status code
-		longRunning := false
 		var longRunningSink audit.Sink
 		if longRunningCheck != nil {
 			ri, _ := request.RequestInfoFrom(ctx)
-			if longRunning = longRunningCheck(req, ri); longRunning {
+			if longRunningCheck(req, ri) {
 				longRunningSink = sink
 			}
 		}
@@ -105,20 +104,34 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 		// running requests, this will be the second audit event.
 		defer func() {
 			if r := recover(); r != nil {
+				defer panic(r)
+				ev.Stage = auditinternal.StagePanic
 				ev.ResponseStatus = &metav1.Status{
-					Code: http.StatusInternalServerError,
+					Code:    http.StatusInternalServerError,
+					Status:  metav1.StatusFailure,
+					Reason:  metav1.StatusReasonInternalError,
+					Message: fmt.Sprintf("APIServer panic'd: %v", r),
 				}
 				sink.ProcessEvents(ev)
-				panic(r)
+				return
 			}
 
-			if ev.ResponseStatus == nil {
-				ev.ResponseStatus = &metav1.Status{
-					Code: 200,
-				}
+			// if no StageResponseStarted event was sent b/c neither a status code nor a body was sent, fake it here
+			fakedSuccessStatus := &metav1.Status{
+				Code:    http.StatusOK,
+				Status:  metav1.StatusSuccess,
+				Message: "Connection closed early",
+			}
+			if ev.ResponseStatus == nil && longRunningSink != nil {
+				ev.ResponseStatus = fakedSuccessStatus
+				ev.Stage = auditinternal.StageResponseStarted
+				longRunningSink.ProcessEvents(ev)
 			}
 
 			ev.Stage = auditinternal.StageResponseComplete
+			if ev.ResponseStatus == nil {
+				ev.ResponseStatus = fakedSuccessStatus
+			}
 			sink.ProcessEvents(ev)
 		}()
 		handler.ServeHTTP(respWriter, req)

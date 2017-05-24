@@ -82,8 +82,8 @@ func (b *backend) logEvent(ev *auditinternal.Event) {
 		ip = ev.SourceIPs[0]
 	}
 
-	line := fmt.Sprintf("%s AUDIT: id=%q ip=%q method=%q user=%q groups=%q as=%q asgroups=%q namespace=%q uri=%q response=\"%s\"\n",
-		ev.Timestamp.Format(time.RFC3339Nano), ev.AuditID, ip, ev.Verb, username, groups, asuser, asgroups, namespace, ev.RequestURI, response)
+	line := fmt.Sprintf("%s AUDIT: id=%q stage=%q ip=%q method=%q user=%q groups=%q as=%q asgroups=%q namespace=%q uri=%q response=\"%s\"\n",
+		ev.Timestamp.Format(time.RFC3339Nano), ev.AuditID, ev.Stage, ip, ev.Verb, username, groups, asuser, asgroups, namespace, ev.RequestURI, response)
 	if _, err := fmt.Fprint(b.out, line); err != nil {
 		glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
 	}
