@@ -149,16 +149,6 @@ func TestScrubDNS(t *testing.T) {
 	}
 }
 
-func TestCreateFirewallFails(t *testing.T) {
-	name := "loadbalancer"
-	region := "us-central1"
-	desc := "description"
-	gce := &GCECloud{}
-	if err := gce.createFirewall(name, region, desc, nil, nil, nil); err == nil {
-		t.Errorf("error expected when creating firewall without any tags found")
-	}
-}
-
 func TestSplitProviderID(t *testing.T) {
 	providers := []struct {
 		providerID string

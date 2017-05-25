@@ -29,10 +29,21 @@ import (
 )
 
 const (
-	minNodesHealthCheckVersion = "1.7.0"
-	nodesHealthCheckPath       = "/healthz"
-	lbNodesHealthCheckPort     = ports.ProxyHealthzPort
+	nodesHealthCheckPath   = "/healthz"
+	lbNodesHealthCheckPort = ports.ProxyHealthzPort
 )
+
+var (
+	minNodesHealthCheckVersion *utilversion.Version
+)
+
+func init() {
+	if v, err := utilversion.ParseGeneric("1.7.0"); err != nil {
+		panic(err)
+	} else {
+		minNodesHealthCheckVersion = v
+	}
+}
 
 func newHealthcheckMetricContext(request string) *metricContext {
 	return &metricContext{
@@ -212,28 +223,22 @@ func makeNodesHealthCheckName(clusterID string) string {
 // MakeHealthCheckFirewallName returns the firewall name used by the GCE load
 // balancers (l4) for performing health checks.
 func MakeHealthCheckFirewallName(clusterID, hcName string, isNodesHealthCheck bool) string {
-	// TODO: Change below fwName to match the proposed schema: k8s-{clusteriD}-{namespace}-{name}-{shortid}-hc.
-	fwName := "k8s-" + hcName + "-http-hc"
 	if isNodesHealthCheck {
-		fwName = makeNodesHealthCheckName(clusterID) + "-http-hc"
+		// TODO: Change below fwName to match the proposed schema: k8s-{clusteriD}-{namespace}-{name}-{shortid}-hc.
+		return makeNodesHealthCheckName(clusterID) + "-http-hc"
 	}
-	return fwName
+	return "k8s-" + hcName + "-http-hc"
 }
 
 // isAtLeastMinNodesHealthCheckVersion checks if a version is higher than
 // `minNodesHealthCheckVersion`.
 func isAtLeastMinNodesHealthCheckVersion(vstring string) bool {
-	minVersion, err := utilversion.ParseGeneric(minNodesHealthCheckVersion)
-	if err != nil {
-		glog.Errorf("MinNodesHealthCheckVersion (%s) is not a valid version string: %v", minNodesHealthCheckVersion, err)
-		return false
-	}
 	version, err := utilversion.ParseGeneric(vstring)
 	if err != nil {
 		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
 		return false
 	}
-	return version.AtLeast(minVersion)
+	return version.AtLeast(minNodesHealthCheckVersion)
 }
 
 // supportsNodesHealthCheck returns false if anyone of the nodes has version
