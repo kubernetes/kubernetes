@@ -332,6 +332,8 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	}
 	if timeout == 0 {
 		numReplicas := ss.Spec.Replicas
+
+		// BUG: this timeout is never used.
 		timeout = Timeout + time.Duration(10*numReplicas)*time.Second
 	}
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
