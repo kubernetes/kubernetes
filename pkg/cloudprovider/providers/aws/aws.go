@@ -2531,7 +2531,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for AWS ELB")
 	}
 
-	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes))
+	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes), "running")
 	if err != nil {
 		return nil, err
 	}
@@ -3095,7 +3095,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
 func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes))
+	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes), "running")
 	if err != nil {
 		return err
 	}
@@ -3167,10 +3167,11 @@ func (c *Cloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Instan
 	return instancesByID, nil
 }
 
-// Fetches and caches instances by node names; returns an error if any cannot be found.
+// Fetches and caches instances in the given state, by node names; returns an error if any cannot be found. If no states
+// are given, no state filter is used and instances of all states are fetched.
 // This is implemented with a multi value filter on the node names, fetching the desired instances with a single query.
 // TODO(therc): make all the caching more rational during the 1.4 timeframe
-func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Instance, error) {
+func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String, states ...string) ([]*ec2.Instance, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if nodeNames.Equal(c.lastNodeNames) {
@@ -3181,7 +3182,7 @@ func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Ins
 			return c.lastInstancesByNodeNames, nil
 		}
 	}
-	instances, err := c.getInstancesByNodeNames(nodeNames.List())
+	instances, err := c.getInstancesByNodeNames(nodeNames.List(), states...)
 
 	if err != nil {
 		return nil, err
@@ -3197,7 +3198,7 @@ func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Ins
 	return instances, nil
 }
 
-func (c *Cloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance, error) {
+func (c *Cloud) getInstancesByNodeNames(nodeNames []string, states ...string) ([]*ec2.Instance, error) {
 	names := aws.StringSlice(nodeNames)
 
 	nodeNameFilter := &ec2.Filter{
@@ -3205,9 +3206,9 @@ func (c *Cloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance, er
 		Values: names,
 	}
 
-	filters := []*ec2.Filter{
-		nodeNameFilter,
-		newEc2Filter("instance-state-name", "running"),
+	filters := []*ec2.Filter{nodeNameFilter}
+	if len(states) > 0 {
+		filters = append(filters, newEc2Filter("instance-state-name", states...))
 	}
 
 	instances, err := c.describeInstances(filters)

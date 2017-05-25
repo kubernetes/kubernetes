@@ -1051,7 +1051,7 @@ func TestFindInstancesByNodeNameCached(t *testing.T) {
 	}
 
 	nodeNames := sets.NewString(nodeNameOne)
-	returnedInstances, errr := c.getInstancesByNodeNamesCached(nodeNames)
+	returnedInstances, errr := c.getInstancesByNodeNamesCached(nodeNames, "running")
 
 	if errr != nil {
 		t.Errorf("Failed to find instance: %v", err)
