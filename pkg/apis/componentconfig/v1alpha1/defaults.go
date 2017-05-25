@@ -230,17 +230,11 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.Address == "" {
 		obj.Address = "0.0.0.0"
 	}
-	if obj.CloudProvider == "" {
-		obj.CloudProvider = AutoDetectCloudProvider
-	}
 	if obj.CAdvisorPort == 0 {
 		obj.CAdvisorPort = 4194
 	}
 	if obj.VolumeStatsAggPeriod == zeroDuration {
 		obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
-	}
-	if obj.CertDirectory == "" {
-		obj.CertDirectory = "/var/run/kubernetes"
 	}
 	if obj.ContainerRuntime == "" {
 		obj.ContainerRuntime = "docker"

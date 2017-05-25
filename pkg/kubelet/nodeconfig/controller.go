@@ -71,14 +71,15 @@ func NewNodeConfigController(client clientset.Interface, nodeName string, config
 	}
 }
 
-// Run initiates operation of the NodeConfigController.
+// Bootstrap initiates operation of the NodeConfigController.
 // If a valid configuration is found as a result of these operations, that configuration is returned.
 // If a valid configuration cannot be found, a fatal error occurs, preventing the Kubelet from continuing with invalid configuration.
-// Run must be called synchronously during Kubelet startup, before any KubeletConfiguration is used.
-func (cc *NodeConfigController) Run() (finalConfig *ccv1a1.KubeletConfiguration, fatalErr error) {
+// Bootstrap must be called synchronously during Kubelet startup, before any KubeletConfiguration is used.
+// If Bootstrap completes successfully, you can optionally call StartSyncLoop to watch the API server for config updates.
+func (cc *NodeConfigController) Bootstrap() (finalConfig *ccv1a1.KubeletConfiguration, fatalErr error) {
 	var curUID string
 
-	// defer updating status and starting the sync loop until the end of Run
+	// defer updating status until the end of Run
 	defer func() {
 		if r := recover(); r != nil {
 			if _, ok := r.(runtime.Error); ok {
@@ -87,7 +88,6 @@ func (cc *NodeConfigController) Run() (finalConfig *ccv1a1.KubeletConfiguration,
 			fatalErr = r.(error)
 		}
 		cc.syncConfigOK()
-		cc.initSync()
 	}()
 
 	infof("starting controller")
@@ -108,7 +108,7 @@ func (cc *NodeConfigController) Run() (finalConfig *ccv1a1.KubeletConfiguration,
 	cc.validateInitConfig()
 	// Assert: the default and init configs are both valid
 
-	// if the client is nil, skip dynamic config and just return the (now validated) init or default configuration
+	// if the client is nil, just return the (now validated) init or default configuration
 	if cc.client == nil {
 		if cc.initConfig != nil {
 			finalConfig = cc.initConfig
@@ -210,9 +210,11 @@ func (cc *NodeConfigController) Run() (finalConfig *ccv1a1.KubeletConfiguration,
 	return
 }
 
-// initSync launches the sync loop that watches the API server for new configuration
-func (cc *NodeConfigController) initSync() {
-	if cc.client != nil {
+// StartSyncLoop launches the sync loop that watches the API server for configuration updates
+// The `client` passed to StartSyncLoop will replace the controller's current client
+func (cc *NodeConfigController) StartSyncLoop(client clientset.Interface) {
+	if client != nil {
+		cc.client = client
 		infof("starting sync loop")
 		go func() {
 			fieldselector := fmt.Sprintf("metadata.name=%s", cc.nodeName)
@@ -254,6 +256,8 @@ func (cc *NodeConfigController) initSync() {
 			informer.Run(stop)
 			return
 		}()
+	} else {
+		errorf("cannot start sync loop with nil client")
 	}
 }
 

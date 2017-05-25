@@ -227,11 +227,12 @@ func validateConfig(s *options.KubeletServer) error {
 	return nil
 }
 
-func initNodeConfigController(s *options.KubeletServer, client clientset.Interface, nodeName string, standaloneMode bool) error {
+// if the node config controller was used, it will be returned as the first return value
+func initNodeConfig(s *options.KubeletServer, client clientset.Interface, nodeName string, standaloneMode bool) (*nodeconfig.NodeConfigController, error) {
 	// Set feature gates based on the value in KubeletConfiguration
 	err := utilfeature.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Register current configuration with /configz endpoint
@@ -248,12 +249,12 @@ func initNodeConfigController(s *options.KubeletServer, client clientset.Interfa
 		flagCfg := &componentconfigv1alpha1.KubeletConfiguration{}
 		err = api.Scheme.Convert(&s.KubeletConfiguration, flagCfg, nil)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// the NodeConfigDir must be specified to use the controller
 		if len(s.NodeConfigDir) == 0 {
-			return fmt.Errorf("--node-config-dir must be specified to use the node config controller")
+			return nil, fmt.Errorf("--node-config-dir must be specified to use the node config controller")
 		}
 		// compute absolute path for NodeConfigDir, if necessary
 		var nodeConfigDir string
@@ -273,16 +274,16 @@ func initNodeConfigController(s *options.KubeletServer, client clientset.Interfa
 
 		// when you run the controller, either you get back a valid config to use, or the Kubelet crashes because
 		// something was fatally wrong with the configuration. Non-fatal errors will be logged, but not returned from Run().
-		kcToUse, err := ncc.Run()
+		kcToUse, err := ncc.Bootstrap()
 		if err != nil {
-			return fmt.Errorf("failed to determine a valid configuration, error: %v", err)
+			return nil, fmt.Errorf("failed to determine a valid configuration, error: %v", err)
 		}
 
 		// Update s (KubeletServer) to any new config
 		kcToUseInternal := componentconfig.KubeletConfiguration{}
 		err = api.Scheme.Convert(kcToUse, &kcToUseInternal, nil)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		s.KubeletConfiguration = kcToUseInternal
 
@@ -296,15 +297,16 @@ func initNodeConfigController(s *options.KubeletServer, client clientset.Interfa
 		// Update feature gates from any new config
 		err = utilfeature.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		return ncc, nil
 	} else {
 		// Validate configuration using the old validation function.
 		if err := validateConfig(s); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // makeEventRecorder sets up kubeDeps.Recorder if its nil. Its a no-op otherwise.
@@ -345,11 +347,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		}
 	}
 
-	// Spin up the NodeConfigController with whatever client we can get this early
 	var nodeName types.NodeName
 	if kubeDeps == nil {
-		// Determine the cloud provider and nodeName based on the configuration that was passed in via defaults and flags.
-		// Once the config controller has had a chance to return a more up-to-date configuration, these will be regenerated.
 		cloud, err := getCloud(s)
 		if err != nil {
 			return err
@@ -358,55 +357,31 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		if err != nil {
 			return err
 		}
-		// bootstrap kubeconfig may be necessary to get a client
 		if s.BootstrapKubeconfig != "" {
 			if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
 				return err
 			}
 		}
-		// Get a client and a cloud based on the configuration that was passed in via defaults and flags.
-		// Once the config controller has had a chance to return a more up-to-date configuration, these will be regenerated.
 		kubeClient, _, _, err := getClients(s, standaloneMode)
 		if err != nil {
 			return err
 		}
-		// Ensure that `s` contains an up-to-date, valid KubeletConfiguration
-		err = initNodeConfigController(s, kubeClient, string(nodeName), standaloneMode)
+		// ensure that `s` contains an up-to-date, valid KubeletConfiguration
+		ncc, err := initNodeConfig(s, kubeClient, string(nodeName), standaloneMode)
 		if err != nil {
 			return err
 		}
-	} else {
-		nodeName, err = getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
-		if err != nil {
-			return err
-		}
-		// Ensure that `s` contains an up-to-date, valid KubeletConfiguration
-		err := initNodeConfigController(s, kubeDeps.KubeClient, string(nodeName), standaloneMode)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Continue setting the rest of things up now that we have a valid configuration,
-	// if kubeDeps isn't overriding, the kubeClient will be regenerated using the most recent config
-	if kubeDeps == nil {
-		cloud, err := getCloud(s)
-		if err != nil {
-			return err
-		}
-		nodeName, err = getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
-		if err != nil {
-			return err
-		}
-		if s.BootstrapKubeconfig != "" {
-			if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
-				return err
-			}
-		}
+		// regenerate the clients, in-case some of the API-call config parameters changed across a config update
 		kubeClient, externalKubeClient, eventClient, err := getClients(s, standaloneMode)
 		if err != nil {
 			return err
 		}
+		// if the controller is available, inject the latest client to start the config sync loop
+		if ncc != nil {
+			ncc.StartSyncLoop(kubeClient)
+		}
+
+		// construct the kubelet deps now that we have a valid config
 		kubeDeps, err = UnsecuredKubeletDeps(s)
 		if err != nil {
 			return err
@@ -419,6 +394,15 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		nodeName, err = getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
 		if err != nil {
 			return err
+		}
+		// ensure that `s` contains an up-to-date, valid KubeletConfiguration
+		ncc, err := initNodeConfig(s, kubeDeps.KubeClient, string(nodeName), standaloneMode)
+		if err != nil {
+			return err
+		}
+		// if the controller is available, start the config sync loop
+		if ncc != nil {
+			ncc.StartSyncLoop(kubeDeps.KubeClient)
 		}
 	}
 
@@ -599,8 +583,8 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
 func InitializeTLS(kf *options.KubeletFlags, kc *componentconfig.KubeletConfiguration) (*server.TLSOptions, error) {
 	if kc.TLSCertFile == "" && kc.TLSPrivateKeyFile == "" {
-		kc.TLSCertFile = path.Join(kc.CertDirectory, "kubelet.crt")
-		kc.TLSPrivateKeyFile = path.Join(kc.CertDirectory, "kubelet.key")
+		kc.TLSCertFile = path.Join(kf.CertDirectory, "kubelet.crt")
+		kc.TLSPrivateKeyFile = path.Join(kf.CertDirectory, "kubelet.key")
 
 		canReadCertAndKey, err := certutil.CanReadCertAndKey(kc.TLSCertFile, kc.TLSPrivateKeyFile)
 		if err != nil {
@@ -785,7 +769,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.Kubele
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
-	k, err := builder(kubeCfg, kubeDeps, standaloneMode, kubeFlags.HostnameOverride, kubeFlags.NodeIP, kubeFlags.DockershimRootDirectory, kubeFlags.ProviderID)
+	k, err := builder(kubeCfg, kubeDeps, standaloneMode, kubeFlags.HostnameOverride, kubeFlags.NodeIP, kubeFlags.DockershimRootDirectory, kubeFlags.ProviderID, kubeFlags.CloudProvider)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -865,11 +849,11 @@ func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg 
 	}
 }
 
-func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, standaloneMode bool, hostnameOverride, nodeIP, dockershimRootDir, providerID string) (k kubelet.KubeletBootstrap, err error) {
+func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, standaloneMode bool, hostnameOverride, nodeIP, dockershimRootDir, providerID, cloudProvider string) (k kubelet.KubeletBootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, standaloneMode, hostnameOverride, nodeIP, dockershimRootDir, providerID)
+	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, standaloneMode, hostnameOverride, nodeIP, dockershimRootDir, providerID, cloudProvider)
 	if err != nil {
 		return nil, err
 	}
