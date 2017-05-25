@@ -13315,6 +13315,11 @@
       "type": "integer",
       "format": "int32"
      },
+     "collisionCount": {
+      "description": "Count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
+      "type": "integer",
+      "format": "int64"
+     },
      "conditions": {
       "description": "Represents the latest available observations of a deployment's current state.",
       "type": "array",

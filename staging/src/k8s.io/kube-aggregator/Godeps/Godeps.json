@@ -224,7 +224,7 @@
 		},
 		{
 			"ImportPath": "github.com/howeyc/gopass",
-			"Rev": "3ca23474a7c7203e0a0a070fd33508f6efdb9b3d"
+			"Rev": "bf9dde6d0d2c004a008c27aaee91170c786f6db8"
 		},
 		{
 			"ImportPath": "github.com/imdario/mergo",
@@ -236,7 +236,7 @@
 		},
 		{
 			"ImportPath": "github.com/juju/ratelimit",
-			"Rev": "77ed1c8a01217656d2080ad51981f6e99adaa177"
+			"Rev": "5b9ff866471762aa2ab2dced63c9fb6f53921342"
 		},
 		{
 			"ImportPath": "github.com/mailru/easyjson/buffer",

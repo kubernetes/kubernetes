@@ -7152,6 +7152,11 @@
        "$ref": "v1beta1.DeploymentCondition"
       },
       "description": "Represents the latest available observations of a deployment's current state."
+     },
+     "collisionCount": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet."
      }
     }
    },

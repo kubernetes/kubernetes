@@ -25,9 +25,11 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
+	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -63,7 +65,8 @@ func NewReconciler(
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	attacherDetacher operationexecutor.OperationExecutor,
-	nodeStatusUpdater statusupdater.NodeStatusUpdater) Reconciler {
+	nodeStatusUpdater statusupdater.NodeStatusUpdater,
+	recorder record.EventRecorder) Reconciler {
 	return &reconciler{
 		loopPeriod:                loopPeriod,
 		maxWaitForUnmountDuration: maxWaitForUnmountDuration,
@@ -74,6 +77,7 @@ func NewReconciler(
 		attacherDetacher:          attacherDetacher,
 		nodeStatusUpdater:         nodeStatusUpdater,
 		timeOfLastSync:            time.Now(),
+		recorder:                  recorder,
 	}
 }
 
@@ -87,6 +91,7 @@ type reconciler struct {
 	nodeStatusUpdater         statusupdater.NodeStatusUpdater
 	timeOfLastSync            time.Time
 	disableReconciliationSync bool
+	recorder                  record.EventRecorder
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
@@ -248,7 +253,14 @@ func (rc *reconciler) reconcile() {
 			if rc.isMultiAttachForbidden(volumeToAttach.VolumeSpec) {
 				nodes := rc.actualStateOfWorld.GetNodesForVolume(volumeToAttach.VolumeName)
 				if len(nodes) > 0 {
-					glog.V(4).Infof("Volume %q is already exclusively attached to node %q and can't be attached to %q", volumeToAttach.VolumeName, nodes, volumeToAttach.NodeName)
+					if !volumeToAttach.MultiAttachErrorReported {
+						simpleMsg, detailedMsg := volumeToAttach.GenerateMsg("Multi-Attach error", "Volume is already exclusively attached to one node and can't be attached to another")
+						for _, pod := range volumeToAttach.ScheduledPods {
+							rc.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, simpleMsg)
+						}
+						volumeToAttach.MultiAttachErrorReported = true
+						glog.Warningf(detailedMsg)
+					}
 					continue
 				}
 			}

@@ -47,6 +47,7 @@ const (
 	NodeNotSchedulable                   = "NodeNotSchedulable"
 	StartingKubelet                      = "Starting"
 	KubeletSetupFailed                   = "KubeletSetupFailed"
+	FailedAttachVolume                   = "FailedAttachVolume"
 	FailedDetachVolume                   = "FailedDetachVolume"
 	FailedMountVolume                    = "FailedMount"
 	FailedUnMountVolume                  = "FailedUnMount"

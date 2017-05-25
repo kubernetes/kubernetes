@@ -184,7 +184,8 @@ func newDControllerRef(d *extensions.Deployment) *metav1.OwnerReference {
 
 // generateRS creates a replica set, with the input deployment's template as its template
 func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
-	template := GetNewReplicaSetTemplate(&deployment)
+	cp, _ := api.Scheme.DeepCopy(deployment.Spec.Template)
+	template := cp.(v1.PodTemplateSpec)
 	return extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             randomUID(),
@@ -193,7 +194,7 @@ func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 			OwnerReferences: []metav1.OwnerReference{*newDControllerRef(&deployment)},
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas: func() *int32 { i := int32(0); return &i }(),
+			Replicas: new(int32),
 			Template: template,
 			Selector: &metav1.LabelSelector{MatchLabels: template.Labels},
 		},
@@ -444,29 +445,22 @@ func TestEqualIgnoreHash(t *testing.T) {
 
 	for _, test := range tests {
 		runTest := func(t1, t2 *v1.PodTemplateSpec, reversed bool) {
-			// Set up
-			t1Copy, err := api.Scheme.DeepCopy(t1)
-			if err != nil {
-				t.Errorf("Failed setting up the test: %v", err)
-			}
-			t2Copy, err := api.Scheme.DeepCopy(t2)
-			if err != nil {
-				t.Errorf("Failed setting up the test: %v", err)
-			}
 			reverseString := ""
 			if reversed {
 				reverseString = " (reverse order)"
 			}
 			// Run
-			equal := EqualIgnoreHash(*t1, *t2)
+			equal, err := EqualIgnoreHash(t1, t2)
+			if err != nil {
+				t.Errorf("%s: unexpected error: %v", err, test.test)
+				return
+			}
 			if equal != test.expected {
-				t.Errorf("In test case %q%s, expected %v", test.test, reverseString, test.expected)
+				t.Errorf("%q%s: expected %v", test.test, reverseString, test.expected)
+				return
 			}
 			if t1.Labels == nil || t2.Labels == nil {
-				t.Errorf("In test case %q%s, unexpected labels becomes nil", test.test, reverseString)
-			}
-			if !reflect.DeepEqual(t1, t1Copy) || !reflect.DeepEqual(t2, t2Copy) {
-				t.Errorf("In test case %q%s, unexpected input template modified", test.test, reverseString)
+				t.Errorf("%q%s: unexpected labels becomes nil", test.test, reverseString)
 			}
 		}
 		runTest(&test.former, &test.latter, false)

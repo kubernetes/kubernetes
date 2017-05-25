@@ -40,10 +40,7 @@ import (
 	authenticationv1 "k8s.io/client-go/pkg/apis/authentication/v1"
 )
 
-const (
-	AuditIDHeader = "X-Request-ID"
-)
-
+// NewEventFromRequest generates an audit event for the request.
 func NewEventFromRequest(req *http.Request, policy *auditinternal.Policy, attribs authorizer.Attributes) (*auditinternal.Event, error) {
 	ev := &auditinternal.Event{
 		Timestamp:  metav1.NewTime(time.Now()),
@@ -61,7 +58,7 @@ func NewEventFromRequest(req *http.Request, policy *auditinternal.Policy, attrib
 
 	// prefer the id from the headers. If not available, create a new one.
 	// TODO(audit): do we want to forbid the header for non-front-proxy users?
-	ids := req.Header[AuditIDHeader]
+	ids := req.Header[auditinternal.HeaderAuditID]
 	if len(ids) > 0 {
 		ev.AuditID = types.UID(ids[0])
 	} else {
@@ -157,7 +154,7 @@ func LogRequestPatch(ae *audit.Event, patch []byte) {
 		return
 	}
 
-	ae.RequestObject = runtime.Unknown{
+	ae.RequestObject = &runtime.Unknown{
 		Raw:         patch,
 		ContentType: runtime.ContentTypeJSON,
 	}
@@ -182,21 +179,21 @@ func LogResponseObject(ae *audit.Event, obj runtime.Object, gv schema.GroupVersi
 	}
 }
 
-func encodeObject(obj runtime.Object, gv schema.GroupVersion, serializer runtime.NegotiatedSerializer) (runtime.Unknown, error) {
+func encodeObject(obj runtime.Object, gv schema.GroupVersion, serializer runtime.NegotiatedSerializer) (*runtime.Unknown, error) {
 	supported := serializer.SupportedMediaTypes()
 	for i := range supported {
 		if supported[i].MediaType == "application/json" {
 			enc := serializer.EncoderForVersion(supported[i].Serializer, gv)
 			var buf bytes.Buffer
 			if err := enc.Encode(obj, &buf); err != nil {
-				return runtime.Unknown{}, fmt.Errorf("encoding failed: %v", err)
+				return nil, fmt.Errorf("encoding failed: %v", err)
 			}
 
-			return runtime.Unknown{
+			return &runtime.Unknown{
 				Raw:         buf.Bytes(),
 				ContentType: runtime.ContentTypeJSON,
 			}, nil
 		}
 	}
-	return runtime.Unknown{}, fmt.Errorf("no json encoder found")
+	return nil, fmt.Errorf("no json encoder found")
 }

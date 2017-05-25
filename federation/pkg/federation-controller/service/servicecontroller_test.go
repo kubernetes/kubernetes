@@ -53,6 +53,8 @@ const (
 	serviceEndpoint2 = "192.168.1.1"
 )
 
+var awfulError error = errors.NewGone("Something bad happened")
+
 func TestServiceController(t *testing.T) {
 	glog.Infof("Creating fake infrastructure")
 	fedClient := &fakefedclientset.Clientset{}
@@ -205,6 +207,53 @@ func TestServiceController(t *testing.T) {
 		key, service, wait.ForeverTestTimeout))
 
 	close(stop)
+}
+
+func TestGetOperationsToPerformOnCluster(t *testing.T) {
+	obj := NewService("test-service-1", 80)
+	cluster1 := NewClusterWithRegionZone("cluster1", v1.ConditionTrue, "region1", "zone1")
+	fedClient := &fakefedclientset.Clientset{}
+	sc := New(fedClient)
+
+	testCases := map[string]struct {
+		expectedSendErr bool
+		sendToCluster   bool
+		operationType   fedutil.FederatedOperationType
+	}{
+		"sendToCluster error returned": {
+			expectedSendErr: true,
+		},
+		"Missing object and not matching ClusterSelector should result in no operations": {
+			sendToCluster: false,
+		},
+		"Missing object and matching ClusterSelector should result in add operation": {
+			operationType: fedutil.OperationTypeAdd,
+			sendToCluster: true,
+		},
+		// Update and Delete scenarios are tested in TestServiceController
+	}
+	for testName, testCase := range testCases {
+		t.Run(testName, func(t *testing.T) {
+
+			operations, err := getOperationsToPerformOnCluster(sc.federatedInformer, cluster1, obj, func(map[string]string, map[string]string) (bool, error) {
+				if testCase.expectedSendErr {
+					return false, awfulError
+				}
+				return testCase.sendToCluster, nil
+			})
+			if testCase.expectedSendErr {
+				require.Error(t, err, "An error was expected")
+			} else {
+				require.NoError(t, err, "An error was not expected")
+			}
+			if len(testCase.operationType) == 0 {
+				require.Nil(t, operations, "An operation was not expected")
+			} else {
+				require.NotNil(t, operations, "A single operation was expected")
+				require.Equal(t, testCase.operationType, operations.Type, "Unexpected operation returned")
+			}
+		})
+	}
 }
 
 func NewService(name string, port int32) *v1.Service {

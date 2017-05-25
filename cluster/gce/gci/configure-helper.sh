@@ -326,6 +326,11 @@ token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
 network-name = ${NODE_NETWORK}
 EOF
+    if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
+      cat <<EOF >>/etc/gce.conf
+subnetwork-name = ${NODE_SUBNETWORK}
+EOF
+    fi
   fi
   if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
     use_cloud_config="true"
@@ -820,6 +825,7 @@ function start-kube-proxy {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
+  params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s"
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
   fi

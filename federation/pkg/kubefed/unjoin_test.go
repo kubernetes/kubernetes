@@ -275,7 +275,7 @@ func fakeUnjoinHostFactory(clusterName string) cmdutil.Factory {
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
 			case strings.HasPrefix(p, clusterRoleBindingPrefix) && m == http.MethodDelete:
 				got := strings.TrimPrefix(p, clusterRoleBindingPrefix)
-				want := util.ClusterRoleName(serviceAccountName(clusterName))
+				want := util.ClusterRoleName(testFederationName, serviceAccountName(clusterName))
 				if got != want {
 					return nil, errors.NewNotFound(api.Resource("clusterrolebindings"), got)
 				}
@@ -286,7 +286,7 @@ func fakeUnjoinHostFactory(clusterName string) cmdutil.Factory {
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
 			case strings.HasPrefix(p, clusterRolePrefix) && m == http.MethodDelete:
 				got := strings.TrimPrefix(p, clusterRolePrefix)
-				want := util.ClusterRoleName(serviceAccountName(clusterName))
+				want := util.ClusterRoleName(testFederationName, serviceAccountName(clusterName))
 				if got != want {
 					return nil, errors.NewNotFound(api.Resource("clusterroles"), got)
 				}

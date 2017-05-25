@@ -170,6 +170,12 @@ message DeploymentStatus {
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated DeploymentCondition conditions = 6;
+
+  // Count of hash collisions for the Deployment. The Deployment controller uses this
+  // field as a collision avoidance mechanism when it needs to create the name for the
+  // newest ReplicaSet.
+  // +optional
+  optional int64 collisionCount = 8;
 }
 
 // DeploymentStrategy describes how to replace existing pods with new ones.

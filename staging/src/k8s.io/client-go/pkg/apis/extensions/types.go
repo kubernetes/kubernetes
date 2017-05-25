@@ -327,6 +327,12 @@ type DeploymentStatus struct {
 
 	// Represents the latest available observations of a deployment's current state.
 	Conditions []DeploymentCondition
+
+	// Count of hash collisions for the Deployment. The Deployment controller uses this
+	// field as a collision avoidance mechanism when it needs to create the name for the
+	// newest ReplicaSet.
+	// +optional
+	CollisionCount *int64
 }
 
 type DeploymentConditionType string

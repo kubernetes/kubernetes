@@ -572,7 +572,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			} else {
 				handler = restfulGetResource(getter, exporter, reqScope)
 			}
-			handler = metrics.InstrumentRouteFunc(action.Verb, resource, handler)
+			handler = metrics.InstrumentRouteFunc(action.Verb, resource, subresource, handler)
 			doc := "read the specified " + kind
 			if hasSubresource {
 				doc = "read " + subresource + " of the specified " + kind
@@ -601,7 +601,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "list " + subresource + " of objects of kind " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -633,7 +633,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "replace " + subresource + " of the specified " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, restfulUpdateResource(updater, reqScope, a.group.Typer, admit))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, restfulUpdateResource(updater, reqScope, a.group.Typer, admit))
 			route := ws.PUT(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -649,7 +649,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "partially update " + subresource + " of the specified " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, restfulPatchResource(patcher, reqScope, admit, mapping.ObjectConvertor))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, restfulPatchResource(patcher, reqScope, admit, mapping.ObjectConvertor))
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -668,7 +668,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			} else {
 				handler = restfulCreateResource(creater, reqScope, a.group.Typer, admit)
 			}
-			handler = metrics.InstrumentRouteFunc(action.Verb, resource, handler)
+			handler = metrics.InstrumentRouteFunc(action.Verb, resource, subresource, handler)
 			article := getArticleForNoun(kind, " ")
 			doc := "create" + article + kind
 			if hasSubresource {
@@ -690,7 +690,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "delete " + subresource + " of" + article + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -711,7 +711,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "delete collection of " + subresource + " of a " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -730,7 +730,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "watch changes to " + subresource + " of an object of kind " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -749,7 +749,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "watch individual changes to a list of " + subresource + " of " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -780,7 +780,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				if hasSubresource {
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
-				handler := metrics.InstrumentRouteFunc(action.Verb, resource, restfulConnectResource(connecter, reqScope, admit, path, hasSubresource))
+				handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, restfulConnectResource(connecter, reqScope, admit, path, hasSubresource))
 				route := ws.Method(method).Path(action.Path).
 					To(handler).
 					Doc(doc).
@@ -841,7 +841,7 @@ func buildProxyRoute(ws *restful.WebService, method string, prefix string, path 
 	if hasSubresource {
 		doc = "proxy " + method + " requests to " + subresource + " of " + kind
 	}
-	handler := metrics.InstrumentRouteFunc("PROXY", resource, routeFunction(proxyHandler))
+	handler := metrics.InstrumentRouteFunc("PROXY", resource, subresource, routeFunction(proxyHandler))
 	proxyRoute := ws.Method(method).Path(path).To(handler).
 		Doc(doc).
 		Operation("proxy" + strings.Title(method) + namespaced + kind + strings.Title(subresource) + operationSuffix).

@@ -17,5 +17,5 @@ images:
     project: kubernetes-node-e2e-images
   gci:
     image_regex: cos-beta-59-9460-20-0 # docker 1.11.2
-    project: google-containers
+    project: cos-cloud
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"

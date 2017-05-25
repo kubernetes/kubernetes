@@ -379,6 +379,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 	}
 	options = append(options, "backup-volfile-servers="+dstrings.Join(addrlist[:], ":"))
+	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
 
 	//fetch client version.
 	mountBinaryVerStr := ""
@@ -386,44 +387,43 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 	cmdOut, err := b.exe.Command(linuxGlusterMountBinary, "-V").CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Failed to get binary %s version", linuxGlusterMountBinary)
-	}
-	//cmdOut will be filled as shown below.
-	/*
-			[root@]# mount.glusterfs -V
-			glusterfs 3.10.1
-			Repository revision: git://git.gluster.org/glusterfs.git
-			Copyright (c) 2006-2016 Red Hat, Inc. <https://www.gluster.org/>
-			GlusterFS comes with ABSOLUTELY NO WARRANTY.
-		    .........
-	*/
+		glog.Warningf("Failed to get binary %q version", linuxGlusterMountBinary)
+	} else {
+		//cmdOut will be filled as shown below.
+		/*
+				[root@]# mount.glusterfs -V
+				glusterfs 3.10.1
+				Repository revision: git://git.gluster.org/glusterfs.git
+				Copyright (c) 2006-2016 Red Hat, Inc. <https://www.gluster.org/>
+				GlusterFS comes with ABSOLUTELY NO WARRANTY.
+			    .........
+		*/
 
-	parseStr := string(cmdOut)
-	if parseStr != "" {
+		parseStr := string(cmdOut)
+		if parseStr != "" {
 
-		//Store the version line from parseStr
-		mountStrSlice := dstrings.Split(parseStr, "\n")
-		if len(mountStrSlice) > 0 {
-			mountStr = mountStrSlice[0]
-		}
-		if mountStr != "" {
-
-			// Get the [binary, version]  slice.
-			mountBinaryVerSlice := dstrings.Split(mountStr, " ")
-			if len(mountBinaryVerSlice) >= 2 {
-
-				// Get the 'version' string in mountBinaryVerStr
-				mountBinaryVerStr = mountBinaryVerSlice[1]
+			//Store the version line from parseStr
+			mountStrSlice := dstrings.Split(parseStr, "\n")
+			if len(mountStrSlice) > 0 {
+				mountStr = mountStrSlice[0]
 			}
+			if mountStr != "" {
 
+				// Get the [binary, version]  slice.
+				mountBinaryVerSlice := dstrings.Split(mountStr, " ")
+				if len(mountBinaryVerSlice) >= 2 {
+
+					// Get the 'version' string in mountBinaryVerStr
+					mountBinaryVerStr = mountBinaryVerSlice[1]
+				}
+
+			}
 		}
-	}
 
-	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
-
-	for i := len(mountOptions) - 1; i >= 0; i-- {
-		if mountOptions[i] == "auto_unmount" && mountBinaryVerStr != "" && mountBinaryVerStr < autoUnmountBinaryVer {
-			mountOptions = append(mountOptions[:i], mountOptions[i+1:]...)
+		for i := len(mountOptions) - 1; i >= 0; i-- {
+			if mountOptions[i] == "auto_unmount" && mountBinaryVerStr != "" && mountBinaryVerStr < autoUnmountBinaryVer {
+				mountOptions = append(mountOptions[:i], mountOptions[i+1:]...)
+			}
 		}
 	}
 
