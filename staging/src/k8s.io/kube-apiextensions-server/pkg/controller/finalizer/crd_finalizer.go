@@ -131,7 +131,7 @@ func (c *CRDFinalizer) sync(key string) error {
 	// Since we control the endpoints, we know that delete collection works. No need to delete if not established.
 	if apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
 		cond, deleteErr := c.deleteInstances(crd)
-		apiextensions.SetCRDCondition(crd, *cond)
+		apiextensions.SetCRDCondition(crd, cond)
 		if deleteErr != nil {
 			crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
 			if err != nil {
@@ -158,19 +158,25 @@ func (c *CRDFinalizer) sync(key string) error {
 	return c.crdClient.CustomResourceDefinitions().Delete(crd.Name, nil)
 }
 
-func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefinition) (*apiextensions.CustomResourceDefinitionCondition, error) {
+func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefinition) (apiextensions.CustomResourceDefinitionCondition, error) {
 	// Now we can start deleting items. While it would be ideal to use a REST API client, doing so
 	// could incorrectly delete a ThirdPartyResource with the same URL as the CustomResource, so we go
 	// directly to the storage instead. Since we control the storage, we know that delete collection works.
 	crClient := c.crClientGetter.GetCustomResourceListerCollectionDeleter(crd.UID)
 	if crClient == nil {
-		return nil, fmt.Errorf("unable to find a custom resource client for %s.%s", crd.Status.AcceptedNames.Plural, crd.Spec.Group)
+		err := fmt.Errorf("unable to find a custom resource client for %s.%s", crd.Status.AcceptedNames.Plural, crd.Spec.Group)
+		return apiextensions.CustomResourceDefinitionCondition{
+			Type:    apiextensions.Terminating,
+			Status:  apiextensions.ConditionTrue,
+			Reason:  "InstanceDeletionFailed",
+			Message: fmt.Sprintf("could not list instances: %v", err),
+		}, err
 	}
 
 	ctx := genericapirequest.NewContext()
 	allResources, err := crClient.List(ctx, nil)
 	if err != nil {
-		return &apiextensions.CustomResourceDefinitionCondition{
+		return apiextensions.CustomResourceDefinitionCondition{
 			Type:    apiextensions.Terminating,
 			Status:  apiextensions.ConditionTrue,
 			Reason:  "InstanceDeletionFailed",
@@ -198,7 +204,7 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 		}
 	}
 	if deleteError := utilerrors.NewAggregate(deleteErrors); deleteError != nil {
-		return &apiextensions.CustomResourceDefinitionCondition{
+		return apiextensions.CustomResourceDefinitionCondition{
 			Type:    apiextensions.Terminating,
 			Status:  apiextensions.ConditionTrue,
 			Reason:  "InstanceDeletionFailed",
@@ -221,14 +227,14 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 		return false, nil
 	})
 	if err != nil {
-		return &apiextensions.CustomResourceDefinitionCondition{
+		return apiextensions.CustomResourceDefinitionCondition{
 			Type:    apiextensions.Terminating,
 			Status:  apiextensions.ConditionTrue,
 			Reason:  "InstanceDeletionCheck",
 			Message: fmt.Sprintf("could not confirm zero CustomResources remaining: %v", err),
 		}, err
 	}
-	return &apiextensions.CustomResourceDefinitionCondition{
+	return apiextensions.CustomResourceDefinitionCondition{
 		Type:    apiextensions.Terminating,
 		Status:  apiextensions.ConditionFalse,
 		Reason:  "InstanceDeletionCompleted",
