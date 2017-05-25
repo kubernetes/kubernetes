@@ -175,6 +175,14 @@
 			"Rev": "d5b7844b561a7bc640052f1b935f7b800330d7e0"
 		},
 		{
+			"ImportPath": "github.com/opentracing/opentracing-go",
+			"Rev": "eaaf4e1eeb7a5373b38e70901270c83577dc6fb9"
+		},
+		{
+			"ImportPath": "github.com/opentracing/opentracing-go/log",
+			"Rev": "eaaf4e1eeb7a5373b38e70901270c83577dc6fb9"
+		},
+		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
 			"Rev": "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
 		},

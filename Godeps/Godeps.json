@@ -114,6 +114,10 @@
 			"Rev": "c0ef4539dfab4d21c8ef20ba2924f9fc6f186d35"
 		},
 		{
+			"ImportPath": "github.com/apache/thrift/lib/go/thrift",
+			"Rev": "e41e47c2b4b2407bac525d203b281c63fb253978"
+		},
+		{
 			"ImportPath": "github.com/appc/spec/schema",
 			"Comment": "v0.8.9-17-gfc380db",
 			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
@@ -400,6 +404,10 @@
 		{
 			"ImportPath": "github.com/clusterhq/flocker-go",
 			"Rev": "2b8b7259d3139c96c4a6871031355808ab3fd3b3"
+		},
+		{
+			"ImportPath": "github.com/codahale/hdrhistogram",
+			"Rev": "3a0bb77429bd3a61596f5e8a3172445844342120"
 		},
 		{
 			"ImportPath": "github.com/codedellemc/goscaleio",
@@ -2156,6 +2164,21 @@
 			"Rev": "d223e2adae83f62d58448a799a5da05730228089"
 		},
 		{
+			"ImportPath": "github.com/opentracing/opentracing-go",
+			"Comment": "v1.0.2-1-geaaf4e1",
+			"Rev": "eaaf4e1eeb7a5373b38e70901270c83577dc6fb9"
+		},
+		{
+			"ImportPath": "github.com/opentracing/opentracing-go/ext",
+			"Comment": "v1.0.2-1-geaaf4e1",
+			"Rev": "eaaf4e1eeb7a5373b38e70901270c83577dc6fb9"
+		},
+		{
+			"ImportPath": "github.com/opentracing/opentracing-go/log",
+			"Comment": "v1.0.2-1-geaaf4e1",
+			"Rev": "eaaf4e1eeb7a5373b38e70901270c83577dc6fb9"
+		},
+		{
 			"ImportPath": "github.com/pborman/uuid",
 			"Rev": "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
 		},
@@ -2440,6 +2463,70 @@
 		{
 			"ImportPath": "github.com/syndtr/gocapability/capability",
 			"Rev": "e7cb7fa329f456b3855136a2642b197bad7366ba"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-client-go",
+			"Comment": "v2.6.0-13-gbcb0e9e",
+			"Rev": "bcb0e9e606be652774700cbfbd822f1cc80ae27a"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-client-go/config",
+			"Comment": "v2.6.0-13-gbcb0e9e",
+			"Rev": "bcb0e9e606be652774700cbfbd822f1cc80ae27a"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-client-go/internal/spanlog",
+			"Comment": "v2.6.0-13-gbcb0e9e",
+			"Rev": "bcb0e9e606be652774700cbfbd822f1cc80ae27a"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-client-go/log",
+			"Comment": "v2.6.0-13-gbcb0e9e",
+			"Rev": "bcb0e9e606be652774700cbfbd822f1cc80ae27a"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-client-go/rpcmetrics",
+			"Comment": "v2.6.0-13-gbcb0e9e",
+			"Rev": "bcb0e9e606be652774700cbfbd822f1cc80ae27a"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-client-go/thrift-gen/agent",
+			"Comment": "v2.6.0-13-gbcb0e9e",
+			"Rev": "bcb0e9e606be652774700cbfbd822f1cc80ae27a"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-client-go/thrift-gen/jaeger",
+			"Comment": "v2.6.0-13-gbcb0e9e",
+			"Rev": "bcb0e9e606be652774700cbfbd822f1cc80ae27a"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-client-go/thrift-gen/sampling",
+			"Comment": "v2.6.0-13-gbcb0e9e",
+			"Rev": "bcb0e9e606be652774700cbfbd822f1cc80ae27a"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-client-go/thrift-gen/zipkincore",
+			"Comment": "v2.6.0-13-gbcb0e9e",
+			"Rev": "bcb0e9e606be652774700cbfbd822f1cc80ae27a"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-client-go/transport",
+			"Comment": "v2.6.0-13-gbcb0e9e",
+			"Rev": "bcb0e9e606be652774700cbfbd822f1cc80ae27a"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-client-go/transport/udp",
+			"Comment": "v2.6.0-13-gbcb0e9e",
+			"Rev": "bcb0e9e606be652774700cbfbd822f1cc80ae27a"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-client-go/utils",
+			"Comment": "v2.6.0-13-gbcb0e9e",
+			"Rev": "bcb0e9e606be652774700cbfbd822f1cc80ae27a"
+		},
+		{
+			"ImportPath": "github.com/uber/jaeger-lib/metrics",
+			"Rev": "b9a0fa4923ad750facbd5a4b93fc6d450bc45ccc"
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
