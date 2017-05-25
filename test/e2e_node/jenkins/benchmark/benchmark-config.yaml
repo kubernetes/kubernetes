@@ -70,21 +70,21 @@ images:
     tests:
       - 'resource tracking for 105 pods per node \[Benchmark\]'
   coreos-resource1:
-    image: coreos-alpha-1122-0-0-v20160727
+    image: coreos-stable-1353-7-0-v20170427
     project: coreos-cloud
     metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
     machine: n1-standard-1
     tests:
       - 'resource tracking for 0 pods per node \[Benchmark\]'
   coreos-resource2:
-    image: coreos-alpha-1122-0-0-v20160727
+    image: coreos-stable-1353-7-0-v20170427
     project: coreos-cloud
     metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
     machine: n1-standard-1
     tests:
       - 'resource tracking for 35 pods per node \[Benchmark\]'
   coreos-resource3:
-    image: coreos-alpha-1122-0-0-v20160727
+    image: coreos-stable-1353-7-0-v20170427
     project: coreos-cloud
     metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
     machine: n1-standard-1
