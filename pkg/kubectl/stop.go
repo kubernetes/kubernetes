@@ -48,10 +48,11 @@ const (
 )
 
 // A Reaper handles terminating an object as gracefully as possible.
-// timeout is how long we'll wait for the termination to be successful
-// gracePeriod is time given to an API object for it to delete itself cleanly,
-// e.g., pod shutdown. It may or may not be supported by the API object.
 type Reaper interface {
+	// Stop a given given object within a namespace. timeout is how long
+	// we'll wait for the termination to be successful. gracePeriod is time
+	// given to an API object for it to delete itself cleanly, e.g., pod
+	// shutdown. It may or may not be supported by the API object.
 	Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error
 }
 
