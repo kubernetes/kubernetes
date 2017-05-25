@@ -92,7 +92,7 @@ func createDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer, cmd *cobra.Co
 	case cmdutil.DeploymentBasicV1Beta1GeneratorName:
 		generator = &kubectl.DeploymentBasicGeneratorV1{Name: name, Images: cmdutil.GetFlagStringSlice(cmd, "image")}
 	default:
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
+		return errUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
