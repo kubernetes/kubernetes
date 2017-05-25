@@ -67,7 +67,7 @@ func NewKubeFedCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer, defa
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
 	cmds.AddCommand(kubectl.NewCmdVersion(f, out))
-	cmds.AddCommand(kubectl.NewCmdOptions())
+	cmds.AddCommand(kubectl.NewCmdOptions(out))
 
 	return cmds
 }
