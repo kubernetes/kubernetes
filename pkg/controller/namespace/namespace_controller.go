@@ -107,6 +107,13 @@ func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
+
+	namespace := obj.(*v1.Namespace)
+	// don't queue if we aren't deleted
+	if namespace.DeletionTimestamp == nil || namespace.DeletionTimestamp.IsZero() {
+		return
+	}
+
 	// delay processing namespace events to allow HA api servers to observe namespace deletion,
 	// and HA etcd servers to observe last minute object creations inside the namespace
 	nm.queue.AddAfter(key, namespaceDeletionGracePeriod)
