@@ -49,6 +49,8 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
+
+	"github.com/opentracing/opentracing-go"
 )
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
@@ -111,12 +113,72 @@ type getterFunc func(ctx request.Context, name string, req *http.Request, trace 
 // MaxRetryWhenPatchConflicts is the maximum number of conflicts retry during a patch operation before returning failure
 const MaxRetryWhenPatchConflicts = 5
 
+// Returns extracted opentracing.Span, or nil in case of any problems
+func startSpanFromRequestContext(req *http.Request, operationName string) opentracing.Span {
+	var serverSpan opentracing.Span
+	appSpecificOperationName := operationName
+	wireContext, err := opentracing.GlobalTracer().Extract(
+		opentracing.HTTPHeaders,
+		opentracing.HTTPHeadersCarrier(req.Header))
+	if err != nil {
+		if err != opentracing.ErrSpanContextNotFound {
+			glog.Warningf("Failed to read client context: %v", err)
+		}
+		return nil
+	}
+
+	serverSpan = opentracing.StartSpan(
+		appSpecificOperationName,
+		opentracing.ChildOf(wireContext),
+		opentracing.StartTime(time.Now()))
+
+	return serverSpan
+}
+
+func startTracing(req *http.Request, operationName string) (otSpan opentracing.Span, simpleTrace *utiltrace.Trace) {
+	trace := utiltrace.New(operationName)
+	var span opentracing.Span
+	wireContext, err := opentracing.GlobalTracer().Extract(
+		opentracing.HTTPHeaders,
+		opentracing.HTTPHeadersCarrier(req.Header))
+	if err != nil {
+		if err != opentracing.ErrSpanContextNotFound {
+			glog.Warningf("Failed to read client context: %v", err)
+		}
+		return nil, trace
+	}
+	span = opentracing.StartSpan(
+		operationName,
+		opentracing.ChildOf(wireContext),
+		opentracing.StartTime(time.Now()))
+
+	return span, trace
+}
+
+func traceStep(otSpan opentracing.Span, simpleTrace *utiltrace.Trace, stepName string) {
+	if otSpan != nil {
+		otSpan.LogKV("Step", stepName)
+	}
+	if simpleTrace != nil {
+		simpleTrace.Step(fmt.Sprintf("%v: %v", "Step", stepName))
+	}
+}
+
+func finalizeTraces(otSpan opentracing.Span, simpleTrace *utiltrace.Trace, simpleTraceLogThreshold time.Duration) {
+	if otSpan != nil {
+		otSpan.Finish()
+	}
+	if simpleTrace != nil {
+		simpleTrace.LogIfLong(simpleTraceLogThreshold)
+	}
+}
+
 // getResourceHandler is an HTTP handler function for get requests. It delegates to the
 // passed-in getterFunc to perform the actual get.
 func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		trace := utiltrace.New("Get " + req.URL.Path)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		otSpan, simpleTrace := startTracing(req, fmt.Sprintf("Get %v", req.URL.Path))
+		defer finalizeTraces(otSpan, simpleTrace, 500*time.Millisecond)
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
@@ -125,8 +187,11 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 		}
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
+		if otSpan != nil {
+			ctx = opentracing.ContextWithSpan(ctx, otSpan)
+		}
 
-		result, err := getter(ctx, name, req, trace)
+		result, err := getter(ctx, name, req, simpleTrace)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -141,15 +206,26 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 			return
 		}
 
-		trace.Step("About to write a response")
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		traceStep(otSpan, simpleTrace, "About to write a response.")
+    transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 	}
 }
 
 // GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
 func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.HandlerFunc {
 	return getResourceHandler(scope,
-		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
+		func(ctx request.Context, name string, req *http.Request, simpleTrace *utiltrace.Trace) (runtime.Object, error) {
+			parentSpan := opentracing.SpanFromContext(ctx)
+			var otSpan opentracing.Span
+			if parentSpan != nil {
+				otSpan = opentracing.StartSpan(
+					"GetResourceInternal",
+					opentracing.ChildOf(parentSpan.Context()),
+					opentracing.StartTime(time.Now()),
+				)
+				defer otSpan.Finish()
+			}
+
 			// check for export
 			options := metav1.GetOptions{}
 			if values := req.URL.Query(); len(values) > 0 {
@@ -169,9 +245,8 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 					return nil, err
 				}
 			}
-			if trace != nil {
-				trace.Step("About to Get from storage")
-			}
+
+			traceStep(otSpan, simpleTrace, "About to Get from storage.")
 			return r.Get(ctx, name, &options)
 		})
 }
@@ -179,16 +254,25 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 // GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
 func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, isSubresource bool) http.HandlerFunc {
 	return getResourceHandler(scope,
-		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
+		func(ctx request.Context, name string, req *http.Request, simpleTrace *utiltrace.Trace) (runtime.Object, error) {
+			parentSpan := opentracing.SpanFromContext(ctx)
+			var otSpan opentracing.Span
+			if parentSpan != nil {
+				otSpan = opentracing.StartSpan(
+					"GetResourceWithOptionsInternal",
+					opentracing.ChildOf(parentSpan.Context()),
+					opentracing.StartTime(time.Now()),
+				)
+				defer otSpan.Finish()
+			}
+
+			traceStep(otSpan, simpleTrace, "About to process Get options.")
 			opts, subpath, subpathKey := r.NewGetOptions()
-			trace.Step("About to process Get options")
 			if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
 				err = errors.NewBadRequest(err.Error())
 				return nil, err
 			}
-			if trace != nil {
-				trace.Step("About to Get from storage")
-			}
+			traceStep(otSpan, simpleTrace, "About to Get from storage.")
 			return r.Get(ctx, name, opts)
 		})
 }
@@ -275,8 +359,10 @@ func (r *responder) Error(err error) {
 
 func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		// For performance tracking purposes.
-		trace := utiltrace.New("List " + req.URL.Path)
+		otSpan, simpleTrace := startTracing(req, fmt.Sprintf("List %v", req.URL.Path))
+		if otSpan != nil {
+			defer otSpan.Finish()
+		}
 
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
@@ -338,6 +424,9 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				scope.err(errors.NewMethodNotSupported(scope.Resource.GroupResource(), "watch"), w, req)
 				return
 			}
+			if otSpan != nil {
+				otSpan.SetTag("ListKind", "Watch")
+			}
 			// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
 			timeout := time.Duration(0)
 			if opts.TimeoutSeconds != nil {
@@ -358,20 +447,20 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		}
 
 		// Log only long List requests (ignore Watch).
-		defer trace.LogIfLong(500 * time.Millisecond)
-		trace.Step("About to List from storage")
+		defer simpleTrace.LogIfLong(500 * time.Millisecond)
+		traceStep(otSpan, simpleTrace, "About to List from storage.")
 		result, err := r.List(ctx, &opts)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Listing from storage done")
+		traceStep(otSpan, simpleTrace, "Listing from storage done.")
 		numberOfItems, err := setListSelfLink(result, ctx, req, scope.Namer)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Self-linking done")
+		traceStep(otSpan, simpleTrace, "Self-linking done.")
 		// Ensure empty lists return a non-nil items slice
 		if numberOfItems == 0 && meta.IsListType(result) {
 			if err := meta.SetList(result, []runtime.Object{}); err != nil {
@@ -380,16 +469,15 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			}
 		}
 
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
-		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
+		traceStep(otSpan, simpleTrace, "About to transform response.")
+    transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 	}
 }
 
 func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		// For performance tracking purposes.
-		trace := utiltrace.New("Create " + req.URL.Path)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		otSpan, simpleTrace := startTracing(req, fmt.Sprintf("Create %v", req.URL.Path))
+		defer finalizeTraces(otSpan, simpleTrace, 500*time.Millisecond)
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.URL.Query().Get("timeout"))
@@ -427,7 +515,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 
 		defaultGVK := scope.Kind
 		original := r.New()
-		trace.Step("About to convert to expected version")
+		traceStep(otSpan, simpleTrace, "About to convert to expected version.")
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
 			err = transformDecodeError(typer, err, original, gvk, body)
@@ -439,7 +527,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Conversion done")
+		traceStep(otSpan, simpleTrace, "Conversion done.")
 
 		ae := request.AuditEventFrom(ctx)
 		audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
@@ -457,7 +545,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		// TODO: replace with content type negotiation?
 		includeUninitialized := req.URL.Query().Get("includeUninitialized") == "1"
 
-		trace.Step("About to store object in database")
+		traceStep(otSpan, simpleTrace, "About to store object in database.")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			return r.Create(ctx, name, obj, includeUninitialized)
 		})
@@ -465,7 +553,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Object stored in database")
+		traceStep(otSpan, simpleTrace, "Object stored in database.")
 
 		requestInfo, ok := request.RequestInfoFrom(ctx)
 		if !ok {
@@ -476,7 +564,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Self-link added")
+    traceStep(otSpan, simpleTrace, "Self-link added.")
 
 		// If the object is partially initialized, always indicate it via StatusAccepted
 		code := http.StatusCreated
@@ -490,6 +578,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			status.Code = int32(code)
 		}
 
+    traceStep(otSpan, simpleTrace, "About to transform the response.")
 		transformResponseObject(ctx, scope, req, w, code, result)
 	}
 }
@@ -516,6 +605,8 @@ func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runti
 // TODO: Eventually PatchResource should just use GuaranteedUpdate and this routine should be a bit cleaner
 func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, converter runtime.ObjectConvertor) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		otSpan, simpleTrace := startTracing(req, fmt.Sprintf("Patch %v", req.URL.Path))
+		defer finalizeTraces(otSpan, simpleTrace, 500*time.Millisecond)
 		// TODO: we either want to remove timeout or document it (if we
 		// document, move timeout out of this function and declare it in
 		// api_installer)
@@ -529,7 +620,11 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
+		if otSpan != nil {
+			ctx = opentracing.ContextWithSpan(ctx, otSpan)
+		}
 
+		traceStep(otSpan, simpleTrace, "About to convert to versioned object.")
 		versionedObj, err := converter.ConvertToVersion(r.New(), scope.Kind.GroupVersion())
 		if err != nil {
 			scope.err(err, w, req)
@@ -573,6 +668,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return nil
 		}
 
+		traceStep(otSpan, simpleTrace, "About to patch a resource.")
 		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS,
 			scope.Namer, scope.Copier, scope.Creater, scope.Defaulter, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec)
 		if err != nil {
@@ -590,6 +686,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
+		traceStep(otSpan, simpleTrace, "About to transform a response.")
 		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 	}
 }
@@ -615,6 +712,16 @@ func patchResource(
 	resource schema.GroupVersionResource,
 	codec runtime.Codec,
 ) (runtime.Object, error) {
+	parentSpan := opentracing.SpanFromContext(ctx)
+	var otSpan opentracing.Span
+	if parentSpan != nil {
+		otSpan = opentracing.StartSpan(
+			"patchResourceInternal",
+			opentracing.ChildOf(parentSpan.Context()),
+			opentracing.StartTime(time.Now()),
+		)
+		defer otSpan.Finish()
+	}
 
 	namespace := request.NamespaceValue(ctx)
 
@@ -820,11 +927,18 @@ func patchResource(
 
 	updatedObjectInfo := rest.DefaultUpdatedObjectInfo(nil, copier, applyPatch, applyAdmission)
 
+	traceStep(otSpan, nil, "About to apply patch.")
 	return finishRequest(timeout, func() (runtime.Object, error) {
 		updateObject, _, updateErr := patcher.Update(ctx, name, updatedObjectInfo)
 		for i := 0; i < MaxRetryWhenPatchConflicts && (errors.IsConflict(updateErr)); i++ {
 			lastConflictErr = updateErr
+			traceStep(otSpan, nil, "About to try update.")
 			updateObject, _, updateErr = patcher.Update(ctx, name, updatedObjectInfo)
+		}
+		if updateErr == nil {
+			traceStep(otSpan, nil, "Successfully finished patch.")
+		} else {
+			traceStep(otSpan, nil, fmt.Sprintf("Gave up while patching. Last encountered error: %v", updateErr))
 		}
 		return updateObject, updateErr
 	})
@@ -833,9 +947,8 @@ func patchResource(
 // UpdateResource returns a function that will handle a resource update
 func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		// For performance tracking purposes.
-		trace := utiltrace.New("Update " + req.URL.Path)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		otSpan, simpleTrace := startTracing(req, fmt.Sprintf("Update %v", req.URL.Path))
+		defer finalizeTraces(otSpan, simpleTrace, 500*time.Millisecond)
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.URL.Query().Get("timeout"))
@@ -861,7 +974,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 		defaultGVK := scope.Kind
 		original := r.New()
-		trace.Step("About to convert to expected version")
+		traceStep(otSpan, simpleTrace, "About to convert to expected version.")
 		obj, gvk, err := scope.Serializer.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, original)
 		if err != nil {
 			err = transformDecodeError(typer, err, original, gvk, body)
@@ -873,7 +986,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Conversion done")
+		traceStep(otSpan, simpleTrace, "Conversion done.")
 
 		ae := request.AuditEventFrom(ctx)
 		audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
@@ -891,7 +1004,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			})
 		}
 
-		trace.Step("About to store object in database")
+		traceStep(otSpan, simpleTrace, "About to store object in database.")
 		wasCreated := false
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			obj, created, err := r.Update(ctx, name, rest.DefaultUpdatedObjectInfo(obj, scope.Copier, transformers...))
@@ -902,7 +1015,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Object stored in database")
+		traceStep(otSpan, simpleTrace, "Object stored in database.")
 
 		requestInfo, ok := request.RequestInfoFrom(ctx)
 		if !ok {
@@ -913,7 +1026,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Self-link added")
+		traceStep(otSpan, simpleTrace, "Self-link added.")
 
 		status := http.StatusOK
 		if wasCreated {
@@ -927,9 +1040,8 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 // DeleteResource returns a function that will handle a resource deletion
 func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		// For performance tracking purposes.
-		trace := utiltrace.New("Delete " + req.URL.Path)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		otSpan, simpleTrace := startTracing(req, fmt.Sprintf("Delete %v", req.URL.Path))
+		defer finalizeTraces(otSpan, simpleTrace, 500*time.Millisecond)
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.URL.Query().Get("timeout"))
@@ -991,7 +1103,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			}
 		}
 
-		trace.Step("About do delete object from database")
+		traceStep(otSpan, simpleTrace, "About do delete object from database.")
 		wasDeleted := true
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			obj, deleted, err := r.Delete(ctx, name, options)
@@ -1002,7 +1114,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Object deleted from database")
+		traceStep(otSpan, simpleTrace, "Object deleted from database.")
 
 		status := http.StatusOK
 		// Return http.StatusAccepted if the resource was not deleted immediately and
@@ -1047,6 +1159,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 // DeleteCollection returns a function that will handle a collection deletion
 func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		otSpan, simpleTrace := startTracing(req, fmt.Sprintf("DeleteCollection %v", req.URL.Path))
+		defer finalizeTraces(otSpan, simpleTrace, 500*time.Millisecond)
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.URL.Query().Get("timeout"))
 
@@ -1120,6 +1234,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+			traceStep(otSpan, simpleTrace, "About to delete a collection.")
 			return r.DeleteCollection(ctx, options, &listOptions)
 		})
 		if err != nil {
@@ -1147,6 +1262,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 		}
 
+		traceStep(otSpan, simpleTrace, "About to transform a response.")
 		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 	}
 }
