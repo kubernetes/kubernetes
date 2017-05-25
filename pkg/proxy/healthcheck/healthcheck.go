@@ -197,7 +197,13 @@ var _ http.Handler = hcHandler{}
 
 func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	h.hcs.lock.Lock()
-	count := h.hcs.services[h.name].endpoints
+	svc, ok := h.hcs.services[h.name]
+	if !ok || svc == nil {
+		h.hcs.lock.Unlock()
+		glog.Errorf("Received request for closed healthcheck %q", h.name.String())
+		return
+	}
+	count := svc.endpoints
 	h.hcs.lock.Unlock()
 
 	resp.Header().Set("Content-Type", "application/json")
