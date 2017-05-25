@@ -54,8 +54,6 @@ func (cc *NodeConfigController) recordStartup() {
 // If filesystem issues prevent determining a modification time or loading
 // the startups-tracking-file, a fatal error occurs.
 func (cc *NodeConfigController) crashLooping(threshold int32) bool {
-	const errfmt = "failed to check for crash loops, error: %v"
-
 	// load the startups-tracking file
 	ls := cc.loadStartups()
 
@@ -70,7 +68,7 @@ func (cc *NodeConfigController) crashLooping(threshold int32) bool {
 	for i, stamp := range ls {
 		t, err := time.Parse(time.RFC3339, stamp)
 		if err != nil {
-			fatalf(errfmt, err)
+			fatalf("failed to parse timestamp while checking for crash loops, error: %v", err)
 		}
 		if t.After(modTime) {
 			num = int32(l - i)

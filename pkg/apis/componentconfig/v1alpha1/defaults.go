@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -205,8 +206,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.ConfigTrialDuration = &metav1.Duration{Duration: 10 * time.Minute}
 	}
 	if obj.CrashLoopThreshold == nil {
-		temp := int32(3)
-		obj.CrashLoopThreshold = &temp
+		obj.CrashLoopThreshold = util.Int32Ptr(3)
 	}
 	if obj.Authentication.Anonymous.Enabled == nil {
 		obj.Authentication.Anonymous.Enabled = boolVar(true)
