@@ -441,7 +441,7 @@ func (as *authStore) UserGrantRole(r *pb.AuthUserGrantRoleRequest) (*pb.AuthUser
 	}
 
 	idx := sort.SearchStrings(user.Roles, r.Role)
-	if idx < len(user.Roles) && strings.Compare(user.Roles[idx], r.Role) == 0 {
+	if idx < len(user.Roles) && user.Roles[idx] == r.Role {
 		plog.Warningf("user %s is already granted role %s", r.User, r.Role)
 		return &pb.AuthUserGrantRoleResponse{}, nil
 	}
@@ -506,7 +506,7 @@ func (as *authStore) UserRevokeRole(r *pb.AuthUserRevokeRoleRequest) (*pb.AuthUs
 	}
 
 	for _, role := range user.Roles {
-		if strings.Compare(role, r.Role) != 0 {
+		if role != r.Role {
 			updatedUser.Roles = append(updatedUser.Roles, role)
 		}
 	}
