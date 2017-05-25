@@ -94,7 +94,7 @@ func configOKEq(a, b *apiv1.NodeCondition) bool {
 // getConfigOK returns the first NodeCondition in `cs` with Type == configOKType.
 // If no such condition exists, returns nil.
 func getConfigOK(cs []apiv1.NodeCondition) *apiv1.NodeCondition {
-	for i, _ := range cs {
+	for i := range cs {
 		if cs[i].Type == configOKType {
 			return &cs[i]
 		}
