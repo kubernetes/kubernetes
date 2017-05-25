@@ -78,6 +78,7 @@ import (
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+	"k8s.io/kubernetes/pkg/util/tracing"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
@@ -162,6 +163,10 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, stopCh); err != nil {
 			return err
 		}
+	}
+
+	if closer := tracing.InitGlobalTracer(runOptions.Tracer, "apiserver"); closer != nil {
+		defer closer.Close()
 	}
 
 	return aggregatorServer.GenericAPIServer.PrepareRun().Run(stopCh)

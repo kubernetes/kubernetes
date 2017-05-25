@@ -613,6 +613,8 @@ type KubeSchedulerConfiguration struct {
 	// UseLegacyPolicyConfig tells the scheduler to ignore Policy ConfigMap and
 	// to use PolicyConfigFile if available.
 	UseLegacyPolicyConfig bool
+	// Tracer is a name of OpenTracing Tracer implementation to start.
+	Tracer string
 }
 
 // LeaderElectionConfiguration defines the configuration of leader election
@@ -858,6 +860,8 @@ type KubeControllerManagerConfiguration struct {
 	// through the kube-aggregator when enabled, instead of using the legacy metrics client
 	// through the API server proxy.
 	HorizontalPodAutoscalerUseRESTClients bool
+	// Tracer is a name of OpenTracing Tracer implementation to start.
+	Tracer string
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

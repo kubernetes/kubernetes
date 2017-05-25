@@ -193,6 +193,8 @@ type KubeSchedulerConfiguration struct {
 	// UseLegacyPolicyConfig tells the scheduler to ignore Policy ConfigMap and
 	// to use PolicyConfigFile if available.
 	UseLegacyPolicyConfig bool `json:"useLegacyPolicyConfig"`
+	// Tracer is a name of OpenTracing Tracer implementation to start.
+	Tracer string `json:"tracer"`
 }
 
 // HairpinMode denotes how the kubelet should configure networking to handle

@@ -57,6 +57,7 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/configz"
+	"k8s.io/kubernetes/pkg/util/tracing"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -152,6 +153,10 @@ func Run(s *options.CMServer) error {
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "controller-manager"})
+
+	if closer := tracing.InitGlobalTracer(s.Tracer, "controller-manager"); closer != nil {
+		defer closer.Close()
+	}
 
 	run := func(stop <-chan struct{}) {
 		rootClientBuilder := controller.SimpleControllerClientBuilder{
