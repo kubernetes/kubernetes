@@ -116,7 +116,7 @@ func TestEdit(t *testing.T) {
 			if step.StepType != "edit" {
 				t.Fatalf("%s, step %d: expected edit step, got %s %s", name, i, req.Method, req.URL.Path)
 			}
-			if bytes.Compare(body, expectedInput) != 0 {
+			if !bytes.Equal(body, expectedInput) {
 				if updateInputFixtures {
 					// Convenience to allow recapturing the input and persisting it here
 					ioutil.WriteFile(inputFile, body, os.FileMode(0644))
@@ -139,7 +139,7 @@ func TestEdit(t *testing.T) {
 					req.Method, req.URL.Path, req.Header.Get("Content-Type"),
 				)
 			}
-			if bytes.Compare(body, expectedInput) != 0 {
+			if !bytes.Equal(body, expectedInput) {
 				if updateInputFixtures {
 					// Convenience to allow recapturing the input and persisting it here
 					ioutil.WriteFile(inputFile, body, os.FileMode(0644))

@@ -136,11 +136,6 @@ type StatefulSetReaper struct {
 	pollInterval, timeout time.Duration
 }
 
-type objInterface interface {
-	Delete(name string) error
-	Get(name string) (metav1.Object, error)
-}
-
 // getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.
 func getOverlappingControllers(rcClient coreclient.ReplicationControllerInterface, rc *api.ReplicationController) ([]api.ReplicationController, error) {
 	rcs, err := rcClient.List(metav1.ListOptions{})

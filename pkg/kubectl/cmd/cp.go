@@ -34,11 +34,10 @@ import (
 )
 
 var (
-	cp_example = templates.Examples(i18n.T(`
+	cpExample = templates.Examples(i18n.T(`
 		# !!!Important Note!!!
 		# Requires that the 'tar' binary is present in your container
 		# image.  If 'tar' is not present, 'kubectl cp' will fail.
-
 
 		# Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in the default namespace
 		kubectl cp /tmp/foo_dir <some-pod>:/tmp/bar_dir
@@ -65,7 +64,7 @@ func NewCmdCp(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
 		Use:     "cp <file-spec-src> <file-spec-dest>",
 		Short:   i18n.T("Copy files and directories to and from containers."),
 		Long:    "Copy files and directories to and from containers.",
-		Example: cp_example,
+		Example: cpExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(runCopy(f, cmd, cmdOut, cmdErr, args))
 		},

@@ -39,12 +39,12 @@ type CreateOptions struct {
 }
 
 var (
-	create_long = templates.LongDesc(i18n.T(`
+	createLong = templates.LongDesc(i18n.T(`
 		Create a resource from a file or from stdin.
 
 		JSON and YAML formats are accepted.`))
 
-	create_example = templates.Examples(i18n.T(`
+	createExample = templates.Examples(i18n.T(`
 		# Create a pod using the data in pod.json.
 		kubectl create -f ./pod.json
 
@@ -61,8 +61,8 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create -f FILENAME",
 		Short:   i18n.T("Create a resource from a file or from stdin."),
-		Long:    create_long,
-		Example: create_example,
+		Long:    createLong,
+		Example: createExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if cmdutil.IsFilenameEmpty(options.FilenameOptions.Filenames) {
 				defaultRunFunc := cmdutil.DefaultSubCommandRun(errOut)
