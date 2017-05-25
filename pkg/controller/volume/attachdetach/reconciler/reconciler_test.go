@@ -55,7 +55,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	nsu := statusupdater.NewNodeStatusUpdater(
 		fakeKubeClient, informerFactory.Core().V1().Nodes().Lister(), asw)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
 
 	// Act
 	ch := make(chan struct{})
@@ -83,7 +83,7 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(fakeKubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -129,7 +129,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(fakeKubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -196,7 +196,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(fakeKubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -263,7 +263,7 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(fakeKubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -333,7 +333,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(fakeKubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -423,7 +423,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(fakeKubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
