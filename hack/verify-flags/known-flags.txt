@@ -490,6 +490,7 @@ network-plugin
 network-plugin-dir
 network-plugin-mtu
 node-cidr-mask-size
+node-config-dir
 node-eviction-rate
 node-instance-group
 node-ip
