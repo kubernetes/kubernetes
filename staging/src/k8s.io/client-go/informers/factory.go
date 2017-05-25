@@ -21,6 +21,7 @@ package informers
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	admissionregistration "k8s.io/client-go/informers/admissionregistration"
 	apps "k8s.io/client-go/informers/apps"
 	autoscaling "k8s.io/client-go/informers/autoscaling"
 	batch "k8s.io/client-go/informers/batch"
@@ -119,6 +120,7 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
+	Admissionregistration() admissionregistration.Interface
 	Apps() apps.Interface
 	Autoscaling() autoscaling.Interface
 	Batch() batch.Interface
@@ -129,6 +131,10 @@ type SharedInformerFactory interface {
 	Rbac() rbac.Interface
 	Settings() settings.Interface
 	Storage() storage.Interface
+}
+
+func (f *sharedInformerFactory) Admissionregistration() admissionregistration.Interface {
+	return admissionregistration.New(f)
 }
 
 func (f *sharedInformerFactory) Apps() apps.Interface {

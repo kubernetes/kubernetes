@@ -17,6 +17,7 @@ go_library(
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/client-go/informers/admissionregistration:go_default_library",
         "//vendor/k8s.io/client-go/informers/apps:go_default_library",
         "//vendor/k8s.io/client-go/informers/autoscaling:go_default_library",
         "//vendor/k8s.io/client-go/informers/batch:go_default_library",
@@ -30,6 +31,7 @@ go_library(
         "//vendor/k8s.io/client-go/informers/storage:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/apis/admissionregistration/v1alpha1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/autoscaling/v1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/autoscaling/v2alpha1:go_default_library",
