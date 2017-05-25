@@ -28,12 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	kubeadmission "k8s.io/apiserver/pkg/admission/initializer"
+	informers "k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/pkg/api/v1"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 // newHandlerForTest returns a configured handler for testing.
@@ -48,29 +48,32 @@ func newHandlerForTestWithClock(c clientset.Interface, cacheClock clock.Clock) (
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil, nil)
+	pluginInitializer, err := kubeadmission.New(c, f, nil)
+	if err != nil {
+		return handler, f, err
+	}
 	pluginInitializer.Initialize(handler)
 	err = admission.Validate(handler)
 	return handler, f, err
 }
 
 // newMockClientForTest creates a mock client that returns a client configured for the specified list of namespaces with the specified phase.
-func newMockClientForTest(namespaces map[string]api.NamespacePhase) *fake.Clientset {
+func newMockClientForTest(namespaces map[string]v1.NamespacePhase) *fake.Clientset {
 	mockClient := &fake.Clientset{}
 	mockClient.AddReactor("list", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
-		namespaceList := &api.NamespaceList{
+		namespaceList := &v1.NamespaceList{
 			ListMeta: metav1.ListMeta{
 				ResourceVersion: fmt.Sprintf("%d", len(namespaces)),
 			},
 		}
 		index := 0
 		for name, phase := range namespaces {
-			namespaceList.Items = append(namespaceList.Items, api.Namespace{
+			namespaceList.Items = append(namespaceList.Items, v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            name,
 					ResourceVersion: fmt.Sprintf("%d", index),
 				},
-				Status: api.NamespaceStatus{
+				Status: v1.NamespaceStatus{
 					Phase: phase,
 				},
 			})
@@ -82,19 +85,19 @@ func newMockClientForTest(namespaces map[string]api.NamespacePhase) *fake.Client
 }
 
 // newPod returns a new pod for the specified namespace
-func newPod(namespace string) api.Pod {
-	return api.Pod{
+func newPod(namespace string) v1.Pod {
+	return v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
-		Spec: api.PodSpec{
-			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image"}},
+		Spec: v1.PodSpec{
+			Volumes:    []v1.Volume{{Name: "vol"}},
+			Containers: []v1.Container{{Name: "ctr", Image: "image"}},
 		},
 	}
 }
 
 func TestAccessReviewCheckOnMissingNamespace(t *testing.T) {
 	namespace := "test"
-	mockClient := newMockClientForTest(map[string]api.NamespacePhase{})
+	mockClient := newMockClientForTest(map[string]v1.NamespacePhase{})
 	mockClient.AddReactor("get", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, fmt.Errorf("nope, out of luck")
 	})
@@ -113,7 +116,7 @@ func TestAccessReviewCheckOnMissingNamespace(t *testing.T) {
 // TestAdmissionNamespaceDoesNotExist verifies pod is not admitted if namespace does not exist.
 func TestAdmissionNamespaceDoesNotExist(t *testing.T) {
 	namespace := "test"
-	mockClient := newMockClientForTest(map[string]api.NamespacePhase{})
+	mockClient := newMockClientForTest(map[string]v1.NamespacePhase{})
 	mockClient.AddReactor("get", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, fmt.Errorf("nope, out of luck")
 	})
@@ -124,7 +127,7 @@ func TestAdmissionNamespaceDoesNotExist(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		actions := ""
 		for _, action := range mockClient.Actions() {
@@ -137,8 +140,8 @@ func TestAdmissionNamespaceDoesNotExist(t *testing.T) {
 // TestAdmissionNamespaceActive verifies a resource is admitted when the namespace is active.
 func TestAdmissionNamespaceActive(t *testing.T) {
 	namespace := "test"
-	mockClient := newMockClientForTest(map[string]api.NamespacePhase{
-		namespace: api.NamespaceActive,
+	mockClient := newMockClientForTest(map[string]v1.NamespacePhase{
+		namespace: v1.NamespaceActive,
 	})
 
 	handler, informerFactory, err := newHandlerForTest(mockClient)
@@ -148,7 +151,7 @@ func TestAdmissionNamespaceActive(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("unexpected error returned from admission handler")
 	}
@@ -157,8 +160,8 @@ func TestAdmissionNamespaceActive(t *testing.T) {
 // TestAdmissionNamespaceTerminating verifies a resource is not created when the namespace is active.
 func TestAdmissionNamespaceTerminating(t *testing.T) {
 	namespace := "test"
-	mockClient := newMockClientForTest(map[string]api.NamespacePhase{
-		namespace: api.NamespaceTerminating,
+	mockClient := newMockClientForTest(map[string]v1.NamespacePhase{
+		namespace: v1.NamespaceTerminating,
 	})
 
 	handler, informerFactory, err := newHandlerForTest(mockClient)
@@ -169,31 +172,31 @@ func TestAdmissionNamespaceTerminating(t *testing.T) {
 
 	pod := newPod(namespace)
 	// verify create operations in the namespace cause an error
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected error rejecting creates in a namespace when it is terminating")
 	}
 
 	// verify update operations in the namespace can proceed
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Update, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler: %v", err)
 	}
 
 	// verify delete operations in the namespace can proceed
-	err = handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Delete, nil))
+	err = handler.Admit(admission.NewAttributesRecord(nil, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Delete, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler: %v", err)
 	}
 
 	// verify delete of namespace default can never proceed
-	err = handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("Namespace").WithVersion("version"), "", metav1.NamespaceDefault, api.Resource("namespaces").WithVersion("version"), "", admission.Delete, nil))
+	err = handler.Admit(admission.NewAttributesRecord(nil, nil, v1.SchemeGroupVersion.WithKind("Namespace").GroupKind().WithVersion("version"), "", metav1.NamespaceDefault, v1.Resource("namespaces").WithVersion("version"), "", admission.Delete, nil))
 	if err == nil {
 		t.Errorf("Expected an error that this namespace can never be deleted")
 	}
 
 	// verify delete of namespace other than default can proceed
-	err = handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("Namespace").WithVersion("version"), "", "other", api.Resource("namespaces").WithVersion("version"), "", admission.Delete, nil))
+	err = handler.Admit(admission.NewAttributesRecord(nil, nil, v1.SchemeGroupVersion.WithKind("Namespace").GroupKind().WithVersion("version"), "", "other", v1.Resource("namespaces").WithVersion("version"), "", admission.Delete, nil))
 	if err != nil {
 		t.Errorf("Did not expect an error %v", err)
 	}
@@ -203,11 +206,11 @@ func TestAdmissionNamespaceTerminating(t *testing.T) {
 func TestAdmissionNamespaceForceLiveLookup(t *testing.T) {
 	namespace := "test"
 	getCalls := int64(0)
-	phases := map[string]api.NamespacePhase{namespace: api.NamespaceActive}
+	phases := map[string]v1.NamespacePhase{namespace: v1.NamespaceActive}
 	mockClient := newMockClientForTest(phases)
 	mockClient.AddReactor("get", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
 		getCalls++
-		return true, &api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}, Status: api.NamespaceStatus{Phase: phases[namespace]}}, nil
+		return true, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}, Status: v1.NamespaceStatus{Phase: phases[namespace]}}, nil
 	})
 
 	fakeClock := clock.NewFakeClock(time.Now())
@@ -220,7 +223,7 @@ func TestAdmissionNamespaceForceLiveLookup(t *testing.T) {
 
 	pod := newPod(namespace)
 	// verify create operations in the namespace is allowed
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error rejecting creates in an active namespace")
 	}
@@ -230,7 +233,7 @@ func TestAdmissionNamespaceForceLiveLookup(t *testing.T) {
 	getCalls = 0
 
 	// verify delete of namespace can proceed
-	err = handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("Namespace").WithVersion("version"), "", namespace, api.Resource("namespaces").WithVersion("version"), "", admission.Delete, nil))
+	err = handler.Admit(admission.NewAttributesRecord(nil, nil, v1.SchemeGroupVersion.WithKind("Namespace").GroupKind().WithVersion("version"), "", namespace, v1.Resource("namespaces").WithVersion("version"), "", admission.Delete, nil))
 	if err != nil {
 		t.Errorf("Expected namespace deletion to be allowed")
 	}
@@ -240,10 +243,10 @@ func TestAdmissionNamespaceForceLiveLookup(t *testing.T) {
 	getCalls = 0
 
 	// simulate the phase changing
-	phases[namespace] = api.NamespaceTerminating
+	phases[namespace] = v1.NamespaceTerminating
 
 	// verify create operations in the namespace cause an error
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected error rejecting creates in a namespace right after deleting it")
 	}
@@ -256,7 +259,7 @@ func TestAdmissionNamespaceForceLiveLookup(t *testing.T) {
 	fakeClock.Step(forceLiveLookupTTL)
 
 	// verify create operations in the namespace cause an error
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected error rejecting creates in a namespace right after deleting it")
 	}
@@ -269,7 +272,7 @@ func TestAdmissionNamespaceForceLiveLookup(t *testing.T) {
 	fakeClock.Step(time.Millisecond)
 
 	// verify create operations in the namespace don't force a live lookup after the timeout
-	handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	handler.Admit(admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if getCalls != 0 {
 		t.Errorf("Expected no live lookup of the namespace at t=forceLiveLookupTTL+1ms, got %d", getCalls)
 	}

@@ -87,6 +87,7 @@ func Run(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// register all admission plugins
 	registerAllAdmissionPlugins(s.Admission.Plugins)
+
 	// set defaults
 	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing); err != nil {
 		return err

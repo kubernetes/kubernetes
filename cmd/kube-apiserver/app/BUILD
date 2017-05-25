@@ -55,7 +55,6 @@ go_library(
         "//plugin/pkg/admission/limitranger:go_default_library",
         "//plugin/pkg/admission/namespace/autoprovision:go_default_library",
         "//plugin/pkg/admission/namespace/exists:go_default_library",
-        "//plugin/pkg/admission/namespace/lifecycle:go_default_library",
         "//plugin/pkg/admission/noderestriction:go_default_library",
         "//plugin/pkg/admission/persistentvolume/label:go_default_library",
         "//plugin/pkg/admission/podnodeselector:go_default_library",
