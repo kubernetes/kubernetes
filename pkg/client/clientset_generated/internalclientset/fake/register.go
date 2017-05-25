@@ -29,6 +29,7 @@ import (
 	batchinternalversion "k8s.io/kubernetes/pkg/apis/batch"
 	certificatesinternalversion "k8s.io/kubernetes/pkg/apis/certificates"
 	extensionsinternalversion "k8s.io/kubernetes/pkg/apis/extensions"
+	networkinginternalversion "k8s.io/kubernetes/pkg/apis/networking"
 	policyinternalversion "k8s.io/kubernetes/pkg/apis/policy"
 	rbacinternalversion "k8s.io/kubernetes/pkg/apis/rbac"
 	settingsinternalversion "k8s.io/kubernetes/pkg/apis/settings"
@@ -67,6 +68,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	batchinternalversion.AddToScheme(scheme)
 	certificatesinternalversion.AddToScheme(scheme)
 	extensionsinternalversion.AddToScheme(scheme)
+	networkinginternalversion.AddToScheme(scheme)
 	policyinternalversion.AddToScheme(scheme)
 	rbacinternalversion.AddToScheme(scheme)
 	settingsinternalversion.AddToScheme(scheme)
