@@ -358,7 +358,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, false)
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
@@ -437,12 +437,10 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, false)
 		pod1.ObjectMeta.Labels = testServiceSelector
-		pod1.ObjectMeta.Annotations = map[string]string{
-			pod.PodHostnameAnnotation:  podHostname,
-			pod.PodSubdomainAnnotation: serviceName,
-		}
+		pod1.Spec.Hostname = podHostname
+		pod1.Spec.Subdomain = serviceName
 
 		validateDNSResults(f, pod1, append(wheezyFileNames, jessieFileNames...))
 	})
@@ -468,7 +466,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, false)
 
 		validateTargetedProbeOutput(f, pod1, []string{wheezyFileName, jessieFileName}, "foo.example.com.")
 
@@ -485,7 +483,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a second pod to probe DNS")
-		pod2 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod2 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, false)
 
 		validateTargetedProbeOutput(f, pod2, []string{wheezyFileName, jessieFileName}, "bar.example.com.")
 
@@ -506,7 +504,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a third pod to probe DNS")
-		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, false)
 
 		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, "127.1.2.3")
 	})
