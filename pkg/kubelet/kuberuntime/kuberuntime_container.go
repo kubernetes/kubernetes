@@ -474,6 +474,43 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(pod *v1.Pod, containerID 
 	return int64(metav1.Now().Sub(start.Time).Seconds())
 }
 
+// executeRetryUntilSuccess runs the Retry-Until lifecycle hooks if applicable and returns the duration it takes.
+func (m *kubeGenericRuntimeManager) executeRetryUntilSuccessHook(pod *v1.Pod, containerID kubecontainer.ContainerID, containerSpec *v1.Container, gracePeriod int64) int64 {
+	glog.V(3).Infof("Running RetryUntilSuccess hook for container %q", containerID.String())
+
+	start := metav1.Now()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer utilruntime.HandleCrash()
+		if msg, err := m.runner.Run(containerID, pod, containerSpec, containerSpec.Lifecycle.RetryUntilSuccess); err != nil {
+			glog.Errorf("preStop hook for container %q failed: %v", containerSpec.Name, err)
+			m.generateContainerEvent(containerID, v1.EventTypeWarning, events.FailedRetryUntilSuccessHook, msg)
+			ticker := time.NewTicker(5 * time.Second)
+			for {
+				time := <-ticker.C
+				glog.Errorf("retryUntilSuccess hook for container %q failed: %v,retry %s===========", containerSpec.Name, err, time)
+				if msg, err = m.runner.Run(containerID, pod, containerSpec, containerSpec.Lifecycle.RetryUntilSuccess); err != nil {
+					continue
+				} else {
+					done <- struct{}{}
+				}
+
+			}
+
+		}
+	}()
+
+	select {
+	case <-time.After(time.Duration(gracePeriod) * time.Second):
+		glog.V(2).Infof("retryUntilSuccess hook for container %q did not complete in %d seconds", containerID, gracePeriod)
+	case <-done:
+		glog.V(3).Infof("retryUntilSuccess hook for container %q completed", containerID)
+	}
+
+	return int64(metav1.Now().Sub(start.Time).Seconds())
+}
+
 // restoreSpecsFromContainerLabels restores all information needed for killing a container. In some
 // case we may not have pod and container spec when killing a container, e.g. pod is deleted during
 // kubelet restart.
@@ -547,6 +584,18 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	// Run the pre-stop lifecycle hooks if applicable.
 	if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil {
 		gracePeriod = gracePeriod - m.executePreStopHook(pod, containerID, containerSpec, gracePeriod)
+	}
+	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
+	if gracePeriod < minimumGracePeriodInSeconds {
+		gracePeriod = minimumGracePeriodInSeconds
+	}
+	if gracePeriodOverride != nil {
+		gracePeriod = *gracePeriodOverride
+		glog.V(3).Infof("Killing container %q, but using %d second grace period override", containerID, gracePeriod)
+	}
+
+	if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.RetryUntilSuccess != nil {
+		gracePeriod = gracePeriod - m.executeRetryUntilSuccessHook(pod, containerID, containerSpec, gracePeriod)
 	}
 	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
 	if gracePeriod < minimumGracePeriodInSeconds {

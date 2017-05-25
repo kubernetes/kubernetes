@@ -1320,6 +1320,13 @@ func DeepCopy_v1_Lifecycle(in interface{}, out interface{}, c *conversion.Cloner
 				return err
 			}
 		}
+		if in.RetryUntilSuccess != nil {
+			in, out := &in.RetryUntilSuccess, &out.RetryUntilSuccess
+			*out = new(Handler)
+			if err := DeepCopy_v1_Handler(*in, *out, c); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 }

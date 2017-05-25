@@ -124,6 +124,11 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
+				}
+			}
 		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
@@ -164,6 +169,11 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
 				}
 			}
 		}
@@ -265,6 +275,11 @@ func SetObjectDefaults_StatefulSet(in *StatefulSet) {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
+				}
+			}
 		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
@@ -305,6 +320,11 @@ func SetObjectDefaults_StatefulSet(in *StatefulSet) {
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
 				}
 			}
 		}
