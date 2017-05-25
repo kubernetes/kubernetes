@@ -1875,6 +1875,12 @@ type Handler struct {
 	// TODO: implement a realistic TCP lifecycle hook
 	// +optional
 	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
+	// Retrypolicy picks a value from three values (Always, OnFail, Never) as a retry strategy.
+	// Always as strategy will retry until timeout no matter what happen.
+	// OnFailure means first time failure and will retry until the timeout or retry until success.
+	// Never is native logic, only run once
+	// +optional
+	RetryPolicy RetryPolicy `json:"retryPolicy,omitempty" protobuf:"bytes,4,opt,name=retryPolicy,casttype=RetryPolicy"`
 }
 
 // Lifecycle describes actions that the management system should take in response to container lifecycle
@@ -2068,6 +2074,18 @@ const (
 	RestartPolicyAlways    RestartPolicy = "Always"
 	RestartPolicyOnFailure RestartPolicy = "OnFailure"
 	RestartPolicyNever     RestartPolicy = "Never"
+)
+
+// Retrypolicy picks a value from three values (Always, OnFail, Never)
+// as a retry strategy. Always as strategy will retry until timeout no matter what happen.
+// OnFailure means first time failure and will retry until the timeout or retry until success.
+// Never is native logic, only run once
+type RetryPolicy string
+
+const (
+	RetryPolicyAlways    RetryPolicy = "Always"
+	RetryPolicyOnFailure RetryPolicy = "OnFailure"
+	RetryPolicyNever     RetryPolicy = "Never"
 )
 
 // DNSPolicy defines how a pod's DNS will be configured.

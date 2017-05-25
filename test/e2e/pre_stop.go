@@ -88,6 +88,7 @@ func testPreStop(c clientset.Interface, ns string) {
 									"wget", "-O-", "--post-data=" + val, fmt.Sprintf("http://%s:8080/write", podOut.Status.PodIP),
 								},
 							},
+							RetryPolicy: v1.RetryPolicyNever,
 						},
 					},
 				},

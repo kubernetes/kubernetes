@@ -1781,6 +1781,7 @@ func autoConvert_v1_Handler_To_api_Handler(in *v1.Handler, out *api.Handler, s c
 	out.Exec = (*api.ExecAction)(unsafe.Pointer(in.Exec))
 	out.HTTPGet = (*api.HTTPGetAction)(unsafe.Pointer(in.HTTPGet))
 	out.TCPSocket = (*api.TCPSocketAction)(unsafe.Pointer(in.TCPSocket))
+	out.RetryPolicy = api.RetryPolicy(in.RetryPolicy)
 	return nil
 }
 
@@ -1793,6 +1794,7 @@ func autoConvert_api_Handler_To_v1_Handler(in *api.Handler, out *v1.Handler, s c
 	out.Exec = (*v1.ExecAction)(unsafe.Pointer(in.Exec))
 	out.HTTPGet = (*v1.HTTPGetAction)(unsafe.Pointer(in.HTTPGet))
 	out.TCPSocket = (*v1.TCPSocketAction)(unsafe.Pointer(in.TCPSocket))
+	out.RetryPolicy = v1.RetryPolicy(in.RetryPolicy)
 	return nil
 }
 

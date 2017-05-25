@@ -177,6 +177,9 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	}
 }
 func SetDefaults_Probe(obj *v1.Probe) {
+	if obj.Handler.RetryPolicy == "" {
+		obj.Handler.RetryPolicy = v1.RetryPolicyNever
+	}
 	if obj.TimeoutSeconds == 0 {
 		obj.TimeoutSeconds = 1
 	}

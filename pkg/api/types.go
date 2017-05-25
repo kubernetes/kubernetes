@@ -1691,6 +1691,12 @@ type Handler struct {
 	// TODO: implement a realistic TCP lifecycle hook
 	// +optional
 	TCPSocket *TCPSocketAction
+	// Retrypolicy picks a value from three values (Always, OnFail, Never)
+	// as a retry strategy. Always as strategy will retry until timeout no matter what happen.
+	// OnFailure means first time failure and will retry until the timeout or retry until success.
+	// Never is native logic, only run once.
+	// +optional
+	RetryPolicy RetryPolicy
 }
 
 // Lifecycle describes actions that the management system should take in response to container lifecycle
@@ -1843,6 +1849,18 @@ const (
 	RestartPolicyAlways    RestartPolicy = "Always"
 	RestartPolicyOnFailure RestartPolicy = "OnFailure"
 	RestartPolicyNever     RestartPolicy = "Never"
+)
+
+// Retrypolicy picks a value from three values (Always, OnFail, Never)
+// as a retry strategy. Always as strategy will retry until timeout no matter what happen.
+// OnFailure means first time failure and will retry until the timeout or retry until success.
+// Never is native logic, only run once
+type RetryPolicy string
+
+const (
+	RetryPolicyAlways    RetryPolicy = "Always"
+	RetryPolicyOnFailure RetryPolicy = "OnFailure"
+	RetryPolicyNever     RetryPolicy = "Never"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -13,6 +13,7 @@ spec:
             - "cp"
             - "/sample.war"
             - "/app"
+        retryPolicy: Never
     volumeMounts:
     - mountPath: /app
       name: app-volume

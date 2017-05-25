@@ -1200,6 +1200,13 @@ message Handler {
   // TODO: implement a realistic TCP lifecycle hook
   // +optional
   optional TCPSocketAction tcpSocket = 3;
+
+  // Retrypolicy picks a value from three values (Always, OnFail, Never) as a retry strategy.
+  // Always as strategy will retry until timeout no matter what happen.
+  // OnFailure means first time failure and will retry until the timeout or retry until success.
+  // Never is native logic, only run once
+  // +optional
+  optional string retryPolicy = 4;
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the

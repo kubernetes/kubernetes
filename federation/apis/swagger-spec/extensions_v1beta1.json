@@ -6389,6 +6389,10 @@
       "$ref": "v1.TCPSocketAction",
       "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported"
      },
+     "retryPolicy": {
+      "type": "string",
+      "description": "Retrypolicy picks a value from three values (Always, OnFail, Never) as a retry strategy. Always as strategy will retry until timeout no matter what happen. OnFailure means first time failure and will retry until the timeout or retry until success. Never is native logic, only run once"
+     },
      "initialDelaySeconds": {
       "type": "integer",
       "format": "int32",
@@ -6525,6 +6529,10 @@
      "tcpSocket": {
       "$ref": "v1.TCPSocketAction",
       "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported"
+     },
+     "retryPolicy": {
+      "type": "string",
+      "description": "Retrypolicy picks a value from three values (Always, OnFail, Never) as a retry strategy. Always as strategy will retry until timeout no matter what happen. OnFailure means first time failure and will retry until the timeout or retry until success. Never is native logic, only run once"
      }
     }
    },
