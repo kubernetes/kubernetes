@@ -21,6 +21,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	admissionregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion"
 	appsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	authenticationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion"
 	authorizationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
@@ -37,6 +38,7 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
+	Admissionregistration() admissionregistrationinternalversion.AdmissionregistrationInterface
 	Core() coreinternalversion.CoreInterface
 	Apps() appsinternalversion.AppsInterface
 	Authentication() authenticationinternalversion.AuthenticationInterface
@@ -55,6 +57,7 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
+	*admissionregistrationinternalversion.AdmissionregistrationClient
 	*coreinternalversion.CoreClient
 	*appsinternalversion.AppsClient
 	*authenticationinternalversion.AuthenticationClient
@@ -67,6 +70,14 @@ type Clientset struct {
 	*rbacinternalversion.RbacClient
 	*settingsinternalversion.SettingsClient
 	*storageinternalversion.StorageClient
+}
+
+// Admissionregistration retrieves the AdmissionregistrationClient
+func (c *Clientset) Admissionregistration() admissionregistrationinternalversion.AdmissionregistrationInterface {
+	if c == nil {
+		return nil
+	}
+	return c.AdmissionregistrationClient
 }
 
 // Core retrieves the CoreClient
@@ -181,6 +192,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
+	cs.AdmissionregistrationClient, err = admissionregistrationinternalversion.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.CoreClient, err = coreinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -242,6 +257,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
+	cs.AdmissionregistrationClient = admissionregistrationinternalversion.NewForConfigOrDie(c)
 	cs.CoreClient = coreinternalversion.NewForConfigOrDie(c)
 	cs.AppsClient = appsinternalversion.NewForConfigOrDie(c)
 	cs.AuthenticationClient = authenticationinternalversion.NewForConfigOrDie(c)
@@ -262,6 +278,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
+	cs.AdmissionregistrationClient = admissionregistrationinternalversion.New(c)
 	cs.CoreClient = coreinternalversion.New(c)
 	cs.AppsClient = appsinternalversion.New(c)
 	cs.AuthenticationClient = authenticationinternalversion.New(c)

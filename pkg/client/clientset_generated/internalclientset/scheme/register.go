@@ -24,6 +24,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	core "k8s.io/kubernetes/pkg/api/install"
+	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	apps "k8s.io/kubernetes/pkg/apis/apps/install"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication/install"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization/install"
@@ -52,6 +53,7 @@ func init() {
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
+	admissionregistration.Install(groupFactoryRegistry, registry, scheme)
 	core.Install(groupFactoryRegistry, registry, scheme)
 	apps.Install(groupFactoryRegistry, registry, scheme)
 	authentication.Install(groupFactoryRegistry, registry, scheme)

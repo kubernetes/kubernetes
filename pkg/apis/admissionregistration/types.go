@@ -20,6 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +genclient=true
+
 // InitializerConfiguration describes the configuration of initializers.
 type InitializerConfiguration struct {
 	metav1.TypeMeta
@@ -110,6 +112,8 @@ const (
 	// extensible admission feature is beta.
 	Fail FailurePolicyType = "Fail"
 )
+
+// +genclient=true
 
 // ExternalAdmissionHookConfiguration describes the configuration of initializers.
 type ExternalAdmissionHookConfiguration struct {
