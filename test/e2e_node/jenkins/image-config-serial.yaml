@@ -8,10 +8,6 @@ images:
   ubuntu-docker12:
     image: e2e-node-ubuntu-trusty-docker12-v2-image # docker 1.12.6
     project: kubernetes-node-e2e-images
-  coreos-alpha:
-    image: coreos-alpha-1122-0-0-v20160727 # docker 1.11.2
-    project: coreos-cloud
-    metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
   containervm:
     image: e2e-node-containervm-v20161208-image # docker 1.11.2
     project: kubernetes-node-e2e-images
