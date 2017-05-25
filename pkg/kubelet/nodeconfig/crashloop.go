@@ -24,8 +24,13 @@ import (
 	"time"
 )
 
-const startupsFile = ".startups.json"
-const maxStartups = 10
+const (
+	startupsFile = ".startups.json"
+
+	// we allow one extra startup to account for the startup necessary to update configuration
+	maxCrashLoopThreshold = 10
+	maxStartups           = maxCrashLoopThreshold + 1
+)
 
 // recordStartup appends a timestamp to the startups-tracking file to indicate a rough Kubelet startup time.
 // If the startups-tracking file cannot be loaded or saved, a fatal error occurs.
@@ -48,7 +53,7 @@ func (cc *NodeConfigController) recordStartup() {
 }
 
 // crashLooping returns true if the number of startup timestamps since the last modification
-// of the current config meets or exceeds `threshold`, false otherwise.
+// of the current config exceeds `threshold`, false otherwise.
 // This function assumes that the trial period for a config is still active, if called outside
 // the trial period, it may overcount startups.
 // If filesystem issues prevent determining a modification time or loading
@@ -75,7 +80,9 @@ func (cc *NodeConfigController) crashLooping(threshold int32) bool {
 			break
 		}
 	}
-	return num >= threshold
+
+	// >, rather than >=, because we implicitly allow one extra startup for changing config
+	return num > threshold
 }
 
 // loadStartups loads the startups-tracking file from disk.

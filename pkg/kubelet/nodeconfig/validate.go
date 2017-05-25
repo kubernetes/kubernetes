@@ -30,9 +30,8 @@ import (
 // feature off temporarily needs to live in another codepath.
 func validateConfig(kc *ccv1a1.KubeletConfiguration) error {
 	// restrict crashloop threshold to between 2 and `maxStartups`, inclusive
-	// 0 or 1 would always trigger a rollback to lkg, more than `maxStartups` adds
-	// unnecessary bloat  to the .startups.json file, and negative values would be silly
-	if *kc.CrashLoopThreshold < 2 || *kc.CrashLoopThreshold > maxStartups {
+	// more than `maxStartups` adds unnecessary bloat to the .startups.json file, and negative values would be silly
+	if *kc.CrashLoopThreshold < 0 || *kc.CrashLoopThreshold > maxCrashLoopThreshold {
 		return fmt.Errorf("CrashLoopThreshold must be between 2 and %d, inclusive.", maxStartups)
 	}
 
