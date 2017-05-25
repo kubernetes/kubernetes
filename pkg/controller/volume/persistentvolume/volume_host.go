@@ -87,6 +87,12 @@ func (adc *PersistentVolumeController) GetSecretFunc() func(namespace, name stri
 	}
 }
 
+func (adc *PersistentVolumeController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
+	return func(_, _ string) (*v1.ConfigMap, error) {
+		return nil, fmt.Errorf("GetConfigMap unsupported in PersistentVolumeController")
+	}
+}
+
 func (ctrl *PersistentVolumeController) GetNodeLabels() (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in PersistentVolumeController")
 }

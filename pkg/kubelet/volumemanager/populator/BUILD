@@ -53,6 +53,7 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//pkg/kubelet/configmap:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/pod/testing:go_default_library",

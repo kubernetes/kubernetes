@@ -134,6 +134,12 @@ func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secre
 	}
 }
 
+func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
+	return func(namespace, name string) (*v1.ConfigMap, error) {
+		return f.kubeClient.Core().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	}
+}
+
 func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
 	return map[string]string{"test-label": "test-value"}, nil
 }

@@ -68,6 +68,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
@@ -487,8 +488,10 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	secretManager := secret.NewCachingSecretManager(
 		kubeDeps.KubeClient, secret.GetObjectTTLFromNodeFunc(klet.GetNode))
-
 	klet.secretManager = secretManager
+
+	configMapManager := configmap.NewSimpleConfigMapManager(kubeDeps.KubeClient)
+	klet.configMapManager = configMapManager
 
 	if klet.experimentalHostUserNamespaceDefaulting {
 		glog.Infof("Experimental host user namespace defaulting is enabled.")
@@ -518,8 +521,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.livenessManager = proberesults.NewManager()
 
 	klet.podCache = kubecontainer.NewCache()
-	// podManager is also responsible for keeping secretManager contents up-to-date.
-	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient), secretManager)
+	// podManager is also responsible for keeping secretManager and configMapManager contents up-to-date.
+	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient), secretManager, configMapManager)
 
 	if kubeCfg.RemoteRuntimeEndpoint != "" {
 		// kubeCfg.RemoteImageEndpoint is same as kubeCfg.RemoteRuntimeEndpoint if not explicitly specified
@@ -717,7 +720,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		kubeDeps.Recorder)
 
 	klet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(klet, secretManager, kubeDeps.VolumePlugins)
+		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, kubeDeps.VolumePlugins)
 	if err != nil {
 		return nil, err
 	}
@@ -916,6 +919,9 @@ type Kubelet struct {
 
 	// Secret manager.
 	secretManager secret.Manager
+
+	// ConfigMap manager.
+	configMapManager configmap.Manager
 
 	// Cached MachineInfo returned by cadvisor.
 	machineInfo *cadvisorapi.MachineInfo
