@@ -46,6 +46,7 @@ go_library(
     deps = [
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/opentracing/opentracing-go:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
