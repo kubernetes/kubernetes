@@ -184,13 +184,12 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	}
 	hc.Resources.Devices = devices
 
-	// Apply seccomp options.
-	seccompSecurityOpts, err := getSeccompSecurityOpts(config.Metadata.Name, sandboxConfig, ds.seccompProfileRoot, securityOptSep)
+	securityOpts, err := ds.getSecurityOpts(config.Metadata.Name, sandboxConfig, securityOptSep)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate seccomp security options for container %q: %v", config.Metadata.Name, err)
+		return "", fmt.Errorf("failed to generate security options for container %q: %v", config.Metadata.Name, err)
 	}
-	hc.SecurityOpt = append(hc.SecurityOpt, seccompSecurityOpts...)
 
+	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 	createConfig.HostConfig = hc
 	createResp, err := ds.client.CreateContainer(createConfig)
 	if err != nil {

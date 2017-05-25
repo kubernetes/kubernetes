@@ -18,6 +18,22 @@ limitations under the License.
 
 package dockershim
 
+import (
+	"fmt"
+
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+)
+
 func DefaultMemorySwap() int64 {
 	return 0
+}
+
+func (ds *dockerService) getSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, separator rune) ([]string, error) {
+	// Apply seccomp options.
+	seccompSecurityOpts, err := getSeccompSecurityOpts(containerName, sandboxConfig, ds.seccompProfileRoot, separator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate seccomp security options for container %q: %v", containerName, err)
+	}
+
+	return seccompSecurityOpts, nil
 }

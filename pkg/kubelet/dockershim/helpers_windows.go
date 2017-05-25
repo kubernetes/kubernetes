@@ -18,6 +18,28 @@ limitations under the License.
 
 package dockershim
 
+import (
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/v1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+)
+
 func DefaultMemorySwap() int64 {
 	return 0
+}
+
+func (ds *dockerService) getSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, separator rune) ([]string, error) {
+	hasSeccompSetting := false
+	annotations := sandboxConfig.GetAnnotations()
+	if _, ok := annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName]; !ok {
+		_, hasSeccompSetting = annotations[v1.SeccompPodAnnotationKey]
+	} else {
+		hasSeccompSetting = true
+	}
+
+	if hasSeccompSetting {
+		glog.Warningf("seccomp annotations found, but it is not supported on windows")
+	}
+
+	return nil, nil
 }

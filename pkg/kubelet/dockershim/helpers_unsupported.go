@@ -18,6 +18,16 @@ limitations under the License.
 
 package dockershim
 
+import (
+	"github.com/golang/glog"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+)
+
 func DefaultMemorySwap() int64 {
 	return -1
+}
+
+func (ds *dockerService) getSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, separator rune) ([]string, error) {
+	glog.Warningf("getSecurityOpts is unsupported in this build")
+	return nil, nil
 }
