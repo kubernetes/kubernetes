@@ -189,6 +189,28 @@ addon-dir-create:
     - file_mode: 644
 {% endif %}
 
+{% if pillar.get('enable_pod_security_policy', '').lower() == 'true' %}
+/etc/kubernetes/addons/podsecuritypolicy:
+  file.recurse:
+    - source: salt://kube-addons/podsecuritypolicy
+    - include_pat: E@^.+\.yaml$
+    - user: root
+    - group: root
+    - dir_mode: 755
+    - file_mode: 644
+{% endif %}
+
+{% if pillar.get('enable_pod_security_policy', '').lower() == 'true' %}
+/etc/kubernetes/addons/podsecuritypolicy-rbac:
+  file.recurse:
+    - source: salt://kube-addons/podsecuritypolicy-rbac
+    - include_pat: E@^.+\.yaml$
+    - user: root
+    - group: root
+    - dir_mode: 755
+    - file_mode: 644
+{% endif %}
+
 {% if pillar.get('enable_cluster_ui', '').lower() == 'true' %}
 /etc/kubernetes/addons/dashboard:
   file.recurse:

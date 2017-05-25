@@ -266,8 +266,19 @@ if [ ${ENABLE_IP_ALIASES} = true ]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_IP_ALIASES"
 fi
 
-# If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
-ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota}"
+# Optional: enable the PodSecurityPolicy admission contrller.
+ENABLE_POD_SECURITY_POLICY="${ENABLE_POD_SECURITY_POLICY:-true}"
+
+if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
+  ADMISSION_CONTROL="Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction"
+  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
+    ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
+  fi
+  # ResourceQuota must come last, or a creation is recorded, but the pod may be forbidden.
+  ADMISSION_CONTROL="${ADMISSION_CONTROL},ResourceQuota"
+else
+  ADMISSION_CONTROL=${KUBE_ADMISSION_CONTROL}
+fi
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}

@@ -55,6 +55,8 @@ spec:
           optional: true
       containers:
       - name: kubedns
+        securityContext:
+          runAsUser: 0
         image: gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.4
         resources:
           # TODO: Set memory limits when we've profiled the container for large
@@ -106,6 +108,8 @@ spec:
         - name: kube-dns-config
           mountPath: /kube-dns-config
       - name: dnsmasq
+        securityContext:
+          runAsUser: 0
         image: gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.4
         livenessProbe:
           httpGet:

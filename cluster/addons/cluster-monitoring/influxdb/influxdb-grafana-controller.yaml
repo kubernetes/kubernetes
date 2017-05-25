@@ -3,24 +3,24 @@ kind: ReplicationController
 metadata:
   name: monitoring-influxdb-grafana-v4
   namespace: kube-system
-  labels: 
+  labels:
     k8s-app: influxGrafana
     version: v4
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-spec: 
+spec:
   replicas: 1
-  selector: 
+  selector:
     k8s-app: influxGrafana
     version: v4
-  template: 
-    metadata: 
-      labels: 
+  template:
+    metadata:
+      labels:
         k8s-app: influxGrafana
         version: v4
         kubernetes.io/cluster-service: "true"
-    spec: 
-      containers: 
+    spec:
+      containers:
         - image: gcr.io/google_containers/heapster-influxdb-amd64:v1.1.1
           name: influxdb
           resources:
@@ -31,12 +31,14 @@ spec:
             requests:
               cpu: 100m
               memory: 500Mi
-          ports: 
+          ports:
             - containerPort: 8083
             - containerPort: 8086
           volumeMounts:
           - name: influxdb-persistent-storage
             mountPath: /data
+          securityContext:
+            runAsNonRoot: false
         - image: gcr.io/google_containers/heapster-grafana-amd64:v4.0.2
           name: grafana
           env:
@@ -67,6 +69,8 @@ spec:
           volumeMounts:
           - name: grafana-persistent-storage
             mountPath: /var
+          securityContext:
+            runAsNonRoot: false
       volumes:
       - name: influxdb-persistent-storage
         emptyDir: {}

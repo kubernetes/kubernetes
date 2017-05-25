@@ -158,6 +158,8 @@ function copy-resource-files-to-master {
     "${RESOURCE_DIRECTORY}/manifests/kube-controller-manager.yaml" \
     "${RESOURCE_DIRECTORY}/manifests/kube-addon-manager.yaml" \
     "${RESOURCE_DIRECTORY}/manifests/addons/kubemark-rbac-bindings" \
+    "${RESOURCE_DIRECTORY}/manifests/addons/podsecuritypolicies" \
+    "${RESOURCE_DIRECTORY}/manifests/addons/podsecuritypolicies-rbac" \
     "kubernetes@${MASTER_NAME}":/home/kubernetes/
   echo "Copied server binary, master startup scripts, configs and resource manifests to master."
 }

@@ -57,6 +57,8 @@ spec:
             - --source=kubernetes.summary_api:''
         - image: gcr.io/google_containers/addon-resizer:2.0
           name: heapster-nanny
+          securityContext:
+            runAsNonRoot: false
           resources:
             limits:
               cpu: 50m
