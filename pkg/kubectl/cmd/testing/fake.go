@@ -745,6 +745,7 @@ func testDynamicResources() []*discovery.APIGroupResources {
 					{Name: "configmaps", Namespaced: true, Kind: "ConfigMap"},
 					{Name: "type", Namespaced: false, Kind: "Type"},
 					{Name: "namespacedtype", Namespaced: true, Kind: "NamespacedType"},
+					{Name: "namespaces", Namespaced: false, Kind: "Namespace"},
 				},
 			},
 		},

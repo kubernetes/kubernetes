@@ -51,11 +51,11 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		},
 		Items: []api.Pod{
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+				ObjectMeta: metav1.ObjectMeta{UID: "random-uid-pod1", Name: "foo", Namespace: "test", ResourceVersion: "10"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
+				ObjectMeta: metav1.ObjectMeta{UID: "random-uid-pod2", Name: "bar", Namespace: "test", ResourceVersion: "11"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 		},
@@ -66,7 +66,7 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		},
 		Items: []api.Service{
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				ObjectMeta: metav1.ObjectMeta{UID: "random-uid-svc1", Name: "baz", Namespace: "test", ResourceVersion: "12"},
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
 					Type:            api.ServiceTypeClusterIP,
@@ -80,7 +80,7 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		},
 		Items: []api.ReplicationController{
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "rc1", Namespace: "test", ResourceVersion: "18"},
+				ObjectMeta: metav1.ObjectMeta{UID: "random-uid-rc1", Name: "rc1", Namespace: "test", ResourceVersion: "18"},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 1,
 				},
