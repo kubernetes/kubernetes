@@ -29,6 +29,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 // DockerKeyring tracks a set of docker registry credentials, maintaining a
@@ -44,14 +45,16 @@ type DockerKeyring interface {
 
 // BasicDockerKeyring is a trivial map-backed implementation of DockerKeyring
 type BasicDockerKeyring struct {
-	index []string
-	creds map[string][]LazyAuthConfiguration
+	DockerClient libdocker.Interface
+	index        []string
+	creds        map[string][]LazyAuthConfiguration
 }
 
 // lazyDockerKeyring is an implementation of DockerKeyring that lazily
 // materializes its dockercfg based on a set of dockerConfigProviders.
 type lazyDockerKeyring struct {
-	Providers []DockerConfigProvider
+	DockerClient libdocker.Interface
+	Providers    []DockerConfigProvider
 }
 
 // LazyAuthConfiguration wraps dockertypes.AuthConfig, potentially deferring its
@@ -237,6 +240,14 @@ func urlsMatch(globUrl *url.URL, targetUrl *url.URL) (bool, error) {
 // Multiple credentials may be returned if there are multiple potentially valid credentials
 // available.  This allows for rotation.
 func (dk *BasicDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
+	if isDefaultRegistryMatch(image) && dk.DockerClient != nil {
+		// we need to qualify the image (prepend the default registry) if available
+		// from RHEL/Fedora/CentOS docker package.
+		reg, err := dk.DockerClient.DefaultRegistry()
+		if err == nil && reg != "docker.io" {
+			image = filepath.Join(reg, image)
+		}
+	}
 	// range over the index as iterating over a map does not provide a predictable ordering
 	ret := []LazyAuthConfiguration{}
 	for _, k := range dk.index {
@@ -266,7 +277,7 @@ func (dk *BasicDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, boo
 // Lookup implements the DockerKeyring method for fetching credentials
 // based on image name.
 func (dk *lazyDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
-	keyring := &BasicDockerKeyring{}
+	keyring := &BasicDockerKeyring{DockerClient: dk.DockerClient}
 
 	for _, p := range dk.Providers {
 		keyring.Add(p.Provide())
@@ -306,7 +317,7 @@ func (k *unionDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool
 // MakeDockerKeyring inspects the passedSecrets to see if they contain any DockerConfig secrets.  If they do,
 // then a DockerKeyring is built based on every hit and unioned with the defaultKeyring.
 // If they do not, then the default keyring is returned
-func MakeDockerKeyring(passedSecrets []v1.Secret, defaultKeyring DockerKeyring) (DockerKeyring, error) {
+func MakeDockerKeyring(passedSecrets []v1.Secret, defaultKeyring DockerKeyring, dc libdocker.Interface) (DockerKeyring, error) {
 	passedCredentials := []DockerConfig{}
 	for _, passedSecret := range passedSecrets {
 		if dockerConfigJsonBytes, dockerConfigJsonExists := passedSecret.Data[v1.DockerConfigJsonKey]; (passedSecret.Type == v1.SecretTypeDockerConfigJson) && dockerConfigJsonExists && (len(dockerConfigJsonBytes) > 0) {
@@ -327,7 +338,7 @@ func MakeDockerKeyring(passedSecrets []v1.Secret, defaultKeyring DockerKeyring) 
 	}
 
 	if len(passedCredentials) > 0 {
-		basicKeyring := &BasicDockerKeyring{}
+		basicKeyring := &BasicDockerKeyring{DockerClient: dc}
 		for _, currCredentials := range passedCredentials {
 			basicKeyring.Add(currCredentials)
 		}

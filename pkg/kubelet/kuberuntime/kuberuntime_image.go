@@ -35,7 +35,7 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 		return "", err
 	}
 
-	keyring, err := credentialprovider.MakeDockerKeyring(pullSecrets, m.keyring)
+	keyring, err := credentialprovider.MakeDockerKeyring(pullSecrets, m.keyring, m.dockerClient)
 	if err != nil {
 		return "", err
 	}

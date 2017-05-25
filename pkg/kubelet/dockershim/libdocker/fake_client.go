@@ -68,12 +68,13 @@ type FakeDockerClient struct {
 	// Images pulled by ref (name or ID).
 	ImagesPulled []string
 
-	VersionInfo     dockertypes.Version
-	Information     dockertypes.Info
-	ExecInspect     *dockertypes.ContainerExecInspect
-	execCmd         []string
-	EnableSleep     bool
-	ImageHistoryMap map[string][]dockertypes.ImageHistory
+	VersionInfo       dockertypes.Version
+	Information       dockertypes.Info
+	ExecInspect       *dockertypes.ContainerExecInspect
+	execCmd           []string
+	EnableSleep       bool
+	ImageHistoryMap   map[string][]dockertypes.ImageHistory
+	DefaultRegistries []string
 }
 
 const (
@@ -114,6 +115,13 @@ func (f *FakeDockerClient) WithTraceDisabled() *FakeDockerClient {
 	f.Lock()
 	defer f.Unlock()
 	f.EnableTrace = false
+	return f
+}
+
+func (f *FakeDockerClient) WithCustomDefaultRegistries(regs []string) *FakeDockerClient {
+	f.Lock()
+	defer f.Unlock()
+	f.DefaultRegistries = regs
 	return f
 }
 
@@ -693,6 +701,14 @@ func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dock
 	f.appendCalled(calledDetail{name: "list_images"})
 	err := f.popError("list_images")
 	return f.Images, err
+}
+
+func (f *FakeDockerClient) DefaultRegistry() (string, error) {
+	f.Lock()
+	defer f.Unlock()
+	f.appendCalled(calledDetail{name: "default_registry"})
+	err := f.popError("default_registry")
+	return f.DefaultRegistries[0], err
 }
 
 func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {

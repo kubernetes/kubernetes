@@ -205,6 +205,15 @@ func (in instrumentedInterface) InspectExec(id string) (*dockertypes.ContainerEx
 	return out, err
 }
 
+func (in instrumentedInterface) DefaultRegistry() (string, error) {
+	const operation = "default_registry"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.DefaultRegistry()
+	recordError(operation, err)
+	return out, err
+}
+
 func (in instrumentedInterface) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
 	const operation = "attach"
 	defer recordOperation(operation, time.Now())

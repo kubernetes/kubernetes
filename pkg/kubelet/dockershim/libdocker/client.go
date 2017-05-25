@@ -63,6 +63,7 @@ type Interface interface {
 	AttachToContainer(string, dockertypes.ContainerAttachOptions, StreamOptions) error
 	ResizeContainerTTY(id string, height, width int) error
 	ResizeExecTTY(id string, height, width int) error
+	DefaultRegistry() (string, error)
 }
 
 // Get a *dockerapi.Client, either using the endpoint passed in, or using
@@ -90,7 +91,7 @@ func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgre
 		glog.Fatalf("Couldn't connect to docker: %v", err)
 	}
 	glog.Infof("Start docker client with request timeout=%v", requestTimeout)
-	return newKubeDockerClient(client, requestTimeout, imagePullProgressDeadline)
+	return newKubeDockerClient(client, requestTimeout, imagePullProgressDeadline, dockerEndpoint)
 }
 
 // GetKubeletDockerContainers lists all container or just the running ones.

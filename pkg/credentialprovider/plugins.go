@@ -19,6 +19,8 @@ package credentialprovider
 import (
 	"sync"
 
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+
 	"github.com/golang/glog"
 )
 
@@ -44,9 +46,10 @@ func RegisterCredentialProvider(name string, provider DockerConfigProvider) {
 
 // NewDockerKeyring creates a DockerKeyring to use for resolving credentials,
 // which lazily draws from the set of registered credential providers.
-func NewDockerKeyring() DockerKeyring {
+func NewDockerKeyring(dockerClient libdocker.Interface) DockerKeyring {
 	keyring := &lazyDockerKeyring{
-		Providers: make([]DockerConfigProvider, 0),
+		DockerClient: dockerClient,
+		Providers:    make([]DockerConfigProvider, 0),
 	}
 
 	// TODO(mattmoor): iterating over the map is non-deterministic.  We should

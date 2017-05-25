@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+
 	dockertypes "github.com/docker/engine-api/types"
 )
 
@@ -354,20 +356,31 @@ func TestKeyringHitWithUnqualifiedDockerHub(t *testing.T) {
 	}
 }
 
-func TestKeyringHitWithUnqualifiedLibraryDockerHub(t *testing.T) {
-	url := defaultRegistryKey
+func TestKeyringHitWithUnqualifiedLibraryDockerHubAndDefaultRHELRegistry(t *testing.T) {
+	url := "myregistrydomain.com:5000"
 	email := "foo@bar.baz"
 	username := "foo"
 	password := "bar"
+	emaild := "foo@bar.bazd"
+	usernamed := "food"
+	passwordd := "bard"
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
+	authd := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", usernamed, passwordd)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
      "email": %q,
      "auth": %q
+   },
+   "https://%s": {
+     "email": %q,
+     "auth": %q
    }
-}`, url, email, auth)
+}`, url, email, auth, defaultRegistryKey, emaild, authd)
 
-	keyring := &BasicDockerKeyring{}
+	fdk := libdocker.NewFakeDockerClient()
+	fdk.WithCustomDefaultRegistries([]string{"myregistrydomain.com:5000", "docker.io"})
+
+	keyring := &BasicDockerKeyring{DockerClient: fdk}
 	if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
