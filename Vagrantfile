@@ -97,9 +97,9 @@ host = RbConfig::CONFIG['host_os']
 if host =~ /darwin/
   $vm_cpus = `sysctl -n hw.physicalcpu`.to_i
 elsif host =~ /linux/
-  #This should work on most processors, however it will fail on ones without the core id field.
-  #So far i have only seen this on a raspberry pi. which you probably don't want to run vagrant on anyhow...
-  #But just in case we'll default to the result of nproc if we get 0 just to be safe.
+  # This should work on most processors, however it will fail on ones without the core id field.
+  # So far i have only seen this on a raspberry pi. which you probably don't want to run vagrant on anyhow...
+  # But just in case we'll default to the result of nproc if we get 0 just to be safe.
   $vm_cpus = `cat /proc/cpuinfo | grep 'core id' | sort -u | wc -l`.to_i
   if $vm_cpus < 1
       $vm_cpus = `nproc`.to_i
@@ -125,7 +125,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     config.proxy.no_proxy = $no_proxy
   end
 
-  # this corrects a bug in 1.8.5 where an invalid SSH key is inserted.
+  # This corrects a bug in 1.8.5 where an invalid SSH key is inserted.
   if Vagrant::VERSION == "1.8.5"
     config.ssh.insert_key = false
   end
@@ -177,7 +177,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       v.vmx['numvcpus'] = $vm_cpus
     end
 
-    # configure libvirt provider
+    # Configure libvirt provider
     config.vm.provider :libvirt do |v, override|
       setvmboxandurl(override, :libvirt)
       v.memory = vm_mem
@@ -255,7 +255,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       # The resource pool for the new VM
       #vsphere.resource_pool_name = 'Comp'
 
-      # path to folder where new VM should be created, if not specified template's parent folder will be used
+      # Path to folder where new VM should be created, if not specified template's parent folder will be used
       vsphere.vm_base_path = ENV['VAGRANT_VSPHERE_BASE_PATH']
 
       # The template we're going to clone
