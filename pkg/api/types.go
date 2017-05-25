@@ -1617,7 +1617,7 @@ type Handler struct {
 }
 
 // Lifecycle describes actions that the management system should take in response to container lifecycle
-// events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
+// events.  For the PostStart, RetryUntilSuccess and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
 type Lifecycle struct {
 	// PostStart is called immediately after a container is created.  If the handler fails, the container
@@ -1628,6 +1628,12 @@ type Lifecycle struct {
 	// passed to the handler.  Regardless of the outcome of the handler, the container is eventually terminated.
 	// +optional
 	PreStop *Handler
+	// RetryUntilSuccess is called immediately before a container is terminated after preStop.
+	// The reason for termination is passed to the handler.  Regardless of the outcome of the handler,
+	// If the hook fails, the execution is retried until it succeeds, or the timeout is skipped .
+	// the container is eventually terminated.
+	// +optional
+	RetryUntilSuccess *Handler
 }
 
 // The below types are used by kube_client and api_server.

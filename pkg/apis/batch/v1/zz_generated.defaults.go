@@ -122,6 +122,11 @@ func SetObjectDefaults_Job(in *Job) {
 					api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
+				}
+			}
 		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
@@ -162,6 +167,11 @@ func SetObjectDefaults_Job(in *Job) {
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
 					api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					api_v1.SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
 				}
 			}
 		}
