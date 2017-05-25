@@ -303,7 +303,11 @@ func (plugin *FakeVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode
 }
 
 func (plugin *FakeVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error) {
-	return nil, nil
+	return &Spec{
+		Volume: &v1.Volume{
+			Name: volumeName,
+		},
+	}, nil
 }
 
 func (plugin *FakeVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
