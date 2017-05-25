@@ -52,6 +52,9 @@ metadata:
   labels:
     tier: node
     component: kube-proxy
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ''
+    scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
 spec:
   hostNetwork: true
   containers:
