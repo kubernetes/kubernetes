@@ -118,6 +118,7 @@ go_test(
         "cluster_test.go",
         "configmap_test.go",
         "deployment_test.go",
+        "env_file_test.go",
         "generate_test.go",
         "kubectl_test.go",
         "namespace_test.go",
