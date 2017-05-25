@@ -35,7 +35,6 @@
   }
 },
 "spec":{
-"hostNetwork": true,
 "containers":[
     {
     "name": "kube-scheduler",
@@ -59,6 +58,13 @@
       "initialDelaySeconds": 15,
       "timeoutSeconds": 15
     },
+    "ports": [
+      {
+        "name": "http",
+        "hostPort": 10251,
+        "containerPort": 10251
+      }
+    ],
     "volumeMounts": [
         {
           "name": "logfile",
