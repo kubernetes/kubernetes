@@ -69,6 +69,8 @@ type Resource struct {
 	MilliCPU           int64
 	Memory             int64
 	NvidiaGPU          int64
+	StorageScratch     int64
+	StorageOverlay     int64
 	OpaqueIntResources map[v1.ResourceName]int64
 }
 
@@ -86,9 +88,11 @@ func (r *Resource) ResourceList() v1.ResourceList {
 
 func (r *Resource) Clone() *Resource {
 	res := &Resource{
-		MilliCPU:  r.MilliCPU,
-		Memory:    r.Memory,
-		NvidiaGPU: r.NvidiaGPU,
+		MilliCPU:       r.MilliCPU,
+		Memory:         r.Memory,
+		NvidiaGPU:      r.NvidiaGPU,
+		StorageOverlay: r.StorageOverlay,
+		StorageScratch: r.StorageScratch,
 	}
 	if r.OpaqueIntResources != nil {
 		res.OpaqueIntResources = make(map[v1.ResourceName]int64)

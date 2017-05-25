@@ -586,6 +586,26 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		node.Status.NodeInfo.BootID = info.BootID
 	}
 
+	rootfs, err := kl.GetCachedRootFsInfo()
+	if err != nil {
+		node.Status.Capacity[v1.ResourceStorage] = resource.MustParse("0Gi")
+	} else {
+		for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
+			node.Status.Capacity[rName] = rCap
+		}
+	}
+
+	if hasDedicatedImageFs, _ := kl.HasDedicatedImageFs(); hasDedicatedImageFs {
+		imagesfs, err := kl.ImagesFsInfo()
+		if err != nil {
+			node.Status.Capacity[v1.ResourceStorageOverlay] = resource.MustParse("0Gi")
+		} else {
+			for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(imagesfs) {
+				node.Status.Capacity[rName] = rCap
+			}
+		}
+	}
+
 	// Set Allocatable.
 	if node.Status.Allocatable == nil {
 		node.Status.Allocatable = make(v1.ResourceList)

@@ -100,3 +100,15 @@ func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	}
 	return kl.machineInfo, nil
 }
+
+// GetCachedRootFsInfo assumes that the rootfs info can't change without a reboot
+func (kl *Kubelet) GetCachedRootFsInfo() (cadvisorapiv2.FsInfo, error) {
+	if kl.rootfsInfo == nil {
+		info, err := kl.cadvisor.RootFsInfo()
+		if err != nil {
+			return cadvisorapiv2.FsInfo{}, err
+		}
+		kl.rootfsInfo = &info
+	}
+	return *kl.rootfsInfo, nil
+}

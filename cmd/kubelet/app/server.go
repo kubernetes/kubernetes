@@ -1026,7 +1026,7 @@ func parseResourceList(m componentconfig.ConfigurationMap) (v1.ResourceList, err
 	for k, v := range m {
 		switch v1.ResourceName(k) {
 		// Only CPU and memory resources are supported.
-		case v1.ResourceCPU, v1.ResourceMemory:
+		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceStorage:
 			q, err := resource.ParseQuantity(v)
 			if err != nil {
 				return nil, err
