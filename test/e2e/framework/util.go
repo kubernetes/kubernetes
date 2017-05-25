@@ -3918,21 +3918,24 @@ func CheckPodsRunningReadyOrSucceeded(c clientset.Interface, ns string, podNames
 func CheckPodsCondition(c clientset.Interface, ns string, podNames []string, timeout time.Duration, condition podCondition, desc string) bool {
 	np := len(podNames)
 	Logf("Waiting up to %v for %d pods to be %s: %s", timeout, np, desc, podNames)
-	result := make(chan bool, len(podNames))
+	type waitPodResult struct {
+		success bool
+		podName string
+	}
+	result := make(chan waitPodResult, len(podNames))
 	for _, podName := range podNames {
 		// Launch off pod readiness checkers.
 		go func(name string) {
 			err := WaitForPodCondition(c, ns, name, desc, timeout, condition)
-			result <- err == nil
+			result <- waitPodResult{err == nil, name}
 		}(podName)
 	}
 	// Wait for them all to finish.
 	success := true
-	// TODO(a-robinson): Change to `for range` syntax and remove logging once we
-	// support only Go >= 1.4.
-	for _, podName := range podNames {
-		if !<-result {
-			Logf("Pod %[1]s failed to be %[2]s.", podName, desc)
+	for range podNames {
+		res := <-result
+		if !res.success {
+			Logf("Pod %[1]s failed to be %[2]s.", res.podName, desc)
 			success = false
 		}
 	}
