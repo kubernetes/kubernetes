@@ -64,7 +64,7 @@ ETCD_PEER_CERT_FILE="/srv/kubernetes/etcd/peer-${ETCD_NAME}.pem"
 ETCD_PEER_KEY_FILE="/srv/kubernetes/etcd/peer-${ETCD_NAME}-key.pem"
 EOF
 
-cat <<EOF >//usr/lib/systemd/system/etcd.service
+cat <<EOF >/usr/lib/systemd/system/etcd.service
 [Unit]
 Description=Etcd Server
 After=network.target
