@@ -33,7 +33,7 @@ type PodDisruptionBudgetListerExpansion interface {
 }
 
 // PodDisruptionBudgetNamespaceListerExpansion allows custom methods to be added to
-// PodDisruptionBudgetNamespaeLister.
+// PodDisruptionBudgetNamespaceLister.
 type PodDisruptionBudgetNamespaceListerExpansion interface{}
 
 // GetPodPodDisruptionBudgets returns a list of PodDisruptionBudgets matching a pod.  Returns an error only if no matching PodDisruptionBudgets are found.
