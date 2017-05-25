@@ -378,6 +378,11 @@ func DeepCopy_extensions_DeploymentStatus(in interface{}, out interface{}, c *co
 				}
 			}
 		}
+		if in.CollisionCount != nil {
+			in, out := &in.CollisionCount, &out.CollisionCount
+			*out = new(int64)
+			**out = **in
+		}
 		return nil
 	}
 }

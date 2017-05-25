@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -1230,6 +1232,11 @@ func TestValidateDeployment(t *testing.T) {
 	}
 }
 
+func int64p(i int) *int64 {
+	i64 := int64(i)
+	return &i64
+}
+
 func TestValidateDeploymentStatus(t *testing.T) {
 	tests := []struct {
 		name string
@@ -1239,6 +1246,7 @@ func TestValidateDeploymentStatus(t *testing.T) {
 		readyReplicas      int32
 		availableReplicas  int32
 		observedGeneration int64
+		collisionCount     *int64
 
 		expectedErr bool
 	}{
@@ -1335,6 +1343,13 @@ func TestValidateDeploymentStatus(t *testing.T) {
 			observedGeneration: 1,
 			expectedErr:        false,
 		},
+		{
+			name:               "invalid collisionCount",
+			replicas:           3,
+			observedGeneration: 1,
+			collisionCount:     int64p(-3),
+			expectedErr:        true,
+		},
 	}
 
 	for _, test := range tests {
@@ -1344,10 +1359,82 @@ func TestValidateDeploymentStatus(t *testing.T) {
 			ReadyReplicas:      test.readyReplicas,
 			AvailableReplicas:  test.availableReplicas,
 			ObservedGeneration: test.observedGeneration,
+			CollisionCount:     test.collisionCount,
 		}
 
-		if hasErr := len(ValidateDeploymentStatus(&status, field.NewPath("status"))) > 0; hasErr != test.expectedErr {
-			t.Errorf("%s: expected error: %t, got error: %t", test.name, test.expectedErr, hasErr)
+		errs := ValidateDeploymentStatus(&status, field.NewPath("status"))
+		if hasErr := len(errs) > 0; hasErr != test.expectedErr {
+			errString := spew.Sprintf("%#v", errs)
+			t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errString)
+		}
+	}
+}
+
+func TestValidateDeploymentStatusUpdate(t *testing.T) {
+	tests := []struct {
+		name string
+
+		from, to extensions.DeploymentStatus
+
+		expectedErr bool
+	}{
+		{
+			name: "increase: valid update",
+			from: extensions.DeploymentStatus{
+				CollisionCount: nil,
+			},
+			to: extensions.DeploymentStatus{
+				CollisionCount: int64p(1),
+			},
+			expectedErr: false,
+		},
+		{
+			name: "stable: valid update",
+			from: extensions.DeploymentStatus{
+				CollisionCount: int64p(1),
+			},
+			to: extensions.DeploymentStatus{
+				CollisionCount: int64p(1),
+			},
+			expectedErr: false,
+		},
+		{
+			name: "unset: invalid update",
+			from: extensions.DeploymentStatus{
+				CollisionCount: int64p(1),
+			},
+			to: extensions.DeploymentStatus{
+				CollisionCount: nil,
+			},
+			expectedErr: true,
+		},
+		{
+			name: "decrease: invalid update",
+			from: extensions.DeploymentStatus{
+				CollisionCount: int64p(2),
+			},
+			to: extensions.DeploymentStatus{
+				CollisionCount: int64p(1),
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		meta := metav1.ObjectMeta{Name: "foo", Namespace: metav1.NamespaceDefault, ResourceVersion: "1"}
+		from := &extensions.Deployment{
+			ObjectMeta: meta,
+			Status:     test.from,
+		}
+		to := &extensions.Deployment{
+			ObjectMeta: meta,
+			Status:     test.to,
+		}
+
+		errs := ValidateDeploymentStatusUpdate(to, from)
+		if hasErr := len(errs) > 0; hasErr != test.expectedErr {
+			errString := spew.Sprintf("%#v", errs)
+			t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errString)
 		}
 	}
 }
