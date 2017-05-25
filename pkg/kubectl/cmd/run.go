@@ -95,7 +95,7 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 		Example: runExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
-			err := Run(f, cmdIn, cmdOut, cmdErr, cmd, args, argsLenAtDash)
+			err := RunRun(f, cmdIn, cmdOut, cmdErr, cmd, args, argsLenAtDash)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -136,7 +136,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("schedule", "", i18n.T("A schedule in the Cron format the job should be run with."))
 }
 
-func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
+func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
 	// Let kubectl run follow rules for `--`, see #13004 issue
 	if len(args) == 0 || argsLenAtDash == 0 {
 		return cmdutil.UsageError(cmd, "NAME is required for run")
