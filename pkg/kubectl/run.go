@@ -868,9 +868,3 @@ func parseEnvs(envArray []string) ([]v1.EnvVar, error) {
 	}
 	return envs, nil
 }
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
-}

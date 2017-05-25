@@ -564,10 +564,7 @@ func Rename(c coreclient.ReplicationControllersGetter, rc *api.ReplicationContro
 	}
 	// Then create the same RC with the new name.
 	_, err = c.ReplicationControllers(rc.Namespace).Create(rc)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func LoadExistingNextReplicationController(c coreclient.ReplicationControllersGetter, namespace, newName string) (*api.ReplicationController, error) {
@@ -683,14 +680,14 @@ func UpdateExistingReplicationController(rcClient coreclient.ReplicationControll
 	if _, found := oldRc.Spec.Selector[deploymentKey]; !found {
 		SetNextControllerAnnotation(oldRc, newName)
 		return AddDeploymentKeyToReplicationController(oldRc, rcClient, podClient, deploymentKey, deploymentValue, namespace, out)
-	} else {
-		// If we didn't need to update the controller for the deployment key, we still need to write
-		// the "next" controller.
-		applyUpdate := func(rc *api.ReplicationController) {
-			SetNextControllerAnnotation(rc, newName)
-		}
-		return updateRcWithRetries(rcClient, namespace, oldRc, applyUpdate)
 	}
+
+	// If we didn't need to update the controller for the deployment key, we still need to write
+	// the "next" controller.
+	applyUpdate := func(rc *api.ReplicationController) {
+		SetNextControllerAnnotation(rc, newName)
+	}
+	return updateRcWithRetries(rcClient, namespace, oldRc, applyUpdate)
 }
 
 func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, rcClient coreclient.ReplicationControllersGetter, podClient coreclient.PodsGetter, deploymentKey, deploymentValue, namespace string, out io.Writer) (*api.ReplicationController, error) {
