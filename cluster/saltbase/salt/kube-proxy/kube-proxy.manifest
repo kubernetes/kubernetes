@@ -29,8 +29,10 @@
  {% set feature_gates = "--feature-gates=" + grains.feature_gates -%}
 {% endif -%}
 
+{% set throttles = "--iptables-sync-period=1m --iptables-min-sync-period=10s" -%}
+
 # test_args should always go last to overwrite prior configuration
-{% set params = log_level + " " + feature_gates + " " + test_args -%}
+{% set params = log_level + " " + throttles + " " + feature_gates + " " + test_args -%}
 
 {% set container_env = "" -%}
 
