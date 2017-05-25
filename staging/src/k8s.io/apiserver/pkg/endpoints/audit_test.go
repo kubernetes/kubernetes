@@ -65,8 +65,22 @@ func TestAudit(t *testing.T) {
 	simpleCPrimeJSON, _ := runtime.Encode(testCodec, simpleCPrime)
 
 	// event checks
+	noRequestBody := func(i int) eventCheck {
+		return func(events []*auditinternal.Event) error {
+			if events[i].RequestObject == nil {
+				return nil
+			}
+			return fmt.Errorf("expected RequestBody to be nil, got non-nill '%s'", events[i].RequestObject.Raw)
+		}
+	}
 	requestBodyIs := func(i int, text string) eventCheck {
 		return func(events []*auditinternal.Event) error {
+			if events[i].RequestObject == nil {
+				if text != "" {
+					return fmt.Errorf("expected RequestBody %q, got <nil>", text)
+				}
+				return nil
+			}
 			if string(events[i].RequestObject.Raw) != text {
 				return fmt.Errorf("expected RequestBody %q, got %q", text, string(events[i].RequestObject.Raw))
 			}
@@ -81,12 +95,12 @@ func TestAudit(t *testing.T) {
 			return nil
 		}
 	}
-	responseBodyIs := func(i int, text string) eventCheck {
+	noResponseBody := func(i int) eventCheck {
 		return func(events []*auditinternal.Event) error {
-			if string(events[i].ResponseObject.Raw) != text {
-				return fmt.Errorf("expected ResponseBody %q, got %q", text, string(events[i].ResponseObject.Raw))
+			if events[i].ResponseObject == nil {
+				return nil
 			}
-			return nil
+			return fmt.Errorf("expected ResponseBody to be nil, got non-nill '%s'", events[i].ResponseObject.Raw)
 		}
 	}
 	responseBodyMatches := func(i int, pattern string) eventCheck {
@@ -115,7 +129,7 @@ func TestAudit(t *testing.T) {
 			200,
 			1,
 			[]eventCheck{
-				requestBodyIs(0, ""),
+				noRequestBody(0),
 				responseBodyMatches(0, `{.*"name":"c".*}`),
 			},
 		},
@@ -132,7 +146,7 @@ func TestAudit(t *testing.T) {
 			200,
 			1,
 			[]eventCheck{
-				requestBodyMatches(0, ""),
+				noRequestBody(0),
 				responseBodyMatches(0, `{.*"name":"a".*"name":"b".*}`),
 			},
 		},
@@ -158,8 +172,8 @@ func TestAudit(t *testing.T) {
 			405,
 			1,
 			[]eventCheck{
-				requestBodyIs(0, ""),  // the 405 is thrown long before the create handler would be executed
-				responseBodyIs(0, ""), // the 405 is thrown long before the create handler would be executed
+				noRequestBody(0),  // the 405 is thrown long before the create handler would be executed
+				noResponseBody(0), // the 405 is thrown long before the create handler would be executed
 			},
 		},
 		{
@@ -171,8 +185,8 @@ func TestAudit(t *testing.T) {
 			200,
 			1,
 			[]eventCheck{
-				requestBodyMatches(0, ""),
-				responseBodyMatches(0, ""),
+				noRequestBody(0),
+				responseBodyMatches(0, `{.*"kind":"Status".*"status":"Success".*}`),
 			},
 		},
 		{
@@ -185,7 +199,7 @@ func TestAudit(t *testing.T) {
 			1,
 			[]eventCheck{
 				requestBodyMatches(0, "DeleteOptions"),
-				responseBodyMatches(0, ""),
+				responseBodyMatches(0, `{.*"kind":"Status".*"status":"Success".*}`),
 			},
 		},
 		{
@@ -247,8 +261,8 @@ func TestAudit(t *testing.T) {
 			200,
 			2,
 			[]eventCheck{
-				requestBodyMatches(0, ""),
-				responseBodyMatches(0, ""),
+				noRequestBody(0),
+				noResponseBody(0),
 			},
 		},
 	} {
