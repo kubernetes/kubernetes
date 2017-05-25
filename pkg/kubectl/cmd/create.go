@@ -41,7 +41,7 @@ type CreateOptions struct {
 
 var (
 	create_long = templates.LongDesc(i18n.T(`
-		Create a resource by filename or stdin.
+		Create a resource from a file or from stdin.
 
 		JSON and YAML formats are accepted.`))
 
@@ -61,7 +61,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "create -f FILENAME",
-		Short:   i18n.T("Create a resource by filename or stdin"),
+		Short:   i18n.T("Create a resource from a file or from stdin."),
 		Long:    create_long,
 		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {
