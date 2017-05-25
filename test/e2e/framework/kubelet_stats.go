@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/common/model"
 )
 
