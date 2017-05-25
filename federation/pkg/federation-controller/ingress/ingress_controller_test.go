@@ -233,6 +233,7 @@ func TestIngressController(t *testing.T) {
 		fedIngress.ObjectMeta.Annotations = make(map[string]string)
 	}
 	fedIngress.ObjectMeta.Annotations["A"] = "B"
+	fedIngress.ObjectMeta.Annotations[federationapi.FederationClusterSelectorAnnotation] = `[{"key": "cluster", "operator": "in", "values": ["cluster1","cluster2"]}]`
 	t.Log("Modifying Federated Ingress")
 	fedIngressWatch.Modify(&fedIngress)
 	t.Log("Checking that Ingress was correctly updated in cluster 1")
