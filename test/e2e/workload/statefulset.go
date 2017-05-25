@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package workload
 
 import (
 	"fmt"
@@ -26,7 +26,6 @@ import (
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -77,14 +76,14 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			ss = framework.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
 
 			By("Creating service " + headlessSvcName + " in namespace " + ns)
-			headlessService := createServiceSpec(headlessSvcName, "", true, labels)
+			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
 			_, err := c.Core().Services(ns).Create(headlessService)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed {
-				dumpDebugInfo(c, ns)
+				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
 			framework.DeleteAllStatefulSets(c, ns)
@@ -276,7 +275,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			sst.BreakPodProbe(ss, &pods.Items[1], testProbe)
 			Expect(err).NotTo(HaveOccurred())
 			ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
-			newImage := newNginxImage
+			newImage := NewNginxImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
@@ -400,7 +399,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 						pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
 						currentRevision))
 			}
-			newImage := newNginxImage
+			newImage := NewNginxImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
@@ -621,7 +620,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 						pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
 						currentRevision))
 			}
-			newImage := newNginxImage
+			newImage := NewNginxImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
@@ -876,7 +875,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed {
-				dumpDebugInfo(c, ns)
+				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
 			framework.DeleteAllStatefulSets(c, ns)
@@ -903,17 +902,6 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 		})
 	})
 })
-
-func dumpDebugInfo(c clientset.Interface, ns string) {
-	sl, _ := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
-	for _, s := range sl.Items {
-		desc, _ := framework.RunKubectl("describe", "po", s.Name, fmt.Sprintf("--namespace=%v", ns))
-		framework.Logf("\nOutput of kubectl describe %v:\n%v", s.Name, desc)
-
-		l, _ := framework.RunKubectl("logs", s.Name, fmt.Sprintf("--namespace=%v", ns), "--tail=100")
-		framework.Logf("\nLast 100 log lines of %v:\n%v", s.Name, l)
-	}
-}
 
 func kubectlExecWithRetries(args ...string) (out string) {
 	var err error

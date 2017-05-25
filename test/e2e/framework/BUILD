@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "authorizer_util.go",
         "cleanup.go",
+        "deployment_util.go",
         "exec_util.go",
         "federation_util.go",
         "firewall_util.go",
@@ -28,7 +29,9 @@ go_library(
         "perf_util.go",
         "pods.go",
         "pv_util.go",
+        "rc_util.go",
         "resource_usage_gatherer.go",
+        "rs_util.go",
         "service_util.go",
         "size.go",
         "statefulset_utils.go",
