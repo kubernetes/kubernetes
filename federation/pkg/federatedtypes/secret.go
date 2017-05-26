@@ -134,6 +134,10 @@ func (a *SecretAdapter) ClusterWatch(client kubeclientset.Interface, namespace s
 	return client.CoreV1().Secrets(namespace).Watch(options)
 }
 
+func (a *SecretAdapter) IsSchedulingAdapter() bool {
+	return false
+}
+
 func (a *SecretAdapter) NewTestObject(namespace string) pkgruntime.Object {
 	return &apiv1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
