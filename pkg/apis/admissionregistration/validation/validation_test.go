@@ -181,7 +181,7 @@ func TestValidateInitializerConfiguration(t *testing.T) {
 			expectedError: "resources[1]: Required value",
 		},
 		{
-			name: "wildcard cannot be mixed with other strings",
+			name: "wildcard cannot be mixed with other strings for APIGroups or APIVersions",
 			config: getInitializerConfiguration(
 				[]admissionregistration.Initializer{
 					{
@@ -190,12 +190,112 @@ func TestValidateInitializerConfiguration(t *testing.T) {
 							{
 								APIGroups:   []string{"a", "*"},
 								APIVersions: []string{"a", "*"},
-								Resources:   []string{"a", "*"},
+								Resources:   []string{"a"},
 							},
 						},
 					},
 				}),
-			expectedError: `initializers[0].rules[0].apiGroups: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other API groups, initializers[0].rules[0].apiVersions: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other API versions, initializers[0].rules[0].Resources: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other resources`,
+			expectedError: `initializers[0].rules[0].apiGroups: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other API groups, initializers[0].rules[0].apiVersions: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other API versions`,
+		},
+		{
+			name: `resource "*" can co-exist with resources that have subresources`,
+			config: getInitializerConfiguration(
+				[]admissionregistration.Initializer{
+					{
+						Name: "initializer.k8s.io",
+						Rules: []admissionregistration.Rule{
+							{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*", "a/b", "a/*", "*/b"},
+							},
+						},
+					},
+				}),
+		},
+		{
+			name: `resource "*" cannot mix with resources that don't have subresources`,
+			config: getInitializerConfiguration(
+				[]admissionregistration.Initializer{
+					{
+						Name: "initializer.k8s.io",
+						Rules: []admissionregistration.Rule{
+							{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*", "a"},
+							},
+						},
+					},
+				}),
+			expectedError: `if '*' is present, must not specify other resources without subresources`,
+		},
+		{
+			name: "resource a/* cannot mix with a/x",
+			config: getInitializerConfiguration(
+				[]admissionregistration.Initializer{
+					{
+						Name: "initializer.k8s.io",
+						Rules: []admissionregistration.Rule{
+							{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a/*", "a/x"},
+							},
+						},
+					},
+				}),
+			expectedError: `initializers[0].rules[0].resources[1]: Invalid value: "a/x": if 'a/*' is present, must not specify a/x`,
+		},
+		{
+			name: "resource a/* can mix with a",
+			config: getInitializerConfiguration(
+				[]admissionregistration.Initializer{
+					{
+						Name: "initializer.k8s.io",
+						Rules: []admissionregistration.Rule{
+							{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a/*", "a"},
+							},
+						},
+					},
+				}),
+		},
+		{
+			name: "resource */a cannot mix with x/a",
+			config: getInitializerConfiguration(
+				[]admissionregistration.Initializer{
+					{
+						Name: "initializer.k8s.io",
+						Rules: []admissionregistration.Rule{
+							{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*/a", "x/a"},
+							},
+						},
+					},
+				}),
+			expectedError: `initializers[0].rules[0].resources[1]: Invalid value: "x/a": if '*/a' is present, must not specify x/a`,
+		},
+		{
+			name: "resource */* cannot mix with other resources",
+			config: getInitializerConfiguration(
+				[]admissionregistration.Initializer{
+					{
+						Name: "initializer.k8s.io",
+						Rules: []admissionregistration.Rule{
+							{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*/*", "a"},
+							},
+						},
+					},
+				}),
+			expectedError: `initializers[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
 		},
 		{
 			name: "FailurePolicy can only be \"Ignore\"",

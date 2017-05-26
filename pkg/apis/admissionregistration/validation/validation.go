@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -66,6 +67,62 @@ func hasWildcard(slice []string) bool {
 	return false
 }
 
+func validateResources(resources []string, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	if len(resources) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath, ""))
+	}
+
+	// */x
+	resourcesWithWildcardSubresoures := sets.String{}
+	// x/*
+	subResoucesWithWildcardResource := sets.String{}
+	// */*
+	hasDoubleWildcard := false
+	// *
+	hasSingleWildcard := false
+	// x
+	hasResourceWithoutSubresource := false
+
+	for i, resSub := range resources {
+		if resSub == "" {
+			allErrors = append(allErrors, field.Required(fldPath.Index(i), ""))
+			continue
+		}
+		if resSub == "*/*" {
+			hasDoubleWildcard = true
+		}
+		if resSub == "*" {
+			hasSingleWildcard = true
+		}
+		parts := strings.SplitN(resSub, "/", 2)
+		if len(parts) == 1 {
+			hasResourceWithoutSubresource = resSub != "*"
+			continue
+		}
+		res, sub := parts[0], parts[1]
+		if _, ok := resourcesWithWildcardSubresoures[res]; ok {
+			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resources[i], fmt.Sprintf("if '%s/*' is present, must not specify %s", res, resources[i])))
+		}
+		if _, ok := subResoucesWithWildcardResource[sub]; ok {
+			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resources[i], fmt.Sprintf("if '*/%s' is present, must not specify %s", sub, resources[i])))
+		}
+		if sub == "*" {
+			resourcesWithWildcardSubresoures[res] = struct{}{}
+		}
+		if res == "*" {
+			subResoucesWithWildcardResource[sub] = struct{}{}
+		}
+	}
+	if len(resources) > 1 && hasDoubleWildcard {
+		allErrors = append(allErrors, field.Invalid(fldPath, resources, "if '*/*' is present, must not specify other resources"))
+	}
+	if hasSingleWildcard && hasResourceWithoutSubresource {
+		allErrors = append(allErrors, field.Invalid(fldPath, resources, "if '*' is present, must not specify other resources without subresources"))
+	}
+	return allErrors
+}
+
 func validateRule(rule *admissionregistration.Rule, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	if len(rule.APIGroups) == 0 {
@@ -86,17 +143,7 @@ func validateRule(rule *admissionregistration.Rule, fldPath *field.Path) field.E
 			allErrors = append(allErrors, field.Required(fldPath.Child("apiVersions").Index(i), ""))
 		}
 	}
-	if len(rule.Resources) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath.Child("resources"), ""))
-	}
-	if len(rule.Resources) > 1 && hasWildcard(rule.Resources) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("Resources"), rule.Resources, "if '*' is present, must not specify other resources"))
-	}
-	for i, resource := range rule.Resources {
-		if resource == "" {
-			allErrors = append(allErrors, field.Required(fldPath.Child("resources").Index(i), ""))
-		}
-	}
+	allErrors = append(allErrors, validateResources(rule.Resources, fldPath.Child("resources"))...)
 	return allErrors
 }
 
