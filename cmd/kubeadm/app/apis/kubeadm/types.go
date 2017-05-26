@@ -20,6 +20,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 type EnvParams struct {
@@ -95,4 +96,6 @@ type NodeConfiguration struct {
 	DiscoveryTokenAPIServers []string
 	TLSBootstrapToken        string
 	Token                    string
+	Labels                   map[string]string
+	Taints                   []v1.Taint
 }
