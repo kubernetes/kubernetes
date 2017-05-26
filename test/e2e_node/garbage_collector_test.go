@@ -18,6 +18,7 @@ package e2e_node
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -289,20 +290,9 @@ func getPods(specs []*testPodSpec) (pods []*v1.Pod) {
 		containers := []v1.Container{}
 		for i := 0; i < spec.numContainers; i++ {
 			containers = append(containers, v1.Container{
-				Image: "gcr.io/google_containers/busybox:1.24",
-				Name:  spec.getContainerName(i),
-				Command: []string{
-					"sh",
-					"-c",
-					fmt.Sprintf(`
-						f=/test-empty-dir-mnt/countfile%d
-						count=$(echo 'hello' >> $f ; wc -l $f | awk {'print $1'})
-						if [ $count -lt %d ]; then
-							exit 0
-						fi
-						while true; do sleep 1; done
-					`, i, spec.restartCount+1),
-				},
+				Image:   "gcr.io/google_containers/busybox:1.24",
+				Name:    spec.getContainerName(i),
+				Command: getRestartingContainerCommand("/test-empty-dir-mnt", i, int(spec.restartCount), ""),
 				VolumeMounts: []v1.VolumeMount{
 					{MountPath: "/test-empty-dir-mnt", Name: "test-empty-dir"},
 				},
@@ -320,4 +310,19 @@ func getPods(specs []*testPodSpec) (pods []*v1.Pod) {
 		})
 	}
 	return
+}
+
+func getRestartingContainerCommand(path string, containerNum, restarts int, loopingCommand string) []string {
+	return []string{
+		"sh",
+		"-c",
+		fmt.Sprintf(`
+			f=%s/countfile%s
+			count=$(echo 'hello' >> $f ; wc -l $f | awk {'print $1'})
+			if [ $count -lt %d ]; then
+				exit 0
+			fi
+			while true; do %s sleep 10; done`,
+			path, strconv.Itoa(containerNum), restarts+1, loopingCommand),
+	}
 }
