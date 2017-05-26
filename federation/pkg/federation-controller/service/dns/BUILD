@@ -13,12 +13,20 @@ go_test(
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/fake:go_default_library",
+        "//federation/pkg/dnsprovider:go_default_library",
         "//federation/pkg/dnsprovider/providers/google/clouddns:go_default_library",
         "//federation/pkg/federation-controller/service/ingress:go_default_library",
         "//federation/pkg/federation-controller/util/test:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/client-go/listers/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 
