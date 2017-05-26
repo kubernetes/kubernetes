@@ -1468,10 +1468,28 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeCla
 		oldPvc.Spec.VolumeName = newPvc.Spec.VolumeName
 		defer func() { oldPvc.Spec.VolumeName = "" }()
 	}
-	// changes to Spec are not allowed, but updates to label/and some annotations are OK.
-	// no-op updates pass validation.
-	if !apiequality.Semantic.DeepEqual(newPvc.Spec, oldPvc.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "field is immutable after creation"))
+
+	oldSize := oldPvc.Spec.Resources.Requests["storage"]
+	newSize := newPvc.Spec.Resources.Requests["storage"]
+
+	if newSize.Cmp(oldSize) < 0 {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be lesser than previous value"))
+	}
+
+	if !apiequality.Semantic.DeepEqual(newPvc.Spec.AccessModes, oldPvc.Spec.AccessModes) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "accessModes"), "field is immutable after creation"))
+	}
+
+	if !apiequality.Semantic.DeepEqual(newPvc.Spec.Selector, oldPvc.Spec.Selector) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "selector"), "field is immutable after creation"))
+	}
+
+	if !apiequality.Semantic.DeepEqual(newPvc.Spec.VolumeName, oldPvc.Spec.VolumeName) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeName"), "field is immutable after creation"))
+	}
+
+	if !apiequality.Semantic.DeepEqual(newPvc.Spec.StorageClassName, oldPvc.Spec.StorageClassName) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "storageClassName"), "field is immutable after creation"))
 	}
 
 	// storageclass annotation should be immutable after creation
