@@ -53,6 +53,8 @@ type FederatedTypeAdapter interface {
 	ClusterUpdate(client kubeclientset.Interface, obj pkgruntime.Object) (pkgruntime.Object, error)
 	ClusterWatch(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (watch.Interface, error)
 
+	IsSchedulingAdapter() bool
+
 	NewTestObject(namespace string) pkgruntime.Object
 }
 
