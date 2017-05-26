@@ -333,7 +333,7 @@ func TestEnsureRuleErrorCreating(t *testing.T) {
 	}
 }
 
-func TestDeleteRuleAlreadyExists(t *testing.T) {
+func TestDeleteRuleDoesNotExist(t *testing.T) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
 			// iptables version check
@@ -368,7 +368,7 @@ func TestDeleteRuleAlreadyExists(t *testing.T) {
 	}
 }
 
-func TestDeleteRuleNew(t *testing.T) {
+func TestDeleteRuleExists(t *testing.T) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
 			// iptables version check
@@ -438,7 +438,7 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 	}
 }
 
-func TestDeleteRuleErrorCreating(t *testing.T) {
+func TestDeleteRuleErrorDeleting(t *testing.T) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
 			// iptables version check
