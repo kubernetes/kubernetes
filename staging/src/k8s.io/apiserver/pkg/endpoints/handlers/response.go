@@ -34,7 +34,7 @@ import (
 // transformResponseObject takes an object loaded from storage and performs any necessary transformations.
 // Will write the complete response object.
 func transformResponseObject(ctx request.Context, scope RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, result runtime.Object) {
-	// TODO: use returned serializer
+	// TODO: fetch the media type much earlier in request processing and pass it into this method.
 	mediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
 	if err != nil {
 		status := responsewriters.ErrorToAPIStatus(err)
@@ -169,7 +169,7 @@ func transformResponseObject(ctx request.Context, scope RequestScope, req *http.
 		}
 	}
 
-	responsewriters.WriteObject(statusCode, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+	responsewriters.WriteObject(ctx, statusCode, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 }
 
 // errNotAcceptable indicates Accept negotiation has failed

@@ -19,11 +19,13 @@ package storage
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/net/context"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +37,7 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -394,6 +397,88 @@ func TestWatch(t *testing.T) {
 			{"metadata.name": "bar"},
 		},
 	)
+}
+
+func TestConvertToTableList(t *testing.T) {
+	storage, _, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericapirequest.NewDefaultContext()
+
+	columns := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Ready", Type: "string", Description: "The aggregate readiness state of this pod for accepting traffic."},
+		{Name: "Status", Type: "string", Description: "The aggregate status of the containers in this pod."},
+		{Name: "Restarts", Type: "integer", Description: "The number of times the containers in this pod have been restarted."},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "IP", Type: "string", Priority: 1, Description: v1.PodStatus{}.SwaggerDoc()["podIP"]},
+		{Name: "Node", Type: "string", Priority: 1, Description: v1.PodSpec{}.SwaggerDoc()["nodeName"]},
+	}
+
+	pod1 := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo", CreationTimestamp: metav1.NewTime(time.Now().Add(-370 * 24 * time.Hour))},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "ctr1"},
+				{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
+			},
+			NodeName: "test-node",
+		},
+		Status: api.PodStatus{
+			PodIP: "10.1.2.3",
+			Phase: api.PodPending,
+			ContainerStatuses: []api.ContainerStatus{
+				{Name: "ctr1", State: api.ContainerState{Running: &api.ContainerStateRunning{}}, RestartCount: 10, Ready: true},
+				{Name: "ctr2", State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}}, RestartCount: 0},
+			},
+		},
+	}
+
+	testCases := []struct {
+		in  runtime.Object
+		out *metav1alpha1.Table
+		err bool
+	}{
+		{
+			in:  nil,
+			err: true,
+		},
+		{
+			in: &api.Pod{},
+			out: &metav1alpha1.Table{
+				ColumnDefinitions: columns,
+				Rows: []metav1alpha1.TableRow{
+					{Cells: []interface{}{"", "0/0", "", 0, "<unknown>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
+				},
+			},
+		},
+		{
+			in: pod1,
+			out: &metav1alpha1.Table{
+				ColumnDefinitions: columns,
+				Rows: []metav1alpha1.TableRow{
+					{Cells: []interface{}{"foo", "1/2", "Pending", 10, "1y", "10.1.2.3", "test-node"}, Object: runtime.RawExtension{Object: pod1}},
+				},
+			},
+		},
+		{
+			in:  &api.PodList{},
+			out: &metav1alpha1.Table{ColumnDefinitions: columns},
+		},
+	}
+	for i, test := range testCases {
+		out, err := storage.ConvertToTable(ctx, test.in, nil)
+		if err != nil {
+			if test.err {
+				continue
+			}
+			t.Errorf("%d: error: %v", i, err)
+			continue
+		}
+		if !apiequality.Semantic.DeepEqual(test.out, out) {
+			t.Errorf("%d: mismatch: %s", i, diff.ObjectReflectDiff(test.out, out))
+		}
+	}
 }
 
 func TestEtcdCreate(t *testing.T) {
