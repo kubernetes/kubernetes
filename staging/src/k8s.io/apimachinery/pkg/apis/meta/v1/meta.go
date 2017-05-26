@@ -149,6 +149,9 @@ func (meta *ObjectMeta) GetFinalizers() []string                      { return m
 func (meta *ObjectMeta) SetFinalizers(finalizers []string)            { meta.Finalizers = finalizers }
 
 func (meta *ObjectMeta) GetOwnerReferences() []OwnerReference {
+	if meta.OwnerReferences == nil {
+		return nil
+	}
 	ret := make([]OwnerReference, len(meta.OwnerReferences))
 	for i := 0; i < len(meta.OwnerReferences); i++ {
 		ret[i].Kind = meta.OwnerReferences[i].Kind
@@ -168,6 +171,10 @@ func (meta *ObjectMeta) GetOwnerReferences() []OwnerReference {
 }
 
 func (meta *ObjectMeta) SetOwnerReferences(references []OwnerReference) {
+	if references == nil {
+		meta.OwnerReferences = nil
+		return
+	}
 	newReferences := make([]OwnerReference, len(references))
 	for i := 0; i < len(references); i++ {
 		newReferences[i].Kind = references[i].Kind

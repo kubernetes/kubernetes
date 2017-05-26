@@ -114,6 +114,7 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1alpha1.PartialObjectMetadat
 				OwnerReferences: m.GetOwnerReferences(),
 				Finalizers:      m.GetFinalizers(),
 				ClusterName:     m.GetClusterName(),
+				Initializers:    m.GetInitializers(),
 			},
 		}
 	}

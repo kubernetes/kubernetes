@@ -32,15 +32,15 @@ type defaultTableConvertor struct{}
 
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
-func (defaultTableConvertor) ConvertToTableList(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.TableList, error) {
-	var table metav1alpha1.TableList
+func (defaultTableConvertor) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error) {
+	var table metav1alpha1.Table
 	fn := func(obj runtime.Object) error {
 		m, err := meta.Accessor(obj)
 		if err != nil {
 			// TODO: skip objects we don't recognize
 			return nil
 		}
-		table.Items = append(table.Items, metav1alpha1.TableListItem{
+		table.Rows = append(table.Rows, metav1alpha1.TableRow{
 			Cells:  []interface{}{m.GetClusterName(), m.GetNamespace(), m.GetName(), m.GetCreationTimestamp().Time.UTC().Format(time.RFC3339)},
 			Object: runtime.RawExtension{Object: obj},
 		})
@@ -56,7 +56,7 @@ func (defaultTableConvertor) ConvertToTableList(ctx genericapirequest.Context, o
 			return nil, err
 		}
 	}
-	table.Headers = []metav1alpha1.TableListHeader{
+	table.ColumnDefinitions = []metav1alpha1.TableColumnDefinition{
 		{Name: "Cluster Name", Type: "string", Description: swaggerMetadataDescriptions["clusterName"]},
 		{Name: "Namespace", Type: "string", Description: swaggerMetadataDescriptions["namespace"]},
 		{Name: "Name", Type: "string", Description: swaggerMetadataDescriptions["name"]},
@@ -71,8 +71,8 @@ func (defaultTableConvertor) ConvertToTableList(ctx genericapirequest.Context, o
 	return &table, nil
 }
 
-func trimColumn(column int, table *metav1alpha1.TableList) bool {
-	for _, item := range table.Items {
+func trimColumn(column int, table *metav1alpha1.Table) bool {
+	for _, item := range table.Rows {
 		switch t := item.Cells[column].(type) {
 		case string:
 			if len(t) > 0 {
@@ -85,22 +85,22 @@ func trimColumn(column int, table *metav1alpha1.TableList) bool {
 		}
 	}
 	if column == 0 {
-		table.Headers = table.Headers[1:]
+		table.ColumnDefinitions = table.ColumnDefinitions[1:]
 	} else {
-		for j := column; j < len(table.Headers); j++ {
-			table.Headers[j] = table.Headers[j+1]
+		for j := column; j < len(table.ColumnDefinitions); j++ {
+			table.ColumnDefinitions[j] = table.ColumnDefinitions[j+1]
 		}
 	}
-	for i := range table.Items {
-		cells := table.Items[i].Cells
+	for i := range table.Rows {
+		cells := table.Rows[i].Cells
 		if column == 0 {
-			table.Items[i].Cells = cells[1:]
+			table.Rows[i].Cells = cells[1:]
 			continue
 		}
 		for j := column; j < len(cells); j++ {
 			cells[j] = cells[j+1]
 		}
-		table.Items[i].Cells = cells[:len(cells)-1]
+		table.Rows[i].Cells = cells[:len(cells)-1]
 	}
 	return true
 }

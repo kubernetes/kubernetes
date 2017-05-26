@@ -118,7 +118,7 @@ type GetterWithOptions interface {
 }
 
 type TableConvertor interface {
-	ConvertToTableList(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.TableList, error)
+	ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error)
 }
 
 // Deleter is an object that can delete a named RESTful resource.
