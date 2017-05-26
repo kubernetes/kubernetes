@@ -17,6 +17,7 @@ limitations under the License.
 package dockershim
 
 import (
+	"encoding/base64"
 	"fmt"
 	"path"
 	"testing"
@@ -249,11 +250,17 @@ func TestGetSecurityOptSeparator(t *testing.T) {
 
 func TestEnsureSandboxImageExists(t *testing.T) {
 	sandboxImage := "gcr.io/test/image"
+	registryHost := "https://gcr.io/"
+	authConfig := dockertypes.AuthConfig{Username: "user", Password: "pass"}
+	authB64 := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", authConfig.Username, authConfig.Password)))
+	authJSON := fmt.Sprintf("{\"auths\": {\"%s\": {\"auth\": \"%s\"} } }", registryHost, authB64)
 	for desc, test := range map[string]struct {
-		injectImage bool
-		injectErr   error
-		calls       []string
-		err         bool
+		injectImage  bool
+		imgNeedsAuth bool
+		injectErr    error
+		calls        []string
+		err          bool
+		configJSON   string
 	}{
 		"should not pull image when it already exists": {
 			injectImage: true,
@@ -271,16 +278,47 @@ func TestEnsureSandboxImageExists(t *testing.T) {
 			calls:       []string{"inspect_image"},
 			err:         true,
 		},
+		"should return error when image pull needs private auth, but none provided": {
+			injectImage:  true,
+			imgNeedsAuth: true,
+			injectErr:    libdocker.ImageNotFoundError{ID: "image_id"},
+			calls:        []string{"inspect_image", "pull"},
+			err:          true,
+		},
+		"should pull private image using dockerauth if image doesn't exist": {
+			injectImage:  true,
+			imgNeedsAuth: true,
+			injectErr:    libdocker.ImageNotFoundError{ID: "image_id"},
+			calls:        []string{"inspect_image", "pull"},
+			configJSON:   authJSON,
+			err:          false,
+		},
 	} {
 		t.Logf("TestCase: %q", desc)
 		_, fakeDocker, _ := newTestDockerService()
 		if test.injectImage {
-			fakeDocker.InjectImages([]dockertypes.Image{{ID: sandboxImage}})
+			images := []dockertypes.Image{{ID: sandboxImage}}
+			fakeDocker.InjectImages(images)
+			if test.imgNeedsAuth {
+				fakeDocker.MakeImagesPrivate(images, authConfig)
+			}
 		}
 		fakeDocker.InjectError("inspect_image", test.injectErr)
+
+		configTeardown := func() {}
+		if test.configJSON != "" {
+			if err, cb := fakeDocker.WriteDockerConfigJSONFile(test.configJSON); err != nil {
+				t.Errorf("could not write fake docker config file: %v", err)
+			} else {
+				configTeardown = cb
+			}
+		}
+
 		err := ensureSandboxImageExists(fakeDocker, sandboxImage)
 		assert.NoError(t, fakeDocker.AssertCalls(test.calls))
 		assert.Equal(t, test.err, err != nil)
+
+		configTeardown()
 	}
 }
 

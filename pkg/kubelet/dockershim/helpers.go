@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -34,11 +35,11 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/security/apparmor"
-
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 const (
@@ -380,11 +381,33 @@ func ensureSandboxImageExists(client libdocker.Interface, image string) error {
 		return nil
 	}
 	if !libdocker.IsImageNotFoundError(err) {
-		return fmt.Errorf("failed to inspect sandbox image %q: %v", image, err)
+		return fmt.Errorf("failed to inspect pod infra container image %q: %v", image, err)
 	}
-	err = client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{})
+
+	// To support images in private registries, try to read docker config
+	authConfig := dockertypes.AuthConfig{}
+	keyring := &credentialprovider.BasicDockerKeyring{}
+	pwd, _ := os.Getwd()
+	paths := []string{"/.docker", "/root/.docker", pwd + "/.docker"}
+	if cfg, err := credentialprovider.ReadDockerConfigJSONFile(paths); err == nil {
+		keyring.Add(cfg)
+	} else if cfg, err := credentialprovider.ReadDockercfgFile(paths); err == nil {
+		keyring.Add(cfg)
+	} else {
+		glog.Infof("Docker config loading error: %v. If pod infra container image %q is in a private registry, this will be a problem.", err, image)
+	}
+
+	if creds, withCredentials := keyring.Lookup(image); withCredentials {
+		// Use the first one that matched our image
+		for _, cred := range creds {
+			authConfig.Username = cred.Username
+			authConfig.Password = cred.Password
+			break
+		}
+	}
+	err = client.PullImage(image, authConfig, dockertypes.ImagePullOptions{})
 	if err != nil {
-		return fmt.Errorf("unable to pull sandbox image %q: %v", image, err)
+		return fmt.Errorf("unable to pull pod infra container image %q: %v", image, err)
 	}
 	return nil
 }
