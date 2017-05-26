@@ -20,6 +20,7 @@ go_library(
         "docker_legacy.go",
         "docker_sandbox.go",
         "docker_service.go",
+        "docker_stats.go",
         "docker_streaming.go",
         "exec.go",
         "helpers.go",

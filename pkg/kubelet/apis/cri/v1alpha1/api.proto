@@ -71,6 +71,12 @@ service RuntimeService {
     // PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
     rpc PortForward(PortForwardRequest) returns (PortForwardResponse) {}
 
+    // ContainerStats returns stats of the container. If the container does not
+    // exist, the call returns an error.
+    rpc ContainerStats(ContainerStatsRequest) returns (ContainerStatsResponse) {}
+    // ListContainerStats returns stats of all running containers.
+    rpc ListContainerStats(ListContainerStatsRequest) returns (ListContainerStatsResponse) {}
+
     // UpdateRuntimeConfig updates the runtime configuration based on the given request.
     rpc UpdateRuntimeConfig(UpdateRuntimeConfigRequest) returns (UpdateRuntimeConfigResponse) {}
 
@@ -971,33 +977,105 @@ message UInt64Value {
     uint64 value = 1;
 }
 
-// FsInfo contains data about filesystem usage.
-message FsInfo {
-    // The block device name associated with the filesystem.
-    string device = 1;
-    // The root directory for the images.
-    string path = 2;
-    // CapacityBytes represents the total capacity (bytes) of the filesystems
-    // underlying storage.
-    UInt64Value capacity_bytes = 3;
-    // AvailableBytes represents the storage space available (bytes) for the
-    // filesystem.
-    UInt64Value available_bytes = 4;
+// StorageIdentifier uniquely identify the storage..
+message StorageIdentifier{
+    // UUID of the device.
+    string uuid = 1;
+}
+
+// FilesystemUsage provides the filesystem usage information.
+message FilesystemUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // The underlying storage of the filesystem.
+    StorageIdentifier storage_id = 2;
     // UsedBytes represents the bytes used for images on the filesystem.
     // This may differ from the total bytes used on the filesystem and may not 
     // equal CapacityBytes - AvailableBytes.
-    UInt64Value used_bytes = 5;
-    // InodesCapacity represents the total inodes in the filesystem.
-    UInt64Value inodes_capacity = 6;
-    // InodesAvailable represents the free inodes in the filesystem.
-    UInt64Value inodes_available = 7;
+    UInt64Value used_bytes = 3;
     // InodesUsed represents the inodes used by the images.
     // This may not equal InodesCapacity - InodesAvailable because the underlying
     // filesystem may also be used for purposes other than storing images.
-    UInt64Value inodes_used = 8;
+    UInt64Value inodes_used = 4;
 }
 
 message ImageFsInfoResponse {
-    // filesystem information of images.
-    FsInfo fs_info = 1;
+    // Information of image filesystem(s).
+    repeated FilesystemUsage image_filesystems = 1;
+}
+
+message ContainerStatsRequest{
+    // ID of the container for which to retrieve stats.
+    string container_id = 1;
+}
+
+message ContainerStatsResponse {
+    // Stats of the container.
+    ContainerStats stats = 1;
+}
+
+message ListContainerStatsRequest{
+    // Filter for the list request.
+    ContainerStatsFilter filter = 1;
+}
+
+// ContainerStatsFilter is used to filter containers.
+// All those fields are combined with 'AND'
+message ContainerStatsFilter {
+    // ID of the container.
+    string id = 1;
+    // ID of the PodSandbox.
+    string pod_sandbox_id = 2;
+    // LabelSelector to select matches.
+    // Only api.MatchLabels is supported for now and the requirements
+    // are ANDed. MatchExpressions is not supported yet.
+    map<string, string> label_selector = 3;
+}
+
+message ListContainerStatsResponse {
+    // Stats of the container.
+    repeated ContainerStats stats = 1;
+}
+
+// ContainerAttributes provides basic information of the container.
+message ContainerAttributes {
+    // ID of the container.
+    string id = 1;
+    // Metadata of the container.
+    ContainerMetadata metadata = 2;
+    // Key-value pairs that may be used to scope and select individual resources.
+    map<string,string> labels = 3;
+    // Unstructured key-value map holding arbitrary metadata.
+    // Annotations MUST NOT be altered by the runtime; the value of this field
+    // MUST be identical to that of the corresponding ContainerConfig used to
+    // instantiate the Container this status represents.
+    map<string,string> annotations = 4;
+}
+
+// ContainerStats provides the resource usage statistics for a container.
+message ContainerStats {
+    // Information of the container.
+    ContainerAttributes attributes = 1;
+    // CPU usage gathered from the container.
+    CpuUsage cpu = 2;
+    // Memory usage gathered from the container.
+    MemoryUsage memory = 3;
+    // Usage of the writeable layer.
+    FilesystemUsage writable_layer = 4;
+}
+
+// CpuUsage provides the CPU usage information.
+message CpuUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // Cumulative CPU usage (sum across all cores) since object creation.
+    UInt64Value usage_core_nano_seconds = 2;
+}
+
+// MemoryUsage provides the memory usage information.
+message MemoryUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // The amount of working set memory in bytes.
+    UInt64Value working_set_bytes = 2;
 }
