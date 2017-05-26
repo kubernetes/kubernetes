@@ -136,6 +136,10 @@ func (a *DaemonSetAdapter) ClusterWatch(client kubeclientset.Interface, namespac
 	return client.Extensions().DaemonSets(namespace).Watch(options)
 }
 
+func (a *DaemonSetAdapter) IsSchedulingAdapter() bool {
+	return false
+}
+
 func (a *DaemonSetAdapter) NewTestObject(namespace string) pkgruntime.Object {
 	return &extensionsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
