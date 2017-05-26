@@ -569,6 +569,10 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		if res, exists := allocatableReservation[k]; exists {
 			value.Sub(res)
 		}
+		if value.Sign() < 0 {
+			// Negative Allocatable resources don't make sense.
+			value.Set(0)
+		}
 		node.Status.Allocatable[k] = value
 	}
 }
