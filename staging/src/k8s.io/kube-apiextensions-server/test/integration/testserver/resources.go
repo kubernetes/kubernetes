@@ -25,17 +25,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
-	apiextensionsv1alpha1 "k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
+	apiextensionsv1beta1 "k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset"
 )
 
-func NewNoxuCustomResourceDefinition(scope apiextensionsv1alpha1.ResourceScope) *apiextensionsv1alpha1.CustomResourceDefinition {
-	return &apiextensionsv1alpha1.CustomResourceDefinition{
+func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
-		Spec: apiextensionsv1alpha1.CustomResourceDefinitionSpec{
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group:   "mygroup.example.com",
-			Version: "v1alpha1",
-			Names: apiextensionsv1alpha1.CustomResourceDefinitionNames{
+			Version: "v1beta1",
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:     "noxus",
 				Singular:   "nonenglishnoxu",
 				Kind:       "WishIHadChosenNoxu",
@@ -50,7 +50,7 @@ func NewNoxuCustomResourceDefinition(scope apiextensionsv1alpha1.ResourceScope) 
 func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "mygroup.example.com/v1alpha1",
+			"apiVersion": "mygroup.example.com/v1beta1",
 			"kind":       "WishIHadChosenNoxu",
 			"metadata": map[string]interface{}{
 				"namespace": namespace,
@@ -67,13 +67,13 @@ func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
 	}
 }
 
-func NewNoxu2CustomResourceDefinition(scope apiextensionsv1alpha1.ResourceScope) *apiextensionsv1alpha1.CustomResourceDefinition {
-	return &apiextensionsv1alpha1.CustomResourceDefinition{
+func NewNoxu2CustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "noxus2.mygroup.example.com"},
-		Spec: apiextensionsv1alpha1.CustomResourceDefinitionSpec{
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group:   "mygroup.example.com",
 			Version: "v1alpha1",
-			Names: apiextensionsv1alpha1.CustomResourceDefinitionNames{
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:     "noxus2",
 				Singular:   "nonenglishnoxu2",
 				Kind:       "WishIHadChosenNoxu2",
@@ -85,13 +85,13 @@ func NewNoxu2CustomResourceDefinition(scope apiextensionsv1alpha1.ResourceScope)
 	}
 }
 
-func NewCurletCustomResourceDefinition(scope apiextensionsv1alpha1.ResourceScope) *apiextensionsv1alpha1.CustomResourceDefinition {
-	return &apiextensionsv1alpha1.CustomResourceDefinition{
+func NewCurletCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "curlets.mygroup.example.com"},
-		Spec: apiextensionsv1alpha1.CustomResourceDefinitionSpec{
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group:   "mygroup.example.com",
-			Version: "v1alpha1",
-			Names: apiextensionsv1alpha1.CustomResourceDefinitionNames{
+			Version: "v1beta1",
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:   "curlets",
 				Singular: "curlet",
 				Kind:     "Curlet",
@@ -105,7 +105,7 @@ func NewCurletCustomResourceDefinition(scope apiextensionsv1alpha1.ResourceScope
 func NewCurletInstance(namespace, name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "mygroup.example.com/v1alpha1",
+			"apiVersion": "mygroup.example.com/v1beta1",
 			"kind":       "Curlet",
 			"metadata": map[string]interface{}{
 				"namespace": namespace,
@@ -118,7 +118,7 @@ func NewCurletInstance(namespace, name string) *unstructured.Unstructured {
 	}
 }
 
-func CreateNewCustomResourceDefinition(crd *apiextensionsv1alpha1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, clientPool dynamic.ClientPool) (*dynamic.Client, error) {
+func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, clientPool dynamic.ClientPool) (*dynamic.Client, error) {
 	_, err := apiExtensionsClient.Apiextensions().CustomResourceDefinitions().Create(crd)
 	if err != nil {
 		return nil, err
@@ -148,7 +148,7 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1alpha1.CustomResource
 	return dynamicClient, nil
 }
 
-func DeleteCustomResourceDefinition(crd *apiextensionsv1alpha1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
+func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
 	if err := apiExtensionsClient.Apiextensions().CustomResourceDefinitions().Delete(crd.Name, nil); err != nil {
 		return err
 	}
@@ -171,6 +171,6 @@ func DeleteCustomResourceDefinition(crd *apiextensionsv1alpha1.CustomResourceDef
 	return err
 }
 
-func GetCustomResourceDefinition(crd *apiextensionsv1alpha1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1alpha1.CustomResourceDefinition, error) {
+func GetCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
 	return apiExtensionsClient.Apiextensions().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
 }

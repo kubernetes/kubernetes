@@ -24,7 +24,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1:go_default_library",
+        "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/apiserver:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/cmd/server:go_default_library",

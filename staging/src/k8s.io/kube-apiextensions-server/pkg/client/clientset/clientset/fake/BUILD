@@ -24,9 +24,9 @@ go_library(
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/discovery/fake:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1:go_default_library",
+        "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset/typed/apiextensions/v1alpha1:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset/typed/apiextensions/v1alpha1/fake:go_default_library",
+        "//vendor/k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset/typed/apiextensions/v1beta1:go_default_library",
+        "//vendor/k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset/typed/apiextensions/v1beta1/fake:go_default_library",
     ],
 )

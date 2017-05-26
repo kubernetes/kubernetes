@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	v1alpha1 "k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
+	v1beta1 "k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1beta1"
 	scheme "k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset/scheme"
 )
 
@@ -33,15 +33,15 @@ type CustomResourceDefinitionsGetter interface {
 
 // CustomResourceDefinitionInterface has methods to work with CustomResourceDefinition resources.
 type CustomResourceDefinitionInterface interface {
-	Create(*v1alpha1.CustomResourceDefinition) (*v1alpha1.CustomResourceDefinition, error)
-	Update(*v1alpha1.CustomResourceDefinition) (*v1alpha1.CustomResourceDefinition, error)
-	UpdateStatus(*v1alpha1.CustomResourceDefinition) (*v1alpha1.CustomResourceDefinition, error)
+	Create(*v1beta1.CustomResourceDefinition) (*v1beta1.CustomResourceDefinition, error)
+	Update(*v1beta1.CustomResourceDefinition) (*v1beta1.CustomResourceDefinition, error)
+	UpdateStatus(*v1beta1.CustomResourceDefinition) (*v1beta1.CustomResourceDefinition, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1alpha1.CustomResourceDefinition, error)
-	List(opts v1.ListOptions) (*v1alpha1.CustomResourceDefinitionList, error)
+	Get(name string, options v1.GetOptions) (*v1beta1.CustomResourceDefinition, error)
+	List(opts v1.ListOptions) (*v1beta1.CustomResourceDefinitionList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.CustomResourceDefinition, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CustomResourceDefinition, err error)
 	CustomResourceDefinitionExpansion
 }
 
@@ -51,15 +51,15 @@ type customResourceDefinitions struct {
 }
 
 // newCustomResourceDefinitions returns a CustomResourceDefinitions
-func newCustomResourceDefinitions(c *ApiextensionsV1alpha1Client) *customResourceDefinitions {
+func newCustomResourceDefinitions(c *ApiextensionsV1beta1Client) *customResourceDefinitions {
 	return &customResourceDefinitions{
 		client: c.RESTClient(),
 	}
 }
 
 // Create takes the representation of a customResourceDefinition and creates it.  Returns the server's representation of the customResourceDefinition, and an error, if there is any.
-func (c *customResourceDefinitions) Create(customResourceDefinition *v1alpha1.CustomResourceDefinition) (result *v1alpha1.CustomResourceDefinition, err error) {
-	result = &v1alpha1.CustomResourceDefinition{}
+func (c *customResourceDefinitions) Create(customResourceDefinition *v1beta1.CustomResourceDefinition) (result *v1beta1.CustomResourceDefinition, err error) {
+	result = &v1beta1.CustomResourceDefinition{}
 	err = c.client.Post().
 		Resource("customresourcedefinitions").
 		Body(customResourceDefinition).
@@ -69,8 +69,8 @@ func (c *customResourceDefinitions) Create(customResourceDefinition *v1alpha1.Cu
 }
 
 // Update takes the representation of a customResourceDefinition and updates it. Returns the server's representation of the customResourceDefinition, and an error, if there is any.
-func (c *customResourceDefinitions) Update(customResourceDefinition *v1alpha1.CustomResourceDefinition) (result *v1alpha1.CustomResourceDefinition, err error) {
-	result = &v1alpha1.CustomResourceDefinition{}
+func (c *customResourceDefinitions) Update(customResourceDefinition *v1beta1.CustomResourceDefinition) (result *v1beta1.CustomResourceDefinition, err error) {
+	result = &v1beta1.CustomResourceDefinition{}
 	err = c.client.Put().
 		Resource("customresourcedefinitions").
 		Name(customResourceDefinition.Name).
@@ -83,8 +83,8 @@ func (c *customResourceDefinitions) Update(customResourceDefinition *v1alpha1.Cu
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
 
-func (c *customResourceDefinitions) UpdateStatus(customResourceDefinition *v1alpha1.CustomResourceDefinition) (result *v1alpha1.CustomResourceDefinition, err error) {
-	result = &v1alpha1.CustomResourceDefinition{}
+func (c *customResourceDefinitions) UpdateStatus(customResourceDefinition *v1beta1.CustomResourceDefinition) (result *v1beta1.CustomResourceDefinition, err error) {
+	result = &v1beta1.CustomResourceDefinition{}
 	err = c.client.Put().
 		Resource("customresourcedefinitions").
 		Name(customResourceDefinition.Name).
@@ -116,8 +116,8 @@ func (c *customResourceDefinitions) DeleteCollection(options *v1.DeleteOptions, 
 }
 
 // Get takes name of the customResourceDefinition, and returns the corresponding customResourceDefinition object, and an error if there is any.
-func (c *customResourceDefinitions) Get(name string, options v1.GetOptions) (result *v1alpha1.CustomResourceDefinition, err error) {
-	result = &v1alpha1.CustomResourceDefinition{}
+func (c *customResourceDefinitions) Get(name string, options v1.GetOptions) (result *v1beta1.CustomResourceDefinition, err error) {
+	result = &v1beta1.CustomResourceDefinition{}
 	err = c.client.Get().
 		Resource("customresourcedefinitions").
 		Name(name).
@@ -128,8 +128,8 @@ func (c *customResourceDefinitions) Get(name string, options v1.GetOptions) (res
 }
 
 // List takes label and field selectors, and returns the list of CustomResourceDefinitions that match those selectors.
-func (c *customResourceDefinitions) List(opts v1.ListOptions) (result *v1alpha1.CustomResourceDefinitionList, err error) {
-	result = &v1alpha1.CustomResourceDefinitionList{}
+func (c *customResourceDefinitions) List(opts v1.ListOptions) (result *v1beta1.CustomResourceDefinitionList, err error) {
+	result = &v1beta1.CustomResourceDefinitionList{}
 	err = c.client.Get().
 		Resource("customresourcedefinitions").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -148,8 +148,8 @@ func (c *customResourceDefinitions) Watch(opts v1.ListOptions) (watch.Interface,
 }
 
 // Patch applies the patch and returns the patched customResourceDefinition.
-func (c *customResourceDefinitions) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.CustomResourceDefinition, err error) {
-	result = &v1alpha1.CustomResourceDefinition{}
+func (c *customResourceDefinitions) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CustomResourceDefinition, err error) {
+	result = &v1beta1.CustomResourceDefinition{}
 	err = c.client.Patch(pt).
 		Resource("customresourcedefinitions").
 		SubResource(subresources...).
