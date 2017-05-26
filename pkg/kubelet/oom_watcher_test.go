@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
-	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/fake"
 )
 
 func TestBasic(t *testing.T) {

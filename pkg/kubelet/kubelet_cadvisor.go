@@ -66,7 +66,12 @@ func (kl *Kubelet) GetContainerInfoV2(name string, options cadvisorapiv2.Request
 // ImagesFsInfo returns information about docker image fs usage from
 // cadvisor.
 func (kl *Kubelet) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return kl.cadvisor.ImagesFsInfo()
+	fsInfo, err := kl.containerRuntime.ImageFsInfo()
+	if err != nil {
+		return cadvisorapiv2.FsInfo{}, err
+	}
+
+	return kubecontainer.ConvertRuntimeFsInfo(fsInfo), nil
 }
 
 // RootFsInfo returns info about the root fs from cadvisor.

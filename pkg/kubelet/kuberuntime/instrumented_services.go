@@ -263,5 +263,5 @@ func (in instrumentedImageManagerService) ImageFsInfo() (*runtimeapi.FsInfo, err
 
 	fsInfo, err := in.service.ImageFsInfo()
 	recordError(operation, err)
-	return fsInfo, nil
+	return fsInfo, err
 }

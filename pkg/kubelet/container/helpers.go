@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -364,4 +365,44 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 		names[pm.Name] = struct{}{}
 	}
 	return
+}
+
+// ConvertCadvisorFsInfo converts cadvisorapiv2.FsInfo to runtimeapi.FsInfo.
+func ConvertCadvisorFsInfo(fsInfo cadvisorapiv2.FsInfo) runtimeapi.FsInfo {
+	runtimeFsInfo := runtimeapi.FsInfo{
+		Device:         fsInfo.Device,
+		Path:           fsInfo.Mountpoint,
+		CapacityBytes:  &runtimeapi.UInt64Value{Value: fsInfo.Capacity},
+		AvailableBytes: &runtimeapi.UInt64Value{Value: fsInfo.Available},
+		UsedBytes:      &runtimeapi.UInt64Value{Value: fsInfo.Usage},
+	}
+
+	if fsInfo.Inodes != nil {
+		runtimeFsInfo.InodesCapacity = &runtimeapi.UInt64Value{Value: *fsInfo.Inodes}
+	}
+	if fsInfo.InodesFree != nil {
+		runtimeFsInfo.InodesAvailable = &runtimeapi.UInt64Value{Value: *fsInfo.InodesFree}
+	}
+
+	return runtimeFsInfo
+}
+
+// ConvertRuntimeFsInfo converts runtimeapi.FsInfo to cadvisorapiv2.FsInfo.
+func ConvertRuntimeFsInfo(imageFsInfo runtimeapi.FsInfo) cadvisorapiv2.FsInfo {
+	fsInfo := cadvisorapiv2.FsInfo{
+		Device:     imageFsInfo.Device,
+		Mountpoint: imageFsInfo.Path,
+		Capacity:   imageFsInfo.GetCapacityBytes().GetValue(),
+		Available:  imageFsInfo.GetAvailableBytes().GetValue(),
+		Usage:      imageFsInfo.GetUsedBytes().GetValue(),
+	}
+
+	if imageFsInfo.GetInodesCapacity() != nil {
+		fsInfo.Inodes = &imageFsInfo.GetInodesCapacity().Value
+	}
+	if imageFsInfo.GetInodesAvailable() != nil {
+		fsInfo.InodesFree = &imageFsInfo.GetInodesAvailable().Value
+	}
+
+	return fsInfo
 }

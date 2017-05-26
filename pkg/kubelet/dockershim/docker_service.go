@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
@@ -146,7 +147,7 @@ var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPat
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(client libdocker.Interface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandlerName, dockershimRootDir string, disableSharedPID bool) (DockerService, error) {
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandlerName, dockershimRootDir string, disableSharedPID bool, cadvisor cadvisor.Interface) (DockerService, error) {
 	c := libdocker.NewInstrumentedInterface(client)
 	checkpointHandler, err := NewPersistentCheckpointHandler(dockershimRootDir)
 	if err != nil {
@@ -166,6 +167,7 @@ func NewDockerService(client libdocker.Interface, seccompProfileRoot string, pod
 	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
 		client:             c,
+		cadvisor:           cadvisor,
 		os:                 kubecontainer.RealOS{},
 		podSandboxImage:    podSandboxImage,
 		streamingRuntime: &streamingRuntime{
@@ -265,6 +267,8 @@ type dockerService struct {
 	// See proposals/pod-pid-namespace.md for details.
 	// TODO: Remove once the escape hatch is no longer used (https://issues.k8s.io/41938)
 	disableSharedPID bool
+	// cadvisor client.
+	cadvisor cadvisor.Interface
 }
 
 // Version returns the runtime name, runtime version and runtime API version
