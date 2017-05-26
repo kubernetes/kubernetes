@@ -45,6 +45,8 @@ type GroupManager interface {
 // The list of APIGroups may change while the server is running because additional resources
 // are registered or removed.  It is not safe to cache the values.
 type rootAPIsHandler struct {
+	postGoRestfulMux http.Handler
+
 	// addresses is used to build cluster IPs for discovery.
 	addresses Addresses
 
@@ -59,17 +61,18 @@ type rootAPIsHandler struct {
 	apiGroupNames []string
 }
 
-func NewRootAPIsHandler(addresses Addresses, serializer runtime.NegotiatedSerializer, contextMapper request.RequestContextMapper) *rootAPIsHandler {
+func NewRootAPIsHandler(postGoRestfulMux http.Handler, addresses Addresses, serializer runtime.NegotiatedSerializer, contextMapper request.RequestContextMapper) *rootAPIsHandler {
 	// Because in release 1.1, /apis returns response with empty APIVersion, we
 	// use stripVersionNegotiatedSerializer to keep the response backwards
 	// compatible.
 	serializer = stripVersionNegotiatedSerializer{serializer}
 
 	return &rootAPIsHandler{
-		addresses:     addresses,
-		serializer:    serializer,
-		apiGroups:     map[string]metav1.APIGroup{},
-		contextMapper: contextMapper,
+		postGoRestfulMux: postGoRestfulMux,
+		addresses:        addresses,
+		serializer:       serializer,
+		apiGroups:        map[string]metav1.APIGroup{},
+		contextMapper:    contextMapper,
 	}
 }
 
@@ -99,6 +102,12 @@ func (s *rootAPIsHandler) RemoveGroup(groupName string) {
 }
 
 func (s *rootAPIsHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	// gorestful steals everything under /APIGroupPrefix, so we need to make sure we actually match
+	if req.URL.Path != APIGroupPrefix && req.URL.Path != APIGroupPrefix+"/" {
+		s.postGoRestfulMux.ServeHTTP(resp, req)
+		return
+	}
+
 	ctx, ok := s.contextMapper.Get(req)
 	if !ok {
 		responsewriters.InternalError(resp, req, errors.New("no context found for request"))
@@ -141,5 +150,11 @@ func (s *rootAPIsHandler) WebService() *restful.WebService {
 		Produces(mediaTypes...).
 		Consumes(mediaTypes...).
 		Writes(metav1.APIGroupList{}))
+	// We have to register for everything here or gorestful will forcibly 404 on misses under /apis which prevents
+	// proper delegation.  We can't take this out of gorestful because our swagger generation still requires it.
+	ws.Route(ws.GET("/{var:*}").To(s.restfulHandle).
+		Doc("ignored endpoint registered for infrastructure handling").
+		Param(ws.PathParameter("var", "ignored variable for infrastructure handling").DataType("string")).
+		Operation("getIgnored"))
 	return ws
 }

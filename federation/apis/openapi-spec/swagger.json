@@ -9676,6 +9676,33 @@
      }
     ]
    },
+   "/apis/{var}": {
+    "get": {
+     "description": "ignored endpoint registered for infrastructure handling",
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "Var"
+     ],
+     "operationId": "getVarIgnored",
+     "responses": {
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "ignored variable for infrastructure handling",
+      "name": "var",
+      "in": "path",
+      "required": true
+     }
+    ]
+   },
    "/logs/": {
     "get": {
      "schemes": [
