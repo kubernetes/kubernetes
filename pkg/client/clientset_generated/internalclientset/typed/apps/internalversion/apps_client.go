@@ -23,12 +23,17 @@ import (
 
 type AppsInterface interface {
 	RESTClient() rest.Interface
+	ControllerRevisionsGetter
 	StatefulSetsGetter
 }
 
 // AppsClient is used to interact with features provided by the apps group.
 type AppsClient struct {
 	restClient rest.Interface
+}
+
+func (c *AppsClient) ControllerRevisions(namespace string) ControllerRevisionInterface {
+	return newControllerRevisions(c, namespace)
 }
 
 func (c *AppsClient) StatefulSets(namespace string) StatefulSetInterface {

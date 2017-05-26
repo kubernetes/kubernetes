@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "apps_client.go",
+        "controllerrevision.go",
         "deployment.go",
         "doc.go",
         "generated_expansion.go",

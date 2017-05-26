@@ -208,6 +208,7 @@ pkg/proxy/healthcheck
 pkg/quota
 pkg/quota/install
 pkg/registry
+pkg/registry/apps/controllerrevision/storage
 pkg/registry/authorization/util
 pkg/registry/core/configmap/storage
 pkg/registry/core/endpoint

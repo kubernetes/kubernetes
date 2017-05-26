@@ -24,6 +24,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/registry/apps/controllerrevision:all-srcs",
         "//pkg/registry/apps/rest:all-srcs",
         "//pkg/registry/apps/statefulset:all-srcs",
         "//pkg/registry/authentication/rest:all-srcs",
