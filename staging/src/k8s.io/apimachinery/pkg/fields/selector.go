@@ -40,6 +40,8 @@ type Selector interface {
 
 	// Transform returns a new copy of the selector after TransformFunc has been
 	// applied to the entire selector, or an error if fn returns an error.
+	// If for a given requirement both field and value are transformed to empty
+	// string, the requirement is skipped.
 	Transform(fn TransformFunc) (Selector, error)
 
 	// Requirements converts this interface to Requirements to expose
@@ -79,6 +81,9 @@ func (t *hasTerm) Transform(fn TransformFunc) (Selector, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(field) == 0 && len(value) == 0 {
+		return Everything(), nil
+	}
 	return &hasTerm{field, value}, nil
 }
 
@@ -114,6 +119,9 @@ func (t *notHasTerm) Transform(fn TransformFunc) (Selector, error) {
 	field, value, err := fn(t.field, t.value)
 	if err != nil {
 		return nil, err
+	}
+	if len(field) == 0 && len(value) == 0 {
+		return Everything(), nil
 	}
 	return &notHasTerm{field, value}, nil
 }
@@ -169,13 +177,15 @@ func (t andTerm) RequiresExactMatch(field string) (string, bool) {
 }
 
 func (t andTerm) Transform(fn TransformFunc) (Selector, error) {
-	next := make([]Selector, len([]Selector(t)))
-	for i, s := range []Selector(t) {
+	next := make([]Selector, 0, len([]Selector(t)))
+	for _, s := range []Selector(t) {
 		n, err := s.Transform(fn)
 		if err != nil {
 			return nil, err
 		}
-		next[i] = n
+		if !n.Empty() {
+			next = append(next, n)
+		}
 	}
 	return andTerm(next), nil
 }
