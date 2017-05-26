@@ -232,6 +232,10 @@ func (c *CreateRoleOptions) Validate() error {
 		return fmt.Errorf("at least one resource must be specified")
 	}
 
+	return c.validateResource()
+}
+
+func (c *CreateRoleOptions) validateResource() error {
 	for _, r := range c.Resources {
 		if len(r.Resource) == 0 {
 			return fmt.Errorf("resource must be specified if apiGroup/subresource specified")
@@ -263,14 +267,13 @@ func (c *CreateRoleOptions) Validate() error {
 			return err
 		}
 	}
-
 	return nil
 }
 
 func (c *CreateRoleOptions) RunCreateRole() error {
 	role := &rbac.Role{}
 	role.Name = c.Name
-	rules, err := generateResourcePolicyRules(c.Mapper, c.Verbs, c.Resources, c.ResourceNames)
+	rules, err := generateResourcePolicyRules(c.Mapper, c.Verbs, c.Resources, c.ResourceNames, []string{})
 	if err != nil {
 		return err
 	}
@@ -301,7 +304,7 @@ func arrayContains(s []string, e string) bool {
 	return false
 }
 
-func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resources []ResourceOptions, resourceNames []string) ([]rbac.PolicyRule, error) {
+func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resources []ResourceOptions, resourceNames []string, nonResourceURLs []string) ([]rbac.PolicyRule, error) {
 	// groupResourceMapping is a apigroup-resource map. The key of this map is api group, while the value
 	// is a string array of resources under this api group.
 	// E.g.  groupResourceMapping = {"extensions": ["replicasets", "deployments"], "batch":["jobs"]}
@@ -334,6 +337,13 @@ func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resourc
 		rule.Resources = groupResourceMapping[g]
 		rule.APIGroups = []string{g}
 		rule.ResourceNames = resourceNames
+		rules = append(rules, rule)
+	}
+
+	if len(nonResourceURLs) > 0 {
+		rule := rbac.PolicyRule{}
+		rule.Verbs = verbs
+		rule.NonResourceURLs = nonResourceURLs
 		rules = append(rules, rule)
 	}
 
