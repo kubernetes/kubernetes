@@ -251,7 +251,7 @@ func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, sc
 // WebServices set.
 func DefaultSwaggerConfig() *swagger.Config {
 	return &swagger.Config{
-		ApiPath:         "/swaggerapi/",
+		ApiPath:         "/swaggerapi",
 		SwaggerPath:     "/swaggerui/",
 		SwaggerFilePath: "/swagger-ui/",
 		SchemaFormatHandler: func(typeName string) string {
@@ -369,7 +369,8 @@ func (c *Config) SkipComplete() completedConfig {
 }
 
 // New creates a new server which logically combines the handling chain with the passed server.
-func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServer, error) {
+// name is used to differentiate for logging.  The handler chain in particular can be difficult as it starts delgating.
+func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*GenericAPIServer, error) {
 	// The delegationTarget and the config must agree on the RequestContextMapper
 
 	if c.Serializer == nil {
@@ -382,7 +383,7 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 	handlerChainBuilder := func(handler http.Handler) http.Handler {
 		return c.BuildHandlerChainFunc(handler, c.Config)
 	}
-	apiServerHandler := NewAPIServerHandler(c.RequestContextMapper, c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
+	apiServerHandler := NewAPIServerHandler(name, c.RequestContextMapper, c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
 
 	s := &GenericAPIServer{
 		discoveryAddresses:     c.DiscoveryAddresses,
@@ -449,7 +450,7 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 	// use the UnprotectedHandler from the delegation target to ensure that we don't attempt to double authenticator, authorize,
 	// or some other part of the filter chain in delegation cases.
 	if delegationTarget.UnprotectedHandler() == nil && c.EnableIndex {
-		s.Handler.PostGoRestfulMux.NotFoundHandler(routes.IndexLister{
+		s.Handler.NonGoRestfulMux.NotFoundHandler(routes.IndexLister{
 			StatusCode:   http.StatusNotFound,
 			PathProvider: s.listedPathProvider,
 		})
@@ -478,22 +479,22 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableIndex {
-		routes.Index{}.Install(s.listedPathProvider, s.Handler.PostGoRestfulMux)
+		routes.Index{}.Install(s.listedPathProvider, s.Handler.NonGoRestfulMux)
 	}
 	if c.SwaggerConfig != nil && c.EnableSwaggerUI {
-		routes.SwaggerUI{}.Install(s.Handler.PostGoRestfulMux)
+		routes.SwaggerUI{}.Install(s.Handler.NonGoRestfulMux)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.Handler.PostGoRestfulMux)
+		routes.Profiling{}.Install(s.Handler.NonGoRestfulMux)
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}
 	if c.EnableMetrics {
 		if c.EnableProfiling {
-			routes.MetricsWithReset{}.Install(s.Handler.PostGoRestfulMux)
+			routes.MetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
 		} else {
-			routes.DefaultMetrics{}.Install(s.Handler.PostGoRestfulMux)
+			routes.DefaultMetrics{}.Install(s.Handler.NonGoRestfulMux)
 		}
 	}
 	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer)
