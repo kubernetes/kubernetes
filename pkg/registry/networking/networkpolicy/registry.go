@@ -57,7 +57,7 @@ func (s *storage) ListNetworkPolicies(ctx genericapirequest.Context, options *me
 }
 
 func (s *storage) CreateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy) error {
-	_, err := s.Create(ctx, np)
+	_, err := s.Create(ctx, np, false)
 	return err
 }
 

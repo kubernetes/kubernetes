@@ -57,7 +57,7 @@ func (s *storage) ListClusterRoles(ctx genericapirequest.Context, options *metai
 }
 
 func (s *storage) CreateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole) error {
-	_, err := s.Create(ctx, clusterRole)
+	_, err := s.Create(ctx, clusterRole, false)
 	return err
 }
 

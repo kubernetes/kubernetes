@@ -101,12 +101,12 @@ func (resourcequotaStatusStrategy) ValidateUpdate(ctx genericapirequest.Context,
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	resourcequotaObj, ok := obj.(*api.ResourceQuota)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a resourcequota")
+		return nil, nil, false, fmt.Errorf("not a resourcequota")
 	}
-	return labels.Set(resourcequotaObj.Labels), ResourceQuotaToSelectableFields(resourcequotaObj), nil
+	return labels.Set(resourcequotaObj.Labels), ResourceQuotaToSelectableFields(resourcequotaObj), resourcequotaObj.Initializers != nil, nil
 }
 
 // MatchResourceQuota returns a generic matcher for a given label and field selector.

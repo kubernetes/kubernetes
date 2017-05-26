@@ -68,7 +68,7 @@ func (s *storage) GetThirdPartyResourceData(ctx genericapirequest.Context, name 
 }
 
 func (s *storage) CreateThirdPartyResourceData(ctx genericapirequest.Context, ThirdPartyResourceData *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error) {
-	obj, err := s.Create(ctx, ThirdPartyResourceData)
+	obj, err := s.Create(ctx, ThirdPartyResourceData, false)
 	return obj.(*extensions.ThirdPartyResourceData), err
 }
 

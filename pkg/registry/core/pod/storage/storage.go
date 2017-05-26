@@ -130,7 +130,7 @@ func (r *BindingREST) New() runtime.Object {
 var _ = rest.Creater(&BindingREST{})
 
 // Create ensures a pod is bound to a specific host.
-func (r *BindingREST) Create(ctx genericapirequest.Context, obj runtime.Object) (out runtime.Object, err error) {
+func (r *BindingREST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (out runtime.Object, err error) {
 	binding := obj.(*api.Binding)
 
 	// TODO: move me to a binding strategy
@@ -141,11 +141,6 @@ func (r *BindingREST) Create(ctx genericapirequest.Context, obj runtime.Object) 
 	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations)
 	out = &metav1.Status{Status: metav1.StatusSuccess}
 	return
-}
-
-// CreateInitialized will ensure the pod is bound.
-func (r *BindingREST) CreateInitialized(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
-	return r.Create(ctx, obj)
 }
 
 // setPodHostAndAnnotations sets the given pod's host to 'machine' if and only if it was

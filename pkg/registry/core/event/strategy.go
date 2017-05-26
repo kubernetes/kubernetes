@@ -73,12 +73,12 @@ func (eventStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	event, ok := obj.(*api.Event)
 	if !ok {
-		return nil, nil, fmt.Errorf("not an event")
+		return nil, nil, false, fmt.Errorf("not an event")
 	}
-	return labels.Set(event.Labels), EventToSelectableFields(event), nil
+	return labels.Set(event.Labels), EventToSelectableFields(event), event.Initializers != nil, nil
 }
 
 func MatchEvent(label labels.Selector, field fields.Selector) storage.SelectionPredicate {

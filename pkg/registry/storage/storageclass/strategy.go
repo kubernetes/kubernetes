@@ -80,12 +80,12 @@ func (storageClassStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	cls, ok := obj.(*storage.StorageClass)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not of type StorageClass")
+		return nil, nil, false, fmt.Errorf("given object is not of type StorageClass")
 	}
-	return labels.Set(cls.ObjectMeta.Labels), StorageClassToSelectableFields(cls), nil
+	return labels.Set(cls.ObjectMeta.Labels), StorageClassToSelectableFields(cls), cls.Initializers != nil, nil
 }
 
 // MatchStorageClass returns a generic matcher for a given label and field selector.

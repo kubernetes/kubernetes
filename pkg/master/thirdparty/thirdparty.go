@@ -297,7 +297,7 @@ func (m *ThirdPartyResourceServer) migrateThirdPartyResourceData(gvk schema.Grou
 		// Store CustomResource.
 		obj := &unstructured.Unstructured{Object: objMap}
 		createCtx := request.WithNamespace(ctx, obj.GetNamespace())
-		if _, err := storage.Create(createCtx, obj); err != nil {
+		if _, err := storage.Create(createCtx, obj, false); err != nil {
 			errs = append(errs, fmt.Errorf("can't create CustomResource for TPR data %q: %v", item.Name, err))
 			continue
 		}
