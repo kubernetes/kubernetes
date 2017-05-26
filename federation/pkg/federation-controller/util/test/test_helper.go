@@ -344,7 +344,7 @@ func CompareObjectMeta(a, b metav1.ObjectMeta) error {
 		return fmt.Errorf("Different namespace expected:%s observed:%s", a.Namespace, b.Namespace)
 	}
 	if a.Name != b.Name {
-		return fmt.Errorf("Different name expected:%s observed:%s", a.Namespace, b.Namespace)
+		return fmt.Errorf("Different name expected:%s observed:%s", a.Name, b.Name)
 	}
 	if !reflect.DeepEqual(a.Labels, b.Labels) && (len(a.Labels) != 0 || len(b.Labels) != 0) {
 		return fmt.Errorf("Labels are different expected:%v observed:%v", a.Labels, b.Labels)
