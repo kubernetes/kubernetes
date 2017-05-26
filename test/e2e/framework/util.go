@@ -590,8 +590,6 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 			case res && err == nil:
 				nOk++
 			case pod.Status.Phase == v1.PodSucceeded:
-				continue
-			case pod.Status.Phase == v1.PodSucceeded:
 				Logf("The status of Pod %s is Succeeded which is unexpected", pod.ObjectMeta.Name)
 				badPods = append(badPods, pod)
 				// it doesn't make sense to wait for this pod
