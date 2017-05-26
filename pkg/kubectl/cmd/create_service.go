@@ -56,6 +56,8 @@ var (
 
     # Create a new clusterIP service named my-cs (in headless mode)
     kubectl create service clusterip my-cs --clusterip="None"`))
+
+	selectorLabelUsage = "Label Selector to define set of pods targeted by service; supports expressions with Equals '=' operator example --selector='a=b' , -l 'a=b,c=d', -l='a=b,c=d'"
 )
 
 func addPortFlags(cmd *cobra.Command) {
@@ -80,6 +82,7 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer) *cobra.Co
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceClusterIPGeneratorV1Name)
 	addPortFlags(cmd)
 	cmd.Flags().String("clusterip", "", i18n.T("Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."))
+	cmd.Flags().StringP("selector", "l", "", selectorLabelUsage)
 	return cmd
 }
 
@@ -97,6 +100,7 @@ func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
 			Type:      api.ServiceTypeClusterIP,
 			ClusterIP: cmdutil.GetFlagString(cmd, "clusterip"),
+			Selector:  cmdutil.GetFlagString(cmd, "selector"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
@@ -135,6 +139,7 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer) *cobra.Com
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceNodePortGeneratorV1Name)
 	cmd.Flags().Int("node-port", 0, "Port used to expose the service on each node in a cluster.")
+	cmd.Flags().StringP("selector", "l", "", selectorLabelUsage)
 	addPortFlags(cmd)
 	return cmd
 }
@@ -154,6 +159,7 @@ func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comma
 			Type:      api.ServiceTypeNodePort,
 			ClusterIP: "",
 			NodePort:  cmdutil.GetFlagInt(cmd, "node-port"),
+			Selector:  cmdutil.GetFlagString(cmd, "selector"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
@@ -191,6 +197,7 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer) *cobra
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceLoadBalancerGeneratorV1Name)
+	cmd.Flags().StringP("selector", "l", "", selectorLabelUsage)
 	addPortFlags(cmd)
 	return cmd
 }
@@ -209,6 +216,7 @@ func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
 			Type:      api.ServiceTypeLoadBalancer,
 			ClusterIP: "",
+			Selector:  cmdutil.GetFlagString(cmd, "selector"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))

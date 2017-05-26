@@ -128,3 +128,95 @@ func TestServiceBasicGenerate(t *testing.T) {
 		}
 	}
 }
+func TestServiceSelectorLabels(t *testing.T) {
+	tests := []struct {
+		name         string
+		selector     string
+		externalname string
+		serviceType  api.ServiceType
+		tcp          []string
+		clusterip    string
+		expected     *api.Service
+		expectErr    bool
+	}{
+		{
+			name:        "clusterIP-selector-ok-custom",
+			selector:    "a=b,c=d",
+			tcp:         []string{"456", "321:908"},
+			clusterip:   "",
+			serviceType: api.ServiceTypeClusterIP,
+			expected: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "clusterIP-selector-ok-custom",
+					Labels: map[string]string{"app": "clusterIP-selector-ok-custom"},
+				},
+				Spec: api.ServiceSpec{Type: "ClusterIP",
+					Ports: []api.ServicePort{{Name: "456", Protocol: "TCP", Port: 456, TargetPort: intstr.IntOrString{Type: 0, IntVal: 456, StrVal: ""}, NodePort: 0},
+						{Name: "321-908", Protocol: "TCP", Port: 321, TargetPort: intstr.IntOrString{Type: 0, IntVal: 908, StrVal: ""}, NodePort: 0}},
+					Selector:  map[string]string{"a": "b", "c": "d"},
+					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+			},
+			expectErr: false,
+		},
+		{
+			name:        "clusterIP-selector-ok-default",
+			selector:    "",
+			tcp:         []string{"456", "321:908"},
+			clusterip:   "",
+			serviceType: api.ServiceTypeClusterIP,
+			expected: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "clusterIP-selector-ok-default",
+					Labels: map[string]string{"app": "clusterIP-selector-ok-default"},
+				},
+				Spec: api.ServiceSpec{Type: "ClusterIP",
+					Ports: []api.ServicePort{{Name: "456", Protocol: "TCP", Port: 456, TargetPort: intstr.IntOrString{Type: 0, IntVal: 456, StrVal: ""}, NodePort: 0},
+						{Name: "321-908", Protocol: "TCP", Port: 321, TargetPort: intstr.IntOrString{Type: 0, IntVal: 908, StrVal: ""}, NodePort: 0}},
+					Selector:  map[string]string{"app": "clusterIP-selector-ok-default"},
+					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+			},
+			expectErr: false,
+		},
+		{
+			name:         "externalname-selector-none",
+			selector:     "a=b",
+			externalname: "externalname",
+			tcp:          []string{},
+			serviceType:  api.ServiceTypeExternalName,
+			expected: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "externalname-selector-none",
+					Labels: map[string]string{"app": "externalname-selector-none"},
+				},
+				Spec: api.ServiceSpec{Type: "ExternalName",
+					Ports:     []api.ServicePort{},
+					Selector:  map[string]string(nil),
+					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: "", ExternalName: "externalname"},
+			},
+			expectErr: false,
+		},
+		{
+			expectErr: true,
+		},
+	}
+	for _, test := range tests {
+		generator := ServiceCommonGeneratorV1{
+			Name:         test.name,
+			Selector:     test.selector,
+			TCP:          test.tcp,
+			Type:         test.serviceType,
+			ClusterIP:    test.clusterip,
+			ExternalName: test.externalname,
+		}
+		obj, err := generator.StructuredGenerate()
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(obj.(*api.Service), test.expected) {
+			t.Errorf("test: %v\nexpected:\n%#v\nsaw:\n%#v", test.name, test.expected, obj.(*api.Service))
+		}
+	}
+}

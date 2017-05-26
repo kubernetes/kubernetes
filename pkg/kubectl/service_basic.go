@@ -35,6 +35,7 @@ type ServiceCommonGeneratorV1 struct {
 	ClusterIP    string
 	NodePort     int
 	ExternalName string
+	Selector     string
 }
 
 type ServiceClusterIPGeneratorV1 struct {
@@ -225,12 +226,24 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 		})
 	}
 
-	// setup default label and selector
+	// setup default label
 	labels := map[string]string{}
 	labels["app"] = s.Name
-	selector := map[string]string{}
-	selector["app"] = s.Name
-
+	// setup selector according to selector flag, use default if nothing is provided
+	// selector will not be added for service type ExternalName
+	selectorString := s.Selector
+	var selector map[string]string
+	if s.Type != api.ServiceTypeExternalName {
+		if len(selectorString) == 0 {
+			selector = map[string]string{}
+			selector["app"] = s.Name
+		} else {
+			selector, err = ParseLabels(selectorString)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 	service := api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
