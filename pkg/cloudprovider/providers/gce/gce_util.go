@@ -19,10 +19,12 @@ package gce
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"cloud.google.com/go/compute/metadata"
 	compute "google.golang.org/api/compute/v1"
@@ -105,6 +107,14 @@ func isHTTPErrorCode(err error, code int) bool {
 	return ok && apiErr.Code == code
 }
 
+func isInUsedByError(err error) bool {
+	apiErr, ok := err.(*googleapi.Error)
+	if !ok || apiErr.Code != http.StatusBadRequest {
+		return false
+	}
+	return strings.Contains(apiErr.Message, "being used by")
+}
+
 // splitProviderID splits a provider's id into core components.
 // A providerID is build out of '${ProviderName}://${project-id}/${zone}/${instance-name}'
 // See cloudprovider.GetInstanceProviderID.
@@ -114,4 +124,13 @@ func splitProviderID(providerID string) (project, zone, instance string, err err
 		return "", "", "", errors.New("error splitting providerID")
 	}
 	return matches[1], matches[2], matches[3], nil
+}
+
+func equalStringSets(x, y []string) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	xString := sets.NewString(x...)
+	yString := sets.NewString(y...)
+	return xString.Equal(yString)
 }

@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/compute/metadata"
@@ -80,7 +81,7 @@ type GCECloud struct {
 	serviceBeta              *computebeta.Service
 	containerService         *container.Service
 	clientBuilder            controller.ControllerClientBuilder
-	ClusterId                ClusterId
+	ClusterID                ClusterID
 	projectID                string
 	region                   string
 	localZone                string   // The zone in which we are running
@@ -92,6 +93,11 @@ type GCECloud struct {
 	useMetadataServer        bool
 	operationPollRateLimiter flowcontrol.RateLimiter
 	manager                  ServiceManager
+	// sharedResourceLock is used to serialize GCE operations that may mutate shared state to
+	// prevent inconsistencies. For example, load balancers manipulation methods will take the
+	// lock to prevent shared resources from being prematurely deleted while the operation is
+	// in progress.
+	sharedResourceLock sync.Mutex
 }
 
 type ServiceManager interface {
@@ -270,10 +276,10 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 }
 
 // Initialize takes in a clientBuilder and spawns a goroutine for watching the clusterid configmap.
-// This must be called before utilizing the funcs of gce.ClusterId
+// This must be called before utilizing the funcs of gce.ClusterID
 func (gce *GCECloud) Initialize(clientBuilder controller.ControllerClientBuilder) {
 	gce.clientBuilder = clientBuilder
-	go gce.watchClusterId()
+	go gce.watchClusterID()
 }
 
 // LoadBalancer returns an implementation of LoadBalancer for Google Compute Engine.
