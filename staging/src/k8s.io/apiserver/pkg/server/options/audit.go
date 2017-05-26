@@ -17,13 +17,17 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"io"
 	"os"
 
 	"github.com/spf13/pflag"
 	"gopkg.in/natefinch/lumberjack.v2"
 
+	"k8s.io/apiserver/pkg/audit/policy"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginlog "k8s.io/apiserver/plugin/pkg/audit/log"
 )
 
@@ -32,6 +36,8 @@ type AuditLogOptions struct {
 	MaxAge     int
 	MaxBackups int
 	MaxSize    int
+
+	PolicyFile string
 }
 
 func NewAuditLogOptions() *AuditLogOptions {
@@ -47,9 +53,28 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 		"The maximum number of old audit log files to retain.")
 	fs.IntVar(&o.MaxSize, "audit-log-maxsize", o.MaxSize,
 		"The maximum size in megabytes of the audit log file before it gets rotated.")
+
+	fs.StringVar(&o.PolicyFile, "audit-policy-file", o.PolicyFile,
+		"Path to the file that defines the audit policy configuration. Requires the 'AdvancedAuditing' feature gate."+
+			" With AdvancedAuditing, a profile is required to enable auditing.")
 }
 
 func (o *AuditLogOptions) ApplyTo(c *server.Config) error {
+	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
+		if o.PolicyFile != "" {
+			p, err := policy.LoadPolicyFromFile(o.PolicyFile)
+			if err != nil {
+				return err
+			}
+			c.AuditPolicyChecker = policy.NewChecker(p)
+		}
+	} else {
+		if o.PolicyFile != "" {
+			return fmt.Errorf("feature '%s' must be enabled to set an audit policy", features.AdvancedAuditing)
+		}
+	}
+
+	// TODO: Generalize for alternative audit backends.
 	if len(o.Path) == 0 {
 		return nil
 	}
@@ -63,6 +88,7 @@ func (o *AuditLogOptions) ApplyTo(c *server.Config) error {
 			MaxSize:    o.MaxSize,
 		}
 	}
+	c.LegacyAuditWriter = w
 	c.AuditBackend = pluginlog.NewBackend(w)
 	return nil
 }

@@ -14,25 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// TODO: Delete this file if we generate a clientset.
 package audit
 
-func ordLevel(l Level) int {
-	switch l {
-	case LevelMetadata:
-		return 1
-	case LevelRequest:
-		return 2
-	case LevelRequestResponse:
-		return 3
-	default:
-		return 0
-	}
-}
+import (
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apiserver/pkg/apis/audit/v1alpha1"
+)
 
-func (a Level) Less(b Level) bool {
-	return ordLevel(a) < ordLevel(b)
-}
+var Scheme = runtime.NewScheme()
+var Codecs = serializer.NewCodecFactory(Scheme)
 
-func (a Level) GreaterOrEqual(b Level) bool {
-	return ordLevel(a) >= ordLevel(b)
+func init() {
+	v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
+	v1alpha1.AddToScheme(Scheme)
 }
