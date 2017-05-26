@@ -87,6 +87,7 @@ go_library(
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/fieldpath:go_default_library",
         "//pkg/printers:go_default_library",
+        "//pkg/registry/rbac/validation:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//vendor/github.com/fatih/camelcase:go_default_library",
