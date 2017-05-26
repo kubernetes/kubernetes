@@ -235,6 +235,25 @@ func (j *ServiceTestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceNa
 	return svc
 }
 
+// CreateLoadBalancerService creates a loadbalancer service and waits
+// for it to acquire an ingress IP.
+func (j *ServiceTestJig) CreateLoadBalancerService(namespace, serviceName string, timeout time.Duration, tweak func(svc *v1.Service)) *v1.Service {
+	By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer")
+	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeLoadBalancer
+		// We need to turn affinity off for our LB distribution tests
+		svc.Spec.SessionAffinity = v1.ServiceAffinityNone
+		if tweak != nil {
+			tweak(svc)
+		}
+	})
+
+	By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
+	svc = j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
+	j.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+	return svc
+}
+
 func GetNodeAddresses(node *v1.Node, addressType v1.NodeAddressType) (ips []string) {
 	for j := range node.Status.Addresses {
 		nodeAddress := &node.Status.Addresses[j]
