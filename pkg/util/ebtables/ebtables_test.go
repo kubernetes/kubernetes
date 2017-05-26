@@ -24,31 +24,16 @@ import (
 )
 
 func TestEnsureChain(t *testing.T) {
-	fcmd := exec.FakeCmd{
-		CombinedOutputScript: []exec.FakeCombinedOutputAction{
-			// Does not Exists
-			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
-			// Success
-			func() ([]byte, error) { return []byte{}, nil },
-			// Exists
-			func() ([]byte, error) { return nil, nil },
-			// Does not Exists
-			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
-			// Fail to create chain
-			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 2} },
-		},
-	}
-	fexec := exec.FakeExec{
-		CommandScript: []exec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
+	fexec := exec.NewFakeExec(t, nil)
+	runner := New(fexec)
 
-	runner := New(&fexec)
+	// Does not Exist
+	fexec.AddCommand("ebtables", "-t", "filter", "-L", "TEST-CHAIN").
+		SetCombinedOutput(nil, &exec.FakeExitError{Status: 1})
+	// Success
+	fexec.AddCommand("ebtables", "-t", "filter", "-N", "TEST-CHAIN").
+		SetCombinedOutput("", nil)
+
 	exists, err := runner.EnsureChain(TableFilter, "TEST-CHAIN")
 	if exists {
 		t.Errorf("expected exists = false")
@@ -56,6 +41,11 @@ func TestEnsureChain(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected err = nil")
 	}
+	fexec.AssertExpectedCommands()
+
+	// Exists
+	fexec.AddCommand("ebtables", "-t", "filter", "-L", "TEST-CHAIN").
+		SetCombinedOutput(nil, nil)
 
 	exists, err = runner.EnsureChain(TableFilter, "TEST-CHAIN")
 	if !exists {
@@ -64,6 +54,14 @@ func TestEnsureChain(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected err = nil")
 	}
+	fexec.AssertExpectedCommands()
+
+	// Does not Exist
+	fexec.AddCommand("ebtables", "-t", "filter", "-L", "TEST-CHAIN").
+		SetCombinedOutput(nil, &exec.FakeExitError{Status: 1})
+	// Fail to create chain
+	fexec.AddCommand("ebtables", "-t", "filter", "-N", "TEST-CHAIN").
+		SetCombinedOutput(nil, &exec.FakeExitError{Status: 2})
 
 	exists, err = runner.EnsureChain(TableFilter, "TEST-CHAIN")
 	if exists {
@@ -73,38 +71,20 @@ func TestEnsureChain(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), errStr) {
 		t.Errorf("expected error: %q", errStr)
 	}
+	fexec.AssertExpectedCommands()
 }
 
 func TestEnsureRule(t *testing.T) {
-	fcmd := exec.FakeCmd{
-		CombinedOutputScript: []exec.FakeCombinedOutputAction{
-			// Exists
-			func() ([]byte, error) {
-				return []byte(`Bridge table: filter
+	fexec := exec.NewFakeExec(t, nil)
+	runner := New(fexec)
+
+	// Exists
+	fexec.AddCommand("ebtables", "-t", "filter", "-L", "OUTPUT", "--Lmac2").
+		SetCombinedOutput(`Bridge table: filter
 
 Bridge chain: OUTPUT, entries: 4, policy: ACCEPT
 -j TEST
-`), nil
-			},
-			// Does not Exists.
-			func() ([]byte, error) {
-				return []byte(`Bridge table: filter
-
-Bridge chain: TEST, entries: 0, policy: ACCEPT`), nil
-			},
-			// Fail to create
-			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 2} },
-		},
-	}
-	fexec := exec.FakeExec{
-		CommandScript: []exec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-
-	runner := New(&fexec)
+`, nil)
 
 	exists, err := runner.EnsureRule(Append, TableFilter, ChainOutput, "-j", "TEST")
 	if !exists {
@@ -113,6 +93,17 @@ Bridge chain: TEST, entries: 0, policy: ACCEPT`), nil
 	if err != nil {
 		t.Errorf("expected err = nil")
 	}
+	fexec.AssertExpectedCommands()
+
+	// Does not Exist.
+	fexec.AddCommand("ebtables", "-t", "filter", "-L", "OUTPUT", "--Lmac2").
+		SetCombinedOutput(`Bridge table: filter
+
+Bridge chain: TEST, entries: 0, policy: ACCEPT`, nil)
+
+	// Fail to create
+	fexec.AddCommand("ebtables", "-t", "filter", "-A", "OUTPUT", "-j", "NEXT-TEST").
+		SetCombinedOutput("", &exec.FakeExitError{Status: 2})
 
 	exists, err = runner.EnsureRule(Append, TableFilter, ChainOutput, "-j", "NEXT-TEST")
 	if exists {
@@ -122,4 +113,5 @@ Bridge chain: TEST, entries: 0, policy: ACCEPT`), nil
 	if err == nil || err.Error() != errStr {
 		t.Errorf("expected error: %q", errStr)
 	}
+	fexec.AssertExpectedCommands()
 }
