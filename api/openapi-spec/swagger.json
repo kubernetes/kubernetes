@@ -52649,6 +52649,35 @@
      }
     ]
    },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerCondition": {
+    "description": "HorizontalPodAutoscalerCondition describes the state of a HorizontalPodAutoscaler at a certain point.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastTransitionTime": {
+      "description": "lastTransitionTime is the last time the condition transitioned from one status to another",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "message": {
+      "description": "message is a human-readable explanation containing details about the transition",
+      "type": "string"
+     },
+     "reason": {
+      "description": "reason is the reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "description": "status is the status of the condition (True, False, Unknown)",
+      "type": "string"
+     },
+     "type": {
+      "description": "type describes the current condition",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerList": {
     "description": "HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.",
     "required": [
@@ -52718,9 +52747,17 @@
     "required": [
      "currentReplicas",
      "desiredReplicas",
-     "currentMetrics"
+     "currentMetrics",
+     "conditions"
     ],
     "properties": {
+     "conditions": {
+      "description": "conditions is the set of conditions required for this autoscaler to scale its target, and indicates whether or not those conditions are met.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerCondition"
+      }
+     },
      "currentMetrics": {
       "description": "currentMetrics is the last read state of the metrics used by this autoscaler.",
       "type": "array",

@@ -68,9 +68,17 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		}
 	}
 
-	if len(otherMetrics) > 0 || len(in.Status.CurrentMetrics) > 0 {
+	// store HPA conditions in an annotation
+	currentConditions := make([]HorizontalPodAutoscalerCondition, len(in.Status.Conditions))
+	for i, currentCondition := range in.Status.Conditions {
+		if err := Convert_autoscaling_HorizontalPodAutoscalerCondition_To_v1_HorizontalPodAutoscalerCondition(&currentCondition, &currentConditions[i], s); err != nil {
+			return err
+		}
+	}
+
+	if len(otherMetrics) > 0 || len(in.Status.CurrentMetrics) > 0 || len(currentConditions) > 0 {
 		old := out.Annotations
-		out.Annotations = make(map[string]string, len(old)+2)
+		out.Annotations = make(map[string]string, len(old)+3)
 		if old != nil {
 			for k, v := range old {
 				out.Annotations[k] = v
@@ -92,6 +100,14 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 			return err
 		}
 		out.Annotations[autoscaling.MetricStatusesAnnotation] = string(currentMetricsEnc)
+	}
+
+	if len(in.Status.Conditions) > 0 {
+		currentConditionsEnc, err := json.Marshal(currentConditions)
+		if err != nil {
+			return err
+		}
+		out.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation] = string(currentConditionsEnc)
 	}
 
 	return nil
@@ -152,6 +168,21 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 		}
 		out.Spec.Metrics[0].Resource.TargetAverageUtilization = new(int32)
 		*out.Spec.Metrics[0].Resource.TargetAverageUtilization = autoscaling.DefaultCPUUtilization
+	}
+
+	if currentConditionsEnc, hasCurrentConditions := out.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation]; hasCurrentConditions {
+		var currentConditions []HorizontalPodAutoscalerCondition
+		if err := json.Unmarshal([]byte(currentConditionsEnc), &currentConditions); err != nil {
+			return err
+		}
+
+		out.Status.Conditions = make([]autoscaling.HorizontalPodAutoscalerCondition, len(currentConditions))
+		for i, currentCondition := range currentConditions {
+			if err := Convert_v1_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition(&currentCondition, &out.Status.Conditions[i], s); err != nil {
+				return err
+			}
+		}
+		delete(out.Annotations, autoscaling.HorizontalPodAutoscalerConditionsAnnotation)
 	}
 
 	return nil
