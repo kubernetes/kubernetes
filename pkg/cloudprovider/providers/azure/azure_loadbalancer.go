@@ -149,7 +149,13 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 		// to nil. This is a workaround until https://github.com/Azure/go-autorest/issues/112 is fixed
 		sg.SecurityGroupPropertiesFormat.NetworkInterfaces = nil
 		sg.SecurityGroupPropertiesFormat.Subnets = nil
-		_, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
+		resp, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
+		if shouldRetryAPIRequest(resp, err) {
+			retryErr := az.CreateOrUpdateSGWithRetry(sg)
+			if retryErr != nil {
+				return nil, retryErr
+			}
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -219,7 +225,13 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	}
 	if !existsLb || lbNeedsUpdate {
 		glog.V(3).Infof("ensure(%s): lb(%s) - updating", serviceName, lbName)
-		_, err = az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
+		resp, err := az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
+		if shouldRetryAPIRequest(resp, err) {
+			retryErr := az.CreateOrUpdateLBWithRetry(lb)
+			if retryErr != nil {
+				return nil, retryErr
+			}
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -310,7 +322,13 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 			// to nil. This is a workaround until https://github.com/Azure/go-autorest/issues/112 is fixed
 			sg.SecurityGroupPropertiesFormat.NetworkInterfaces = nil
 			sg.SecurityGroupPropertiesFormat.Subnets = nil
-			_, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *reconciledSg.Name, reconciledSg, nil)
+			resp, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *reconciledSg.Name, reconciledSg, nil)
+			if shouldRetryAPIRequest(resp, err) {
+				retryErr := az.CreateOrUpdateSGWithRetry(reconciledSg)
+				if retryErr != nil {
+					return retryErr
+				}
+			}
 			if err != nil {
 				return err
 			}
@@ -339,14 +357,26 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 		if lbNeedsUpdate {
 			if len(*lb.FrontendIPConfigurations) > 0 {
 				glog.V(3).Infof("delete(%s): lb(%s) - updating", serviceName, lbName)
-				_, err = az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
+				resp, err := az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
+				if shouldRetryAPIRequest(resp, err) {
+					retryErr := az.CreateOrUpdateLBWithRetry(lb)
+					if retryErr != nil {
+						return retryErr
+					}
+				}
 				if err != nil {
 					return err
 				}
 			} else {
 				glog.V(3).Infof("delete(%s): lb(%s) - deleting; no remaining frontendipconfigs", serviceName, lbName)
 
-				_, err = az.LoadBalancerClient.Delete(az.ResourceGroup, lbName, nil)
+				resp, err := az.LoadBalancerClient.Delete(az.ResourceGroup, lbName, nil)
+				if shouldRetryAPIRequest(resp, err) {
+					retryErr := az.DeleteLBWithRetry(lbName)
+					if retryErr != nil {
+						return retryErr
+					}
+				}
 				if err != nil {
 					return err
 				}
@@ -392,7 +422,13 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.Pub
 	pip.Tags = &map[string]*string{"service": &serviceName}
 
 	glog.V(3).Infof("ensure(%s): pip(%s) - creating", serviceName, *pip.Name)
-	_, err = az.PublicIPAddressesClient.CreateOrUpdate(az.ResourceGroup, *pip.Name, pip, nil)
+	resp, err := az.PublicIPAddressesClient.CreateOrUpdate(az.ResourceGroup, *pip.Name, pip, nil)
+	if shouldRetryAPIRequest(resp, err) {
+		retryErr := az.CreateOrUpdatePIPWithRetry(pip)
+		if retryErr != nil {
+			return nil, retryErr
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +443,10 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.Pub
 }
 
 func (az *Cloud) ensurePublicIPDeleted(serviceName, pipName string) error {
-	_, deleteErr := az.PublicIPAddressesClient.Delete(az.ResourceGroup, pipName, nil)
+	resp, deleteErr := az.PublicIPAddressesClient.Delete(az.ResourceGroup, pipName, nil)
+	if shouldRetryAPIRequest(resp, deleteErr) {
+		deleteErr = az.DeletePublicIPWithRetry(pipName)
+	}
 	_, realErr := checkResourceExistsFromError(deleteErr)
 	if realErr != nil {
 		return nil
@@ -848,7 +887,13 @@ func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, b
 		primaryIPConfig.LoadBalancerBackendAddressPools = &newBackendPools
 
 		glog.V(3).Infof("nicupdate(%s): nic(%s) - updating", serviceName, nicName)
-		_, err := az.InterfacesClient.CreateOrUpdate(az.ResourceGroup, *nic.Name, nic, nil)
+		resp, err := az.InterfacesClient.CreateOrUpdate(az.ResourceGroup, *nic.Name, nic, nil)
+		if shouldRetryAPIRequest(resp, err) {
+			retryErr := az.CreateOrUpdateInterfaceWithRetry(nic)
+			if retryErr != nil {
+				return retryErr
+			}
+		}
 		if err != nil {
 			return err
 		}

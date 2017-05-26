@@ -64,7 +64,13 @@ func (az *Cloud) AttachDisk(diskName, diskURI string, nodeName types.NodeName, l
 		},
 	}
 	vmName := mapNodeNameToVMName(nodeName)
-	_, err = az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
+	resp, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
+	if shouldRetryAPIRequest(resp, err) {
+		retryErr := az.CreateOrUpdateVMWithRetry(vmName, newVM)
+		if retryErr != nil {
+			return retryErr
+		}
+	}
 	if err != nil {
 		glog.Errorf("azure attach failed, err: %v", err)
 		detail := err.Error()
@@ -135,7 +141,13 @@ func (az *Cloud) DetachDiskByName(diskName, diskURI string, nodeName types.NodeN
 		},
 	}
 	vmName := mapNodeNameToVMName(nodeName)
-	_, err = az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
+	resp, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
+	if shouldRetryAPIRequest(resp, err) {
+		retryErr := az.CreateOrUpdateVMWithRetry(vmName, newVM)
+		if retryErr != nil {
+			return retryErr
+		}
+	}
 	if err != nil {
 		glog.Errorf("azure disk detach failed, err: %v", err)
 	} else {

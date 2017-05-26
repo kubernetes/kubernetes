@@ -76,7 +76,13 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 		}
 
 		glog.V(3).Infof("create: creating routetable. routeTableName=%q", az.RouteTableName)
-		_, err = az.RouteTablesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, routeTable, nil)
+		resp, err := az.RouteTablesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, routeTable, nil)
+		if shouldRetryAPIRequest(resp, err) {
+			retryErr := az.CreateOrUpdateRouteTableWithRetry(routeTable)
+			if retryErr != nil {
+				return retryErr
+			}
+		}
 		if err != nil {
 			return err
 		}
@@ -103,7 +109,13 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 	}
 
 	glog.V(3).Infof("create: creating route: instance=%q cidr=%q", kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
-	_, err = az.RoutesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, *route.Name, route, nil)
+	resp, err := az.RoutesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, *route.Name, route, nil)
+	if shouldRetryAPIRequest(resp, err) {
+		retryErr := az.CreateOrUpdateRouteWithRetry(route)
+		if retryErr != nil {
+			return retryErr
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -118,7 +130,13 @@ func (az *Cloud) DeleteRoute(clusterName string, kubeRoute *cloudprovider.Route)
 	glog.V(2).Infof("delete: deleting route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 
 	routeName := mapNodeNameToRouteName(kubeRoute.TargetNode)
-	_, err := az.RoutesClient.Delete(az.ResourceGroup, az.RouteTableName, routeName, nil)
+	resp, err := az.RoutesClient.Delete(az.ResourceGroup, az.RouteTableName, routeName, nil)
+	if shouldRetryAPIRequest(resp, err) {
+		retryErr := az.DeleteRouteWithRetry(routeName)
+		if retryErr != nil {
+			return retryErr
+		}
+	}
 	if err != nil {
 		return err
 	}

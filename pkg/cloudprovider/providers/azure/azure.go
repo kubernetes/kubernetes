@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"time"
 
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
@@ -74,16 +75,17 @@ type Config struct {
 // Cloud holds the config and clients
 type Cloud struct {
 	Config
-	Environment             azure.Environment
-	RoutesClient            network.RoutesClient
-	SubnetsClient           network.SubnetsClient
-	InterfacesClient        network.InterfacesClient
-	RouteTablesClient       network.RouteTablesClient
-	LoadBalancerClient      network.LoadBalancersClient
-	PublicIPAddressesClient network.PublicIPAddressesClient
-	SecurityGroupsClient    network.SecurityGroupsClient
-	VirtualMachinesClient   compute.VirtualMachinesClient
-	StorageAccountClient    storage.AccountsClient
+	Environment              azure.Environment
+	RoutesClient             network.RoutesClient
+	SubnetsClient            network.SubnetsClient
+	InterfacesClient         network.InterfacesClient
+	RouteTablesClient        network.RouteTablesClient
+	LoadBalancerClient       network.LoadBalancersClient
+	PublicIPAddressesClient  network.PublicIPAddressesClient
+	SecurityGroupsClient     network.SecurityGroupsClient
+	VirtualMachinesClient    compute.VirtualMachinesClient
+	StorageAccountClient     storage.AccountsClient
+	operationPollRateLimiter flowcontrol.RateLimiter
 }
 
 func init() {
@@ -176,6 +178,9 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 
 	az.StorageAccountClient = storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
 	az.StorageAccountClient.Authorizer = servicePrincipalToken
+
+	// 1 qps, up to 5 burst when in flowcontrol; i.e., aggressive backoff enforcement
+	az.operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(1, 5)
 
 	return &az, nil
 }
