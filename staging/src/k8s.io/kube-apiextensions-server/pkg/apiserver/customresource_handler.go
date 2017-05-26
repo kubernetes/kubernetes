@@ -247,13 +247,9 @@ func (r *crdHandler) removeDeadStorage() {
 
 // GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter for
 // the given uid, or nil if one does not exist.
-func (r *crdHandler) GetCustomResourceListerCollectionDeleter(uid types.UID) finalizer.ListerCollectionDeleter {
-	storageMap := r.customStorage.Load().(crdStorageMap)
-	ret, ok := storageMap[uid]
-	if !ok {
-		return nil
-	}
-	return ret.storage
+func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) finalizer.ListerCollectionDeleter {
+	info := r.getServingInfoFor(crd)
+	return info.storage
 }
 
 func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefinition) *crdInfo {
