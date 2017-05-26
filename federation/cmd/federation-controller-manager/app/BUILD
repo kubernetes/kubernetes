@@ -28,6 +28,7 @@ go_library(
         "//federation/pkg/federation-controller/namespace:go_default_library",
         "//federation/pkg/federation-controller/replicaset:go_default_library",
         "//federation/pkg/federation-controller/service:go_default_library",
+        "//federation/pkg/federation-controller/service/dns:go_default_library",
         "//federation/pkg/federation-controller/sync:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/version:go_default_library",
