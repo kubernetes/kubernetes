@@ -319,13 +319,13 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota *v1.Resourc
 
 	// Create a usage object that is based on the quota resource version that will handle updates
 	// by default, we preserve the past usage observation, and set hard to the current spec
+	copy, err := api.Scheme.DeepCopy(resourceQuota.ObjectMeta)
+	if err != nil {
+		return err
+	}
+	objectMeta := copy.(metav1.ObjectMeta)
 	usage := api.ResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            resourceQuota.Name,
-			Namespace:       resourceQuota.Namespace,
-			ResourceVersion: resourceQuota.ResourceVersion,
-			Labels:          resourceQuota.Labels,
-			Annotations:     resourceQuota.Annotations},
+		ObjectMeta: objectMeta,
 		Status: api.ResourceQuotaStatus{
 			Hard: hardLimits,
 			Used: used,
