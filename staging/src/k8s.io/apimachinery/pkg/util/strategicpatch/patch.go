@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
-	"k8s.io/apimachinery/pkg/util/sets"
 	forkedjson "k8s.io/apimachinery/third_party/forked/golang/json"
 )
 
@@ -44,10 +43,10 @@ const (
 	replaceDirective = "replace"
 	mergeDirective   = "merge"
 
-	replaceKeysStrategy = "replaceKeys"
+	retainKeysStrategy = "retainKeys"
 
 	deleteFromPrimitiveListDirectivePrefix = "$deleteFromPrimitiveList"
-	replaceKeysDirective                   = "$" + replaceKeysStrategy
+	retainKeysDirective                    = "$" + retainKeysStrategy
 )
 
 // JSONMap is a representations of JSON object encoded as map[string]interface{}
@@ -62,16 +61,20 @@ type DiffOptions struct {
 	IgnoreChangesAndAdditions bool
 	// IgnoreDeletions indicates if we keep the deletions in the patch.
 	IgnoreDeletions bool
-	// We introduce a new value replaceKeys for patchStrategy.
+	// We introduce a new value retainKeys for patchStrategy.
 	// It indicates that all fields needing to be preserved must be
-	// present in the `replaceKeys` list.
+	// present in the `retainKeys` list.
 	// And the fields that are present will be merged with live object.
 	// All the missing fields will be cleared when patching.
-	ReplaceKeys bool
+	BuildRetainKeysDirective bool
 }
 
 type MergeOptions struct {
 	// MergeParallelList indicates if we are merging the parallel list.
+	// We don't merge parallel list when calling mergeMap() in CreateThreeWayMergePatch()
+	// which is called client-side.
+	// We merge parallel list iff when calling mergeMap() in StrategicMergeMapPatch()
+	// which is called server-side
 	MergeParallelList bool
 	// IgnoreUnmatchedNulls indicates if we should process the unmatched nulls.
 	IgnoreUnmatchedNulls bool
@@ -134,18 +137,29 @@ func CreateTwoWayMergeMapPatch(original, modified JSONMap, dataStruct interface{
 }
 
 // Returns a (recursive) strategic merge patch that yields modified when applied to original.
+// Including:
+// - Adding fields to the patch present in modified, missing from original
+// - Setting fields to the patch present in modified and original with different values
+// - Delete fields present in original, missing from modified through
+// - IFF map field - set to nil in patch
+// - IFF list of maps && merge strategy - use deleteDirective for the elements
+// - IFF list of primitives && merge strategy - use parallel deletion list
+// - IFF list of maps or primitives with replace strategy (default) - set patch value to the value in modified
+// - Build $retainKeys directive for fields with retainKeys patch strategy
 func diffMaps(original, modified map[string]interface{}, t reflect.Type, diffOptions DiffOptions) (map[string]interface{}, error) {
 	patch := map[string]interface{}{}
+	// Get the underlying type for pointers
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	// replaceKeysList will contains all the keys with non-nil value.
-	replaceKeysList := make([]interface{}, 0, len(modified))
+	// This will be used to build the $retainKeys directive sent in the patch
+	retainKeysList := make([]interface{}, 0, len(modified))
 
+	// Compare each value in the modified map against the value in the original map
 	for key, modifiedValue := range modified {
-		// Collect all keys with non-nil value.
-		if diffOptions.ReplaceKeys && modifiedValue != nil {
-			replaceKeysList = append(replaceKeysList, key)
+		// Get the underlying type for pointers
+		if diffOptions.BuildRetainKeysDirective && modifiedValue != nil {
+			retainKeysList = append(retainKeysList, key)
 		}
 
 		originalValue, ok := original[key]
@@ -158,6 +172,7 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, diffOpt
 		}
 
 		// The patch may have a patch directive
+		// TODO: figure out if we need this. This shouldn't be needed by apply. When would the original map have patch directives in it?
 		foundDirectiveMarker, err := handleDirectiveMarker(key, originalValue, modifiedValue, patch)
 		if err != nil {
 			return nil, err
@@ -191,12 +206,13 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, diffOpt
 	}
 
 	updatePatchIfMissing(original, modified, patch, diffOptions)
-	// Insert the replaceKeysList when either of the following is true:
-	// - there are changes in patch list
+	// Insert the retainKeysList iff there are values present in the retainKeysList and
+	// either of the following is true:
+	// - the patch is not empty
 	// - there are additional field in original that need to be cleared
-	if len(replaceKeysList) > 0 &&
+	if len(retainKeysList) > 0 &&
 		(len(patch) > 0 || hasAdditionalNewField(original, modified)) {
-		patch[replaceKeysDirective] = sortScalars(replaceKeysList)
+		patch[retainKeysDirective] = sortScalars(retainKeysList)
 	}
 	return patch, nil
 }
@@ -238,11 +254,11 @@ func handleMapDiff(key string, originalValue, modifiedValue, patch map[string]in
 		// Otherwise, return the error
 		return err
 	}
-	replaceKeys, patchStrategy, err := extractReplaceKeysPatchStrategy(fieldPatchStrategies)
+	retainKeys, patchStrategy, err := extractRetainKeysPatchStrategy(fieldPatchStrategies)
 	if err != nil {
 		return err
 	}
-	diffOptions.ReplaceKeys = replaceKeys
+	diffOptions.BuildRetainKeysDirective = retainKeys
 	switch patchStrategy {
 	// The patch strategic from metadata tells us to replace the entire object instead of diffing it
 	case replaceDirective:
@@ -280,14 +296,14 @@ func handleSliceDiff(key string, originalValue, modifiedValue []interface{}, pat
 		// Otherwise, return the error
 		return err
 	}
-	replaceKeys, patchStrategy, err := extractReplaceKeysPatchStrategy(fieldPatchStrategies)
+	retainKeys, patchStrategy, err := extractRetainKeysPatchStrategy(fieldPatchStrategies)
 	if err != nil {
 		return err
 	}
 	switch patchStrategy {
 	// Merge the 2 slices using mergePatchKey
 	case mergeDirective:
-		diffOptions.ReplaceKeys = replaceKeys
+		diffOptions.BuildRetainKeysDirective = retainKeys
 		addList, deletionList, err := diffLists(originalValue, modifiedValue, fieldType.Elem(), fieldPatchMergeKey, diffOptions)
 		if err != nil {
 			return err
@@ -601,6 +617,7 @@ func getTagStructType(dataStruct interface{}) (reflect.Type, error) {
 	}
 
 	t := reflect.TypeOf(dataStruct)
+	// Get the underlying type for pointers
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
@@ -652,47 +669,53 @@ func preprocessDeletionListForMerging(key string, original map[string]interface{
 	return false, false, "", nil
 }
 
-// processReplaceKeys processes replaceKeys list.
-// When MergeParallelList is true, we validate the patch and
-// then clear the fields that are not in the list.
-func processReplaceKeys(original, patch map[string]interface{}, options MergeOptions) error {
-	replaceKeysInPatch, foundInPatch := patch[replaceKeysDirective]
+// applyRetainKeysDirective looks for a retainKeys directive and applies to original
+// - if no directive exists do nothing
+// - if directive is found, clear keys in original missing from the directive list
+// - validate that all keys present in the patch are present in the retainKeys directive
+// note: original may be another patch request, e.g. applying the add+modified patch to the deletions patch. In this case it may have directives
+func applyRetainKeysDirective(original, patch map[string]interface{}, options MergeOptions) error {
+	retainKeysInPatch, foundInPatch := patch[retainKeysDirective]
 	if !foundInPatch {
 		return nil
 	}
-	delete(patch, replaceKeysDirective)
+	// cleanup the directive
+	delete(patch, retainKeysDirective)
 
 	if !options.MergeParallelList {
-		replaceKeysInOriginal, foundInOriginal := original[replaceKeysDirective]
+		// If original is actually a patch, make sure the retainKeys directives are the same in both patches if present in both.
+		// If not present in the original patch, copy from the modified patch.
+		retainKeysInOriginal, foundInOriginal := original[retainKeysDirective]
 		if foundInOriginal {
-			if !reflect.DeepEqual(replaceKeysInOriginal, replaceKeysInPatch) {
+			if !reflect.DeepEqual(retainKeysInOriginal, retainKeysInPatch) {
 				// This error actually should never happen.
-				return fmt.Errorf("%v and %v are not deep equal: this may happen when calculating the 3-way diff patch", replaceKeysInOriginal, replaceKeysInPatch)
+				return fmt.Errorf("%v and %v are not deep equal: this may happen when calculating the 3-way diff patch", retainKeysInOriginal, retainKeysInPatch)
 			}
 		} else {
-			original[replaceKeysDirective] = replaceKeysInPatch
+			original[retainKeysDirective] = retainKeysInPatch
 		}
 		return nil
 	}
 
-	replaceKeysList, ok := replaceKeysInPatch.([]interface{})
+	retainKeysList, ok := retainKeysInPatch.([]interface{})
 	if !ok {
-		return mergepatch.ErrBadPatchFormatForReplaceKeys
+		return mergepatch.ErrBadPatchFormatForRetainKeys
 	}
 
-	// validate patch to make sure all field in patch is covered in replaceKeysList
-	m := map[interface{}]sets.Empty{}
-	for _, v := range replaceKeysList {
-		m[v] = sets.Empty{}
+	// validate patch to make sure all fields in the patch are present in the retainKeysList.
+	// The map is used only as a set, the value is never referenced
+	m := map[interface{}]struct{}{}
+	for _, v := range retainKeysList {
+		m[v] = struct{}{}
 	}
 	for k, v := range patch {
 		if v == nil || strings.HasPrefix(k, deleteFromPrimitiveListDirectivePrefix) {
 			continue
 		}
-		// If there is an item present in the patch but not in the replaceKeys list,
+		// If there is an item present in the patch but not in the retainKeys list,
 		// the patch is invalid.
 		if _, found := m[k]; !found {
-			return mergepatch.ErrPatchContentNotMatchReplaceKeys
+			return mergepatch.ErrBadPatchFormatForRetainKeys
 		}
 	}
 
@@ -723,7 +746,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeOptio
 		original = map[string]interface{}{}
 	}
 
-	err := processReplaceKeys(original, patch, mergeOptions)
+	err := applyRetainKeysDirective(original, patch, mergeOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -778,7 +801,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeOptio
 		if err != nil {
 			return nil, err
 		}
-		_, patchStrategy, err := extractReplaceKeysPatchStrategy(fieldPatchStrategies)
+		_, patchStrategy, err := extractRetainKeysPatchStrategy(fieldPatchStrategies)
 		if err != nil {
 			return nil, err
 		}
@@ -1028,10 +1051,10 @@ func sortMergeListsByName(mapJSON []byte, dataStruct interface{}) ([]byte, error
 func sortMergeListsByNameMap(s map[string]interface{}, t reflect.Type) (map[string]interface{}, error) {
 	newS := map[string]interface{}{}
 	for k, v := range s {
-		if k == replaceKeysDirective {
+		if k == retainKeysDirective {
 			typedV, ok := v.([]interface{})
 			if !ok {
-				return nil, mergepatch.ErrBadPatchFormatForReplaceKeys
+				return nil, mergepatch.ErrBadPatchFormatForRetainKeys
 			}
 			v = sortScalars(typedV)
 		} else if strings.HasPrefix(k, deleteFromPrimitiveListDirectivePrefix) {
@@ -1040,13 +1063,12 @@ func sortMergeListsByNameMap(s map[string]interface{}, t reflect.Type) (map[stri
 				return nil, mergepatch.ErrBadPatchFormatForPrimitiveList
 			}
 			v = uniqifyAndSortScalars(typedV)
-		} else if k != directiveMarker && k != replaceKeysDirective &&
-			!strings.HasPrefix(k, deleteFromPrimitiveListDirectivePrefix) {
+		} else if k != directiveMarker {
 			fieldType, fieldPatchStrategies, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, k)
 			if err != nil {
 				return nil, err
 			}
-			_, patchStrategy, err := extractReplaceKeysPatchStrategy(fieldPatchStrategies)
+			_, patchStrategy, err := extractRetainKeysPatchStrategy(fieldPatchStrategies)
 			if err != nil {
 				return nil, err
 			}
@@ -1305,13 +1327,13 @@ func mergingMapFieldsHaveConflicts(
 
 func mapsHaveConflicts(typedLeft, typedRight map[string]interface{}, structType reflect.Type) (bool, error) {
 	for key, leftValue := range typedLeft {
-		if key != directiveMarker && key != replaceKeysDirective {
+		if key != directiveMarker && key != retainKeysDirective {
 			if rightValue, ok := typedRight[key]; ok {
 				fieldType, fieldPatchStrategies, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(structType, key)
 				if err != nil {
 					return true, err
 				}
-				_, patchStrategy, err := extractReplaceKeysPatchStrategy(fieldPatchStrategies)
+				_, patchStrategy, err := extractRetainKeysPatchStrategy(fieldPatchStrategies)
 				if err != nil {
 					return true, err
 				}
@@ -1539,26 +1561,26 @@ func sliceTypeAssertion(original, patch interface{}) ([]interface{}, []interface
 	return typedOriginal, typedPatch, nil
 }
 
-// extractReplaceKeysPatchStrategy process patch strategy, which is a string may contains multiple
+// extractRetainKeysPatchStrategy process patch strategy, which is a string may contains multiple
 // patch strategies seperated by ",". It returns a boolean var indicating if it has
-// replaceKeys strategies and a string for the other strategy.
-func extractReplaceKeysPatchStrategy(strategies []string) (bool, string, error) {
+// retainKeys strategies and a string for the other strategy.
+func extractRetainKeysPatchStrategy(strategies []string) (bool, string, error) {
 	switch len(strategies) {
 	case 0:
 		return false, "", nil
 	case 1:
 		singleStrategy := strategies[0]
 		switch singleStrategy {
-		case replaceKeysStrategy:
+		case retainKeysStrategy:
 			return true, "", nil
 		default:
 			return false, singleStrategy, nil
 		}
 	case 2:
 		switch {
-		case strategies[0] == replaceKeysStrategy:
+		case strategies[0] == retainKeysStrategy:
 			return true, strategies[1], nil
-		case strategies[1] == replaceKeysStrategy:
+		case strategies[1] == retainKeysStrategy:
 			return true, strategies[0], nil
 		default:
 			return false, "", fmt.Errorf("unexpected patch strategy: %v", strategies)
