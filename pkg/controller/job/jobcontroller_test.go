@@ -473,6 +473,106 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	}
 }
 
+func TestSyncJobPastDeadlineJustComplete(t *testing.T) {
+	testCases := map[string]struct {
+		// job setup
+		parallelism           int32
+		completions           int32
+		activeDeadlineSeconds int64
+		startTime             int64
+
+		// pod setup
+		activePods    int32
+		succeededPods int32
+		failedPods    int32
+
+		// expectations
+		expectedDeletions int32
+		expectedActive    int32
+		expectedSucceeded int32
+		expectedFailed    int32
+	}{
+		"dummy": {
+			-1, -1, 10, 15,
+			0, 1, 0,
+			0, 0, 1, 0,
+		},
+		"parallelism job kicked by last succeed pod": {
+			5, -1, 10, 15,
+			0, 5, 0,
+			0, 0, 5, 0,
+		},
+		"completion job kicked by last succeed pod": {
+			-1, 5, 10, 15,
+			0, 5, 0,
+			0, 0, 5, 0,
+		},
+	}
+
+	for name, tc := range testCases {
+		// job manager setup
+		clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+		manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+		fakePodControl := controller.FakePodControl{}
+		manager.podControl = &fakePodControl
+		manager.podStoreSynced = alwaysReady
+		manager.jobStoreSynced = alwaysReady
+		var actual *batch.Job
+		manager.updateHandler = func(job *batch.Job) error {
+			actual = job
+			return nil
+		}
+
+		// job & pods setup
+		job := newJob(tc.parallelism, tc.completions)
+		job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
+		start := metav1.Unix(metav1.Now().Time.Unix()-tc.startTime, 0)
+		job.Status.StartTime = &start
+		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
+		for _, pod := range newPodList(tc.activePods, v1.PodRunning, job) {
+			podIndexer.Add(&pod)
+		}
+		for _, pod := range newPodList(tc.succeededPods, v1.PodSucceeded, job) {
+			podIndexer.Add(&pod)
+		}
+		for _, pod := range newPodList(tc.failedPods, v1.PodFailed, job) {
+			podIndexer.Add(&pod)
+		}
+
+		// run
+		err := manager.syncJob(getKey(job, t))
+		if err != nil {
+			t.Errorf("%s: unexpected error when syncing jobs %v", name, err)
+		}
+
+		// validate created/deleted pods
+		if int32(len(fakePodControl.Templates)) != 0 {
+			t.Errorf("%s: unexpected number of creates.  Expected 0, saw %d\n", name, len(fakePodControl.Templates))
+		}
+		if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
+			t.Errorf("%s: unexpected number of deletes.  Expected %d, saw %d\n", name, tc.expectedDeletions, len(fakePodControl.DeletePodName))
+		}
+		// validate status
+		if actual.Status.Active != tc.expectedActive {
+			t.Errorf("%s: unexpected number of active pods.  Expected %d, saw %d\n", name, tc.expectedActive, actual.Status.Active)
+		}
+		if actual.Status.Succeeded != tc.expectedSucceeded {
+			t.Errorf("%s: unexpected number of succeeded pods.  Expected %d, saw %d\n", name, tc.expectedSucceeded, actual.Status.Succeeded)
+		}
+		if actual.Status.Failed != tc.expectedFailed {
+			t.Errorf("%s: unexpected number of failed pods.  Expected %d, saw %d\n", name, tc.expectedFailed, actual.Status.Failed)
+		}
+		if actual.Status.StartTime == nil {
+			t.Errorf("%s: .status.startTime was not set", name)
+		}
+		// validate conditions
+		if !getCondition(actual, batch.JobComplete) {
+			t.Errorf("%s: expected job complete condition.  Got %#v", name, actual.Status.Conditions)
+		}
+	}
+}
+
 func TestSyncJobComplete(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)

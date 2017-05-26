@@ -431,7 +431,41 @@ func (jm *JobController) syncJob(key string) error {
 	}
 
 	var manageJobErr error
-	if pastActiveDeadline(&job) {
+
+	jobTimeout := pastActiveDeadline(&job)
+
+	if jobNeedsSync && job.DeletionTimestamp == nil && !jobTimeout {
+		active, manageJobErr = jm.manageJob(activePods, succeeded, &job)
+	}
+	completions := succeeded
+	jobComplete := false
+	if job.Spec.Completions == nil {
+		// This type of job is complete when any pod exits with success.
+		// Each pod is capable of
+		// determining whether or not the entire Job is done.  Subsequent pods are
+		// not expected to fail, but if they do, the failure is ignored.  Once any
+		// pod succeeds, the controller waits for remaining pods to finish, and
+		// then the job is complete.
+		if succeeded > 0 && active == 0 {
+			jobComplete = true
+		}
+	} else {
+		if completions >= *job.Spec.Completions {
+			jobComplete = true
+			if active > 0 {
+				jm.recorder.Event(&job, v1.EventTypeWarning, "TooManyActivePods", "Too many active pods running after completion count reached")
+			}
+			if completions > *job.Spec.Completions {
+				jm.recorder.Event(&job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
+			}
+		}
+	}
+
+	if jobComplete {
+		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
+		now := metav1.Now()
+		job.Status.CompletionTime = &now
+	} else if jobTimeout {
 		// TODO: below code should be replaced with pod termination resulting in
 		// pod failures, rather than killing pods. Unfortunately none such solution
 		// exists ATM. There's an open discussion in the topic in
@@ -466,42 +500,6 @@ func (jm *JobController) syncJob(key string) error {
 		active = 0
 		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
 		jm.recorder.Event(&job, v1.EventTypeNormal, "DeadlineExceeded", "Job was active longer than specified deadline")
-	} else {
-		if jobNeedsSync && job.DeletionTimestamp == nil {
-			active, manageJobErr = jm.manageJob(activePods, succeeded, &job)
-		}
-		completions := succeeded
-		complete := false
-		if job.Spec.Completions == nil {
-			// This type of job is complete when any pod exits with success.
-			// Each pod is capable of
-			// determining whether or not the entire Job is done.  Subsequent pods are
-			// not expected to fail, but if they do, the failure is ignored.  Once any
-			// pod succeeds, the controller waits for remaining pods to finish, and
-			// then the job is complete.
-			if succeeded > 0 && active == 0 {
-				complete = true
-			}
-		} else {
-			// Job specifies a number of completions.  This type of job signals
-			// success by having that number of successes.  Since we do not
-			// start more pods than there are remaining completions, there should
-			// not be any remaining active pods once this count is reached.
-			if completions >= *job.Spec.Completions {
-				complete = true
-				if active > 0 {
-					jm.recorder.Event(&job, v1.EventTypeWarning, "TooManyActivePods", "Too many active pods running after completion count reached")
-				}
-				if completions > *job.Spec.Completions {
-					jm.recorder.Event(&job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
-				}
-			}
-		}
-		if complete {
-			job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
-			now := metav1.Now()
-			job.Status.CompletionTime = &now
-		}
 	}
 
 	// no need to update the job if the status hasn't changed since last time
