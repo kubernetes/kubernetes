@@ -1265,29 +1265,19 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("%v: unexpected error: %v", item.description, err)
 		}
-		// Give some time for rate-limiter to reload
-		time.Sleep(500 * time.Millisecond)
-
 		for zone, state := range item.expectedFollowingStates {
 			if state != nodeController.zoneStates[zone] {
 				t.Errorf("%v: Unexpected zone state: %v: %v instead %v", item.description, zone, nodeController.zoneStates[zone], state)
 			}
 		}
-		zones := testutil.GetZones(fakeNodeHandler)
-		for _, zone := range zones {
-			// Time for rate-limiter reloading per node.
-			time.Sleep(50 * time.Millisecond)
-			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				uid, _ := value.UID.(string)
-				deletePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, nodeController.daemonSetStore)
-				return true, 0
-			})
-		}
-
-		podEvicted := false
-		for _, action := range fakeNodeHandler.Actions() {
-			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
-				podEvicted = true
+		var podEvicted bool
+		start := time.Now()
+		// Infinite loop, used for retrying in case ratelimiter fails to reload for Try function.
+		// this breaks when we have the status that we need for test case or when we don't see the
+		// intended result after 1 minute.
+		for {
+			podEvicted = nodeController.doEviction(fakeNodeHandler)
+			if podEvicted == item.expectedEvictPods || time.Since(start) > 1*time.Minute {
 				break
 			}
 		}
@@ -1296,6 +1286,27 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 			t.Errorf("%v: expected pod eviction: %+v, got %+v", item.description, item.expectedEvictPods, podEvicted)
 		}
 	}
+}
+
+// doEviction does the fake eviction and returns the status of eviction operation.
+func (nc *nodeController) doEviction(fakeNodeHandler *testutil.FakeNodeHandler) bool {
+	var podEvicted bool
+	zones := testutil.GetZones(fakeNodeHandler)
+	for _, zone := range zones {
+		nc.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
+			uid, _ := value.UID.(string)
+			deletePods(fakeNodeHandler, nc.recorder, value.Value, uid, nc.daemonSetStore)
+			return true, 0
+		})
+	}
+
+	for _, action := range fakeNodeHandler.Actions() {
+		if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
+			podEvicted = true
+			return podEvicted
+		}
+	}
+	return podEvicted
 }
 
 // TestCloudProviderNoRateLimit tests that monitorNodes() immediately deletes
