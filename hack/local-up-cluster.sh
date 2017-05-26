@@ -86,6 +86,10 @@ DEFAULT_STORAGE_CLASS=${KUBE_DEFAULT_STORAGE_CLASS:-true}
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
+# panic the server on watch decode errors since they are considered coder mistakes
+KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
+export KUBE_PANIC_WATCH_DECODE_ERROR
+
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
@@ -658,11 +662,11 @@ function start_kubelet {
 	${KUBELET_FLAGS} >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
       # Quick check that kubelet is running.
-      if ps -p $KUBELET_PID > /dev/null ; then 
+      if ps -p $KUBELET_PID > /dev/null ; then
 	echo "kubelet ( $KUBELET_PID ) is running."
       else
 	cat ${KUBELET_LOG} ; exit 1
-      fi	
+      fi
     else
       # Docker won't run a container with a cidfile (container id file)
       # unless that file does not already exist; clean up an existing
@@ -733,7 +737,7 @@ function start_kubedns {
         echo "Creating kube-system namespace"
         sed -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.in" >| kubedns-deployment.yaml
         sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.in" >| kubedns-svc.yaml
-        
+
         # TODO update to dns role once we have one.
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
         # use kubectl to create kubedns deployment and service
@@ -748,7 +752,7 @@ function start_kubedns {
 
 function start_kubedashboard {
     if [[ "${ENABLE_CLUSTER_DASHBOARD}" = true ]]; then
-        echo "Creating kubernetes-dashboard"       
+        echo "Creating kubernetes-dashboard"
         # use kubectl to create the dashboard
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml

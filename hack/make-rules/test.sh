@@ -27,6 +27,10 @@ kube::golang::setup_env
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
+# panic the server on watch decode errors since they are considered coder mistakes
+KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
+export KUBE_PANIC_WATCH_DECODE_ERROR
+
 # Handle case where OS has sha#sum commands, instead of shasum.
 if which shasum >/dev/null 2>&1; then
   SHA1SUM="shasum -a1"
