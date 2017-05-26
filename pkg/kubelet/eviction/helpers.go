@@ -932,7 +932,7 @@ func isSoftEvictionThresholds(thresholds []evictionapi.Threshold, starvedResourc
 	return true
 }
 
-// isSoftEviction returns true if the thresholds met for the starved resource are only soft thresholds
+// isHardEvictionThreshold returns true if eviction should immediately occur
 func isHardEvictionThreshold(threshold evictionapi.Threshold) bool {
 	return threshold.GracePeriod == time.Duration(0)
 }
