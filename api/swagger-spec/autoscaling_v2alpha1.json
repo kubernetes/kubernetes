@@ -1512,7 +1512,8 @@
     "required": [
      "currentReplicas",
      "desiredReplicas",
-     "currentMetrics"
+     "currentMetrics",
+     "conditions"
     ],
     "properties": {
      "observedGeneration": {
@@ -1540,6 +1541,13 @@
        "$ref": "v2alpha1.MetricStatus"
       },
       "description": "currentMetrics is the last read state of the metrics used by this autoscaler."
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v2alpha1.HorizontalPodAutoscalerCondition"
+      },
+      "description": "conditions is the set of conditions required for this autoscaler to scale its target, and indicates whether or not those conditions are met."
      }
     }
    },
@@ -1629,6 +1637,36 @@
      "currentAverageValue": {
       "type": "string",
       "description": "currentAverageValue is the the current value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type. It will always be set, regardless of the corresponding metric specification."
+     }
+    }
+   },
+   "v2alpha1.HorizontalPodAutoscalerCondition": {
+    "id": "v2alpha1.HorizontalPodAutoscalerCondition",
+    "description": "HorizontalPodAutoscalerCondition describes the state of a HorizontalPodAutoscaler at a certain point.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "type describes the current condition"
+     },
+     "status": {
+      "type": "string",
+      "description": "status is the status of the condition (True, False, Unknown)"
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "description": "lastTransitionTime is the last time the condition transitioned from one status to another"
+     },
+     "reason": {
+      "type": "string",
+      "description": "reason is the reason for the condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "message is a human-readable explanation containing details about the transition"
      }
     }
    },
