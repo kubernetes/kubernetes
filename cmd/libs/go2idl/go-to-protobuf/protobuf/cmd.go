@@ -91,6 +91,7 @@ func New() *Generator {
 			`k8s.io/kubernetes/pkg/apis/storage/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/storage/v1`,
 			`k8s.io/kubernetes/pkg/apis/admission/v1alpha1`,
+			`k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1`,
 		}, ","),
 		DropEmbeddedFields: "k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta",
 	}

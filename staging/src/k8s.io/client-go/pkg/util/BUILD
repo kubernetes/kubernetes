@@ -16,7 +16,4 @@ go_library(
         "util.go",
     ],
     tags = ["automanaged"],
-    visibility = [
-        "//vendor/k8s.io/client-go/pkg/api/v1:__pkg__",
-    ],
 )

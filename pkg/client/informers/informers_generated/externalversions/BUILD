@@ -16,6 +16,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/admissionregistration/v1alpha1:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/autoscaling/v2alpha1:go_default_library",
@@ -30,6 +31,7 @@ go_library(
         "//pkg/apis/storage/v1:go_default_library",
         "//pkg/apis/storage/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions/admissionregistration:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/apps:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/autoscaling:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/batch:go_default_library",
@@ -58,6 +60,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/client/informers/informers_generated/externalversions/admissionregistration:all-srcs",
         "//pkg/client/informers/informers_generated/externalversions/apps:all-srcs",
         "//pkg/client/informers/informers_generated/externalversions/autoscaling:all-srcs",
         "//pkg/client/informers/informers_generated/externalversions/batch:all-srcs",

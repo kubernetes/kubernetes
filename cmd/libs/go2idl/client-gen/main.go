@@ -36,6 +36,7 @@ var (
 	test          = flag.BoolP("test", "t", false, "set this flag to generate the client code for the testdata")
 	inputVersions = flag.StringSlice("input", []string{
 		"api/",
+		"admissionregistration/",
 		"authentication/",
 		"authorization/",
 		"autoscaling/",

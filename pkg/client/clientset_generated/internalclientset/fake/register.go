@@ -22,6 +22,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	coreinternalversion "k8s.io/kubernetes/pkg/api"
+	admissionregistrationinternalversion "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	appsinternalversion "k8s.io/kubernetes/pkg/apis/apps"
 	authenticationinternalversion "k8s.io/kubernetes/pkg/apis/authentication"
 	authorizationinternalversion "k8s.io/kubernetes/pkg/apis/authorization"
@@ -59,6 +60,7 @@ func init() {
 // After this, RawExtensions in Kubernetes types will serialize kube-aggregator types
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
+	admissionregistrationinternalversion.AddToScheme(scheme)
 	coreinternalversion.AddToScheme(scheme)
 	appsinternalversion.AddToScheme(scheme)
 	authenticationinternalversion.AddToScheme(scheme)

@@ -20,6 +20,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/apis/admissionregistration/v1alpha1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/authentication/v1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/authentication/v1beta1:go_default_library",
