@@ -187,7 +187,6 @@ func linkFiles(old, new string) error {
 
 // registerBinaryEncodingTypes registers the types so they can be binary encoded by gob
 func registerBinaryEncodingTypes() {
-	gob.Register(map[string]interface{}{})
+	gob.Register(map[interface{}]interface{}{})
 	gob.Register([]interface{}{})
-	gob.Register(Resources{})
 }
