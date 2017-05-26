@@ -20,6 +20,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Set locale to ensure english responses from kubectl commands
+export LANG=C
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 # Expects the following has already been done by whatever sources this script
 # source "${KUBE_ROOT}/hack/lib/init.sh"
