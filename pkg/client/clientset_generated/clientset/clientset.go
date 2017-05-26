@@ -21,6 +21,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	admissionregistrationv1alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/admissionregistration/v1alpha1"
 	appsv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	authenticationv1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1"
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
@@ -43,6 +44,9 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
+	AdmissionregistrationV1alpha1() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Admissionregistration() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface
 	CoreV1() corev1.CoreV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Core() corev1.CoreV1Interface
@@ -91,6 +95,7 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
+	*admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Client
 	*corev1.CoreV1Client
 	*appsv1beta1.AppsV1beta1Client
 	*authenticationv1.AuthenticationV1Client
@@ -109,6 +114,23 @@ type Clientset struct {
 	*settingsv1alpha1.SettingsV1alpha1Client
 	*storagev1beta1.StorageV1beta1Client
 	*storagev1.StorageV1Client
+}
+
+// AdmissionregistrationV1alpha1 retrieves the AdmissionregistrationV1alpha1Client
+func (c *Clientset) AdmissionregistrationV1alpha1() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.AdmissionregistrationV1alpha1Client
+}
+
+// Deprecated: Admissionregistration retrieves the default version of AdmissionregistrationClient.
+// Please explicitly pick a version.
+func (c *Clientset) Admissionregistration() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.AdmissionregistrationV1alpha1Client
 }
 
 // CoreV1 retrieves the CoreV1Client
@@ -379,6 +401,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
+	cs.AdmissionregistrationV1alpha1Client, err = admissionregistrationv1alpha1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.CoreV1Client, err = corev1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -464,6 +490,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
+	cs.AdmissionregistrationV1alpha1Client = admissionregistrationv1alpha1.NewForConfigOrDie(c)
 	cs.CoreV1Client = corev1.NewForConfigOrDie(c)
 	cs.AppsV1beta1Client = appsv1beta1.NewForConfigOrDie(c)
 	cs.AuthenticationV1Client = authenticationv1.NewForConfigOrDie(c)
@@ -490,6 +517,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
+	cs.AdmissionregistrationV1alpha1Client = admissionregistrationv1alpha1.New(c)
 	cs.CoreV1Client = corev1.New(c)
 	cs.AppsV1beta1Client = appsv1beta1.New(c)
 	cs.AuthenticationV1Client = authenticationv1.New(c)

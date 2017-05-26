@@ -110,34 +110,6 @@ function write-pki-config-to-master {
   echo "Wrote PKI certs, keys, tokens and admin password to master."
 }
 
-# Copy all the necessary resource files (scripts/configs/manifests) to the master.
-function copy-resource-files-to-master {
-  copy-files \
-    "${SERVER_BINARY_TAR}" \
-    "${RESOURCE_DIRECTORY}/kubemark-master-env.sh" \
-    "${RESOURCE_DIRECTORY}/start-kubemark-master.sh" \
-    "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
-    "${RESOURCE_DIRECTORY}/manifests/etcd.yaml" \
-    "${RESOURCE_DIRECTORY}/manifests/etcd-events.yaml" \
-    "${RESOURCE_DIRECTORY}/manifests/kube-apiserver.yaml" \
-    "${RESOURCE_DIRECTORY}/manifests/kube-scheduler.yaml" \
-    "${RESOURCE_DIRECTORY}/manifests/kube-controller-manager.yaml" \
-    "${RESOURCE_DIRECTORY}/manifests/kube-addon-manager.yaml" \
-    "${RESOURCE_DIRECTORY}/manifests/addons/kubemark-rbac-bindings" \
-    "kubernetes@${MASTER_NAME}":/home/kubernetes/
-  echo "Copied server binary, master startup scripts, configs and resource manifests to master."
-}
-
-# Make startup scripts executable and run start-kubemark-master.sh.
-function start-master-components {
-  echo ""
-  MASTER_STARTUP_CMD="sudo chmod a+x /home/kubernetes/configure-kubectl.sh && \
-    sudo chmod a+x /home/kubernetes/start-kubemark-master.sh && \
-    sudo bash /home/kubernetes/start-kubemark-master.sh"
-  execute-cmd-on-master-with-retries "${MASTER_STARTUP_CMD}"
-  echo "The master has started and is now live."
-}
-
 # Write kubeconfig to ${RESOURCE_DIRECTORY}/kubeconfig.kubemark in order to
 # use kubectl locally.
 function write-local-kubeconfig {
@@ -165,6 +137,35 @@ contexts:
 current-context: kubemark-context
 EOF
   echo "Kubeconfig file for kubemark master written to ${LOCAL_KUBECONFIG}."
+}
+
+# Copy all the necessary resource files (scripts/configs/manifests) to the master.
+function copy-resource-files-to-master {
+  copy-files \
+    "${SERVER_BINARY_TAR}" \
+    "${RESOURCE_DIRECTORY}/kubemark-master-env.sh" \
+    "${RESOURCE_DIRECTORY}/start-kubemark-master.sh" \
+    "${RESOURCE_DIRECTORY}/kubeconfig.kubemark" \
+    "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
+    "${RESOURCE_DIRECTORY}/manifests/etcd.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/etcd-events.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/kube-apiserver.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/kube-scheduler.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/kube-controller-manager.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/kube-addon-manager.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/addons/kubemark-rbac-bindings" \
+    "kubernetes@${MASTER_NAME}":/home/kubernetes/
+  echo "Copied server binary, master startup scripts, configs and resource manifests to master."
+}
+
+# Make startup scripts executable and run start-kubemark-master.sh.
+function start-master-components {
+  echo ""
+  MASTER_STARTUP_CMD="sudo chmod a+x /home/kubernetes/configure-kubectl.sh && \
+    sudo chmod a+x /home/kubernetes/start-kubemark-master.sh && \
+    sudo bash /home/kubernetes/start-kubemark-master.sh"
+  execute-cmd-on-master-with-retries "${MASTER_STARTUP_CMD}"
+  echo "The master has started and is now live."
 }
 
 # Finds the right kubemark binary for 'linux/amd64' platform and uses it to
@@ -303,8 +304,8 @@ current-context: kubemark-context")
   metrics_mem=$((200 + ${metrics_mem_per_node}*${NUM_NODES:-10}))
   sed -i'' -e "s/{{METRICS_MEM}}/${metrics_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
   metrics_cpu_per_node_numerator=${NUM_NODES:-10}
-  metrics_cpu_per_node_denumerator=2
-  metrics_cpu=$((80 + metrics_cpu_per_node_numerator / metrics_cpu_per_node_denumerator))
+  metrics_cpu_per_node_denominator=2
+  metrics_cpu=$((80 + metrics_cpu_per_node_numerator / metrics_cpu_per_node_denominator))
   sed -i'' -e "s/{{METRICS_CPU}}/${metrics_cpu}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
   eventer_mem_per_node=500
   eventer_mem=$((200 * 1024 + ${eventer_mem_per_node}*${NUM_NODES:-10}))
@@ -378,13 +379,13 @@ create-master-instance-with-resources
 generate-pki-config
 wait-for-master-reachability
 write-pki-config-to-master
+write-local-kubeconfig
 copy-resource-files-to-master
 start-master-components
 
 # Setup for hollow-nodes.
 echo ""
 echo -e "${color_yellow}STARTING SETUP FOR HOLLOW-NODES${color_norm}"
-write-local-kubeconfig
 create-and-upload-hollow-node-image
 create-kube-hollow-node-resources
 wait-for-hollow-nodes-to-run-or-timeout

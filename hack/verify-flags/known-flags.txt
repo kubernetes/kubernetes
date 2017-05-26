@@ -242,6 +242,7 @@ experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
 experimental-bootstrap-token-auth
 experimental-check-node-capabilities-before-mount
+experimental-cluster-signing-duration
 experimental-cri
 experimental-dockershim
 experimental-dockershim-root-directory

@@ -23,6 +23,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/api"
+	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
@@ -60,7 +61,15 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=Apps, Version=InternalVersion
+	// Group=Admissionregistration, Version=InternalVersion
+	case admissionregistration.SchemeGroupVersion.WithResource("externaladmissionhookconfigurations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().InternalVersion().ExternalAdmissionHookConfigurations().Informer()}, nil
+	case admissionregistration.SchemeGroupVersion.WithResource("initializerconfigurations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().InternalVersion().InitializerConfigurations().Informer()}, nil
+
+		// Group=Apps, Version=InternalVersion
+	case apps.SchemeGroupVersion.WithResource("controllerrevisions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().InternalVersion().ControllerRevisions().Informer()}, nil
 	case apps.SchemeGroupVersion.WithResource("statefulsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().InternalVersion().StatefulSets().Informer()}, nil
 

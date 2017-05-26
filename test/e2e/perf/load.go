@@ -59,6 +59,8 @@ const (
 	// nodeCountPerNamespace determines how many namespaces we will be using
 	// depending on the number of nodes in the underlying cluster.
 	nodeCountPerNamespace = 100
+	// How many threads will be used to create/delete services during this test.
+	serviceOperationsParallelism = 5
 )
 
 var randomKind = schema.GroupKind{Kind: "Random"}
@@ -190,7 +192,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 					_, err := clientset.Core().Services(services[i].Namespace).Create(services[i])
 					framework.ExpectNoError(err)
 				}
-				workqueue.Parallelize(25, len(services), createService)
+				workqueue.Parallelize(serviceOperationsParallelism, len(services), createService)
 				framework.Logf("%v Services created.", len(services))
 				defer func(services []*v1.Service) {
 					framework.Logf("Starting to delete services...")
@@ -198,7 +200,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 						err := clientset.Core().Services(services[i].Namespace).Delete(services[i].Name, nil)
 						framework.ExpectNoError(err)
 					}
-					workqueue.Parallelize(25, len(services), deleteService)
+					workqueue.Parallelize(serviceOperationsParallelism, len(services), deleteService)
 					framework.Logf("Services deleted")
 				}(services)
 			} else {

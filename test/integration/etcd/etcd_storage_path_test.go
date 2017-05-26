@@ -141,6 +141,10 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		expectedEtcdPath: "/registry/deployments/etcdstoragepathtestnamespace/deployment2",
 		expectedGVK:      gvkP("extensions", "v1beta1", "Deployment"),
 	},
+	gvr("apps", "v1beta1", "controllerrevisions"): {
+		stub:             `{"metadata":{"name":"crs1"},"data":{"name":"abc","namespace":"default","creationTimestamp":null,"Spec":{"Replicas":0,"Selector":{"matchLabels":{"foo":"bar"}},"Template":{"creationTimestamp":null,"labels":{"foo":"bar"},"Spec":{"Volumes":null,"InitContainers":null,"Containers":null,"RestartPolicy":"Always","TerminationGracePeriodSeconds":null,"ActiveDeadlineSeconds":null,"DNSPolicy":"ClusterFirst","NodeSelector":null,"ServiceAccountName":"","AutomountServiceAccountToken":null,"NodeName":"","SecurityContext":null,"ImagePullSecrets":null,"Hostname":"","Subdomain":"","Affinity":null,"SchedulerName":"","Tolerations":null,"HostAliases":null}},"VolumeClaimTemplates":null,"ServiceName":""},"Status":{"ObservedGeneration":null,"Replicas":0}},"revision":0}`,
+		expectedEtcdPath: "/registry/controllerrevisions/etcdstoragepathtestnamespace/crs1",
+	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/autoscaling/v1
@@ -285,6 +289,16 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		expectedEtcdPath: "/registry/clusterrolebindings/croleb2",
 	},
 	// --
+
+	// k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1
+	gvr("admissionregistration.k8s.io", "v1alpha1", "initializerconfigurations"): {
+		stub:             `{"metadata":{"name":"ic1"},"initializers":[{"name":"initializer.k8s.io","rules":[{"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,
+		expectedEtcdPath: "/registry/initializerconfigurations/ic1",
+	},
+	gvr("admissionregistration.k8s.io", "v1alpha1", "externaladmissionhookconfigurations"): {
+		stub:             `{"metadata":{"name":"hook1","creationTimestamp":null},"externalAdmissionHooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"","name":""},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,
+		expectedEtcdPath: "/registry/externaladmissionhookconfigurations/hook1",
+	},
 }
 
 // Be very careful when whitelisting an object as ephemeral.

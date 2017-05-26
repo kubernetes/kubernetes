@@ -151,7 +151,7 @@ func construct(name string, fn func(), minInterval, maxInterval time.Duration, b
 		fn:          fn,
 		minInterval: minInterval,
 		maxInterval: maxInterval,
-		run:         make(chan struct{}, 16),
+		run:         make(chan struct{}, 1),
 		timer:       timer,
 	}
 	if minInterval == 0 {
@@ -185,8 +185,18 @@ func (bfr *BoundedFrequencyRunner) Loop(stop <-chan struct{}) {
 
 // Run the function as soon as possible.  If this is called while Loop is not
 // running, the call may be deferred indefinitely.
+// If there is already a queued request to call the underlying function, it
+// may be dropped - it is just guaranteed that we will try calling the
+// underlying function as soon as possible starting from now.
 func (bfr *BoundedFrequencyRunner) Run() {
-	bfr.run <- struct{}{}
+	// If it takes a lot of time to run the underlying function, noone is really
+	// processing elements from <run> channel. So to avoid blocking here on the
+	// putting element to it, we simply skip it if there is already an element
+	// in it.
+	select {
+	case bfr.run <- struct{}{}:
+	default:
+	}
 }
 
 // assumes the lock is not held

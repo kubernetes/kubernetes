@@ -42,6 +42,7 @@ import (
 	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
 	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
+	servicednscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service/dns"
 	synccontroller "k8s.io/kubernetes/federation/pkg/federation-controller/sync"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/version"
@@ -136,9 +137,9 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	clustercontroller.StartClusterController(restClientCfg, stopChan, s.ClusterMonitorPeriod.Duration)
 
 	if controllerEnabled(s.Controllers, serverResources, servicecontroller.ControllerName, servicecontroller.RequiredResources, true) {
-		if controllerEnabled(s.Controllers, serverResources, servicecontroller.DNSControllerName, servicecontroller.RequiredResources, true) {
-			serviceDNScontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.DNSUserAgentName))
-			serviceDNSController, err := servicecontroller.NewServiceDNSController(serviceDNScontrollerClientset, s.DnsProvider, s.DnsConfigFile, s.FederationName, s.ServiceDnsSuffix, s.ZoneName, s.ZoneID)
+		if controllerEnabled(s.Controllers, serverResources, servicednscontroller.ControllerName, servicecontroller.RequiredResources, true) {
+			serviceDNScontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicednscontroller.UserAgentName))
+			serviceDNSController, err := servicednscontroller.NewServiceDNSController(serviceDNScontrollerClientset, s.DnsProvider, s.DnsConfigFile, s.FederationName, s.ServiceDnsSuffix, s.ZoneName, s.ZoneID)
 			if err != nil {
 				glog.Fatalf("Failed to start service dns controller: %v", err)
 			} else {

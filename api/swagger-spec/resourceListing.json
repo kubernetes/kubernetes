@@ -132,6 +132,14 @@
    {
     "path": "/apis/apps",
     "description": "get information of a group"
+   },
+   {
+    "path": "/apis/admissionregistration.k8s.io/v1alpha1",
+    "description": "API at /apis/admissionregistration.k8s.io/v1alpha1"
+   },
+   {
+    "path": "/apis/admissionregistration.k8s.io",
+    "description": "get information of a group"
    }
   ],
   "apiVersion": "",

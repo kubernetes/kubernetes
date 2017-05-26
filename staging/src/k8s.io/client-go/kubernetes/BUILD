@@ -17,6 +17,7 @@ go_library(
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1beta1:go_default_library",

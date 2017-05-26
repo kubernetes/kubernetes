@@ -14,7 +14,7 @@
 
 .PHONY:	build push
 
-TAG = v4.6.1-1
+TAG = v5.4.0
 PREFIX = gcr.io/google_containers
 
 build:

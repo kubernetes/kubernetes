@@ -66,6 +66,7 @@ pkg/api/v1/node
 pkg/api/v1/service
 pkg/apis/abac/v0
 pkg/apis/abac/v1beta1
+pkg/apis/admissionregistration/install
 pkg/apis/apps/install
 pkg/apis/apps/v1beta1
 pkg/apis/authentication/install
@@ -91,6 +92,8 @@ pkg/auth/nodeidentifier
 pkg/bootstrap/api
 pkg/client/conditions
 pkg/client/informers/informers_generated/externalversions
+pkg/client/informers/informers_generated/externalversions/admissionregistration
+pkg/client/informers/informers_generated/externalversions/admissionregistration/v1alpha1
 pkg/client/informers/informers_generated/externalversions/apps
 pkg/client/informers/informers_generated/externalversions/apps/v1beta1
 pkg/client/informers/informers_generated/externalversions/autoscaling
@@ -116,6 +119,8 @@ pkg/client/informers/informers_generated/externalversions/storage
 pkg/client/informers/informers_generated/externalversions/storage/v1
 pkg/client/informers/informers_generated/externalversions/storage/v1beta1
 pkg/client/informers/informers_generated/internalversion
+pkg/client/informers/informers_generated/internalversion/admissionregistration
+pkg/client/informers/informers_generated/internalversion/admissionregistration/internalversion
 pkg/client/informers/informers_generated/internalversion/apps
 pkg/client/informers/informers_generated/internalversion/apps/internalversion
 pkg/client/informers/informers_generated/internalversion/autoscaling
@@ -136,6 +141,8 @@ pkg/client/informers/informers_generated/internalversion/settings
 pkg/client/informers/informers_generated/internalversion/settings/internalversion
 pkg/client/informers/informers_generated/internalversion/storage
 pkg/client/informers/informers_generated/internalversion/storage/internalversion
+pkg/client/listers/admissionregistration/internalversion
+pkg/client/listers/admissionregistration/v1alpha1
 pkg/client/listers/apps/internalversion
 pkg/client/listers/apps/v1beta1
 pkg/client/listers/authentication/internalversion
@@ -208,6 +215,7 @@ pkg/proxy/healthcheck
 pkg/quota
 pkg/quota/install
 pkg/registry
+pkg/registry/apps/controllerrevision/storage
 pkg/registry/authorization/util
 pkg/registry/core/configmap/storage
 pkg/registry/core/endpoint
@@ -348,6 +356,8 @@ staging/src/k8s.io/client-go/examples/in-cluster
 staging/src/k8s.io/client-go/examples/out-of-cluster
 staging/src/k8s.io/client-go/examples/third-party-resources
 staging/src/k8s.io/client-go/informers
+staging/src/k8s.io/client-go/informers/admissionregistration
+staging/src/k8s.io/client-go/informers/admissionregistration/v1alpha1
 staging/src/k8s.io/client-go/informers/apps
 staging/src/k8s.io/client-go/informers/apps/v1beta1
 staging/src/k8s.io/client-go/informers/autoscaling
@@ -372,6 +382,7 @@ staging/src/k8s.io/client-go/informers/settings/v1alpha1
 staging/src/k8s.io/client-go/informers/storage
 staging/src/k8s.io/client-go/informers/storage/v1
 staging/src/k8s.io/client-go/informers/storage/v1beta1
+staging/src/k8s.io/client-go/listers/admissionregistration/v1alpha1
 staging/src/k8s.io/client-go/listers/apps/v1beta1
 staging/src/k8s.io/client-go/listers/autoscaling/v1
 staging/src/k8s.io/client-go/listers/autoscaling/v2alpha1

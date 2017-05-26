@@ -45,6 +45,7 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/apis/example/fuzzer:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/example/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/audit:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/audit/policy:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/filters:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/handlers:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",

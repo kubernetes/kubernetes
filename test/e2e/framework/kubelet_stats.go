@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/common/model"
 )
 
@@ -103,10 +102,7 @@ func GetKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMetrics {
 	latencyMethods := sets.NewString(
 		kubeletmetrics.PodWorkerLatencyKey,
 		kubeletmetrics.PodWorkerStartLatencyKey,
-		kubeletmetrics.SyncPodsLatencyKey,
 		kubeletmetrics.PodStartLatencyKey,
-		kubeletmetrics.PodStatusLatencyKey,
-		kubeletmetrics.ContainerManagerOperationsKey,
 		kubeletmetrics.CgroupManagerOperationsKey,
 		kubeletmetrics.DockerOperationsLatencyKey,
 		kubeletmetrics.PodWorkerStartLatencyKey,
@@ -370,10 +366,8 @@ func getOneTimeResourceUsageOnNode(
 	}
 
 	f := func(name string, newStats *stats.ContainerStats) *ContainerResourceUsage {
-		// TODO(gmarek): remove when #46198 is debugged.
-		if newStats == nil || newStats.CPU == nil {
-			glog.Warning("NewStats is %#v for container %v", newStats, name)
-			return &ContainerResourceUsage{}
+		if newStats == nil || newStats.CPU == nil || newStats.Memory == nil {
+			return nil
 		}
 		return &ContainerResourceUsage{
 			Name:                    name,
@@ -402,7 +396,9 @@ func getOneTimeResourceUsageOnNode(
 			if !isInteresting {
 				continue
 			}
-			usageMap[pod.PodRef.Name+"/"+container.Name] = f(pod.PodRef.Name+"/"+container.Name, &container)
+			if usage := f(pod.PodRef.Name+"/"+container.Name, &container); usage != nil {
+				usageMap[pod.PodRef.Name+"/"+container.Name] = usage
+			}
 		}
 	}
 	return usageMap, nil

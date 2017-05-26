@@ -545,17 +545,10 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			// kubelet, which handles the requests using DockerService..
 			klet.criHandler = ds
 
-			const (
-				// The unix socket for kubelet <-> dockershim communication.
-				ep = "/var/run/dockershim.sock"
-			)
-			if len(kubeCfg.RemoteRuntimeEndpoint) == 0 {
-				kubeCfg.RemoteRuntimeEndpoint = ep
-			}
-			if len(kubeCfg.RemoteImageEndpoint) == 0 {
-				kubeCfg.RemoteImageEndpoint = ep
-			}
-
+			// The unix socket for kubelet <-> dockershim communication.
+			glog.V(5).Infof("RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
+				kubeCfg.RemoteRuntimeEndpoint,
+				kubeCfg.RemoteImageEndpoint)
 			glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
 			server := dockerremote.NewDockerServer(kubeCfg.RemoteRuntimeEndpoint, ds)
 			if err := server.Start(); err != nil {
@@ -577,6 +570,9 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			return nil, fmt.Errorf("unsupported CRI runtime: %q", kubeCfg.ContainerRuntime)
 		}
 		runtimeService, imageService, err := getRuntimeAndImageServices(kubeCfg)
+		if err != nil {
+			return nil, err
+		}
 		runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 			klet.livenessManager,

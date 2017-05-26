@@ -41,6 +41,7 @@ import (
 	fedapi "k8s.io/kubernetes/federation/apis/federation"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/service/ingress"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/clusterselector"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
@@ -52,7 +53,7 @@ import (
 )
 
 const (
-	serviceSyncPeriod = 10 * time.Minute
+	serviceSyncPeriod = 30 * time.Second
 
 	UserAgentName = "federation-service-controller"
 
@@ -472,7 +473,7 @@ func (s *ServiceController) reconcileService(key string) reconciliationStatus {
 	}
 
 	newLBStatus := newLoadbalancerStatus()
-	newServiceIngress := NewFederatedServiceIngress()
+	newServiceIngress := ingress.NewFederatedServiceIngress()
 	operations := make([]fedutil.FederatedOperation, 0)
 	for _, cluster := range clusters {
 		// Aggregate all operations to perform on all federated clusters
@@ -660,7 +661,7 @@ func (s *ServiceController) getServiceEndpointsInCluster(cluster *v1beta1.Cluste
 
 // updateFederatedService updates the federated service with aggregated lbStatus and serviceIngresses
 // and also updates the dns records as needed
-func (s *ServiceController) updateFederatedService(fedService *v1.Service, newLBStatus *loadbalancerStatus, newServiceIngress *FederatedServiceIngress) error {
+func (s *ServiceController) updateFederatedService(fedService *v1.Service, newLBStatus *loadbalancerStatus, newServiceIngress *ingress.FederatedServiceIngress) error {
 	key := types.NamespacedName{Namespace: fedService.Namespace, Name: fedService.Name}.String()
 	needUpdate := false
 
@@ -672,7 +673,7 @@ func (s *ServiceController) updateFederatedService(fedService *v1.Service, newLB
 		needUpdate = true
 	}
 
-	existingServiceIngress, err := ParseFederatedServiceIngress(fedService)
+	existingServiceIngress, err := ingress.ParseFederatedServiceIngress(fedService)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("Failed to parse endpoint annotations for service %s: %v", key, err))
 		return err
@@ -695,7 +696,7 @@ func (s *ServiceController) updateFederatedService(fedService *v1.Service, newLB
 	// Update federated service status and/or ingress annotations if changed
 	sort.Sort(newServiceIngress)
 	if !reflect.DeepEqual(existingServiceIngress.Items, newServiceIngress.Items) {
-		fedService = UpdateIngressAnnotation(fedService, newServiceIngress)
+		fedService = ingress.UpdateIngressAnnotation(fedService, newServiceIngress)
 		glog.V(3).Infof("Federated service loadbalancer ingress updated for %s: existing: %#v, desired: %#v", key, existingServiceIngress, newServiceIngress)
 		needUpdate = true
 	}

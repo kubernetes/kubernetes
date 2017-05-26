@@ -32,6 +32,38 @@ import "k8s.io/kubernetes/pkg/apis/policy/v1beta1/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
+// ControllerRevision implements an immutable snapshot of state data. Clients
+// are responsible for serializing and deserializing the objects that contain
+// their internal state.
+// Once a ControllerRevision has been successfully created, it can not be updated.
+// The API Server will fail validation of all requests that attempt to mutate
+// the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both
+// the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However,
+// it may be subject to name and representation changes in future releases, and clients should not
+// depend on its stability. It is primarily for internal use by controllers.
+message ControllerRevision {
+  // Standard object's metadata.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Data is the serialized representation of the state.
+  optional k8s.io.apimachinery.pkg.runtime.RawExtension data = 2;
+
+  // Revision indicates the revision of the state represented by Data.
+  optional int64 revision = 3;
+}
+
+// ControllerRevisionList is a resource containing a list of ControllerRevision objects.
+message ControllerRevisionList {
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of ControllerRevisions
+  repeated ControllerRevision items = 2;
+}
+
 // Deployment enables declarative updates for Pods and ReplicaSets.
 message Deployment {
   // Standard object metadata.

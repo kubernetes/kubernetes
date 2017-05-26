@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -738,6 +739,21 @@ func certificateFuncs(t apitesting.TestingCommon) []interface{} {
 	}
 }
 
+func admissionregistrationFuncs(t apitesting.TestingCommon) []interface{} {
+	return []interface{}{
+		func(obj *admissionregistration.ExternalAdmissionHook, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			p := admissionregistration.FailurePolicyType("Fail")
+			obj.FailurePolicy = &p
+		},
+		func(obj *admissionregistration.Initializer, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			p := admissionregistration.FailurePolicyType("Fail")
+			obj.FailurePolicy = &p
+		},
+	}
+}
+
 func FuzzerFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
 	return apitesting.MergeFuzzerFuncs(t,
 		apitesting.GenericFuzzerFuncs(t, codecs),
@@ -751,6 +767,7 @@ func FuzzerFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFacto
 		kubeadmfuzzer.KubeadmFuzzerFuncs(t),
 		policyFuncs(t),
 		certificateFuncs(t),
+		admissionregistrationFuncs(t),
 	)
 }
 

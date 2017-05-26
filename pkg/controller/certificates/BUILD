@@ -66,5 +66,6 @@ go_test(
         "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
     ],
 )

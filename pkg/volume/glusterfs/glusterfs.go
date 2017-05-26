@@ -155,7 +155,7 @@ func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volu
 			return nil, fmt.Errorf("failed to get endpoint %s, error %v", epName, err)
 		}
 		glog.Errorf("glusterfs: failed to get endpoint %s[%v]", epName, err)
-		if spec != nil && spec.PersistentVolume.Annotations["kubernetes.io/createdby"] == heketiAnn {
+		if spec != nil && spec.PersistentVolume.Annotations[volumehelper.VolumeDynamicallyCreatedByKey] == heketiAnn {
 			class, err := volutil.GetClassForVolume(plugin.host.GetKubeClient(), spec.PersistentVolume)
 			if err != nil {
 				return nil, fmt.Errorf("glusterfs: failed to get storageclass, error: %v", err)
@@ -862,11 +862,11 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	gidStr := strconv.FormatInt(int64(gid), 10)
 
 	pv.Annotations = map[string]string{
-		volumehelper.VolumeGidAnnotationKey: gidStr,
-		"kubernetes.io/createdby":           heketiAnn,
-		glusterTypeAnn:                      "file",
-		"Description":                       glusterDescAnn,
-		v1.MountOptionAnnotation:            "auto_unmount",
+		volumehelper.VolumeGidAnnotationKey:        gidStr,
+		volumehelper.VolumeDynamicallyCreatedByKey: heketiAnn,
+		glusterTypeAnn:                             "file",
+		"Description":                              glusterDescAnn,
+		v1.MountOptionAnnotation:                   "auto_unmount",
 	}
 
 	pv.Spec.Capacity = v1.ResourceList{

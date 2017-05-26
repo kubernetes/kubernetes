@@ -125,6 +125,10 @@ type ActualStateOfWorld interface {
 
 	// GetNodesToUpdateStatusFor returns the map of nodeNames to nodeToUpdateStatusFor
 	GetNodesToUpdateStatusFor() map[types.NodeName]nodeToUpdateStatusFor
+
+	// Removes the given node from the record of attach updates. The node's entire
+	// volumesToReportAsAttached list is removed.
+	RemoveNodeFromAttachUpdates(nodeName types.NodeName) error
 }
 
 // AttachedVolume represents a volume that is attached to a node.
@@ -258,6 +262,19 @@ func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(
 	asw.Lock()
 	defer asw.Unlock()
 	asw.addVolumeToReportAsAttached(volumeName, nodeName)
+}
+
+func (asw *actualStateOfWorld) RemoveNodeFromAttachUpdates(nodeName types.NodeName) error {
+	asw.Lock()
+	defer asw.Unlock()
+
+	_, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]
+	if nodeToUpdateExists {
+		delete(asw.nodesToUpdateStatusFor, nodeName)
+		return nil
+	}
+	return fmt.Errorf("node %q does not exist in volumesToReportAsAttached list",
+		nodeName)
 }
 
 func (asw *actualStateOfWorld) AddVolumeNode(

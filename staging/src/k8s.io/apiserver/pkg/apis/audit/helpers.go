@@ -36,11 +36,3 @@ func (a Level) Less(b Level) bool {
 func (a Level) GreaterOrEqual(b Level) bool {
 	return ordLevel(a) >= ordLevel(b)
 }
-
-func NewConstantPolicy(level Level) *Policy {
-	return &Policy{
-		Rules: []PolicyRule{
-			{Level: level},
-		},
-	}
-}

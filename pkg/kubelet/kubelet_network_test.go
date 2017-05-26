@@ -112,6 +112,7 @@ func TestParseResolvConf(t *testing.T) {
 
 func TestComposeDNSSearch(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	recorder := record.NewFakeRecorder(20)
