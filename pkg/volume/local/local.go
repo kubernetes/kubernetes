@@ -216,6 +216,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) err
 	glog.V(4).Infof("attempting to mount %s", dir)
 	err = m.mounter.Mount(m.globalPath, dir, "", options)
 	if err != nil {
+		glog.Errorf("Mount of volume %s failed: %v", dir, err)
 		notMnt, mntErr := m.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
 			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
@@ -226,7 +227,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) err
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			notMnt, mntErr := m.mounter.IsLikelyNotMountPoint(dir)
+			notMnt, mntErr = m.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
 				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
@@ -238,7 +239,6 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) err
 			}
 		}
 		os.Remove(dir)
-		glog.Errorf("Mount of volume %s failed: %v", dir, err)
 		return err
 	}
 

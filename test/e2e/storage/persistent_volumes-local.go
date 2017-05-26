@@ -165,8 +165,8 @@ func cleanupLocalVolume(config *localTestConfig, volume *localTestVolume) {
 	}
 
 	By("Removing the test directory")
-	writeCmd := fmt.Sprintf("rm -r %s", volume.containerDir)
-	runLocalUtil(config, volume.node.Name, writeCmd)
+	removeCmd := fmt.Sprintf("rm -r %s", volume.containerDir)
+	runLocalUtil(config, volume.node.Name, removeCmd)
 }
 
 func runLocalUtil(config *localTestConfig, nodeName, cmd string) {

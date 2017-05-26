@@ -76,7 +76,7 @@ type VolumeTestConfig struct {
 	ServerImage string
 	// Ports to export from the server pod. TCP only.
 	ServerPorts []int
-	// Commands to run in the comtainer image.
+	// Commands to run in the container image.
 	ServerCmds []string
 	// Arguments to pass to the container image.
 	ServerArgs []string
