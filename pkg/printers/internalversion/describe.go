@@ -2627,6 +2627,14 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 				w.Write(LEVEL_0, "failed to check Replication Controller\n")
 			}
 		}
+		if len(hpa.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n")
+			w.Write(LEVEL_1, "Type\tStatus\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t------\t-------\n")
+			for _, c := range hpa.Status.Conditions {
+				w.Write(LEVEL_1, "%v\t%v\t%v\t%v\n", c.Type, c.Status, c.Reason, c.Message)
+			}
+		}
 
 		if events != nil {
 			DescribeEvents(events, w)
