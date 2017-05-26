@@ -48,6 +48,7 @@ go_library(
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
+        "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor/github.com/codedellemc/goscaleio:go_default_library",
         "//vendor/github.com/codedellemc/goscaleio/types/v1:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
