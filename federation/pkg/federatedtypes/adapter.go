@@ -21,9 +21,7 @@ import (
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
@@ -58,30 +56,6 @@ type FederatedTypeAdapter interface {
 	IsSchedulingAdapter() bool
 
 	NewTestObject(namespace string) pkgruntime.Object
-}
-
-// SchedulingStatus contains the status of the objects that are being
-// scheduled into joined clusters.
-type SchedulingStatus struct {
-	Replicas             int32
-	FullyLabeledReplicas int32
-	ReadyReplicas        int32
-	AvailableReplicas    int32
-}
-
-// SchedulingInfo wraps the information that a SchedulingAdapter needs
-// to update objects per a schedule.
-type SchedulingInfo struct {
-	Schedule map[string]int64
-	Status   SchedulingStatus
-}
-
-// SchedulingAdapter defines operations for interacting with a
-// federated type that requires more complex synchronization logic.
-type SchedulingAdapter interface {
-	GetSchedule(obj pkgruntime.Object, key string, clusters []*federationapi.Cluster, informer fedutil.FederatedInformer) (*SchedulingInfo, error)
-	ScheduleObject(cluster *federationapi.Cluster, clusterObj pkgruntime.Object, federationObjCopy pkgruntime.Object, schedulingInfo *SchedulingInfo) (pkgruntime.Object, bool, error)
-	UpdateFederatedStatus(obj pkgruntime.Object, status SchedulingStatus) error
 }
 
 // AdapterFactory defines the function signature for factory methods
