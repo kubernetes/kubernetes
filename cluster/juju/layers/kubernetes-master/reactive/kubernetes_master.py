@@ -791,6 +791,7 @@ def configure_master_services():
     api_opts.add('insecure-port', '8080')
     api_opts.add('storage-backend', 'etcd2')  # FIXME: add etcd3 support
     admission_control = [
+        'Initializers',
         'NamespaceLifecycle',
         'LimitRanger',
         'ServiceAccount',

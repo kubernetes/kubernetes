@@ -70,7 +70,7 @@ SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-}"
 APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-}"
 STORAGE_BACKEND="${STORAGE_BACKEND:-}"
 NUM_NODES="${NUM_NODES:-}"
-CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota}"
+CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota}"
 EOF
   echo "Created the environment file for master."
 }

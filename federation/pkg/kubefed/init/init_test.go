@@ -869,7 +869,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		fmt.Sprintf("--secure-port=%d", apiServerSecurePort),
 		"--tls-cert-file=/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file=/etc/federation/apiserver/server.key",
-		"--admission-control=NamespaceLifecycle",
+		"--admission-control=Initializers,NamespaceLifecycle",
 		fmt.Sprintf("--advertise-address=%s", address),
 	}
 

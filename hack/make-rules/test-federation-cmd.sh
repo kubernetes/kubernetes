@@ -34,7 +34,7 @@ function run_federation_apiserver() {
   kube::log::status "Starting federation-apiserver"
 
   # Admission Controllers to invoke prior to persisting objects in cluster
-  ADMISSION_CONTROL="NamespaceLifecycle"
+  ADMISSION_CONTROL="Initializers,NamespaceLifecycle"
 
   "${KUBE_OUTPUT_HOSTBIN}/federation-apiserver" \
     --insecure-port="${API_PORT}" \
