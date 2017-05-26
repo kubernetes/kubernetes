@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	capi "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -35,20 +36,13 @@ import (
 	"github.com/cloudflare/cfssl/signer/local"
 )
 
-var onlySigningPolicy = &config.Signing{
-	Default: &config.SigningProfile{
-		Usage:        []string{"signing"},
-		Expiry:       helpers.OneYear,
-		ExpiryString: "8760h",
-	},
-}
-
 func NewCSRSigningController(
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
+	certificateDuration time.Duration,
 ) (*certificates.CertificateController, error) {
-	signer, err := newCFSSLSigner(caFile, caKeyFile, client)
+	signer, err := newCFSSLSigner(caFile, caKeyFile, client, certificateDuration)
 	if err != nil {
 		return nil, err
 	}
@@ -60,13 +54,14 @@ func NewCSRSigningController(
 }
 
 type cfsslSigner struct {
-	ca      *x509.Certificate
-	priv    crypto.Signer
-	sigAlgo x509.SignatureAlgorithm
-	client  clientset.Interface
+	ca                  *x509.Certificate
+	priv                crypto.Signer
+	sigAlgo             x509.SignatureAlgorithm
+	client              clientset.Interface
+	certificateDuration time.Duration
 }
 
-func newCFSSLSigner(caFile, caKeyFile string, client clientset.Interface) (*cfsslSigner, error) {
+func newCFSSLSigner(caFile, caKeyFile string, client clientset.Interface, certificateDuration time.Duration) (*cfsslSigner, error) {
 	ca, err := ioutil.ReadFile(caFile)
 	if err != nil {
 		return nil, err
@@ -92,10 +87,11 @@ func newCFSSLSigner(caFile, caKeyFile string, client clientset.Interface) (*cfss
 		return nil, fmt.Errorf("Malformed private key %v", err)
 	}
 	return &cfsslSigner{
-		priv:    priv,
-		ca:      parsedCa,
-		sigAlgo: signer.DefaultSigAlgo(priv),
-		client:  client,
+		priv:                priv,
+		ca:                  parsedCa,
+		sigAlgo:             signer.DefaultSigAlgo(priv),
+		client:              client,
+		certificateDuration: certificateDuration,
 	}, nil
 }
 
@@ -122,8 +118,8 @@ func (s *cfsslSigner) sign(csr *capi.CertificateSigningRequest) (*capi.Certifica
 	policy := &config.Signing{
 		Default: &config.SigningProfile{
 			Usage:        usages,
-			Expiry:       helpers.OneYear,
-			ExpiryString: "8760h",
+			Expiry:       s.certificateDuration,
+			ExpiryString: s.certificateDuration.String(),
 		},
 	}
 	cfs, err := local.NewSigner(s.priv, s.ca, s.sigAlgo, policy)
