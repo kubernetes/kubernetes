@@ -71,6 +71,7 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 		if level == auditinternal.LevelNone {
 			// Don't audit.
 			handler.ServeHTTP(w, req)
+			return
 		}
 
 		ev, err := audit.NewEventFromRequest(req, level, attribs)
