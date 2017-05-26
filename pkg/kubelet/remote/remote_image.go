@@ -26,6 +26,7 @@ import (
 
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 // RemoteImageService is a gRPC implementation of internalapi.ImageManagerService.
@@ -35,9 +36,14 @@ type RemoteImageService struct {
 }
 
 // NewRemoteImageService creates a new internalapi.ImageManagerService.
-func NewRemoteImageService(addr string, connectionTimeout time.Duration) (internalapi.ImageManagerService, error) {
-	glog.V(3).Infof("Connecting to image service %s", addr)
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimeout), grpc.WithDialer(dial))
+func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (internalapi.ImageManagerService, error) {
+	glog.V(3).Infof("Connecting to image service %s", endpoint)
+	addr, dailer, err := util.GetAddressAndDialer(endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimeout), grpc.WithDialer(dailer))
 	if err != nil {
 		glog.Errorf("Connect remote image service %s failed: %v", addr, err)
 		return nil, err

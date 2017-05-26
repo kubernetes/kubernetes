@@ -975,14 +975,8 @@ func RunDockershim(c *componentconfig.KubeletConfiguration, dockershimRootDir st
 		return err
 	}
 
-	// The unix socket for kubelet <-> dockershim communication.
-	ep := c.RemoteRuntimeEndpoint
-	if len(ep) == 0 {
-		ep = "/var/run/dockershim.sock"
-	}
-
 	glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-	server := dockerremote.NewDockerServer(ep, ds)
+	server := dockerremote.NewDockerServer(c.RemoteRuntimeEndpoint, ds)
 	if err := server.Start(); err != nil {
 		return err
 	}

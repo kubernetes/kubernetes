@@ -1,7 +1,7 @@
 // +build !linux,!windows
 
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,21 +16,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package util
 
 import (
 	"fmt"
-
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	"net"
+	"time"
 )
 
-type unsupportedContainerManager struct {
+func CreateListener(endpoint string) (net.Listener, error) {
+	return nil, fmt.Errorf("CreateListener is unsupported in this build")
 }
 
-func NewContainerManager(_ string, _ libdocker.Interface) ContainerManager {
-	return &unsupportedContainerManager{}
-}
-
-func (m *unsupportedContainerManager) Start() error {
-	return fmt.Errorf("Container Manager is unsupported in this build")
+func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
+	return "", nil, fmt.Errorf("GetAddressAndDialer is unsupported in this build")
 }

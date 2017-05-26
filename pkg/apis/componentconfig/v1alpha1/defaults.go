@@ -438,6 +438,13 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.ExperimentalDockershim == nil {
 		obj.ExperimentalDockershim = boolVar(false)
 	}
+	if obj.RemoteRuntimeEndpoint == "" {
+		if runtime.GOOS == "linux" {
+			obj.RemoteRuntimeEndpoint = "unix:///var/run/dockershim.sock"
+		} else if runtime.GOOS == "windows" {
+			obj.RemoteRuntimeEndpoint = "tcp://localhost:3735"
+		}
+	}
 }
 
 func boolVar(b bool) *bool {
