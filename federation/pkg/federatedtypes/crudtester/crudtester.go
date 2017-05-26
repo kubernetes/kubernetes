@@ -197,8 +197,17 @@ func (c *FederatedTypeCRUDTester) CheckPropagationForClients(obj pkgruntime.Obje
 func (c *FederatedTypeCRUDTester) waitForResource(client clientset.Interface, obj pkgruntime.Object) error {
 	namespacedName := c.adapter.NamespacedName(obj)
 	err := wait.PollImmediate(c.waitInterval, c.clusterWaitTimeout, func() (bool, error) {
+		equivalenceFunc := c.adapter.Equivalent
+		if c.adapter.IsSchedulingAdapter() {
+			schedulingAdapter, ok := c.adapter.(federatedtypes.SchedulingAdapter)
+			if !ok {
+				c.tl.Fatalf("Adapter for kind %q does not properly implement SchedulingAdapter.", c.adapter.Kind())
+			}
+			equivalenceFunc = schedulingAdapter.EquivalentIgnoringSchedule
+		}
+
 		clusterObj, err := c.adapter.ClusterGet(client, namespacedName)
-		if err == nil && c.adapter.Equivalent(clusterObj, obj) {
+		if err == nil && equivalenceFunc(clusterObj, obj) {
 			return true, nil
 		}
 		if errors.IsNotFound(err) {

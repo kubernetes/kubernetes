@@ -29,7 +29,6 @@ go_library(
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/core/v1:go_default_library",
         "//federation/pkg/federatedtypes:go_default_library",
-        "//federation/pkg/federation-controller/replicaset:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
