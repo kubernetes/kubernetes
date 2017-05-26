@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	storagedefault "k8s.io/kubernetes/plugin/pkg/admission/storageclass/default"
+	"k8s.io/kubernetes/plugin/pkg/admission/webhook"
 )
 
 // registerAllAdmissionPlugins registers all admission plugins
@@ -75,4 +76,5 @@ func registerAllAdmissionPlugins(plugins *admission.Plugins) {
 	scdeny.Register(plugins)
 	serviceaccount.Register(plugins)
 	storagedefault.Register(plugins)
+	webhook.Register(plugins)
 }

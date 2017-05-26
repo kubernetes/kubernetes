@@ -25,6 +25,7 @@ go_library(
         "//pkg/api/endpoints:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/admission/install:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
