@@ -90,12 +90,12 @@ func ControllerRevisionToSelectableFields(revision *apps.ControllerRevision) fie
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	history, ok := obj.(*apps.ControllerRevision)
 	if !ok {
-		return nil, nil, errors.New("supplied object is not an ControllerRevision")
+		return nil, nil, false, errors.New("supplied object is not an ControllerRevision")
 	}
-	return labels.Set(history.ObjectMeta.Labels), ControllerRevisionToSelectableFields(history), nil
+	return labels.Set(history.ObjectMeta.Labels), ControllerRevisionToSelectableFields(history), history.Initializers != nil, nil
 }
 
 // MatchControllerRevision returns a generic matcher for a given label and field selector.

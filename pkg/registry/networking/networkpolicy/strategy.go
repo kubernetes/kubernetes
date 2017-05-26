@@ -98,12 +98,12 @@ func SelectableFields(networkPolicy *networking.NetworkPolicy) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	networkPolicy, ok := obj.(*networking.NetworkPolicy)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a NetworkPolicy.")
+		return nil, nil, false, fmt.Errorf("given object is not a NetworkPolicy.")
 	}
-	return labels.Set(networkPolicy.ObjectMeta.Labels), SelectableFields(networkPolicy), nil
+	return labels.Set(networkPolicy.ObjectMeta.Labels), SelectableFields(networkPolicy), networkPolicy.Initializers != nil, nil
 }
 
 // Matcher is the filter used by the generic etcd backend to watch events

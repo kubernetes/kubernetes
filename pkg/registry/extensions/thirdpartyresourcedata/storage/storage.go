@@ -55,11 +55,11 @@ func (r *REST) isFrozen() bool {
 }
 
 // Create is a wrapper to support Freeze.
-func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	if r.isFrozen() {
 		return nil, errFrozen
 	}
-	return r.Store.Create(ctx, obj)
+	return r.Store.Create(ctx, obj, includeUninitialized)
 }
 
 // Update is a wrapper to support Freeze.

@@ -39,7 +39,7 @@ func (r *REST) New() runtime.Object {
 	return &authentication.TokenReview{}
 }
 
-func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	tokenReview, ok := obj.(*authentication.TokenReview)
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a TokenReview: %#v", obj))
@@ -75,8 +75,4 @@ func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtim
 	}
 
 	return tokenReview, nil
-}
-
-func (r *REST) CreateInitialized(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
-	return r.Create(ctx, obj)
 }

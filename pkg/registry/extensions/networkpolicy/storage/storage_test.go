@@ -45,7 +45,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 // createNetworkPolicy is a helper function that returns a NetworkPolicy with the updated resource version.
 func createNetworkPolicy(storage *REST, np extensions.NetworkPolicy, t *testing.T) (extensions.NetworkPolicy, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), np.Namespace)
-	obj, err := storage.Create(ctx, &np)
+	obj, err := storage.Create(ctx, &np, false)
 	if err != nil {
 		t.Errorf("Failed to create NetworkPolicy, %v", err)
 	}

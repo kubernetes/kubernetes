@@ -93,12 +93,12 @@ func SelectableFields(pip *settings.PodPreset) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	pip, ok := obj.(*settings.PodPreset)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a PodPreset.")
+		return nil, nil, false, fmt.Errorf("given object is not a PodPreset.")
 	}
-	return labels.Set(pip.ObjectMeta.Labels), SelectableFields(pip), nil
+	return labels.Set(pip.ObjectMeta.Labels), SelectableFields(pip), pip.Initializers != nil, nil
 }
 
 // Matcher is the filter used by the generic etcd backend to watch events

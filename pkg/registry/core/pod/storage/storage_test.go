@@ -185,7 +185,7 @@ func TestIgnoreDeleteNotFound(t *testing.T) {
 	}
 
 	// create pod
-	_, err = registry.Create(testContext, pod)
+	_, err = registry.Create(testContext, pod, false)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestCreateSetsFields(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	pod := validNewPod()
-	_, err := storage.Create(genericapirequest.NewDefaultContext(), pod)
+	_, err := storage.Create(genericapirequest.NewDefaultContext(), pod, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -486,7 +486,7 @@ func TestEtcdCreate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
-	_, err := storage.Create(ctx, validNewPod())
+	_, err := storage.Create(ctx, validNewPod(), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -495,7 +495,7 @@ func TestEtcdCreate(t *testing.T) {
 	_, err = bindingStorage.Create(ctx, &api.Binding{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 		Target:     api.ObjectReference{Name: "machine"},
-	})
+	}, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -521,7 +521,7 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	_, err := bindingStorage.Create(ctx, &api.Binding{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 		Target:     api.ObjectReference{Name: "machine"},
-	})
+	}, false)
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
@@ -544,7 +544,7 @@ func TestEtcdCreateFailsWithoutNamespace(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	pod := validNewPod()
 	pod.Namespace = ""
-	_, err := storage.Create(genericapirequest.NewContext(), pod)
+	_, err := storage.Create(genericapirequest.NewContext(), pod, false)
 	// Accept "namespace" or "Namespace".
 	if err == nil || !strings.Contains(err.Error(), "amespace") {
 		t.Fatalf("expected error that namespace was missing from context, got: %v", err)
@@ -556,7 +556,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
-	_, err := storage.Create(ctx, validNewPod())
+	_, err := storage.Create(ctx, validNewPod(), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -569,7 +569,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 			Annotations: map[string]string{"label1": "value1"},
 		},
 		Target: api.ObjectReference{Name: "machine"},
-	})
+	}, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -591,7 +591,7 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
 
-	_, err := storage.Create(ctx, validNewPod())
+	_, err := storage.Create(ctx, validNewPod(), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -605,12 +605,12 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 		},
 		Target: api.ObjectReference{Name: "machine"},
 	}
-	_, err = bindingStorage.Create(ctx, &binding)
+	_, err = bindingStorage.Create(ctx, &binding, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = bindingStorage.Create(ctx, &binding)
+	_, err = bindingStorage.Create(ctx, &binding, false)
 	if err == nil || !errors.IsConflict(err) {
 		t.Fatalf("expected resource conflict error, not: %v", err)
 	}
@@ -621,7 +621,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
-	_, err := storage.Create(ctx, validNewPod())
+	_, err := storage.Create(ctx, validNewPod(), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -630,7 +630,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 	_, err = bindingStorage.Create(ctx, &api.Binding{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 		Target:     api.ObjectReference{Name: "machine"},
-	})
+	}, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -680,10 +680,10 @@ func TestEtcdCreateBinding(t *testing.T) {
 	for k, test := range testCases {
 		storage, bindingStorage, _, server := newStorage(t)
 
-		if _, err := storage.Create(ctx, validNewPod()); err != nil {
+		if _, err := storage.Create(ctx, validNewPod(), false); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
 		}
-		if _, err := bindingStorage.Create(ctx, &test.binding); !test.errOK(err) {
+		if _, err := bindingStorage.Create(ctx, &test.binding, false); !test.errOK(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		} else if err == nil {
 			// If bind succeeded, verify Host field in pod's Spec.
@@ -705,7 +705,7 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
 
-	if _, err := storage.Create(ctx, validNewPod()); err != nil {
+	if _, err := storage.Create(ctx, validNewPod(), false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
