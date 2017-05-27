@@ -31,6 +31,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"net/url"
 )
 
 type targetHTTPHandler struct {
@@ -76,6 +77,17 @@ func (m *fakeRequestContextMapper) Get(req *http.Request) (genericapirequest.Con
 
 func (*fakeRequestContextMapper) Update(req *http.Request, context genericapirequest.Context) error {
 	return nil
+}
+
+type mockedRouter struct {
+	destinationHost string
+}
+
+func (r *mockedRouter) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+	return &url.URL{
+		Scheme: "https",
+		Host:   r.destinationHost,
+	}, nil
 }
 
 func TestProxyHandler(t *testing.T) {
@@ -159,15 +171,15 @@ func TestProxyHandler(t *testing.T) {
 		func() {
 			handler := &proxyHandler{
 				localDelegate: http.NewServeMux(),
+				routing:       &mockedRouter{destinationHost: targetServer.Listener.Addr().String()},
 			}
 			handler.contextMapper = &fakeRequestContextMapper{user: tc.user}
 			server := httptest.NewServer(handler)
 			defer server.Close()
 
 			if tc.apiService != nil {
-				handler.updateAPIService(tc.apiService, tc.apiService.Spec.Service.Name+"."+tc.apiService.Spec.Service.Namespace+".svc")
+				handler.updateAPIService(tc.apiService)
 				curr := handler.handlingInfo.Load().(proxyHandlingInfo)
-				curr.destinationHost = targetServer.Listener.Addr().String()
 				handler.handlingInfo.Store(curr)
 			}
 

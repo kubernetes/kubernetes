@@ -68,6 +68,8 @@ type ServerRunOptions struct {
 
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
+
+	EnableAggregatorRouting bool
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
@@ -216,5 +218,8 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"client certificate used to prove the identity of the aggragator or kube-apiserver when it proxies requests to a user api-server")
 	fs.StringVar(&s.ProxyClientKeyFile, "proxy-client-key-file", s.ProxyClientKeyFile,
 		"client certificate key used to prove the identity of the aggragator or kube-apiserver when it proxies requests to a user api-server")
+
+	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
+		"Turns on aggregator routing requests to endoints IP rather than cluster IP.")
 
 }

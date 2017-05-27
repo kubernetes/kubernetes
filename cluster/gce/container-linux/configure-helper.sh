@@ -810,6 +810,7 @@ function start-kube-apiserver {
   params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
   params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
   params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
+  params+=" --enable-aggregator-routing=true"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
     params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
   fi
