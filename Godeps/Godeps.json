@@ -962,6 +962,11 @@
 			"Rev": "e30f1e79f3cd72542f2026ceec18d3bd67ab859c"
 		},
 		{
+			"ImportPath": "github.com/docker/libnetwork/ipvs",
+			"Comment": "v0.8.0-dev.2-787-gbed38de",
+			"Rev": "bed38de9bbb7c90b40bce6d68270046552d6d735"
+		},
+		{
 			"ImportPath": "github.com/docker/spdystream",
 			"Rev": "449fdfce4d962303d702fec724ef0ad181c92528"
 		},
@@ -2435,6 +2440,10 @@
 		{
 			"ImportPath": "github.com/vishvananda/netlink/nl",
 			"Rev": "1e2e08e8a2dcdacaae3f14ac44c5cfa31361f270"
+		},
+		{
+			"ImportPath": "github.com/vishvananda/netns",
+			"Rev": "54f0e4339ce73702a0607f49922aaa1e749b418d"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi",
