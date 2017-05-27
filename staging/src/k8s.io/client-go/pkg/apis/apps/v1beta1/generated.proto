@@ -244,7 +244,7 @@ message RollingUpdateDeployment {
   // that the total number of pods available at all times during the update is at
   // least 70% of desired pods.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 0;
 
   // The maximum number of pods that can be scheduled above the desired number of
   // pods.
