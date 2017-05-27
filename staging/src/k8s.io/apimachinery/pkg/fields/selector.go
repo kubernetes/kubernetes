@@ -222,7 +222,7 @@ var valueEscaper = strings.NewReplacer(
 	`=`, `\=`,
 )
 
-// Escapes an arbitrary literal string for use as a fieldSelector value
+// EscapeValue escapes an arbitrary literal string for use as a fieldSelector value
 func EscapeValue(s string) string {
 	return valueEscaper.Replace(s)
 }
@@ -245,7 +245,7 @@ func (i UnescapedRune) Error() string {
 	return fmt.Sprintf("invalid field selector: unescaped character in value: %v", i.r)
 }
 
-// Unescapes a fieldSelector value and returns the original literal value.
+// UnescapeValue unescapes a fieldSelector value and returns the original literal value.
 // May return the original string if it contains no escaped or special characters.
 func UnescapeValue(s string) (string, error) {
 	// if there's no escaping or special characters, just return to avoid allocation
@@ -307,12 +307,12 @@ func ParseSelector(selector string) (Selector, error) {
 		})
 }
 
-// Parses the selector and runs them through the given TransformFunc.
+// ParseAndTransformSelector parses the selector and runs them through the given TransformFunc.
 func ParseAndTransformSelector(selector string, fn TransformFunc) (Selector, error) {
 	return parseSelector(selector, fn)
 }
 
-// Function to transform selectors.
+// TransformFunc transforms selectors.
 type TransformFunc func(field, value string) (newField, newValue string, err error)
 
 // splitTerms returns the comma-separated terms contained in the given fieldSelector.
