@@ -42,6 +42,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubeapiserver/admission/configuration:all-srcs",
+    ],
     tags = ["automanaged"],
 )
