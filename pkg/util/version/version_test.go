@@ -27,7 +27,7 @@ type testItem struct {
 	equalsPrev bool
 }
 
-func testOne(v *Version, item, prev testItem) error {
+func testOne(v *Version, item testItem, prev testItem) error {
 	str := v.String()
 	if item.unparsed == "" {
 		if str != item.version {
@@ -48,9 +48,9 @@ func testOne(v *Version, item, prev testItem) error {
 		case cmp == -1:
 			return fmt.Errorf("unexpected ordering %q < %q", item.version, prev.version)
 		case cmp == 0 && !item.equalsPrev:
-			return fmt.Errorf("unexpected comparison %q == %q", item.version, item.version)
+			return fmt.Errorf("unexpected comparison %q == %q", item.version, prev.version)
 		case cmp == 1 && item.equalsPrev:
-			return fmt.Errorf("unexpected comparison %q != %q", item.version, item.version)
+			return fmt.Errorf("unexpected comparison %q != %q", item.version, prev.version)
 		}
 	}
 
