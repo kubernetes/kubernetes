@@ -40,12 +40,10 @@ const (
 	configKey                = "schedulingPolicy"
 	policyConfigMapNamespace = "kube-federation-scheduling-policy"
 
-	// Lower and upper bounds on policy engine query retry delays. The actual
+	// Default backoff delay for policy engine query retries. The actual
 	// backoff implementation is handled by k8s.io/apiserver/pkg/util/webhook.
-	// The defaultRetryBackoff is used if the admission controller
-	// configuration does not specify one.
-	minRetryBackoff     = time.Millisecond
-	maxRetryBackoff     = time.Second * 60
+	// If the admission controller config file does not specify a backoff, this
+	// one is used.
 	defaultRetryBackoff = time.Millisecond * 100
 )
 
@@ -193,7 +191,7 @@ func loadConfig(file io.Reader) (*admissionConfig, error) {
 	}
 
 	if len(cfg.Kubeconfig) == 0 {
-		return nil, fmt.Errorf("kubeconfig must specify path")
+		return nil, fmt.Errorf("kubeconfig path must not be empty")
 	}
 
 	if cfg.RetryBackoff == 0 {
@@ -201,9 +199,10 @@ func loadConfig(file io.Reader) (*admissionConfig, error) {
 	} else {
 		// Scale up value from config (which is unmarshalled as ns).
 		cfg.RetryBackoff *= time.Millisecond
-		if cfg.RetryBackoff < minRetryBackoff || cfg.RetryBackoff > maxRetryBackoff {
-			return nil, fmt.Errorf("retryBackoff must be between %v and %v but got %v", minRetryBackoff, maxRetryBackoff, cfg.RetryBackoff)
-		}
+	}
+
+	if cfg.RetryBackoff.Nanoseconds() < 0 {
+		return nil, fmt.Errorf("retryBackoff must not be negative")
 	}
 
 	return &cfg, nil
