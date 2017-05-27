@@ -1287,12 +1287,9 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 
 			// Make sure we didn't leak the health check node port.
-			for name, ips := range jig.GetEndpointNodes(svc) {
-				_, fail, status := jig.TestHTTPHealthCheckNodePort(ips[0], healthCheckNodePort, "/healthz", 5)
-				if fail < 2 {
-					framework.Failf("Health check node port %v not released on node %v: %v", healthCheckNodePort, name, status)
-				}
-				break
+			threshold := 2
+			for _, ips := range jig.GetEndpointNodes(svc) {
+				Expect(jig.TestHTTPHealthCheckNodePort(ips[0], healthCheckNodePort, "/healthz", framework.KubeProxyEndpointLagTimeout, false, threshold)).NotTo(HaveOccurred())
 			}
 			Expect(cs.Core().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
 		}()
@@ -1379,16 +1376,12 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 			// HealthCheck should pass only on the node where num(endpoints) > 0
 			// All other nodes should fail the healthcheck on the service healthCheckNodePort
 			for n, publicIP := range ips {
+				// Make sure the loadbalancer picked up the health check change.
+				// Confirm traffic can reach backend through LB before checking healthcheck nodeport.
+				jig.TestReachableHTTP(ingressIP, svcTCPPort, framework.KubeProxyLagTimeout)
 				expectedSuccess := nodes.Items[n].Name == endpointNodeName
 				framework.Logf("Health checking %s, http://%s:%d%s, expectedSuccess %v", nodes.Items[n].Name, publicIP, healthCheckNodePort, path, expectedSuccess)
-				pass, fail, err := jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, path, 5)
-				if expectedSuccess && pass < threshold {
-					framework.Failf("Expected %d successes on %v%v, got %d, err %v", threshold, endpointNodeName, path, pass, err)
-				} else if !expectedSuccess && fail < threshold {
-					framework.Failf("Expected %d failures on %v%v, got %d, err %v", threshold, endpointNodeName, path, fail, err)
-				}
-				// Make sure the loadbalancer picked up the helth check change
-				jig.TestReachableHTTP(ingressIP, svcTCPPort, framework.KubeProxyLagTimeout)
+				Expect(jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, path, framework.KubeProxyEndpointLagTimeout, expectedSuccess, threshold)).NotTo(HaveOccurred())
 			}
 			framework.ExpectNoError(framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, namespace, serviceName))
 		}
