@@ -32,12 +32,12 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
-        "//pkg/volume/util:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/libopenstorage/openstorage/api",
         "//vendor:github.com/libopenstorage/openstorage/api/client",
