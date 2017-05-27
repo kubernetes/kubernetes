@@ -738,6 +738,11 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap proxyEndpointsMap, 
 				glog.V(4).Infof("Stale endpoint %v -> %v", svcPortName, ep.endpoint)
 				staleEndpoints[endpointServicePair{endpoint: ep.endpoint, servicePortName: svcPortName}] = true
 			}
+
+			// Reset local endpoints count to 0 for existing OnlyLocal services.
+			if ep.isLocal {
+				hcEndpoints[svcPort.NamespacedName] = 0
+			}
 		}
 	}
 }
