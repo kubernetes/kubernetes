@@ -35,6 +35,7 @@ import (
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/clusterselector"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
@@ -765,7 +766,14 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		desiredIngress.Spec = *objSpecCopy
 		glog.V(4).Infof("Desired Ingress: %v", desiredIngress)
 
-		if !clusterIngressFound {
+		send, err := clusterselector.SendToCluster(cluster.Labels, desiredIngress.ObjectMeta.Annotations)
+		if err != nil {
+			glog.Errorf("Error processing ClusterSelector cluster: %s for Ingress map: %s error: %s", cluster.Name, key, err.Error())
+			return
+		}
+
+		switch {
+		case !clusterIngressFound && send:
 			glog.V(4).Infof("No existing Ingress %s in cluster %s - checking if appropriate to queue a create operation", ingress, cluster.Name)
 			// We can't supply server-created fields when creating a new object.
 			desiredIngress.ObjectMeta = util.DeepCopyRelevantObjectMeta(baseIngress.ObjectMeta)
@@ -799,7 +807,15 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 			} else {
 				glog.V(4).Infof("No annotation %q exists on ingress %q in federation and waiting for ingress in cluster %s. Not queueing create operation for ingress until annotation exists", staticIPNameKeyWritable, ingress, firstClusterName)
 			}
-		} else {
+		case clusterIngressFound && !send:
+			glog.V(5).Infof("Removing Ingress: %s from cluster: %s reason: cluster selectors do not match: %-v %-v", key, cluster.Name, cluster.ObjectMeta.Labels, desiredIngress.ObjectMeta.Annotations[federationapi.FederationClusterSelectorAnnotation])
+			operations = append(operations, util.FederatedOperation{
+				Type:        util.OperationTypeDelete,
+				Obj:         desiredIngress,
+				ClusterName: cluster.Name,
+				Key:         key,
+			})
+		case clusterIngressFound && send:
 			clusterIngress := clusterIngressObj.(*extensionsv1beta1.Ingress)
 			glog.V(4).Infof("Found existing Ingress %s in cluster %s - checking if update is required (in either direction)", ingress, cluster.Name)
 			clusterIPName, clusterIPNameExists := clusterIngress.ObjectMeta.Annotations[staticIPNameKeyReadonly]
