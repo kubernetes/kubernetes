@@ -331,6 +331,7 @@ func (IngressTLS) SwaggerDoc() map[string]string {
 }
 
 var map_NetworkPolicy = map[string]string{
+	"":         "NetworkPolicy describes what network traffic is allowed for a set of Pods",
 	"metadata": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
 	"spec":     "Specification of the desired behavior for this NetworkPolicy.",
 }
@@ -379,7 +380,7 @@ func (NetworkPolicyPort) SwaggerDoc() map[string]string {
 
 var map_NetworkPolicySpec = map[string]string{
 	"podSelector": "Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods.  In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.",
-	"ingress":     "List of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if namespace.networkPolicy.ingress.isolation is undefined and cluster policy allows it, OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not affect ingress isolation. If this field is present and contains at least one rule, this policy allows any traffic which matches at least one of the ingress rules in this list.",
+	"ingress":     "List of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default).",
 }
 
 func (NetworkPolicySpec) SwaggerDoc() map[string]string {

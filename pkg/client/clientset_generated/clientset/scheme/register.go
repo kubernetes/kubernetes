@@ -34,6 +34,7 @@ import (
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	certificatesv1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	networkingv1 "k8s.io/kubernetes/pkg/apis/networking/v1"
 	policyv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
@@ -79,6 +80,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	batchv2alpha1.AddToScheme(scheme)
 	certificatesv1beta1.AddToScheme(scheme)
 	extensionsv1beta1.AddToScheme(scheme)
+	networkingv1.AddToScheme(scheme)
 	policyv1beta1.AddToScheme(scheme)
 	rbacv1beta1.AddToScheme(scheme)
 	rbacv1alpha1.AddToScheme(scheme)

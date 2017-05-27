@@ -532,6 +532,7 @@ message IngressTLS {
   optional string secretName = 2;
 }
 
+// NetworkPolicy describes what network traffic is allowed for a set of Pods
 message NetworkPolicy {
   // Standard object's metadata.
   // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
@@ -612,13 +613,12 @@ message NetworkPolicySpec {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
   // List of ingress rules to be applied to the selected pods.
-  // Traffic is allowed to a pod if namespace.networkPolicy.ingress.isolation is undefined and cluster policy allows it,
+  // Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod
   // OR if the traffic source is the pod's local node,
   // OR if the traffic matches at least one ingress rule across all of the NetworkPolicy
   // objects whose podSelector matches the pod.
-  // If this field is empty then this NetworkPolicy does not affect ingress isolation.
-  // If this field is present and contains at least one rule, this policy allows any traffic
-  // which matches at least one of the ingress rules in this list.
+  // If this field is empty then this NetworkPolicy does not allow any traffic
+  // (and serves solely to ensure that the pods it selects are isolated by default).
   // +optional
   repeated NetworkPolicyIngressRule ingress = 2;
 }
