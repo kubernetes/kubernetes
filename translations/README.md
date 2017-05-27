@@ -23,7 +23,7 @@ Once the strings are wrapped, you can extract strings from go files using
 the `go-xgettext` command which can be installed with:
 
 ```console
-go get github.com/gosexy/gettext/tree/master/go-xgettext
+go get github.com/gosexy/gettext/go-xgettext
 ```
 
 Once that's installed you can run `hack/update-translations.sh`, which
