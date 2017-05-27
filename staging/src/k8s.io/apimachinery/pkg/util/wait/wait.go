@@ -19,6 +19,7 @@ package wait
 import (
 	"errors"
 	"math/rand"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -35,6 +36,15 @@ var ForeverTestTimeout = time.Second * 30
 
 // NeverStop may be passed to Until to make it never stop.
 var NeverStop <-chan struct{} = make(chan struct{})
+
+// StartUntil starts f in a new goroutine and calls done once f has finished.
+func StartUntil(stopCh <-chan struct{}, wg *sync.WaitGroup, f func(stopCh <-chan struct{})) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		f(stopCh)
+	}()
+}
 
 // Forever calls f every period for ever.
 //
