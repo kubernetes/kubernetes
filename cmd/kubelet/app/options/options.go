@@ -263,7 +263,8 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	// TODO(#40229): Remove the docker-exec-handler flag.
 	fs.StringVar(&c.DockerExecHandlerName, "docker-exec-handler", c.DockerExecHandlerName, "Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'.")
 	fs.MarkDeprecated("docker-exec-handler", "this flag will be removed and only the 'native' handler will be supported in the future.")
-	fs.StringVar(&c.NonMasqueradeCIDR, "non-masquerade-cidr", c.NonMasqueradeCIDR, "Traffic to IPs outside this range will use IP masquerade.")
+	fs.StringVar(&c.NonMasqueradeCIDR, "non-masquerade-cidr", c.NonMasqueradeCIDR, "Traffic to IPs outside this range will use IP masquerade. Set to '0.0.0.0/0' to never masquerade.")
+	fs.MarkDeprecated("non-masquerade-cidr", "will be removed in a future version")
 	fs.StringVar(&c.PodCIDR, "pod-cidr", "", "The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.")
 	fs.StringVar(&c.ResolverConfig, "resolv-conf", c.ResolverConfig, "Resolver configuration file used as the basis for the container DNS resolution configuration.")
 	fs.BoolVar(&c.CPUCFSQuota, "cpu-cfs-quota", c.CPUCFSQuota, "Enable CPU CFS quota enforcement for containers that specify CPU limits")
