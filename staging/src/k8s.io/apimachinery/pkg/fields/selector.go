@@ -48,6 +48,9 @@ type Selector interface {
 
 	// String returns a human readable string that represents this selector.
 	String() string
+
+	// Len returns how much item this seletor has
+	Len() int
 }
 
 // Everything returns a selector that matches all fields.
@@ -66,6 +69,7 @@ func (t *hasTerm) Matches(ls Fields) bool {
 func (t *hasTerm) Empty() bool {
 	return false
 }
+
 
 func (t *hasTerm) RequiresExactMatch(field string) (value string, found bool) {
 	if t.field == field {
@@ -92,6 +96,10 @@ func (t *hasTerm) Requirements() Requirements {
 
 func (t *hasTerm) String() string {
 	return fmt.Sprintf("%v=%v", t.field, EscapeValue(t.value))
+}
+
+func (t *hasTerm) Len() int {
+	return 1
 }
 
 type notHasTerm struct {
@@ -128,6 +136,10 @@ func (t *notHasTerm) Requirements() Requirements {
 
 func (t *notHasTerm) String() string {
 	return fmt.Sprintf("%v!=%v", t.field, EscapeValue(t.value))
+}
+
+func (t *notHasTerm) Len() int {
+	return 1
 }
 
 type andTerm []Selector
@@ -197,6 +209,9 @@ func (t andTerm) String() string {
 	return strings.Join(terms, ",")
 }
 
+func (t andTerm) Len() int {
+	return len([]Selector(t))
+}
 // SelectorFromSet returns a Selector which will match exactly the given Set. A
 // nil Set is considered equivalent to Everything().
 func SelectorFromSet(ls Set) Selector {

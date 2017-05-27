@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -399,6 +400,102 @@ func TestPortForwardLocation(t *testing.T) {
 		}
 		if !reflect.DeepEqual(loc, tc.expectedURL) {
 			t.Errorf("expected %v, got %v", tc.expectedURL, loc)
+		}
+	}
+}
+
+func TestPodFastPredicate(t *testing.T) {
+	table := map[string]struct {
+		labelSelector, fieldSelector string
+		labels                       labels.Set
+		fields                       fields.Set
+		obj                          runtime.Object
+		shouldMatch                  bool
+	}{
+		"A": {
+			labelSelector: "",
+			fieldSelector: "spec.nodeName=bar",
+			labels:        labels.Set{"name": "foo"},
+			fields:        fields.Set{"spec.nodeName": "bar"},
+			obj: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+					},
+				},
+				Spec: api.PodSpec{
+					NodeName: "bar",
+				},
+			},
+			shouldMatch: true,
+		},
+		"B": {
+			labelSelector: "name=foo",
+			fieldSelector: "spec.nodeName=bar",
+			labels:        labels.Set{"name": "foo"},
+			fields:        fields.Set{},
+			obj: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+					},
+				},
+			},
+			shouldMatch: false,
+		},
+		"C": {
+			fieldSelector: "status.phase=12345,spec.nodeName=bar",
+			labels:        labels.Set{"name": "foo"},
+			fields:        fields.Set{"status.phase": "12345", "spec.nodeName": "bar"},
+			obj: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+					},
+				},
+				Spec: api.PodSpec{
+					NodeName: "bar",
+				},
+				Status: api.PodStatus{
+					Phase: api.PodPhase("123145"),
+				},
+			},
+			shouldMatch: true,
+		},
+		"D": {
+			fieldSelector: "spec.nodeName!=12345",
+			labels:        labels.Set{},
+			fields:        fields.Set{"spec.nodeName": "12345"},
+			obj: &api.Pod{
+				Spec: api.PodSpec{
+					NodeName: "12345",
+				},
+			},
+			shouldMatch: false,
+		},
+	}
+
+	for name, item := range table {
+		parsedLabel, err := labels.Parse(item.labelSelector)
+		if err != nil {
+			panic(err)
+		}
+		parsedField, err := fields.ParseSelector(item.fieldSelector)
+		if err != nil {
+			panic(err)
+		}
+		pfp := &PodFastPredicate{
+			SelectionPredicate: storage.SelectionPredicate{
+				Label: parsedLabel,
+				Field: parsedField,
+				GetAttrs: func(runtime.Object) (label labels.Set, field fields.Set, err error) {
+					return item.labels, item.fields, nil
+				},
+			},
+		}
+		got, err := pfp.Matches(item.obj)
+		if e, a := item.shouldMatch, got; e != a {
+			t.Errorf("%v: expected %v, got %v", name, e, a)
 		}
 	}
 }
