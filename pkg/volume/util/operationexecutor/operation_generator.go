@@ -70,7 +70,7 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 // OperationGenerator interface that extracts out the functions from operation_executor to make it dependency injectable
 type OperationGenerator interface {
 	// Generates the MountVolume function needed to perform the mount of a volume plugin
-	GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (func() error, error)
+	GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) (func() error, error)
 
 	// Generates the UnmountVolume function needed to perform the unmount of a volume plugin
 	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (func() error, error)
@@ -354,7 +354,8 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 func (og *operationGenerator) GenerateMountVolumeFunc(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
-	actualStateOfWorld ActualStateOfWorldMounterUpdater) (func() error, error) {
+	actualStateOfWorld ActualStateOfWorldMounterUpdater,
+	isRemount bool) (func() error, error) {
 	// Get mounter plugin
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
@@ -456,7 +457,11 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			return detailedErr
 		}
 
-		glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.SetUp succeeded", ""))
+		verbosity := glog.Level(1)
+		if isRemount {
+			verbosity = glog.Level(7)
+		}
+		glog.V(verbosity).Infof(volumeToMount.GenerateMsgDetailed("MountVolume.SetUp succeeded", ""))
 
 		// Update actual state of world
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(
