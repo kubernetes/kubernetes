@@ -10,7 +10,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["controller.go"],
+    srcs = [
+        "adapter_fake.go",
+        "controller.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",

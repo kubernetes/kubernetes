@@ -356,10 +356,34 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		return statusError
 	}
 
+	schedObjsAccessor := func(adapter federatedtypes.FederatedTypeAdapter, fedObj pkgruntime.Object,
+		toScheduleObjs map[string]pkgruntime.Object) (map[string]pkgruntime.Object, error) {
+		scheduledObjs := make(map[string]pkgruntime.Object)
+		if adapter.ImplementsReconcilePlugin() {
+			reconcilePlugin, ok := adapter.(federatedtypes.ReconcilePlugin)
+			if !ok {
+				return nil, fmt.Errorf("%s adapter does not implement required plugin interface", adapter.Kind())
+			}
+			var err error
+			// The adapter implementation can choose to update the federated object status, if need be.
+			scheduledObjs, err = reconcilePlugin.ReconcileHook(fedObj, toScheduleObjs)
+			if err != nil {
+				return nil, fmt.Errorf("Failure executing Reconcile Hook on %s %q: %v", adapter.Kind(), key, err)
+			}
+		} else {
+			for clusterName := range toScheduleObjs {
+				// The same object gets scheduled into all clusters.
+				desiredObj := adapter.Copy(fedObj)
+				scheduledObjs[clusterName] = desiredObj
+			}
+		}
+		return scheduledObjs, nil
+	}
+
 	operationsAccessor := func(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, obj pkgruntime.Object) ([]util.FederatedOperation, error) {
 		operations, err := clusterOperations(adapter, clusters, obj, key, func(clusterName string) (interface{}, bool, error) {
 			return s.informer.GetTargetStore().GetByKey(clusterName, key)
-		}, clusterselector.SendToCluster)
+		}, clusterselector.SendToCluster, schedObjsAccessor)
 		if err != nil {
 			s.eventRecorder.Eventf(obj, api.EventTypeWarning, "FedClusterOperationsError", "Error obtaining sync operations for %s: %s error: %s", kind, key, err.Error())
 		}
@@ -458,52 +482,90 @@ func syncToClusters(clustersAccessor clustersAccessorFunc, operationsAccessor op
 
 type clusterObjectAccessorFunc func(clusterName string) (interface{}, bool, error)
 type clusterSelectorFunc func(map[string]string, map[string]string) (bool, error)
+type schedObjsAccessorFunc func(federatedtypes.FederatedTypeAdapter, pkgruntime.Object,
+	map[string]pkgruntime.Object) (map[string]pkgruntime.Object, error)
 
 // clusterOperations returns the list of operations needed to synchronize the state of the given object to the provided clusters
-func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, obj pkgruntime.Object, key string, accessor clusterObjectAccessorFunc, selector clusterSelectorFunc) ([]util.FederatedOperation, error) {
-	// The data should not be modified.
-	desiredObj := adapter.Copy(obj)
-	objMeta := adapter.ObjectMeta(desiredObj)
+func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, fedObj pkgruntime.Object,
+	key string, accessor clusterObjectAccessorFunc, selector clusterSelectorFunc, shedObjectsAccessor schedObjsAccessorFunc) ([]util.FederatedOperation, error) {
+	fedobjAnnotations := adapter.ObjectMeta(fedObj).Annotations
 	kind := adapter.Kind()
 	operations := make([]util.FederatedOperation, 0)
+	clustersCurrentStatus, toScheduleObjs, err := getCurrentClusterObjs(key, kind, clusters, accessor, selector, fedobjAnnotations)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, cluster := range clusters {
-		clusterObj, found, err := accessor(cluster.Name)
-		if err != nil {
-			wrappedErr := fmt.Errorf("Failed to get %s %q from cluster %q: %v", adapter.Kind(), key, cluster.Name, err)
-			runtime.HandleError(wrappedErr)
-			return nil, wrappedErr
-		}
+	scheduledObjs, err := shedObjectsAccessor(adapter, fedObj, toScheduleObjs)
+	if err != nil {
+		return nil, err
+	}
 
-		send, err := selector(cluster.Labels, objMeta.Annotations)
-		if err != nil {
-			glog.Errorf("Error processing ClusterSelector cluster: %s for %s map: %s error: %s", cluster.Name, kind, key, err.Error())
-			return nil, err
-		} else if !send {
-			glog.V(5).Infof("Skipping cluster: %s for %s: %s reason: cluster selectors do not match: %-v %-v", cluster.Name, kind, key, cluster.ObjectMeta.Labels, objMeta.Annotations[federationapi.FederationClusterSelectorAnnotation])
-		}
-
+	for clusterName, existing := range clustersCurrentStatus {
 		var operationType util.FederatedOperationType = ""
+		desiredClusterObj, scheduled := scheduledObjs[clusterName]
+		currentClusterObj := toScheduleObjs[clusterName]
+		if desiredClusterObj == nil {
+			//reconcile plugin might choose to remove an object
+			scheduled = false
+		}
 		switch {
-		case found && send:
-			clusterObj := clusterObj.(pkgruntime.Object)
-			if !adapter.Equivalent(desiredObj, clusterObj) {
+		case existing && scheduled:
+			if !adapter.Equivalent(currentClusterObj, desiredClusterObj) {
 				operationType = util.OperationTypeUpdate
 			}
-		case found && !send:
-			operationType = util.OperationTypeDelete
-		case !found && send:
+		case !existing && scheduled:
 			operationType = util.OperationTypeAdd
+		case existing && !scheduled:
+			operationType = util.OperationTypeDelete
 		}
 
 		if len(operationType) > 0 {
 			operations = append(operations, util.FederatedOperation{
 				Type:        operationType,
-				Obj:         desiredObj,
-				ClusterName: cluster.Name,
+				Obj:         desiredClusterObj,
+				ClusterName: clusterName,
 				Key:         key,
 			})
 		}
 	}
 	return operations, nil
+}
+
+func getCurrentClusterObjs(key, kind string, clusters []*federationapi.Cluster, accessor clusterObjectAccessorFunc,
+	selector clusterSelectorFunc, annotations map[string]string) (map[string]bool, map[string]pkgruntime.Object, error) {
+	clustersCurrentStatus := make(map[string]bool)
+	selectedClusterObjs := make(map[string]pkgruntime.Object)
+	for _, cluster := range clusters {
+		clusterName := cluster.Name
+		clusterObj, found, err := accessor(clusterName)
+		if err != nil {
+			wrappedErr := fmt.Errorf("Failed to get %s %q from cluster %q: %v", kind, key, clusterName, err)
+			runtime.HandleError(wrappedErr)
+			return nil, nil, wrappedErr
+		}
+
+		selected, err := selector(cluster.Labels, annotations)
+		if err != nil {
+			glog.Errorf("Error processing ClusterSelector cluster: %s for %s map: %s error: %s", clusterName, kind, key, err.Error())
+			return nil, nil, err
+		} else if !selected {
+			glog.V(5).Infof("Skipping cluster: %s for %s: %s reason: cluster selectors do not match: %-v %-v", clusterName, kind, key, cluster.ObjectMeta.Labels, annotations[federationapi.FederationClusterSelectorAnnotation])
+		}
+
+		switch {
+		case found:
+			clustersCurrentStatus[clusterName] = true
+			if selected {
+				selectedClusterObjs[cluster.Name] = clusterObj.(pkgruntime.Object)
+			}
+		case !found && selected:
+			clustersCurrentStatus[clusterName] = false
+			// Nil indication is for the reconcile plugin
+			// to understand that this cluster exists without object.
+			selectedClusterObjs[clusterName] = nil
+		}
+	}
+
+	return clustersCurrentStatus, selectedClusterObjs, nil
 }
