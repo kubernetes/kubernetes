@@ -50,6 +50,10 @@ const (
 	// liberal. Fix tracked in #20567.
 	KubeProxyLagTimeout = 5 * time.Minute
 
+	// KubeProxyEndpointLagTimeout is the maximum time a kube-proxy daemon on a node is allowed
+	// to not notice an Endpoint update.
+	KubeProxyEndpointLagTimeout = 30 * time.Second
+
 	// LoadBalancerLagTimeoutDefault is the maximum time a load balancer is allowed to
 	// not respond after creation.
 	LoadBalancerLagTimeoutDefault = 2 * time.Minute
@@ -752,18 +756,24 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 	return false, fmt.Errorf("Unexpected HTTP response code %s from health check responder at %s", resp.Status, url)
 }
 
-func (j *ServiceTestJig) TestHTTPHealthCheckNodePort(host string, port int, request string, tries int) (pass, fail int, statusMsg string) {
-	for i := 0; i < tries; i++ {
-		success, err := testHTTPHealthCheckNodePort(host, port, request)
-		if success {
-			pass++
-		} else {
-			fail++
+func (j *ServiceTestJig) TestHTTPHealthCheckNodePort(host string, port int, request string, timeout time.Duration, expectSucceed bool, threshold int) error {
+	count := 0
+	condition := func() (bool, error) {
+		success, _ := testHTTPHealthCheckNodePort(host, port, request)
+		if success && expectSucceed ||
+			!success && !expectSucceed {
+			count++
 		}
-		statusMsg += fmt.Sprintf("\nAttempt %d Error %v", i, err)
-		time.Sleep(1 * time.Second)
+		if count >= threshold {
+			return true, nil
+		}
+		return false, nil
 	}
-	return pass, fail, statusMsg
+
+	if err := wait.PollImmediate(time.Second, timeout, condition); err != nil {
+		return fmt.Errorf("error waiting for healthCheckNodePort: expected at least %d succeed=%v on %v%v, got %d", threshold, expectSucceed, host, port, count)
+	}
+	return nil
 }
 
 // Simple helper class to avoid too much boilerplate in tests
