@@ -102,11 +102,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMap"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -192,11 +192,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Event"
+      "group": "",
+      "version": "v1",
+      "kind": "Event"
      }
     },
     "parameters": [
@@ -326,11 +326,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     },
     "post": {
@@ -371,11 +371,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "POST",
+     "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     },
     "parameters": [
@@ -463,11 +463,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMap"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap"
      }
     },
     "post": {
@@ -508,11 +508,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "POST",
+     "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMap"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap"
      }
     },
     "delete": {
@@ -587,11 +587,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-action": "deletecollection",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMap"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -657,11 +657,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMap"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap"
      }
     },
     "put": {
@@ -702,11 +702,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMap"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap"
      }
     },
     "delete": {
@@ -768,11 +768,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-action": "delete",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMap"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap"
      }
     },
     "patch": {
@@ -815,11 +815,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMap"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -923,11 +923,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Event"
+      "group": "",
+      "version": "v1",
+      "kind": "Event"
      }
     },
     "post": {
@@ -968,11 +968,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "POST",
+     "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Event"
+      "group": "",
+      "version": "v1",
+      "kind": "Event"
      }
     },
     "delete": {
@@ -1047,11 +1047,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-action": "deletecollection",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Event"
+      "group": "",
+      "version": "v1",
+      "kind": "Event"
      }
     },
     "parameters": [
@@ -1117,11 +1117,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Event"
+      "group": "",
+      "version": "v1",
+      "kind": "Event"
      }
     },
     "put": {
@@ -1162,11 +1162,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Event"
+      "group": "",
+      "version": "v1",
+      "kind": "Event"
      }
     },
     "delete": {
@@ -1228,11 +1228,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-action": "delete",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Event"
+      "group": "",
+      "version": "v1",
+      "kind": "Event"
      }
     },
     "patch": {
@@ -1275,11 +1275,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Event"
+      "group": "",
+      "version": "v1",
+      "kind": "Event"
      }
     },
     "parameters": [
@@ -1383,11 +1383,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Secret"
+      "group": "",
+      "version": "v1",
+      "kind": "Secret"
      }
     },
     "post": {
@@ -1428,11 +1428,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "POST",
+     "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Secret"
+      "group": "",
+      "version": "v1",
+      "kind": "Secret"
      }
     },
     "delete": {
@@ -1507,11 +1507,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-action": "deletecollection",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Secret"
+      "group": "",
+      "version": "v1",
+      "kind": "Secret"
      }
     },
     "parameters": [
@@ -1577,11 +1577,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Secret"
+      "group": "",
+      "version": "v1",
+      "kind": "Secret"
      }
     },
     "put": {
@@ -1622,11 +1622,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Secret"
+      "group": "",
+      "version": "v1",
+      "kind": "Secret"
      }
     },
     "delete": {
@@ -1688,11 +1688,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-action": "delete",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Secret"
+      "group": "",
+      "version": "v1",
+      "kind": "Secret"
      }
     },
     "patch": {
@@ -1735,11 +1735,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Secret"
+      "group": "",
+      "version": "v1",
+      "kind": "Secret"
      }
     },
     "parameters": [
@@ -1843,11 +1843,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "post": {
@@ -1888,11 +1888,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "POST",
+     "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "delete": {
@@ -1967,11 +1967,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-action": "deletecollection",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "parameters": [
@@ -2037,11 +2037,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "put": {
@@ -2082,11 +2082,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "delete": {
@@ -2148,11 +2148,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-action": "delete",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "patch": {
@@ -2195,11 +2195,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "parameters": [
@@ -2257,11 +2257,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "put": {
@@ -2302,11 +2302,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "patch": {
@@ -2349,11 +2349,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "parameters": [
@@ -2427,11 +2427,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     },
     "put": {
@@ -2472,11 +2472,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     },
     "delete": {
@@ -2538,11 +2538,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-action": "delete",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     },
     "patch": {
@@ -2585,11 +2585,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     },
     "parameters": [
@@ -2649,11 +2649,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     },
     "parameters": [
@@ -2703,11 +2703,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     },
     "put": {
@@ -2748,11 +2748,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     },
     "patch": {
@@ -2795,11 +2795,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     },
     "parameters": [
@@ -2851,11 +2851,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Secret"
+      "group": "",
+      "version": "v1",
+      "kind": "Secret"
      }
     },
     "parameters": [
@@ -2941,11 +2941,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "parameters": [
@@ -3031,11 +3031,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMap"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -3121,11 +3121,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Event"
+      "group": "",
+      "version": "v1",
+      "kind": "Event"
      }
     },
     "parameters": [
@@ -3211,11 +3211,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     },
     "parameters": [
@@ -3301,11 +3301,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMap"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -3399,11 +3399,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-action": "watch",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMap"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -3505,11 +3505,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Event"
+      "group": "",
+      "version": "v1",
+      "kind": "Event"
      }
     },
     "parameters": [
@@ -3603,11 +3603,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-action": "watch",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Event"
+      "group": "",
+      "version": "v1",
+      "kind": "Event"
      }
     },
     "parameters": [
@@ -3709,11 +3709,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Secret"
+      "group": "",
+      "version": "v1",
+      "kind": "Secret"
      }
     },
     "parameters": [
@@ -3807,11 +3807,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-action": "watch",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Secret"
+      "group": "",
+      "version": "v1",
+      "kind": "Secret"
      }
     },
     "parameters": [
@@ -3913,11 +3913,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "parameters": [
@@ -4011,11 +4011,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-action": "watch",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "parameters": [
@@ -4117,11 +4117,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-action": "watch",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     },
     "parameters": [
@@ -4215,11 +4215,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Secret"
+      "group": "",
+      "version": "v1",
+      "kind": "Secret"
      }
     },
     "parameters": [
@@ -4305,11 +4305,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     },
     "parameters": [
@@ -4494,11 +4494,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -4584,11 +4584,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -4674,11 +4674,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -4808,11 +4808,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "post": {
@@ -4853,11 +4853,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "POST",
+     "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "delete": {
@@ -4932,11 +4932,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-action": "deletecollection",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -5002,11 +5002,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "put": {
@@ -5047,11 +5047,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "delete": {
@@ -5113,11 +5113,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-action": "delete",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "patch": {
@@ -5160,11 +5160,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -5222,11 +5222,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "put": {
@@ -5267,11 +5267,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "patch": {
@@ -5314,11 +5314,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -5422,11 +5422,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "post": {
@@ -5467,11 +5467,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "POST",
+     "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "delete": {
@@ -5546,11 +5546,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-action": "deletecollection",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -5616,11 +5616,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "put": {
@@ -5661,11 +5661,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "delete": {
@@ -5727,11 +5727,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-action": "delete",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "patch": {
@@ -5774,11 +5774,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -5846,11 +5846,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "POST",
+     "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DeploymentRollback"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DeploymentRollback"
      }
     },
     "parameters": [
@@ -5908,11 +5908,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Scale"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Scale"
      }
     },
     "put": {
@@ -5953,11 +5953,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Scale"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Scale"
      }
     },
     "patch": {
@@ -6000,11 +6000,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Scale"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Scale"
      }
     },
     "parameters": [
@@ -6062,11 +6062,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "put": {
@@ -6107,11 +6107,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "patch": {
@@ -6154,11 +6154,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -6262,11 +6262,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "post": {
@@ -6307,11 +6307,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "POST",
+     "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "delete": {
@@ -6386,11 +6386,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-action": "deletecollection",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -6456,11 +6456,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "put": {
@@ -6501,11 +6501,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "delete": {
@@ -6567,11 +6567,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-action": "delete",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "patch": {
@@ -6614,11 +6614,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -6676,11 +6676,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "put": {
@@ -6721,11 +6721,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "patch": {
@@ -6768,11 +6768,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -6876,11 +6876,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "post": {
@@ -6921,11 +6921,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "POST",
+     "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "delete": {
@@ -7000,11 +7000,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-action": "deletecollection",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -7070,11 +7070,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "put": {
@@ -7115,11 +7115,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "delete": {
@@ -7181,11 +7181,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-action": "delete",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "patch": {
@@ -7228,11 +7228,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -7290,11 +7290,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Scale"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Scale"
      }
     },
     "put": {
@@ -7335,11 +7335,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Scale"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Scale"
      }
     },
     "patch": {
@@ -7382,11 +7382,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Scale"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Scale"
      }
     },
     "parameters": [
@@ -7444,11 +7444,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "put": {
@@ -7489,11 +7489,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "patch": {
@@ -7536,11 +7536,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -7600,11 +7600,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -7690,11 +7690,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -7780,11 +7780,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -7870,11 +7870,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -7960,11 +7960,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -8058,11 +8058,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-action": "watch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -8164,11 +8164,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -8262,11 +8262,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-action": "watch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -8368,11 +8368,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -8466,11 +8466,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-action": "watch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -8572,11 +8572,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -8670,11 +8670,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-action": "watch",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -8776,11 +8776,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -8976,11 +8976,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "LIST",
+     "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
-      "Group": "federation",
-      "Version": "v1beta1",
-      "Kind": "Cluster"
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "Cluster"
      }
     },
     "post": {
@@ -9021,11 +9021,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "POST",
+     "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
-      "Group": "federation",
-      "Version": "v1beta1",
-      "Kind": "Cluster"
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "Cluster"
      }
     },
     "delete": {
@@ -9100,11 +9100,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETECOLLECTION",
+     "x-kubernetes-action": "deletecollection",
      "x-kubernetes-group-version-kind": {
-      "Group": "federation",
-      "Version": "v1beta1",
-      "Kind": "Cluster"
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "Cluster"
      }
     },
     "parameters": [
@@ -9162,11 +9162,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "GET",
+     "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
-      "Group": "federation",
-      "Version": "v1beta1",
-      "Kind": "Cluster"
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "Cluster"
      }
     },
     "put": {
@@ -9207,11 +9207,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "federation",
-      "Version": "v1beta1",
-      "Kind": "Cluster"
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "Cluster"
      }
     },
     "delete": {
@@ -9273,11 +9273,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "DELETE",
+     "x-kubernetes-action": "delete",
      "x-kubernetes-group-version-kind": {
-      "Group": "federation",
-      "Version": "v1beta1",
-      "Kind": "Cluster"
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "Cluster"
      }
     },
     "patch": {
@@ -9320,11 +9320,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PATCH",
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
-      "Group": "federation",
-      "Version": "v1beta1",
-      "Kind": "Cluster"
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "Cluster"
      }
     },
     "parameters": [
@@ -9384,11 +9384,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "PUT",
+     "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
-      "Group": "federation",
-      "Version": "v1beta1",
-      "Kind": "Cluster"
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "Cluster"
      }
     },
     "parameters": [
@@ -9440,11 +9440,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCHLIST",
+     "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
-      "Group": "federation",
-      "Version": "v1beta1",
-      "Kind": "Cluster"
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "Cluster"
      }
     },
     "parameters": [
@@ -9530,11 +9530,11 @@
        "description": "Unauthorized"
       }
      },
-     "x-kubernetes-action": "WATCH",
+     "x-kubernetes-action": "watch",
      "x-kubernetes-group-version-kind": {
-      "Group": "federation",
-      "Version": "v1beta1",
-      "Kind": "Cluster"
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "Cluster"
      }
     },
     "parameters": [
@@ -10321,9 +10321,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "federation",
-      "Version": "v1beta1",
-      "Kind": "Cluster"
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "Cluster"
      }
     ]
    },
@@ -10388,9 +10388,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "federation",
-      "Version": "v1beta1",
-      "Kind": "ClusterList"
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "ClusterList"
      }
     ]
    },
@@ -10650,9 +10650,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMap"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap"
      }
     ]
    },
@@ -10717,9 +10717,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ConfigMapList"
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMapList"
      }
     ]
    },
@@ -11086,9 +11086,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Event"
+      "group": "",
+      "version": "v1",
+      "kind": "Event"
      }
     ]
    },
@@ -11120,9 +11120,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "EventList"
+      "group": "",
+      "version": "v1",
+      "kind": "EventList"
      }
     ]
    },
@@ -11553,9 +11553,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Namespace"
+      "group": "",
+      "version": "v1",
+      "kind": "Namespace"
      }
     ]
    },
@@ -11587,9 +11587,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "NamespaceList"
+      "group": "",
+      "version": "v1",
+      "kind": "NamespaceList"
      }
     ]
    },
@@ -12322,9 +12322,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Secret"
+      "group": "",
+      "version": "v1",
+      "kind": "Secret"
      }
     ]
    },
@@ -12389,9 +12389,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "SecretList"
+      "group": "",
+      "version": "v1",
+      "kind": "SecretList"
      }
     ]
    },
@@ -12496,9 +12496,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "Service"
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
      }
     ]
    },
@@ -12530,9 +12530,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "",
-      "Version": "v1",
-      "Kind": "ServiceList"
+      "group": "",
+      "version": "v1",
+      "kind": "ServiceList"
      }
     ]
    },
@@ -12909,9 +12909,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSet"
      }
     ]
    },
@@ -12943,9 +12943,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DaemonSetList"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DaemonSetList"
      }
     ]
    },
@@ -13068,9 +13068,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Deployment"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Deployment"
      }
     ]
    },
@@ -13135,9 +13135,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DeploymentList"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DeploymentList"
      }
     ]
    },
@@ -13174,9 +13174,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "DeploymentRollback"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DeploymentRollback"
      }
     ]
    },
@@ -13347,9 +13347,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Ingress"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Ingress"
      }
     ]
    },
@@ -13398,9 +13398,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "IngressList"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "IngressList"
      }
     ]
    },
@@ -13490,9 +13490,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSet"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSet"
      }
     ]
    },
@@ -13553,9 +13553,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "ReplicaSetList"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "ReplicaSetList"
      }
     ]
    },
@@ -13681,9 +13681,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "Group": "extensions",
-      "Version": "v1beta1",
-      "Kind": "Scale"
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "Scale"
      }
     ]
    },
