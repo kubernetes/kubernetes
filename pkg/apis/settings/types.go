@@ -61,3 +61,11 @@ type PodPresetList struct {
 
 	Items []PodPreset
 }
+
+type PodPresetTemplateSpec struct {
+	// +optional
+	metav1.ObjectMeta
+
+	// +optional
+	Spec PodPresetSpec
+}

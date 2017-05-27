@@ -65,3 +65,11 @@ type PodPresetList struct {
 	// Items is a list of schema objects.
 	Items []PodPreset `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+type PodPresetTemplateSpec struct {
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// +optional
+	Spec PodPresetSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+}
