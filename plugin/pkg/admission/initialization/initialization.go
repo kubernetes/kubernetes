@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation"
@@ -56,9 +58,6 @@ func NewInitializer() admission.Interface {
 }
 
 func (i *initializer) Validate() error {
-	if i.authorizer == nil {
-		return fmt.Errorf("requires authorizer")
-	}
 	return nil
 }
 
@@ -131,6 +130,11 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 }
 
 func (i *initializer) canInitialize(a admission.Attributes) error {
+	// if no authorizer is present, the initializer plugin allows modification of uninitialized resources
+	if i.authorizer == nil {
+		glog.V(4).Infof("No authorizer provided to initialization admission control, unable to check permissions")
+		return nil
+	}
 	// caller must have the ability to mutate un-initialized resources
 	authorized, reason, err := i.authorizer.Authorize(authorizer.AttributesRecord{
 		Name:            a.GetName(),
