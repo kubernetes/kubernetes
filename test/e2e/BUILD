@@ -44,6 +44,7 @@ go_library(
     srcs = [
         "addon_update.go",
         "apparmor.go",
+        "audit.go",
         "cadvisor.go",
         "certificates.go",
         "cluster_upgrade.go",
