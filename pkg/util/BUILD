@@ -65,6 +65,7 @@ filegroup(
         "//pkg/util/io:all-srcs",
         "//pkg/util/ipconfig:all-srcs",
         "//pkg/util/iptables:all-srcs",
+        "//pkg/util/ipvs:all-srcs",
         "//pkg/util/json:all-srcs",
         "//pkg/util/keymutex:all-srcs",
         "//pkg/util/labels:all-srcs",
