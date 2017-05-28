@@ -19,6 +19,11 @@ limitations under the License.
 package dockershim
 
 import (
+	"os"
+
+	"github.com/blang/semver"
+	dockertypes "github.com/docker/engine-api/types"
+	dockercontainer "github.com/docker/engine-api/types/container"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
@@ -42,4 +47,16 @@ func (ds *dockerService) getSecurityOpts(containerName string, sandboxConfig *ru
 	}
 
 	return nil, nil
+}
+
+func (ds *dockerService) updateCreateConfig(
+	createConfig *dockertypes.ContainerCreateConfig,
+	config *runtimeapi.ContainerConfig,
+	sandboxConfig *runtimeapi.PodSandboxConfig,
+	podSandboxID string, securityOptSep rune, apiVersion *semver.Version) error {
+	if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode != "" {
+		createConfig.HostConfig.NetworkMode = dockercontainer.NetworkMode(networkMode)
+	}
+
+	return nil
 }

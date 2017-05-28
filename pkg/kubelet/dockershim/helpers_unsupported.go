@@ -19,6 +19,8 @@ limitations under the License.
 package dockershim
 
 import (
+	"github.com/blang/semver"
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 )
@@ -30,4 +32,13 @@ func DefaultMemorySwap() int64 {
 func (ds *dockerService) getSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, separator rune) ([]string, error) {
 	glog.Warningf("getSecurityOpts is unsupported in this build")
 	return nil, nil
+}
+
+func (ds *dockerService) updateCreateConfig(
+	createConfig *dockertypes.ContainerCreateConfig,
+	config *runtimeapi.ContainerConfig,
+	sandboxConfig *runtimeapi.PodSandboxConfig,
+	podSandboxID string, securityOptSep rune, apiVersion *semver.Version) error {
+	glog.Warningf("updateCreateConfig is unsupported in this build")
+	return nil
 }
