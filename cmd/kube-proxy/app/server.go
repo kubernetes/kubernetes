@@ -415,7 +415,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 			int(*config.IPTables.MasqueradeBit),
 			config.ClusterCIDR,
 			hostname,
-			getNodeIP(client, hostname),
+			net.ParseIP(config.BindAddress),
 			recorder,
 			healthzServer,
 		)
