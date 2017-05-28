@@ -17,8 +17,12 @@ limitations under the License.
 package dockershim
 
 import (
+	"encoding/base64"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/blang/semver"
@@ -247,13 +251,33 @@ func TestGetSecurityOptSeparator(t *testing.T) {
 	}
 }
 
+// writeDockerConfig will write a config file into a temporary dir, and return that dir.
+// Caller is responsible for deleting the dir and its contents.
+func writeDockerConfig(cfg string) (string, error) {
+	tmpdir, err := ioutil.TempDir("", "dockershim=helpers_test.go=")
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(tmpdir, ".docker")
+	if err := os.Mkdir(dir, 0755); err != nil {
+		return "", err
+	}
+	return tmpdir, ioutil.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0644)
+}
+
 func TestEnsureSandboxImageExists(t *testing.T) {
 	sandboxImage := "gcr.io/test/image"
+	registryHost := "https://gcr.io/"
+	authConfig := dockertypes.AuthConfig{Username: "user", Password: "pass"}
+	authB64 := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", authConfig.Username, authConfig.Password)))
+	authJSON := fmt.Sprintf("{\"auths\": {\"%s\": {\"auth\": \"%s\"} } }", registryHost, authB64)
 	for desc, test := range map[string]struct {
-		injectImage bool
-		injectErr   error
-		calls       []string
-		err         bool
+		injectImage  bool
+		imgNeedsAuth bool
+		injectErr    error
+		calls        []string
+		err          bool
+		configJSON   string
 	}{
 		"should not pull image when it already exists": {
 			injectImage: true,
@@ -271,14 +295,42 @@ func TestEnsureSandboxImageExists(t *testing.T) {
 			calls:       []string{"inspect_image"},
 			err:         true,
 		},
+		"should return error when image pull needs private auth, but none provided": {
+			injectImage:  true,
+			imgNeedsAuth: true,
+			injectErr:    libdocker.ImageNotFoundError{ID: "image_id"},
+			calls:        []string{"inspect_image", "pull"},
+			err:          true,
+		},
+		"should pull private image using dockerauth if image doesn't exist": {
+			injectImage:  true,
+			imgNeedsAuth: true,
+			injectErr:    libdocker.ImageNotFoundError{ID: "image_id"},
+			calls:        []string{"inspect_image", "pull"},
+			configJSON:   authJSON,
+			err:          false,
+		},
 	} {
 		t.Logf("TestCase: %q", desc)
 		_, fakeDocker, _ := newTestDockerService()
 		if test.injectImage {
-			fakeDocker.InjectImages([]dockertypes.Image{{ID: sandboxImage}})
+			images := []dockertypes.Image{{ID: sandboxImage}}
+			fakeDocker.InjectImages(images)
+			if test.imgNeedsAuth {
+				fakeDocker.MakeImagesPrivate(images, authConfig)
+			}
 		}
 		fakeDocker.InjectError("inspect_image", test.injectErr)
-		err := ensureSandboxImageExists(fakeDocker, sandboxImage)
+
+		var dockerCfgSearchPath []string
+		if test.configJSON != "" {
+			tmpdir, err := writeDockerConfig(test.configJSON)
+			require.NoError(t, err, "could not create a temp docker config file")
+			dockerCfgSearchPath = append(dockerCfgSearchPath, filepath.Join(tmpdir, ".docker"))
+			defer os.RemoveAll(tmpdir)
+		}
+
+		err := ensureSandboxImageExistsDockerCfg(fakeDocker, sandboxImage, dockerCfgSearchPath)
 		assert.NoError(t, fakeDocker.AssertCalls(test.calls))
 		assert.Equal(t, test.err, err != nil)
 	}

@@ -124,7 +124,7 @@ func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestCgroupMountValidationMultipleSubsytem(t *testing.T) {
+func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
 	mountInt := &fakeMountInterface{
 		[]mount.MountPoint{
 			{

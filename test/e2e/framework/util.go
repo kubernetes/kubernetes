@@ -590,8 +590,6 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 			case res && err == nil:
 				nOk++
 			case pod.Status.Phase == v1.PodSucceeded:
-				continue
-			case pod.Status.Phase == v1.PodSucceeded:
 				Logf("The status of Pod %s is Succeeded which is unexpected", pod.ObjectMeta.Name)
 				badPods = append(badPods, pod)
 				// it doesn't make sense to wait for this pod
@@ -5183,12 +5181,16 @@ func CleanupGCEResources(loadBalancerName string) (retErr error) {
 	if err := DeleteGCEStaticIP(loadBalancerName); err != nil {
 		Logf("%v", err)
 	}
+	var hcNames []string
 	hc, getErr := gceCloud.GetHttpHealthCheck(loadBalancerName)
 	if getErr != nil && !IsGoogleAPIHTTPErrorCode(getErr, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, getErr)
 		return
 	}
-	if err := gceCloud.DeleteTargetPool(loadBalancerName, hc); err != nil &&
+	if hc != nil {
+		hcNames = append(hcNames, hc.Name)
+	}
+	if err := gceCloud.DeleteTargetPool(loadBalancerName, hcNames...); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 	}

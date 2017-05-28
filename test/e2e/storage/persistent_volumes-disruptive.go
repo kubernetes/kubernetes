@@ -180,7 +180,7 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 	result, err := framework.SSH(fmt.Sprintf("mount | grep %s", clientPod.UID), nodeIP, framework.TestContext.Provider)
 	framework.LogSSHResult(result)
 	Expect(err).NotTo(HaveOccurred(), "Encountered SSH error.")
-	Expect(result.Code).To(BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %s", result.Code))
+	Expect(result.Code).To(BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 
 	By("Stopping the kubelet.")
 	kubeletCommand(kStop, c, clientPod)

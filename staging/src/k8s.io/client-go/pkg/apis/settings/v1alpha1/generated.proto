@@ -19,12 +19,11 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.pkg.apis.settings.v1alpha1;
+package k8s.io.client_go.pkg.apis.settings.v1alpha1;
 
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -59,18 +58,18 @@ message PodPresetSpec {
 
   // Env defines the collection of EnvVar to inject into containers.
   // +optional
-  repeated k8s.io.kubernetes.pkg.api.v1.EnvVar env = 2;
+  repeated k8s.io.client_go.pkg.api.v1.EnvVar env = 2;
 
   // EnvFrom defines the collection of EnvFromSource to inject into containers.
   // +optional
-  repeated k8s.io.kubernetes.pkg.api.v1.EnvFromSource envFrom = 3;
+  repeated k8s.io.client_go.pkg.api.v1.EnvFromSource envFrom = 3;
 
   // Volumes defines the collection of Volume to inject into the pod.
   // +optional
-  repeated k8s.io.kubernetes.pkg.api.v1.Volume volumes = 4;
+  repeated k8s.io.client_go.pkg.api.v1.Volume volumes = 4;
 
   // VolumeMounts defines the collection of VolumeMount to inject into containers.
   // +optional
-  repeated k8s.io.kubernetes.pkg.api.v1.VolumeMount volumeMounts = 5;
+  repeated k8s.io.client_go.pkg.api.v1.VolumeMount volumeMounts = 5;
 }
 

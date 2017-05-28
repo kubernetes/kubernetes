@@ -227,12 +227,12 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)
 	}
 
-	m, err := genericConfig.Complete().New(genericapiserver.EmptyDelegate)
+	m, err := genericConfig.Complete().New("federation", genericapiserver.EmptyDelegate)
 	if err != nil {
 		return err
 	}
 
-	routes.UIRedirect{}.Install(m.Handler.PostGoRestfulMux)
+	routes.UIRedirect{}.Install(m.Handler.NonGoRestfulMux)
 	routes.Logs{}.Install(m.Handler.GoRestfulContainer)
 
 	apiResourceConfigSource := storageFactory.APIResourceConfigSource

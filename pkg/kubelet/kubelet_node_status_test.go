@@ -1100,3 +1100,129 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
+	// generate one more than maxImagesInNodeStatus in inputImageList
+	inputImageList, expectedImageList := generateTestingImageList(maxImagesInNodeStatus + 1)
+	testKubelet := newTestKubeletWithImageList(
+		t, inputImageList, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubelet.containerManager = &localCM{
+		ContainerManager: cm.NewStubContainerManager(),
+		allocatable: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(40000, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+		},
+	}
+	kubeClient := testKubelet.fakeKubeClient
+	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
+	machineInfo := &cadvisorapi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 10E9, // 10G
+	}
+	mockCadvisor := testKubelet.fakeCadvisor
+	mockCadvisor.On("Start").Return(nil)
+	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &cadvisorapi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+	}
+	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+
+	// Make kubelet report that it has sufficient disk space.
+	require.NoError(t, updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100))
+
+	expectedNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		Spec:       v1.NodeSpec{},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:               v1.NodeOutOfDisk,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasSufficientDisk",
+					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
+				},
+				{
+					Type:               v1.NodeMemoryPressure,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasSufficientMemory",
+					Message:            fmt.Sprintf("kubelet has sufficient memory available"),
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
+				},
+				{
+					Type:               v1.NodeDiskPressure,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasNoDiskPressure",
+					Message:            fmt.Sprintf("kubelet has no disk pressure"),
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
+				},
+				{
+					Type:               v1.NodeReady,
+					Status:             v1.ConditionTrue,
+					Reason:             "KubeletReady",
+					Message:            fmt.Sprintf("kubelet is posting ready status"),
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
+				},
+			},
+			NodeInfo: v1.NodeSystemInfo{
+				MachineID:               "123",
+				SystemUUID:              "abc",
+				BootID:                  "1b3",
+				KernelVersion:           "3.16.0-0.bpo.4-amd64",
+				OSImage:                 "Debian GNU/Linux 7 (wheezy)",
+				OperatingSystem:         goruntime.GOOS,
+				Architecture:            goruntime.GOARCH,
+				ContainerRuntimeVersion: "test://1.5.0",
+				KubeletVersion:          version.Get().String(),
+				KubeProxyVersion:        version.Get().String(),
+			},
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+			},
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(9900E6, resource.BinarySI),
+				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+			},
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			Images: expectedImageList,
+		},
+	}
+
+	kubelet.updateRuntimeUp()
+	assert.NoError(t, kubelet.updateNodeStatus())
+	actions := kubeClient.Actions()
+	require.Len(t, actions, 2)
+	require.True(t, actions[1].Matches("patch", "nodes"))
+	require.Equal(t, actions[1].GetSubresource(), "status")
+
+	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
+	assert.NoError(t, err)
+	for i, cond := range updatedNode.Status.Conditions {
+		assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
+		assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition  is zero", cond.Type)
+		updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
+		updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
+	}
+
+	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
+	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type, "NotReady should be last")
+	assert.Len(t, updatedNode.Status.Images, maxImagesInNodeStatus)
+	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
+}

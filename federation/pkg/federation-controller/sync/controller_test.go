@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
@@ -74,11 +75,14 @@ func TestSyncToClusters(t *testing.T) {
 					}
 					return nil, nil
 				},
-				func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, pkgruntime.Object) ([]util.FederatedOperation, error) {
+				func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, []*federationapi.Cluster, pkgruntime.Object) ([]util.FederatedOperation, error) {
 					if testCase.operationsError {
 						return nil, awfulError
 					}
 					return testCase.operations, nil
+				},
+				func(objMeta *metav1.ObjectMeta, selector func(map[string]string, map[string]string) (bool, error), clusters []*federationapi.Cluster) ([]*federationapi.Cluster, []*federationapi.Cluster, error) {
+					return clusters, []*federationapi.Cluster{}, nil
 				},
 				func([]util.FederatedOperation) error {
 					if testCase.executionError {
@@ -94,6 +98,67 @@ func TestSyncToClusters(t *testing.T) {
 	}
 }
 
+func TestSelectedClusters(t *testing.T) {
+	clusterOne := fedtest.NewCluster("cluster1", apiv1.ConditionTrue)
+	clusterOne.Labels = map[string]string{"name": "cluster1"}
+	clusterTwo := fedtest.NewCluster("cluster2", apiv1.ConditionTrue)
+	clusterTwo.Labels = map[string]string{"name": "cluster2"}
+
+	clusters := []*federationapi.Cluster{clusterOne, clusterTwo}
+	testCases := map[string]struct {
+		expectedSelectorError      bool
+		clusterOneSelected         bool
+		clusterTwoSelected         bool
+		expectedSelectedClusters   []*federationapi.Cluster
+		expectedUnselectedClusters []*federationapi.Cluster
+	}{
+		"Selector returned error": {
+			expectedSelectorError: true,
+		},
+		"All clusters selected": {
+			clusterOneSelected:         true,
+			clusterTwoSelected:         true,
+			expectedSelectedClusters:   clusters,
+			expectedUnselectedClusters: []*federationapi.Cluster{},
+		},
+		"One cluster selected": {
+			clusterOneSelected:         true,
+			expectedSelectedClusters:   []*federationapi.Cluster{clusterOne},
+			expectedUnselectedClusters: []*federationapi.Cluster{clusterTwo},
+		},
+		"No clusters selected": {
+			expectedSelectedClusters:   []*federationapi.Cluster{},
+			expectedUnselectedClusters: clusters,
+		},
+	}
+
+	for testName, testCase := range testCases {
+		t.Run(testName, func(t *testing.T) {
+			selectedClusters, unselectedClusters, err := selectedClusters(&metav1.ObjectMeta{}, func(labels map[string]string, annotations map[string]string) (bool, error) {
+				if testCase.expectedSelectorError {
+					return false, awfulError
+				}
+				if labels["name"] == "cluster1" {
+					return testCase.clusterOneSelected, nil
+				}
+				if labels["name"] == "cluster2" {
+					return testCase.clusterTwoSelected, nil
+				}
+				t.Errorf("Unexpected cluster")
+				return false, nil
+			}, clusters)
+
+			if testCase.expectedSelectorError {
+				require.Error(t, err, "An error was expected")
+			} else {
+				require.NoError(t, err, "An error was not expected")
+			}
+			require.Equal(t, testCase.expectedSelectedClusters, selectedClusters, "Expected the correct clusters to be selected.")
+			require.Equal(t, testCase.expectedUnselectedClusters, unselectedClusters, "Expected the correct clusters to be unselected.")
+		})
+	}
+}
+
 func TestClusterOperations(t *testing.T) {
 	adapter := &federatedtypes.SecretAdapter{}
 	obj := adapter.NewTestObject("foo")
@@ -101,18 +166,14 @@ func TestClusterOperations(t *testing.T) {
 	federatedtypes.SetAnnotation(adapter, differingObj, "foo", "bar")
 
 	testCases := map[string]struct {
-		clusterObject   pkgruntime.Object
-		expectedErr     bool
-		expectedSendErr bool
-		sendToCluster   bool
+		clusterObject pkgruntime.Object
+		expectedErr   bool
+		sendToCluster bool
 
 		operationType util.FederatedOperationType
 	}{
 		"Accessor error returned": {
 			expectedErr: true,
-		},
-		"sendToCluster error returned": {
-			expectedSendErr: true,
 		},
 		"Missing cluster object should result in add operation": {
 			operationType: util.OperationTypeAdd,
@@ -138,18 +199,21 @@ func TestClusterOperations(t *testing.T) {
 			clusters := []*federationapi.Cluster{fedtest.NewCluster("cluster1", apiv1.ConditionTrue)}
 			key := federatedtypes.ObjectKey(adapter, obj)
 
-			operations, err := clusterOperations(adapter, clusters, obj, key, func(string) (interface{}, bool, error) {
+			var selectedClusters, unselectedClusters []*federationapi.Cluster
+			if testCase.sendToCluster {
+				selectedClusters = clusters
+				unselectedClusters = []*federationapi.Cluster{}
+			} else {
+				selectedClusters = []*federationapi.Cluster{}
+				unselectedClusters = clusters
+			}
+			operations, err := clusterOperations(adapter, selectedClusters, unselectedClusters, obj, key, func(string) (interface{}, bool, error) {
 				if testCase.expectedErr {
 					return nil, false, awfulError
 				}
 				return testCase.clusterObject, (testCase.clusterObject != nil), nil
-			}, func(map[string]string, map[string]string) (bool, error) {
-				if testCase.expectedSendErr {
-					return false, awfulError
-				}
-				return testCase.sendToCluster, nil
 			})
-			if testCase.expectedErr || testCase.expectedSendErr {
+			if testCase.expectedErr {
 				require.Error(t, err, "An error was expected")
 			} else {
 				require.NoError(t, err, "An error was not expected")

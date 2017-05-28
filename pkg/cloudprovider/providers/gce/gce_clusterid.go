@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,18 +49,18 @@ const (
 	updateFuncFrequency = 10 * time.Minute
 )
 
-type ClusterId struct {
+type ClusterID struct {
 	idLock     sync.RWMutex
 	client     clientset.Interface
 	cfgMapKey  string
 	store      cache.Store
-	providerId *string
-	clusterId  *string
+	providerID *string
+	clusterID  *string
 }
 
-// Continually watches for changes to the cluser id config map
-func (gce *GCECloud) watchClusterId() {
-	gce.ClusterId = ClusterId{
+// Continually watches for changes to the cluster id config map
+func (gce *GCECloud) watchClusterID() {
+	gce.ClusterID = ClusterID{
 		cfgMapKey: fmt.Sprintf("%v/%v", UIDNamespace, UIDConfigMapName),
 		client:    gce.clientBuilder.ClientOrDie("cloud-provider"),
 	}
@@ -77,8 +77,8 @@ func (gce *GCECloud) watchClusterId() {
 				return
 			}
 
-			glog.V(4).Infof("Observed new configmap for clusterid: %v, %v; setting local values", m.Name, m.Data)
-			gce.ClusterId.setIds(m)
+			glog.V(4).Infof("Observed new configmap for clusteriD: %v, %v; setting local values", m.Name, m.Data)
+			gce.ClusterID.update(m)
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			m, ok := cur.(*v1.ConfigMap)
@@ -96,71 +96,71 @@ func (gce *GCECloud) watchClusterId() {
 				return
 			}
 
-			glog.V(4).Infof("Observed updated configmap for clusterid %v, %v; setting local values", m.Name, m.Data)
-			gce.ClusterId.setIds(m)
+			glog.V(4).Infof("Observed updated configmap for clusteriD %v, %v; setting local values", m.Name, m.Data)
+			gce.ClusterID.update(m)
 		},
 	}
 
-	listerWatcher := cache.NewListWatchFromClient(gce.ClusterId.client.Core().RESTClient(), "configmaps", UIDNamespace, fields.Everything())
+	listerWatcher := cache.NewListWatchFromClient(gce.ClusterID.client.Core().RESTClient(), "configmaps", UIDNamespace, fields.Everything())
 	var controller cache.Controller
-	gce.ClusterId.store, controller = cache.NewInformer(newSingleObjectListerWatcher(listerWatcher, UIDConfigMapName), &v1.ConfigMap{}, updateFuncFrequency, mapEventHandler)
+	gce.ClusterID.store, controller = cache.NewInformer(newSingleObjectListerWatcher(listerWatcher, UIDConfigMapName), &v1.ConfigMap{}, updateFuncFrequency, mapEventHandler)
 
 	controller.Run(nil)
 }
 
-// GetId returns the id which is unique to this cluster
+// GetID returns the id which is unique to this cluster
 // if federated, return the provider id (unique to the cluster)
 // if not federated, return the cluster id
-func (ci *ClusterId) GetId() (string, error) {
+func (ci *ClusterID) GetID() (string, error) {
 	if err := ci.getOrInitialize(); err != nil {
 		return "", err
 	}
 
 	ci.idLock.RLock()
 	defer ci.idLock.RUnlock()
-	if ci.clusterId == nil {
+	if ci.clusterID == nil {
 		return "", errors.New("Could not retrieve cluster id")
 	}
 
 	// If provider ID is set, (Federation is enabled) use this field
-	if ci.providerId != nil && *ci.providerId != *ci.clusterId {
-		return *ci.providerId, nil
+	if ci.providerID != nil {
+		return *ci.providerID, nil
 	}
 
-	// providerId is not set, use the cluster id
-	return *ci.clusterId, nil
+	// providerID is not set, use the cluster id
+	return *ci.clusterID, nil
 }
 
 // GetFederationId returns the id which could represent the entire Federation
 // or just the cluster if not federated.
-func (ci *ClusterId) GetFederationId() (string, bool, error) {
+func (ci *ClusterID) GetFederationId() (string, bool, error) {
 	if err := ci.getOrInitialize(); err != nil {
 		return "", false, err
 	}
 
 	ci.idLock.RLock()
 	defer ci.idLock.RUnlock()
-	if ci.clusterId == nil {
+	if ci.clusterID == nil {
 		return "", false, errors.New("Could not retrieve cluster id")
 	}
 
 	// If provider ID is not set, return false
-	if ci.providerId == nil || *ci.clusterId == *ci.providerId {
+	if ci.providerID == nil || *ci.clusterID == *ci.providerID {
 		return "", false, nil
 	}
 
-	return *ci.clusterId, true, nil
+	return *ci.clusterID, true, nil
 }
 
 // getOrInitialize either grabs the configmaps current value or defines the value
-// and sets the configmap. This is for the case of the user calling GetClusterId()
+// and sets the configmap. This is for the case of the user calling GetClusterID()
 // before the watch has begun.
-func (ci *ClusterId) getOrInitialize() error {
+func (ci *ClusterID) getOrInitialize() error {
 	if ci.store == nil {
-		return errors.New("GCECloud.ClusterId is not ready. Call Initialize() before using.")
+		return errors.New("GCECloud.ClusterID is not ready. Call Initialize() before using.")
 	}
 
-	if ci.clusterId != nil {
+	if ci.clusterID != nil {
 		return nil
 	}
 
@@ -177,7 +177,7 @@ func (ci *ClusterId) getOrInitialize() error {
 		return err
 	}
 
-	glog.V(4).Infof("Creating clusterid: %v", newId)
+	glog.V(4).Infof("Creating clusteriD: %v", newId)
 	cfg := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      UIDConfigMapName,
@@ -194,12 +194,12 @@ func (ci *ClusterId) getOrInitialize() error {
 		return err
 	}
 
-	glog.V(2).Infof("Created a config map containing clusterid: %v", newId)
-	ci.setIds(cfg)
+	glog.V(2).Infof("Created a config map containing clusteriD: %v", newId)
+	ci.update(cfg)
 	return nil
 }
 
-func (ci *ClusterId) getConfigMap() (bool, error) {
+func (ci *ClusterID) getConfigMap() (bool, error) {
 	item, exists, err := ci.store.GetByKey(ci.cfgMapKey)
 	if err != nil {
 		return false, err
@@ -214,18 +214,18 @@ func (ci *ClusterId) getConfigMap() (bool, error) {
 		glog.Error(err)
 		return false, err
 	}
-	ci.setIds(m)
+	ci.update(m)
 	return true, nil
 }
 
-func (ci *ClusterId) setIds(m *v1.ConfigMap) {
+func (ci *ClusterID) update(m *v1.ConfigMap) {
 	ci.idLock.Lock()
 	defer ci.idLock.Unlock()
-	if clusterId, exists := m.Data[UIDCluster]; exists {
-		ci.clusterId = &clusterId
+	if clusterID, exists := m.Data[UIDCluster]; exists {
+		ci.clusterID = &clusterID
 	}
 	if provId, exists := m.Data[UIDProvider]; exists {
-		ci.providerId = &provId
+		ci.providerID = &provId
 	}
 }
 

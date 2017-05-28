@@ -235,14 +235,16 @@ func (rc *reconciler) reconcile() {
 		} else if !volMounted || cache.IsRemountRequiredError(err) {
 			// Volume is not mounted, or is already mounted, but requires remounting
 			remountingLogStr := ""
-			if cache.IsRemountRequiredError(err) {
+			isRemount := cache.IsRemountRequiredError(err)
+			if isRemount {
 				remountingLogStr = "Volume is already mounted to pod, but remount was requested."
 			}
 			glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.MountVolume", remountingLogStr))
 			err := rc.operationExecutor.MountVolume(
 				rc.waitForAttachTimeout,
 				volumeToMount.VolumeToMount,
-				rc.actualStateOfWorld)
+				rc.actualStateOfWorld,
+				isRemount)
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {

@@ -203,6 +203,24 @@ func (in instrumentedRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandbo
 	return out, err
 }
 
+func (in instrumentedRuntimeService) ContainerStats(req *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
+	const operation = "container_stats"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.ContainerStats(req)
+	recordError(operation, err)
+	return out, err
+}
+
+func (in instrumentedRuntimeService) ListContainerStats(req *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
+	const operation = "list_container_stats"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.ListContainerStats(req)
+	recordError(operation, err)
+	return out, err
+}
+
 func (in instrumentedRuntimeService) PortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	const operation = "port_forward"
 	defer recordOperation(operation, time.Now())
@@ -257,11 +275,11 @@ func (in instrumentedImageManagerService) RemoveImage(image *runtimeapi.ImageSpe
 	return err
 }
 
-func (in instrumentedImageManagerService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
+func (in instrumentedImageManagerService) ImageFsInfo(req *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
 	const operation = "image_fs_info"
 	defer recordOperation(operation, time.Now())
 
-	fsInfo, err := in.service.ImageFsInfo()
+	fsInfo, err := in.service.ImageFsInfo(req)
 	recordError(operation, err)
 	return fsInfo, nil
 }

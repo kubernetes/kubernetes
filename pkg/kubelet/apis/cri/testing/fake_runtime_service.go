@@ -389,3 +389,11 @@ func (r *FakeRuntimeService) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.
 func (r *FakeRuntimeService) UpdateRuntimeConfig(runtimeCOnfig *runtimeapi.RuntimeConfig) error {
 	return nil
 }
+
+func (r *FakeRuntimeService) ContainerStats(req *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
+	return nil, fmt.Errorf("Not implemented")
+}
+
+func (r *FakeRuntimeService) ListContainerStats(req *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
+	return nil, fmt.Errorf("Not implemented")
+}

@@ -85,16 +85,28 @@ type StrategicMergePatchRawTestCaseData struct {
 }
 
 type MergeItem struct {
-	Name              string
-	Value             string
-	Other             string
-	MergingList       []MergeItem `patchStrategy:"merge" patchMergeKey:"name"`
-	NonMergingList    []MergeItem
-	MergingIntList    []int `patchStrategy:"merge"`
-	NonMergingIntList []int
-	MergeItemPtr      *MergeItem `patchStrategy:"merge" patchMergeKey:"name"`
-	SimpleMap         map[string]string
-	ReplacingItem     runtime.RawExtension `patchStrategy:"replace"`
+	Name                  string
+	Value                 string
+	Other                 string
+	MergingList           []MergeItem `patchStrategy:"merge" patchMergeKey:"name"`
+	NonMergingList        []MergeItem
+	MergingIntList        []int `patchStrategy:"merge"`
+	NonMergingIntList     []int
+	MergeItemPtr          *MergeItem `patchStrategy:"merge" patchMergeKey:"name"`
+	SimpleMap             map[string]string
+	ReplacingItem         runtime.RawExtension `patchStrategy:"replace"`
+	RetainKeysMap         RetainKeysMergeItem  `patchStrategy:"retainKeys"`
+	RetainKeysMergingList []MergeItem          `patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+}
+
+type RetainKeysMergeItem struct {
+	Name           string
+	Value          string
+	Other          string
+	SimpleMap      map[string]string
+	MergingIntList []int       `patchStrategy:"merge"`
+	MergingList    []MergeItem `patchStrategy:"merge" patchMergeKey:"name"`
+	NonMergingList []MergeItem
 }
 
 var mergeItem MergeItem
@@ -276,8 +288,11 @@ func TestSortMergeLists(t *testing.T) {
 }
 
 // These are test cases for StrategicMergePatch that cannot be generated using
-// CreateTwoWayMergePatch because it doesn't use the replace directive, generate
-// duplicate integers for a merging list patch, or generate empty merging lists.
+// CreateTwoWayMergePatch because it may be one of the following cases:
+// - not use the replace directive.
+// - generate duplicate integers for a merging list patch.
+// - generate empty merging lists.
+// - use patch format from an old client.
 var customStrategicMergePatchTestCaseData = []byte(`
 testCases:
   - description: unique scalars when merging lists
@@ -357,6 +372,94 @@ testCases:
       mergingList:
         - name: 2
           value: a
+  - description: retainKeys map can add a field when no retainKeys directive present
+    original:
+      retainKeysMap:
+        name: foo
+    twoWay:
+      retainKeysMap:
+        value: bar
+    modified:
+      retainKeysMap:
+        name: foo
+        value: bar
+  - description: retainKeys map can change a field when no retainKeys directive present
+    original:
+      retainKeysMap:
+        name: foo
+        value: a
+    twoWay:
+      retainKeysMap:
+        value: b
+    modified:
+      retainKeysMap:
+        name: foo
+        value: b
+  - description: retainKeys map can delete a field when no retainKeys directive present
+    original:
+      retainKeysMap:
+        name: foo
+        value: a
+    twoWay:
+      retainKeysMap:
+        value: null
+    modified:
+      retainKeysMap:
+        name: foo
+  - description: retainKeys map merge an empty map
+    original:
+      retainKeysMap:
+        name: foo
+        value: a
+    twoWay:
+      retainKeysMap: {}
+    modified:
+      retainKeysMap:
+        name: foo
+        value: a
+  - description: retainKeys list can add a field when no retainKeys directive present
+    original:
+      retainKeysMergingList:
+      - name: bar
+      - name: foo
+    twoWay:
+      retainKeysMergingList:
+      - name: foo
+        value: a
+    modified:
+      retainKeysMergingList:
+      - name: bar
+      - name: foo
+        value: a
+  - description: retainKeys list can change a field when no retainKeys directive present
+    original:
+      retainKeysMergingList:
+      - name: bar
+      - name: foo
+        value: a
+    twoWay:
+      retainKeysMergingList:
+      - name: foo
+        value: b
+    modified:
+      retainKeysMergingList:
+      - name: bar
+      - name: foo
+        value: b
+  - description: retainKeys list can delete a field when no retainKeys directive present
+    original:
+      retainKeysMergingList:
+      - name: bar
+      - name: foo
+        value: a
+    twoWay:
+      retainKeysMergingList:
+      - name: foo
+        value: null
+    modified:
+      retainKeysMergingList:
+      - name: bar
+      - name: foo
 `)
 
 func TestCustomStrategicMergePatch(t *testing.T) {
@@ -1871,6 +1974,52 @@ testCases:
     result:
       name: modified-name
       other: current-other
+  - description: nil patch with retainKeys map
+    original:
+      name: a
+      retainKeysMap:
+        name: foo
+    current:
+      name: a
+      value: b
+      retainKeysMap:
+        name: foo
+    modified:
+      name: a
+      retainKeysMap:
+        name: foo
+    twoWay: {}
+    threeWay: {}
+    result:
+      name: a
+      value: b
+      retainKeysMap:
+        name: foo
+  - description: retainKeys map with no change should not present
+    original:
+      name: a
+      retainKeysMap:
+        name: foo
+    current:
+      name: a
+      other: c
+      retainKeysMap:
+        name: foo
+    modified:
+      name: a
+      value: b
+      retainKeysMap:
+        name: foo
+    twoWay:
+      value: b
+    threeWay:
+      value: b
+    result:
+      name: a
+      value: b
+      other: c
+      retainKeysMap:
+        name: foo
 `)
 
 var strategicMergePatchRawTestCases = []StrategicMergePatchRawTestCase{
@@ -1987,6 +2136,1640 @@ mergingIntList:
   - 1
   - 2
   - 4
+`),
+		},
+	},
+	{
+		Description: "retainKeys map should clear defaulted field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`{}`),
+			Current: []byte(`
+retainKeysMap:
+  value: foo
+`),
+			Modified: []byte(`
+retainKeysMap:
+  other: bar
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  other: bar
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - other
+  other: bar
+`),
+			Result: []byte(`
+retainKeysMap:
+  other: bar
+`),
+		},
+	},
+	{
+		Description: "retainKeys map should clear defaulted field with conflict (discriminated union)",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`{}`),
+			Current: []byte(`
+retainKeysMap:
+  name: type1
+  value: foo
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: type2
+  other: bar
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  name: type2
+  other: bar
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - other
+  name: type2
+  other: bar
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: type2
+  other: bar
+`),
+		},
+	},
+	{
+		Description: "retainKeys map adds a field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - value
+  value: bar
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - value
+  value: bar
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+		},
+	},
+	{
+		Description: "retainKeys map adds a field and clear a field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  other: a
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - value
+  value: bar
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - value
+  value: bar
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+		},
+	},
+	{
+		Description: "retainKeys map deletes a field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+  value: null
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+  value: null
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+`),
+		},
+	},
+	{
+		Description: "retainKeys map deletes a field and clears a field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  other: a
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+  value: null
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+  value: null
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+`),
+		},
+	},
+	{
+		Description: "retainKeys map clears a field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  other: a
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+			TwoWay: []byte(`{}`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - value
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+		},
+	},
+	{
+		Description: "retainKeys map nested map with no change",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  simpleMap:
+    key1: a
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  simpleMap:
+    key1: a
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: a
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - simpleMap
+    - value
+  value: bar
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - simpleMap
+    - value
+  value: bar
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: a
+`),
+		},
+	},
+	{
+		Description: "retainKeys map adds a field in a nested map",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: a
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: a
+    key3: c
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: a
+    key2: b
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - simpleMap
+    - value
+  simpleMap:
+    key2: b
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - simpleMap
+    - value
+  simpleMap:
+    key2: b
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: a
+    key2: b
+    key3: c
+`),
+		},
+	},
+	{
+		Description: "retainKeys map deletes a field in a nested map",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: a
+    key2: b
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: a
+    key2: b
+    key3: c
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: a
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - simpleMap
+    - value
+  simpleMap:
+    key2: null
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - simpleMap
+    - value
+  simpleMap:
+    key2: null
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: a
+    key3: c
+`),
+		},
+	},
+	{
+		Description: "retainKeys map changes a field in a nested map",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: a
+    key2: b
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: a
+    key2: b
+    key3: c
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: x
+    key2: b
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - simpleMap
+    - value
+  simpleMap:
+    key1: x
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - simpleMap
+    - value
+  simpleMap:
+    key1: x
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: x
+    key2: b
+    key3: c
+`),
+		},
+	},
+	{
+		Description: "retainKeys map changes a field in a nested map with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: old
+    key2: b
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: new
+    key2: b
+    key3: c
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: modified
+    key2: b
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - simpleMap
+    - value
+  simpleMap:
+    key1: modified
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - simpleMap
+    - value
+  simpleMap:
+    key1: modified
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  simpleMap:
+    key1: modified
+    key2: b
+    key3: c
+`),
+		},
+	},
+	{
+		Description: "retainKeys map replaces non-merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  nonMergingList:
+  - name: a
+  - name: c
+  - name: b
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - nonMergingList
+    - value
+  nonMergingList:
+  - name: a
+  - name: c
+  - name: b
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - nonMergingList
+    - value
+  nonMergingList:
+  - name: a
+  - name: c
+  - name: b
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  nonMergingList:
+  - name: a
+  - name: c
+  - name: b
+`),
+		},
+	},
+	{
+		Description: "retainKeys map nested non-merging list with no change",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - nonMergingList
+    - value
+  value: bar
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - nonMergingList
+    - value
+  value: bar
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+		},
+	},
+	{
+		Description: "retainKeys map nested non-merging list with no change with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  nonMergingList:
+  - name: a
+  - name: b
+  - name: c
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - nonMergingList
+    - value
+  value: bar
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - nonMergingList
+    - value
+  value: bar
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+		},
+	},
+	{
+		Description: "retainKeys map deletes nested non-merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - value
+  value: bar
+  nonMergingList: null
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - value
+  value: bar
+  nonMergingList: null
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+		},
+	},
+	{
+		Description: "retainKeys map delete nested non-merging list with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  nonMergingList:
+  - name: a
+  - name: b
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  nonMergingList:
+  - name: a
+  - name: b
+  - name: c
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - value
+  value: bar
+  nonMergingList: null
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - value
+  value: bar
+  nonMergingList: null
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+		},
+	},
+	{
+		Description: "retainKeys map nested merging int list with no change",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 2
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  mergingIntList:
+  - 1
+  - 2
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingIntList
+    - name
+    - value
+  value: bar
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingIntList
+    - name
+    - value
+  value: bar
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+		},
+	},
+	{
+		Description: "retainKeys map adds an item in nested merging int list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 2
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 2
+  - 4
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingIntList
+    - name
+  mergingIntList:
+  - 4
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingIntList
+    - name
+  mergingIntList:
+  - 4
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 2
+  - 3
+  - 4
+`),
+		},
+	},
+	{
+		Description: "retainKeys map deletes an item in nested merging int list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 2
+  - 3
+  - 4
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 3
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingIntList
+    - name
+  $deleteFromPrimitiveList/mergingIntList:
+  - 2
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingIntList
+    - name
+  $deleteFromPrimitiveList/mergingIntList:
+  - 2
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 3
+  - 4
+`),
+		},
+	},
+	{
+		Description: "retainKeys map adds an item and deletes an item in nested merging int list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 2
+  - 3
+  - 4
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 3
+  - 5
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingIntList
+    - name
+  mergingIntList:
+  - 5
+  $deleteFromPrimitiveList/mergingIntList:
+  - 2
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingIntList
+    - name
+  mergingIntList:
+  - 5
+  $deleteFromPrimitiveList/mergingIntList:
+  - 2
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 3
+  - 4
+  - 5
+`),
+		},
+	},
+	{
+		Description: "retainKeys map deletes nested merging int list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+  mergingIntList: null
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+  mergingIntList: null
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+`),
+		},
+	},
+	{
+		Description: "retainKeys map nested merging list with no change",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+  - name: c
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  mergingList:
+  - name: a
+  - name: b
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingList
+    - name
+    - value
+  value: bar
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingList
+    - name
+    - value
+  value: bar
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+  mergingList:
+  - name: a
+  - name: b
+  - name: c
+`),
+		},
+	},
+	{
+		Description: "retainKeys map adds an item in nested merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+  - name: x
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+  - name: c
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingList
+    - name
+  mergingList:
+  - name: c
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingList
+    - name
+  mergingList:
+  - name: c
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+  - name: c
+  - name: x
+`),
+		},
+	},
+	{
+		Description: "retainKeys map changes an item in nested merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+    value: foo
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+    value: foo
+  - name: x
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+    value: bar
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingList
+    - name
+  mergingList:
+  - name: b
+    value: bar
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingList
+    - name
+  mergingList:
+  - name: b
+    value: bar
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+    value: bar
+  - name: x
+`),
+		},
+	},
+	{
+		Description: "retainKeys map deletes nested merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - value
+  value: bar
+  mergingList: null
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - name
+    - value
+  value: bar
+  mergingList: null
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  value: bar
+`),
+		},
+	},
+	{
+		Description: "retainKeys map deletes an item in nested merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+`),
+			Current: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: b
+  - name: x
+`),
+			Modified: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+`),
+			TwoWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingList
+    - name
+  mergingList:
+  - name: b
+    $patch: delete
+`),
+			ThreeWay: []byte(`
+retainKeysMap:
+  $retainKeys:
+    - mergingList
+    - name
+  mergingList:
+  - name: b
+    $patch: delete
+`),
+			Result: []byte(`
+retainKeysMap:
+  name: foo
+  mergingList:
+  - name: a
+  - name: x
+`),
+		},
+	},
+	{
+		Description: "retainKeys list of maps clears a field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: a
+`),
+			Current: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: a
+  other: x
+`),
+			Modified: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: a
+`),
+			TwoWay: []byte(`{}`),
+			ThreeWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+    - value
+  name: foo
+`),
+			Result: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: a
+`),
+		},
+	},
+	{
+		Description: "retainKeys list of maps clears a field with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: old
+`),
+			Current: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: new
+  other: x
+`),
+			Modified: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: modified
+`),
+			TwoWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+    - value
+  name: foo
+  value: modified
+`),
+			ThreeWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+    - value
+  name: foo
+  value: modified
+`),
+			Result: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: modified
+`),
+		},
+	},
+	{
+		Description: "retainKeys list of maps changes a field and clear a field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: old
+`),
+			Current: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: old
+  other: x
+`),
+			Modified: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: new
+`),
+			TwoWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+    - value
+  name: foo
+  value: new
+`),
+			ThreeWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+    - value
+  name: foo
+  value: new
+`),
+			Result: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: new
+`),
+		},
+	},
+	{
+		Description: "retainKeys list of maps changes a field and clear a field with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: old
+`),
+			Current: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: modified
+  other: x
+`),
+			Modified: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: new
+`),
+			TwoWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+    - value
+  name: foo
+  value: new
+`),
+			ThreeWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+    - value
+  name: foo
+  value: new
+`),
+			Result: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: new
+`),
+		},
+	},
+	{
+		Description: "retainKeys list of maps adds a field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+`),
+			Current: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+`),
+			Modified: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: a
+`),
+			TwoWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+    - value
+  name: foo
+  value: a
+`),
+			ThreeWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+    - value
+  name: foo
+  value: a
+`),
+			Result: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: a
+`),
+		},
+	},
+	{
+		Description: "retainKeys list of maps adds a field and clear a field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+`),
+			Current: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  other: x
+`),
+			Modified: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: a
+`),
+			TwoWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+    - value
+  name: foo
+  value: a
+`),
+			ThreeWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+    - value
+  name: foo
+  value: a
+`),
+			Result: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: a
+`),
+		},
+	},
+	{
+		Description: "retainKeys list of maps deletes a field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: a
+`),
+			Current: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: a
+`),
+			Modified: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+`),
+			TwoWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+  name: foo
+  value: null
+`),
+			ThreeWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+  name: foo
+  value: null
+`),
+			Result: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+`),
+		},
+	},
+	{
+		Description: "retainKeys list of maps deletes a field and clear a field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: a
+`),
+			Current: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+  value: a
+  other: x
+`),
+			Modified: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
+`),
+			TwoWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+  name: foo
+  value: null
+`),
+			ThreeWay: []byte(`
+retainKeysMergingList:
+- $retainKeys:
+    - name
+  name: foo
+  value: null
+`),
+			Result: []byte(`
+retainKeysMergingList:
+- name: bar
+- name: foo
 `),
 		},
 	},

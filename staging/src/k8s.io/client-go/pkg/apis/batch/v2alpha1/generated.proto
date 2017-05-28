@@ -19,13 +19,12 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.pkg.apis.batch.v2alpha1;
+package k8s.io.client_go.pkg.apis.batch.v2alpha1;
 
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
-import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/apis/batch/v1/generated.proto";
 
@@ -99,7 +98,7 @@ message CronJobSpec {
 message CronJobStatus {
   // A list of pointers to currently running jobs.
   // +optional
-  repeated k8s.io.kubernetes.pkg.api.v1.ObjectReference active = 1;
+  repeated k8s.io.client_go.pkg.api.v1.ObjectReference active = 1;
 
   // Information when was the last time the job was successfully scheduled.
   // +optional
@@ -129,6 +128,6 @@ message JobTemplateSpec {
   // Specification of the desired behavior of the job.
   // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.batch.v1.JobSpec spec = 2;
+  optional k8s.io.client_go.pkg.apis.batch.v1.JobSpec spec = 2;
 }
 
