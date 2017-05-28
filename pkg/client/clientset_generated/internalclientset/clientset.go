@@ -30,6 +30,7 @@ import (
 	certificatesinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
 	coreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	networkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion"
 	policyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	settingsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/settings/internalversion"
@@ -47,6 +48,7 @@ type Interface interface {
 	Batch() batchinternalversion.BatchInterface
 	Certificates() certificatesinternalversion.CertificatesInterface
 	Extensions() extensionsinternalversion.ExtensionsInterface
+	Networking() networkinginternalversion.NetworkingInterface
 	Policy() policyinternalversion.PolicyInterface
 	Rbac() rbacinternalversion.RbacInterface
 	Settings() settingsinternalversion.SettingsInterface
@@ -66,6 +68,7 @@ type Clientset struct {
 	*batchinternalversion.BatchClient
 	*certificatesinternalversion.CertificatesClient
 	*extensionsinternalversion.ExtensionsClient
+	*networkinginternalversion.NetworkingClient
 	*policyinternalversion.PolicyClient
 	*rbacinternalversion.RbacClient
 	*settingsinternalversion.SettingsClient
@@ -142,6 +145,14 @@ func (c *Clientset) Extensions() extensionsinternalversion.ExtensionsInterface {
 		return nil
 	}
 	return c.ExtensionsClient
+}
+
+// Networking retrieves the NetworkingClient
+func (c *Clientset) Networking() networkinginternalversion.NetworkingInterface {
+	if c == nil {
+		return nil
+	}
+	return c.NetworkingClient
 }
 
 // Policy retrieves the PolicyClient
@@ -228,6 +239,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.NetworkingClient, err = networkinginternalversion.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.PolicyClient, err = policyinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -266,6 +281,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.BatchClient = batchinternalversion.NewForConfigOrDie(c)
 	cs.CertificatesClient = certificatesinternalversion.NewForConfigOrDie(c)
 	cs.ExtensionsClient = extensionsinternalversion.NewForConfigOrDie(c)
+	cs.NetworkingClient = networkinginternalversion.NewForConfigOrDie(c)
 	cs.PolicyClient = policyinternalversion.NewForConfigOrDie(c)
 	cs.RbacClient = rbacinternalversion.NewForConfigOrDie(c)
 	cs.SettingsClient = settingsinternalversion.NewForConfigOrDie(c)
@@ -287,6 +303,7 @@ func New(c rest.Interface) *Clientset {
 	cs.BatchClient = batchinternalversion.New(c)
 	cs.CertificatesClient = certificatesinternalversion.New(c)
 	cs.ExtensionsClient = extensionsinternalversion.New(c)
+	cs.NetworkingClient = networkinginternalversion.New(c)
 	cs.PolicyClient = policyinternalversion.New(c)
 	cs.RbacClient = rbacinternalversion.New(c)
 	cs.SettingsClient = settingsinternalversion.New(c)

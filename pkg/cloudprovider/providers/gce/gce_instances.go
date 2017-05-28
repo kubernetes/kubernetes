@@ -443,3 +443,117 @@ func (gce *GCECloud) isCurrentInstance(instanceID string) bool {
 
 	return currentInstanceID == canonicalizeInstanceName(instanceID)
 }
+
+// ComputeHostTags grabs all tags from all instances being added to the pool.
+// * The longest tag that is a prefix of the instance name is used
+// * If any instance has no matching prefix tag, return error
+// Invoking this method to get host tags is risky since it depends on the format
+// of the host names in the cluster. Only use it as a fallback if gce.nodeTags
+// is unspecified
+func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
+	// TODO: We could store the tags in gceInstance, so we could have already fetched it
+	hostNamesByZone := make(map[string]map[string]bool) // map of zones -> map of names -> bool (for easy lookup)
+	nodeInstancePrefix := gce.nodeInstancePrefix
+	for _, host := range hosts {
+		if !strings.HasPrefix(host.Name, gce.nodeInstancePrefix) {
+			glog.Warningf("instance '%s' does not conform to prefix '%s', ignoring filter", host, gce.nodeInstancePrefix)
+			nodeInstancePrefix = ""
+		}
+
+		z, ok := hostNamesByZone[host.Zone]
+		if !ok {
+			z = make(map[string]bool)
+			hostNamesByZone[host.Zone] = z
+		}
+		z[host.Name] = true
+	}
+
+	tags := sets.NewString()
+
+	for zone, hostNames := range hostNamesByZone {
+		pageToken := ""
+		page := 0
+		for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
+			listCall := gce.service.Instances.List(gce.projectID, zone)
+
+			if nodeInstancePrefix != "" {
+				// Add the filter for hosts
+				listCall = listCall.Filter("name eq " + nodeInstancePrefix + ".*")
+			}
+
+			// Add the fields we want
+			// TODO(zmerlynn): Internal bug 29524655
+			// listCall = listCall.Fields("items(name,tags)")
+
+			if pageToken != "" {
+				listCall = listCall.PageToken(pageToken)
+			}
+
+			res, err := listCall.Do()
+			if err != nil {
+				return nil, err
+			}
+			pageToken = res.NextPageToken
+			for _, instance := range res.Items {
+				if !hostNames[instance.Name] {
+					continue
+				}
+
+				longest_tag := ""
+				for _, tag := range instance.Tags.Items {
+					if strings.HasPrefix(instance.Name, tag) && len(tag) > len(longest_tag) {
+						longest_tag = tag
+					}
+				}
+				if len(longest_tag) > 0 {
+					tags.Insert(longest_tag)
+				} else {
+					return nil, fmt.Errorf("Could not find any tag that is a prefix of instance name for instance %s", instance.Name)
+				}
+			}
+		}
+		if page >= maxPages {
+			glog.Errorf("computeHostTags exceeded maxPages=%d for Instances.List: truncating.", maxPages)
+		}
+	}
+	if len(tags) == 0 {
+		return nil, fmt.Errorf("No instances found")
+	}
+	return tags.List(), nil
+}
+
+// GetNodeTags will first try returning the list of tags specified in GCE cloud Configuration.
+// If they weren't provided, it'll compute the host tags with the given hostnames. If the list
+// of hostnames has not changed, a cached set of nodetags are returned.
+func (gce *GCECloud) GetNodeTags(nodeNames []string) ([]string, error) {
+	// If nodeTags were specified through configuration, use them
+	if len(gce.nodeTags) > 0 {
+		return gce.nodeTags, nil
+	}
+
+	gce.computeNodeTagLock.Lock()
+	defer gce.computeNodeTagLock.Unlock()
+
+	// Early return if hosts have not changed
+	hosts := sets.NewString(nodeNames...)
+	if hosts.Equal(gce.lastKnownNodeNames) {
+		return gce.lastComputedNodeTags, nil
+	}
+
+	// Get GCE instance data by hostname
+	instances, err := gce.getInstancesByNames(nodeNames)
+	if err != nil {
+		return nil, err
+	}
+
+	// Determine list of host tags
+	tags, err := gce.computeHostTags(instances)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save the list of tags
+	gce.lastKnownNodeNames = hosts
+	gce.lastComputedNodeTags = tags
+	return tags, nil
+}

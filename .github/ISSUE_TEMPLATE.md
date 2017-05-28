@@ -1,6 +1,6 @@
 <!-- Thanks for filing an issue! Before hitting the button, please answer these questions.-->
 
-**Is this a request for help?** (If yes, you should use our troubleshooting guide and community support channels, see http://kubernetes.io/docs/troubleshooting/.):
+**Is this a request for help?** (If yes, you should use our troubleshooting guide and community support channels, see https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/.):
 
 **Note:** Please file issues for subcomponents under the appropriate repo
 

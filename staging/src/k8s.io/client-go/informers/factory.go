@@ -29,6 +29,7 @@ import (
 	core "k8s.io/client-go/informers/core"
 	extensions "k8s.io/client-go/informers/extensions"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
+	networking "k8s.io/client-go/informers/networking"
 	policy "k8s.io/client-go/informers/policy"
 	rbac "k8s.io/client-go/informers/rbac"
 	settings "k8s.io/client-go/informers/settings"
@@ -127,6 +128,7 @@ type SharedInformerFactory interface {
 	Certificates() certificates.Interface
 	Core() core.Interface
 	Extensions() extensions.Interface
+	Networking() networking.Interface
 	Policy() policy.Interface
 	Rbac() rbac.Interface
 	Settings() settings.Interface
@@ -159,6 +161,10 @@ func (f *sharedInformerFactory) Core() core.Interface {
 
 func (f *sharedInformerFactory) Extensions() extensions.Interface {
 	return extensions.New(f)
+}
+
+func (f *sharedInformerFactory) Networking() networking.Interface {
+	return networking.New(f)
 }
 
 func (f *sharedInformerFactory) Policy() policy.Interface {
