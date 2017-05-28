@@ -19,6 +19,7 @@ package status
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -230,6 +231,11 @@ func equalToAcceptedOrFresh(requestedName, acceptedName string, usedNames sets.S
 func (c *NamingConditionController) sync(key string) error {
 	inCustomResourceDefinition, err := c.crdLister.Get(key)
 	if apierrors.IsNotFound(err) {
+		// CRD was deleted and has freed its names.
+		// Reconsider all other CRDs in the same group.
+		if err := c.requeueAllOtherGroupCRDs(key); err != nil {
+			return err
+		}
 		return nil
 	}
 	if err != nil {
@@ -264,14 +270,8 @@ func (c *NamingConditionController) sync(key string) error {
 
 	// we updated our status, so we may be releasing a name.  When this happens, we need to rekick everything in our group
 	// if we fail to rekick, just return as normal.  We'll get everything on a resync
-	list, err := c.crdLister.List(labels.Everything())
-	if err != nil {
-		return nil
-	}
-	for _, curr := range list {
-		if curr.Spec.Group == crd.Spec.Group {
-			c.queue.Add(curr.Name)
-		}
+	if err := c.requeueAllOtherGroupCRDs(key); err != nil {
+		return err
 	}
 
 	return nil
@@ -357,4 +357,18 @@ func (c *NamingConditionController) deleteCustomResourceDefinition(obj interface
 	}
 	glog.V(4).Infof("Deleting %q", castObj.Name)
 	c.enqueue(castObj)
+}
+
+func (c *NamingConditionController) requeueAllOtherGroupCRDs(name string) error {
+	pluralGroup := strings.SplitN(name, ".", 2)
+	list, err := c.crdLister.List(labels.Everything())
+	if err != nil {
+		return err
+	}
+	for _, curr := range list {
+		if curr.Spec.Group == pluralGroup[1] && curr.Name != name {
+			c.queue.Add(curr.Name)
+		}
+	}
+	return nil
 }
