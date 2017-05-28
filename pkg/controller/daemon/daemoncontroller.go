@@ -1016,6 +1016,30 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	return dsc.updateDaemonSetStatus(ds)
 }
 
+// hasIntentionalPredicatesReasons checks if any of the given predicate failure reasons
+// is intentional.
+func hasIntentionalPredicatesReasons(reasons []algorithm.PredicateFailureReason) bool {
+	for _, r := range reasons {
+		switch reason := r.(type) {
+		case *predicates.PredicateFailureError:
+			switch reason {
+			// intentional
+			case
+				predicates.ErrNodeSelectorNotMatch,
+				predicates.ErrPodNotMatchHostName,
+				predicates.ErrNodeLabelPresenceViolated,
+				// this one is probably intentional since it's a workaround for not having
+				// pod hard anti affinity.
+				predicates.ErrPodNotFitsHostPorts,
+				// DaemonSet is expected to respect taints and tolerations
+				predicates.ErrTaintsTolerationsNotMatch:
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // nodeShouldRunDaemonPod checks a set of preconditions against a (node,daemonset) and returns a
 // summary. Returned booleans are:
 // * wantToRun:
@@ -1105,6 +1129,12 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		return false, false, false, err
 	}
 
+	// Return directly if there is any intentional predicate failure reason, so that daemonset controller skips
+	// checking other predicate failures, such as InsufficientResourceError and unintentional errors.
+	if hasIntentionalPredicatesReasons(reasons) {
+		return false, false, false, nil
+	}
+
 	for _, r := range reasons {
 		glog.V(4).Infof("DaemonSet Predicates failed on node %s for ds '%s/%s' for reason: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
 		switch reason := r.(type) {
@@ -1113,20 +1143,8 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 			shouldSchedule = false
 		case *predicates.PredicateFailureError:
 			var emitEvent bool
-			// we try to partition predicates into two partitions here: intentional on the part of the operator and not.
 			switch reason {
-			// intentional
-			case
-				predicates.ErrNodeSelectorNotMatch,
-				predicates.ErrPodNotMatchHostName,
-				predicates.ErrNodeLabelPresenceViolated,
-				// this one is probably intentional since it's a workaround for not having
-				// pod hard anti affinity.
-				predicates.ErrPodNotFitsHostPorts,
-				// DaemonSet is expected to respect taints and tolerations
-				predicates.ErrTaintsTolerationsNotMatch:
-				wantToRun, shouldSchedule, shouldContinueRunning = false, false, false
-			// unintentional
+			// unintentional predicates reasons need to be fired out to event.
 			case
 				predicates.ErrDiskConflict,
 				predicates.ErrVolumeZoneConflict,
