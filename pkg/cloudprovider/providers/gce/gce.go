@@ -29,6 +29,7 @@ import (
 
 	"gopkg.in/gcfg.v1"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -77,19 +78,25 @@ const (
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
+	ClusterID ClusterID
+
 	service                  *compute.Service
 	serviceBeta              *computebeta.Service
 	containerService         *container.Service
 	clientBuilder            controller.ControllerClientBuilder
-	ClusterID                ClusterID
 	projectID                string
 	region                   string
 	localZone                string   // The zone in which we are running
 	managedZones             []string // List of zones we are spanning (for multi-AZ clusters, primarily when running on master)
 	networkURL               string
 	subnetworkURL            string
-	nodeTags                 []string // List of tags to use on firewall rules for load balancers
-	nodeInstancePrefix       string   // If non-"", an advisory prefix for all nodes in the cluster
+	networkProjectID         string
+	onXPN                    bool
+	nodeTags                 []string    // List of tags to use on firewall rules for load balancers
+	lastComputedNodeTags     []string    // List of node tags calculated in GetHostTags()
+	lastKnownNodeNames       sets.String // List of hostnames used to calculate lastComputedHostTags in GetHostTags(names)
+	computeNodeTagLock       sync.Mutex  // Lock for computing and setting node tags
+	nodeInstancePrefix       string      // If non-"", an advisory prefix for all nodes in the cluster
 	useMetadataServer        bool
 	operationPollRateLimiter flowcontrol.RateLimiter
 	manager                  ServiceManager
@@ -243,6 +250,12 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		networkURL = gceNetworkURL(projectID, networkName)
 	}
 
+	networkProjectID, err := getProjectIDInURL(networkURL)
+	if err != nil {
+		return nil, err
+	}
+	onXPN := networkProjectID != projectID
+
 	if len(managedZones) == 0 {
 		managedZones, err = getZonesForRegion(service, projectID, region)
 		if err != nil {
@@ -260,6 +273,8 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		serviceBeta:              serviceBeta,
 		containerService:         containerService,
 		projectID:                projectID,
+		networkProjectID:         networkProjectID,
+		onXPN:                    onXPN,
 		region:                   region,
 		localZone:                zone,
 		managedZones:             managedZones,
@@ -311,6 +326,26 @@ func (gce *GCECloud) ProviderName() string {
 	return ProviderName
 }
 
+// Region returns the region
+func (gce *GCECloud) Region() string {
+	return gce.region
+}
+
+// OnXPN returns true if the cluster is running on a cross project network (XPN)
+func (gce *GCECloud) OnXPN() bool {
+	return gce.onXPN
+}
+
+// NetworkURL returns the network url
+func (gce *GCECloud) NetworkURL() string {
+	return gce.networkURL
+}
+
+// SubnetworkURL returns the subnetwork url
+func (gce *GCECloud) SubnetworkURL() string {
+	return gce.subnetworkURL
+}
+
 // Known-useless DNS search path.
 var uselessDNSSearchRE = regexp.MustCompile(`^[0-9]+.google.internal.$`)
 
@@ -334,6 +369,20 @@ func gceNetworkURL(project, network string) string {
 
 func gceSubnetworkURL(project, region, subnetwork string) string {
 	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/subnetworks/%s", project, region, subnetwork)
+}
+
+// getProjectIDInURL parses typical full resource URLS and shorter URLS
+// https://www.googleapis.com/compute/v1/projects/myproject/global/networks/mycustom
+// projects/myproject/global/networks/mycustom
+// All return "myproject"
+func getProjectIDInURL(urlStr string) (string, error) {
+	fields := strings.Split(urlStr, "/")
+	for i, v := range fields {
+		if v == "projects" && i < len(fields)-1 {
+			return fields[i+1], nil
+		}
+	}
+	return "", fmt.Errorf("could not find project field in url: %v", urlStr)
 }
 
 func getNetworkNameViaMetadata() (string, error) {

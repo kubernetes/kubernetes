@@ -478,7 +478,7 @@ func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 
 func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
-	beList, err := gceCloud.ListBackendServices()
+	beList, err := gceCloud.ListGlobalBackendServices()
 	if err != nil {
 		if cont.isHTTPErrorCode(err, http.StatusNotFound) {
 			return msg
@@ -495,7 +495,7 @@ func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 		}
 		if del {
 			Logf("Deleting backed-service: %s", be.Name)
-			if err := gceCloud.DeleteBackendService(be.Name); err != nil &&
+			if err := gceCloud.DeleteGlobalBackendService(be.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete backend service %v: %v\n", be.Name, err)
 			}
