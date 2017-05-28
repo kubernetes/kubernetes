@@ -1,0 +1,14 @@
+Dockerbuild/*
+Dockerbuildclient/*
+nptests
+netperf-w?.yaml
+*.csv
+*.jpg
+*.png
+*.svg
+*.cap
+*~
+*.pyc
+.vscode
+data-*
+
