@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	apiextensionsv1alpha1 "k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
@@ -309,6 +310,7 @@ func TestSelfLink(t *testing.T) {
 	}
 	defer close(stopCh)
 
+	// namespace scoped
 	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
 	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
 	if err != nil {
@@ -318,7 +320,7 @@ func TestSelfLink(t *testing.T) {
 	ns := "not-the-default"
 	noxuNamespacedResourceClient := noxuVersionClient.Resource(&metav1.APIResource{
 		Name:       noxuDefinition.Spec.Names.Plural,
-		Namespaced: true,
+		Namespaced: noxuDefinition.Spec.Scope == apiextensionsv1alpha1.NamespaceScoped,
 	}, ns)
 
 	noxuInstanceToCreate := testserver.NewNoxuInstance(ns, "foo")
@@ -331,8 +333,27 @@ func TestSelfLink(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	// TODO add test for cluster scoped self-link when its available
+	// cluster scoped
+	curletDefinition := testserver.NewCurletCustomResourceDefinition(apiextensionsv1alpha1.ClusterScoped)
+	curletVersionClient, err := testserver.CreateNewCustomResourceDefinition(curletDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
 
+	curletResourceClient := curletVersionClient.Resource(&metav1.APIResource{
+		Name:       curletDefinition.Spec.Names.Plural,
+		Namespaced: curletDefinition.Spec.Scope == apiextensionsv1alpha1.NamespaceScoped,
+	}, ns)
+
+	curletInstanceToCreate := testserver.NewCurletInstance(ns, "foo")
+	createdCurletInstance, err := curletResourceClient.Create(curletInstanceToCreate)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if e, a := "/apis/mygroup.example.com/v1alpha1/foo", createdCurletInstance.GetSelfLink(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 }
 
 func TestPreserveInt(t *testing.T) {
@@ -513,5 +534,66 @@ func checkNamespacesWatchHelper(t *testing.T, ns string, namespacedwatch watch.I
 			}
 		}
 		namespacedAddEvent++
+	}
+}
+
+func TestNameConflict(t *testing.T) {
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
+	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxu2Definition := testserver.NewNoxu2CustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
+	_, err = apiExtensionClient.Apiextensions().CustomResourceDefinitions().Create(noxu2Definition)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A NameConflict occurs
+	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		crd, err := testserver.GetCustomResourceDefinition(noxu2Definition, apiExtensionClient)
+		if err != nil {
+			return false, err
+		}
+
+		for _, condition := range crd.Status.Conditions {
+			if condition.Type == apiextensionsv1alpha1.NamesAccepted && condition.Status == apiextensionsv1alpha1.ConditionFalse {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = testserver.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Names are now accepted
+	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		crd, err := testserver.GetCustomResourceDefinition(noxu2Definition, apiExtensionClient)
+		if err != nil {
+			return false, err
+		}
+
+		for _, condition := range crd.Status.Conditions {
+			if condition.Type == apiextensionsv1alpha1.NamesAccepted && condition.Status == apiextensionsv1alpha1.ConditionTrue {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
