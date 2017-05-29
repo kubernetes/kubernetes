@@ -333,15 +333,12 @@ func TestAudit(t *testing.T) {
 		req, _ := http.NewRequest("GET", test.path, nil)
 		req.RemoteAddr = "127.0.0.1"
 
-		done := make(chan struct{})
-		go func() {
+		func() {
 			defer func() {
 				recover()
-				close(done)
 			}()
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 		}()
-		<-done
 
 		t.Logf("[%s] audit log: %v", test.desc, buf.String())
 
@@ -393,4 +390,24 @@ func TestAuditNoPanicOnNilUser(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	handler.ServeHTTP(httptest.NewRecorder(), req)
+}
+
+func TestAuditLevelNone(t *testing.T) {
+	sink := &fakeAuditSink{}
+	var handler http.Handler
+	handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(200)
+	})
+	policyChecker := policy.FakeChecker(auditinternal.LevelNone)
+	handler = WithAudit(handler, &fakeRequestContextMapper{
+		user: &user.DefaultInfo{Name: "admin"},
+	}, sink, policyChecker, nil)
+
+	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req.RemoteAddr = "127.0.0.1"
+
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	if len(sink.events) > 0 {
+		t.Errorf("Generated events, but should not have: %#v", sink.events)
+	}
 }
