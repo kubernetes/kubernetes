@@ -41,9 +41,10 @@ func ApiCallToPerfData(apicalls *APIResponsiveness) *perftype.PerfData {
 			},
 			Unit: "ms",
 			Labels: map[string]string{
-				"Verb":     apicall.Verb,
-				"Resource": apicall.Resource,
-				"Count":    fmt.Sprintf("%v", apicall.Count),
+				"Verb":        apicall.Verb,
+				"Resource":    apicall.Resource,
+				"Subresource": apicall.Subresource,
+				"Count":       fmt.Sprintf("%v", apicall.Count),
 			},
 		}
 		perfData.DataItems = append(perfData.DataItems, item)
