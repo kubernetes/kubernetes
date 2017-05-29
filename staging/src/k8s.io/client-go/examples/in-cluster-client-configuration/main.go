@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -43,6 +44,17 @@ func main() {
 			panic(err.Error())
 		}
 		fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
+
+		// Example for handling status errors
+		_, err = clientset.CoreV1().Pods("").Get("ExamplePodName", metav1.GetOptions{})
+		if statusError, isStatus := err.(*errors.StatusError); isStatus && statusError.Status().Reason == metav1.StatusReasonNotFound {
+			fmt.Printf("Pod not found\n")
+		} else if err != nil {
+			panic(err.Error())
+		} else {
+			fmt.Printf("Found pod\n")
+		}
+
 		time.Sleep(10 * time.Second)
 	}
 }
