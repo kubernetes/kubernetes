@@ -65,14 +65,39 @@ func (s *SelectionPredicate) MatchesLabelsAndFields(l labels.Set, f fields.Set) 
 	return matched
 }
 
+const matchesSingleField = "metadata.name"
+
+func removeMatchesSingleField(field, value string) (string, string, error) {
+	if field == matchesSingleField {
+		return "", "", nil
+	}
+	return field, value, nil
+}
+
 // MatchesSingle will return (name, true) if and only if s.Field matches on the object's
 // name.
 func (s *SelectionPredicate) MatchesSingle() (string, bool) {
-	// TODO: should be namespace.name
-	if name, ok := s.Field.RequiresExactMatch("metadata.name"); ok {
+	if name, ok := s.Field.RequiresExactMatch(matchesSingleField); ok {
 		return name, true
 	}
 	return "", false
+}
+
+func (s *SelectionPredicate) RemoveMatchesSingleRequirements() (SelectionPredicate, error) {
+	var fieldsSelector fields.Selector
+	if s.Field != nil {
+		var err error
+		fieldsSelector, err = s.Field.Transform(removeMatchesSingleField)
+		if err != nil {
+			return SelectionPredicate{}, err
+		}
+	}
+	return SelectionPredicate{
+		Label:       s.Label,
+		Field:       fieldsSelector,
+		GetAttrs:    s.GetAttrs,
+		IndexFields: s.IndexFields,
+	}, nil
 }
 
 // For any index defined by IndexFields, if a matcher can match only (a subset)
