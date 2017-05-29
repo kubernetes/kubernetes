@@ -22,10 +22,9 @@ import "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/i
 var _ interfaces.ManagedZone = ManagedZone{}
 
 type ManagedZone struct {
-	Service *ManagedZonesService
-	Name_   string
-	Id_     uint64
-	Rrsets  []ResourceRecordSet
+	Name_  string
+	Id_    uint64
+	Rrsets []ResourceRecordSet
 }
 
 func (m ManagedZone) Name() string {

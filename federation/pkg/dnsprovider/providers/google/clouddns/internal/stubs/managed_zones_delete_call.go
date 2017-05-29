@@ -34,6 +34,8 @@ type ManagedZonesDeleteCall struct {
 }
 
 func (call ManagedZonesDeleteCall) Do(opts ...googleapi.CallOption) error {
+	call.Service.Service.Lock()
+	defer call.Service.Service.Unlock()
 	if call.Error != nil { // Return the override value
 		return *call.Error
 	} else { // Just try to delete it from the in-memory array.
