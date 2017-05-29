@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
@@ -217,6 +218,7 @@ func (cc *NodeConfigController) StartSyncLoop(client clientset.Interface) {
 		cc.client = client
 		infof("starting sync loop")
 		go func() {
+			defer utilruntime.HandleCrash()
 			fieldselector := fmt.Sprintf("metadata.name=%s", cc.nodeName)
 
 			// Add some randomness to resync period, which can help avoid controllers falling into lock-step
