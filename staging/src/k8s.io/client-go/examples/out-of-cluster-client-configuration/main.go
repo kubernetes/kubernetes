@@ -59,10 +59,14 @@ func main() {
 		}
 		fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
 
-		// Example for handling status errors
+		// Examples for error handling:
+		// - Use helper functions like e.g. errors.IsNotFound()
+		// - And/or cast to StatusError and use its properties like e.g. ErrStatus.Message
 		_, err = clientset.CoreV1().Pods("").Get("ExamplePodName", metav1.GetOptions{})
-		if statusError, isStatus := err.(*errors.StatusError); isStatus && statusError.Status().Reason == metav1.StatusReasonNotFound {
+		if errors.IsNotFound(err) {
 			fmt.Printf("Pod not found\n")
+		} else if statusError, isStatus := err.(*errors.StatusError); isStatus {
+			fmt.Printf("Error getting pod %v\n", statusError.ErrStatus.Message)
 		} else if err != nil {
 			panic(err.Error())
 		} else {
