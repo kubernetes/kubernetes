@@ -88,8 +88,12 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 			return
 		}
 
-		ev.Stage = auditinternal.StageRequestReceived
-		sink.ProcessEvents(ev)
+		// send first event for non-read-only requests
+		ri, _ := request.RequestInfoFrom(ctx)
+		if !(ri != nil && ri.ReadOnly) {
+			ev.Stage = auditinternal.StageRequestReceived
+			sink.ProcessEvents(ev)
+		}
 
 		// intercept the status code
 		var longRunningSink audit.Sink
