@@ -189,6 +189,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 				framework.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
 				createService := func(i int) {
+					defer GinkgoRecover()
 					_, err := clientset.Core().Services(services[i].Namespace).Create(services[i])
 					framework.ExpectNoError(err)
 				}
@@ -197,6 +198,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 				defer func(services []*v1.Service) {
 					framework.Logf("Starting to delete services...")
 					deleteService := func(i int) {
+						defer GinkgoRecover()
 						err := clientset.Core().Services(services[i].Namespace).Delete(services[i].Name, nil)
 						framework.ExpectNoError(err)
 					}
