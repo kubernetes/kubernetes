@@ -101,6 +101,41 @@ func TestEmptyList(t *testing.T) {
 	}
 }
 
+func TestStatus(t *testing.T) {
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
+
+	u := s.URL + "/apis/batch/v1/namespaces/default/jobs/foo"
+	resp, err := http.Get(u)
+	if err != nil {
+		t.Fatalf("unexpected error getting %s: %v", u, err)
+	}
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("got status %v instead of 404", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+	data, _ := ioutil.ReadAll(resp.Body)
+	decodedData := map[string]interface{}{}
+	if err := json.Unmarshal(data, &decodedData); err != nil {
+		t.Logf("body: %s", string(data))
+		t.Fatalf("got error decoding data: %v", err)
+	}
+	t.Logf("body: %s", string(data))
+
+	if got, expected := decodedData["apiVersion"], "v1"; got != expected {
+		t.Errorf("unexpected apiVersion %q, expected %q", got, expected)
+	}
+	if got, expected := decodedData["kind"], "Status"; got != expected {
+		t.Errorf("unexpected kind %q, expected %q", got, expected)
+	}
+	if got, expected := decodedData["status"], "Failure"; got != expected {
+		t.Errorf("unexpected status %q, expected %q", got, expected)
+	}
+	if got, expected := decodedData["code"], float64(404); got != expected {
+		t.Errorf("unexpected code %v, expected %v", got, expected)
+	}
+}
+
 func TestWatchSucceedsWithoutArgs(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(nil)
 	defer closeFn()
